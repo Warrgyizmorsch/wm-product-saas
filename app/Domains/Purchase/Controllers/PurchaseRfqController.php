@@ -134,7 +134,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => $costRate,
+                        'estimated_cost'       => round(convert_from_base($costRate), 2),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -177,7 +177,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => $costRate,
+                        'estimated_cost'       => round(convert_from_base($costRate), 2),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -329,7 +329,7 @@ class PurchaseRfqController extends Controller
                                 'tenant_id'  => $rfq->tenant_id,
                                 'company_id' => $rfq->company_id,
                                 'branch_id'  => $rfq->branch_id,
-                                'rate'       => $rData['rate'],
+                                'rate'       => convert_to_base((float) $rData['rate']),
                             ]
                         );
                     }
@@ -539,7 +539,7 @@ class PurchaseRfqController extends Controller
                                     'tenant_id'     => $rfq->tenant_id,
                                     'company_id'    => $rfq->company_id,
                                     'branch_id'     => $rfq->branch_id,
-                                    'rate'          => (float) $qItem['rate'],
+                                    'rate'          => convert_to_base((float) $qItem['rate']),
                                     'quantity'      => isset($qItem['quantity']) && $qItem['quantity'] !== '' ? (float) $qItem['quantity'] : null,
                                     'delivery_date' => !empty($qItem['delivery_date']) ? $qItem['delivery_date'] : null,
                                     'validity_date' => !empty($qItem['validity_date']) ? $qItem['validity_date'] : null,
@@ -582,7 +582,7 @@ class PurchaseRfqController extends Controller
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
                 'quantity' => (float)$item->quantity,
-                'estimated_cost' => (float)$item->estimated_cost,
+                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 2),
             ];
         }
 
@@ -732,7 +732,7 @@ class PurchaseRfqController extends Controller
                         'company_id'    => $rfqVendor->company_id ?? $rfq?->company_id,
                         'branch_id'     => $rfqVendor->branch_id ?? $rfq?->branch_id,
                         'quantity'      => $itemData['quantity'] ?? null,
-                        'rate'          => $itemData['rate'],
+                        'rate'          => convert_to_base((float) $itemData['rate']),
                         'delivery_date' => $itemData['delivery_date'] ?? null,
                         'validity_date' => $itemData['validity_date'] ?? null,
                     ]

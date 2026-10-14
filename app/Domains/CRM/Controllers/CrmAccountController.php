@@ -141,7 +141,7 @@ class CrmAccountController extends Controller
             'phone'         => $validated['phone'] ?? null,
             'website'       => $validated['website'] ?? null,
             'industry_type' => $validated['industry_type'] ?? null,
-            'credit_limit'  => $validated['credit_limit'] ?? 0.00,
+            'credit_limit'  => !empty($validated['credit_limit']) ? convert_to_base((float)$validated['credit_limit']) : 0.00,
             'street'        => $validated['street'] ?? null,
             'city'          => $validated['city'] ?? null,
             'state'         => $validated['state'] ?? null,
@@ -298,6 +298,10 @@ class CrmAccountController extends Controller
             'zip_code'      => 'nullable|string|max:20',
             'status'        => 'required|string|in:active,inactive',
         ]);
+
+        if (isset($validated['credit_limit'])) {
+            $validated['credit_limit'] = !empty($validated['credit_limit']) ? convert_to_base((float) $validated['credit_limit']) : 0.00;
+        }
 
         $account->update($validated);
 

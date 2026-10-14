@@ -99,7 +99,7 @@
                         <div class="alert alert-info border-info p-3 mb-4 rounded shadow-sm d-flex align-items-center justify-content-between flex-wrap gap-2">
                             <div>
                                 <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>Vendor Advance Credit Available:</strong>
-                                <span class="text-success fw-bold font-monospace fs-14 ms-1">₹{{ number_format($advanceAmount, 2) }}</span>
+                                <span class="text-success fw-bold font-monospace fs-14 ms-1">{{ format_currency($advanceAmount) }}</span>
                                 <small class="text-muted d-block fs-11 mt-0.5">This advance credit will be available to apply against the bill immediately after posting.</small>
                             </div>
                             <span class="badge bg-primary text-white px-3 py-2 fs-12 font-monospace">Credit Available</span>
@@ -172,7 +172,7 @@
                             <div id="freightFieldsContainer">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-5" id="freightAmountCol">
-                                        <x-ui.odoo-form-ui type="input" :label="__('purchase.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format($po?->freight_amount ?? 0, 2, '.', ''))" />
+                                        <x-ui.odoo-form-ui type="input" :label="__('purchase.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="freightAmountInput" inputType="number" step="0.01" min="0" :value="old('freight_amount', number_format(convert_from_base($po?->freight_amount ?? 0), 2, '.', ''))" />
                                     </div>
                                     <div class="col-7" id="freightAllocationMethodCol">
                                         <x-ui.odoo-form-ui type="select" label="Allocation Rule" name="freight_allocation_method" id="freightAllocationMethodSelect">
@@ -243,7 +243,7 @@
 
                                             $qty = (float) $item->accepted_qty;
                                             $poRate = (float) ($poItem?->rate ?? 0);
-                                            $rate = $poRate > 0 ? $poRate : (float) $item->unit_rate;
+                                            $rate = $poRate > 0 ? convert_from_base($poRate) : convert_from_base((float) $item->unit_rate);
                                             $lineSub = $qty * $rate;
                                         @endphp
                                         <tr class="bill-line-row">

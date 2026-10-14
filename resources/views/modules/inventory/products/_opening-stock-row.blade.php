@@ -37,7 +37,7 @@
             <option value="">— {{ __('inventory.select_variant') }} —</option>
             @foreach($variants as $v)
                 <option value="{{ $v->id }}"
-                        data-cost="{{ $v->cost_price }}"
+                        data-cost="{{ round(convert_from_base((float)$v->cost_price), 2) }}"
                         {{ (string)$v->id === (string)$selectedVariantId ? 'selected' : '' }}>
                     {{ $v->variant_values['label'] ?? $v->name }}
                 </option>
@@ -107,7 +107,7 @@
                name="{{ $nameBase }}[unit_cost]"
                class="odoo-table-input cost-input"
                data-row="{{ $rowIdx }}"
-               value="{{ $cost ?? $product->cost_price }}"
+               value="{{ $cost ?? ($product->cost_price ? round(convert_from_base((float)$product->cost_price), 2) : '') }}"
                placeholder="0.00"
                min="0" step="any"
                style="max-width:130px;">

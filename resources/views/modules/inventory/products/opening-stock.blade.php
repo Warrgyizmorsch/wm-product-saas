@@ -94,10 +94,10 @@
                             @endif
                         </th>
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:160px;">
-                            {{ __('inventory.rate_per_unit') }}
+                            {{ __('inventory.rate_per_unit') }} ({{ active_currency_symbol() }})
                         </th>
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:140px;">
-                            {{ __('inventory.amount') }}
+                            {{ __('inventory.amount') }} ({{ active_currency_symbol() }})
                         </th>
                         <th class="py-3" style="width:48px;"></th>
                     </tr>
@@ -124,7 +124,7 @@
                                     'warehouses'   => $warehouses,
                                     'selectedWhId' => $whId,
                                     'qty'          => $ws['quantity'] ?? 0,
-                                    'cost'         => $ws['unit_cost'] ?? $variant->cost_price,
+                                    'cost'         => ($ws['unit_cost'] ?? null) !== null ? round(convert_from_base((float)$ws['unit_cost']), 2) : ($variant->cost_price ? round(convert_from_base((float)$variant->cost_price), 2) : 0),
                                     'product'      => $product,
                                 ])
                                 @php $rowIdx++; @endphp
@@ -143,7 +143,7 @@
                                 'warehouses'   => $warehouses,
                                 'selectedWhId' => $warehouse->id,
                                 'qty'          => $stockMap[$warehouse->id]['quantity']  ?? 0,
-                                'cost'         => $stockMap[$warehouse->id]['unit_cost'] ?? $product->cost_price,
+                                'cost'         => isset($stockMap[$warehouse->id]['unit_cost']) ? round(convert_from_base((float)$stockMap[$warehouse->id]['unit_cost']), 2) : ($product->cost_price ? round(convert_from_base((float)$product->cost_price), 2) : 0),
                                 'product'      => $product,
                             ])
                             @php $rowIdx++; @endphp
@@ -216,7 +216,7 @@
             <select name="__variant_name__" class="odoo-table-select variant-selector" data-row="__IDX__" style="min-width:190px;">
                 <option value="">— {{ __('inventory.select_variant') }} —</option>
                 @foreach($product->variants as $v)
-                    <option value="{{ $v->id }}" data-cost="{{ $v->cost_price }}">
+                    <option value="{{ $v->id }}" data-cost="{{ round(convert_from_base((float)($v->cost_price ?? 0)), 2) }}">
                         {{ $v->variant_values['label'] ?? $v->name }}
                     </option>
                 @endforeach
@@ -273,7 +273,7 @@
     'use strict';
 
     const isVariant = {{ $product->variation_type === 'Variant' ? 'true' : 'false' }};
-    const defaultCost = {{ $product->cost_price ?? 0 }};
+    const defaultCost = {{ round(convert_from_base((float)($product->cost_price ?? 0)), 2) }};
     let rowCounter = {{ $rowIdx ?? $warehouses->count() }};
 
     /* ── Formatting ─────────────────────────────────────────────────────── */

@@ -120,7 +120,7 @@ class QuotationController extends Controller
                 $prefilledItems[] = [
                     'product_id' => $productObj->id,
                     'quantity'   => floatval($it['quantity'] ?? 1),
-                    'price'      => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                    'price'      => floatval(convert_from_base($productObj->selling_price ?: $productObj->unit_cost ?: 0)),
                     'tax_rate'   => floatval($productObj->gst_rate ?: 18),
                 ];
             }

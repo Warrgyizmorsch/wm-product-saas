@@ -122,7 +122,7 @@
                                                 <x-ui.odoo-form-ui type="select" name="items[{{ $index }}][product_id]" required="true" class="product-select select2-simple">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($item->product_id == $p->id)>{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                                        <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}" @selected($item->product_id == $p->id)>{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                             </td>
@@ -138,7 +138,7 @@
                                                 <x-ui.odoo-form-ui type="input" name="items[{{ $index }}][quantity]" inputType="number" class="text-end qty-input" step="0.0001" min="0.0001" required="true" :value="(float)$item->quantity" placeholder="0.00" />
                                             </td>
                                             <td>
-                                                <x-ui.odoo-form-ui type="input" name="items[{{ $index }}][estimated_cost]" inputType="number" class="text-end cost-input" step="0.01" min="0" required="true" :value="$item->estimated_cost" placeholder="0.00" />
+                                                <x-ui.odoo-form-ui type="input" name="items[{{ $index }}][estimated_cost]" inputType="number" class="text-end cost-input" step="0.01" min="0" required="true" :value="convert_from_base($item->estimated_cost)" placeholder="0.00" />
                                             </td>
                                             <td class="text-center">
                                                 <button type="button" class="btn btn-sm btn-link text-danger remove-row-btn p-1 border-0"><i class="feather-trash-2 fs-14"></i></button>
@@ -216,7 +216,7 @@
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select product-select select2-simple" required>
                                 <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
-                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                    <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                 @endforeach
                             </select>
                         </td>

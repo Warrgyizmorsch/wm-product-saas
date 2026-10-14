@@ -125,7 +125,7 @@
                                                 <select name="items[{{ $index }}][product_id]" required class="odoo-table-select product-select select2-simple">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}" @selected($item['product_id'] == $p->id)>{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                                        <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}" data-vendor="{{ $p->preferred_vendor_id }}" @selected($item['product_id'] == $p->id)>{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </select>
                                             </td>
@@ -160,7 +160,7 @@
                                                 <select name="items[0][product_id]" required class="odoo-table-select product-select select2-simple">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}">{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                                        <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}" data-vendor="{{ $p->preferred_vendor_id }}">{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </select>
                                             </td>
@@ -221,7 +221,7 @@
                 <select name="items[__INDEX__][product_id]" class="odoo-table-select product-select select2-simple" required>
                     <option value="">{{ __('purchase.select_product') }}</option>
                     @foreach($products as $p)
-                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}">{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                        <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base((float)($p->unit_cost ?? 0.00)), 2) }}" data-vendor="{{ $p->preferred_vendor_id }}">{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                     @endforeach
                 </select>
             </td>

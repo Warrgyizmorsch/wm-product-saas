@@ -54,7 +54,7 @@ class PurchaseRfqService
                     'purchase_rfq_id' => $rfq->id,
                     'product_id' => $itemData['product_id'],
                     'quantity' => $itemData['quantity'],
-                    'estimated_cost' => $itemData['estimated_cost'] ?? 0.00,
+                    'estimated_cost' => !empty($itemData['estimated_cost']) ? convert_to_base((float)$itemData['estimated_cost']) : 0.00,
                 ]);
 
                 if (isset($itemData['vendor_ids']) && is_array($itemData['vendor_ids'])) {
@@ -102,7 +102,7 @@ class PurchaseRfqService
                     'purchase_rfq_id' => $rfq->id,
                     'product_id' => $itemData['product_id'],
                     'quantity' => $itemData['quantity'],
-                    'estimated_cost' => $itemData['estimated_cost'] ?? 0.00,
+                    'estimated_cost' => !empty($itemData['estimated_cost']) ? convert_to_base((float)$itemData['estimated_cost']) : 0.00,
                 ]);
 
                 if (isset($itemData['vendor_ids']) && is_array($itemData['vendor_ids'])) {
@@ -183,38 +183,39 @@ class PurchaseRfqService
                 'discount_type' => $validated['discount_type'],
                 'tax_type' => $validated['tax_type'],
                 'gst_type' => $validated['gst_type'],
-                'subtotal' => $validated['subtotal'],
-                'discount_amount' => $validated['discount_amount'],
-                'cgst_amount' => $validated['cgst_amount'],
-                'sgst_amount' => $validated['sgst_amount'],
-                'igst_amount' => $validated['igst_amount'],
-                'tax_amount' => $validated['tax_amount'],
-                'grand_total' => $validated['grand_total'],
+                'subtotal' => convert_to_base((float)$validated['subtotal']),
+                'discount_amount' => convert_to_base((float)$validated['discount_amount']),
+                'cgst_amount' => convert_to_base((float)$validated['cgst_amount']),
+                'sgst_amount' => convert_to_base((float)$validated['sgst_amount']),
+                'igst_amount' => convert_to_base((float)$validated['igst_amount']),
+                'tax_amount' => convert_to_base((float)$validated['tax_amount']),
+                'grand_total' => convert_to_base((float)$validated['grand_total']),
                 'status' => 'Draft',
                 'notes' => $validated['notes'] ?? null,
                 'created_by' => auth()->id() ?: 1,
             ]);
 
             foreach ($validated['items'] as $item) {
-                $amount = $item['quantity'] * $item['rate'];
+                $baseRate = convert_to_base((float)$item['rate']);
+                $amount = $item['quantity'] * $baseRate;
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $warehouseId,
                     'quantity' => $item['quantity'],
-                    'rate' => $item['rate'],
+                    'rate' => $baseRate,
                     'amount' => $amount,
                     'discount_percent' => $item['discount_percent'] ?? 0.00,
-                    'discount_amount' => $item['discount_amount'] ?? 0.00,
+                    'discount_amount' => convert_to_base((float)($item['discount_amount'] ?? 0.00)),
                     'tax_percent' => $item['tax_percent'] ?? 0.00,
                     'cgst_percent' => $item['cgst_percent'] ?? 0.00,
                     'sgst_percent' => $item['sgst_percent'] ?? 0.00,
                     'igst_percent' => $item['igst_percent'] ?? 0.00,
-                    'cgst_amount' => $item['cgst_amount'] ?? 0.00,
-                    'sgst_amount' => $item['sgst_amount'] ?? 0.00,
-                    'igst_amount' => $item['igst_amount'] ?? 0.00,
-                    'tax_amount' => $item['tax_amount'] ?? 0.00,
-                    'total_amount' => $item['total_amount'] ?? $amount,
+                    'cgst_amount' => convert_to_base((float)($item['cgst_amount'] ?? 0.00)),
+                    'sgst_amount' => convert_to_base((float)($item['sgst_amount'] ?? 0.00)),
+                    'igst_amount' => convert_to_base((float)($item['igst_amount'] ?? 0.00)),
+                    'tax_amount' => convert_to_base((float)($item['tax_amount'] ?? 0.00)),
+                    'total_amount' => convert_to_base((float)($item['total_amount'] ?? $amount)),
                 ]);
             }
 

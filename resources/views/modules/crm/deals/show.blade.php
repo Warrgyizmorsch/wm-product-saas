@@ -2476,7 +2476,7 @@
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                                                     <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
-                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount ? round(convert_from_base((float)$activeQuotation->discount), 2) : 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
@@ -2869,6 +2869,9 @@
                 @csrf
                 <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
 
+                {{-- Google Calendar & Meet Integration Banner --}}
+                @include('modules.crm.partials.google-calendar-banner')
+
                 <!-- 2-Mode Switcher Tabs -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
                     <button type="button" class="btn btn-sm flex-fill fw-bold text-center border-0 deal-offcanvas-mode-btn active btn-primary text-white shadow-sm" data-mode="log_note" style="font-size: 12px; padding: 8px 6px; background-color: var(--bs-primary); border-radius: 6px; transition: all 0.2s ease;">
@@ -3159,7 +3162,19 @@
                 }
             } catch(e){}
 
-            const crmProductsList = @json($products ?? []);
+            @php
+                $crmProductsFormatted = ($products ?? collect())->map(function($p) {
+                    return [
+                        'id' => $p->id,
+                        'name' => $p->name,
+                        'sku' => $p->sku,
+                        'selling_price' => round(convert_from_base((float)($p->selling_price ?: ($p->unit_cost ?: 0))), 2),
+                        'unit_cost' => round(convert_from_base((float)($p->unit_cost ?: 0)), 2),
+                        'gst_rate' => $p->gst_rate,
+                    ];
+                });
+            @endphp
+            const crmProductsList = @json($crmProductsFormatted);
             let rowIndex = 0;
 
             function buildProductOptions(selectedId = '') {
@@ -3310,7 +3325,28 @@
             const hasCreateQ = @json(request()->has('create_quotation') || old('form_type') === 'quotation_create');
             const hasEditQ = @json(request()->has('edit_quotation') || old('form_type') === 'quotation_edit');
             const prefilledDealItems = @json($prefilledDealItems ?? []);
-            const existingItems = @json(old('items') ?: (request()->has('create_quotation') && !empty($prefilledDealItems) ? $prefilledDealItems : (isset($activeQuotation) ? $activeQuotation->items : [])));
+            @php
+                $mappedExistingItems = null;
+                if (old('items')) {
+                    $mappedExistingItems = old('items');
+                } elseif (request()->has('create_quotation') && !empty($prefilledDealItems)) {
+                    $mappedExistingItems = $prefilledDealItems;
+                } elseif (isset($activeQuotation)) {
+                    $mappedExistingItems = $activeQuotation->items->map(function($it) {
+                        return [
+                            'id' => $it->id,
+                            'product_id' => $it->product_id,
+                            'item_name' => $it->item_name,
+                            'description' => $it->description,
+                            'quantity' => (float)$it->quantity,
+                            'unit_price' => round(convert_from_base((float)$it->unit_price), 2),
+                            'tax_rate' => (float)$it->tax_rate,
+                            'amount' => round(convert_from_base((float)$it->amount), 2),
+                        ];
+                    });
+                }
+            @endphp
+            const existingItems = @json($mappedExistingItems ?? []);
 
             if (hasCreateQ || hasEditQ) {
                 if (existingItems && existingItems.length > 0) {

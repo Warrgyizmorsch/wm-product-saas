@@ -57,7 +57,8 @@ class VendorBillService
             // Freight Terms Logic: "to_pay" means Freight is paid to 3rd party Transporter via Landed Cost Voucher.
             // Therefore, Freight Amount MUST NOT be billed on Material Vendor Bill!
             $isFreightBilledOnInvoice = in_array($freightTerms, ['to_be_billed', 'prepaid']);
-            $freightAmount = $isFreightBilledOnInvoice ? (float)($validated['freight_amount'] ?? $po?->freight_amount ?? 0) : 0.0;
+            $rawFreight = $validated['freight_amount'] ?? null;
+            $freightAmount = $isFreightBilledOnInvoice ? ($rawFreight !== null ? convert_to_base((float)$rawFreight) : (float)($po?->freight_amount ?? 0)) : 0.0;
             $freightTaxPercent = $isFreightBilledOnInvoice ? (float)($validated['freight_tax_percent'] ?? 18.0) : 0.0;
             $orderTaxPercent = (float)($validated['order_tax_percent'] ?? $validated['tax_rate'] ?? 0);
 
@@ -69,7 +70,7 @@ class VendorBillService
 
             foreach ($validated['items'] as $item) {
                 $qty = (float)$item['quantity'];
-                $price = (float)($item['unit_price'] ?? $item['unit_rate'] ?? 0);
+                $price = convert_to_base((float)($item['unit_price'] ?? $item['unit_rate'] ?? 0));
                 $discPct = (float)($item['discount_percent'] ?? 0);
                 $taxRate = (float)($item['tax_rate'] ?? $item['tax_percentage'] ?? 0);
 
@@ -97,7 +98,7 @@ class VendorBillService
             }
 
             if ($discountType === 'order_wise') {
-                $discountAmount = (float)($validated['discount_amount'] ?? 0);
+                $discountAmount = convert_to_base((float)($validated['discount_amount'] ?? 0));
             } elseif ($discountType === 'item_wise') {
                 $discountAmount = $sumItemDiscounts;
             } else {
@@ -167,7 +168,7 @@ class VendorBillService
                 }
             }
 
-            $adjustment = (float) ($validated['adjustment'] ?? 0);
+            $adjustment = convert_to_base((float) ($validated['adjustment'] ?? 0));
             $grandTotal = max(0, $grossBeforeTax + $freightAmount + $taxAmount + $adjustment);
 
             // Calculate Landed Cost Revaluation Data and update Stock Valuation

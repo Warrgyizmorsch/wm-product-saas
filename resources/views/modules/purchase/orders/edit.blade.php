@@ -186,7 +186,7 @@
                                                 <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($p->id == $item->product_id)>
+                                                        <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" @selected($p->id == $item->product_id)>
                                                             {{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})
                                                         </option>
                                                     @endforeach
@@ -196,17 +196,17 @@
                                                 <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" required="true" :value="(float)$item->quantity" />
                                             </td>
                                             <td>
-                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][rate]" class="text-end rate-input" step="0.01" min="0" required="true" :value="(float)$item->rate" />
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][rate]" class="text-end rate-input" step="0.01" min="0" required="true" :value="convert_from_base((float)$item->rate)" />
                                             </td>
                                             <td>
-                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][amount]" class="text-end amount-input" step="0.01" min="0" readonly="true" :value="(float)$item->amount" />
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][amount]" class="text-end amount-input" step="0.01" min="0" readonly="true" :value="convert_from_base((float)$item->amount)" />
                                             </td>
                                             <!-- Discount -->
                                             <td class="discount-column">
                                                 <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][discount_percent]" class="text-end disc-percent-input" step="0.01" min="0" max="100" :value="(float)$item->discount_percent" />
                                             </td>
                                             <td class="discount-column">
-                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][discount_amount]" class="text-end disc-amount-input" step="0.01" readonly="true" :value="(float)$item->discount_amount" />
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][discount_amount]" class="text-end disc-amount-input" step="0.01" readonly="true" :value="convert_from_base((float)$item->discount_amount)" />
                                             </td>
                                             <!-- Tax rates (Percent and Amount columns) -->
                                             <td class="tax-column">
@@ -221,10 +221,10 @@
                                                 <input type="hidden" name="items[{{ $idx }}][igst_amount]" class="igst-amount-input" value="{{ (float)$item->igst_amount }}">
                                             </td>
                                             <td class="tax-column">
-                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][tax_amount]" class="text-end tax-amount-input" step="0.01" readonly="true" :value="(float)$item->tax_amount" />
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][tax_amount]" class="text-end tax-amount-input" step="0.01" readonly="true" :value="convert_from_base((float)$item->tax_amount)" />
                                             </td>
                                             <td>
-                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][total_amount]" class="text-end total-amount-input" step="0.01" readonly="true" :value="(float)$item->total_amount" />
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][total_amount]" class="text-end total-amount-input" step="0.01" readonly="true" :value="convert_from_base((float)$item->total_amount)" />
                                             </td>
                                             <td class="text-center">
                                                 <button type="button" class="btn btn-sm btn-link text-danger remove-row-btn p-1 border-0"><i class="feather-trash-2 fs-14"></i></button>
@@ -267,14 +267,14 @@
                                     <!-- Total Discount -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryDiscountRow">
                                         <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">{{ __('purchase.discount_amount') }}</span>
-                                        <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="{{ number_format($order->discount_amount, 2, '.', '') }}">
+                                        <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="{{ number_format(convert_from_base($order->discount_amount), 2, '.', '') }}">
                                     </div>
 
                                     <!-- Taxable Subtotal -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryTaxableSubtotalRow">
                                         <span class="text-muted fs-13 fw-semibold">{{ __('purchase.taxable_subtotal') }}</span>
-                                        <input type="text" id="summarySubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->subtotal - $order->discount_amount, 2, '.', '') }}">
-                                        <input type="text" id="summaryGrossText" class="d-none" readonly value="{{ number_format($order->subtotal - $order->discount_amount, 2, '.', '') }}">
+                                        <input type="text" id="summarySubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format(convert_from_base($order->subtotal - $order->discount_amount), 2, '.', '') }}">
+                                        <input type="text" id="summaryGrossText" class="d-none" readonly value="{{ number_format(convert_from_base($order->subtotal - $order->discount_amount), 2, '.', '') }}">
                                     </div>
 
                                     <!-- Tax Rate (Percent) -->
@@ -297,20 +297,20 @@
                                     <!-- Tax Amount -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryTaxRow">
                                         <span class="text-muted fs-13 fw-semibold">{{ __('purchase.tax_amount') }}</span>
-                                        <input type="text" id="summaryTaxText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->tax_amount, 2, '.', '') }}">
+                                        <input type="text" id="summaryTaxText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format(convert_from_base($order->tax_amount), 2, '.', '') }}">
                                         <input type="hidden" name="tax_amount" id="summaryTax" value="{{ (float)$order->tax_amount }}">
                                     </div>
 
                                     <!-- Freight Charges -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightRow">
                                         <span class="text-muted fs-13 fw-semibold">{{ __('purchase.freight_charges') }}</span>
-                                        <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format($order->freight_amount ?? 0, 2, '.', '') }}">
+                                        <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="{{ number_format(convert_from_base($order->freight_amount ?? 0), 2, '.', '') }}">
                                     </div>
 
                                     <!-- Grand Total -->
                                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                         <span class="fw-bold fs-13" style="color: #2563eb;">{{ __('purchase.grand_total') }}</span>
-                                        <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="{{ number_format($order->grand_total, 2, '.', '') }}">
+                                        <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="{{ number_format(convert_from_base($order->grand_total), 2, '.', '') }}">
                                         <input type="hidden" name="grand_total" id="summaryGrandtotal" value="{{ (float)$order->grand_total }}">
                                     </div>
                                 </div>
@@ -615,7 +615,7 @@
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                 <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
-                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                 @endforeach
                             </select>
                         </td>
@@ -709,7 +709,7 @@
                                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                                 <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
-                                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">${item.product_name}</option>
+                                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">${item.product_name}</option>
                                                 @endforeach
                                             </select>
                                         </td>

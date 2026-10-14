@@ -76,7 +76,7 @@ class PurchaseRequisitionService
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
-                    'estimated_cost' => $item['estimated_cost'],
+                    'estimated_cost' => convert_to_base((float)($item['estimated_cost'] ?? 0)),
                 ]);
             }
 
@@ -119,7 +119,7 @@ class PurchaseRequisitionService
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
-                    'estimated_cost' => $item['estimated_cost'],
+                    'estimated_cost' => convert_to_base((float)($item['estimated_cost'] ?? 0)),
                 ]);
             }
 

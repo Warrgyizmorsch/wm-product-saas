@@ -92,7 +92,7 @@
                     </x-ui.odoo-form-ui>
 
                     <div id="soFreightAmountContainer" class="{{ old('freight_terms', $order->freight_terms) === 'To Be Billed' ? '' : 'd-none' }}">
-                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', $order->freight_amount ?? 0)" min="0" step="0.01" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', convert_from_base($order->freight_amount ?? 0))" min="0" step="0.01" />
                     </div>
                 </div>
             </div>
@@ -164,7 +164,7 @@
                             <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryDiscountRow">
                                 <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">{{ __('crm.less_item_discounts') }}</span>
                                 <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-0.00">
-                                <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #fca5a5; border-radius: 4px; background-color: #fef2f2;" value="{{ old('discount', $order->discount ?: 0) }}" step="0.01">
+                                <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #fca5a5; border-radius: 4px; background-color: #fef2f2;" value="{{ old('discount', $order->discount ? round(convert_from_base($order->discount), 2) : 0) }}" step="0.01">
                             </div>
 
                             <!-- 3. Items Taxable Value -->
@@ -214,7 +214,7 @@
                             <!-- 9. Adjustment -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <span class="text-muted fs-13 fw-semibold">{{ __('crm.adjustment') }}</span>
-                                <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('adjustment', $order->adjustment) }}" step="0.01">
+                                <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('adjustment', $order->adjustment ? round(convert_from_base($order->adjustment), 2) : 0) }}" step="0.01">
                             </div>
 
                             <!-- 10. Grand Total -->
@@ -260,7 +260,7 @@
                         'id' => $p->id,
                         'name' => $p->name,
                         'sku' => $p->sku,
-                        'selling_price' => $p->selling_price  // Sales price from item master (like Odoo list_price / Zoho item rate)
+                        'selling_price' => convert_from_base($p->selling_price)
                     ];
                 });
             @endphp
@@ -557,7 +557,17 @@
             }
 
             // Prefill order items
-            const orderItems = @json($order->items);
+            const orderItems = @json($order->items->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'description' => $item->description,
+                    'quantity' => $item->quantity,
+                    'unit_price' => convert_from_base($item->unit_price),
+                    'tax_rate' => $item->tax_rate,
+                    'discount' => convert_from_base($item->discount),
+                ];
+            }));
             if (orderItems.length > 0) {
                 orderItems.forEach(function(item) {
                     addRow(item);

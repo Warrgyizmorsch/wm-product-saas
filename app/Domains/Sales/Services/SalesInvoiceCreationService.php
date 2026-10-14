@@ -72,8 +72,8 @@ class SalesInvoiceCreationService
 
             foreach ($items as $item) {
                 $qty = (float) ($item['quantity'] ?? 1);
-                $price = (float) ($item['unit_price'] ?? 0);
-                $disc = ($discountType === 'item_wise') ? (float) ($item['discount'] ?? 0) : 0.0;
+                $price = convert_to_base((float) ($item['unit_price'] ?? 0));
+                $disc = ($discountType === 'item_wise') ? convert_to_base((float) ($item['discount'] ?? 0)) : 0.0;
 
                 $productId = $item['product_id'] ?? null;
                 $product = $productId ? Product::where('tenant_id', $tenantId)->find($productId) : null;

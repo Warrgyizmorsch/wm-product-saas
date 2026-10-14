@@ -17,54 +17,12 @@
         }
 
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 11px;
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 10px;
             color: #1e293b;
             background: #ffffff;
-            padding: 30px 35px;
+            padding: 25px 30px;
             position: relative;
-        }
-
-        /* ── CORNER RIBBON BADGE ───────────────────── */
-        .corner-ribbon-container {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 90px;
-            height: 90px;
-            overflow: hidden;
-            z-index: 10;
-        }
-        .corner-ribbon {
-            position: absolute;
-            top: 18px;
-            right: -24px;
-            width: 115px;
-            transform: rotate(45deg);
-            -webkit-transform: rotate(45deg);
-            text-align: center;
-            font-size: 8.5px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            padding: 4px 0;
-            color: #ffffff;
-        }
-
-        .ribbon-accepted, .ribbon-approved {
-            background-color: #16a34a;
-        }
-        .ribbon-sent, .ribbon-quotation-sent {
-            background-color: #2563eb;
-        }
-        .ribbon-draft {
-            background-color: #64748b;
-        }
-        .ribbon-rejected, .ribbon-declined {
-            background-color: #dc2626;
-        }
-        .ribbon-rework {
-            background-color: #d97706;
         }
 
         /* ── HEADER SECTION ──────────────────────── */
@@ -361,21 +319,6 @@
 </head>
 <body>
 
-    <!-- Status Corner Ribbon Tag -->
-    @php
-        $ribbonClass = match($quotation->status) {
-            'Accepted', 'Approved' => 'ribbon-accepted',
-            'Sent', 'Quotation Sent' => 'ribbon-sent',
-            'Rejected', 'Declined' => 'ribbon-rejected',
-            'Rework', 'Quotation Rework' => 'ribbon-rework',
-            default => 'ribbon-draft',
-        };
-    @endphp
-    <div class="corner-ribbon-container">
-        <div class="corner-ribbon {{ $ribbonClass }}">
-            {{ $quotation->status }}
-        </div>
-    </div>
 
     <!-- 1. HEADER SECTION -->
     <table class="header-table">
@@ -476,7 +419,8 @@
 
     <!-- 3. ORDER LINES TABLE -->
     @php
-        $currencySymbol = active_currency_symbol();
+        $rawSymbol = active_currency_symbol();
+        $currencySymbol = ($rawSymbol === '₹' || active_currency() === 'INR') ? '&#8377;' : $rawSymbol;
     @endphp
     <table class="items-table">
         <thead>
@@ -484,9 +428,9 @@
                 <th style="width: 5%; text-align: center;">#</th>
                 <th style="width: 45%;">Item & Description</th>
                 <th style="width: 12%; text-align: right;">Qty</th>
-                <th style="width: 13%; text-align: right;">Rate ({{ $currencySymbol }})</th>
+                <th style="width: 13%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
                 <th style="width: 10%; text-align: right;">Tax %</th>
-                <th style="width: 15%; text-align: right;">Amount ({{ $currencySymbol }})</th>
+                <th style="width: 15%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
             </tr>
         </thead>
         <tbody>
@@ -500,9 +444,9 @@
                         @endif
                     </td>
                     <td style="text-align: right;">{{ $item->quantity }}</td>
-                    <td style="text-align: right;">{{ $currencySymbol }}{{ number_format($item->unit_price, 2) }}</td>
+                    <td style="text-align: right;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->unit_price), 2) }}</td>
                     <td style="text-align: right;">{{ number_format($item->tax_rate, 2) }}%</td>
-                    <td style="text-align: right; font-weight: bold; color: #0f172a;">{{ $currencySymbol }}{{ number_format($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                    <td style="text-align: right; font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price))), 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -529,21 +473,21 @@
                 <div class="summary-box">
                     <div class="summary-line">
                         <span class="summary-lbl">Subtotal:</span>
-                        <span class="summary-num">{{ $currencySymbol }}{{ number_format($quotation->subtotal, 2) }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->subtotal), 2) }}</span>
                     </div>
                     <div class="summary-line">
                         <span class="summary-lbl">Tax Amount (GST):</span>
-                        <span class="summary-num">{{ $currencySymbol }}{{ number_format($quotation->tax, 2) }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->tax), 2) }}</span>
                     </div>
                     @if($quotation->discount > 0)
                         <div class="summary-line" style="color: #dc2626;">
                             <span class="summary-lbl" style="color: #dc2626;">Discount:</span>
-                            <span class="summary-num" style="color: #dc2626;">-{{ $currencySymbol }}{{ number_format($quotation->discount, 2) }}</span>
+                            <span class="summary-num" style="color: #dc2626;">-{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->discount), 2) }}</span>
                         </div>
                     @endif
                     <div class="total-payable-box">
                         <span class="total-payable-lbl">Total Payable:</span>
-                        <span class="total-payable-num">{{ $currencySymbol }}{{ number_format($quotation->total_amount, 2) }}</span>
+                        <span class="total-payable-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->total_amount), 2) }}</span>
                     </div>
                 </div>
             </td>

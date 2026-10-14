@@ -81,7 +81,7 @@
                                         $prefilledItems[] = [
                                             'product_id' => (int)$item['product_id'],
                                             'quantity'   => (float)($item['quantity'] ?? 1),
-                                            'price'      => (float)($item['unit_price'] ?? ($pObj ? $pObj->price : 0)),
+                                            'price'      => (float) convert_from_base($item['unit_price'] ?? ($pObj ? ($pObj->selling_price ?: $pObj->unit_cost) : 0)),
                                             'tax_rate'   => $pObj ? (float)($pObj->tax_rate ?: 18) : 18,
                                         ];
                                     }
@@ -93,7 +93,7 @@
                                         $prefilledItems[] = [
                                             'product_id' => (int)$pId,
                                             'quantity'   => 1,
-                                            'price'      => (float) ($pObj->price ?: 0),
+                                            'price'      => (float) convert_from_base($pObj->selling_price ?: $pObj->unit_cost ?: 0),
                                             'tax_rate'   => (float) ($pObj->tax_rate ?: 18),
                                         ];
                                     }
@@ -259,7 +259,7 @@
             var productsData = {
                 @foreach ($products as $p)
                     "{{ $p->id }}": {
-                        price: {{ (float) ($p->selling_price ?: $p->unit_cost ?: 0) }},
+                        price: {{ (float) convert_from_base($p->selling_price ?: $p->unit_cost ?: 0) }},
                         tax_rate: {{ (float) ($p->gst_rate ?: 18) }}
                     },
                 @endforeach

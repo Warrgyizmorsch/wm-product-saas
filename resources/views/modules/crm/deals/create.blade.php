@@ -76,7 +76,7 @@
 
                     <x-ui.odoo-form-ui type="input" :label="__('crm.project_deal_title')" name="title" :value="old('title')" required="true" placeholder="e.g. Project Name" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.expected_revenue_label')" name="estimated_value" :value="old('estimated_value', '0.00')" step="0.01" required="true" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.expected_revenue_label') . ' (' . active_currency_symbol() . ')'" name="estimated_value" :value="old('estimated_value', '0.00')" step="0.01" required="true" placeholder="0.00" />
                 </div>
 
                 <!-- Right Column: Classification, Notes & Products -->
@@ -200,7 +200,7 @@
                                                     @if($finished->count())
                                                         <optgroup label="{{ __('crm.optgroup_finished_goods') }}">
                                                             @foreach($finished as $p)
-                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
@@ -211,7 +211,7 @@
                                                     @if($semiFinished->count())
                                                         <optgroup label="{{ __('crm.optgroup_semi_finished') }}">
                                                             @foreach($semiFinished as $p)
-                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
@@ -222,7 +222,7 @@
                                                     @if($services->count())
                                                         <optgroup label="{{ __('crm.optgroup_services') }}">
                                                             @foreach($services as $p)
-                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
@@ -233,7 +233,7 @@
                                                     @if($others->count())
                                                         <optgroup label="{{ __('crm.optgroup_raw_materials') }}">
                                                             @foreach($others as $p)
-                                                                @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                                                @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                                                 <option value="{{ $p->id }}" data-price="{{ $pPrice }}" @selected(($item['product_id'] ?? '') == $p->id)>
                                                                     {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
                                                                 </option>
@@ -265,7 +265,7 @@
                             @if($finished->count())
                                 <optgroup label="{{ __('crm.optgroup_finished_goods') }}">
                                     @foreach($finished as $p)
-                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
@@ -274,7 +274,7 @@
                             @if($semiFinished->count())
                                 <optgroup label="{{ __('crm.optgroup_semi_finished') }}">
                                     @foreach($semiFinished as $p)
-                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
@@ -283,7 +283,7 @@
                             @if($services->count())
                                 <optgroup label="{{ __('crm.optgroup_services') }}">
                                     @foreach($services as $p)
-                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>
@@ -292,7 +292,7 @@
                             @if($others->count())
                                 <optgroup label="{{ __('crm.optgroup_raw_materials') }}">
                                     @foreach($others as $p)
-                                        @php $pPrice = ($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0)); @endphp
+                                        @php $pPrice = round(convert_from_base(($p->selling_price > 0) ? $p->selling_price : (($p->unit_cost > 0) ? $p->unit_cost : ($p->cost_price ?? 0))), 2); @endphp
                                         <option value="{{ $p->id }}" data-price="{{ $pPrice }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
                                     @endforeach
                                 </optgroup>

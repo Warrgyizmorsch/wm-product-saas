@@ -23,13 +23,15 @@ class PurchaseAdvancePaymentService
         return DB::transaction(function () use ($validated, $tenantId) {
             $advanceNumber = $this->advanceRepo->getNextAdvanceNumber($tenantId);
 
+            $baseAmount = convert_to_base((float) $validated['amount']);
+
             $advance = $this->advanceRepo->create([
                 'tenant_id' => $tenantId,
                 'payment_number' => $advanceNumber,
                 'payment_date' => $validated['payment_date'],
                 'vendor_id' => $validated['vendor_id'],
                 'purchase_order_id' => $validated['purchase_order_id'] ?? null,
-                'amount' => $validated['amount'],
+                'amount' => $baseAmount,
                 'payment_method' => $validated['payment_method'],
                 'reference_number' => $validated['reference_number'] ?? null,
                 'notes' => $validated['notes'] ?? null,

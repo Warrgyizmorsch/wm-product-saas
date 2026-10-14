@@ -65,9 +65,9 @@ class SalesOrderService
 
             foreach ($items as $item) {
                 $qty = intval($item['quantity'] ?? 0);
-                $price = floatval($item['unit_price'] ?? 0);
+                $price = convert_to_base((float)($item['unit_price'] ?? 0));
                 $taxRate = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
-                $discount = ($discountType === 'item_wise') ? floatval($item['discount'] ?? 0) : 0;
+                $discount = ($discountType === 'item_wise') ? convert_to_base((float)($item['discount'] ?? 0)) : 0;
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
                 $warehouseId = !empty($item['warehouse_id']) ? intval($item['warehouse_id']) : null;
 
@@ -100,11 +100,11 @@ class SalesOrderService
 
             $discountVal = 0;
             if ($discountType === 'item_wise') {
-                foreach ($items as $it) {
+                foreach ($itemsData as $it) {
                     $discountVal += floatval($it['discount'] ?? 0);
                 }
             } elseif ($discountType === 'order_wise') {
-                $discountVal = floatval($data['discount'] ?? 0);
+                $discountVal = convert_to_base((float)($data['discount'] ?? 0));
             }
 
             if ($taxType === 'order_wise_tax') {
@@ -115,8 +115,8 @@ class SalesOrderService
             }
 
             $freightTerms = $data['freight_terms'] ?? 'To Pay';
-            $freightAmount = floatval($data['freight_amount'] ?? $data['shipping_charges'] ?? 0);
-            $adjustment = floatval($data['adjustment'] ?? 0);
+            $freightAmount = convert_to_base((float)($data['freight_amount'] ?? $data['shipping_charges'] ?? 0));
+            $adjustment = convert_to_base((float)($data['adjustment'] ?? 0));
 
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
             $totalTax = $tax;
@@ -182,9 +182,9 @@ class SalesOrderService
 
             foreach ($items as $item) {
                 $qty = intval($item['quantity'] ?? 0);
-                $price = floatval($item['unit_price'] ?? 0);
+                $price = convert_to_base((float)($item['unit_price'] ?? 0));
                 $taxRate = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
-                $discount = ($discountType === 'item_wise') ? floatval($item['discount'] ?? 0) : 0;
+                $discount = ($discountType === 'item_wise') ? convert_to_base((float)($item['discount'] ?? 0)) : 0;
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
                 $warehouseId = !empty($item['warehouse_id']) ? intval($item['warehouse_id']) : null;
 
@@ -217,11 +217,11 @@ class SalesOrderService
 
             $discountVal = 0;
             if ($discountType === 'item_wise') {
-                foreach ($items as $it) {
+                foreach ($itemsData as $it) {
                     $discountVal += floatval($it['discount'] ?? 0);
                 }
             } elseif ($discountType === 'order_wise') {
-                $discountVal = floatval($data['discount'] ?? 0);
+                $discountVal = convert_to_base((float)($data['discount'] ?? 0));
             }
 
             if ($taxType === 'order_wise_tax') {
@@ -232,8 +232,8 @@ class SalesOrderService
             }
 
             $freightTerms = $data['freight_terms'] ?? $salesOrder->freight_terms ?? 'To Pay';
-            $freightAmount = floatval($data['freight_amount'] ?? $data['shipping_charges'] ?? 0);
-            $adjustment = floatval($data['adjustment'] ?? 0);
+            $freightAmount = convert_to_base((float)($data['freight_amount'] ?? $data['shipping_charges'] ?? 0));
+            $adjustment = convert_to_base((float)($data['adjustment'] ?? 0));
 
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
             $totalTax = $tax;

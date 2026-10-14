@@ -623,7 +623,7 @@
             <div class="tab-pane fade" id="ledger-pane" role="tabpanel">
                 <div class="card border shadow-none">
                     <div class="card-header bg-light py-2.5">
-                        <h6 class="fw-bold text-primary mb-0"><i class="feather-book me-1"></i>{{ __('crm.ledger_statement') }}</h6>
+                        <h6 class="fw-bold text-primary mb-0"><i class="feather-book me-1"></i>{{ __('crm.transporter_ledger_tab') }}</h6>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0 fs-12">

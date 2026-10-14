@@ -72,7 +72,7 @@
                 </div>
 
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('purchase.net_bank_outflow') }} ({{ active_currency_symbol() }})" name="amount" :value="old('amount', ($totalAdvancePaid > 0 ? $suggestedNetPayable : $selectedBill?->due_amount))" step="0.01" min="0.01" required="true" placeholder="{{ __('purchase.amount_placeholder') }}" :errorText="$errors->first('amount')" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('purchase.net_bank_outflow') }} ({{ active_currency_symbol() }})" name="amount" :value="old('amount', convert_from_base($totalAdvancePaid > 0 ? $suggestedNetPayable : ($selectedBill?->due_amount ?? 0)))" step="0.01" min="0.01" required="true" placeholder="{{ __('purchase.amount_placeholder') }}" :errorText="$errors->first('amount')" />
                 </div>
 
                 <div class="col-md-4">
@@ -117,7 +117,7 @@
                                 <td class="text-end font-monospace">{{ format_currency($selectedBill->grand_total) }}</td>
                                 <td class="text-end font-monospace text-danger fw-bold">{{ format_currency($selectedBill->due_amount) }}</td>
                                 <td class="text-end pe-3">
-                                    <input type="number" name="allocations[0][allocated_amount]" class="form-control form-control-sm text-end font-monospace fw-bold text-success" value="{{ ($totalAdvancePaid > 0 ? $suggestedNetPayable : $selectedBill->due_amount) }}" step="0.01" min="0.01" max="{{ $selectedBill->due_amount }}" required>
+                                    <input type="number" name="allocations[0][allocated_amount]" class="form-control form-control-sm text-end font-monospace fw-bold text-success" value="{{ convert_from_base($totalAdvancePaid > 0 ? $suggestedNetPayable : $selectedBill->due_amount) }}" step="0.01" min="0.01" max="{{ convert_from_base($selectedBill->due_amount) }}" required>
                                 </td>
                             </tr>
                         </tbody>

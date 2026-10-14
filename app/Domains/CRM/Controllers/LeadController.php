@@ -38,6 +38,10 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback($request)) {
+            return $redirect;
+        }
+
         $filters = $request->only([
             'search', 'duplicates_only', 'priority', 'segment', 'status', 'lead_owner_id', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
@@ -476,6 +480,11 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $this->authorize('view', $lead);
+
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback()) {
+            return $redirect;
+        }
+
         $details = $this->leadRepo->getLeadDetails($lead, request()->input('active_quotation_id'));
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
@@ -540,7 +549,7 @@ class LeadController extends Controller
             'company_name' => $lead->company_name ?? 'Lead',
             'contact_person' => $lead->contact_person ?? 'N/A',
             'source' => $lead->source ?? 'Direct',
-            'expected_amount' => number_format((float)($lead->expected_amount ?? 0), 2),
+            'expected_amount' => format_currency($lead->expected_amount ?? 0),
             'created_by' => auth()->user()?->name ?? 'User',
         ], route('crm.leads.edit', $lead->id), $lead);
 

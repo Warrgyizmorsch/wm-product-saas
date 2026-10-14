@@ -352,7 +352,7 @@
                         <div class="col-lg-6">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>{{ __('inventory.sales_purchase_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" :placeholder="__('inventory.selling_price')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ convert_from_base($product->selling_price) }}" inputType="number" step="0.01" :placeholder="__('inventory.selling_price')" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" :errorText="$errors->first('sales_account')">
                                 <option value="" {{ empty($product->sales_account) ? 'selected' : '' }}>{{ __('inventory.select_sales_account') }}</option>
@@ -367,7 +367,7 @@
                                 @endforelse
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" :placeholder="__('inventory.cost_price')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ convert_from_base($product->cost_price) }}" inputType="number" step="0.01" :placeholder="__('inventory.cost_price')" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" :errorText="$errors->first('purchase_account')">
                                 <option value="" {{ empty($product->purchase_account) ? 'selected' : '' }}>{{ __('inventory.select_purchase_account') }}</option>
@@ -494,14 +494,14 @@
                                             <th>{{ __('inventory.warehouse_code') }}</th>
                                             <th>{{ __('inventory.warehouse_name') }}</th>
                                             <th>{{ __('inventory.quantity_on_hand') }}</th>
-                                            <th>{{ __('inventory.unit_cost') }}</th>
+                                            <th>{{ __('inventory.unit_cost') }} ({{ active_currency_symbol() }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($warehouses as $wh)
                                             @php
                                                 $qty = $warehouseStocksMap[$wh->id] ?? 0;
-                                                $cost = $warehouseCostsMap[$wh->id] ?? 0;
+                                                $cost = isset($warehouseCostsMap[$wh->id]) ? round(convert_from_base((float)$warehouseCostsMap[$wh->id]), 2) : 0;
                                             @endphp
                                             <tr>
                                                 <td class="fw-semibold text-dark">{{ $wh->code }}</td>
@@ -781,8 +781,8 @@
             $vData = [
                 'id' => $v->id,
                 'sku' => $v->sku,
-                'selling_price' => $v->selling_price,
-                'cost_price' => $v->cost_price,
+                'selling_price' => convert_from_base($v->selling_price),
+                'cost_price' => convert_from_base($v->cost_price),
                 'opening_stock' => $v->opening_stock,
                 'reorder_point' => $v->reorder_point,
                 'name' => $v->name,
@@ -984,8 +984,8 @@
 
                 const parentName = $('input[name="name"]').val().trim() || '{{ $product->name }}';
                 const parentSku = '{{ $product->sku }}';
-                const defaultSellingPrice = '{{ $product->selling_price }}';
-                const defaultCostPrice = '{{ $product->cost_price }}';
+                const defaultSellingPrice = '{{ convert_from_base($product->selling_price) }}';
+                const defaultCostPrice = '{{ convert_from_base($product->cost_price) }}';
 
                 const tbody = $('#variantsMatrixBody');
                 tbody.empty();

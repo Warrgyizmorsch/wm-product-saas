@@ -5,6 +5,8 @@ namespace App\Domains\CRM\Services;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\LeadFollowup;
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -25,7 +27,7 @@ class GoogleCalendarIntegrationService
     {
         try {
             $resolvedUserId = $userId ?? auth()->id() ?? 1;
-            $response = Http::timeout(10)->post($this->baseUrl . '/auth/token', [
+            $response = Http::withoutVerifying()->timeout(10)->post($this->baseUrl . '/auth/token', [
                 'auth_code' => trim($authCode),
                 'user_id'   => $resolvedUserId,
             ]);
@@ -100,6 +102,95 @@ class GoogleCalendarIntegrationService
         }
 
         return [(int)$resolvedUserId, $resolvedToken];
+    }
+
+    /**
+     * Clean sensitive/callback query parameters from a URL.
+     */
+    public function cleanAuthParams(string $url): string
+    {
+        $parsed = parse_url($url);
+        if (!isset($parsed['query'])) {
+            return $url;
+        }
+
+        parse_str($parsed['query'], $query);
+        unset(
+            $query['auth_code'],
+            $query['code'],
+            $query['user_id'],
+            $query['google_user_id'],
+            $query['token'],
+            $query['access_token']
+        );
+
+        $scheme      = isset($parsed['scheme']) ? $parsed['scheme'] . '://' : '';
+        $host        = $parsed['host'] ?? '';
+        $port        = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+        $user        = $parsed['user'] ?? '';
+        $pass        = isset($parsed['pass']) ? ':' . $parsed['pass'] : '';
+        $pass        = ($user || $pass) ? "$pass@" : '';
+        $path        = $parsed['path'] ?? '';
+        $queryString = !empty($query) ? '?' . http_build_query($query) : '';
+        $fragment    = isset($parsed['fragment']) ? '#' . $parsed['fragment'] : '';
+
+        return "{$scheme}{$user}{$pass}{$host}{$port}{$path}{$queryString}{$fragment}";
+    }
+
+    /**
+     * Handle incoming Google OAuth callback params (auth_code, token, etc.)
+     * Exchanges code, persists session/settings, and returns a clean RedirectResponse (or null if not a callback).
+     */
+    public function handleAuthCallback(?Request $request = null, ?string $defaultRedirectUrl = null): ?RedirectResponse
+    {
+        $req = $request ?: request();
+        if (!$req) {
+            return null;
+        }
+
+        $hasCode = $req->filled('auth_code') || $req->filled('code');
+        $hasToken = $req->filled('token') || $req->filled('access_token');
+
+        if (!$hasCode && !$hasToken) {
+            return null;
+        }
+
+        $googleUserId = $req->input('google_user_id') ?: $req->input('user_id') ?: (session('google_user_id') ?: auth()->id() ?: 1);
+        if ($googleUserId) {
+            session(['google_user_id' => (int) $googleUserId]);
+        }
+
+        if ($hasCode) {
+            $authCode = $req->input('auth_code') ?: $req->input('code');
+            $this->exchangeAuthCode($authCode, (int) $googleUserId);
+        } elseif ($hasToken) {
+            $token = $req->input('token') ?: $req->input('access_token');
+            session([
+                'google_token' => $token,
+                'google_user_id' => (int) $googleUserId,
+                'google_calendar_connected' => true,
+            ]);
+
+            if (auth()->check()) {
+                $user = auth()->user();
+                $settings = is_array($user->settings) ? $user->settings : (json_decode($user->settings ?? '{}', true) ?: []);
+                $settings['google_token'] = $token;
+                $settings['google_user_id'] = (int) $googleUserId;
+                $user->settings = $settings;
+                $user->saveQuietly();
+            }
+        }
+
+        // Determine destination URL
+        $returnTo = session()->pull('google_oauth_return_to')
+            ?: $defaultRedirectUrl
+            ?: $req->input('return_to')
+            ?: $req->input('next')
+            ?: url()->current();
+
+        $cleanUrl = $this->cleanAuthParams($returnTo);
+
+        return redirect()->to($cleanUrl ?: url()->current())->with('success', 'Google Calendar connected successfully!');
     }
 
     /**
@@ -291,6 +382,14 @@ class GoogleCalendarIntegrationService
         ]);
         session()->put('google_calendar_connected', false);
         session()->save();
+
+        if (auth()->check()) {
+            $user = auth()->user();
+            $settings = is_array($user->settings) ? $user->settings : (json_decode($user->settings ?? '{}', true) ?: []);
+            unset($settings['google_token'], $settings['google_user_id']);
+            $user->settings = $settings;
+            $user->saveQuietly();
+        }
 
         try {
             Http::timeout(3)->get($this->baseUrl . '/auth/logout');
