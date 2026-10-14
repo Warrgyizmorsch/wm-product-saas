@@ -800,6 +800,36 @@
                     });
             });
 
+            // Helper to synchronize Shift Propagation Mode select & its Select2 UI
+            function syncEditShiftModeSelect(mode) {
+                const select = document.getElementById('editShiftMode') || document.querySelector('#editShiftMode select');
+                if (!select) return;
+
+                // 1. Update native select value and option attributes
+                select.value = mode;
+                Array.from(select.options).forEach(opt => {
+                    opt.selected = (opt.value === mode);
+                });
+
+                // 2. Trigger jQuery Select2 change event
+                if (window.jQuery && $(select).data('select2')) {
+                    $(select).val(mode).trigger('change.select2').trigger('change');
+                } else {
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                // 3. Direct update of Select2 visible rendered text container as fail-safe
+                const selectedOpt = select.querySelector(`option[value="${mode}"]`);
+                if (selectedOpt) {
+                    const s2Container = document.getElementById('select2-editShiftMode-container') ||
+                                        select.parentElement?.querySelector('.select2-selection__rendered');
+                    if (s2Container) {
+                        s2Container.textContent = selectedOpt.textContent.trim();
+                        s2Container.title = selectedOpt.textContent.trim();
+                    }
+                }
+            }
+
             // Shift Mode Handler
             window.setShiftMode = function (mode) {
                 currentShiftMode = mode;
@@ -808,6 +838,9 @@
                 document.getElementById('iconIsolatedCheck').className = mode === 'isolated' ? 'feather-check me-1 text-success d-inline' : 'feather-check me-1 text-success d-none';
                 document.getElementById('optShiftRipple').classList.toggle('active', mode === 'ripple');
                 document.getElementById('optShiftIsolated').classList.toggle('active', mode === 'isolated');
+
+                // Synchronize modal Select2 dropdown
+                syncEditShiftModeSelect(mode);
             };
 
             // View Scale Handlers
@@ -914,6 +947,23 @@
                 btnRefreshBoardData.addEventListener('click', loadDispatchData);
             }
 
+            // Safely hide and purge all tooltips and orphaned tooltip DOM nodes
+            function hideAllTooltips() {
+                try {
+                    if (window.bootstrap && bootstrap.Tooltip) {
+                        document.querySelectorAll('#ganttSwimlanesBody .gantt-op-bar, [data-bs-toggle="tooltip"]').forEach(el => {
+                            const inst = bootstrap.Tooltip.getInstance(el);
+                            if (inst) {
+                                inst.hide();
+                            }
+                        });
+                    }
+                } catch (e) {}
+                document.querySelectorAll('.tooltip, .bs-tooltip-top, .bs-tooltip-bottom, .bs-tooltip-start, .bs-tooltip-end, .bs-tooltip-auto').forEach(el => {
+                    el.remove();
+                });
+            }
+
             // Dynamic Button Visibility & State Updater
             function updateDynamicButtons(data) {
                 const btnPreRelease = document.getElementById('btnPreReleaseCheck');
@@ -954,6 +1004,18 @@
 
             // Fetch Main Board Data API
             function loadDispatchData() {
+                hideAllTooltips();
+                document.querySelectorAll('#ganttSwimlanesBody .gantt-op-bar').forEach(el => {
+                    try {
+                        if (window.bootstrap && bootstrap.Tooltip) {
+                            const inst = bootstrap.Tooltip.getInstance(el);
+                            if (inst) {
+                                inst.dispose();
+                            }
+                        }
+                    } catch (e) {}
+                });
+
                 const startDate = filterStartDate.value;
                 const endDate = filterEndDate.value;
                 const workCenterId = filterWorkCenter.value;
@@ -1056,6 +1118,18 @@
 
             // Render Timeline Scale Header and Resource Swimlanes
             function renderTimelineAndOperations(data) {
+                hideAllTooltips();
+                document.querySelectorAll('#ganttSwimlanesBody .gantt-op-bar').forEach(el => {
+                    try {
+                        if (window.bootstrap && bootstrap.Tooltip) {
+                            const inst = bootstrap.Tooltip.getInstance(el);
+                            if (inst) {
+                                inst.dispose();
+                            }
+                        }
+                    } catch (e) {}
+                });
+
                 const bodyEl = document.getElementById('ganttSwimlanesBody');
                 const headerTicksEl = document.getElementById('ganttHeaderTicks');
 
@@ -1298,10 +1372,8 @@
                                         </div>
                                     `;
 
-                            bar.setAttribute('data-bs-toggle', 'tooltip');
                             bar.setAttribute('data-bs-html', 'true');
                             bar.setAttribute('data-bs-title', tooltipContent);
-                            bar.setAttribute('title', tooltipContent);
 
                             if (window.bootstrap && bootstrap.Tooltip) {
                                 new bootstrap.Tooltip(bar, {
@@ -1310,11 +1382,18 @@
                                     placement: 'top',
                                     container: 'body'
                                 });
+
+                                bar.addEventListener('show.bs.tooltip', function (e) {
+                                    if (dragContext) {
+                                        e.preventDefault();
+                                    }
+                                });
                             }
 
                             // Click to open Quick Edit Modal
                             bar.addEventListener('click', function (e) {
                                 e.stopPropagation();
+                                hideAllTooltips();
                                 openQuickEditModal(op);
                             });
 
@@ -1323,6 +1402,7 @@
                                 bar.draggable = true;
 
                                 bar.addEventListener('dragstart', function (e) {
+                                    hideAllTooltips();
                                     const barRect = bar.getBoundingClientRect();
                                     dragContext = {
                                         op: op,
@@ -1339,8 +1419,14 @@
                                     e.dataTransfer.setData('text/plain', op.schedule_operation_id);
                                 });
 
+                                bar.addEventListener('drag', function () {
+                                    hideAllTooltips();
+                                });
+
                                 bar.addEventListener('dragend', function () {
+                                    hideAllTooltips();
                                     bar.classList.remove('opacity-50');
+                                    dragContext = null;
                                 });
                             }
 
@@ -1360,7 +1446,39 @@
                         laneTimelineCol.addEventListener('drop', function (e) {
                             e.preventDefault();
                             laneTimelineCol.classList.remove('bg-soft-primary');
+                            hideAllTooltips();
                             if (!dragContext) return;
+
+                            const targetWorkCenterId = parseInt(res.id);
+                            const targetMachineId = m.id ? parseInt(m.id) : null;
+                            const targetMachineName = m.id ? `${m.name} (${m.code})` : 'Manual Operation';
+
+                            // Validation: Cannot move operation to a different Work Center
+                            if (targetWorkCenterId !== parseInt(dragContext.op.work_center_id)) {
+                                showPlannerAlert(
+                                    'Invalid Work Center',
+                                    `Operation #${dragContext.op.sequence} (${dragContext.op.operation_name}) belongs to Work Center #${dragContext.op.work_center_id} and cannot be moved to a different Work Center.`,
+                                    'danger'
+                                );
+                                loadDispatchData();
+                                dragContext = null;
+                                return;
+                            }
+
+                            // Validation: Target machine must be approved for this operation (Primary or Approved Alternate)
+                            if (targetMachineId && dragContext.op.qualified_machine_ids && dragContext.op.qualified_machine_ids.length > 0) {
+                                const isQualified = dragContext.op.qualified_machine_ids.map(Number).includes(targetMachineId);
+                                if (!isQualified) {
+                                    showPlannerAlert(
+                                        'Incompatible Machine',
+                                        `Machine [${targetMachineName}] is not an approved primary or alternate machine for operation [${dragContext.op.operation_name}]. It cannot perform this work.`,
+                                        'danger'
+                                    );
+                                    loadDispatchData();
+                                    dragContext = null;
+                                    return;
+                                }
+                            }
 
                             const rect = laneTimelineCol.getBoundingClientRect();
                             const grabOffset = (dragContext && typeof dragContext.grabOffsetX === 'number') ? dragContext.grabOffsetX : 0;
@@ -1374,9 +1492,6 @@
 
                             const proposedStartDate = new Date(snappedMs);
                             const proposedStartIso = formatLocalIso(proposedStartDate);
-
-                            const targetMachineId = m.id;
-                            const targetMachineName = m.id ? `${m.name} (${m.code})` : 'Manual Operation';
 
                             // Prompt Drag Confirmation Modal
                             promptDragConfirm(dragContext.op, proposedStartIso, targetMachineId, targetMachineName);
@@ -1397,6 +1512,7 @@
 
             // Prompt Confirmation Modal for Drag & Drop Move
             function promptDragConfirm(op, proposedStartIso, targetMachineId, targetMachineName) {
+                hideAllTooltips();
                 document.getElementById('dragOpTitle').textContent = `#${op.sequence} ${op.operation_name} (${op.production_order_number})`;
                 document.getElementById('dragNewStartDisplay').textContent = proposedStartIso.replace('T', ' ');
                 document.getElementById('dragNewMachineDisplay').textContent = targetMachineName;
@@ -1526,6 +1642,7 @@
 
             // Quick Edit Operation Modal Handler
             function openQuickEditModal(op) {
+                hideAllTooltips();
                 quickEditOp = op;
                 document.getElementById('editOpId').value = op.schedule_operation_id;
                 document.getElementById('editOpVersion').value = op.version;
@@ -1540,7 +1657,7 @@
                 const editStartInput = document.querySelector('#editPlannedStart input') || document.getElementById('editPlannedStart');
                 editStartInput.value = localIso;
 
-                // Populate Machines Select
+                // Populate Machines Select with qualification indicators
                 const selectM = document.querySelector('#editMachineId select') || document.getElementById('editMachineId');
                 selectM.innerHTML = '<option value="">{{ __('production.no_machine_manual') }}</option>';
                 if (dispatchBoardData && dispatchBoardData.resources) {
@@ -1549,16 +1666,31 @@
                             res.machines.forEach(m => {
                                 const opt = document.createElement('option');
                                 opt.value = m.id;
-                                opt.textContent = `${m.name} (${m.code})`;
-                                if (m.id === op.machine_id) opt.selected = true;
+                                let suffix = '';
+                                const hasQualification = op.qualified_machine_ids && op.qualified_machine_ids.length > 0;
+                                if (hasQualification) {
+                                    if (op.primary_machine_id && (parseInt(op.primary_machine_id) === parseInt(m.id))) {
+                                        suffix = ' — Primary Machine ⭐';
+                                    } else if (op.qualified_machine_ids.map(Number).includes(parseInt(m.id))) {
+                                        suffix = ' — Approved Alternate ✓';
+                                    } else {
+                                        suffix = ' — Incompatible / Not Approved ⚠️';
+                                        opt.disabled = true;
+                                    }
+                                }
+                                opt.textContent = `${m.name} (${m.code})${suffix}`;
+                                if (parseInt(m.id) === parseInt(op.machine_id)) opt.selected = true;
                                 selectM.appendChild(opt);
                             });
                         }
                     });
                 }
 
-                const editShiftSelect = document.querySelector('#editShiftMode select') || document.getElementById('editShiftMode');
-                editShiftSelect.value = currentShiftMode;
+                if (window.jQuery && $(selectM).data('select2')) {
+                    $(selectM).trigger('change');
+                }
+
+                syncEditShiftModeSelect(currentShiftMode);
                 document.getElementById('editBaselineStart').textContent = op.baseline_start || 'N/A';
                 document.getElementById('editBaselineFinish').textContent = op.baseline_finish || 'N/A';
 
@@ -1594,14 +1726,23 @@
             document.getElementById('btnToggleLockInModal').addEventListener('click', function () {
                 if (!quickEditOp) return;
                 const opId = quickEditOp.schedule_operation_id;
+                const urlParams = new URLSearchParams(window.location.search);
+                const scenarioId = urlParams.get('scenario_id');
+
+                const payload = {};
+                if (scenarioId) {
+                    payload.scenario_id = scenarioId;
+                }
 
                 fetch(`{{ url('production/schedules/operations') }}/${opId}/toggle-lock`, {
                     method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         'X-Requested-With': 'XMLHttpRequest'
-                    }
+                    },
+                    body: JSON.stringify(payload)
                 })
                     .then(r => r.json())
                     .then(res => {
@@ -1913,6 +2054,41 @@
                 }
             }
 
+            // Modal lifecycle handlers to prevent stuck tooltips
+            ['modalConfirmDrag', 'modalQuickEditOp', 'modalPlanningScenario', 'modalLevelCapacity', 'modalPreReleaseValidation'].forEach(id => {
+                const modalEl = document.getElementById(id);
+                if (modalEl) {
+                    modalEl.addEventListener('show.bs.modal', hideAllTooltips);
+                    modalEl.addEventListener('hidden.bs.modal', hideAllTooltips);
+                }
+            });
+
+            // Ensure Quick Edit modal Select2 reflects currentShiftMode when fully shown
+            const quickEditModalEl = document.getElementById('modalQuickEditOp');
+            if (quickEditModalEl) {
+                quickEditModalEl.addEventListener('shown.bs.modal', function () {
+                    syncEditShiftModeSelect(currentShiftMode);
+                });
+            }
+
+            // Sync user changes inside the Quick Edit modal back to the board header
+            const editShiftSelectEl = document.getElementById('editShiftMode') || document.querySelector('#editShiftMode select');
+            if (editShiftSelectEl) {
+                if (window.jQuery) {
+                    window.jQuery(editShiftSelectEl).on('change', function () {
+                        if (this.value && this.value !== currentShiftMode) {
+                            window.setShiftMode(this.value);
+                        }
+                    });
+                } else {
+                    editShiftSelectEl.addEventListener('change', function () {
+                        if (this.value && this.value !== currentShiftMode) {
+                            window.setShiftMode(this.value);
+                        }
+                    });
+                }
+            }
+
             // Initial Board Load
             loadDispatchData();
         });
@@ -1996,6 +2172,10 @@
             z-index: 20;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
             filter: brightness(1.05);
+        }
+
+        .tooltip {
+            pointer-events: none !important;
         }
 
         .gantt-downtime-block {

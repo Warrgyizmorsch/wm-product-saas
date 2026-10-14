@@ -469,13 +469,19 @@ class ProductionScheduleScenarioService
                 }
             }
 
-            // 2. Pre-Release Constraint Validation on Scenario Timings
+            // 2. Pre-Release Constraint Validation on Scenario Timings & Machine Qualifications
             foreach ($scenarioOps as $sOp) {
                 if ($sOp->machine_id) {
+                    /** @var ProductionScheduleOperation $lOp */
+                    $lOp = $liveOps->get($sOp->source_schedule_operation_id);
+                    if ($lOp) {
+                        $this->capacityPlanningService->validateMachineQualification($lOp, (int) $sOp->machine_id, $tenantId);
+                    }
+
                     $downtimeConflict = ProductionMachineDowntime::withoutGlobalScopes()
                         ->where('tenant_id', $tenantId)
                         ->where('machine_id', $sOp->machine_id)
-                        ->whereIn('status', ['scheduled', 'in_progress'])
+                        ->whereIn('status', ['scheduled', 'in_progress', 'open'])
                         ->where(function ($q) use ($sOp) {
                             $q->whereBetween('start_time', [$sOp->planned_start, $sOp->planned_finish])
                               ->orWhereBetween('end_time', [$sOp->planned_start, $sOp->planned_finish]);
@@ -645,6 +651,333 @@ class ProductionScheduleScenarioService
             'overloads'          => max(0, $conflictsCount),
             'operations_count'   => $ops->count(),
         ];
+    }
+
+    /**
+     * Reschedule an operation within a What-If Scenario with complete constraint validations.
+     * Validates machine qualification (primary/alternate), working days, downtime collisions,
+     * predecessor/successor dependencies, and executes isolated/ripple shifts in sandbox mode.
+     */
+    public function rescheduleScenarioOperation(
+        int     $tenantId,
+        int     $scenarioId,
+        int     $operationId,
+        Carbon  $newStart,
+        ?int    $newMachineId    = null,
+        string  $shiftMode       = ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED,
+        ?string $reason          = null,
+        ?int    $userId          = null,
+        ?int    $expectedVersion = null
+    ): array {
+        return DB::transaction(function () use ($tenantId, $scenarioId, $operationId, $newStart, $newMachineId, $shiftMode, $reason, $userId, $expectedVersion) {
+            $scenario = ProductionScheduleScenario::withoutGlobalScopes()
+                ->where('id', $scenarioId)
+                ->where('tenant_id', $tenantId)
+                ->first();
+
+            if (!$scenario) {
+                throw new InvalidArgumentException("Scenario #{$scenarioId} not found.");
+            }
+
+            if ($scenario->isPromoted() || $scenario->isDiscarded()) {
+                throw new InvalidArgumentException("Cannot modify a {$scenario->status} scenario.");
+            }
+
+            $scenOp = ProductionScheduleScenarioOperation::withoutGlobalScopes()
+                ->where('scenario_id', $scenario->id)
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($operationId) {
+                    $q->where('id', $operationId)
+                        ->orWhere('source_schedule_operation_id', $operationId);
+                })
+                ->with(['orderOperation.routingOperation', 'workCenter', 'order'])
+                ->lockForUpdate()
+                ->first();
+
+            if (!$scenOp) {
+                throw new InvalidArgumentException("Scenario operation #{$operationId} not found in Scenario #{$scenarioId}.");
+            }
+
+            if ($expectedVersion !== null && (int) $scenOp->source_version !== (int) $expectedVersion) {
+                throw new InvalidArgumentException("CONCURRENCY_CONFLICT: Scenario operation was modified (Expected version {$expectedVersion}, actual {$scenOp->source_version}).");
+            }
+
+            if ($scenOp->locked) {
+                throw new InvalidArgumentException("Operation [{$scenOp->orderOperation?->name}] is locked and cannot be moved.");
+            }
+
+            if (in_array($scenOp->status, ['completed', 'in_progress', 'cancelled'], true)) {
+                throw new InvalidArgumentException("Operation is in execution state ({$scenOp->status}) and cannot be rescheduled.");
+            }
+
+            $order = $scenOp->order;
+            if ($order && ($order->isClosed() || $order->isCancelled())) {
+                throw new InvalidArgumentException("Operation cannot be rescheduled: Parent production order is closed or cancelled.");
+            }
+
+            $targetMachineId = $newMachineId ?: $scenOp->machine_id;
+            if ($targetMachineId) {
+                $this->capacityPlanningService->validateMachineQualification($scenOp, $targetMachineId, $tenantId);
+            }
+
+            $wc = $scenOp->workCenter;
+            $calendar = $this->capacityPlanningService->resolveCalendarForWorkCenter($wc, $tenantId);
+            if (!$this->capacityPlanningService->isWorkingDay($calendar, $newStart, $tenantId)) {
+                throw new InvalidArgumentException("Reschedule failed: Target date is not a valid working day on calendar.");
+            }
+
+            $durationMinutes = (float) $scenOp->planned_duration_minutes;
+            $newFinish       = $this->schedulingService->addWorkingMinutes($scenOp->work_center_id, $newStart, $durationMinutes);
+
+            if ($targetMachineId) {
+                $this->capacityPlanningService->validateMachineAvailability($tenantId, $targetMachineId, $newStart, $newFinish, $scenOp->id);
+
+                // Check scenario temporary downtime assumptions
+                $tempDowntimes = $scenario->assumptions['temporary_downtimes'] ?? [];
+                foreach ($tempDowntimes as $dt) {
+                    if ((int) ($dt['machine_id'] ?? 0) === (int) $targetMachineId) {
+                        $dtStart = Carbon::parse($dt['start']);
+                        $dtEnd   = Carbon::parse($dt['finish']);
+                        if ($newStart->lt($dtEnd) && $newFinish->gt($dtStart)) {
+                            throw new InvalidArgumentException("Reschedule conflict: Target machine has scheduled downtime in this scenario ({$dtStart->toDateTimeString()} to {$dtEnd->toDateTimeString()}).");
+                        }
+                    }
+                }
+            }
+
+            // Predecessor Check
+            $allScenarioOps = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+                ->where('production_order_id', $scenOp->production_order_id)
+                ->whereNotIn('status', ['cancelled', 'skipped'])
+                ->orderBy('sequence')
+                ->get();
+
+            $orderOp = $scenOp->orderOperation;
+            $predecessor = null;
+            if ($orderOp && $orderOp->previous_operation_id) {
+                $predecessor = $allScenarioOps->firstWhere('production_order_operation_id', $orderOp->previous_operation_id);
+            }
+            if (!$predecessor && $orderOp) {
+                $predOpIds = $orderOp->predecessorDependencies()->pluck('predecessor_operation_id')->toArray();
+                if (!empty($predOpIds)) {
+                    $predecessor = $allScenarioOps->whereIn('production_order_operation_id', $predOpIds)->sortByDesc('planned_finish')->first();
+                }
+            }
+            if (!$predecessor && $orderOp && !$orderOp->isEntryOperation()) {
+                $predecessor = $allScenarioOps->where('sequence', '<', $scenOp->sequence)->sortByDesc('sequence')->first();
+            }
+
+            if ($predecessor) {
+                $predOrderOp = $predecessor->orderOperation;
+                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                    $setupMinutes          = (float) ($predOrderOp->setup_time_planned ?? 0);
+                    $batchQty              = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
+                    $lagMinutes            = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
+                    $orderQty              = (float) ($order?->quantity_ordered ?? 1);
+                    $effectiveBatchQty     = min($batchQty, $orderQty);
+                    $firstBatchRunDuration = (float) $predOrderOp->processing_time_planned * $effectiveBatchQty;
+                    $totalOffsetMinutes    = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                    $earliestAllowedStart = $this->schedulingService->addWorkingMinutes(
+                        $predecessor->work_center_id,
+                        $predecessor->planned_start,
+                        $totalOffsetMinutes
+                    );
+
+                    if ($newStart->lt($earliestAllowedStart)) {
+                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor transfer-ready time ({$earliestAllowedStart->toDateTimeString()}).");
+                    }
+                } else {
+                    if ($newStart->lt($predecessor->planned_finish)) {
+                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor finishes ({$predecessor->planned_finish->toDateTimeString()}).");
+                    }
+                }
+            }
+
+            // Successor / Shift Mode Check
+            $successor = null;
+            if ($orderOp) {
+                $successor = $allScenarioOps->first(fn($o) => $o->orderOperation?->previous_operation_id === $orderOp->id);
+            }
+            if (!$successor && $orderOp) {
+                $succOpIds = $orderOp->successorDependencies()->pluck('operation_id')->toArray();
+                if (!empty($succOpIds)) {
+                    $successor = $allScenarioOps->whereIn('production_order_operation_id', $succOpIds)->sortBy('planned_start')->first();
+                }
+            }
+            if (!$successor && $orderOp) {
+                $successor = $allScenarioOps->where('sequence', '>', $scenOp->sequence)->sortBy('sequence')->first();
+            }
+
+            if ($shiftMode === ProductionScheduleChangeLog::SHIFT_MODE_ISOLATED) {
+                if ($successor) {
+                    if ($orderOp && (bool) $orderOp->overlap_enabled) {
+                        $setupMinutes          = (float) ($orderOp->setup_time_planned ?? 0);
+                        $batchQty              = (float) ($orderOp->transfer_batch_quantity ?? 0);
+                        $lagMinutes            = (float) ($orderOp->transfer_lag_minutes ?? 0);
+                        $orderQty              = (float) ($order?->quantity_ordered ?? 1);
+                        $effectiveBatchQty     = min($batchQty, $orderQty);
+                        $firstBatchRunDuration = (float) $orderOp->processing_time_planned * $effectiveBatchQty;
+                        $totalOffsetMinutes    = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                        $earliestSuccessorStart = $this->schedulingService->addWorkingMinutes(
+                            $scenOp->work_center_id,
+                            $newStart,
+                            $totalOffsetMinutes
+                        );
+
+                        if ($successor->planned_start->lt($earliestSuccessorStart)) {
+                            throw new InvalidArgumentException("Isolated move conflict: Moving this operation delays transfer-ready time beyond successor start ({$successor->planned_start->toDateTimeString()}).");
+                        }
+                    } else {
+                        if ($newFinish->gt($successor->planned_start)) {
+                            throw new InvalidArgumentException("Isolated move conflict: Operation finishes after successor starts ({$successor->planned_start->toDateTimeString()}).");
+                        }
+                    }
+                }
+            } elseif ($shiftMode === ProductionScheduleChangeLog::SHIFT_MODE_RIPPLE) {
+                // Downstream Ripple Propagation inside Scenario
+                $successors = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+                    ->where('production_order_id', $scenOp->production_order_id)
+                    ->where('id', '!=', $scenOp->id)
+                    ->whereNotIn('status', ['cancelled', 'skipped'])
+                    ->orderBy('planned_start', 'asc')
+                    ->orderBy('sequence', 'asc')
+                    ->get();
+
+                $scheduledMap = [
+                    $scenOp->id => [
+                        'id'             => $scenOp->id,
+                        'production_order_operation_id' => $scenOp->production_order_operation_id,
+                        'sequence'       => $scenOp->sequence,
+                        'parallel_group' => $scenOp->orderOperation?->parallel_group,
+                        'is_parallel'    => $scenOp->orderOperation?->is_parallel,
+                        'planned_start'  => $newStart->copy(),
+                        'planned_finish' => $newFinish->copy(),
+                        'work_center_id' => $scenOp->work_center_id,
+                        'order_op'       => $scenOp->orderOperation,
+                    ],
+                ];
+
+                foreach ($successors as $succOp) {
+                    $isSuccFrozen = $succOp->locked || in_array($succOp->status, ['completed', 'in_progress'], true);
+
+                    $earliestStart = $this->schedulingService->calculateEarliestStartFromPredecessors(
+                        $scheduledMap,
+                        $succOp->sequence,
+                        $succOp->orderOperation?->parallel_group,
+                        (bool) $succOp->orderOperation?->is_parallel,
+                        $newStart,
+                        (float) ($order?->quantity_ordered ?? 1),
+                        $succOp->orderOperation
+                    );
+
+                    if ($isSuccFrozen) {
+                        if ($succOp->planned_start->lt($earliestStart)) {
+                            throw new \LogicException(json_encode([
+                                'success'               => false,
+                                'code'                  => 'LOCKED_OPERATION_CONFLICT',
+                                'blocking_operation_id' => $succOp->id,
+                                'message'               => "LOCKED_OPERATION_CONFLICT: Operation sequence [{$succOp->sequence}] ({$succOp->orderOperation?->name}) is locked/running and prevents downstream ripple propagation.",
+                            ]));
+                        }
+                        $scheduledMap[$succOp->id] = [
+                            'id'             => $succOp->id,
+                            'production_order_operation_id' => $succOp->production_order_operation_id,
+                            'sequence'       => $succOp->sequence,
+                            'parallel_group' => $succOp->orderOperation?->parallel_group,
+                            'is_parallel'    => $succOp->orderOperation?->is_parallel,
+                            'planned_start'  => $succOp->planned_start->copy(),
+                            'planned_finish' => $succOp->planned_finish->copy(),
+                            'work_center_id' => $succOp->work_center_id,
+                            'order_op'       => $succOp->orderOperation,
+                        ];
+                        continue;
+                    }
+
+                    if ($succOp->planned_start->lt($earliestStart)) {
+                        $succDuration = (float) $succOp->planned_duration_minutes;
+                        $succFinish   = $this->schedulingService->addWorkingMinutes($succOp->work_center_id, $earliestStart, $succDuration);
+
+                        $succOp->planned_start   = $earliestStart;
+                        $succOp->planned_finish  = $succFinish;
+                        $succOp->manual_override = true;
+                        $succOp->source_version  = (int) $succOp->source_version + 1;
+                        $succOp->save();
+                    }
+
+                    $scheduledMap[$succOp->id] = [
+                        'id'             => $succOp->id,
+                        'production_order_operation_id' => $succOp->production_order_operation_id,
+                        'sequence'       => $succOp->sequence,
+                        'parallel_group' => $succOp->orderOperation?->parallel_group,
+                        'is_parallel'    => $succOp->orderOperation?->is_parallel,
+                        'planned_start'  => $succOp->planned_start->copy(),
+                        'planned_finish' => $succOp->planned_finish->copy(),
+                        'work_center_id' => $succOp->work_center_id,
+                        'order_op'       => $succOp->orderOperation,
+                    ];
+                }
+            }
+
+            // Save Target Operation in Scenario
+            $scenOp->planned_start   = $newStart;
+            $scenOp->planned_finish  = $newFinish;
+            $scenOp->machine_id      = $targetMachineId;
+            $scenOp->manual_override = true;
+            $scenOp->source_version  = (int) $scenOp->source_version + 1;
+            $scenOp->save();
+
+            // Recalculate Scenario KPIs
+            $this->recalculateScenario($tenantId, $scenario->id);
+
+            return [
+                'success' => true,
+                'message' => "Scenario operation sequence #{$scenOp->sequence} rescheduled in What-If Sandbox mode.",
+                'operation' => [
+                    'id'             => $scenOp->source_schedule_operation_id ?: $scenOp->id,
+                    'planned_start'  => $scenOp->planned_start->toIso8601String(),
+                    'planned_finish' => $scenOp->planned_finish->toIso8601String(),
+                ]
+            ];
+        });
+    }
+
+    /**
+     * Toggle lock on a scenario operation.
+     */
+    public function toggleScenarioOperationLock(int $tenantId, int $scenarioId, int $operationId, ?int $userId = null): ProductionScheduleScenarioOperation
+    {
+        $scenario = ProductionScheduleScenario::withoutGlobalScopes()
+            ->where('id', $scenarioId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        if (!$scenario) {
+            throw new InvalidArgumentException("Scenario #{$scenarioId} not found.");
+        }
+
+        if ($scenario->isPromoted() || $scenario->isDiscarded()) {
+            throw new InvalidArgumentException("Cannot toggle lock on a {$scenario->status} scenario.");
+        }
+
+        $scenOp = ProductionScheduleScenarioOperation::withoutGlobalScopes()
+            ->where('scenario_id', $scenarioId)
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($operationId) {
+                $q->where('id', $operationId)
+                    ->orWhere('source_schedule_operation_id', $operationId);
+            })->first();
+
+        if (!$scenOp) {
+            throw new InvalidArgumentException("Scenario operation #{$operationId} not found in Scenario #{$scenarioId}.");
+        }
+
+        $scenOp->locked = !$scenOp->locked;
+        $scenOp->source_version = (int) $scenOp->source_version + 1;
+        $scenOp->save();
+
+        return $scenOp;
     }
 
     private function countLiveLateOrders($liveOps): int

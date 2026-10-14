@@ -642,4 +642,207 @@ class ScheduleScenarioTest extends TestCase
             'op2'        => $op2,
         ];
     }
+
+    /**
+     * What-If Board: Adjust Operation rejects unqualified machine (different work).
+     */
+    public function test_scenario_adjust_operation_validates_machine_qualification(): void
+    {
+        $setup = $this->createTestScheduleSetup();
+        $unqualifiedMachine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $setup['workCenter']->id,
+            'name'           => 'Unqualified Machine 99',
+            'code'           => 'UNQ-99',
+            'status'         => 'active',
+        ]);
+
+        $scenarioData = [
+            'name'       => 'Qualification Test Scenario',
+            'start_date' => Carbon::now()->format('Y-m-d'),
+            'end_date'   => Carbon::now()->addDays(7)->format('Y-m-d'),
+        ];
+        $scenario = $this->scenarioService->createScenario($this->tenant->id, $scenarioData, $this->planner->id);
+
+        $sOp1 = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+            ->where('source_schedule_operation_id', $setup['op1']->id)
+            ->first();
+
+        // Attempting to move scenario operation to unqualified machine returns 422
+        $response = $this->actingAs($this->planner)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->postJson(route('production.schedules.operations.adjust', $sOp1->id), [
+                'planned_start' => $sOp1->planned_start->format('Y-m-d H:i:s'),
+                'machine_id'    => $unqualifiedMachine->id,
+                'shift_mode'    => 'isolated',
+                'scenario_id'   => $scenario->id,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment(['success' => false]);
+        $this->assertStringContainsString('not an approved primary or alternate machine', $response->json('message'));
+    }
+
+    /**
+     * What-If Board: Adjust Operation rejects machine belonging to different work center.
+     */
+    public function test_scenario_adjust_operation_validates_different_work_center(): void
+    {
+        $setup = $this->createTestScheduleSetup();
+        $otherWc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Assembly Work Center',
+            'code'                  => 'WC-ASSY',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+        $otherMachine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $otherWc->id,
+            'name'           => 'Assembly Station 01',
+            'code'           => 'ASSY-01',
+            'status'         => 'active',
+        ]);
+
+        $scenarioData = [
+            'name'       => 'Different WC Test',
+            'start_date' => Carbon::now()->format('Y-m-d'),
+            'end_date'   => Carbon::now()->addDays(7)->format('Y-m-d'),
+        ];
+        $scenario = $this->scenarioService->createScenario($this->tenant->id, $scenarioData, $this->planner->id);
+
+        $sOp1 = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+            ->where('source_schedule_operation_id', $setup['op1']->id)
+            ->first();
+
+        $response = $this->actingAs($this->planner)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->postJson(route('production.schedules.operations.adjust', $sOp1->id), [
+                'planned_start' => $sOp1->planned_start->format('Y-m-d H:i:s'),
+                'machine_id'    => $otherMachine->id,
+                'shift_mode'    => 'isolated',
+                'scenario_id'   => $scenario->id,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment(['success' => false]);
+        $this->assertStringContainsString('does not belong to Work Center', $response->json('message'));
+    }
+
+    /**
+     * What-If Board: Adjust Operation rejects locked scenario operation.
+     */
+    public function test_scenario_adjust_operation_rejects_locked_operation(): void
+    {
+        $setup = $this->createTestScheduleSetup();
+        $scenarioData = [
+            'name'       => 'Locked Op Scenario Test',
+            'start_date' => Carbon::now()->format('Y-m-d'),
+            'end_date'   => Carbon::now()->addDays(7)->format('Y-m-d'),
+        ];
+        $scenario = $this->scenarioService->createScenario($this->tenant->id, $scenarioData, $this->planner->id);
+
+        $sOp1 = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+            ->where('source_schedule_operation_id', $setup['op1']->id)
+            ->first();
+
+        // Lock scenario operation
+        $sOp1->update(['locked' => true]);
+
+        $response = $this->actingAs($this->planner)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->postJson(route('production.schedules.operations.adjust', $sOp1->id), [
+                'planned_start' => $sOp1->planned_start->copy()->addMinutes(30)->format('Y-m-d H:i:s'),
+                'machine_id'    => $setup['machine1']->id,
+                'shift_mode'    => 'isolated',
+                'scenario_id'   => $scenario->id,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment(['success' => false]);
+        $this->assertStringContainsString('locked and cannot be moved', $response->json('message'));
+    }
+
+    /**
+     * What-If Board: Adjust Operation executes ripple shift across scenario operations.
+     */
+    public function test_scenario_adjust_operation_executes_ripple_shift(): void
+    {
+        $setup = $this->createTestScheduleSetup();
+        $scenarioData = [
+            'name'       => 'Ripple Shift Scenario Test',
+            'start_date' => Carbon::now()->format('Y-m-d'),
+            'end_date'   => Carbon::now()->addDays(7)->format('Y-m-d'),
+        ];
+        $scenario = $this->scenarioService->createScenario($this->tenant->id, $scenarioData, $this->planner->id);
+
+        $sOp1 = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+            ->where('source_schedule_operation_id', $setup['op1']->id)
+            ->first();
+        $sOp2 = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+            ->where('source_schedule_operation_id', $setup['op2']->id)
+            ->first();
+
+        $originalOp2Start = $sOp2->planned_start->copy();
+
+        // Shift Op1 to start 3 hours later in ripple mode (pushing finish past op2 start)
+        $newStart = $sOp1->planned_start->copy()->addHours(3);
+
+        $response = $this->actingAs($this->planner)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->postJson(route('production.schedules.operations.adjust', $sOp1->id), [
+                'planned_start' => $newStart->format('Y-m-d H:i:s'),
+                'machine_id'    => $setup['machine1']->id,
+                'shift_mode'    => 'ripple',
+                'scenario_id'   => $scenario->id,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment(['success' => true]);
+
+        $sOp1->refresh();
+        $sOp2->refresh();
+
+        // Op2 must have rippled forward in the scenario!
+        $this->assertTrue($sOp2->planned_start->gt($originalOp2Start));
+        $this->assertTrue($sOp2->planned_start->gte($sOp1->planned_finish));
+
+        // Live operations must remain untouched!
+        $liveOp2 = ProductionScheduleOperation::find($setup['op2']->id);
+        $this->assertEquals($originalOp2Start->toIso8601String(), $liveOp2->planned_start->toIso8601String());
+    }
+
+    /**
+     * What-If Board: Toggle lock on scenario operation updates scenario lock state only.
+     */
+    public function test_scenario_toggle_lock_updates_scenario_only(): void
+    {
+        $setup = $this->createTestScheduleSetup();
+        $scenarioData = [
+            'name'       => 'Toggle Lock Scenario Test',
+            'start_date' => Carbon::now()->format('Y-m-d'),
+            'end_date'   => Carbon::now()->addDays(7)->format('Y-m-d'),
+        ];
+        $scenario = $this->scenarioService->createScenario($this->tenant->id, $scenarioData, $this->planner->id);
+
+        $sOp1 = ProductionScheduleScenarioOperation::where('scenario_id', $scenario->id)
+            ->where('source_schedule_operation_id', $setup['op1']->id)
+            ->first();
+
+        $response = $this->actingAs($this->planner)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->postJson(route('production.schedules.operations.toggle-lock', $sOp1->id), [
+                'scenario_id' => $scenario->id,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment(['success' => true, 'locked' => true]);
+
+        $sOp1->refresh();
+        $this->assertTrue($sOp1->locked);
+
+        // Live operation must remain UNLOCKED
+        $liveOp1 = ProductionScheduleOperation::find($setup['op1']->id);
+        $this->assertFalse($liveOp1->locked);
+    }
 }
