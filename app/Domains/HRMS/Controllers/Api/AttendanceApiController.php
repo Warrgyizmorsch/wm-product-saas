@@ -252,8 +252,7 @@ class AttendanceApiController extends Controller
             return $authError;
         }
 
-        $user = auth()->user();
-        $employee = Employee::where('user_id', $user->id)->first();
+        $employee = $this->getAuthenticatedEmployee();
 
         if (!$employee) {
             return $this->sendError('Employee profile not found.', 404);
@@ -337,14 +336,18 @@ class AttendanceApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
 
+        if (!$isHrAdmin && !$authEmployee) {
+            return $this->sendError('Employee profile not found for the authenticated user.', 404);
+        }
+
+        if (!$isHrAdmin && !empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only clock in for yourself.', 403);
+        }
+
         $targetEmployeeId = $validated['employee_id'] ?? $authEmployee?->id;
 
         if (!$targetEmployeeId) {
             return $this->sendError('Employee profile not found for the authenticated user.', 404);
-        }
-
-        if (!$isHrAdmin && $authEmployee && (int)$targetEmployeeId !== (int)$authEmployee->id) {
-            return $this->sendError('Unauthorized action. You can only clock in for yourself.', 403);
         }
 
         try {
@@ -781,7 +784,7 @@ class AttendanceApiController extends Controller
         }
 
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
+            'employee_id' => 'nullable|integer|exists:employees,id',
             'latitude'    => 'required|numeric|between:-90,90',
             'longitude'   => 'required|numeric|between:-180,180',
         ]);
@@ -789,8 +792,16 @@ class AttendanceApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
 
-        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
-            return $this->sendError('Unauthorized action. You can only track location for yourself.', 403);
+        if (!$isHrAdmin) {
+            if (!$authEmployee) {
+                return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            }
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('Unauthorized action. You can only track location for yourself.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
         }
 
         $result = $this->attendanceRepository->trackLocation(
@@ -820,8 +831,13 @@ class AttendanceApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
 
-        if (!$isHrAdmin && $authEmployee && (int)$employee->id !== (int)$authEmployee->id) {
-            return $this->sendError('Unauthorized action. You can only view your own attendance logs.', 403);
+        if (!$isHrAdmin) {
+            if (!$authEmployee) {
+                return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            }
+            if ((int) $employee->id !== (int) $authEmployee->id) {
+                return $this->sendError('Unauthorized action. You can only view your own attendance logs.', 403);
+            }
         }
 
         $startDate = $request->query('start_date') ?? $request->query('from');

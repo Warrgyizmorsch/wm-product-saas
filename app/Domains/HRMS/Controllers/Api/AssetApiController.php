@@ -997,7 +997,7 @@ class AssetApiController extends Controller
     public function storeRequest(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'employee_id'           => 'required|exists:employees,id',
+            'employee_id'           => 'nullable|integer|exists:employees,id',
             'reason'                => 'required|string|max:1000',
             'requested_asset_ids'   => 'nullable|array',
             'requested_asset_ids.*' => 'exists:assets,id',
@@ -1008,8 +1008,16 @@ class AssetApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
 
-        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
-            return $this->sendError('Unauthorized action. You can only submit asset requests for yourself.', 403);
+        if (!$isHrAdmin) {
+            if (!$authEmployee) {
+                return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            }
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('Unauthorized action. You can only submit asset requests for yourself.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
         }
 
         $categoryIds = [];
@@ -1367,8 +1375,7 @@ class AssetApiController extends Controller
             return $authError;
         }
 
-        $user = auth()->user();
-        $employee = Employee::where('user_id', $user->id)->first();
+        $employee = $this->getAuthenticatedEmployee();
 
         if (!$employee) {
             return $this->sendError('You do not have an active employee profile associated with your user account.', 403);
@@ -1577,6 +1584,9 @@ class AssetApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+        if (!$request->user()?->can('viewAny', Asset::class)) {
+            return $this->sendError('Unauthorized action.', 403);
+        }
 
         $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
         return $repo->export($request->all());
@@ -1591,8 +1601,8 @@ class AssetApiController extends Controller
             return $authError;
         }
 
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized action. Admin permissions required to import assets.', 403);
+        if (!$request->user()?->can('create', Asset::class)) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
         $request->validate([
@@ -1617,61 +1627,12 @@ class AssetApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+        if (!request()->user()?->can('viewAny', Asset::class)) {
+            return $this->sendError('Unauthorized action.', 403);
+        }
 
         $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
         return $repo->downloadTemplate();
     }
 
-    /**
-     * Export asset categories to Excel (.xlsx) with matching web filters.
-     */
-    public function exportCategories(Request $request): mixed
-    {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
-        return $repo->exportCategories($request->all());
-    }
-
-    /**
-     * Import asset categories from Excel / CSV file.
-     */
-    public function importCategories(Request $request): JsonResponse
-    {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized action. Admin permissions required to import asset categories.', 403);
-        }
-
-        $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
-        ]);
-
-        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
-        $result = $repo->importCategories($request->file('file'));
-
-        if (!($result['success'] ?? false)) {
-            return $this->sendError($result['message'] ?? 'Failed to import asset categories.', 422);
-        }
-
-        return $this->sendSuccess($result, $result['message'] ?? 'Asset categories imported successfully.');
-    }
-
-    /**
-     * Download Asset Categories Import Excel Template.
-     */
-    public function downloadCategoriesTemplate(): mixed
-    {
-        if ($authError = $this->authorizeUser()) {
-            return $authError;
-        }
-
-        $repo = app(\App\Domains\HRMS\Repositories\AssetRepositoryInterface::class);
-        return $repo->downloadCategoriesTemplate();
-    }
 }

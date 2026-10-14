@@ -9,7 +9,9 @@ use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 
 class OvertimeRequestController extends Controller
 {
@@ -17,17 +19,13 @@ class OvertimeRequestController extends Controller
         private readonly OvertimeRequestRepositoryInterface $overtimeRepository
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        $data = $this->overtimeRepository->getIndexData($request->all());
-
-        return view('modules.hrms.overtime.index', $data);
+        return redirect()->route('hrms.shift-overtime.index', array_merge(['tab' => 'overtime'], $request->all()));
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $user = auth()->user();
-
         $validated = $request->validate([
             'employee_id'       => 'required|exists:employees,id',
             'date'              => 'required|date',
@@ -49,13 +47,16 @@ class OvertimeRequestController extends Controller
 
         $employee = Employee::findOrFail($validated['employee_id']);
 
-        if (!$employee) {
-            return redirect()->back()->with('error', __('hrms.overtime.profile_not_found'));
+        // Check if employee's shift on this date permits overtime
+        $shift = $employee->resolveShiftForDate($validated['date']);
+        if ($shift && !$shift->overtime_allowed && !$isHrAdmin) {
+            return redirect()->back()->withInput()->with('error', __('hrms.overtime.shift_not_allowed', ['shift' => $shift->name]));
         }
 
-        // Check if an overtime request already exists for this employee on this date
+        // Check if an active/pending overtime request already exists for this employee on this date
         $exists = OvertimeRequest::where('employee_id', $employee->id)
             ->where('date', $validated['date'])
+            ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
             ->exists();
         if ($exists) {
             return redirect()->back()->withInput()->with('error', __('hrms.overtime.request_exists'));
@@ -69,31 +70,88 @@ class OvertimeRequestController extends Controller
         }
         $durationHours = $startTime->diffInMinutes($endTime) / 60.0;
 
-        // Fetch minimum overtime request hours setting
+        // Fetch overtime policy rules (minimum request hours and monthly maximum cap)
         $minHours = 0.5;
-        $tenant = $user ? \App\Models\Tenant::find($user->tenant_id) : null;
-        if ($tenant && is_array($tenant->settings)) {
-            $minHours = (float) ($tenant->settings['min_overtime_request_hours'] ?? 0.5);
+        $maxMonthlyHours = null;
+
+        $otPenaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where('rule_type', 'overtime_rules')
+            ->where(function ($q) use ($employee) {
+                $q->where('company_id', $employee->company_id)->orWhereNull('company_id');
+            })
+            ->where('status', true)
+            ->orderByRaw('company_id IS NULL ASC')
+            ->first();
+
+        if ($otPenaltyRule && is_array($otPenaltyRule->penalty_tiers)) {
+            if (isset($otPenaltyRule->penalty_tiers['min_overtime_request_hours']) && $otPenaltyRule->penalty_tiers['min_overtime_request_hours'] !== '' && $otPenaltyRule->penalty_tiers['min_overtime_request_hours'] !== null) {
+                $minHours = (float) $otPenaltyRule->penalty_tiers['min_overtime_request_hours'];
+            }
+            if (isset($otPenaltyRule->penalty_tiers['overtime_max_monthly_hours']) && $otPenaltyRule->penalty_tiers['overtime_max_monthly_hours'] !== '' && $otPenaltyRule->penalty_tiers['overtime_max_monthly_hours'] !== null) {
+                $maxMonthlyHours = (float) $otPenaltyRule->penalty_tiers['overtime_max_monthly_hours'];
+            }
+        } else {
+            $tenantId = $employee->tenant_id ?? $user?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null);
+            $tenant = $tenantId ? \App\Models\Tenant::find($tenantId) : null;
+            if ($tenant && is_array($tenant->settings)) {
+                if (isset($tenant->settings['min_overtime_request_hours']) && $tenant->settings['min_overtime_request_hours'] !== '' && $tenant->settings['min_overtime_request_hours'] !== null) {
+                    $minHours = (float) $tenant->settings['min_overtime_request_hours'];
+                }
+                if (isset($tenant->settings['overtime_max_monthly_hours']) && $tenant->settings['overtime_max_monthly_hours'] !== '' && $tenant->settings['overtime_max_monthly_hours'] !== null) {
+                    $maxMonthlyHours = (float) $tenant->settings['overtime_max_monthly_hours'];
+                }
+            }
         }
 
         if ($durationHours < $minHours) {
             return redirect()->back()->withInput()->with('error', __('hrms.overtime.duration_error', ['min' => $minHours]));
         }
 
+        if ($maxMonthlyHours !== null && $maxMonthlyHours > 0) {
+            $reqDate = Carbon::parse($validated['date']);
+            $existingMonthHours = (float) OvertimeRequest::where('employee_id', $employee->id)
+                ->whereBetween('date', [$reqDate->copy()->startOfMonth()->toDateString(), $reqDate->copy()->endOfMonth()->toDateString()])
+                ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
+                ->sum('duration_hours');
+
+            if (($existingMonthHours + $durationHours) > $maxMonthlyHours) {
+                $remainingHours = max(0.0, $maxMonthlyHours - $existingMonthHours);
+                return redirect()->back()->withInput()->with('error', __('hrms.overtime.monthly_limit_exceeded', ['max' => $maxMonthlyHours, 'logged' => $existingMonthHours, 'remaining' => $remainingHours]));
+            }
+        }
+
         $validated['duration_hours']          = $durationHours;
         $validated['approved_duration_hours'] = $durationHours;
         $validated['employee_id']             = $employee->id;
-        $validated['company_id']              = $employee->company_id;
+        $validated['company_id']              = $employee->company_id ?? ($user?->company_id ?? 1);
 
-        $this->overtimeRepository->storeOvertimeRequest($validated, $request);
+        DB::transaction(function () use ($validated, $request) {
+            return $this->overtimeRepository->storeOvertimeRequest($validated, $request);
+        });
 
-        \App\Services\Notification\NotificationService::sendToHrAdmins(
-            title: 'New Overtime Request',
-            message: "{$employee->full_name} submitted an overtime request for {$durationHours} hrs.",
-            actionUrl: \Illuminate\Support\Facades\Route::has('hrms.overtime.index') ? route('hrms.overtime.index') : (\Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime')),
-            type: 'overtime_request',
-            iconClass: 'feather-clock'
-        );
+        // Safely dispatch notifications to HR Admins & Reporting Manager
+        try {
+            $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'New Overtime Request',
+                message: "{$employee->full_name} submitted an overtime request for {$durationHours} hrs.",
+                actionUrl: $actionUrl,
+                type: 'overtime_request',
+                iconClass: 'feather-clock'
+            );
+
+            if ($employee->reportingManager && $employee->reportingManager->user_id) {
+                \App\Services\Notification\NotificationService::sendToUser(
+                    userId: $employee->reportingManager->user_id,
+                    title: 'New Overtime Request',
+                    message: "{$employee->full_name} submitted an overtime request for {$durationHours} hrs.",
+                    actionUrl: $actionUrl,
+                    type: 'overtime_request',
+                    iconClass: 'feather-clock'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Overtime request notification dispatch failed: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', __('hrms.overtime.submitted_successfully'));
     }
@@ -140,49 +198,33 @@ class OvertimeRequestController extends Controller
             $reason = $request->input('rejection_reason');
         }
 
-        $this->overtimeRepository->updateStatus($overtimeRequest, [
-            'action'                  => $action,
-            'rejection_reason'        => $reason,
-            'approved_duration_hours' => $approvedHours,
-        ], $request);
+        DB::transaction(function () use ($overtimeRequest, $action, $reason, $approvedHours, $request) {
+            $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
+            $this->overtimeRepository->updateStatus($locked, [
+                'action'                  => $action,
+                'rejection_reason'        => $reason,
+                'approved_duration_hours' => $approvedHours,
+            ], $request);
+        });
 
-        if ($overtimeRequest->employee_id) {
-            \App\Services\Notification\NotificationService::sendToEmployee(
-                employeeId: $overtimeRequest->employee_id,
-                title: 'Overtime Request ' . ucfirst($action),
-                message: "Your overtime request for {$overtimeRequest->date} has been {$action}.",
-                actionUrl: \Illuminate\Support\Facades\Route::has('hrms.overtime.index') ? route('hrms.overtime.index') : (\Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime')),
-                type: 'overtime_' . $action,
-                iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
-            );
+        // Safely notify Employee
+        try {
+            if ($overtimeRequest->employee_id) {
+                $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $overtimeRequest->employee_id,
+                    title: 'Overtime Request ' . ucfirst($action),
+                    message: "Your overtime request for {$overtimeRequest->date} has been {$action}.",
+                    actionUrl: $actionUrl,
+                    type: 'overtime_' . $action,
+                    iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Overtime status notification dispatch failed: ' . $e->getMessage());
         }
 
         return redirect()->back()->with('success', __('hrms.overtime.status_updated'));
-    }
-
-    public function updateSettings(Request $request): RedirectResponse
-    {
-        $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
-        $validated = $request->validate([
-            'auto_overtime_threshold_hours' => 'required_without:min_overtime_request_hours|nullable|numeric|min:0',
-            'min_overtime_request_hours'    => 'required_without:auto_overtime_threshold_hours|nullable|numeric|min:0.5',
-            'overtime_max_monthly_hours'    => 'nullable|numeric|min:0',
-            'overtime_weekend_multiplier'   => 'nullable|numeric|min:1.0',
-            'overtime_holiday_multiplier'   => 'nullable|numeric|min:1.0',
-            'overtime_tiers'                => 'nullable|array',
-            'overtime_tiers.*.min_hours'    => 'required|numeric|min:0',
-            'overtime_tiers.*.max_hours'    => 'nullable|numeric|min:0',
-            'overtime_tiers.*.multiplier'   => 'required|numeric|min:1.0',
-        ], [
-            'auto_overtime_threshold_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
-            'min_overtime_request_hours.required_without' => 'Either the Auto Overtime Threshold Hours or the Minimum Overtime Request Hours must be specified.',
-        ]);
-
-        $this->overtimeRepository->updateGlobalSettings($validated);
-
-        return redirect()->back()->with('success', __('hrms.overtime.policies_updated'));
     }
 
     public function withdraw(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
@@ -197,12 +239,18 @@ class OvertimeRequestController extends Controller
         }
 
         if (!$overtimeRequest->canWithdraw()) {
-            return redirect()->back()->with('error', 'Only pending requests can be withdrawn.');
+            return redirect()->back()->with('error', __('hrms.overtime.withdraw_only_pending'));
         }
 
-        $overtimeRequest->delete();
+        DB::transaction(function () use ($overtimeRequest) {
+            $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
+            if (!$locked->canWithdraw()) {
+                throw new \RuntimeException(__('hrms.overtime.withdraw_only_pending'));
+            }
+            $locked->delete();
+        });
 
-        return redirect()->back()->with('success', 'Overtime request withdrawn successfully.');
+        return redirect()->back()->with('success', __('hrms.overtime.withdraw_success'));
     }
 
     public function requestCancellation(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
@@ -217,23 +265,45 @@ class OvertimeRequestController extends Controller
         }
 
         if (!$overtimeRequest->canRequestCancellation()) {
-            return redirect()->back()->with('error', 'Only approved requests can have a cancellation requested.');
+            return redirect()->back()->with('error', __('hrms.overtime.only_approved_can_cancel'));
         }
 
         $validated = $request->validate([
             'cancellation_reason' => 'required|string|max:1000',
         ]);
 
-        $updateData = ['status' => 'cancellation_requested'];
-        if (\Illuminate\Support\Facades\Schema::hasColumn('overtime_requests', 'cancellation_reason')) {
-            $updateData['cancellation_reason'] = $validated['cancellation_reason'];
-        } else {
-            $updateData['rejection_reason'] = $validated['cancellation_reason'];
+        DB::transaction(function () use ($overtimeRequest, $validated) {
+            $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
+            if (!$locked->canRequestCancellation()) {
+                throw new \RuntimeException(__('hrms.overtime.only_approved_can_cancel'));
+            }
+
+            $updateData = ['status' => 'cancellation_requested'];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('overtime_requests', 'cancellation_reason')) {
+                $updateData['cancellation_reason'] = $validated['cancellation_reason'];
+            } else {
+                $updateData['rejection_reason'] = $validated['cancellation_reason'];
+            }
+
+            $locked->update($updateData);
+        });
+
+        // Safely notify HR Admins
+        try {
+            $empName = $overtimeRequest->employee ? $overtimeRequest->employee->full_name : 'An employee';
+            $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Overtime Cancellation Requested',
+                message: "{$empName} requested cancellation for an overtime request on {$overtimeRequest->date}.",
+                actionUrl: $actionUrl,
+                type: 'overtime_cancellation_requested',
+                iconClass: 'feather-alert-circle'
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Overtime cancellation notification failed: ' . $e->getMessage());
         }
 
-        $overtimeRequest->update($updateData);
-
-        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+        return redirect()->back()->with('success', __('hrms.overtime.cancellation_submitted'));
     }
 
     public function approveCancellation(OvertimeRequest $overtimeRequest): RedirectResponse
@@ -242,15 +312,34 @@ class OvertimeRequestController extends Controller
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
         abort_unless($isHrAdmin, 403);
 
-        if ($overtimeRequest->status !== 'cancellation_requested') {
-            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        DB::transaction(function () use ($overtimeRequest) {
+            $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'cancellation_requested') {
+                throw new \RuntimeException(__('hrms.overtime.no_pending_cancellation'));
+            }
+
+            $this->overtimeRepository->revertCompOffLeave($locked);
+            $locked->update(['status' => 'cancelled']);
+        });
+
+        // Safely notify Employee
+        try {
+            if ($overtimeRequest->employee_id) {
+                $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $overtimeRequest->employee_id,
+                    title: 'Overtime Cancellation Approved',
+                    message: "Your overtime cancellation request for {$overtimeRequest->date} has been approved.",
+                    actionUrl: $actionUrl,
+                    type: 'overtime_cancellation_approved',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Overtime cancellation approval notification failed: ' . $e->getMessage());
         }
 
-        $this->revertCompOffIfApplicable($overtimeRequest);
-
-        $overtimeRequest->update(['status' => 'cancelled']);
-
-        return redirect()->back()->with('success', 'Overtime cancellation approved.');
+        return redirect()->back()->with('success', __('hrms.overtime.cancellation_approved'));
     }
 
     public function denyCancellation(OvertimeRequest $overtimeRequest): RedirectResponse
@@ -259,18 +348,38 @@ class OvertimeRequestController extends Controller
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
         abort_unless($isHrAdmin, 403);
 
-        if ($overtimeRequest->status !== 'cancellation_requested') {
-            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        DB::transaction(function () use ($overtimeRequest) {
+            $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'cancellation_requested') {
+                throw new \RuntimeException(__('hrms.overtime.no_pending_cancellation'));
+            }
+
+            $updateData = ['status' => 'approved'];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('overtime_requests', 'cancellation_reason')) {
+                $updateData['cancellation_reason'] = null;
+            }
+
+            $locked->update($updateData);
+        });
+
+        // Safely notify Employee
+        try {
+            if ($overtimeRequest->employee_id) {
+                $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $overtimeRequest->employee_id,
+                    title: 'Overtime Cancellation Denied',
+                    message: "Your overtime cancellation request for {$overtimeRequest->date} was denied. Request remains approved.",
+                    actionUrl: $actionUrl,
+                    type: 'overtime_cancellation_denied',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Overtime cancellation denial notification failed: ' . $e->getMessage());
         }
 
-        $updateData = ['status' => 'approved'];
-        if (\Illuminate\Support\Facades\Schema::hasColumn('overtime_requests', 'cancellation_reason')) {
-            $updateData['cancellation_reason'] = null;
-        }
-
-        $overtimeRequest->update($updateData);
-
-        return redirect()->back()->with('success', 'Cancellation request denied. Request remains approved.');
+        return redirect()->back()->with('success', __('hrms.overtime.cancellation_denied'));
     }
 
     public function destroy(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
@@ -283,37 +392,18 @@ class OvertimeRequestController extends Controller
                 abort(403, 'Unauthorized action.');
             }
             if ($overtimeRequest->status !== 'pending') {
-                return redirect()->back()->with('error', 'Only pending requests can be deleted.');
+                return redirect()->back()->with('error', __('hrms.overtime.delete_only_pending'));
             }
         }
 
-        // If approved and was comp_off, revert comp off credit
-        if (in_array($overtimeRequest->status, ['approved', 'cancellation_requested'])) {
-            $this->revertCompOffIfApplicable($overtimeRequest);
-        }
-
-        $overtimeRequest->delete();
+        DB::transaction(function () use ($overtimeRequest) {
+            $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
+            if (in_array($locked->status, ['approved', 'cancellation_requested'])) {
+                $this->overtimeRepository->revertCompOffLeave($locked);
+            }
+            $locked->delete();
+        });
 
         return redirect()->back()->with('success', __('hrms.overtime.deleted_successfully'));
-    }
-
-    private function revertCompOffIfApplicable(OvertimeRequest $overtimeRequest): void
-    {
-        if ($overtimeRequest->compensation_type === 'comp_off' && $overtimeRequest->employee) {
-            $approvedHours = (float) ($overtimeRequest->approved_duration_hours ?? $overtimeRequest->duration_hours);
-            $creditDays = round($approvedHours / 8, 1);
-            if ($creditDays > 0) {
-                $compOffType = \App\Domains\HRMS\Models\LeaveType::where('code', 'COMP_OFF')->first();
-                if ($compOffType) {
-                    $balance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $overtimeRequest->employee_id)
-                        ->where('leave_type_id', $compOffType->id)
-                        ->first();
-                    if ($balance) {
-                        $newAllocated = max(0, floatval($balance->allocated) - $creditDays);
-                        $balance->update(['allocated' => $newAllocated]);
-                    }
-                }
-            }
-        }
     }
 }

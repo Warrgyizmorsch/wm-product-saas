@@ -201,7 +201,7 @@ class EmployeeExitApiController extends Controller
         [$tenantId, , $authEmployee, $isHrAdmin] = $this->resolveContext();
 
         $validator = Validator::make($request->all(), [
-            'employee_id'        => 'required|exists:employees,id',
+            'employee_id'        => 'nullable|integer|exists:employees,id',
             'separation_type'    => 'required|string|in:resignation,termination,retirement,layoff,contract_end,absconding,death',
             'resignation_date'   => 'required|date',
             'preferred_lwd'      => 'nullable|date|after_or_equal:resignation_date',
@@ -218,8 +218,16 @@ class EmployeeExitApiController extends Controller
 
         $validated = $validator->validated();
 
-        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
-            return $this->sendError('Unauthorized action. You can only initiate resignation for yourself.', 403);
+        if (!$isHrAdmin) {
+            if (!$authEmployee) {
+                return $this->sendError('Employee profile not found for the authenticated user.', 404);
+            }
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('Unauthorized action. You can only initiate resignation for yourself.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('employee_id is required for HR administrators.', 422);
         }
 
         $employee = Employee::find($validated['employee_id']);

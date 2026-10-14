@@ -21,6 +21,7 @@ class LeaveEncashment extends BaseModel
         'reason',
         'approved_by',
         'approved_at',
+        'rejection_reason',
     ];
 
     protected $casts = [

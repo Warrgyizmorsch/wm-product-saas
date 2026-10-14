@@ -163,7 +163,7 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
         ];
     }
 
-    public function approve(AttendanceCorrection $correction, ?User $user): array
+    public function approve(AttendanceCorrection $correction, ?User $user, ?string $approvedCheckIn = null, ?string $approvedCheckOut = null): array
     {
         if ($correction->status !== 'pending') {
             return [
@@ -175,11 +175,21 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
 
         DB::beginTransaction();
         try {
+            $dateStr = $correction->date ? $correction->date->format('Y-m-d') : Carbon::today()->format('Y-m-d');
+
+            $finalCheckInTime = $approvedCheckIn ?: ($correction->requested_check_in ? $correction->requested_check_in->format('H:i') : null);
+            $finalCheckOutTime = $approvedCheckOut ?: ($correction->requested_check_out ? $correction->requested_check_out->format('H:i') : null);
+
+            $requestedCheckIn = $finalCheckInTime ? Carbon::parse($dateStr . ' ' . $finalCheckInTime) : null;
+            $requestedCheckOut = $finalCheckOutTime ? Carbon::parse($dateStr . ' ' . $finalCheckOutTime) : null;
+
             $correction->update([
-                'status'          => 'approved',
-                'approved_by'     => $user?->id,
-                'approved_at'     => Carbon::now(),
-                'rejected_reason' => null,
+                'status'              => 'approved',
+                'requested_check_in'  => $requestedCheckIn ?? $correction->requested_check_in,
+                'requested_check_out' => $requestedCheckOut ?? $correction->requested_check_out,
+                'approved_by'         => $user?->id,
+                'approved_at'         => Carbon::now(),
+                'rejected_reason'     => null,
             ]);
 
             $attendance = $correction->attendance ?? Attendance::where('tenant_id', $correction->tenant_id)
@@ -187,22 +197,22 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
                 ->whereDate('date', $correction->date)
                 ->first();
 
-            $dateStr = $correction->date ? $correction->date->format('Y-m-d') : Carbon::today()->format('Y-m-d');
-            $requestedCheckIn = $correction->requested_check_in 
-                ? Carbon::parse($dateStr . ' ' . $correction->requested_check_in->format('H:i:s')) 
-                : null;
-            $requestedCheckOut = $correction->requested_check_out 
-                ? Carbon::parse($dateStr . ' ' . $correction->requested_check_out->format('H:i:s')) 
-                : null;
+            $effectiveCheckIn = $requestedCheckIn ?? $attendance?->check_in;
+            $effectiveCheckOut = $requestedCheckOut ?? $attendance?->check_out;
+
+            $existingBreakHours = $attendance ? (float) ($attendance->total_break_hours ?? 0.00) : 0.00;
+            $workHours = 0.00;
+            if ($effectiveCheckIn && $effectiveCheckOut && $effectiveCheckOut->greaterThan($effectiveCheckIn)) {
+                $grossHours = round($effectiveCheckIn->diffInMinutes($effectiveCheckOut) / 60, 2);
+                $workHours = max(0.00, round($grossHours - $existingBreakHours, 2));
+            }
 
             if ($attendance) {
                 $attendance->update([
-                    'check_in'         => $requestedCheckIn ?? $attendance->check_in,
-                    'check_out'        => $requestedCheckOut ?? $attendance->check_out,
+                    'check_in'         => $effectiveCheckIn,
+                    'check_out'        => $effectiveCheckOut,
                     'status'           => 'present',
-                    'total_work_hours' => ($requestedCheckIn && $requestedCheckOut) 
-                        ? round($requestedCheckIn->diffInMinutes($requestedCheckOut) / 60, 2) 
-                        : $attendance->total_work_hours,
+                    'total_work_hours' => $workHours,
                 ]);
             } else {
                 $employee = Employee::find($correction->employee_id);
@@ -211,12 +221,11 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
                     'company_id'       => $employee?->company_id,
                     'employee_id'      => $correction->employee_id,
                     'date'             => $dateStr,
-                    'check_in'         => $requestedCheckIn,
-                    'check_out'        => $requestedCheckOut,
+                    'check_in'         => $effectiveCheckIn ?: Carbon::parse($dateStr . ' 00:00:00'),
+                    'check_out'        => $effectiveCheckOut,
                     'status'           => 'present',
-                    'total_work_hours' => ($requestedCheckIn && $requestedCheckOut) 
-                        ? round($requestedCheckIn->diffInMinutes($requestedCheckOut) / 60, 2) 
-                        : 0,
+                    'total_work_hours' => $workHours,
+                    'location_type'    => 'office',
                 ]);
 
                 $correction->update(['attendance_id' => $attendance->id]);

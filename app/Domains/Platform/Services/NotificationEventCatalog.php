@@ -419,6 +419,16 @@ class NotificationEventCatalog
                         'action_route' => 'hrms.wfh.index',
                         'variables' => ['employee_name', 'date', 'approved_by'],
                     ],
+                    'hrms.wfh.rejected' => [
+                        'label' => 'Work From Home (WFH) Rejected',
+                        'description' => 'Triggered when a WFH request is rejected.',
+                        'icon' => 'feather-x-circle',
+                        'default_roles' => ['Employee', 'HR Manager'],
+                        'default_title' => '❌ WFH Request Rejected: {{date}}',
+                        'default_body' => 'Your WFH request for {{date}} has been rejected by {{rejected_by}}. Reason: {{reason}}.',
+                        'action_route' => 'hrms.wfh.index',
+                        'variables' => ['employee_name', 'date', 'reason', 'rejected_by'],
+                    ],
 
                     // Overtime & Shifts
                     'hrms.overtime.applied' => [

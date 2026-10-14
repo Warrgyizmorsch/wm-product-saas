@@ -47,7 +47,9 @@ class WfhRequestApiController extends Controller
 
         return $user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hrms.leave_requests.approve')
-            || $user->hasHrPermission('hrms.leaves.manage');
+            || $user->hasHrPermission('hrms.leaves.manage')
+            || $user->hasHrPermission('hrms.wfh_requests.approve')
+            || $user->hasHrPermission('hrms.wfh_requests.manage');
     }
 
     private function getAuthenticatedEmployee(): ?Employee
@@ -57,12 +59,7 @@ class WfhRequestApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     private function authorizeUser(): ?JsonResponse
@@ -180,10 +177,8 @@ class WfhRequestApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $employee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $employee) {
-            if ($wfhRequest->employee_id !== $employee->id) {
-                return $this->sendError('Unauthorized action. You can only view your own WFH requests.', 403);
-            }
+        if (!$isHrAdmin && (!$employee || (int) $wfhRequest->employee_id !== (int) $employee->id)) {
+            return $this->sendError('Unauthorized action. You can only view your own WFH requests.', 403);
         }
 
         $isOwner = $employee && (int)$wfhRequest->employee_id === (int)$employee->id;
@@ -204,8 +199,12 @@ class WfhRequestApiController extends Controller
             return $authError;
         }
 
+        if ($request->filled('start_date') && !$request->filled('end_date')) {
+            $request->merge(['end_date' => $request->input('start_date')]);
+        }
+
         $validated = $request->validate([
-            'employee_id'       => 'required|exists:employees,id',
+            'employee_id'       => 'nullable|exists:employees,id',
             'start_date'        => 'required|date',
             'end_date'          => 'required|date|after_or_equal:start_date',
             'start_date_type'   => 'required|string|in:full_day,first_half,second_half',
@@ -221,8 +220,16 @@ class WfhRequestApiController extends Controller
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
 
-        if (!$isHrAdmin && $authEmployee && (int)$validated['employee_id'] !== (int)$authEmployee->id) {
-            return $this->sendError('Unauthorized action. You can only submit WFH requests for yourself.', 403);
+        if (!$isHrAdmin) {
+            if (!$authEmployee) {
+                return $this->sendError('An employee profile is required to submit a WFH request.', 403);
+            }
+            if (!empty($validated['employee_id']) && (int) $validated['employee_id'] !== (int) $authEmployee->id) {
+                return $this->sendError('You can only submit a WFH request for your own employee profile.', 403);
+            }
+            $validated['employee_id'] = $authEmployee->id;
+        } elseif (empty($validated['employee_id'])) {
+            return $this->sendError('Select an employee for this WFH request.', 422);
         }
 
         $employee = Employee::find($validated['employee_id']);
@@ -272,8 +279,11 @@ class WfhRequestApiController extends Controller
             $attachmentPath = $request->file('attachment')->store('wfh_attachments', 'public');
         }
 
+        $user = auth()->user();
+        $tenantId = $user?->tenant_id ?? $employee->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null);
+
         $wfhRequest = WfhRequest::create([
-            'tenant_id'         => auth()->user()->tenant_id ?? null,
+            'tenant_id'         => $tenantId,
             'company_id'        => $employee->company_id,
             'employee_id'       => $employee->id,
             'start_date'        => $startDate->format('Y-m-d'),
@@ -290,6 +300,45 @@ class WfhRequestApiController extends Controller
             'attachment_path'   => $attachmentPath,
         ]);
 
+        $wfhDateStr = $startDate->format('d M Y') . ($duration > 1 ? ' to ' . $endDate->format('d M Y') : '');
+
+        try {
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'New WFH Request',
+                message: "{$employee->full_name} applied for {$duration} day(s) WFH.",
+                actionUrl: route('hrms.wfh.index'),
+                type: 'wfh_request',
+                iconClass: 'feather-home'
+            );
+
+            if ($employee->reportingManager) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $employee->reportingManager,
+                    title: 'New WFH Request Applied',
+                    message: "{$employee->full_name} applied for {$duration} day(s) WFH.",
+                    actionUrl: route('hrms.wfh.index'),
+                    type: 'wfh_request',
+                    iconClass: 'feather-home'
+                );
+            }
+
+            if (!empty($validated['notified_contacts'])) {
+                $contacts = Employee::whereIn('id', $validated['notified_contacts'])->get();
+                foreach ($contacts as $contact) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $contact,
+                        title: 'Colleague WFH Notice',
+                        message: "{$employee->full_name} will be working from home (" . $startDate->format('d M') . ($duration > 1 ? ' - ' . $endDate->format('d M') : '') . ").",
+                        actionUrl: route('hrms.wfh.index'),
+                        type: 'wfh_notice',
+                        iconClass: 'feather-home'
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('API WFH notification dispatch failed: ' . $e->getMessage());
+        }
+
         return $this->sendSuccess($wfhRequest->load(['employee']), 'WFH request submitted successfully.', 201);
     }
 
@@ -303,22 +352,67 @@ class WfhRequestApiController extends Controller
             return $this->sendError('Unauthorized action. HR Admin permissions required to approve WFH request.', 403);
         }
 
-        $wfhRequest = WfhRequest::find($id);
-        if (!$wfhRequest) {
-            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($id) {
+            $wfhRequest = WfhRequest::whereKey($id)->lockForUpdate()->first();
+            if (!$wfhRequest) {
+                return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+            }
 
-        $adminEmployee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+            $actorEmployee = $this->getAuthenticatedEmployee();
+            if ($actorEmployee && (int) $actorEmployee->id === (int) $wfhRequest->employee_id) {
+                $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+                if (!$workflowService->allowsSelfApproval(auth()->user(), $wfhRequest)) {
+                    return $this->sendError('Self-approval is prohibited.', 403);
+                }
+            }
 
-        $wfhRequest->update([
-            'status'        => 'approved',
-            'current_level' => 'approved',
-            'approved_by'   => $adminEmployee ? $adminEmployee->id : null
-        ]);
+            if ($wfhRequest->status !== 'pending') {
+                return $this->sendError('Only pending WFH requests can be approved.', 422);
+            }
 
-        return $this->sendSuccess($wfhRequest, 'WFH request approved successfully.');
+            $adminEmployee = Employee::where('personal_email', auth()->user()->email)
+                ->orWhere('office_email', auth()->user()->email)
+                ->first();
+
+            $wfhRequest->update([
+                'status'        => 'approved',
+                'current_level' => 'approved',
+                'approved_by'   => $adminEmployee ? $adminEmployee->id : null
+            ]);
+
+            $wfhDateStr = $wfhRequest->start_date ? \Carbon\Carbon::parse($wfhRequest->start_date)->format('d M Y') : now()->format('d M Y');
+
+            try {
+                if ($wfhRequest->employee) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $wfhRequest->employee,
+                        title: 'WFH Request Approved',
+                        message: "Your WFH request for {$wfhDateStr} has been approved.",
+                        actionUrl: route('hrms.wfh.index'),
+                        type: 'wfh_approved',
+                        iconClass: 'feather-check-circle'
+                    );
+                }
+
+                if (!empty($wfhRequest->notified_contacts)) {
+                    $contacts = Employee::whereIn('id', $wfhRequest->notified_contacts)->get();
+                    foreach ($contacts as $contact) {
+                        \App\Services\Notification\NotificationService::sendToEmployee(
+                            employee: $contact,
+                            title: 'Colleague WFH Approved',
+                            message: "{$wfhRequest->employee?->full_name}'s WFH ({$wfhDateStr}) has been approved.",
+                            actionUrl: route('hrms.wfh.index'),
+                            type: 'wfh_approved',
+                            iconClass: 'feather-home'
+                        );
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('API WFH approval notification dispatch failed: ' . $e->getMessage());
+            }
+
+            return $this->sendSuccess($wfhRequest, 'WFH request approved successfully.');
+        });
     }
 
     public function rejectRequest(Request $request, mixed $id): JsonResponse
@@ -331,22 +425,33 @@ class WfhRequestApiController extends Controller
             return $this->sendError('Unauthorized action. HR Admin permissions required to reject WFH request.', 403);
         }
 
-        $wfhRequest = WfhRequest::find($id);
-        if (!$wfhRequest) {
-            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
-        }
-
         $validated = $request->validate([
             'rejection_reason' => 'required|string|max:500'
         ]);
 
-        $wfhRequest->update([
-            'status'           => 'rejected',
-            'current_level'    => 'rejected',
-            'rejection_reason' => $validated['rejection_reason']
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($id, $validated) {
+            $wfhRequest = WfhRequest::whereKey($id)->lockForUpdate()->first();
+            if (!$wfhRequest) {
+                return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+            }
 
-        return $this->sendSuccess($wfhRequest, 'WFH request rejected successfully.');
+            $actorEmployee = $this->getAuthenticatedEmployee();
+            if ($actorEmployee && (int) $actorEmployee->id === (int) $wfhRequest->employee_id) {
+                return $this->sendError('You cannot process your own WFH request.', 403);
+            }
+
+            if ($wfhRequest->status !== 'pending') {
+                return $this->sendError('Only pending WFH requests can be rejected.', 422);
+            }
+
+            $wfhRequest->update([
+                'status'           => 'rejected',
+                'current_level'    => 'rejected',
+                'rejection_reason' => $validated['rejection_reason']
+            ]);
+
+            return $this->sendSuccess($wfhRequest, 'WFH request rejected successfully.');
+        });
     }
 
     public function updateStatus(Request $request, mixed $id): JsonResponse
@@ -359,47 +464,89 @@ class WfhRequestApiController extends Controller
             return $this->sendError('Unauthorized action. HR Admin permissions required to update WFH request status.', 403);
         }
 
-        $wfhRequest = WfhRequest::find($id);
-        if (!$wfhRequest) {
-            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
-        }
-
-        if ($wfhRequest->status === 'cancelled') {
-            return $this->sendError('Cannot change the status of a cancelled WFH application.', 422);
-        }
-
         $validated = $request->validate([
             'status'           => 'required|string|in:approved,rejected,pending',
             'rejection_reason' => 'nullable|string|max:500'
         ]);
 
-        $status        = $validated['status'];
-        $adminEmployee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
-            ->first();
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($id, $validated) {
+            $wfhRequest = WfhRequest::whereKey($id)->lockForUpdate()->first();
+            if (!$wfhRequest) {
+                return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+            }
 
-        if ($status === 'approved') {
-            $wfhRequest->update([
-                'status'           => 'approved',
-                'current_level'    => 'approved',
-                'approved_by'      => $adminEmployee ? $adminEmployee->id : null,
-                'rejection_reason' => null
-            ]);
-        } elseif ($status === 'rejected') {
-            $wfhRequest->update([
-                'status'           => 'rejected',
-                'current_level'    => 'rejected',
-                'rejection_reason' => $validated['rejection_reason'] ?? 'Rejected by Admin'
-            ]);
-        } else {
-            $wfhRequest->update([
-                'status'           => 'pending',
-                'current_level'    => '1',
-                'rejection_reason' => null
-            ]);
-        }
+            $actorEmployee = $this->getAuthenticatedEmployee();
+            if ($actorEmployee && (int) $actorEmployee->id === (int) $wfhRequest->employee_id) {
+                $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+                if (!$workflowService->allowsSelfApproval(auth()->user(), $wfhRequest)) {
+                    return $this->sendError('You cannot process your own WFH request.', 403);
+                }
+            }
 
-        return $this->sendSuccess($wfhRequest, "WFH request status updated to '{$status}' successfully.");
+            if (in_array($wfhRequest->status, ['cancelled', 'cancellation_requested'], true)) {
+                return $this->sendError('This WFH application cannot be changed through the status workflow.', 422);
+            }
+
+            $status        = $validated['status'];
+            $adminEmployee = Employee::where('personal_email', auth()->user()->email)
+                ->orWhere('office_email', auth()->user()->email)
+                ->first();
+
+            if ($status === 'approved') {
+                $wfhRequest->update([
+                    'status'           => 'approved',
+                    'current_level'    => 'approved',
+                    'approved_by'      => $adminEmployee ? $adminEmployee->id : null,
+                    'rejection_reason' => null
+                ]);
+            } elseif ($status === 'rejected') {
+                $wfhRequest->update([
+                    'status'           => 'rejected',
+                    'current_level'    => 'rejected',
+                    'rejection_reason' => $validated['rejection_reason'] ?? 'Rejected by Admin'
+                ]);
+            } else {
+                $wfhRequest->update([
+                    'status'           => 'pending',
+                    'current_level'    => '1',
+                    'rejection_reason' => null
+                ]);
+            }
+
+            $wfhDateStr = $wfhRequest->start_date ? \Carbon\Carbon::parse($wfhRequest->start_date)->format('d M Y') : now()->format('d M Y');
+
+            try {
+                if ($wfhRequest->employee) {
+                    $statusText = ucfirst($status);
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $wfhRequest->employee,
+                        title: "WFH Request {$statusText}",
+                        message: "Your WFH request status is now {$statusText}." . ($status === 'rejected' && !empty($validated['rejection_reason']) ? " Reason: {$validated['rejection_reason']}" : ''),
+                        actionUrl: route('hrms.wfh.index'),
+                        type: 'wfh_' . $status,
+                        iconClass: $status === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
+                    );
+                }
+
+                if ($status === 'approved' && !empty($wfhRequest->notified_contacts)) {
+                    $contacts = Employee::whereIn('id', $wfhRequest->notified_contacts)->get();
+                    foreach ($contacts as $contact) {
+                        \App\Services\Notification\NotificationService::sendToEmployee(
+                            employee: $contact,
+                            title: 'Colleague WFH Approved',
+                            message: "{$wfhRequest->employee?->full_name}'s WFH ({$wfhDateStr}) has been approved.",
+                            actionUrl: route('hrms.wfh.index'),
+                            type: 'wfh_approved',
+                            iconClass: 'feather-home'
+                        );
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('API WFH status notification failed: ' . $e->getMessage());
+            }
+
+            return $this->sendSuccess($wfhRequest, "WFH request status updated to '{$status}' successfully.");
+        });
     }
 
     public function withdrawRequest(mixed $id): JsonResponse
@@ -415,7 +562,7 @@ class WfhRequestApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $wfhRequest->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && (!$authEmployee || (int) $wfhRequest->employee_id !== (int) $authEmployee->id)) {
             return $this->sendError('Unauthorized action. You can only withdraw your own WFH request.', 403);
         }
 
@@ -441,7 +588,7 @@ class WfhRequestApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $wfhRequest->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && (!$authEmployee || (int) $wfhRequest->employee_id !== (int) $authEmployee->id)) {
             return $this->sendError('Unauthorized action. You can only request cancellation for your own WFH request.', 403);
         }
 
@@ -471,21 +618,23 @@ class WfhRequestApiController extends Controller
             return $this->sendError('Unauthorized action. HR Admin permissions required to approve WFH cancellation.', 403);
         }
 
-        $wfhRequest = WfhRequest::find($id);
-        if (!$wfhRequest) {
-            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($id) {
+            $wfhRequest = WfhRequest::whereKey($id)->lockForUpdate()->first();
+            if (!$wfhRequest) {
+                return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+            }
 
-        if ($wfhRequest->status !== 'cancellation_requested') {
-            return $this->sendError('This application does not have a pending cancellation request.', 400);
-        }
+            if ($wfhRequest->status !== 'cancellation_requested') {
+                return $this->sendError('This application does not have a pending cancellation request.', 400);
+            }
 
-        $wfhRequest->update([
-            'status'        => 'cancelled',
-            'current_level' => 'cancelled',
-        ]);
+            $wfhRequest->update([
+                'status'        => 'cancelled',
+                'current_level' => 'cancelled',
+            ]);
 
-        return $this->sendSuccess($wfhRequest, 'WFH cancellation approved.');
+            return $this->sendSuccess($wfhRequest, 'WFH cancellation approved.');
+        });
     }
 
     public function denyCancellation(mixed $id): JsonResponse
@@ -498,21 +647,23 @@ class WfhRequestApiController extends Controller
             return $this->sendError('Unauthorized action. HR Admin permissions required to deny WFH cancellation.', 403);
         }
 
-        $wfhRequest = WfhRequest::find($id);
-        if (!$wfhRequest) {
-            return $this->sendError("WFH request with ID '{$id}' not found.", 404);
-        }
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($id) {
+            $wfhRequest = WfhRequest::whereKey($id)->lockForUpdate()->first();
+            if (!$wfhRequest) {
+                return $this->sendError("WFH request with ID '{$id}' not found.", 404);
+            }
 
-        if ($wfhRequest->status !== 'cancellation_requested') {
-            return $this->sendError('This application does not have a pending cancellation request.', 400);
-        }
+            if ($wfhRequest->status !== 'cancellation_requested') {
+                return $this->sendError('This application does not have a pending cancellation request.', 400);
+            }
 
-        $wfhRequest->update([
-            'status'              => 'approved',
-            'cancellation_reason' => null,
-        ]);
+            $wfhRequest->update([
+                'status'              => 'approved',
+                'cancellation_reason' => null,
+            ]);
 
-        return $this->sendSuccess($wfhRequest, 'Cancellation request denied. Application remains approved.');
+            return $this->sendSuccess($wfhRequest, 'Cancellation request denied. Application remains approved.');
+        });
     }
 
     /**

@@ -24,8 +24,17 @@ class ShiftOvertimeController extends Controller
         $data = array_merge($shiftData, $overtimeData);
 
         // Explicitly name lists and counts so they don't overwrite each other
-        $data['shiftRequests'] = $shiftData['requests'];
-        $data['overtimeRequests'] = $overtimeData['requests'];
+        $data['shiftRequests']          = $shiftData['requests'];
+        $data['overtimeRequests']       = $overtimeData['requests'];
+        $data['shiftTotalRequests']     = $shiftData['totalRequests'];
+        $data['shiftPendingRequests']   = $shiftData['pendingRequests'];
+        $data['shiftApprovedRequests']  = $shiftData['approvedRequests'];
+        $data['shiftRejectedRequests']  = $shiftData['rejectedRequests'];
+        $data['overtimeTotalRequests']   = $overtimeData['totalRequests'];
+        $data['overtimePendingRequests'] = $overtimeData['pendingRequests'];
+        $data['overtimeApprovedRequests']= $overtimeData['approvedRequests'];
+        $data['overtimeRejectedRequests']= $overtimeData['rejectedRequests'];
+
         $rawTab = $request->input('tab', 'shift');
         $data['activeTab'] = in_array($rawTab, ['shift-change', 'shift_change', 'shift']) ? 'shift' : $rawTab;
 

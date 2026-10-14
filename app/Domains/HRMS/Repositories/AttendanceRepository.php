@@ -849,25 +849,48 @@ class AttendanceRepository implements AttendanceRepositoryInterface
     public function export(array $filters = []): mixed
     {
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
-        $date = $filters['date'] ?? Carbon::today()->format('Y-m-d');
-        $departmentId = $filters['department_id'] ?? null;
-        $employeeId = $filters['employee_id'] ?? null;
+        $user = auth()->user();
 
-        $query = Attendance::with(['employee.department'])
-            ->where('tenant_id', $tenantId)
-            ->whereDate('date', $date);
+        $query = Attendance::with(['employee.department']);
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
+        if ($user) {
+            $query->forUserScope($user);
+        }
 
-        if ($departmentId) {
+        // Date range / Month / Single Date filtering
+        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+            $query->whereBetween('date', [$filters['start_date'], $filters['end_date']]);
+        } elseif (!empty($filters['month']) && $filters['month'] !== 'all') {
+            $parts = explode('-', $filters['month']);
+            if (count($parts) === 2) {
+                $start = Carbon::createFromDate((int)$parts[0], (int)$parts[1], 1)->startOfMonth()->format('Y-m-d');
+                $end = Carbon::createFromDate((int)$parts[0], (int)$parts[1], 1)->endOfMonth()->format('Y-m-d');
+                $query->whereBetween('date', [$start, $end]);
+            }
+        } elseif (!empty($filters['date'])) {
+            $query->whereDate('date', $filters['date']);
+        } elseif (empty($filters['month']) || $filters['month'] !== 'all') {
+            $query->whereDate('date', Carbon::today()->format('Y-m-d'));
+        }
+
+        if (!empty($filters['department_id'])) {
+            $departmentId = $filters['department_id'];
             $query->whereHas('employee', function ($q) use ($departmentId) {
                 $q->where('department_id', $departmentId);
             });
         }
 
-        if ($employeeId) {
-            $query->where('employee_id', $employeeId);
+        if (!empty($filters['employee_id'])) {
+            $query->where('employee_id', $filters['employee_id']);
         }
 
-        $logs = $query->get();
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        $logs = $query->orderBy('date', 'desc')->get();
 
         $headers = [
             "Content-type"        => "text/csv",
@@ -1066,19 +1089,69 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                 continue;
             }
 
-            Attendance::updateOrCreate(
-                [
-                    'tenant_id'   => $tenantId,
-                    'employee_id' => $employee->id,
-                    'date'        => $dateStr,
-                ],
-                [
-                    'status'        => $statusRaw,
-                    'check_in'      => $checkInTime,
-                    'check_out'     => $checkOutTime,
-                    'location_type' => 'office',
-                ]
-            );
+            $punchInDatetime = $checkInTime ? Carbon::parse("{$dateStr} {$checkInTime}") : null;
+            $punchOutDatetime = $checkOutTime ? Carbon::parse("{$dateStr} {$checkOutTime}") : null;
+
+            $existingAtt = Attendance::where('tenant_id', $tenantId)
+                ->where('employee_id', $employee->id)
+                ->whereDate('date', $dateStr)
+                ->first();
+
+            if ($existingAtt) {
+                // If existing record already has check_in and this is a single punch import
+                $newCheckIn = $existingAtt->check_in;
+                $newCheckOut = $existingAtt->check_out;
+
+                if ($punchInDatetime) {
+                    if (!$newCheckIn) {
+                        $newCheckIn = $punchInDatetime;
+                    } elseif ($punchInDatetime->lt($newCheckIn)) {
+                        if (!$newCheckOut) {
+                            $newCheckOut = $newCheckIn;
+                        }
+                        $newCheckIn = $punchInDatetime;
+                    } elseif ($punchInDatetime->gt($newCheckIn)) {
+                        if (!$newCheckOut || $punchInDatetime->gt($newCheckOut)) {
+                            $newCheckOut = $punchInDatetime;
+                        }
+                    }
+                }
+
+                if ($punchOutDatetime) {
+                    if (!$newCheckOut || $punchOutDatetime->gt($newCheckOut)) {
+                        $newCheckOut = $punchOutDatetime;
+                    }
+                }
+
+                $workHours = 0.00;
+                if ($newCheckIn && $newCheckOut && $newCheckOut->gt($newCheckIn)) {
+                    $workHours = round($newCheckIn->diffInMinutes($newCheckOut) / 60, 2);
+                }
+
+                $existingAtt->update([
+                    'status'           => $statusRaw ?: $existingAtt->status,
+                    'check_in'         => $newCheckIn,
+                    'check_out'        => $newCheckOut,
+                    'total_work_hours' => $workHours > 0 ? $workHours : $existingAtt->total_work_hours,
+                    'location_type'    => $existingAtt->location_type ?: 'office',
+                ]);
+            } else {
+                $workHours = 0.00;
+                if ($punchInDatetime && $punchOutDatetime && $punchOutDatetime->gt($punchInDatetime)) {
+                    $workHours = round($punchInDatetime->diffInMinutes($punchOutDatetime) / 60, 2);
+                }
+
+                Attendance::create([
+                    'tenant_id'        => $tenantId,
+                    'employee_id'      => $employee->id,
+                    'date'             => $dateStr,
+                    'status'           => $statusRaw,
+                    'check_in'         => $punchInDatetime ?: Carbon::parse("{$dateStr} 00:00:00"),
+                    'check_out'        => $punchOutDatetime,
+                    'total_work_hours' => $workHours,
+                    'location_type'    => 'office',
+                ]);
+            }
 
             $importedCount++;
         }

@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('requested_days', 8, 1);
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->text('reason')->nullable();
+            $table->text('rejection_reason')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->softDeletes();

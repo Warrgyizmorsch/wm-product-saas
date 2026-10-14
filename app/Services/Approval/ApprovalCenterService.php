@@ -244,8 +244,8 @@ class ApprovalCenterService
         // ==========================================
         if ($isHrmsEnabled && $this->canApproveHrms($user)) {
             $isHrAdmin = $user->role === 'admin' || (method_exists($user, 'hasHrPermission') && $user->hasHrPermission('hr.settings.manage'));
-            $canApproveLeave = $isHrAdmin || $this->hasPermission($user, 'hrms.leave.approve') || $this->hasPermission($user, 'hrms.leaves.manage');
-            $canApproveWfh = $isHrAdmin || $this->hasPermission($user, 'hrms.wfh.approve') || $this->hasPermission($user, 'hrms.leaves.manage');
+            $canApproveLeave = $isHrAdmin || $this->hasPermission($user, 'hrms.leave.approve') || $this->hasPermission($user, 'hrms.leaves.manage') || $this->hasPermission($user, 'hrms.leave_requests.approve') || $this->hasPermission($user, 'hrms.leave_encashments.approve');
+            $canApproveWfh = $isHrAdmin || $this->hasPermission($user, 'hrms.wfh_requests.approve') || $this->hasPermission($user, 'hrms.wfh_requests.manage') || $this->hasPermission($user, 'hrms.wfh.approve') || $this->hasPermission($user, 'hrms.leaves.manage');
             $canApproveOvertime = $isHrAdmin || $this->hasPermission($user, 'hrms.overtime.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
             $canApproveShift = $isHrAdmin || $this->hasPermission($user, 'hrms.shift.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
             $canApproveAttendance = $isHrAdmin || $this->hasPermission($user, 'hrms.attendance.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
@@ -1079,6 +1079,8 @@ class ApprovalCenterService
         return $this->hasPermission($user, 'hrms.employees.update')
             || $this->hasPermission($user, 'hrms.leave.approve')
             || $this->hasPermission($user, 'hrms.leaves.manage')
+            || $this->hasPermission($user, 'hrms.leave_requests.approve')
+            || $this->hasPermission($user, 'hrms.leave_encashments.approve')
             || $this->hasPermission($user, 'hrms.attendance.approve')
             || $this->hasPermission($user, 'hrms.attendance.manage')
             || $this->hasPermission($user, 'hrms.travel_expenses.approve')

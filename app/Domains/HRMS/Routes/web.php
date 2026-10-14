@@ -266,6 +266,7 @@ Route::prefix('hrms')
 
         // Shift Change Request Management (Actions only)
         Route::prefix('shift-change')->group(function (): void {
+            Route::get('/', [ShiftChangeRequestController::class, 'index'])->name('shift-change.index');
             Route::post('/store', [ShiftChangeRequestController::class, 'store'])->name('shift-change.store');
             Route::post('/{shiftChangeRequest}/approve', [ShiftChangeRequestController::class, 'approve'])->name('shift-change.approve');
             Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestController::class, 'reject'])->name('shift-change.reject');
@@ -281,12 +282,12 @@ Route::prefix('hrms')
 
         // Overtime Request Management (Actions only)
         Route::prefix('overtime')->group(function (): void {
+            Route::get('/', [OvertimeRequestController::class, 'index'])->name('overtime.index');
             Route::post('/store', [OvertimeRequestController::class, 'store'])->name('overtime.store');
             Route::post('/{overtimeRequest}/approve', [OvertimeRequestController::class, 'approve'])->name('overtime.approve');
             Route::post('/{overtimeRequest}/reject', [OvertimeRequestController::class, 'reject'])->name('overtime.reject');
             Route::post('/{overtimeRequest}/update-status', [OvertimeRequestController::class, 'updateStatus'])->name('overtime.update-status');
             Route::delete('/{overtimeRequest}', [OvertimeRequestController::class, 'destroy'])->name('overtime.destroy');
-            Route::post('/settings', [OvertimeRequestController::class, 'updateSettings'])->name('overtime.update-settings');
 
             // Overtime Cancellation / Withdraw flow
             Route::post('/{overtimeRequest}/withdraw', [OvertimeRequestController::class, 'withdraw'])->name('overtime.withdraw');

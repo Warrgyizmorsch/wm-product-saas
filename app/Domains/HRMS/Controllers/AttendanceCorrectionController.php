@@ -83,9 +83,16 @@ class AttendanceCorrectionController extends Controller
      * POST /api/hrms/attendance-corrections
      * Submit a new attendance correction request.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        if (!$request->filled('employee_id')) {
+            $currentEmp = \App\Domains\HRMS\Models\Employee::resolveForUser(auth()->user());
+            if ($currentEmp) {
+                $request->merge(['employee_id' => $currentEmp->id]);
+            }
+        }
 
         $validated = $request->validate([
             'employee_id'         => 'required|integer|exists:employees,id',
@@ -96,6 +103,9 @@ class AttendanceCorrectionController extends Controller
         ]);
 
         if (empty($validated['requested_check_in']) && empty($validated['requested_check_out'])) {
+            if (!$request->expectsJson() && !$request->ajax()) {
+                return redirect()->back()->with('error', 'At least one of requested check-in or requested check-out must be provided.')->withInput();
+            }
             return response()->json([
                 'success' => false,
                 'message' => 'At least one of requested_check_in or requested_check_out must be provided.',
@@ -122,11 +132,26 @@ class AttendanceCorrectionController extends Controller
      * POST /api/hrms/attendance-corrections/{correction}/approve
      * Approve a pending attendance correction request.
      */
-    public function approve(Request $request, AttendanceCorrection $correction): JsonResponse
+    public function approve(Request $request, AttendanceCorrection $correction): JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $this->authorizeHrms('hrms.attendance_corrections.approve');
 
-        $res = $this->attendanceCorrectionRepository->approve($correction, auth()->user());
+        $approvedCheckIn = $request->input('approved_check_in');
+        $approvedCheckOut = $request->input('approved_check_out');
+
+        $res = $this->attendanceCorrectionRepository->approve(
+            $correction,
+            auth()->user(),
+            $approvedCheckIn,
+            $approvedCheckOut
+        );
+
+        if (!$request->expectsJson() && !$request->ajax()) {
+            if (!$res['success']) {
+                return redirect()->back()->with('error', $res['message']);
+            }
+            return redirect()->back()->with('success', $res['message']);
+        }
 
         return response()->json([
             'success' => $res['success'],
@@ -139,7 +164,7 @@ class AttendanceCorrectionController extends Controller
      * POST /api/hrms/attendance-corrections/{correction}/reject
      * Reject a pending attendance correction request.
      */
-    public function reject(Request $request, AttendanceCorrection $correction): JsonResponse
+    public function reject(Request $request, AttendanceCorrection $correction): JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $this->authorizeHrms('hrms.attendance_corrections.approve');
 
@@ -148,6 +173,13 @@ class AttendanceCorrectionController extends Controller
         ]);
 
         $res = $this->attendanceCorrectionRepository->reject($correction, $validated['rejected_reason'] ?? null, auth()->user());
+
+        if (!$request->expectsJson() && !$request->ajax()) {
+            if (!$res['success']) {
+                return redirect()->back()->with('error', $res['message']);
+            }
+            return redirect()->back()->with('success', $res['message']);
+        }
 
         return response()->json([
             'success' => $res['success'],

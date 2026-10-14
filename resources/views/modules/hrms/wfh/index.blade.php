@@ -278,10 +278,10 @@
                 <table class="table table-hover align-middle mb-0" id="wfhTable">
                     <thead class="table-light">
                         <tr>
-                            @if($isAdmin)
+                            @if($isAdmin || $canManageRequests)
                                 <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:160px;">{{ __('hrms.wfh.employee') }}</th>
                             @endif
-                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:170px;">{{ __('hrms.wfh.start_date') }} – {{ __('hrms.wfh.end_date') }}</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !($isAdmin || $canManageRequests) ? 'ps-3' : '' }}" style="min-width:170px;">{{ __('hrms.wfh.start_date') }} – {{ __('hrms.wfh.end_date') }}</th>
                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:70px;">{{ __('hrms.wfh.duration') }}</th>
                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:240px;">{{ __('hrms.wfh.reason') }}</th>
                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">{{ __('hrms.employees.tbl_file') }}</th>
@@ -292,6 +292,13 @@
                     <tbody>
                         @forelse($requests as $req)
                             @php
+                                $isSelf = $employee && (int) $req->employee_id === (int) $employee->id;
+                                $canManageRequest = $isAdmin || (
+                                    (!$isSelf) && (
+                                        ($req->employee && $employee && (string) $req->employee->reporting_manager_id === (string) $employee->id)
+                                        || ($req->employee?->department && $employee && (string) $req->employee->department->head_employee_id === (string) $employee->id)
+                                    )
+                                );
                                 $sameYear = $req->start_date && $req->end_date && ($req->start_date->format('Y') === $req->end_date->format('Y'));
                                 $startStr = $req->start_date ? $req->start_date->format($sameYear ? 'd M' : 'd M Y') : '';
                                 $endStr   = $req->end_date ? $req->end_date->format('d M Y') : '';
@@ -328,7 +335,7 @@
                                  data-duration="{{ $req->duration }}"
                                  data-created-at="{{ $req->created_at ? $req->created_at->timestamp : 0 }}"
                              >
-                                @if($isAdmin)
+                                @if($isAdmin || $canManageRequests)
                                     <td class="ps-3">
                                         <div class="fw-semibold text-dark fs-13">{{ $req->employee->full_name ?? 'N/A' }}</div>
                                         <div class="text-muted fs-11">
@@ -336,7 +343,7 @@
                                         </div>
                                     </td>
                                 @endif
-                                <td class="{{ !$isAdmin ? 'ps-3' : '' }}">
+                                <td class="{{ !($isAdmin || $canManageRequests) ? 'ps-3' : '' }}">
                                     <div class="fw-semibold text-dark fs-13">{{ $dateRange }}</div>
                                     <div class="text-muted fs-11">{{ $sessionInfo }}</div>
                                 </td>
@@ -350,6 +357,13 @@
                                         </div>
                                         @if($isLongReason)
                                             <a href="#" class="wfh-toggle-reason-btn fs-11 text-primary fw-semibold d-inline-block mt-0.5" onclick="toggleWfhReasonText(this); return false;">See more</a>
+                                        @endif
+                                        @if($req->wfh_latitude && $req->wfh_longitude)
+                                            <div class="mt-1">
+                                                <a href="https://www.google.com/maps?q={{ $req->wfh_latitude }},{{ $req->wfh_longitude }}" target="_blank" class="badge bg-soft-primary text-primary fs-11 text-decoration-none" title="View Target Location">
+                                                    <i class="feather-map-pin me-1"></i>{{ round($req->wfh_latitude, 4) }}, {{ round($req->wfh_longitude, 4) }}
+                                                </a>
+                                            </div>
                                         @endif
                                         @if($req->status === 'rejected' && !empty($req->rejection_reason))
                                             <div class="text-danger fs-11 mt-1">
@@ -389,8 +403,8 @@
                                 <td class="text-end pe-3">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
 
-                                        @if($isAdmin)
-                                            @if($req->status === 'cancellation_requested')
+                                        @if($canManageRequest)
+                                            @if($req->status === 'cancellation_requested' && $isAdmin)
                                                 {{-- Cancellation dropdown: Accept / Deny --}}
                                                 <div class="dropdown d-inline-block position-relative">
                                                     <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
@@ -403,19 +417,19 @@
                                                     </button>
                                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1060; background: #ffffff;">
                                                         <li>
-                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Approve this WFH cancellation?', { title: 'Approve Cancellation', variant: 'success', confirmButtonText: 'Approve' })" class="m-0">
+                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.wfh.confirm_approve_cancellation') }}', { title: '{{ __('hrms.wfh.accept') }}', variant: 'success', confirmButtonText: '{{ __('hrms.wfh.accept') }}' })" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
-                                                                    <span>{{ __('hrms.wfh.approved') }}</span>
+                                                                    <span>{{ __('hrms.wfh.accept') }}</span>
                                                                     <i class="feather-check text-success fs-12"></i>
                                                                 </button>
                                                             </form>
                                                         </li>
                                                         <li>
-                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Deny this cancellation request?', { title: 'Deny Cancellation', variant: 'danger', confirmButtonText: 'Deny' })" class="m-0">
+                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.wfh.confirm_deny_cancellation') }}', { title: '{{ __('hrms.wfh.deny') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.wfh.deny') }}' })" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
-                                                                    <span>{{ __('hrms.wfh.rejected') }}</span>
+                                                                    <span>{{ __('hrms.wfh.deny') }}</span>
                                                                     <i class="feather-x text-danger fs-12"></i>
                                                                 </button>
                                                             </form>
@@ -423,7 +437,7 @@
                                                     </ul>
                                                 </div>
 
-                                            @elseif(!in_array($req->status, ['cancelled']))
+                                            @elseif($req->status !== 'cancellation_requested' && !in_array($req->status, ['cancelled']))
                                                 {{-- Normal status dropdown: Approved / Rejected / Pending --}}
                                                 <div class="dropdown d-inline-block position-relative">
                                                     <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
@@ -464,6 +478,7 @@
                                                 </div>
                                             @endif
 
+                                            @if($isAdmin || ($employee && (int) $req->employee_id === (int) $employee->id && $req->status === 'pending'))
                                             {{-- Admin Delete button --}}
                                             <form method="POST" action="{{ route('hrms.wfh.destroy', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this WFH application?', { title: 'Delete WFH Application', variant: 'danger', confirmButtonText: 'Delete' })" class="d-inline">
                                                 @csrf
@@ -474,30 +489,31 @@
                                                     <i class="feather-trash-2 fs-14"></i>
                                                 </button>
                                             </form>
+                                            @endif
 
                                         @else
                                             {{-- Non-admin actions --}}
                                             {{-- Unified Withdraw / Cancellation Delete button --}}
                                             @if($req->canWithdraw())
-                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this WFH application?', { title: 'Withdraw WFH Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
+                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.wfh.confirm_withdraw') }}', { title: '{{ __('hrms.wfh.withdraw_application') }}', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                            title="Withdraw Application"
+                                                            title="{{ __('hrms.wfh.withdraw_application') }}"
                                                             style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
                                                         <i class="feather-trash-2 fs-14"></i>
                                                     </button>
                                                 </form>
                                             @elseif($req->canRequestCancellation())
-                                                <button type="button" class="btn btn-sm btn-soft-danger border" 
-                                                        title="Request Cancellation"
+                                                <button type="button" class="btn btn-sm btn-soft-warning border" 
+                                                        title="{{ __('hrms.wfh.request_wfh_cancellation') }}"
                                                         onclick="openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                    <i class="feather-trash-2 fs-14"></i>
+                                                    <i class="feather-rotate-ccw fs-14"></i>
                                                 </button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-light border disabled" 
                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
-                                                    <i class="feather-trash-2 fs-14"></i>
+                                                    <i class="feather-minus fs-14"></i>
                                                 </button>
                                             @endif
                                         @endif
@@ -543,7 +559,7 @@
         <div class="modal-content border-0 shadow">
             <div class="modal-header border-bottom py-3">
                 <h5 class="modal-title fw-bold text-dark" id="wfhCancellationModalLabel">
-                    <i class="feather-x-circle text-warning me-2"></i>{{ __('hrms.wfh.delete_application') }}
+                    <i class="feather-rotate-ccw text-warning me-2"></i>{{ __('hrms.wfh.request_wfh_cancellation') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -551,11 +567,11 @@
                 @csrf
                 <div class="modal-body p-4">
                     <p class="text-muted fs-13 mb-3">
-                        {{ __('hrms.wfh.confirm_delete') }}
+                        {{ __('hrms.wfh.wfh_cancel_help') }}
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.wfh.reason_comments') }} <span class="text-danger">*</span></label>
-                        <textarea name="cancellation_reason" id="wfh_cancellation_reason" class="form-control fs-13" rows="3" placeholder="{{ __('hrms.wfh.reason_placeholder') }}" required maxlength="1000"></textarea>
+                        <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.wfh.cancellation_reason') }} <span class="text-danger">*</span></label>
+                        <textarea name="cancellation_reason" id="wfh_cancellation_reason" class="form-control fs-13" rows="3" placeholder="{{ __('hrms.wfh.cancellation_reason_placeholder') }}" required maxlength="1000"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
@@ -590,7 +606,22 @@
                         </div>
                     @endif
 
-                    <input type="hidden" name="employee_id" id="wfh_employee_select" value="{{ $employee ? $employee->id : '' }}">
+                    @if($isAdmin)
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.employees.tbl_employee')" name="employee_id" id="wfh_employee_select" :required="true" class="odoo-select2-custom">
+                                    <option value="">{{ __('hrms.wfh.select_employee') }}</option>
+                                    @foreach (($employees ?? []) as $emp)
+                                        <option value="{{ $emp->id }}" data-lat="{{ $emp->wfh_latitude }}" data-lng="{{ $emp->wfh_longitude }}" {{ ($employee && $employee->id === $emp->id) ? 'selected' : '' }}>
+                                            {{ $emp->full_name }} ({{ $emp->employee_id }})
+                                        </option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        </div>
+                    @else
+                        <input type="hidden" name="employee_id" id="wfh_employee_select" value="{{ $employee ? $employee->id : '' }}">
+                    @endif
 
                     <div class="row mb-3">
                         <div class="col-md-6">
@@ -642,32 +673,44 @@
                         </div>
                     </div>
 
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" :label="__('hrms.wfh.notify_members')" name="notified_contacts[]" id="wfh_notified_contacts" :required="false" :multiple="true" class="odoo-select2-custom" :placeholder="__('hrms.leave.app.notify_placeholder')">
+                                @foreach (($employees ?? []) as $emp)
+                                    @if (!$employee || $emp->id !== $employee->id)
+                                        <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
+                                    @endif
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <div class="card bg-light border p-3 rounded-3 shadow-sm">
-                            <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> WFH Target Coordinates</div>
+                            <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> {{ __('hrms.wfh.target_coordinates') }}</div>
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-4">
-                                    <x-ui.odoo-form-ui type="input" label="WFH Latitude" name="wfh_latitude" id="wfh_req_latitude" placeholder="e.g. 28.6139" class="odoo-underline-input" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.wfh.latitude')" name="wfh_latitude" id="wfh_req_latitude" placeholder="e.g. 28.6139" value="{{ old('wfh_latitude', $employee?->wfh_latitude) }}" class="odoo-underline-input" />
                                 </div>
                                 <div class="col-md-4">
-                                    <x-ui.odoo-form-ui type="input" label="WFH Longitude" name="wfh_longitude" id="wfh_req_longitude" placeholder="e.g. 77.2090" class="odoo-underline-input" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.wfh.longitude')" name="wfh_longitude" id="wfh_req_longitude" placeholder="e.g. 77.2090" value="{{ old('wfh_longitude', $employee?->wfh_longitude) }}" class="odoo-underline-input" />
                                 </div>
                                 <div class="col-md-4 d-flex align-items-end">
                                     <div class="d-flex gap-2 w-100">
                                         <button type="button" class="btn btn-primary btn-sm flex-fill" id="btn_detect_wfh_req_loc" style="font-size: 11px;">
-                                            <i class="feather-crosshair me-1"></i>Detect
+                                            <i class="feather-crosshair me-1"></i>{{ __('hrms.wfh.detect') }}
                                         </button>
                                         <button type="button" class="btn btn-light-brand btn-sm flex-fill" id="btn_toggle_wfh_req_map" style="font-size: 11px;" onclick="toggleWfhReqMap()">
-                                            <i class="feather-map me-1"></i>Map
+                                            <i class="feather-map me-1"></i>{{ __('hrms.wfh.map') }}
                                         </button>
                                     </div>
                                 </div>
                             </div>
                             <div class="position-relative mt-3" id="wfh_req_map_wrap" style="display: none;">
-                                <input type="text" id="wfh_req_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="Search address or subarea (Press Enter)...">
+                                <input type="text" id="wfh_req_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="{{ __('hrms.wfh.search_location_placeholder') }}">
                                 <div id="wfh_req_map_picker" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #ced4da; z-index: 1;"></div>
                             </div>
-                            <small class="form-text text-muted fs-11 mt-1">If WFH geofencing is enabled, checking in will require matching these coordinates.</small>
+                            <small class="form-text text-muted fs-11 mt-1">{{ __('hrms.wfh.geofencing_help') }}</small>
                         </div>
                     </div>
                 </div>
@@ -768,12 +811,52 @@ function openWfhRejectModal(btn) {
     }
 }
 
+function openWfhCancellationModal(reqId, actionUrl) {
+    var form = document.getElementById('wfhCancellationForm');
+    if (form && actionUrl) {
+        form.action = actionUrl;
+        var modalEl = document.getElementById('wfhCancellationModal');
+        if (modalEl) {
+            var reasonEl = document.getElementById('wfh_cancellation_reason');
+            if (reasonEl) reasonEl.value = '';
+            var modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // Ensure modals are appended to document.body to prevent backdrop z-index clipping
-    ['applyWfhModal', 'rejectWfhModal'].forEach(function (id) {
+    ['applyWfhModal', 'rejectWfhModal', 'wfhCancellationModal'].forEach(function (id) {
         const modalEl = document.getElementById(id);
         if (modalEl && modalEl.parentElement !== document.body) {
             document.body.appendChild(modalEl);
+        }
+    });
+
+    // Initialize Select2 in modals
+    $('#applyWfhModal').on('shown.bs.modal', function () {
+        $(this).find('.odoo-select2-custom').each(function() {
+            var $select = $(this);
+            if (!$select.hasClass('select2-hidden-accessible') && typeof $.fn.select2 !== 'undefined') {
+                $select.select2({
+                    dropdownParent: $('#applyWfhModal .modal-content'),
+                    width: '100%'
+                });
+            }
+        });
+    });
+
+    // Dynamic employee coordinates auto-population
+    $(document).on('change', '#wfh_employee_select', function() {
+        var $opt = $(this).find('option:selected');
+        var lat = $opt.data('lat');
+        var lng = $opt.data('lng');
+        if (lat && !$('#wfh_req_latitude').val()) {
+            $('#wfh_req_latitude').val(lat);
+        }
+        if (lng && !$('#wfh_req_longitude').val()) {
+            $('#wfh_req_longitude').val(lng);
         }
     });
 
@@ -814,30 +897,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         let duration = 0;
-        let current = new Date(start);
-
         if (start.getTime() === end.getTime()) {
             // Single day
-            if (start.getDay() !== 0) { // Exclude Sunday (0)
-                duration = (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
-            }
+            duration = (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
         } else {
-            while (current <= end) {
-                // Exclude Sundays
-                if (current.getDay() !== 0) {
-                    var isStart = current.getTime() === start.getTime();
-                    var isEnd = current.getTime() === end.getTime();
-
-                    if (isStart) {
-                        duration += (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
-                    } else if (isEnd) {
-                        duration += (endTypeInput.value === 'full_day') ? 1.0 : 0.5;
-                    } else {
-                        duration += 1.0;
-                    }
-                }
-                current.setDate(current.getDate() + 1);
-            }
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            const startDur = (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
+            const endDur   = (endTypeInput.value === 'full_day') ? 1.0 : 0.5;
+            duration = startDur + Math.max(0, diffDays - 1) + endDur;
         }
 
         const formatted = duration.toFixed(1);
@@ -869,18 +937,18 @@ document.addEventListener('DOMContentLoaded', function () {
         calculateDuration();
     }
 
-    // Append wfhCancellationModal to body to avoid z-index/backdrop issues
-    var wfhCancelEl = document.getElementById('wfhCancellationModal');
-    if (wfhCancelEl && wfhCancelEl.parentNode !== document.body) {
-        document.body.appendChild(wfhCancelEl);
-    }
-
     // AJAX Loader for server-side search, sort, filter, and pagination
     function loadWfhApplications(page = 1) {
         var search = $('#wfh_search').val() || '';
         var empId = $('#filter_wfh_employee_id').val() || '';
         var status = $('#filter_wfh_status').val() || '';
         var sort = $('#wfh_sort_input').val() || 'newest';
+
+        var exportUrl = '{{ route("hrms.wfh.export") }}?' +
+                  'wfh_search=' + encodeURIComponent(search) +
+                  '&wfh_employee_id=' + encodeURIComponent(empId) +
+                  '&wfh_status=' + encodeURIComponent(status);
+        $('#btnExportHeader').attr('href', exportUrl);
 
         var url = '{{ route("hrms.wfh.index") }}?' +
                   'wfh_search=' + encodeURIComponent(search) +
@@ -1250,14 +1318,14 @@ const runWfhReqSetup = () => {
             if (isVisible) {
                 mapWrap.style.display = 'none';
                 if (toggleBtn) {
-                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>{{ __('hrms.wfh.map') }}';
                     toggleBtn.classList.remove('btn-secondary');
                     toggleBtn.classList.add('btn-soft-secondary');
                 }
             } else {
                 mapWrap.style.display = 'block';
                 if (toggleBtn) {
-                    toggleBtn.innerHTML = '<i class="feather-x me-1"></i>Hide Map';
+                    toggleBtn.innerHTML = '<i class="feather-x me-1"></i>{{ __('hrms.wfh.hide_map') }}';
                     toggleBtn.classList.remove('btn-soft-secondary');
                     toggleBtn.classList.add('btn-secondary');
                 }
@@ -1272,14 +1340,14 @@ const runWfhReqSetup = () => {
                 const searchInput = $('#wfh_req_map_search');
                 if (searchInput.length) {
                     searchInput.val('');
-                    searchInput.prop('disabled', false).attr('placeholder', 'Search address or subarea (Press Enter)...');
+                    searchInput.prop('disabled', false).attr('placeholder', '{{ __('hrms.wfh.search_location_placeholder') }}');
                 }
                 // Reset map visibility
                 const mapWrap = document.getElementById('wfh_req_map_wrap');
                 const toggleBtn = document.getElementById('btn_toggle_wfh_req_map');
                 if (mapWrap) mapWrap.style.display = 'none';
                 if (toggleBtn) {
-                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>Map';
+                    toggleBtn.innerHTML = '<i class="feather-map me-1"></i>{{ __('hrms.wfh.map') }}';
                     toggleBtn.classList.remove('btn-secondary');
                     toggleBtn.classList.add('btn-soft-secondary');
                 }
@@ -1291,7 +1359,7 @@ const runWfhReqSetup = () => {
             const originalHtml = btn.html();
             
             if (!navigator.geolocation) {
-                alert('Geolocation is not supported by your browser.');
+                alert('{{ __('hrms.wfh.geolocation_not_supported') }}');
                 return;
             }
 
@@ -1324,9 +1392,9 @@ const runWfhReqSetup = () => {
                     btn.prop('disabled', false).html(originalHtml);
                 },
                 function(error) {
-                    let errorMsg = 'Unable to retrieve location.';
+                    let errorMsg = '{{ __('hrms.wfh.unable_retrieve_location') }}';
                     if (error.code === error.PERMISSION_DENIED) {
-                        errorMsg = 'Permission denied. Please allow location access.';
+                        errorMsg = '{{ __('hrms.wfh.location_permission_denied') }}';
                     }
                     alert(errorMsg);
                     btn.prop('disabled', false).html(originalHtml);
