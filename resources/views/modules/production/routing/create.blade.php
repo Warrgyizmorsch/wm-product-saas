@@ -97,37 +97,25 @@
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.routing_name')" name="name" placeholder="{{ __('production.routing_name_placeholder') }}" :value="old('name')" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" :required="true">
+                        <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" id="product_id" :required="true">
                             <option value="">{{ __('production.select_product') }}</option>
                             @foreach($products as $p)
                                 <option value="{{ $p->id }}" @selected(old('product_id', $selectedProductId ?? '') == $p->id)>{{ $p->name }} ({{ $p->sku }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" />
+
+                        <x-ui.odoo-form-ui type="select" :label="__('production.bom') ?? 'Bill of Materials (BOM)'" name="bom_id" id="bom_id" :required="true" :searchable="false">
+                            <option value="">-- {{ __('production.select_bom') ?? 'Select BOM (Active / Draft)' }} --</option>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="effective_from" inputType="date" :value="old('effective_from', date('Y-m-d'))" :required="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.expiry_date')" name="effective_to" inputType="date" :value="old('effective_to')" />
-                        
-                        <x-ui.odoo-form-ui type="select" :label="__('production.routing_type')" name="is_default" :required="true">
-                            <option value="1" @selected(old('is_default', '1') == '1')>{{ __('production.primary') }}</option>
-                            <option value="0" @selected(old('is_default') == '0')>{{ __('production.alternative') }}</option>
-                        </x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" />
 
-                        <x-ui.odoo-form-ui type="radio" :label="__('production.sequence_control')">
-                            <div class="form-check me-3">
-                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_auto" :value="true" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_auto">{{ __('production.auto_manage_sequence') }}</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_manual" :value="false" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_manual">Manual Sequence</label>
-                            </div>
-                        </x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="effective_from" inputType="date" :value="old('effective_from', date('Y-m-d'))" :required="true" />
+
+                        <input type="hidden" name="is_default" value="1">
                     </div>
 
                     <div class="col-12 border-top pt-3">
@@ -405,6 +393,53 @@
     </div>
 
     <script>
+        const allBoms = @json($boms ?? []);
+
+        function updateBomOptions(productId, selectedBomId) {
+            const $bomSelect = $('#bom_id');
+            const currentVal = (selectedBomId !== undefined && selectedBomId !== null && selectedBomId !== '') 
+                ? String(selectedBomId) 
+                : String($bomSelect.val() || '');
+            
+            $bomSelect.empty();
+            $bomSelect.append($('<option>', {
+                value: '',
+                text: '-- {{ __('production.select_bom') ?? 'Select BOM (Active / Draft)' }} --'
+            }));
+
+            if (!productId) {
+                return;
+            }
+
+            // Only active, approved, or draft BOMs for that product - never cancelled
+            const filtered = allBoms.filter(b => String(b.product_id) === String(productId) && ['approved', 'active', 'draft'].includes(b.status));
+            
+            let matchedId = null;
+            if (currentVal && filtered.some(b => String(b.id) === currentVal)) {
+                matchedId = currentVal;
+            } else {
+                // Auto-select active/approved BOM if available, otherwise draft
+                const activeBom = filtered.find(b => b.status === 'active' || b.status === 'approved') || filtered.find(b => b.status === 'draft');
+                if (activeBom) {
+                    matchedId = String(activeBom.id);
+                }
+            }
+
+            filtered.forEach(b => {
+                const statusLabel = b.status.charAt(0).toUpperCase() + b.status.slice(1);
+                const isSelected = String(b.id) === matchedId;
+                $bomSelect.append($('<option>', {
+                    value: b.id,
+                    text: `${b.bom_number} - ${b.bom_name} (v${b.version} - ${statusLabel})`,
+                    selected: isSelected
+                }));
+            });
+
+            if (matchedId) {
+                $bomSelect.val(matchedId);
+            }
+        }
+
         function routingForm() {
             return {
                 operations: [],
@@ -412,6 +447,15 @@
                 uidCounter: 1,
 
                 init() {
+                    // Initialize dynamic BOM options
+                    const initProdId = $('#product_id').val();
+                    const initBomId = @js(old('bom_id', $selectedBomId ?? ''));
+                    updateBomOptions(initProdId, initBomId);
+
+                    $('#product_id').on('change.select2 change', function() {
+                        updateBomOptions($(this).val(), null);
+                    });
+
                     // Add initial operation row
                     this.addOperation();
 

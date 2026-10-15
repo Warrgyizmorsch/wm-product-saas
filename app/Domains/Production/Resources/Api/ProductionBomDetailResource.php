@@ -31,7 +31,7 @@ class ProductionBomDetailResource extends JsonResource
             'effective_date'  => $this->effective_date?->format('Y-m-d'),
             'expiry_date'     => $this->expiry_date?->format('Y-m-d'),
             'notes'           => $this->notes,
-            'routing_id'      => $this->routing_id,
+            'routing_id'      => $this->routing?->id,
             'routing'         => $this->whenLoaded('routing', fn () => [
                 'id'             => $this->routing->id,
                 'routing_number' => $this->routing->routing_number,

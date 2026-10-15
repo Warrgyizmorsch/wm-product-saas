@@ -1476,6 +1476,44 @@ body.app-skin-dark .erp-badge-active,
     border: 1px solid rgba(34, 197, 94, 0.3) !important;
 }
 
+.erp-badge-cancelled {
+    background-color: #fee2e2 !important;
+    color: #dc2626 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    display: inline-block;
+    text-transform: uppercase;
+}
+
+html.app-skin-dark .erp-badge-cancelled,
+body.app-skin-dark .erp-badge-cancelled,
+[data-bs-theme="dark"] .erp-badge-cancelled {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    color: #f87171 !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+.erp-badge-inactive {
+    background-color: #fef3c7 !important;
+    color: #d97706 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    display: inline-block;
+    text-transform: uppercase;
+}
+
+html.app-skin-dark .erp-badge-inactive,
+body.app-skin-dark .erp-badge-inactive,
+[data-bs-theme="dark"] .erp-badge-inactive {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
 .erp-single-panel {
     display: flex !important;
     flex-direction: column !important;

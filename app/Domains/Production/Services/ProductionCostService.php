@@ -34,10 +34,6 @@ class ProductionCostService
      */
     public function calculateLaborCost(ProductionBom $bom): float
     {
-        if (!$bom->routing_id) {
-            return 0.0;
-        }
-
         $bom->loadMissing('routing.operations.workCenter');
         $routing = $bom->routing;
         if (!$routing) {
@@ -68,10 +64,6 @@ class ProductionCostService
      */
     public function calculateMachineCost(ProductionBom $bom): float
     {
-        if (!$bom->routing_id) {
-            return 0.0;
-        }
-
         $bom->loadMissing('routing.operations');
         $routing = $bom->routing;
         if (!$routing) {
@@ -98,10 +90,6 @@ class ProductionCostService
      */
     public function calculateOverheadCost(ProductionBom $bom): float
     {
-        if (!$bom->routing_id) {
-            return 0.0;
-        }
-
         $bom->loadMissing('routing.operations.workCenter');
         $routing = $bom->routing;
         if (!$routing) {

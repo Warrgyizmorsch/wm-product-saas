@@ -176,7 +176,6 @@ class ProductionBomTest extends TestCase
                 'base_quantity' => 100, // base quantity basis
                 'base_uom_id' => $this->uomA->id,
                 'version' => '1.0.0',
-                'routing_id' => $this->routingA->id,
                 'effective_date' => now()->toDateString(),
                 'notes' => 'Standard Door assembly',
                 'items' => [
@@ -199,7 +198,6 @@ class ProductionBomTest extends TestCase
         $this->assertEquals('Car Door Standard BOM', $bom->bom_name);
         $this->assertEquals('manufacturing', $bom->bom_type);
         $this->assertEquals(100.0, $bom->base_quantity);
-        $this->assertEquals($this->routingA->id, $bom->routing_id);
         $this->assertEquals('draft', $bom->status);
         $this->assertCount(1, $bom->items);
         $this->assertEquals(5.00, $bom->items->first()->material_scrap_percentage);
@@ -721,8 +719,8 @@ class ProductionBomTest extends TestCase
         $response->assertRedirect(route('production.boms.index'));
         $response->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('production_boms', ['id' => $bom1->id]);
-        $this->assertDatabaseMissing('production_boms', ['id' => $bom2->id]);
+        $this->assertSoftDeleted('production_boms', ['id' => $bom1->id]);
+        $this->assertSoftDeleted('production_boms', ['id' => $bom2->id]);
         $this->assertDatabaseHas('production_boms', ['id' => $bom3->id]);
     }
 

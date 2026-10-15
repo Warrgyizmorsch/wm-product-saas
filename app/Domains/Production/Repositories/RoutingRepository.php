@@ -40,7 +40,7 @@ class RoutingRepository implements RoutingRepositoryInterface
     public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         $query = Routing::query()
-            ->with(['product', 'creator'])
+            ->with(['product', 'creator', 'bom'])
             ->withCount('operations');
 
         if (!empty($filters['product_id'])) {

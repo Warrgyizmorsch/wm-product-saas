@@ -18,6 +18,7 @@ class UpdateRoutingRequest extends FormRequest
         $this->merge([
             'version'        => $this->input('version') ?: '1.0.0',
             'effective_from' => $this->input('effective_from') ?: now()->toDateString(),
+            'is_default'     => $this->has('is_default') ? (bool) $this->input('is_default') : true,
         ]);
     }
 
@@ -29,6 +30,7 @@ class UpdateRoutingRequest extends FormRequest
             'routing_number'     => 'nullable|string|max:50',
             'name'               => 'required|string|max:255',
             'product_id'         => 'required|exists:products,id',
+            'bom_id'             => 'nullable|exists:production_boms,id',
             'version'            => 'nullable|string|max:50',
             'is_default'         => 'boolean',
             'effective_from'     => 'nullable|date',

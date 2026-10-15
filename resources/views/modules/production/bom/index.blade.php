@@ -286,12 +286,16 @@
                                 <span class="fw-semibold text-dark">{{ $bom->bom_name ?: 'N/A' }}</span>
                             </td>
                             <td>
-                                @if($bom->status === 'approved')
+                                @if($bom->status === 'approved' || $bom->status === 'active')
                                     <span class="erp-badge-active">{{ __('production.active') }}</span>
                                 @elseif($bom->status === 'draft')
                                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                                 @elseif($bom->status === 'pending_approval')
                                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
+                                @elseif($bom->status === 'cancelled')
+                                    <span class="erp-badge-cancelled">{{ __('production.cancelled') }}</span>
+                                @elseif($bom->status === 'inactive')
+                                    <span class="erp-badge-inactive">{{ __('production.inactive') }}</span>
                                 @else
                                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) }}</span>
                                 @endif
@@ -323,18 +327,12 @@
                                             </a>
                                         </li>
                                         <li>
-                                            @if($bom->routing_id)
-                                                <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}">
-                                                    @csrf
-                                                    <button type="submit" class="dropdown-item">
-                                                        <i class="feather-send me-2 text-muted fs-12"></i>{{ __('production.submit_approval') }}
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <button type="button" class="dropdown-item text-muted" disabled title="Routing reference is required before submitting for approval" data-bs-toggle="tooltip" style="cursor: not-allowed;">
-                                                    <i class="feather-send me-2 text-muted fs-12"></i>{{ __('production.submit_approval_routing_required') }}
+                                            <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item">
+                                                    <i class="feather-send me-2 text-muted fs-12"></i>{{ __('production.submit_approval') }}
                                                 </button>
-                                            @endif
+                                            </form>
                                         </li>
                                     @endif
 

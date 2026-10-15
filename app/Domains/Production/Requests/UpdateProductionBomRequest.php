@@ -51,9 +51,7 @@ class UpdateProductionBomRequest extends FormRequest
             'base_uom_id' => 'required|exists:uoms,id',
             'version' => 'required|string|max:50',
             'revision_reason' => 'nullable|string|max:1000',
-            'routing_id' => 'nullable|exists:routings,id',
             'effective_date' => 'required|date',
-            'expiry_date' => 'nullable|date|after_or_equal:effective_date',
             'notes' => 'nullable|string',
             
             'items' => 'required|array|min:1',

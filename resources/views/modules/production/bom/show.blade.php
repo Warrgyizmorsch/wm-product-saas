@@ -12,18 +12,22 @@
             {{ __('production.edit_draft') }}
         </x-ui.button>
 
-        @if($bom->routing_id)
-            <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline me-2">
+        <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline me-2">
+            @csrf
+            <x-ui.button type="submit" variant="info" icon="feather-send">
+                {{ __('production.submit_approval') }}
+            </x-ui.button>
+        </form>
+
+        @can('delete', $bom)
+            <form id="delete-draft-bom-form" method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" class="d-inline me-2">
                 @csrf
-                <x-ui.button type="submit" variant="info" icon="feather-send">
-                    {{ __('production.submit_approval') }}
+                @method('DELETE')
+                <x-ui.button type="button" variant="danger" icon="feather-trash-2" onclick="deleteDraftBom()">
+                    {{ __('production.delete') }}
                 </x-ui.button>
             </form>
-        @else
-            <x-ui.button type="button" variant="info" icon="feather-send" class="me-2" disabled title="Routing reference must be selected in Edit Draft before submitting for approval" data-bs-toggle="tooltip">
-                {{ __('production.submit_approval_routing_required') }}
-            </x-ui.button>
-        @endif
+        @endcan
     @endif
 
     @if($bom->isPendingApproval())
@@ -89,12 +93,16 @@
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <h4 class="fw-bold text-dark mb-0">{{ __('production.bom_details') }} (BOM #{{ $bom->bom_number }})</h4>
             <div>
-                @if($bom->status === 'approved')
+                @if($bom->status === 'approved' || $bom->status === 'active')
                     <span class="erp-badge-active">{{ __('production.active') }}</span>
                 @elseif($bom->status === 'draft')
                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                 @elseif($bom->status === 'pending_approval')
                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
+                @elseif($bom->status === 'cancelled')
+                    <span class="erp-badge-cancelled">{{ __('production.cancelled') }}</span>
+                @elseif($bom->status === 'inactive')
+                    <span class="erp-badge-inactive">{{ __('production.inactive') }}</span>
                 @else
                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) ?? $bom->status }}</span>
                 @endif
@@ -757,6 +765,24 @@
     </div>
 
     <script>
+        function deleteDraftBom() {
+            var message = '{{ addslashes(__('production.confirm_delete_bom') ?: 'Are you sure you want to delete this draft BOM?') }}';
+            var options = {
+                title: '{{ addslashes(__('production.delete_bom') ?: 'Delete BOM') }}',
+                confirmButtonText: '{{ addslashes(__('production.delete') ?: 'Delete') }}',
+                confirmButtonClass: 'btn-danger',
+                variant: 'danger'
+            };
+
+            if (typeof confirmAction === 'function') {
+                confirmAction(message, function() {
+                    document.getElementById('delete-draft-bom-form').submit();
+                }, options);
+            } else if (confirm(message)) {
+                document.getElementById('delete-draft-bom-form').submit();
+            }
+        }
+
         @if(isset($parentProduct))
             // Notify opener (parent BOM page) about the newly created child BOM
             if (window.opener && !window.opener.closed) {

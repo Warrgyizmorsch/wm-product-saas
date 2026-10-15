@@ -288,7 +288,7 @@
                         <th style="width: 6%" class="text-center">{{ __('production.operations_count') }}</th>
                         <th style="width: 8%">{{ __('production.effective_from') }}</th>
                         <th style="width: 8%">{{ __('production.effective_to') }}</th>
-                        <th style="width: 6%">{{ __('production.routing_type') }}</th>
+                        <th style="width: 10%">{{ __('production.bom') ?? 'Linked BOM' }}</th>
                         <th style="width: 7%">{{ __('production.status') }}</th>
                         <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
@@ -328,13 +328,16 @@
                                     {{ $routing->operations_count }}
                                 </span>
                             </td>
-                            <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : __('production.immediate') }}</td>
+                            <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '-' }}</td>
                             <td class="text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}</td>
                             <td>
-                                @if ($routing->is_default)
-                                    <span class="badge bg-soft-success text-success px-2 py-1 rounded-pill fs-10">{{ __('production.primary') }}</span>
+                                @if ($routing->bom)
+                                    <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="fw-semibold text-primary">
+                                        {{ $routing->bom->bom_number }}
+                                    </a>
+                                    <small class="text-muted d-block fs-10">v{{ $routing->bom->version }}</small>
                                 @else
-                                    <span class="badge bg-soft-warning text-warning px-2 py-1 rounded-pill fs-10">{{ __('production.alternative') }}</span>
+                                    <span class="text-muted fs-11">—</span>
                                 @endif
                             </td>
                             <td>
@@ -395,7 +398,7 @@
                                     @endif
 
                                     {{-- Cancel --}}
-                                    @if(!$routing->isCancelled() && !$routing->isHistorical())
+                                    @if($routing->isActive())
                                         @can('cancel', $routing)
                                             <li>
                                                 <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $routing->id }}">

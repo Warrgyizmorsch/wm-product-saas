@@ -79,11 +79,11 @@ class TableManufacturingSeederTest extends TestCase
         $rtFg = Routing::where('tenant_id', $this->tenant->id)->where('routing_number', 'RT-TBL-FG')->firstOrFail();
         $rtFrame = Routing::where('tenant_id', $this->tenant->id)->where('routing_number', 'RT-TBL-FRAME')->firstOrFail();
 
-        $this->assertEquals($rtFg->id, $bomFg->routing_id);
-        $this->assertEquals($rtFrame->id, $bomFrame->routing_id);
-        $this->assertNotNull($bomLeg->routing_id);
-        $this->assertNotNull($bomSupport->routing_id);
-        $this->assertNotNull($bomTop->routing_id);
+        $this->assertEquals($rtFg->id, $bomFg->routing?->id);
+        $this->assertEquals($rtFrame->id, $bomFrame->routing?->id);
+        $this->assertNotNull($bomLeg->routing?->id);
+        $this->assertNotNull($bomSupport->routing?->id);
+        $this->assertNotNull($bomTop->routing?->id);
 
         // Check child_bom_id linkages
         $frameItemInFg = $bomFg->items()->where('material_id', $bomFrame->product_id)->firstOrFail();
@@ -122,18 +122,18 @@ class TableManufacturingSeederTest extends TestCase
             'quantity' => 0.60,
         ]);
 
-        // RT-TBL-FRAME (OP30 Frame Welding consumes SFG-TBL-LEG and SFG-TBL-SUPPORT)
+        // RT-TBL-FRAME (OP10 Frame Welding consumes SFG-TBL-LEG and SFG-TBL-SUPPORT)
         $rtFrame = Routing::where('tenant_id', $this->tenant->id)->where('routing_number', 'RT-TBL-FRAME')->firstOrFail();
-        $op30 = $rtFrame->operations->where('sequence', 30)->first();
+        $op10 = $rtFrame->operations->where('sequence', 10)->first();
         $this->assertDatabaseHas('production_routing_operation_materials', [
             'tenant_id' => $this->tenant->id,
-            'routing_operation_id' => $op30->id,
+            'routing_operation_id' => $op10->id,
             'material_id' => $sfgLeg->id,
             'quantity' => 4.0,
         ]);
         $this->assertDatabaseHas('production_routing_operation_materials', [
             'tenant_id' => $this->tenant->id,
-            'routing_operation_id' => $op30->id,
+            'routing_operation_id' => $op10->id,
             'material_id' => $sfgSupport->id,
             'quantity' => 2.0,
         ]);
@@ -213,12 +213,12 @@ class TableManufacturingSeederTest extends TestCase
 
         $order->refresh();
 
-        $op10 = $order->operations()->where('sequence', 10)->firstOrFail();
-        $op20 = $order->operations()->where('sequence', 20)->firstOrFail();
-        $op30 = $order->operations()->where('sequence', 30)->firstOrFail();
-        $op40 = $order->operations()->where('sequence', 40)->firstOrFail();
-        $op50 = $order->operations()->where('sequence', 50)->firstOrFail();
-        $op60 = $order->operations()->where('sequence', 60)->firstOrFail();
+        $op10 = $order->operations()->where('name', 'Table Leg Pipe Cutting & Deburring')->firstOrFail();
+        $op20 = $order->operations()->where('name', 'Horizontal Support Pipe Sizing')->firstOrFail();
+        $op30 = $order->operations()->where('name', 'Frame MIG Welding Assembly')->firstOrFail();
+        $op40 = $order->operations()->where('name', 'Table Top Panel Sizing & PUR Edge Banding')->firstOrFail();
+        $op50 = $order->operations()->where('name', 'Frame Surface Finishing & Powder Coating')->firstOrFail();
+        $op60 = $order->operations()->where('name', 'Final Dining Table Assembly')->firstOrFail();
 
         // 10 Tables Output Targets:
         // OP10 (Table Leg): 10 FG * 4 Legs = 40 Legs

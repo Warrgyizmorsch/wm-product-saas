@@ -137,23 +137,10 @@
                                     alpineError="errors.version" />
                             </div>
                             <div class="col-md-6">
-                                <label for="routing_reference_display" class="form-label fs-12 fw-semibold text-dark mb-2">
-                                    {{ __('production.routing_reference') }}
-                                </label>
-                                <input type="text" id="routing_reference_display" class="form-control" readonly
-                                       value="" placeholder="{{ __('production.no_routing') }}">
-                                <input type="hidden" name="routing_id" id="routing_id" value="{{ old('routing_id', '') }}">
-                            </div>
-                            <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="input" :label="__('production.start_date') ?? 'Start Date'"
                                     name="effective_date" inputType="date" :value="old('effective_date', date('Y-m-d'))"
                                     :required="true" :error-text="$errors->first('effective_date')"
                                     alpineError="errors.effective_date" />
-                            </div>
-                            <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" :label="__('production.expiry_date') ?? 'Expiry Date'"
-                                    name="expiry_date" inputType="date" :value="old('expiry_date')"
-                                    :error-text="$errors->first('expiry_date')" alpineError="errors.expiry_date" />
                             </div>
                             <div class="col-md-12">
                                 <x-ui.odoo-form-ui type="input" :label="__('production.revision_reason') ?? 'Revision Reason'" name="revision_reason"
@@ -167,8 +154,7 @@
 
                 <!-- Tab Headers -->
                 <x-ui.horizontal-tabs id="bomFormTabs" :tabs="[
-            ['id' => 'tab-components', 'label' => __('production.components'), 'active' => true, 'icon' => 'feather-list'],
-            ['id' => 'tab-operations', 'label' => __('production.operations'), 'icon' => 'feather-sliders']
+            ['id' => 'tab-components', 'label' => __('production.components'), 'active' => true, 'icon' => 'feather-list']
         ]" />
 
                 <div class="tab-content mt-3">
@@ -423,78 +409,6 @@
                             </button>
                         </div>
                     </div>
-
-                    <!-- Tab 2: Operations Panel (Linked to Routing reference dropdown) -->
-                    <div class="tab-pane fade" id="tab-operations" role="tabpanel" aria-labelledby="tab-operations-tab">
-                        <h5 class="fw-bold text-dark mb-3">{{ __('production.workflow_routing') }}</h5>
-
-                        <template x-if="!selectedRoutingId">
-                            <div class="p-4 text-center border rounded bg-light text-muted">
-                                <i class="feather-info me-2"></i>{{ __('production.select_routing_see_ops') }}
-                            </div>
-                        </template>
-
-                        <template x-if="selectedRoutingId">
-                            <div>
-                                <template x-if="loadingOperations">
-                                    <div class="p-4 text-center">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                                        {{ __('production.loading_operations') }}
-                                    </div>
-                                </template>
-
-                                <template x-if="!loadingOperations && operations.length === 0">
-                                    <div class="p-4 text-center border rounded bg-light text-muted">
-                                        {{ __('production.no_operations_defined') }}
-                                    </div>
-                                </template>
-
-                                <template x-if="!loadingOperations && operations.length > 0">
-                                    <div class="table-responsive">
-                                        <x-ui.odoo-form-ui type="table">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width: 10%" class="text-center">{{ __('production.seq') }}
-                                                    </th>
-                                                    <th style="width: 25%">{{ __('production.operation_stage') }}</th>
-                                                    <th style="width: 15%">{{ __('production.type') }}</th>
-                                                    <th style="width: 20%">{{ __('production.work_center') }}</th>
-                                                    <th style="width: 15%">{{ __('production.machine') }}</th>
-                                                    <th style="width: 15%" class="text-end">
-                                                        {{ __('production.times_yield') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <template x-for="op in operations" :key="op.sequence">
-                                                    <tr>
-                                                        <td class="fw-semibold text-muted text-center align-middle"
-                                                            x-text="op.sequence"></td>
-                                                        <td class="fw-bold text-dark align-middle" x-text="op.name"></td>
-                                                        <td class="text-capitalize align-middle" x-text="op.operation_type">
-                                                        </td>
-                                                        <td class="align-middle" x-text="op.work_center_name"></td>
-                                                        <td class="align-middle" x-text="op.machine_name"></td>
-                                                        <td class="text-end align-middle">
-                                                            <div class="fs-11 text-muted">{{ __('production.setup') }}:
-                                                                <span class="fw-semibold text-dark"
-                                                                    x-text="op.setup_time_minutes + 'm'"></span></div>
-                                                            <div class="fs-11 text-muted">{{ __('production.run') }}: <span
-                                                                    class="fw-semibold text-dark"
-                                                                    x-text="op.processing_time_minutes + 'm'"></span></div>
-                                                            <div class="fs-11 text-muted">{{ __('production.yield') }}:
-                                                                <span class="fw-semibold text-dark"
-                                                                    x-text="op.expected_yield_percentage + '%'"></span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </template>
-                                            </tbody>
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                    </div>
                 </div>
 
                 <!-- Footer Save and Cancel buttons -->
@@ -512,21 +426,6 @@
         $oldItems = old('items', [
             ['material_id' => '', 'quantity' => '', 'quantity_type' => 'fixed', 'formula' => '', 'uom_id' => '', 'material_scrap_percentage' => 0.00, 'is_alternative' => false, 'replaces_row_uid' => '', 'priority' => 1]
         ]);
-    @endphp
-
-    @php
-        $activeRoutingsJson = $routings
-            ->where('status', 'active')
-            ->map(function ($rt) {
-                return [
-                    'id' => (int) $rt->id,
-                    'text' => trim(($rt->routing_number ?? '') . ' - ' . ($rt->name ?? '') . ' (v' . ($rt->version ?? '0') . ')'),
-                    'productId' => (int) ($rt->product_id ?? 0),
-                    'status' => $rt->status,
-                ];
-            })
-            ->values()
-            ->toArray();
     @endphp
 
     <style>
@@ -547,37 +446,13 @@
     </style>
 
     <script>
-        const activeRoutings = @json($activeRoutingsJson);
         const productsData = @json($products);
-
-        const setRoutingUi = (route) => {
-            const $display = $('#routing_reference_display');
-            const $hidden = $('#routing_id');
-
-            if (!route || route.status !== 'active') {
-                $hidden.val('');
-                $display.val('No Routing');
-                return '';
-            }
-
-            $hidden.val(route.id);
-            $display.val(route.text);
-            return String(route.id);
-        };
-
-        const syncRoutingDisplay = (routeId) => {
-            const route = activeRoutings.find(rt => String(rt.id) === String(routeId));
-            return setRoutingUi(route || null);
-        };
 
         document.addEventListener('alpine:init', () => {
             Alpine.data('bomForm', () => ({
                 items: @json($oldItems),
                 errors: @json($errors->toArray()),
                 materials: @json($materials),
-                selectedRoutingId: syncRoutingDisplay('{{ old("routing_id", "") }}'),
-                operations: [],
-                loadingOperations: false,
                 activeTab: 'components',
                 showAdvanced: true,
 
@@ -692,40 +567,12 @@
                         }
                     };
 
-                    const filterRoutings = (productId) => {
-                        const currentVal = $('#routing_id').val();
-                        const validRoutes = activeRoutings.filter(rt => rt.status === 'active' && (!productId || String(rt.productId) === String(productId)));
-                        const selectedRoute = validRoutes.find(rt => String(rt.id) === String(currentVal)) || validRoutes[0] || null;
-
-                        if (!productId || validRoutes.length === 0) {
-                            $('#routing_id').val('');
-                            $('#routing_reference_display').val('No Routing');
-                            this.selectedRoutingId = '';
-                            this.loadOperations();
-                            return;
-                        }
-
-                        if (selectedRoute) {
-                            $('#routing_id').val(selectedRoute.id);
-                            $('#routing_reference_display').val(selectedRoute.text);
-                            this.selectedRoutingId = String(selectedRoute.id);
-                        } else {
-                            $('#routing_id').val('');
-                            $('#routing_reference_display').val('No Routing');
-                            this.selectedRoutingId = '';
-                        }
-
-                        this.loadOperations();
-                    };
-
-                    // Initial filter and header UOM on load
+                    // Initial header UOM on load
                     const initialProductId = $('#product_id').val();
-                    filterRoutings(initialProductId);
                     syncHeaderUom(initialProductId);
 
                     $('#product_id').on('change.select2 change', (e) => {
                         var parentProductId = e.target.value;
-                        filterRoutings(parentProductId);
                         syncHeaderUom(parentProductId);
 
                         $('.odoo-table-select[name*="[material_id]"]').each(function () {
@@ -743,34 +590,7 @@
                         });
                     });
 
-                    // Trigger initial load
-                    this.loadOperations();
                     this.$nextTick(() => this.initAllRowSelects());
-                },
-
-                loadOperations() {
-                    // Pull routing ID directly from DOM select input to guarantee sync
-                    var routingEl = document.getElementById('routing_id');
-                    if (routingEl) {
-                        this.selectedRoutingId = routingEl.value;
-                    }
-
-                    if (!this.selectedRoutingId) {
-                        this.operations = [];
-                        return;
-                    }
-                    this.loadingOperations = true;
-                    fetch('{{ url('production/routing') }}/' + this.selectedRoutingId + '/operations')
-                        .then(res => res.json())
-                        .then(data => {
-                            this.operations = data;
-                            this.loadingOperations = false;
-                        })
-                        .catch(err => {
-                            console.error(err);
-                            this.operations = [];
-                            this.loadingOperations = false;
-                        });
                 },
 
                 previewFormula(formula) {

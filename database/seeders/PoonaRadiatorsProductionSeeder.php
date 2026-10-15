@@ -706,8 +706,6 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'comments' => 'Core routing verified for shop floor execution.',
         ]);
 
-        // Link core routing to core BOM
-        $coreBom->update(['routing_id' => $routCore->id]);
 
         // Routing 2: Finished Radiator Assembly Routing
         $routFg = Routing::create([
@@ -794,7 +792,5 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'comments' => 'Finished good assembly routing approved for OEM orders.',
         ]);
 
-        // Link finished good routing to FG BOM
-        $fgBom->update(['routing_id' => $routFg->id]);
     }
 }

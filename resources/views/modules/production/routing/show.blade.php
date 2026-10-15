@@ -16,6 +16,16 @@
                     {{ __('production.edit_draft') }}
                 </x-ui.button>
             @endcan
+
+            @can('delete', $routing)
+                <form id="delete-draft-routing-header-form" action="{{ route('production.routing.destroy', $routing->id) }}" method="POST" class="d-inline">
+                    @csrf
+                    @method('DELETE')
+                    <x-ui.button type="button" variant="danger" icon="feather-trash-2" onclick="deleteDraftRouting()">
+                        {{ __('production.delete') }}
+                    </x-ui.button>
+                </form>
+            @endcan
         @endif
 
         @can('duplicate', $routing)
@@ -89,7 +99,7 @@
                     @endcan
                 @endif
 
-                @if (!$routing->isCancelled() && !$routing->isHistorical())
+                @if ($routing->isActive())
                     @can('cancel', $routing)
                         <x-ui.button type="button" variant="outline-danger" icon="feather-slash" class="px-3" data-bs-toggle="modal" data-bs-target="#cancelModal">
                             {{ __('production.cancel_routing') }}
@@ -98,6 +108,17 @@
                 @endif
             </div>
         </div>
+
+        @if ($routing->isPendingApproval() && $routing->bom && $routing->bom->status === \App\Domains\Production\Models\ProductionBom::STATUS_DRAFT)
+            <div class="alert alert-warning py-2 px-3 d-flex align-items-center gap-2 mb-3 fs-13">
+                <i class="feather-clock fs-18 text-warning flex-shrink-0"></i>
+                <div>
+                    <strong>Awaiting Linked BOM Approval:</strong> This routing is linked to draft BOM 
+                    <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="fw-bold text-dark text-decoration-underline">{{ $routing->bom->bom_number }}</a>. 
+                    The BOM must be approved first before this routing can be activated.
+                </div>
+            </div>
+        @endif
 
         <!-- Summary Statistics Layout -->
         <div class="row g-4 mb-4 pb-4 border-bottom">
@@ -109,13 +130,6 @@
                     </div>
                     <h4 class="fw-bold text-dark mb-1">{{ $routing->name }}</h4>
                     <span class="fs-13 fw-semibold text-muted text-uppercase">{{ $routing->routing_number }}</span>
-                    <div class="mt-2">
-                        @if ($routing->is_default)
-                            <span class="badge bg-soft-success text-success px-3 py-1 rounded-pill">{{ __('production.primary') }}</span>
-                        @else
-                            <span class="badge bg-soft-warning text-warning px-3 py-1 rounded-pill">{{ __('production.alternative') }}</span>
-                        @endif
-                    </div>
                 </div>
 
                 <div class="d-flex flex-column gap-3 mt-4 px-3">
@@ -131,13 +145,31 @@
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted fs-13">{{ __('production.bom') ?? 'BOM' }}:</span>
+                        <span class="fw-bold text-dark text-end">
+                            @if ($routing->bom)
+                                <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="text-primary text-decoration-none">
+                                    {{ $routing->bom->bom_number }}
+                                </a>
+                                <small class="text-muted d-block fs-11">
+                                    v{{ $routing->bom->version }} &bull; 
+                                    <span class="badge badge-sm @if($routing->bom->status === 'active') bg-soft-success text-success @elseif($routing->bom->status === 'draft') bg-soft-warning text-warning @else bg-soft-secondary text-secondary @endif">
+                                        {{ ucfirst($routing->bom->status) }}
+                                    </span>
+                                </small>
+                            @else
+                                <span class="text-muted fs-12">{{ __('production.not_specified') }}</span>
+                            @endif
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted fs-13">{{ __('production.version') }}:</span>
                         <span class="fw-semibold text-dark">{{ $routing->version }} (Rev {{ $routing->revision }})</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted fs-13">{{ __('production.validity') }}:</span>
                         <span class="fw-semibold text-dark text-end fs-12">
-                            {{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : __('production.immediate') }}
+                            {{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '-' }}
                             {{ __('production.to') ?? 'to' }}
                             {{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}
                         </span>
@@ -450,10 +482,26 @@
         <small class="text-muted d-block mt-2">{{ __('production.duplicate_routing_modal_body') }}</small>
     </x-ui.modal>
 
-    <x-ui.confirmation-modal />
-
     @push('scripts')
         <script>
+            function deleteDraftRouting() {
+                var message = '{{ addslashes(__('production.confirm_delete_routing') ?: 'Are you sure you want to delete this draft routing?') }}';
+                var options = {
+                    title: '{{ addslashes(__('production.confirm_delete_routing_title') ?: 'Delete Routing') }}',
+                    confirmButtonText: '{{ addslashes(__('production.delete') ?: 'Delete') }}',
+                    confirmButtonClass: 'btn-danger',
+                    variant: 'danger'
+                };
+
+                if (typeof confirmAction === 'function') {
+                    confirmAction(message, function() {
+                        document.getElementById('delete-draft-routing-header-form').submit();
+                    }, options);
+                } else if (confirm(message)) {
+                    document.getElementById('delete-draft-routing-header-form').submit();
+                }
+            }
+
             function confirmApproveRouting() {
                 confirmAction({
                     title: 'Approve & Activate Routing',

@@ -31,7 +31,8 @@ class RoutingPolicy
     public function delete(User $user, Routing $routing): bool
     {
         return $routing->isDraft()
-            && $user->hasProductionPermission('production.routing.update', $routing->tenant_id);
+            && ($user->hasProductionPermission('production.routing.update', $routing->tenant_id)
+                || ($user->role === 'admin' && $user->tenant_id === $routing->tenant_id));
     }
 
     public function submit(User $user, Routing $routing): bool

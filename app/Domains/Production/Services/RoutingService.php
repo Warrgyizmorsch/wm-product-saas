@@ -119,6 +119,28 @@ class RoutingService
             throw new InvalidArgumentException('Routing must have at least one operation before submitting for approval.');
         }
 
+        // Require linked active or draft BOM before routing can be submitted for approval
+        $bom = $routing->bom;
+        if (!$bom && $routing->product_id) {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $routing->tenant_id)
+                ->where('product_id', $routing->product_id)
+                ->whereIn('status', ['approved', 'active', 'draft'])
+                ->latest('id')
+                ->first();
+            if ($bom) {
+                $routing->update(['bom_id' => $bom->id]);
+            }
+        }
+
+        if (!$bom) {
+            throw new InvalidArgumentException('Cannot submit routing for approval: A linked Bill of Materials (BOM) in active or draft status is required.');
+        }
+
+        if (!in_array($bom->status, ['approved', 'active', 'draft'])) {
+            throw new InvalidArgumentException("Cannot submit routing for approval: The linked BOM must be active or draft (currently '{$bom->status}').");
+        }
+
         return DB::transaction(function () use ($routing, $userId) {
             $this->routingRepository->update($routing->id, ['status' => Routing::STATUS_PENDING_APPROVAL]);
 
@@ -135,22 +157,6 @@ class RoutingService
     }
 
     /**
-     * Update all draft BOMs for the product to use the newly approved routing.
-     *
-     * If no draft BOMs exist, nothing is changed.
-     */
-    private function updateDraftBomsForApprovedRouting(Routing $routing): void
-    {
-        ProductionBom::query()
-            ->where('tenant_id', $routing->tenant_id)
-            ->where('product_id', $routing->product_id)
-            ->draft()
-            ->update([
-                'routing_id' => $routing->id,
-            ]);
-    }
-
-    /**
      * Approve a pending routing. Makes it active and archives old active version.
      */
     public function approve(int $id, int $approverUserId): Routing
@@ -163,6 +169,24 @@ class RoutingService
 
         if (!$routing->isPendingApproval()) {
             throw new InvalidArgumentException('Only routings pending approval can be approved.');
+        }
+
+        // Require linked BOM to be approved and active before routing can be approved
+        $bom = $routing->bom;
+        if (!$bom && $routing->product_id) {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $routing->tenant_id)
+                ->where('product_id', $routing->product_id)
+                ->whereIn('status', ['approved', 'active'])
+                ->latest('id')
+                ->first();
+            if ($bom) {
+                $routing->update(['bom_id' => $bom->id]);
+            }
+        }
+
+        if (!$bom || !in_array($bom->status, ['approved', 'active'])) {
+            throw new InvalidArgumentException('Cannot approve routing: The linked Bill of Materials (BOM) must be approved and active first.');
         }
 
         return DB::transaction(function () use ($routing, $approverUserId) {
@@ -188,9 +212,6 @@ class RoutingService
                 'action'     => RoutingApproval::ACTION_APPROVED,
                 'comments'   => 'Routing approved and set as active manufacturing process.',
             ]);
-
-            // Update all draft BOMs for this product to use the newly approved routing
-            $this->updateDraftBomsForApprovedRouting($routing);
 
             event(new \App\Domains\Production\Events\RoutingApproved($routing->fresh()));
 
@@ -273,11 +294,33 @@ class RoutingService
         $this->checkRoutingConflicts($original->product_id, $newVersion, $tenantId);
 
         return DB::transaction(function () use ($original, $newVersion, $creatorUserId, $tenantId) {
+            $bomId = $original->bom_id;
+            $currentBom = $original->bom_id ? \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)->find($original->bom_id) : null;
+            if (!$currentBom || in_array($currentBom->status, ['cancelled', 'inactive'])) {
+                // If old routing had a cancelled/inactive BOM, automatically select an active/approved BOM
+                $activeBom = \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)
+                    ->where('product_id', $original->product_id)
+                    ->whereIn('status', ['approved', 'active'])
+                    ->orderByDesc('id')
+                    ->first();
+                if ($activeBom) {
+                    $bomId = $activeBom->id;
+                } else {
+                    $draftBom = \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)
+                        ->where('product_id', $original->product_id)
+                        ->where('status', 'draft')
+                        ->orderByDesc('id')
+                        ->first();
+                    $bomId = $draftBom ? $draftBom->id : null;
+                }
+            }
+
             $newRouting = $this->routingRepository->create([
                 'tenant_id'      => $tenantId,
                 'routing_number' => $this->numberService->generateNextNumber($tenantId),
                 'name'           => $original->name,
                 'product_id'     => $original->product_id,
+                'bom_id'         => $bomId,
                 'version'        => $newVersion,
                 'revision'       => $original->revision + 1,
                 'is_default'     => $original->is_default,

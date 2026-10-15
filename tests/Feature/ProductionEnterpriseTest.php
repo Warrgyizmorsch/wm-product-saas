@@ -463,6 +463,14 @@ class ProductionEnterpriseTest extends TestCase
      */
     public function test_overhead_costs_and_scrap_calculation(): void
     {
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Car Chassis',
+            'sku' => 'FG-CHASSIS',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
         $wc = WorkCenter::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Welding Bay A',
@@ -475,6 +483,7 @@ class ProductionEnterpriseTest extends TestCase
 
         $routing = Routing::create([
             'tenant_id' => $this->tenant->id,
+            'product_id' => $fg->id,
             'name' => 'Chassis Assembly Routing',
             'status' => 'active',
         ]);
@@ -495,14 +504,6 @@ class ProductionEnterpriseTest extends TestCase
             'quality_required' => false,
         ]);
 
-        $fg = Product::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Car Chassis',
-            'sku' => 'FG-CHASSIS',
-            'type' => 'finished_good',
-            'status' => 'active',
-        ]);
-
         $rm = Product::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Steel Plate',
@@ -521,7 +522,6 @@ class ProductionEnterpriseTest extends TestCase
             'base_quantity' => 2.0, // base quantity
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
-            'routing_id' => $routing->id,
             'effective_date' => now()->toDateString(),
             'status' => 'approved',
         ]);
@@ -747,17 +747,10 @@ class ProductionEnterpriseTest extends TestCase
     }
 
     /**
-     * Test Routing validation contexts (permissive for engineering, strict active-only for manufacturing).
+     * Test Routing submission requires an active approved BOM first.
      */
     public function test_routing_validation_context_constraints(): void
     {
-        $routing = Routing::create([
-            'tenant_id' => $this->tenant->id,
-            'routing_number' => 'RT-DRAFT-1',
-            'name' => 'Draft Routing',
-            'status' => 'draft',
-        ]);
-
         $fg = Product::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Engineered FG',
@@ -766,58 +759,42 @@ class ProductionEnterpriseTest extends TestCase
             'status' => 'active',
         ]);
 
-        $rm = Product::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Metal sheet',
-            'sku' => 'RM-METAL',
-            'type' => 'raw_material',
-            'status' => 'active',
-        ]);
-
-        // 1. Trying to link draft routing to manufacturing BOM should throw exception
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage("Only active routings can be assigned to manufacturing BOMs.");
-
-        $bomService = new \App\Domains\Production\Services\ProductionBomService(
-            new \App\Domains\Production\Repositories\ProductionBomRepository(),
-            new \App\Domains\Production\Services\ProductionBomNumberService()
-        );
-
-        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
-            'bom_number' => 'BOM-ENG-1',
-            'bom_name' => 'Manufacturing BOM',
-            'bom_type' => 'manufacturing',
-            'usage_context' => 'manufacturing',
-            'product_id' => $fg->id,
-            'base_quantity' => 1.0,
-            'base_uom_id' => $this->uom->id,
-            'version' => '1.0.0',
-            'routing_id' => $routing->id,
-            'effective_date' => now()->toDateString(),
-            'items' => [
-                [
-                    'material_id' => $rm->id,
-                    'quantity' => 1.0,
-                    'uom_id' => $this->uom->id,
-                ]
-            ]
-        ]);
-
-        $bomService->create($dto, $this->user->id);
-    }
-
-    /**
-     * Test draft routing is permitted during engineering BOM creation.
-     */
-    public function test_draft_routing_is_permitted_for_engineering_context(): void
-    {
         $routing = Routing::create([
             'tenant_id' => $this->tenant->id,
-            'routing_number' => 'RT-DRAFT-2',
-            'name' => 'Draft Routing 2',
+            'routing_number' => 'RT-DRAFT-1',
+            'name' => 'Draft Routing',
+            'product_id' => $fg->id,
             'status' => 'draft',
         ]);
 
+        $wc = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Assembly WC',
+            'code' => 'WC-ASSY-1',
+            'status' => 'active',
+        ]);
+
+        $routing->operations()->create([
+            'tenant_id' => $this->tenant->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Assembly',
+            'work_center_id' => $wc->id,
+        ]);
+
+        // 1. Trying to submit routing without an approved BOM should throw exception
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Cannot submit routing for approval: An active, approved Bill of Materials (BOM) is required for this product first.");
+
+        $routingService = app(\App\Domains\Production\Services\RoutingService::class);
+        $routingService->submitApproval($routing->id, $this->user->id);
+    }
+
+    /**
+     * Test BOM creation operates independently of routing and routing can be submitted once BOM is approved.
+     */
+    public function test_draft_routing_is_permitted_for_engineering_context(): void
+    {
         $fg = Product::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Engineered FG 2',
@@ -839,6 +816,7 @@ class ProductionEnterpriseTest extends TestCase
             new \App\Domains\Production\Services\ProductionBomNumberService()
         );
 
+        // BOM is created first without needing any routing
         $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
             'bom_number' => 'BOM-ENG-2',
             'bom_name' => 'Engineering BOM',
@@ -848,7 +826,6 @@ class ProductionEnterpriseTest extends TestCase
             'base_quantity' => 1.0,
             'base_uom_id' => $this->uom->id,
             'version' => '1.0.0',
-            'routing_id' => $routing->id,
             'effective_date' => now()->toDateString(),
             'items' => [
                 [
@@ -861,7 +838,7 @@ class ProductionEnterpriseTest extends TestCase
 
         $bom = $bomService->create($dto, $this->user->id);
         $this->assertNotNull($bom);
-        $this->assertEquals($routing->id, $bom->routing_id);
+        $this->assertEquals('draft', $bom->status);
     }
 
     /**

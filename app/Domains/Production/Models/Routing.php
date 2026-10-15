@@ -39,6 +39,7 @@ class Routing extends BaseModel
         'routing_number',
         'name',
         'product_id',
+        'bom_id',
         'version',
         'revision',
         'is_default',       // A3: routing alternatives flag
@@ -66,6 +67,11 @@ class Routing extends BaseModel
         return $this->belongsTo(Product::class, 'product_id');
     }
 
+    public function bom(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBom::class, 'bom_id');
+    }
+
     public function operations(): HasMany
     {
         return $this->hasMany(RoutingOperation::class, 'routing_id')
@@ -76,11 +82,6 @@ class Routing extends BaseModel
     {
         return $this->hasMany(RoutingApproval::class, 'routing_id')
             ->orderBy('created_at', 'desc');
-    }
-
-    public function boms(): HasMany
-    {
-        return $this->hasMany(ProductionBom::class, 'routing_id');
     }
 
     public function creator(): BelongsTo

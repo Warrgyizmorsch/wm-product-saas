@@ -19,6 +19,7 @@ class RoutingApproval extends BaseModel
     public const ACTION_APPROVED         = 'Approved';
     public const ACTION_REJECTED         = 'Rejected';
     public const ACTION_CANCELLED        = 'Cancelled';
+    public const ACTION_ARCHIVED         = 'Archived';
     public const ACTION_REVISION_CREATED = 'Revision Created';
 
     protected $fillable = [

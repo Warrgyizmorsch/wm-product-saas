@@ -12,6 +12,7 @@ class RoutingDTO
         public readonly int     $product_id,
         public readonly string  $version,
         public readonly string  $effective_from,
+        public readonly ?int    $bom_id = null,
         public readonly ?string $routing_number = null,
         public readonly ?int    $revision = null,
         public readonly bool    $is_default = true,
@@ -32,6 +33,7 @@ class RoutingDTO
         return new self(
             name:           $data['name'],
             product_id:     (int) $data['product_id'],
+            bom_id:         !empty($data['bom_id']) ? (int) $data['bom_id'] : null,
             version:        $data['version'] ?? '1.0.0',
             effective_from: $data['effective_from'] ?? now()->toDateString(),
             routing_number: $data['routing_number'] ?? null,
@@ -48,6 +50,7 @@ class RoutingDTO
         $data = [
             'name'           => $this->name,
             'product_id'     => $this->product_id,
+            'bom_id'         => $this->bom_id,
             'version'        => $this->version,
             'effective_from' => $this->effective_from,
             'routing_number' => $this->routing_number,

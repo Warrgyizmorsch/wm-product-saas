@@ -779,7 +779,6 @@ class TableManufacturingProductionSeeder extends Seeder
             ['priority' => 2]
         );
 
-        $boms['leg']->update(['routing_id' => $rtLeg->id]);
 
         // 2. Horizontal Support Routing
         $rtSupport = Routing::updateOrCreate(
@@ -819,7 +818,6 @@ class TableManufacturingProductionSeeder extends Seeder
             ['quantity' => 0.60, 'uom_id' => $rmPipe->uom_id]
         );
 
-        $boms['support']->update(['routing_id' => $rtSupport->id]);
 
         // 3. Table Frame Routing
         $rtFrame = Routing::updateOrCreate(
@@ -884,7 +882,6 @@ class TableManufacturingProductionSeeder extends Seeder
             ]
         );
 
-        $boms['frame']->update(['routing_id' => $rtFrame->id]);
 
         // 4. Table Top Routing
         $rtTop = Routing::updateOrCreate(
@@ -924,7 +921,6 @@ class TableManufacturingProductionSeeder extends Seeder
             ['quantity' => 1.0, 'uom_id' => $pcs->id]
         );
 
-        $boms['top']->update(['routing_id' => $rtTop->id]);
 
         // 5. Industrial Dining Table Master FG Routing (Sequences 10, 20, 30)
         $rtFg = Routing::updateOrCreate(
@@ -1017,7 +1013,6 @@ class TableManufacturingProductionSeeder extends Seeder
             ]
         );
 
-        $boms['fg']->update(['routing_id' => $rtFg->id]);
 
         return [
             'leg' => $rtLeg,

@@ -4,6 +4,7 @@ namespace App\Domains\Production\Controllers;
 
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\DTO\RoutingDTO;
+use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Repositories\RoutingRepositoryInterface;
@@ -50,10 +51,15 @@ class RoutingController extends Controller
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
         $operationTypes = config('production.operation_types', []);
-        $selectedProductId = $request->query('product_id');
+        $boms        = ProductionBom::whereIn('status', ['approved', 'active', 'draft'])
+            ->select(['id', 'bom_number', 'bom_name', 'product_id', 'version', 'status'])
+            ->orderBy('bom_number')
+            ->get();
+
+        $selectedProductId = request('product_id');
 
         return view('modules.production.routing.create', compact(
-            'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'selectedProductId', 'rawMaterials'
+            'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'selectedProductId', 'rawMaterials', 'boms'
         ));
     }
 
@@ -123,10 +129,15 @@ class RoutingController extends Controller
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
+        $boms           = ProductionBom::whereIn('status', ['approved', 'active', 'draft'])
+            ->select(['id', 'bom_number', 'bom_name', 'product_id', 'version', 'status'])
+            ->orderBy('bom_number')
+            ->get();
+
         $operationTypes = config('production.operation_types', []);
 
         return view('modules.production.routing.edit', compact(
-            'routing', 'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'rawMaterials'
+            'routing', 'products', 'workCenters', 'vendors', 'serviceProducts', 'operationTypes', 'rawMaterials', 'boms'
         ));
     }
 

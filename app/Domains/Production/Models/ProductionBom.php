@@ -10,15 +10,25 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 class ProductionBom extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'production_boms';
 
     public const USAGE_CONTEXTS = ['manufacturing', 'engineering', 'prototype', 'costing'];
+
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PENDING_APPROVAL = 'pending_approval';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_ACTIVE = 'approved';
+    public const STATUS_INACTIVE = 'inactive';
+    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_SUPERSEDED = 'inactive';
+    public const STATUS_UNDER_REVISION = 'under_revision';
 
     protected $fillable = [
         'tenant_id',
@@ -32,7 +42,6 @@ class ProductionBom extends BaseModel
         'version',
         'revision',
         'revision_reason',
-        'routing_id',
         'effective_date',
         'expiry_date',
         'status', // draft, pending_approval, approved, inactive, cancelled, under_revision
@@ -60,9 +69,20 @@ class ProductionBom extends BaseModel
         return $this->belongsTo(Uom::class, 'base_uom_id');
     }
 
-    public function routing(): BelongsTo
+    public function routings(): HasMany
     {
-        return $this->belongsTo(Routing::class, 'routing_id');
+        return $this->hasMany(Routing::class, 'bom_id');
+    }
+
+    public function routing(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Routing::class, 'bom_id')
+            ->where('status', Routing::STATUS_ACTIVE);
+    }
+
+    public function getActiveRoutingAttribute(): ?Routing
+    {
+        return $this->routing ?: Routing::where('product_id', $this->product_id)->where('status', Routing::STATUS_ACTIVE)->first();
     }
 
     public function items(): HasMany
