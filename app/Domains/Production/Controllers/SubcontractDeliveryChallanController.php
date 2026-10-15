@@ -219,6 +219,36 @@ class SubcontractDeliveryChallanController extends Controller
             'items.*.serial_number' => 'nullable|string',
         ]);
 
+        $activeCompanyId = company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null) ?? $request->user()?->company_id;
+        $activeBranchId = branch_id() ?? (class_exists(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null) ?? $request->user()?->branch_id;
+
+        // Mutual compatibility validation across company/branch boundaries
+        $order = !empty($validated['production_order_id'])
+            ? ProductionOrder::where('tenant_id', $tenantId)->find($validated['production_order_id'])
+            : null;
+
+        if ($order && $activeCompanyId && $order->company_id && (int) $order->company_id !== (int) $activeCompanyId) {
+            return redirect()->back()->withInput()->withErrors(['production_order_id' => 'The selected production order belongs to a different company.']);
+        }
+
+        if ($order && $activeBranchId && $order->branch_id && (int) $order->branch_id !== (int) $activeBranchId) {
+            return redirect()->back()->withInput()->withErrors(['production_order_id' => 'The selected production order belongs to a different branch.']);
+        }
+
+        $vendor = Vendor::where('tenant_id', $tenantId)->find($validated['vendor_id']);
+        if ($vendor && $activeCompanyId && $vendor->company_id && (int) $vendor->company_id !== (int) $activeCompanyId) {
+            return redirect()->back()->withInput()->withErrors(['vendor_id' => 'The selected vendor belongs to a different company.']);
+        }
+
+        // Validate warehouses belong to active company
+        $warehouseIds = collect($validated['items'])->pluck('warehouse_id')->push($validated['warehouse_id'] ?? null)->filter()->unique();
+        foreach ($warehouseIds as $whId) {
+            $wh = Warehouse::where('tenant_id', $tenantId)->find($whId);
+            if ($wh && $activeCompanyId && $wh->company_id && (int) $wh->company_id !== (int) $activeCompanyId) {
+                return redirect()->back()->withInput()->withErrors(['items' => "Warehouse '{$wh->name}' belongs to a different company."]);
+            }
+        }
+
         $op = !empty($validated['production_order_operation_id']) ? ProductionOrderOperation::find($validated['production_order_operation_id']) : null;
         $isWipJobWork = $op?->isWipJobWork() ?? false;
 
@@ -288,6 +318,11 @@ class SubcontractDeliveryChallanController extends Controller
         $challan = $this->repository->findOrFail((int) $id, $tenantId);
 
         $this->authorize('dispatch', $challan);
+
+        $activeCompanyId = company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null) ?? request()->user()?->company_id;
+        if ($activeCompanyId !== null && $challan->company_id !== null && (int) $challan->company_id !== (int) $activeCompanyId) {
+            abort(403, 'This delivery challan belongs to a different company.');
+        }
 
         if ($challan->status === 'dispatched') {
             return redirect()->back()->with('warning', 'Challan is already dispatched.');
@@ -372,6 +407,11 @@ class SubcontractDeliveryChallanController extends Controller
         $challan = $this->repository->findOrFail((int) $id, $tenantId);
 
         $this->authorize('receive', $challan);
+
+        $activeCompanyId = company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null) ?? $request->user()?->company_id;
+        if ($activeCompanyId !== null && $challan->company_id !== null && (int) $challan->company_id !== (int) $activeCompanyId) {
+            abort(403, 'This delivery challan belongs to a different company.');
+        }
 
         if ($challan->status === 'completed') {
             return redirect()->back()->with('warning', 'This delivery challan is already completed.');
