@@ -557,17 +557,20 @@
             }
 
             // Prefill order items
-            const orderItems = @json($order->items->map(function($item) {
-                return [
-                    'id' => $item->id,
-                    'product_id' => $item->product_id,
-                    'description' => $item->description,
-                    'quantity' => $item->quantity,
-                    'unit_price' => convert_from_base($item->unit_price),
-                    'tax_rate' => $item->tax_rate,
-                    'discount' => convert_from_base($item->discount),
-                ];
-            }));
+            @php
+                $mappedOrderItems = $order->items->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'description' => $item->description,
+                        'quantity' => $item->quantity,
+                        'unit_price' => convert_from_base($item->unit_price),
+                        'tax_rate' => $item->tax_rate,
+                        'discount' => convert_from_base($item->discount),
+                    ];
+                });
+            @endphp
+            const orderItems = @json($mappedOrderItems);
             if (orderItems.length > 0) {
                 orderItems.forEach(function(item) {
                     addRow(item);
