@@ -101,16 +101,25 @@ class VendorController extends Controller
         $this->authorizePurchase('purchase.vendors.create');
 
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+        $companyId = company_id() ?? auth()->user()?->company_id;
+        $branchId = branch_id() ?? auth()->user()?->branch_id;
+
+        $uniqueScope = $this->scopeUniqueVendor((int) $tenantId, $companyId, $branchId);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('vendors', 'name')->where($uniqueScope),
+            ],
             'company_name' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:50'],
             'email' => [
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('vendors', 'email')->where(fn ($q) => $q->where('tenant_id', $tenantId))
+                Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
@@ -127,11 +136,20 @@ class VendorController extends Controller
         ]);
 
         if (empty($validated['code'])) {
-            $nextCount = Vendor::where('tenant_id', $tenantId)->count() + 1;
-            $validated['code'] = 'VEND-' . str_pad((string)$nextCount, 4, '0', STR_PAD_LEFT);
+            $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
+            do {
+                $candidateCode = 'VEND-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
+                $exists = Vendor::where('tenant_id', $tenantId)
+                    ->where('code', $candidateCode)
+                    ->exists();
+                $counter++;
+            } while ($exists);
+            $validated['code'] = $candidateCode;
         }
 
         $validated['tenant_id'] = $tenantId;
+        $validated['company_id'] = $companyId;
+        $validated['branch_id'] = $branchId;
         $validated['status'] = strtolower($validated['status']);
         $validated['opening_balance'] = $validated['opening_balance'] ?? 0.00;
 
@@ -145,18 +163,42 @@ class VendorController extends Controller
     public function quickCreate(Request $request): JsonResponse
     {
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id;
+        $branchId = branch_id() ?? auth()->user()?->branch_id;
+
+        $uniqueScope = $this->scopeUniqueVendor((int) $tenantId, $companyId, $branchId);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('vendors', 'name')->where($uniqueScope),
+            ],
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('vendors', 'email')->where($uniqueScope),
+            ],
             'phone' => ['nullable', 'string', 'max:50'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string'],
         ]);
 
-        $nextCount = Vendor::where('tenant_id', $tenantId)->count() + 1;
-        $validated['code'] = 'VEND-' . str_pad((string)$nextCount, 4, '0', STR_PAD_LEFT);
+        $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
+        do {
+            $candidateCode = 'VEND-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
+            $exists = Vendor::where('tenant_id', $tenantId)
+                ->where('code', $candidateCode)
+                ->exists();
+            $counter++;
+        } while ($exists);
+
+        $validated['code'] = $candidateCode;
         $validated['tenant_id'] = $tenantId;
+        $validated['company_id'] = $companyId;
+        $validated['branch_id'] = $branchId;
         $validated['status'] = 'active';
 
         $vendor = Vendor::create($validated);
@@ -280,16 +322,25 @@ class VendorController extends Controller
         $this->authorizePurchase('purchase.vendors.edit');
 
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+        $companyId = $vendor->company_id ?? company_id() ?? auth()->user()?->company_id;
+        $branchId = $vendor->branch_id ?? branch_id() ?? auth()->user()?->branch_id;
+
+        $uniqueScope = $this->scopeUniqueVendor((int) $tenantId, $companyId, $branchId);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('vendors', 'name')->ignore($vendor->id)->where($uniqueScope),
+            ],
             'company_name' => ['nullable', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50'],
             'email' => [
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('vendors', 'email')->ignore($vendor->id)->where(fn ($q) => $q->where('tenant_id', $tenantId))
+                Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope),
             ],
             'phone' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
@@ -335,5 +386,23 @@ class VendorController extends Controller
             ]),
             403
         );
+    }
+
+    private function scopeUniqueVendor(int $tenantId, ?int $companyId, ?int $branchId): \Closure
+    {
+        return function ($query) use ($tenantId, $companyId, $branchId) {
+            $query->where('tenant_id', $tenantId);
+            if ($companyId !== null) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
+            if ($branchId !== null) {
+                $query->where('branch_id', $branchId);
+            } else {
+                $query->whereNull('branch_id');
+            }
+            return $query;
+        };
     }
 }

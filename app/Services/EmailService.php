@@ -162,8 +162,8 @@ class EmailService
         $mailable = new QuotationMailable($subject, nl2br($bodyHtml), $pdfBinary, $pdfFileName);
         Mail::to($toEmail)->send($mailable);
 
-        // Update Quotation Status if Draft
-        if ($quotation->status === 'Draft') {
+        // Update Quotation Status if Draft, Approved, or Pending Approval
+        if (in_array($quotation->status, ['Draft', 'Approved', 'Pending Approval'])) {
             $quotation->update(['status' => 'Quotation Sent']);
         }
 
