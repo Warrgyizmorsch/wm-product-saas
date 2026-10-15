@@ -124,7 +124,6 @@ class WorkCenterTest extends TestCase
                 'name' => 'Laser Cut Station',
                 'code' => 'WC-LASER',
                 'work_center_type' => 'machining',
-                'department_name' => 'Fabrication',
                 'status' => 'active',
                 'capacity_per_hour' => 100,
                 'efficiency_percentage' => 100.0,
@@ -135,7 +134,6 @@ class WorkCenterTest extends TestCase
         $this->assertDatabaseHas('production_work_centers', [
             'tenant_id' => $this->tenantA->id,
             'code' => 'WC-LASER',
-            'department_name' => 'Fabrication',
         ]);
     }
 

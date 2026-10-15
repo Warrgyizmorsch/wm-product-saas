@@ -199,7 +199,7 @@ class SchedulingCalendarService
 
             if ($hasExternalOps) {
                 $classification = 'external';
-            } elseif ($wc->type === 'machine_group' || $wc->machines->isNotEmpty()) {
+            } elseif ($wc->machines->isNotEmpty()) {
                 $hasUnassigned = $wcOps->contains(fn($op) => is_null($op->machine_id));
                 $classification = $hasUnassigned ? 'machine_optional' : 'machine_based';
             } elseif ($wc->machines->isEmpty()) {

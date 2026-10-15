@@ -45,28 +45,6 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
                         
-                        @php
-                            $parentList = [];
-                            foreach ($parentOptions as $po) {
-                                $parentList[$po->id] = "{$po->name} ({$po->code})";
-                            }
-                        @endphp
-                        <x-ui.odoo-form-ui type="select" :label="__('production.parent_work_center')" name="parent_id">
-                            <option value="">{{ __('production.none_top_level') }}</option>
-                            @foreach($parentList as $id => $label)
-                                <option value="{{ $id }}" @selected(old('parent_id') == $id)>{{ $label }}</option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
-                        
-                        <x-ui.odoo-form-ui type="select" :label="__('production.hierarchy_type')" name="type" :required="true">
-                            <option value="department" @selected(old('type') === 'department')>{{ __('production.wc_type_department') }}</option>
-                            <option value="section" @selected(old('type') === 'section')>{{ __('production.wc_type_section') }}</option>
-                            <option value="work_center" @selected(old('type', 'work_center') === 'work_center')>{{ __('production.wc_type_work_center') }}</option>
-                            <option value="machine_group" @selected(old('type') === 'machine_group')>{{ __('production.wc_type_machine_group') }}</option>
-                        </x-ui.odoo-form-ui>
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.department_name')" name="department_name" placeholder="{{ __('production.dept_name_placeholder') }}" :value="old('department_name')" />
-                        
                         <x-ui.odoo-form-ui type="input" :label="__('production.physical_location')" name="location" placeholder="{{ __('production.location_placeholder') }}" :value="old('location')" />
                         
                         <x-ui.odoo-form-ui type="select" :label="__('production.status')" name="status" :required="true">

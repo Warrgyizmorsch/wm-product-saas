@@ -712,39 +712,6 @@ class ProductionEnterpriseTest extends TestCase
         ]);
     }
 
-    /**
-     * Test Work Center hierarchy path generation helper.
-     */
-    public function test_work_center_hierarchy_path_generation(): void
-    {
-        $dept = WorkCenter::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Fabrication',
-            'code' => 'DEPT-FAB',
-            'type' => 'department',
-            'status' => 'active',
-        ]);
-
-        $section = WorkCenter::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Cutting',
-            'code' => 'SEC-CUT',
-            'type' => 'section',
-            'parent_id' => $dept->id,
-            'status' => 'active',
-        ]);
-
-        $wc = WorkCenter::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Laser Cutting',
-            'code' => 'WC-LASER',
-            'type' => 'work_center',
-            'parent_id' => $section->id,
-            'status' => 'active',
-        ]);
-
-        $this->assertEquals('Fabrication > Cutting > Laser Cutting', $wc->getHierarchyPath());
-    }
 
     /**
      * Test Routing submission requires an active approved BOM first.

@@ -48,10 +48,6 @@
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.department_name') }}:</span>
-                        <span class="fw-semibold text-dark">{{ $workCenter->department_name ?? '—' }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted fs-13">{{ __('production.physical_location') }}:</span>
                         <span class="fw-semibold text-dark">{{ $workCenter->location ?? '—' }}</span>
                     </div>

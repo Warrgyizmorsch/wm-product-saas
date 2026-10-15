@@ -23,8 +23,7 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('department_name', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -47,8 +46,7 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('department_name', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%");
             });
         }
 

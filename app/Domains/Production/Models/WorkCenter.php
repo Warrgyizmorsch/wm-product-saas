@@ -14,8 +14,6 @@ class WorkCenter extends BaseModel
 {
     use HasFactory, SoftDeletes, Loggable;
 
-    public const TYPES = ['department', 'section', 'work_center', 'machine_group'];
-
     protected $table = 'production_work_centers';
 
     protected $fillable = [
@@ -24,15 +22,12 @@ class WorkCenter extends BaseModel
         'code',
         'work_center_type',  // A4: future FK when master table arrives
         'description',
-        'department_name',   // Q2: plain string, no FK
         'location',
         'capacity_per_hour',
         'efficiency_percentage',
         'cost_per_hour',
         'overhead_rate',
         'status',
-        'parent_id',
-        'type',
         'production_calendar_id',
     ];
 
@@ -41,20 +36,9 @@ class WorkCenter extends BaseModel
         'efficiency_percentage'  => 'float',
         'cost_per_hour'          => 'float',
         'overhead_rate'          => 'float',
-        'parent_id'              => 'integer',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
-
-    public function parent(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_id');
-    }
-
-    public function children(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(self::class, 'parent_id');
-    }
 
     public function machines(): HasMany
     {
@@ -120,24 +104,5 @@ class WorkCenter extends BaseModel
     public function effectiveCapacityPerHour(): float
     {
         return ($this->capacity_per_hour ?? 0) * ($this->efficiency_percentage / 100);
-    }
-
-    /**
-     * Get the breadcrumb path of the work center hierarchy.
-     * e.g. "Fabrication > Cutting > Laser Cutting"
-     */
-    public function getHierarchyPath(string $separator = ' > '): string
-    {
-        $path = [$this->name];
-        $current = $this;
-        $depth = 0;
-
-        while ($current->parent_id && $current->parent && $depth < 10) {
-            $current = $current->parent;
-            array_unshift($path, $current->name);
-            $depth++;
-        }
-
-        return implode($separator, $path);
     }
 }

@@ -43,9 +43,8 @@ class WorkCenterController extends Controller
         $tenantId = require_tenant_id();
         $shifts = $this->repository->getActiveShifts($tenantId);
         $workCenterTypes = config('production.work_center_types', []);
-        $parentOptions = $this->repository->getAllOrderedByName();
         $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions', 'shifts', 'calendars'));
+        return view('modules.production.work-centers.create', compact('workCenterTypes', 'shifts', 'calendars'));
     }
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
@@ -100,9 +99,8 @@ class WorkCenterController extends Controller
         $tenantId = require_tenant_id();
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
         $workCenterTypes = config('production.work_center_types', []);
-        $parentOptions = WorkCenter::where('id', '!=', $id)->orderBy('name')->get();
         $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions', 'shifts', 'calendars'));
+        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'shifts', 'calendars'));
     }
 
     public function update(UpdateWorkCenterRequest $request, int $id): RedirectResponse

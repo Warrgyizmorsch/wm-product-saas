@@ -207,8 +207,8 @@ class FilteredExportsTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertEquals('WC-CUT-01', $rows->first()->code);
 
-        // 3. Search by department_name
-        $exportSearchDept = new WorkCenterExport($this->tenant->id, ['search' => 'Fabrication']);
+        // 3. Search by name
+        $exportSearchDept = new WorkCenterExport($this->tenant->id, ['search' => 'Laser']);
         $rows = $exportSearchDept->collection();
         $this->assertCount(1, $rows);
         $this->assertEquals('WC-CUT-01', $rows->first()->code);
