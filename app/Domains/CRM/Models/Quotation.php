@@ -48,6 +48,7 @@ class Quotation extends BaseModel
         'total_amount',
         'terms_conditions',
         'notes',
+        'phone',
         'rejection_reason',
     ];
 

@@ -2520,27 +2520,35 @@
                                         </div>
 
                                         <div class="d-flex align-items-center flex-wrap gap-2">
-                                            <!-- WhatsApp Action Button -->
-                                            <button type="button" 
-                                                    class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal" 
-                                                    data-quotation-id="{{ $activeQuotation->id }}" 
-                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
-                                                    data-client-phone="{{ $activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)) }}" 
-                                                    data-deal-title="{{ addslashes($deal->title) }}"
-                                                    title="Send PDF via WhatsApp" data-bs-toggle="tooltip">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
-                                            </button>
+                                            @php
+                                                $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+                                                $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+                                                $canSendToClient = $isQuotationAutoApprove || in_array($activeQuotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted']);
+                                            @endphp
 
-                                            <!-- Send Email Action Button -->
-                                            <button type="button" 
-                                                    class="action-dropdown-btn action-btn-email btn-open-send-quote-modal" 
-                                                    data-quotation-id="{{ $activeQuotation->id }}" 
-                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
-                                                    data-client-email="{{ $activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)) }}" 
-                                                    data-deal-title="{{ addslashes($deal->title) }}"
-                                                    title="Send PDF via Email" data-bs-toggle="tooltip">
-                                                <i class="feather-mail text-primary fs-14"></i>
-                                            </button>
+                                            @if ($canSendToClient)
+                                                <!-- WhatsApp Action Button -->
+                                                <button type="button" 
+                                                        class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal" 
+                                                        data-quotation-id="{{ $activeQuotation->id }}" 
+                                                        data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                        data-client-phone="{{ $activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)) }}" 
+                                                        data-deal-title="{{ addslashes($deal->title) }}"
+                                                        title="Send PDF via WhatsApp" data-bs-toggle="tooltip">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                                                </button>
+
+                                                <!-- Send Email Action Button -->
+                                                <button type="button" 
+                                                        class="action-dropdown-btn action-btn-email btn-open-send-quote-modal" 
+                                                        data-quotation-id="{{ $activeQuotation->id }}" 
+                                                        data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                        data-client-email="{{ $activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)) }}" 
+                                                        data-deal-title="{{ addslashes($deal->title) }}"
+                                                        title="Send PDF via Email" data-bs-toggle="tooltip">
+                                                    <i class="feather-mail text-primary fs-14"></i>
+                                                </button>
+                                            @endif
 
                                             <!-- Download PDF Action Button -->
                                             <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" 
@@ -2551,12 +2559,25 @@
 
                                             <!-- Status / Workflow Action Buttons -->
                                             @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
-                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="Pending Approval">
-                                                    <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Submit Approval</button>
-                                                </form>
+                                                @if (!$isQuotationAutoApprove)
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Pending Approval">
+                                                        <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Submit Approval</button>
+                                                    </form>
+                                                @else
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Quotation Sent">
+                                                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
+                                                    </form>
+                                                @endif
+                                            @elseif ($activeQuotation->status === 'Pending Approval')
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fw-bold px-2.5 py-1.5 fs-12 d-inline-flex align-items-center">
+                                                    <i class="feather-clock me-1"></i>Pending Approval
+                                                </span>
                                             @elseif ($activeQuotation->status === 'Approved')
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
@@ -2565,6 +2586,9 @@
                                                     <button type="submit" class="btn btn-sm btn-primary fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
                                                 </form>
                                             @elseif ($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent')
+                                                <span class="badge bg-soft-success text-success border border-success-subtle fw-bold px-2.5 py-1.5 fs-12 d-inline-flex align-items-center">
+                                                    <i class="feather-check-circle me-1"></i>Sent
+                                                </span>
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
                                                     @method('PATCH')
@@ -2621,7 +2645,7 @@
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.contact_email') }}</label>
                                                     <div class="fs-12 text-primary d-flex align-items-center flex-nowrap gap-1">
                                                         <span class="fw-semibold text-truncate" title="{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}</span>
-                                                        @if ($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)))
+                                                        @if ($canSendToClient && ($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))))
                                                             <button type="button" 
                                                                     class="action-dropdown-btn action-btn-email btn-open-send-quote-modal ms-1 flex-shrink-0" 
                                                                     data-quotation-id="{{ $activeQuotation->id }}" 
@@ -2639,7 +2663,7 @@
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.contact_phone') }}</label>
                                                     <div class="fs-12 text-dark d-flex align-items-center flex-nowrap gap-1">
                                                         <span class="fw-semibold text-truncate">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—')) }}</span>
-                                                        @if ($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)))
+                                                        @if ($canSendToClient && ($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))))
                                                             <button type="button" 
                                                                     class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal ms-1 flex-shrink-0" 
                                                                     data-quotation-id="{{ $activeQuotation->id }}" 
@@ -4409,7 +4433,7 @@
         let defaultQuotationPdfUrl = '';
         let customWaPdfFile = null;
 
-        function showNotificationModal(isSuccess, title, message) {
+        function showNotificationModal(isSuccess, title, message, reloadOnClose = false) {
             const iconHtml = isSuccess 
                 ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
                 : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
@@ -4421,6 +4445,15 @@
             const modalEl = document.getElementById('waResultModal');
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
+
+            if (isSuccess && reloadOnClose) {
+                $(modalEl).one('hidden.bs.modal', function () {
+                    window.location.reload();
+                });
+                setTimeout(function () {
+                    window.location.reload();
+                }, 2000);
+            }
         }
 
         function checkWhatsAppStatus() {
@@ -4564,7 +4597,7 @@
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     if (modal) modal.hide();
 
-                    showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                    showNotificationModal(true, "WhatsApp Message Delivered!", res.message, true);
                 },
                 error: function (xhr) {
                     btn.prop('disabled', false).html(origHtml);
@@ -4614,7 +4647,7 @@
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     if (modal) modal.hide();
 
-                    showNotificationModal(true, "Quotation Email Dispatched!", res.message);
+                    showNotificationModal(true, "Quotation Email Dispatched!", res.message, true);
                 },
                 error: function (xhr) {
                     btn.prop('disabled', false).html(origHtml);

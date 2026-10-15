@@ -278,7 +278,12 @@ class WhatsAppService
 
         $caption = $customCaption ?: $defaultCaption;
 
-        $updateData = ['phone' => $mobile];
+        $cleanMobile = preg_replace('/\D/', '', trim($mobile));
+        if (strlen($cleanMobile) === 10) {
+            $cleanMobile = '91' . $cleanMobile;
+        }
+
+        $updateData = ['phone' => $cleanMobile ?: $mobile];
         if (in_array($quotation->status, ['Draft', 'Approved', 'Pending Approval'])) {
             $updateData['status'] = 'Quotation Sent';
         }

@@ -76,9 +76,10 @@ class WhatsAppBotService
     }
 
     /**
-     * Handle incoming message for Quotation Acceptance / Rejection
+     * Handle incoming message for Quotation Acceptance / Rejection / Rejection Reason
+     * Strictly isolated to the recipient phone number the quotation was sent to.
      */
-    public function handleQuotationResponse(WhatsAppConfiguration $config, string $senderNumber, string $rawMsg, ?string $messageId = null): bool
+    public function handleQuotationResponse(WhatsAppConfiguration $config, string $senderNumber, string $rawMsg, ?string $messageId = null, string $senderName = ''): bool
     {
         $cleanPhone = preg_replace('/\D/', '', $senderNumber);
         $last10 = strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone;
@@ -88,22 +89,97 @@ class WhatsAppBotService
 
         $trimMsg = strtolower(trim($rawMsg));
 
-        // 1. ACCEPTANCE DETECTION (e.g. '1', '1. accept', 'accept', 'yes', 'approve', 'haan', etc.)
+        // =========================================================================
+        // STEP 1: CHECK IF THIS SENDER IS AWAITING REJECTION FEEDBACK
+        // Strictly scoped to THIS phone number with a 30-minute validity window.
+        // Other phone numbers sending messages will NEVER trigger this block!
+        // =========================================================================
+        $activeRejectSession = WhatsAppChatSession::where('tenant_id', $config->tenant_id)
+            ->where('phone', $senderNumber)
+            ->where('category', 'awaiting_quotation_rejection_reason')
+            ->where('is_completed', false)
+            ->latest('id')
+            ->first();
+
+        if ($activeRejectSession) {
+            $collected = $activeRejectSession->collected_data ?: [];
+            $quoteId = $collected['quotation_id'] ?? null;
+            $requestedAt = $collected['requested_at'] ?? 0;
+            $isExpired = (time() - $requestedAt) > 1800; // 30 minutes window
+
+            if ($isExpired || in_array($trimMsg, ['hi', 'hello', 'menu', 'reset', 'restart', 'help', 'start'], true)) {
+                $activeRejectSession->update(['is_completed' => true]);
+                // If reset/greeting was typed, let it fall through to normal greeting/bot
+            } else {
+                // Sender provided their rejection reason!
+                $activeRejectSession->update(['is_completed' => true]);
+
+                $rejectedQuotation = \App\Domains\CRM\Models\Quotation::where('tenant_id', $config->tenant_id)
+                    ->where('id', $quoteId)
+                    ->first();
+
+                if ($rejectedQuotation) {
+                    $rejectedQuotation->update([
+                        'rejection_reason' => $rawMsg,
+                    ]);
+
+                    if ($rejectedQuotation->crmDeal) {
+                        $rejectedQuotation->crmDeal->update([
+                            'close_reason' => $rawMsg,
+                        ]);
+                    }
+
+                    $lead = $rejectedQuotation->lead ?: ($rejectedQuotation->crmDeal?->lead);
+                    if ($lead) {
+                        \App\Domains\CRM\Models\LeadHistory::logEvent(
+                            $lead,
+                            'quotation_rejection_reason_updated',
+                            null,
+                            $rawMsg,
+                            "Client provided rejection feedback for Quotation {$rejectedQuotation->quotation_number}: {$rawMsg}"
+                        );
+                    }
+
+                    $reply = "📝 *Feedback Recorded*\n\n"
+                           . "Thank you! Your feedback for Quotation *{$rejectedQuotation->quotation_number}* has been recorded:\n"
+                           . "\"_{$rawMsg}_\"\n\n"
+                           . "Our team will review your feedback.";
+                    $this->waService->sendMessage($senderNumber, $reply, $messageId);
+                    return true;
+                }
+            }
+        }
+
+        // =========================================================================
+        // STEP 2: CHECK FOR EXPLICIT ACCEPTANCE OR REJECTION
+        // =========================================================================
         $isAccept = (
             $trimMsg === '1' ||
-            preg_match('/^(1[\,\.\s\:\-\)]*|accept[\,\:\s\-]*|accepted[\,\:\s\-]*|yes[\,\:\s\-]*|approve[\,\:\s\-]*|approved[\,\:\s\-]*|agree[\,\:\s\-]*|haan[\,\:\s\-]*|ha[\,\:\s\-]*|ok[\,\:\s\-]*)/i', $trimMsg)
+            preg_match('/^(1[\,\.\s\:\-\)]+|accept[\,\:\s\-]*|accepted[\,\:\s\-]*|approve[\,\:\s\-]*|approved[\,\:\s\-]*|agree[\,\:\s\-]*)/i', $trimMsg) ||
+            ($trimMsg === 'yes' || $trimMsg === 'haan' || $trimMsg === 'ha')
         );
 
-        // 2. REJECTION DETECTION (e.g. '2', '2, not valid', '2. reject', 'reject: reason', 'decline', 'not interested', etc.)
         $isReject = (
             $trimMsg === '2' ||
-            preg_match('/^(2[\,\.\s\:\-\)]*|reject[\,\:\s\-]*|rejected[\,\:\s\-]*|decline[\,\:\s\-]*|declined[\,\:\s\-]*|not interested[\,\:\s\-]*|cancel[\,\:\s\-]*|no[\,\:\s\-]*|na[\,\:\s\-]*)/i', $trimMsg)
+            preg_match('/^(2[\,\.\s\:\-\)]+|reject[\,\:\s\-]*|rejected[\,\:\s\-]*|decline[\,\:\s\-]*|declined[\,\:\s\-]*|cancel[\,\:\s\-]*)/i', $trimMsg) ||
+            ($trimMsg === 'not interested')
         );
 
-        // MULTI-STRATEGY QUOTATION LOOKUP:
+        // If message is neither Accept nor Reject, and sender is not awaiting reason:
+        // IT CANNOT BE A QUOTATION ACTION. Return false immediately!
+        // This ensures random chat messages from anyone (e.g. "meeting hai", "4 baje") are NEVER treated as quotation actions!
+        if (!$isAccept && !$isReject) {
+            return false;
+        }
+
+        // =========================================================================
+        // STEP 3: STRICT SENDER-BASED QUOTATION LOOKUP
+        // ONLY quotations sent to or linked to THIS phone number ($last10).
+        // NO global fallback. Messages from other users will NEVER touch someone else's quote!
+        // =========================================================================
         $pendingQuotation = null;
 
-        // Strategy A: Find by Quotation number mentioned in recent outbound WhatsApp messages to this phone number
+        // Strategy A: Check recent outbound quotation message sent to THIS sender number
         $lastOutbound = \App\Models\WhatsAppMessage::where('tenant_id', $config->tenant_id)
             ->where('direction', 'outbound')
             ->where(function ($q) use ($last10, $senderNumber, $cleanPhone) {
@@ -111,7 +187,13 @@ class WhatsAppBotService
                   ->orWhere('sender_number', $senderNumber)
                   ->orWhere('sender_number', $cleanPhone);
             })
-            ->where('message_body', 'like', '%Quotation%')
+            ->where(function ($q) {
+                $q->where('message_body', 'like', '%Please find attached Quotation%')
+                  ->orWhere('message_body', 'like', '%Please respond with one of the options%')
+                  ->orWhere('message_body', 'like', '%to Accept Quotation%')
+                  ->orWhere('message_body', 'like', '[Document: Quotation_%');
+            })
+            ->where('created_at', '>=', now()->subDays(30))
             ->latest('id')
             ->first();
 
@@ -123,16 +205,18 @@ class WhatsAppBotService
                     $q->where('quotation_number', $rawNum)
                       ->orWhere('quotation_number', $extractedQuoteNum);
                 })
+                ->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])
                 ->first();
         }
 
-        // Strategy B: Match active quotation by contact phone / lead phone / account phone / deal lead phone
+        // Strategy B: Match active quotation by quotation phone, contact phone, lead phone, or account phone
         if (!$pendingQuotation) {
             $pendingQuotation = \App\Domains\CRM\Models\Quotation::query()
                 ->where('tenant_id', $config->tenant_id)
                 ->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])
                 ->where(function ($q) use ($last10) {
-                    $q->whereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
+                    $q->where('phone', 'like', "%{$last10}%")
+                      ->orWhereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
                       ->orWhereHas('crmDeal.lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                       ->orWhereHas('lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
                       ->orWhereHas('crmAccount', fn($aq) => $aq->where('phone', 'like', "%{$last10}%"));
@@ -141,7 +225,7 @@ class WhatsAppBotService
                 ->first();
         }
 
-        // Strategy C: Fallback to most recent quotation for any Deal linked to this phone
+        // Strategy C: Match active quotation for any Deal linked to this phone
         if (!$pendingQuotation) {
             $linkedDeal = \App\Domains\CRM\Models\CrmDeal::where('tenant_id', $config->tenant_id)
                 ->where(function ($q) use ($last10) {
@@ -153,66 +237,27 @@ class WhatsAppBotService
                 ->first();
 
             if ($linkedDeal && $linkedDeal->quotations->isNotEmpty()) {
-                $pendingQuotation = $linkedDeal->quotations->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])->first()
-                    ?: $linkedDeal->quotations->last();
-            }
-        }
-
-        // Strategy D: Reliable Fallback for Explicit Accept ("1") / Reject ("2")
-        if (!$pendingQuotation && ($isAccept || $isReject)) {
-            // First check if an outbound quotation message was recently sent
-            $recentOutbound = \App\Models\WhatsAppMessage::where('tenant_id', $config->tenant_id)
-                ->where('direction', 'outbound')
-                ->where('message_body', 'like', '%Quotation%')
-                ->latest('id')
-                ->first();
-
-            if ($recentOutbound && preg_match('/Quotation[_\s\*]+(QT-[0-9\-R]+)/i', $recentOutbound->message_body, $matches)) {
-                $extractedQuoteNum = $matches[1];
-                $rawNum = str_replace('QT-', '', $extractedQuoteNum);
-                $pendingQuotation = \App\Domains\CRM\Models\Quotation::where('tenant_id', $config->tenant_id)
-                    ->where(function($q) use ($rawNum, $extractedQuoteNum) {
-                        $q->where('quotation_number', $rawNum)
-                          ->orWhere('quotation_number', $extractedQuoteNum);
-                    })
-                    ->first();
-            }
-
-            if (!$pendingQuotation) {
-                // Fallback to the latest pending quotation in this tenant
-                $pendingQuotation = \App\Domains\CRM\Models\Quotation::where('tenant_id', $config->tenant_id)
+                $pendingQuotation = $linkedDeal->quotations
                     ->whereIn('status', ['Quotation Sent', 'Sent', 'Approved', 'Pending Approval', 'Draft'])
-                    ->latest('id')
-                    ->first();
+                    ->last();
             }
         }
 
-        // Check if there is a recently rejected quotation awaiting explanation
-        $recentlyRejectedQuotation = null;
-        if (!$pendingQuotation || in_array($pendingQuotation->status, ['Rejected', 'Declined'])) {
-            $recentlyRejectedQuotation = ($pendingQuotation && in_array($pendingQuotation->status, ['Rejected', 'Declined']))
-                ? $pendingQuotation
-                : \App\Domains\CRM\Models\Quotation::query()
-                    ->where('tenant_id', $config->tenant_id)
-                    ->where('status', 'Rejected')
-                    ->where('updated_at', '>=', now()->subMinutes(60))
-                    ->where(function ($q) use ($last10) {
-                        $q->whereHas('crmDeal.contact', fn($cq) => $cq->where('phone', 'like', "%{$last10}%"))
-                          ->orWhereHas('crmDeal.lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
-                          ->orWhereHas('lead', fn($lq) => $lq->where('phone', 'like', "%{$last10}%")->orWhere('company_phone', 'like', "%{$last10}%"))
-                          ->orWhereHas('crmAccount', fn($aq) => $aq->where('phone', 'like', "%{$last10}%"));
-                    })
-                    ->latest('updated_at')
-                    ->first();
+        // If NO quotation was sent/linked to this phone number, DO NOT TOUCH ANY QUOTATION!
+        // Return false so normal lead qualification or chatbot can handle this message.
+        if (!$pendingQuotation) {
+            return false;
         }
 
-        // ==========================================
-        // ACTION: ACCEPT QUOTATION
-        // ==========================================
-        if ($pendingQuotation && $isAccept) {
+        // =========================================================================
+        // STEP 4: ACTION - ACCEPT QUOTATION
+        // =========================================================================
+        if ($isAccept) {
             $pendingQuotation->update([
-                'status' => 'Accepted',
+                'status'           => 'Accepted',
+                'rejection_reason' => null,
             ]);
+
             try {
                 app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($pendingQuotation, 'Accepted');
             } catch (\Throwable $e) {
@@ -230,7 +275,10 @@ class WhatsAppBotService
                 );
             }
 
-            WhatsAppChatSession::where('phone', $senderNumber)->update(['is_completed' => true]);
+            // Clear any awaiting rejection session for this phone
+            WhatsAppChatSession::where('tenant_id', $config->tenant_id)
+                ->where('phone', $senderNumber)
+                ->update(['is_completed' => true]);
 
             $reply = "✅ *Quotation Accepted!*\n\n"
                    . "Thank you! Quotation *{$pendingQuotation->quotation_number}* has been marked as *ACCEPTED*.\n\n"
@@ -239,14 +287,15 @@ class WhatsAppBotService
             return true;
         }
 
-        // ==========================================
-        // ACTION: REJECT QUOTATION
-        // ==========================================
-        if ($pendingQuotation && $isReject) {
+        // =========================================================================
+        // STEP 5: ACTION - REJECT QUOTATION
+        // =========================================================================
+        if ($isReject) {
             $reasonText = preg_replace('/^(2[\,\.\s\:\-\)]*|reject[\,\:\s\-]*|rejected[\,\:\s\-]*|decline[\,\:\s\-]*|declined[\,\:\s\-]*|cancel[\,\:\s\-]*|no[\,\:\s\-]*|na[\,\:\s\-]*)/i', '', $rawMsg);
             $reasonText = trim($reasonText, " \t\n\r\0\x0B,.-:");
 
-            $reason = !empty($reasonText) ? $reasonText : 'Client rejected quotation via WhatsApp';
+            $hasReason = !empty($reasonText);
+            $reason = $hasReason ? $reasonText : 'Client rejected quotation via WhatsApp';
 
             $pendingQuotation->update([
                 'status'           => 'Rejected',
@@ -276,14 +325,38 @@ class WhatsAppBotService
                 );
             }
 
-            WhatsAppChatSession::where('phone', $senderNumber)->update(['is_completed' => true]);
+            if ($hasReason) {
+                // User already provided reason in this rejection message
+                WhatsAppChatSession::where('tenant_id', $config->tenant_id)
+                    ->where('phone', $senderNumber)
+                    ->update(['is_completed' => true]);
 
-            if (!empty($reasonText)) {
                 $reply = "❌ *Quotation Rejected*\n\n"
                        . "Quotation *{$pendingQuotation->quotation_number}* has been marked as *REJECTED*.\n"
                        . "📝 *Reason Recorded:* \"_{$reason}_\"\n\n"
                        . "Thank you for your feedback. Our sales team has been updated.";
             } else {
+                // User replied only '2' without reason.
+                // Store state strictly for THIS sender number to await reason
+                WhatsAppChatSession::updateOrCreate(
+                    [
+                        'tenant_id' => $config->tenant_id,
+                        'phone'     => $senderNumber,
+                        'category'  => 'awaiting_quotation_rejection_reason',
+                    ],
+                    [
+                        'session_key'    => $config->session_key,
+                        'sender_name'    => $senderName,
+                        'current_step'   => 99,
+                        'collected_data' => [
+                            'quotation_id'     => $pendingQuotation->id,
+                            'quotation_number' => $pendingQuotation->quotation_number,
+                            'requested_at'     => now()->timestamp,
+                        ],
+                        'is_completed'   => false,
+                    ]
+                );
+
                 $reply = "❌ *Quotation Rejected*\n\n"
                        . "Quotation *{$pendingQuotation->quotation_number}* has been marked as *REJECTED*.\n\n"
                        . "💬 *Please reply with your reason or feedback* (e.g. *Price too high, Delivery timeline, Requirement changed*) so we can assist you better.";
@@ -291,43 +364,6 @@ class WhatsAppBotService
 
             $this->waService->sendMessage($senderNumber, $reply, $messageId);
             return true;
-        }
-
-        // ==========================================
-        // ACTION: FOLLOW-UP REJECTION REASON
-        // ==========================================
-        if ($recentlyRejectedQuotation && !$isAccept && !$isReject && !in_array($trimMsg, ['hi', 'hello', 'menu', 'reset', 'restart', 'help'], true)) {
-            if (str_contains($recentlyRejectedQuotation->rejection_reason ?? '', 'via WhatsApp') || empty($recentlyRejectedQuotation->rejection_reason) || strlen($recentlyRejectedQuotation->rejection_reason) < 5) {
-                $recentlyRejectedQuotation->update([
-                    'rejection_reason' => $rawMsg,
-                ]);
-
-                if ($recentlyRejectedQuotation->crmDeal) {
-                    $recentlyRejectedQuotation->crmDeal->update([
-                        'close_reason' => $rawMsg,
-                    ]);
-                }
-
-                $lead = $recentlyRejectedQuotation->lead ?: ($recentlyRejectedQuotation->crmDeal?->lead);
-                if ($lead) {
-                    \App\Domains\CRM\Models\LeadHistory::logEvent(
-                        $lead,
-                        'quotation_rejection_reason_updated',
-                        null,
-                        $rawMsg,
-                        "Client provided rejection feedback for Quotation {$recentlyRejectedQuotation->quotation_number}: {$rawMsg}"
-                    );
-                }
-
-                WhatsAppChatSession::where('phone', $senderNumber)->update(['is_completed' => true]);
-
-                $reply = "📝 *Feedback Recorded*\n\n"
-                       . "Thank you! Your feedback for Quotation *{$recentlyRejectedQuotation->quotation_number}* has been recorded:\n"
-                       . "\"_{$rawMsg}_\"\n\n"
-                       . "Our team will review your feedback.";
-                $this->waService->sendMessage($senderNumber, $reply, $messageId);
-                return true;
-            }
         }
 
         return false;
@@ -342,7 +378,7 @@ class WhatsAppBotService
         $trimMsg = strtolower($rawMsg);
 
         // PRIORITY 1: Check if this message is an action/reply for a Quotation
-        if ($this->handleQuotationResponse($config, $senderNumber, $rawMsg, $messageId)) {
+        if ($this->handleQuotationResponse($config, $senderNumber, $rawMsg, $messageId, $senderName)) {
             return;
         }
 
