@@ -504,9 +504,13 @@ class SubcontractMaterialBalanceService
             }
 
             $challanNumber = 'DC-RWK-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
+            $companyId = $order?->company_id ?? company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null);
+            $branchId = $order?->branch_id ?? branch_id() ?? (class_exists(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null);
 
             $challan = \App\Domains\Production\Models\DeliveryChallan::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'challan_number' => $challanNumber,
                 'type' => 'vendor_rework',
                 'production_order_id' => $op->production_order_id,
@@ -532,6 +536,8 @@ class SubcontractMaterialBalanceService
 
             \App\Domains\Production\Models\DeliveryChallanItem::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'delivery_challan_id' => $challan->id,
                 'product_id' => $op->source_product_id ?: $order?->product_id,
                 'production_batch_id' => $data['batch_id'] ?? $batch?->id,
