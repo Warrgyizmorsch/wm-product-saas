@@ -267,7 +267,6 @@ class TableManufacturingProductionSeeder extends Seeder
                 ['tenant_id' => $tenantId, 'code' => $data['code']],
                 [
                     'name' => $data['name'],
-                    'type' => 'work_center',
                     'work_center_type' => 'machining',
                     'description' => $data['description'],
                     'capacity_per_hour' => $data['capacity_per_hour'],
