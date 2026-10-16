@@ -656,7 +656,7 @@ class ProductImportMapperService
                 }
 
                 $defaultProdModelRaw = $getValue($row, 'default_production_model');
-                $defaultProdModel = !empty($defaultProdModelRaw) ? trim($defaultProdModelRaw) : null;
+                $defaultProdModel = !empty($defaultProdModelRaw) ? trim($defaultProdModelRaw) : 'pure_manufacturing';
 
                 // Resolve UOM safely (matching name or code, or auto-creating)
                 $uomId = $resolveUom($getValue($row, 'uom'));

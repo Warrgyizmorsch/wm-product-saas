@@ -271,14 +271,40 @@ class QuotationApiController extends Controller
             ], 422);
         }
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        if ($approvalPolicy !== 'auto_approve' && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quotation must be Approved before sending to client.',
+            ], 422);
+        }
+
         try {
             /** @var \App\Services\EmailService $emailService */
             $emailService = app(\App\Services\EmailService::class);
             $emailService->sendQuotationEmail($quotation, $request->all());
 
+            // Synchronize status to 'Quotation Sent' (same action as Mark as Sent)
+            $oldStatus = $quotation->status;
+            if (in_array($oldStatus, ['Draft', 'Approved', 'Pending Approval'])) {
+                $quotation->update(['status' => 'Quotation Sent']);
+                $leadId = $quotation->lead_id ?: ($quotation->crmDeal?->lead_id);
+                if ($leadId && ($lead = Lead::find($leadId))) {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $lead, 'quotation_status_changed', $oldStatus, 'Quotation Sent',
+                        "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Quotation Sent' via Email dispatch"
+                    );
+                }
+                try {
+                    app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent', $leadId);
+                } catch (\Throwable $e) {}
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => "Quotation {$quotation->quotation_number} sent successfully to {$request->input('to_email')} with PDF attached!",
+                'new_status' => 'Quotation Sent',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -298,6 +324,15 @@ class QuotationApiController extends Controller
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        if ($approvalPolicy !== 'auto_approve' && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quotation must be Approved before sending to client.',
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'phone'      => 'required|string',
             'caption'    => 'nullable|string',
@@ -314,7 +349,11 @@ class QuotationApiController extends Controller
 
         $phone = $request->input('phone');
         if (!empty($phone)) {
-            $quotation->update(['phone' => $phone]);
+            $cleanPhone = preg_replace('/\D/', '', trim($phone));
+            if (strlen($cleanPhone) === 10) {
+                $cleanPhone = '91' . $cleanPhone;
+            }
+            $quotation->update(['phone' => $cleanPhone ?: $phone]);
         }
 
         try {
@@ -327,11 +366,36 @@ class QuotationApiController extends Controller
                 customPdfFile: $request->file('custom_pdf')
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => "Quotation {$quotation->quotation_number} sent via WhatsApp to {$phone}!",
-                'data'    => $result,
-            ]);
+            if ($result['success']) {
+                // Synchronize status to 'Quotation Sent' (same action as Mark as Sent)
+                $oldStatus = $quotation->status;
+                if (in_array($oldStatus, ['Draft', 'Approved', 'Pending Approval'])) {
+                    $quotation->update(['status' => 'Quotation Sent']);
+                    $leadId = $quotation->lead_id ?: ($quotation->crmDeal?->lead_id);
+                    if ($leadId && ($lead = Lead::find($leadId))) {
+                        \App\Domains\CRM\Models\LeadHistory::logEvent(
+                            $lead, 'quotation_status_changed', $oldStatus, 'Quotation Sent',
+                            "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Quotation Sent' via WhatsApp dispatch"
+                        );
+                    }
+                    try {
+                        app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent', $leadId);
+                    } catch (\Throwable $e) {}
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Quotation {$quotation->quotation_number} sent via WhatsApp to {$phone}!",
+                    'data'    => $result,
+                    'new_status' => 'Quotation Sent',
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Failed to send WhatsApp message.',
+                    'status'  => $result['status'] ?? 'error',
+                ], 422);
+            }
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,

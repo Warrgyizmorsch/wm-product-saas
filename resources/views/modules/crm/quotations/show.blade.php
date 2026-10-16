@@ -5,6 +5,13 @@
 @section('breadcrumb', 'CRM / Quotations / ' . $quotation->quotation_number)
 
 @section('page-actions')
+    @php
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        $isQuotationAutoApprove = ($approvalPolicy === 'auto_approve');
+        $canSendToClient = $isQuotationAutoApprove || in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted']);
+    @endphp
+
     <div class="d-flex align-items-center gap-2">
         <a href="{{ route('crm.quotations.index') }}" class="action-dropdown-btn" title="Back to Quotations" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
@@ -13,6 +20,39 @@
         <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3">
             <i class="feather-printer me-1.5"></i>Print
         </a>
+
+        @if ($quotation->status === 'Draft' || $quotation->status === 'Quotation Rework')
+            @if (!$isQuotationAutoApprove)
+                <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline m-0">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="Pending Approval">
+                    <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold px-3 py-1.5"><i class="feather-send me-1"></i>Submit Approval</button>
+                </form>
+            @else
+                <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline m-0">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="Quotation Sent">
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-3 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
+                </form>
+            @endif
+        @elseif ($quotation->status === 'Pending Approval')
+            <span class="badge bg-soft-warning text-warning border border-warning-subtle fw-bold px-2.5 py-1.5 fs-12 d-inline-flex align-items-center">
+                <i class="feather-clock me-1"></i>Pending Approval
+            </span>
+        @elseif ($quotation->status === 'Approved')
+            <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline m-0">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="status" value="Quotation Sent">
+                <button type="submit" class="btn btn-sm btn-primary fw-bold px-3 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
+            </form>
+        @elseif ($quotation->status === 'Quotation Sent' || $quotation->status === 'Sent')
+            <span class="badge bg-soft-success text-success border border-success-subtle fw-bold px-2.5 py-1.5 fs-12 d-inline-flex align-items-center">
+                <i class="feather-check-circle me-1"></i>Sent
+            </span>
+        @endif
 
         @if ($quotation->status === 'Accepted')
             @php
@@ -44,6 +84,7 @@
                 <i class="feather-more-horizontal me-1"></i>MORE
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-1" style="min-width: 210px;">
+                @if ($canSendToClient)
                 <li>
                     <button type="button" 
                             class="dropdown-item py-2 fs-12 fw-medium btn-open-send-quote-wa-modal d-flex align-items-center" 
@@ -66,6 +107,7 @@
                         Send via Email
                     </button>
                 </li>
+                @endif
                 <li>
                     <a href="{{ route('crm.quotations.download', $quotation->id) }}" class="dropdown-item py-2 fs-12 fw-medium d-flex align-items-center">
                         <i class="feather-download me-2 text-danger fs-14"></i>
@@ -681,7 +723,7 @@
     let defaultQuotationPdfUrl = '';
     let customWaPdfFile = null;
 
-    function showNotificationModal(isSuccess, title, message) {
+    function showNotificationModal(isSuccess, title, message, reloadOnClose = false) {
         const iconHtml = isSuccess 
             ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
             : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
@@ -693,6 +735,15 @@
         const modalEl = document.getElementById('waResultModal');
         const modal = new bootstrap.Modal(modalEl);
         modal.show();
+
+        if (isSuccess && reloadOnClose) {
+            $(modalEl).one('hidden.bs.modal', function () {
+                window.location.reload();
+            });
+            setTimeout(function () {
+                window.location.reload();
+            }, 2000);
+        }
     }
 
     function checkWhatsAppStatus() {
@@ -836,7 +887,7 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
 
-                showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                showNotificationModal(true, "WhatsApp Message Delivered!", res.message, true);
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
@@ -886,7 +937,7 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
 
-                showNotificationModal(true, "Quotation Email Dispatched!", res.message);
+                showNotificationModal(true, "Quotation Email Dispatched!", res.message, true);
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);

@@ -607,17 +607,20 @@
             }).trigger('change');
 
             // Prefill order items
-            const prefillItems = @json($prefillQuotation ? $prefillQuotation->items->map(function($item) {
-                return [
-                    'id' => $item->id,
-                    'product_id' => $item->product_id,
-                    'description' => $item->description,
-                    'quantity' => $item->quantity,
-                    'unit_price' => convert_from_base($item->unit_price),
-                    'tax_rate' => $item->tax_rate,
-                    'discount' => convert_from_base($item->discount),
-                ];
-            }) : []);
+            @php
+                $mappedPrefillItems = $prefillQuotation ? $prefillQuotation->items->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'description' => $item->description,
+                        'quantity' => $item->quantity,
+                        'unit_price' => convert_from_base($item->unit_price),
+                        'tax_rate' => $item->tax_rate,
+                        'discount' => convert_from_base($item->discount),
+                    ];
+                }) : [];
+            @endphp
+            const prefillItems = @json($mappedPrefillItems);
             if (prefillItems.length > 0) {
                 prefillItems.forEach(function(item) {
                     addRow(item);
