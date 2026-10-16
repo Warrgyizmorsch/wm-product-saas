@@ -67,7 +67,7 @@ class RoutingParallelDependencyTest extends TestCase
             'name' => 'Turbine Multi-Branch Routing',
             'product_id' => $this->product->id,
             'version' => '1.0.0',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'is_default' => '1',
             'operations' => [
                 [

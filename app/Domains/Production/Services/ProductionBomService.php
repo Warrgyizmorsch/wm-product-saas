@@ -17,7 +17,9 @@ class ProductionBomService
 {
     public function __construct(
         private readonly ProductionBomRepositoryInterface $bomRepository,
-        private readonly ProductionBomNumberService $numberService
+        private readonly ProductionBomNumberService $numberService,
+        private readonly BomLifecycleService $bomLifecycleService,
+        private readonly RoutingLifecycleService $routingLifecycleService
     ) {
     }
 
@@ -49,6 +51,14 @@ class ProductionBomService
         }
 
         $this->checkBomConflicts($dto->product_id, $dto->version);
+        $this->bomLifecycleService->validateEffectiveDates(
+            $dto->effective_date,
+            $dto->expiry_date,
+            $dto->product_id,
+            null,
+            $tenantId,
+            $dto->bom_type
+        );
 
         return DB::transaction(function () use ($dto, $bomNumber, $creatorUserId, $tenantId) {
             $bomData = array_merge($dto->toArray(), [
@@ -95,6 +105,14 @@ class ProductionBomService
         }
 
         $this->checkBomConflicts($dto->product_id, $dto->version, $id);
+        $this->bomLifecycleService->validateEffectiveDates(
+            $dto->effective_date,
+            $dto->expiry_date,
+            $dto->product_id,
+            $id,
+            $bom->tenant_id,
+            $dto->bom_type
+        );
 
         $tenantId = $bom->tenant_id;
 
@@ -167,59 +185,20 @@ class ProductionBomService
                 throw new InvalidArgumentException("Only BOMs pending approval can be approved.");
             }
 
-            // 1. Deactivate previously approved BOMs for the same product and BOM type
-            $deactivateQuery = ProductionBom::withoutGlobalScopes()
-                ->where('tenant_id', $bom->tenant_id)
-                ->where('product_id', $bom->product_id)
-                ->where('status', 'approved')
-                ->where('id', '!=', $bom->id);
+            // 1. Centralized lifecycle transition on approval: sets previous active version's expiry date
+            // to the new version's start date and activates the new version
+            $deactivatedBomIds = $this->bomLifecycleService->transitionOnApproval($bom, $approverUserId);
 
-            if (!empty($bom->bom_type)) {
-                $deactivateQuery->where('bom_type', $bom->bom_type);
-            }
-
-            $deactivatedBomIds = (clone $deactivateQuery)->pluck('id')->toArray();
-
-            $deactivateQuery->update([
-                'status' => 'inactive',
-                'expiry_date' => Carbon::now()->toDateString(),
-            ]);
-
-            // When a BOM becomes inactive, the routing connected to that BOM also becomes historical
+            // 2. Centralized archival of connected routings
             if (!empty($deactivatedBomIds)) {
-                $linkedRoutings = Routing::withoutGlobalScopes()
-                    ->where(function ($q) use ($deactivatedBomIds, $bom) {
-                        $q->whereIn('bom_id', $deactivatedBomIds)
-                          ->orWhere(function ($sub) use ($bom) {
-                              $sub->whereNull('bom_id')
-                                  ->where('product_id', $bom->product_id);
-                          });
-                    })
-                    ->where('status', Routing::STATUS_ACTIVE)
-                    ->get();
-
-                foreach ($linkedRoutings as $linkedRouting) {
-                    $linkedRouting->update([
-                        'status' => Routing::STATUS_HISTORICAL,
-                        'effective_to' => Carbon::now()->toDateString(),
-                    ]);
-
-                    RoutingApproval::create([
-                        'tenant_id' => $linkedRouting->tenant_id,
-                        'routing_id' => $linkedRouting->id,
-                        'user_id' => $approverUserId,
-                        'action' => RoutingApproval::ACTION_ARCHIVED,
-                        'comments' => 'Automatically archived because connected BOM was superseded and deactivated.',
-                    ]);
-                }
+                $this->routingLifecycleService->archiveRoutingsForDeactivatedBoms(
+                    $deactivatedBomIds,
+                    $bom->product_id,
+                    $approverUserId,
+                    'Automatically archived because connected BOM was superseded and deactivated.',
+                    $bom->effective_date ? \Illuminate\Support\Carbon::parse($bom->effective_date)->toDateString() : null
+                );
             }
-
-            // 2. Approve current BOM
-            $bom->update([
-                'status' => 'approved',
-                'approved_by' => $approverUserId,
-                'approved_at' => Carbon::now(),
-            ]);
 
             // 3. Log approval history
             ProductionBomApproval::create([
@@ -302,44 +281,18 @@ class ProductionBomService
         }
 
         return DB::transaction(function () use ($bom, $userId, $comments) {
-            $bom->update(['status' => 'cancelled']);
-
-            ProductionBomApproval::create([
-                'tenant_id' => $bom->tenant_id,
-                'bom_id' => $bom->id,
-                'user_id' => $userId,
-                'action' => 'Cancelled',
-                'comments' => $comments ?: 'BOM cancelled by user.',
-            ]);
+            $this->bomLifecycleService->transitionOnCancellation($bom, $userId, $comments);
 
             // Archive any active routings connected to this cancelled BOM
-            $linkedRoutings = Routing::withoutGlobalScopes()
-                ->where(function ($q) use ($bom) {
-                    $q->where('bom_id', $bom->id)
-                      ->orWhere(function ($sub) use ($bom) {
-                          $sub->whereNull('bom_id')
-                              ->where('product_id', $bom->product_id);
-                      });
-                })
-                ->where('status', Routing::STATUS_ACTIVE)
-                ->get();
+            $this->routingLifecycleService->archiveRoutingsForDeactivatedBoms(
+                [$bom->id],
+                $bom->product_id,
+                $userId,
+                'Automatically archived because connected BOM (' . $bom->bom_number . ') was cancelled.',
+                Carbon::now()->toDateString()
+            );
 
-            foreach ($linkedRoutings as $linkedRouting) {
-                $linkedRouting->update([
-                    'status' => Routing::STATUS_HISTORICAL,
-                    'effective_to' => Carbon::now()->toDateString(),
-                ]);
-
-                RoutingApproval::create([
-                    'tenant_id' => $linkedRouting->tenant_id,
-                    'routing_id' => $linkedRouting->id,
-                    'user_id' => $userId,
-                    'action' => RoutingApproval::ACTION_ARCHIVED,
-                    'comments' => 'Automatically archived because connected BOM (' . $bom->bom_number . ') was cancelled.',
-                ]);
-            }
-
-            return $bom;
+            return $bom->fresh();
         });
     }
 
@@ -356,6 +309,14 @@ class ProductionBomService
 
         $tenantId = $original->tenant_id;
         $this->checkBomConflicts($original->product_id, $newVersion);
+        $this->bomLifecycleService->validateEffectiveDates(
+            Carbon::now()->toDateString(),
+            null,
+            $original->product_id,
+            null,
+            $tenantId,
+            $original->bom_type
+        );
 
         return DB::transaction(function () use ($original, $newVersion, $creatorUserId, $tenantId) {
             $newBom = ProductionBom::create([

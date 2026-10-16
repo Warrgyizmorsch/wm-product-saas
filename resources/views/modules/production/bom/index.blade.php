@@ -212,6 +212,7 @@
                                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>{{ __('production.draft') }}</option>
                                     <option value="pending_approval" {{ request('status') === 'pending_approval' ? 'selected' : '' }}>{{ __('production.pending_approval') }}</option>
                                     <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>{{ __('production.approved_active') }}</option>
+                                    <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>{{ __('production.scheduled') }}</option>
                                     <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>{{ __('production.inactive') }}</option>
                                     <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>{{ __('production.cancelled') }}</option>
                                 </x-ui.odoo-form-ui>
@@ -286,16 +287,23 @@
                                 <span class="fw-semibold text-dark">{{ $bom->bom_name ?: 'N/A' }}</span>
                             </td>
                             <td>
-                                @if($bom->status === 'approved' || $bom->status === 'active')
-                                    <span class="erp-badge-active">{{ __('production.active') }}</span>
-                                @elseif($bom->status === 'draft')
+                                @php
+                                    $todayStr = now()->toDateString();
+                                    $effDateStr = $bom->effective_date ? $bom->effective_date->toDateString() : null;
+                                    $expDateStr = $bom->expiry_date ? $bom->expiry_date->toDateString() : null;
+                                @endphp
+                                @if($bom->status === 'draft')
                                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                                 @elseif($bom->status === 'pending_approval')
                                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
                                 @elseif($bom->status === 'cancelled')
                                     <span class="erp-badge-cancelled">{{ __('production.cancelled') }}</span>
-                                @elseif($bom->status === 'inactive')
+                                @elseif($bom->status === 'scheduled' || (in_array($bom->status, ['approved', 'active']) && $effDateStr && $effDateStr > $todayStr))
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 font-monospace fw-bold">{{ __('production.scheduled') }}</span>
+                                @elseif($bom->status === 'inactive' || ($expDateStr && $expDateStr <= $todayStr && !$bom->isCurrentlyActive()))
                                     <span class="erp-badge-inactive">{{ __('production.inactive') }}</span>
+                                @elseif(in_array($bom->status, ['approved', 'active']))
+                                    <span class="erp-badge-active">{{ __('production.active') }}</span>
                                 @else
                                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) }}</span>
                                 @endif

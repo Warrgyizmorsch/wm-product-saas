@@ -114,13 +114,215 @@
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" :value="old('version', $routing->version)" :required="true" />
 
-                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="effective_from" inputType="date" :value="old('effective_from', $routing->effective_from?->format('Y-m-d'))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="effective_from" inputType="date" :value="old('effective_from', $routing->effective_from?->format('Y-m-d'))" min="{{ date('Y-m-d') }}" :required="true" />
 
                         <input type="hidden" name="is_default" value="{{ $routing->is_default ? '1' : '0' }}">
                     </div>
 
+                    <!-- Material Quantity Entry Basis (Header Level) -->
+                    <div class="col-12 border-top pt-3">
+                        <label class="form-label fw-bold text-dark fs-13 d-flex align-items-center gap-2 mb-2">
+                            <i class="feather-sliders text-primary"></i>
+                            <span>Material Quantity Entry Basis</span>
+                            <span class="text-danger">*</span>
+                            <span class="badge bg-soft-info text-info fs-11 fw-normal" x-show="selectedBom" x-cloak>
+                                Linked BOM: <span class="fw-bold font-monospace" x-text="selectedBom ? selectedBom.bom_number : ''"></span> 
+                                (Base Qty: <span class="fw-bold" x-text="selectedBom ? selectedBom.base_quantity : 1"></span> <span x-text="selectedBomProductUom"></span>)
+                            </span>
+                        </label>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded border h-100 c-pointer transition-all"
+                                     :class="material_quantity_mode === 'per_unit' ? 'border-primary bg-primary-subtle shadow-sm' : 'border-light bg-light hover-bg-light'"
+                                     @click="changeMode('per_unit')">
+                                    <div class="form-check m-0 d-flex align-items-start gap-2">
+                                        <input class="form-check-input mt-1" type="radio" name="material_quantity_mode" id="edit_mode_per_unit" value="per_unit" x-model="material_quantity_mode" @change="onModeChange('per_unit')">
+                                        <div>
+                                            <label class="form-check-label fw-bold text-dark fs-13 c-pointer d-block" for="edit_mode_per_unit">
+                                                Per 1 Finished Product Unit
+                                            </label>
+                                            <p class="fs-12 text-muted mb-0 mt-1">
+                                                Enter the amount of this component consumed by this operation to produce <strong>1 unit</strong> of the routing's finished product.
+                                            </p>
+                                            <div class="mt-2 text-primary fs-11 fw-semibold">
+                                                <i class="feather-info me-1"></i>Example: 20 fasteners per table, 2 legs per table.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="p-3 rounded border h-100 c-pointer transition-all"
+                                     :class="material_quantity_mode === 'per_bom_base_quantity' ? 'border-primary bg-primary-subtle shadow-sm' : 'border-light bg-light hover-bg-light'"
+                                     @click="changeMode('per_bom_base_quantity')">
+                                    <div class="form-check m-0 d-flex align-items-start gap-2">
+                                        <input class="form-check-input mt-1" type="radio" name="material_quantity_mode" id="edit_mode_per_bom_base_quantity" value="per_bom_base_quantity" x-model="material_quantity_mode" @change="onModeChange('per_bom_base_quantity')">
+                                        <div>
+                                            <label class="form-check-label fw-bold text-dark fs-13 c-pointer d-block" for="edit_mode_per_bom_base_quantity">
+                                                Per BOM Base Quantity
+                                                <span class="badge bg-primary text-white ms-1 fs-10" x-show="selectedBom" x-text="(selectedBom ? selectedBom.base_quantity : '1') + ' ' + selectedBomProductUom"></span>
+                                            </label>
+                                            <p class="fs-12 text-muted mb-0 mt-1">
+                                                Enter the amount of this component consumed by this operation for the quantity specified as the <strong>BOM's Base Quantity</strong> (<span class="fw-semibold" x-text="(selectedBom ? selectedBom.base_quantity : '1') + ' ' + selectedBomProductUom"></span>).
+                                            </p>
+                                            <div class="mt-2 text-primary fs-11 fw-semibold">
+                                                <i class="feather-info me-1"></i>Example: 200 fasteners for 10 tables (BOM Base Qty).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-text fs-11 text-muted mt-2">
+                            <i class="feather-help-circle me-1"></i>
+                            <span>During production planning, operation material requirements will be scaled automatically to the Production Order quantity based on this chosen entry basis.</span>
+                        </div>
+                    </div>
+
                     <div class="col-12 border-top pt-3">
                         <x-ui.odoo-form-ui type="textarea" :label="__('production.description')" name="description" placeholder="{{ __('production.description_placeholder') }}" rows="3">{{ old('description', $routing->description) }}</x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                <!-- Live BOM Component Allocation Summary Card -->
+                <div class="border rounded p-3 mb-4 bg-white shadow-sm" x-show="selectedBom" x-cloak>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 pb-2 border-bottom gap-2">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0 fs-14 d-flex align-items-center gap-2">
+                                <i class="feather-pie-chart text-primary"></i>
+                                BOM Component Allocation Summary
+                            </h5>
+                            <span class="fs-11 text-muted">
+                                Live tracking of BOM requirements vs. operation allocations. Every BOM component must be assigned to at least 1 operation.
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge bg-soft-primary text-primary fs-11">
+                                BOM: <span class="fw-bold" x-text="selectedBom ? selectedBom.bom_number : ''"></span>
+                            </span>
+                            <span class="badge bg-soft-secondary text-secondary fs-11">
+                                BOM Base Qty: <span class="fw-bold" x-text="selectedBom ? selectedBom.base_quantity : 1"></span> <span x-text="selectedBomProductUom"></span>
+                            </span>
+                            <span class="badge fs-11" :class="material_quantity_mode === 'per_unit' ? 'bg-soft-info text-info' : 'bg-soft-dark text-dark'">
+                                Basis: <span class="fw-bold" x-text="material_quantity_mode === 'per_unit' ? 'Per 1 Finished Unit' : 'Per BOM Base Qty (' + (selectedBom ? selectedBom.base_quantity : 1) + ' ' + selectedBomProductUom + ')'"></span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Summary Warnings / Status Banner -->
+                    <template x-if="summaryErrors.length > 0">
+                        <div class="alert alert-danger py-2 px-3 fs-12 mb-2 d-flex align-items-center gap-2" x-cloak>
+                            <i class="feather-alert-octagon fs-16 flex-shrink-0"></i>
+                            <div>
+                                <strong>Validation Warning:</strong>
+                                <span x-text="summaryErrors.join(' | ')"></span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="summaryWarnings.length > 0 && summaryErrors.length === 0">
+                        <div class="alert alert-warning py-2 px-3 fs-12 mb-2 d-flex align-items-center gap-2" x-cloak>
+                            <i class="feather-alert-triangle fs-16 flex-shrink-0"></i>
+                            <div>
+                                <strong>Partial Allocation Notice:</strong>
+                                <span x-text="summaryWarnings.join(' | ')"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="table-responsive">
+                        <table class="erp-thin-table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 200px;">BOM Component</th>
+                                    <th style="width: 75px;" class="text-center">UOM</th>
+                                    <th style="min-width: 140px;" class="text-end">
+                                        BOM Req
+                                        <small class="d-block text-muted fs-10" x-text="'(Base: ' + (selectedBom ? selectedBom.base_quantity : 1) + ' ' + selectedBomProductUom + ')'"></small>
+                                    </th>
+                                    <th style="min-width: 130px;" class="text-end">
+                                        Per Unit Req
+                                        <small class="d-block text-muted fs-10">(Normalized)</small>
+                                    </th>
+                                    <th style="min-width: 150px;" class="text-end">
+                                        Total Allocated
+                                        <small class="d-block text-muted fs-10" x-text="'(In ' + (material_quantity_mode === 'per_unit' ? 'Per Unit' : 'BOM Base') + ')'"></small>
+                                    </th>
+                                    <th style="min-width: 150px;" class="text-end">
+                                        Remaining
+                                        <small class="d-block text-muted fs-10" x-text="'(In ' + (material_quantity_mode === 'per_unit' ? 'Per Unit' : 'BOM Base') + ')'"></small>
+                                    </th>
+                                    <th style="width: 130px;" class="text-center">Status</th>
+                                    <th style="min-width: 180px;">Assigned In Operations</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in allocationSummary" :key="item.material_id">
+                                    <tr>
+                                        <td>
+                                            <span class="fw-bold text-dark fs-12" x-text="item.material_name"></span>
+                                            <small class="text-muted d-block font-monospace fs-10" x-text="item.material_sku"></small>
+                                        </td>
+                                        <td class="text-center font-monospace fs-11 text-secondary" x-text="item.uom_code || item.uom_name"></td>
+                                        <td class="text-end font-monospace fs-12">
+                                            <span class="fw-semibold text-dark" x-text="formatQty(item.bom_qty) + ' ' + (item.uom_code || item.uom_name)"></span>
+                                            <small class="text-muted d-block fs-10">per <span x-text="(selectedBom ? selectedBom.base_quantity : 1) + ' ' + selectedBomProductUom"></span></small>
+                                        </td>
+                                        <td class="text-end font-monospace fs-12">
+                                            <span class="text-secondary" x-text="formatQty(item.normalized_bom_qty) + ' ' + (item.uom_code || item.uom_name)"></span>
+                                            <small class="text-muted d-block fs-10">per 1 unit</small>
+                                        </td>
+                                        <td class="text-end font-monospace fs-12">
+                                            <span :class="item.is_over ? 'text-danger fw-bold' : (item.is_assigned ? 'text-primary fw-semibold' : 'text-muted')" x-text="formatQty(item.allocated_in_mode) + ' ' + (item.uom_code || item.uom_name)"></span>
+                                            <small class="text-muted d-block fs-10" x-show="material_quantity_mode === 'per_bom_base_quantity'" x-text="'(' + formatQty(item.allocated_normalized) + ' / unit)'"></small>
+                                        </td>
+                                        <td class="text-end font-monospace fs-12">
+                                            <span :class="item.is_over ? 'text-danger fw-bold' : (item.remaining_in_mode > 0.0001 ? 'text-warning fw-semibold' : 'text-success fw-bold')" 
+                                                  x-text="(item.is_over ? '-' + formatQty(Math.abs(item.remaining_in_mode)) : formatQty(item.remaining_in_mode)) + ' ' + (item.uom_code || item.uom_name)">
+                                            </span>
+                                            <small class="text-muted d-block fs-10" x-show="material_quantity_mode === 'per_bom_base_quantity'" x-text="'(' + formatQty(item.remaining_normalized) + ' / unit)'"></small>
+                                        </td>
+                                        <td class="text-center">
+                                            <template x-if="!item.is_assigned">
+                                                <span class="badge bg-soft-danger text-danger fs-10 text-uppercase fw-bold">
+                                                    <i class="feather-x-circle me-1"></i>Unassigned
+                                                </span>
+                                            </template>
+                                            <template x-if="item.is_assigned && item.is_over">
+                                                <span class="badge bg-danger text-white fs-10 text-uppercase fw-bold" :title="'Exceeds BOM by ' + formatQty(Math.abs(item.remaining_in_mode))">
+                                                    <i class="feather-alert-octagon me-1"></i>Over-Allocated
+                                                </span>
+                                            </template>
+                                            <template x-if="item.is_assigned && !item.is_over && item.remaining_in_mode > 0.0001">
+                                                <span class="badge bg-soft-warning text-warning fs-10 text-uppercase fw-semibold" :title="'Remaining: ' + formatQty(item.remaining_in_mode)">
+                                                    <i class="feather-clock me-1"></i>Partial (OK)
+                                                </span>
+                                            </template>
+                                            <template x-if="item.is_assigned && !item.is_over && Math.abs(item.remaining_in_mode) <= 0.0001">
+                                                <span class="badge bg-soft-success text-success fs-10 text-uppercase fw-bold">
+                                                    <i class="feather-check-circle me-1"></i>100% Allocated
+                                                </span>
+                                            </template>
+                                        </td>
+                                        <td>
+                                            <template x-if="item.assigned_operations.length === 0">
+                                                <span class="text-danger fs-11 fst-italic">None (Must assign to &ge;1 op)</span>
+                                            </template>
+                                            <template x-if="item.assigned_operations.length > 0">
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    <template x-for="op in item.assigned_operations" :key="op.sequence">
+                                                        <span class="badge bg-light border text-dark fs-10 font-monospace">
+                                                            Op <span class="fw-bold" x-text="op.sequence"></span>: <span class="text-primary fw-semibold" x-text="formatQty(op.quantity)"></span> <span x-text="item.uom_code || item.uom_name"></span>
+                                                        </span>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -232,18 +434,9 @@
                                                                <option :value="prevOp.sequence" x-text="'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '')" :selected="operation.predecessor_sequence == prevOp.sequence"></option>
                                                            </template>
                                                        </x-ui.odoo-form-ui>
-                                                   </div>
-                                               </div>
-
-                                              <div class="mt-1">
-                                                  <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][material_id]'" class="odoo-table-select text-muted" x-model="operation.material_id" select2Selector="default">
-                                                      <option value="">-- Consumed Component Material (Optional) --</option>
-                                                      @foreach ($rawMaterials as $mat)
-                                                          <option value="{{ $mat->id }}">{{ $mat->name }} ({{ $mat->sku }})</option>
-                                                      @endforeach
-                                                  </x-ui.odoo-form-ui>
-                                              </div>
-                                          </td>
+                                                                                                       </div>
+                                                </div>
+                                            </td>
                                           
                                           <!-- Work Center -->
                                           <td class="align-middle">
@@ -308,6 +501,99 @@
                                               </div>
                                           </td>
                                       </tr>
+
+                                    <!-- Consumed Component Materials Row (Dedicated 2nd <tr>) -->
+                                    <tr class="routing-materials-row bg-light-subtle">
+                                        <td colspan="10" class="px-3 py-2 border-top-0">
+                                            <div class="p-2 bg-white rounded border" style="width: 75%; max-width: 75%;">
+                                                <div class="d-flex justify-content-between align-items-center mb-1 pb-1 border-bottom">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="fs-11 fw-bold text-dark text-uppercase">
+                                                            <i class="feather-layers text-primary me-1"></i>Consumed Component Materials
+                                                        </span>
+                                                        <span class="badge bg-soft-primary text-primary fs-10" x-text="'Op ' + operation.sequence"></span>
+                                                        <span class="badge bg-soft-info text-info fs-10" x-show="operation.materials && operation.materials.length > 0" x-text="operation.materials.length + ' component' + (operation.materials.length > 1 ? 's' : '')"></span>
+                                                    </div>
+                                                    <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 fs-10" @click="addMaterialToOperation(operation)" :disabled="!selectedBom" title="Add a BOM component consumed in this operation">
+                                                        <i class="feather-plus me-1"></i>Add Material
+                                                    </button>
+                                                </div>
+
+                                                <!-- If no BOM is selected -->
+                                                <template x-if="!selectedBom">
+                                                    <div class="text-muted fs-11 fst-italic py-1 px-1">
+                                                        <i class="feather-info me-1 text-secondary"></i>Select a BOM above to assign component materials to this operation.
+                                                    </div>
+                                                </template>
+
+                                                <!-- If BOM selected but no materials assigned yet -->
+                                                <template x-if="selectedBom && (!operation.materials || operation.materials.length === 0)">
+                                                    <div class="text-muted fs-11 fst-italic py-1 px-1">
+                                                        No component materials assigned to this operation. Click <span class="fw-semibold text-primary">"+ Add Material"</span> above to allocate a BOM component.
+                                                    </div>
+                                                </template>
+
+                                                <!-- Materials Repeater List -->
+                                                <template x-if="selectedBom && operation.materials && operation.materials.length > 0">
+                                                    <div class="d-flex flex-column gap-1.5 mt-1">
+                                                        <template x-for="(mat, mIdx) in operation.materials" :key="mat.uid">
+                                                            <div class="d-flex align-items-center gap-2 bg-light-subtle p-1.5 rounded border">
+                                                                <!-- Material Dropdown (Restricted to Selected BOM Components) -->
+                                                                <div class="flex-grow-1" style="max-width: 420px;">
+                                                                    <select class="form-select form-select-sm fs-11 text-dark fw-semibold py-1" 
+                                                                            style="height: 30px;"
+                                                                            x-bind:name="'operations['+index+'][materials]['+mIdx+'][material_id]'" 
+                                                                            x-model="mat.material_id"
+                                                                            @change="onMaterialSelected(mat)"
+                                                                            required>
+                                                                        <option value="">-- Select BOM Component --</option>
+                                                                        <template x-for="comp in selectedBomComponents" :key="comp.material_id">
+                                                                            <option :value="comp.material_id" 
+                                                                                    x-text="comp.material_name + ' (' + comp.material_sku + ')'" 
+                                                                                    :selected="mat.material_id == comp.material_id"></option>
+                                                                        </template>
+                                                                    </select>
+                                                                </div>
+
+                                                                <!-- Read-only UOM Badge -->
+                                                                <div style="width: 80px; min-width: 80px;" class="text-center">
+                                                                    <span class="badge bg-white border text-secondary font-monospace fs-11 w-100 py-1" 
+                                                                          x-text="mat.uom_code || mat.uom_name || 'UOM'"
+                                                                          title="Component UOM (from BOM)"></span>
+                                                                    <input type="hidden" x-bind:name="'operations['+index+'][materials]['+mIdx+'][uom_id]'" :value="mat.uom_id">
+                                                                </div>
+
+                                                                <!-- Quantity Input with Basis Addon -->
+                                                                <div class="d-flex align-items-center gap-1.5" style="width: 180px; min-width: 180px;">
+                                                                    <input type="number" 
+                                                                           step="any" 
+                                                                           min="0.0001" 
+                                                                           x-bind:name="'operations['+index+'][materials]['+mIdx+'][quantity]'" 
+                                                                           class="routing-sub-input text-end font-monospace" 
+                                                                           style="width: 85px; min-width: 85px;" 
+                                                                           x-model="mat.quantity" 
+                                                                           required 
+                                                                           placeholder="0.00">
+                                                                    <span class="fs-10 text-muted font-monospace text-truncate" 
+                                                                          x-text="material_quantity_mode === 'per_unit' ? '/ unit' : ('/ ' + (selectedBom ? selectedBom.base_quantity : 1) + ' ' + selectedBomProductUom)"
+                                                                          :title="material_quantity_mode === 'per_unit' ? 'Quantity per 1 finished product unit' : ('Quantity per BOM Base Quantity (' + (selectedBom ? selectedBom.base_quantity : 1) + ' ' + selectedBomProductUom + ')')"></span>
+                                                                </div>
+
+                                                                <!-- Remove Material Button -->
+                                                                <button type="button" 
+                                                                        class="btn btn-xs btn-outline-danger d-inline-flex align-items-center gap-1 py-1 px-2 fs-11 ms-auto" 
+                                                                        @click="removeMaterialFromOperation(operation, mIdx)"
+                                                                        title="Remove component material">
+                                                                    <i class="feather-trash-2 fs-12"></i>
+                                                                    <span>Delete</span>
+                                                                </button>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </td>
+                                    </tr>
 
                                       <!-- Subcontract Details Expanded Panel -->
                                      <tr x-show="operation.is_external" class="bg-light-subtle">
@@ -409,6 +695,7 @@
             }));
 
             if (!productId) {
+                $bomSelect.val('').trigger('change');
                 return;
             }
 
@@ -437,7 +724,43 @@
             });
 
             if (matchedId) {
-                $bomSelect.val(matchedId);
+                $bomSelect.val(matchedId).trigger('change');
+            } else {
+                $bomSelect.val('').trigger('change');
+            }
+        }
+
+        function confirmBomChange(onConfirm, onCancel) {
+            if (typeof window.confirmAction === 'function') {
+                let confirmed = false;
+                const modalEl = document.getElementById('globalConfirmModal');
+                const onHidden = function() {
+                    if (modalEl) modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    if (!confirmed && typeof onCancel === 'function') {
+                        onCancel();
+                    }
+                };
+                if (modalEl) {
+                    modalEl.addEventListener('hidden.bs.modal', onHidden);
+                }
+                window.confirmAction({
+                    title: 'Change Bill of Materials (BOM)?',
+                    message: 'Changing the BOM will clear all existing operation material assignments, as they belong to the previously selected BOM. Operation sequence, workstations, and timings will be preserved. Do you want to proceed?',
+                    variant: 'warning',
+                    confirmText: 'Yes, Change BOM',
+                    cancelButtonText: 'Cancel'
+                }, function() {
+                    confirmed = true;
+                    if (typeof onConfirm === 'function') {
+                        onConfirm();
+                    }
+                });
+            } else {
+                if (confirm('Changing the BOM will clear all existing operation material assignments. Do you want to proceed?')) {
+                    if (typeof onConfirm === 'function') onConfirm();
+                } else {
+                    if (typeof onCancel === 'function') onCancel();
+                }
             }
         }
 
@@ -446,18 +769,317 @@
                 operations: [],
                 autoSequence: true,
                 uidCounter: 1,
+                matUidCounter: 1,
+                material_quantity_mode: @js(old('material_quantity_mode', $routing->material_quantity_mode ?? 'per_unit')),
+                selectedBomId: @js(old('bom_id', $routing->bom_id ?? '')),
+                previousBomId: @js(old('bom_id', $routing->bom_id ?? '')),
+                selectedProductId: @js(old('product_id', $routing->product_id ?? '')),
+                previousProductId: @js(old('product_id', $routing->product_id ?? '')),
+
+                get selectedBom() {
+                    if (!this.selectedBomId) return null;
+                    return allBoms.find(b => String(b.id) === String(this.selectedBomId)) || null;
+                },
+
+                get selectedBomProductUom() {
+                    if (!this.selectedBom) return 'Units';
+                    return this.selectedBom.base_uom?.name || this.selectedBom.product?.uom?.name || 'Units';
+                },
+
+                get selectedBomComponents() {
+                    if (!this.selectedBom || !this.selectedBom.items) return [];
+                    return this.selectedBom.items
+                        .filter(item => !item.is_alternative)
+                        .map(item => ({
+                            material_id: item.material_id,
+                            material_name: item.material ? item.material.name : ('Material #' + item.material_id),
+                            material_sku: item.material ? item.material.sku : '',
+                            uom_id: item.uom_id,
+                            uom_name: item.uom ? item.uom.name : '',
+                            uom_code: item.uom ? item.uom.code : '',
+                            bom_quantity: parseFloat(item.quantity) || 0
+                        }));
+                },
+
+                get allocationSummary() {
+                    const bom = this.selectedBom;
+                    if (!bom || !this.selectedBomComponents.length) return [];
+
+                    const baseQty = parseFloat(bom.base_quantity) || 1.0;
+                    const isPerUnit = this.material_quantity_mode === 'per_unit';
+
+                    return this.selectedBomComponents.map(comp => {
+                        const bomQty = parseFloat(comp.bom_quantity) || 0;
+                        const normBomQty = baseQty > 0 ? (bomQty / baseQty) : 0;
+
+                        // Find all allocations for this component across all operations
+                        const assignedOps = [];
+                        let totalAllocInMode = 0;
+
+                        this.operations.forEach(op => {
+                            if (op.materials && Array.isArray(op.materials)) {
+                                op.materials.forEach(m => {
+                                    if (String(m.material_id) === String(comp.material_id)) {
+                                        const qty = parseFloat(m.quantity) || 0;
+                                        totalAllocInMode += qty;
+                                        assignedOps.push({
+                                            sequence: op.sequence,
+                                            operation_name: op.name,
+                                            quantity: qty
+                                        });
+                                    }
+                                });
+                            }
+                        });
+
+                        const allocatedNormalized = isPerUnit ? totalAllocInMode : (baseQty > 0 ? (totalAllocInMode / baseQty) : 0);
+                        const targetInMode = isPerUnit ? normBomQty : bomQty;
+                        const remainingInMode = targetInMode - totalAllocInMode;
+                        const remainingNormalized = normBomQty - allocatedNormalized;
+                        const isOver = allocatedNormalized > (normBomQty + 0.000001);
+                        const isAssigned = assignedOps.length > 0;
+
+                        return {
+                            material_id: comp.material_id,
+                            material_name: comp.material_name,
+                            material_sku: comp.material_sku,
+                            uom_name: comp.uom_name,
+                            uom_code: comp.uom_code,
+                            bom_qty: bomQty,
+                            normalized_bom_qty: normBomQty,
+                            allocated_in_mode: totalAllocInMode,
+                            allocated_normalized: allocatedNormalized,
+                            remaining_in_mode: remainingInMode,
+                            remaining_normalized: remainingNormalized,
+                            is_assigned: isAssigned,
+                            is_over: isOver,
+                            assigned_operations: assignedOps
+                        };
+                    });
+                },
+
+                get summaryErrors() {
+                    const errors = [];
+                    this.allocationSummary.forEach(item => {
+                        if (!item.is_assigned) {
+                            errors.push(`'${item.material_name}' is not assigned to any operation`);
+                        }
+                        if (item.is_over) {
+                            const excess = Math.abs(item.remaining_in_mode);
+                            errors.push(`'${item.material_name}' is over-allocated by ${this.formatQty(excess)} ${item.uom_code || item.uom_name}`);
+                        }
+                    });
+                    return errors;
+                },
+
+                get summaryWarnings() {
+                    const warnings = [];
+                    this.allocationSummary.forEach(item => {
+                        if (item.is_assigned && !item.is_over && item.remaining_in_mode > 0.0001) {
+                            warnings.push(`'${item.material_name}' has ${this.formatQty(item.remaining_in_mode)} ${item.uom_code || item.uom_name} unallocated`);
+                        }
+                    });
+                    return warnings;
+                },
+
+                formatQty(val) {
+                    const num = parseFloat(val);
+                    if (isNaN(num)) return '0.00';
+                    return (Math.round(num * 10000) / 10000).toString();
+                },
+
+                changeMode(newMode) {
+                    if (this.material_quantity_mode === newMode) return;
+                    this.onModeChange(newMode);
+                },
+
+                onModeChange(newMode) {
+                    if (this.material_quantity_mode === newMode) return;
+
+                    const oldMode = this.material_quantity_mode;
+                    const baseQty = parseFloat(this.selectedBom?.base_quantity) || 1.0;
+
+                    let hasEnteredQuantities = false;
+                    this.operations.forEach(op => {
+                        if (op.materials) {
+                            op.materials.forEach(m => {
+                                if (parseFloat(m.quantity) > 0) hasEnteredQuantities = true;
+                            });
+                        }
+                    });
+
+                    if (hasEnteredQuantities && baseQty > 0) {
+                        this.operations.forEach(op => {
+                            if (op.materials) {
+                                op.materials.forEach(m => {
+                                    const qty = parseFloat(m.quantity);
+                                    if (!isNaN(qty) && qty > 0) {
+                                        if (oldMode === 'per_unit' && newMode === 'per_bom_base_quantity') {
+                                            m.quantity = (qty * baseQty).toFixed(4);
+                                        } else if (oldMode === 'per_bom_base_quantity' && newMode === 'per_unit') {
+                                            m.quantity = (qty / baseQty).toFixed(4);
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    this.material_quantity_mode = newMode;
+                },
+
+                addMaterialToOperation(operation) {
+                    if (!operation.materials) {
+                        operation.materials = [];
+                    }
+                    const defaultComp = this.selectedBomComponents.length > 0 ? this.selectedBomComponents[0] : null;
+                    operation.materials.push({
+                        uid: this.matUidCounter++,
+                        material_id: defaultComp ? defaultComp.material_id : '',
+                        quantity: '',
+                        uom_id: defaultComp ? defaultComp.uom_id : '',
+                        uom_name: defaultComp ? defaultComp.uom_name : '',
+                        uom_code: defaultComp ? defaultComp.uom_code : ''
+                    });
+                },
+
+                removeMaterialFromOperation(operation, mIdx) {
+                    if (operation.materials) {
+                        operation.materials.splice(mIdx, 1);
+                    }
+                },
+
+                onMaterialSelected(mat) {
+                    const comp = this.selectedBomComponents.find(c => String(c.material_id) === String(mat.material_id));
+                    if (comp) {
+                        mat.uom_id = comp.uom_id;
+                        mat.uom_name = comp.uom_name;
+                        mat.uom_code = comp.uom_code;
+                    }
+                },
 
                 init() {
+                    const self = this;
+
+                    // Listen for BOM changes with confirmation if material assignments exist
+                    $('#bom_id').on('change', function() {
+                        const newBomId = $(this).val();
+                        if (String(newBomId) === String(self.selectedBomId)) return;
+
+                        const hasAssignments = self.operations.some(op => op.materials && op.materials.length > 0 && op.materials.some(m => m.material_id));
+                        if (hasAssignments) {
+                            confirmBomChange(
+                                function onConfirm() {
+                                    self.previousBomId = self.selectedBomId;
+                                    self.selectedBomId = newBomId;
+                                    self.previousProductId = self.selectedProductId;
+                                    // Clear material assignments from all operations
+                                    self.operations.forEach(op => {
+                                        op.materials = [];
+                                    });
+                                },
+                                function onCancel() {
+                                    $('#bom_id').val(self.selectedBomId);
+                                    if (self.previousProductId) {
+                                        self.selectedProductId = self.previousProductId;
+                                        $('#product_id').val(self.previousProductId).trigger('change.select2');
+                                    }
+                                }
+                            );
+                        } else {
+                            self.previousBomId = self.selectedBomId;
+                            self.selectedBomId = newBomId;
+                            self.previousProductId = self.selectedProductId;
+                        }
+                    });
+
                     // Initialize dynamic BOM options
                     const initProdId = $('#product_id').val();
                     const initBomId = @js(old('bom_id', $routing->bom_id ?? ''));
+                    this.selectedProductId = String(initProdId || '');
+                    this.previousProductId = this.selectedProductId;
+                    if (initBomId) {
+                        this.selectedBomId = String(initBomId);
+                        this.previousBomId = String(initBomId);
+                    }
+
                     updateBomOptions(initProdId, initBomId);
 
+                    const currentBomVal = $('#bom_id').val();
+                    if (currentBomVal) {
+                        this.selectedBomId = String(currentBomVal);
+                        this.previousBomId = String(currentBomVal);
+                    }
+
                     $('#product_id').on('change.select2 change', function() {
-                        updateBomOptions($(this).val(), null);
+                        const newProd = $(this).val();
+                        if (String(newProd) === String(self.selectedProductId)) return;
+                        self.previousProductId = self.selectedProductId;
+                        self.selectedProductId = String(newProd || '');
+                        updateBomOptions(newProd, null);
                     });
 
-                    // Populate from existing operations database collection
+                    // Populate from old('operations') if returning with validation errors/warnings, otherwise from database
+                    const oldOps = @json(old('operations', []));
+                    const rawOpsList = Array.isArray(oldOps) ? oldOps : Object.values(oldOps || {});
+                    if (rawOpsList.length > 0) {
+                        rawOpsList.forEach((op, opIndex) => {
+                            let mats = [];
+                            if (op.materials) {
+                                const rawMats = Array.isArray(op.materials) ? op.materials : Object.values(op.materials);
+                                mats = rawMats.map(m => {
+                                    const comp = self.selectedBomComponents.find(c => String(c.material_id) === String(m.material_id));
+                                    return {
+                                        uid: self.matUidCounter++,
+                                        material_id: m.material_id || '',
+                                        quantity: m.quantity || '1',
+                                        uom_id: m.uom_id || (comp ? comp.uom_id : ''),
+                                        uom_name: comp ? comp.uom_name : (m.uom_name || ''),
+                                        uom_code: comp ? comp.uom_code : (m.uom_code || '')
+                                    };
+                                });
+                            }
+                            self.operations.push({
+                                uid: self.uidCounter++,
+                                sequence: op.sequence ? parseInt(op.sequence) : (opIndex + 1) * 10,
+                                name: op.name || '',
+                                operation_type: op.operation_type || 'manufacturing',
+                                work_center_id: op.work_center_id || '',
+                                machine_id: op.machine_id || '',
+                                setup_time_minutes: op.setup_time_minutes !== undefined ? op.setup_time_minutes : '0.00',
+                                processing_time_minutes: op.processing_time_minutes !== undefined ? op.processing_time_minutes : '0.00',
+                                wait_time_minutes: op.wait_time_minutes !== undefined ? op.wait_time_minutes : '0.00',
+                                labor_cost_rate: op.labor_cost_rate !== undefined ? op.labor_cost_rate : '0.0000',
+                                description: op.description || '',
+                                instructions: op.instructions || '',
+                                showSop: !!(op.instructions),
+                                expected_yield_percentage: op.expected_yield_percentage || '100.00',
+                                quality_required: op.quality_required == 1 || op.quality_required === '1' || op.quality_required === true,
+                                is_external: op.is_external == 1 || op.is_external === '1' || op.is_external === true,
+                                vendor_id: op.vendor_id || '',
+                                material_supply_type: op.material_supply_type || 'company_supplied',
+                                subcontract_input_type: op.subcontract_input_type || 'bom_raw_materials',
+                                subcontract_lead_time_days: parseInt(op.subcontract_lead_time_days || 0),
+                                subcontract_cost_per_unit: op.subcontract_cost_per_unit || '0.00',
+                                subcontract_service_product_id: op.subcontract_service_product_id || '',
+                                dispatch_buffer_days: parseInt(op.dispatch_buffer_days || 0),
+                                return_buffer_days: parseInt(op.return_buffer_days || 0),
+                                queue_threshold_enabled: op.queue_threshold_enabled == 1 || op.queue_threshold_enabled === '1' || op.queue_threshold_enabled === true,
+                                overlap_enabled: op.overlap_enabled == 1 || op.overlap_enabled === '1' || op.overlap_enabled === true,
+                                transfer_batch_quantity: op.transfer_batch_quantity || '0.00',
+                                transfer_lag_minutes: parseInt(op.transfer_lag_minutes || 0),
+                                materials: mats,
+                                is_parallel: op.is_parallel == 1 || op.is_parallel === '1' || op.is_parallel === true,
+                                parallel_group: op.parallel_group || '',
+                                predecessor_sequence: op.predecessor_sequence || '',
+                                availableMachines: []
+                            });
+                            if (op.work_center_id) {
+                                self.loadMachinesForOperation(opIndex, op.machine_id);
+                            }
+                        });
+                    } else {
+                        // Populate from existing operations database collection
                         @foreach ($routing->operations as $op)
                             this.operations.push({
                                 uid: this.uidCounter++,
@@ -491,245 +1113,260 @@
                                 is_parallel: {{ $op->is_parallel ? 'true' : 'false' }},
                                 parallel_group: "{{ $op->parallel_group ?? '' }}",
                                 predecessor_sequence: "{{ $op->previousOperation?->sequence ?? ($op->previous_operation_id === null && $loop->index > 0 && !$op->is_parallel ? '-1' : '') }}",
-                                @php
-                                    $firstMat = \App\Domains\Production\Models\RoutingOperationMaterial::where('routing_operation_id', $op->id)->first();
-                                @endphp
-                                material_id: "{{ $firstMat?->material_id ?? '' }}",
+                                materials: [
+                                    @foreach ($op->materials as $opMat)
+                                    {
+                                        uid: this.matUidCounter++,
+                                        material_id: "{{ $opMat->material_id }}",
+                                        quantity: "{{ number_format($opMat->quantity, 4, '.', '') }}",
+                                        uom_id: "{{ $opMat->uom_id }}",
+                                        uom_name: "{{ addslashes($opMat->uom?->name ?? '') }}",
+                                        uom_code: "{{ addslashes($opMat->uom?->code ?? '') }}"
+                                    },
+                                    @endforeach
+                                ],
                                 availableMachines: []
                             });
                             // Fetch machines for the preloaded work center
-                            this.loadMachinesForOperation(this.operations.length - 1);
+                            this.loadMachinesForOperation(this.operations.length - 1, "{{ $op->machine_id ?? '' }}");
                         @endforeach
-
-                        if (this.operations.length === 0) {
-                            this.addOperation();
-                        }
-
-                        this.$watch('autoSequence', value => {
-                            if (value) {
-                                this.recalculateSequences();
-                            }
-                        });
-                        this.$nextTick(() => this.initAllOperationSelects());
-                    },
-
-                    addOperation() {
-                        const nextSeq = this.operations.length > 0
-                            ? parseInt(this.operations[this.operations.length - 1].sequence) + 10
-                            : 10;
-
-                        this.operations.push({
-                            uid: this.uidCounter++,
-                            sequence: nextSeq,
-                            name: '',
-                            operation_type: 'manufacturing',
-                            work_center_id: '',
-                            machine_id: '',
-                            setup_time_minutes: '0.00',
-                            processing_time_minutes: '0.00',
-                            wait_time_minutes: '0.00',
-                            labor_cost_rate: '0.0000',
-                            description: '',
-                            instructions: '',
-                            showSop: false,
-                            expected_yield_percentage: '100.00',
-                            quality_required: false,
-                            is_external: false,
-                            vendor_id: '',
-                            material_supply_type: 'company_supplied',
-                            subcontract_input_type: 'bom_raw_materials',
-                            subcontract_lead_time_days: 0,
-                            subcontract_cost_per_unit: '0.00',
-                            subcontract_service_product_id: '',
-                            dispatch_buffer_days: 0,
-                            return_buffer_days: 0,
-                            queue_threshold_enabled: false,
-                            overlap_enabled: false,
-                            transfer_batch_quantity: '0.00',
-                            transfer_lag_minutes: 0,
-                            material_id: '',
-                            is_parallel: false,
-                            parallel_group: '',
-                            predecessor_sequence: '',
-                            availableMachines: []
-                        });
-                        this.$nextTick(() => this.initAllOperationSelects());
-                    },
-
-                    getPriorOperations(currentIndex) {
-                        return this.operations.filter((op, idx) => idx < currentIndex);
-                    },
-
-                    removeOperation(index) {
-                        if (this.operations.length > 1) {
-                            this.operations.splice(index, 1);
-                            this.recalculateSequences();
-                            this.$nextTick(() => this.initAllOperationSelects());
-                        } else {
-                            if (typeof confirmAction === 'function') {
-                                confirmAction({
-                                    title: @js(__('production.validation_failed') ?? 'Validation Warning'),
-                                    message: @js(__('production.requires_at_least_one_operation')),
-                                    variant: 'warning',
-                                    confirmText: 'OK'
-                                });
-                            } else {
-                                alert(@js(__('production.requires_at_least_one_operation')));
-                            }
-                        }
-                    },
-
-                    duplicateOperation(index) {
-                        const original = this.operations[index];
-                        const clone = JSON.parse(JSON.stringify(original));
-
-                        clone.uid = this.uidCounter++;
-                        let newSeq = parseInt(original.sequence) + 5;
-                        const existingSeqs = this.operations.map(o => parseInt(o.sequence));
-                        while (existingSeqs.includes(newSeq)) {
-                            newSeq += 5;
-                        }
-                        clone.sequence = newSeq;
-
-                        this.operations.splice(index + 1, 0, clone);
-                        this.recalculateSequences();
-
-                        if (clone.work_center_id) {
-                            this.loadMachinesForOperation(index + 1);
-                        }
-                        this.$nextTick(() => this.initAllOperationSelects());
-                    },
-
-                    moveUp(index) {
-                        if (index > 0) {
-                            const temp = this.operations[index];
-                            this.operations[index] = this.operations[index - 1];
-                            this.operations[index - 1] = temp;
-                            this.recalculateSequences();
-                            this.$nextTick(() => this.initAllOperationSelects());
-                        }
-                    },
-
-                    moveDown(index) {
-                        if (index < this.operations.length - 1) {
-                            const temp = this.operations[index];
-                            this.operations[index] = this.operations[index + 1];
-                            this.operations[index + 1] = temp;
-                            this.recalculateSequences();
-                            this.$nextTick(() => this.initAllOperationSelects());
-                        }
-                    },
-
-                    recalculateSequences() {
-                        if (this.autoSequence) {
-                            this.operations.forEach((op, index) => {
-                                op.sequence = (index + 1) * 10;
-                            });
-                        }
-                    },
-
-                    workCenterChanged(index) {
-                        const op = this.operations[index];
-                        op.machine_id = '';
-                        op.availableMachines = [];
-
-                        if (op.work_center_id) {
-                            this.loadMachinesForOperation(index);
-                        }
-                        this.$nextTick(() => this.initAllOperationSelects());
-                    },
-
-                    loadMachinesForOperation(index) {
-                        const op = this.operations[index];
-                        fetch(`{{ url('production/machines/by-work-center') }}/${op.work_center_id}`)
-                            .then(res => res.json())
-                            .then(data => {
-                                op.availableMachines = data;
-                                this.$nextTick(() => this.initAllOperationSelects());
-                            })
-                            .catch(err => console.error('Failed to load machines:', err));
-                    },
-
-                    initOperationSelects(rowEl, operation) {
-                        var self = this;
-                        $(rowEl).find('[data-select2-selector="default"]').each(function() {
-                            var $select = $(this);
-                            var nameAttr = $select.attr('name') || '';
-                            var isDynamic = nameAttr.indexOf('machine_id') !== -1 || nameAttr.indexOf('predecessor_sequence') !== -1;
-
-                            if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
-                                if (isDynamic) {
-                                    $select.select2('destroy');
-                                } else {
-                                    $select.trigger('change.select2');
-                                    return;
-                                }
-                            }
-
-                            if ($select.hasClass('select2-hidden-accessible')) {
-                                $select.select2('destroy');
-                            }
-
-                            $select.data('select2-initialized', true);
-                            $select.select2(self.select2RowOptions());
-
-                            // Sync values for select2
-                            if (nameAttr.indexOf('operation_type') !== -1) {
-                                if (operation.operation_type) $select.val(operation.operation_type).trigger('change.select2');
-                            } else if (nameAttr.indexOf('work_center_id') !== -1) {
-                                if (operation.work_center_id) $select.val(operation.work_center_id).trigger('change.select2');
-                            } else if (nameAttr.indexOf('material_id') !== -1) {
-                                if (operation.material_id) $select.val(operation.material_id).trigger('change.select2');
-                            } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
-                                if (operation.predecessor_sequence !== undefined && operation.predecessor_sequence !== '') {
-                                    $select.val(operation.predecessor_sequence).trigger('change.select2');
-                                }
-                            } else if (nameAttr.indexOf('machine_id') !== -1) {
-                                if (operation.machine_id) {
-                                    $select.val(operation.machine_id).trigger('change.select2');
-                                }
-                            }
-
-                            $select.off('change.routing-operation-select').on('change.routing-operation-select', function() {
-                                var val = $select.val();
-                                var nameAttr = $select.attr('name') || '';
-
-                                if (nameAttr.indexOf('operation_type') !== -1) {
-                                    operation.operation_type = val;
-                                } else if (nameAttr.indexOf('work_center_id') !== -1) {
-                                    operation.work_center_id = val;
-                                    self.workCenterChanged(self.operations.indexOf(operation));
-                                } else if (nameAttr.indexOf('machine_id') !== -1) {
-                                    operation.machine_id = val;
-                                } else if (nameAttr.indexOf('material_id') !== -1) {
-                                    operation.material_id = val;
-                                } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
-                                    operation.predecessor_sequence = val;
-                                }
-
-                                this.dispatchEvent(new Event('input', { bubbles: true }));
-                            });
-                        });
-                    },
-
-                    initAllOperationSelects() {
-                        var self = this;
-                        $('.routing-operation-row').each(function(index) {
-                            if (self.operations[index]) {
-                                self.initOperationSelects(this, self.operations[index]);
-                            }
-                        });
-                    },
-
-                    select2RowOptions() {
-                        return {
-                            theme: "bootstrap-5",
-                            width: '100%',
-                            dropdownParent: $('body'),
-                            dropdownCssClass: 'routing-select2-dropdown'
-                        };
                     }
+
+                    if (this.operations.length === 0) {
+                        this.addOperation();
+                    }
+
+                    this.$watch('autoSequence', value => {
+                        if (value) {
+                            this.recalculateSequences();
+                        }
+                    });
+                    this.$nextTick(() => this.initAllOperationSelects());
+                },
+
+                addOperation() {
+                    const nextSeq = this.operations.length > 0
+                        ? parseInt(this.operations[this.operations.length - 1].sequence) + 10
+                        : 10;
+
+                    this.operations.push({
+                        uid: this.uidCounter++,
+                        sequence: nextSeq,
+                        name: '',
+                        operation_type: 'manufacturing',
+                        work_center_id: '',
+                        machine_id: '',
+                        setup_time_minutes: '0.00',
+                        processing_time_minutes: '0.00',
+                        wait_time_minutes: '0.00',
+                        labor_cost_rate: '0.0000',
+                        description: '',
+                        instructions: '',
+                        showSop: false,
+                        expected_yield_percentage: '100.00',
+                        quality_required: false,
+                        is_external: false,
+                        vendor_id: '',
+                        material_supply_type: 'company_supplied',
+                        subcontract_input_type: 'bom_raw_materials',
+                        subcontract_lead_time_days: 0,
+                        subcontract_cost_per_unit: '0.00',
+                        subcontract_service_product_id: '',
+                        dispatch_buffer_days: 0,
+                        return_buffer_days: 0,
+                        queue_threshold_enabled: false,
+                        overlap_enabled: false,
+                        transfer_batch_quantity: '0.00',
+                        transfer_lag_minutes: 0,
+                        materials: [],
+                        is_parallel: false,
+                        parallel_group: '',
+                        predecessor_sequence: '',
+                        availableMachines: []
+                    });
+                    this.$nextTick(() => this.initAllOperationSelects());
+                },
+
+                getPriorOperations(currentIndex) {
+                    return this.operations.filter((op, idx) => idx < currentIndex);
+                },
+
+                removeOperation(index) {
+                    if (this.operations.length > 1) {
+                        this.operations.splice(index, 1);
+                        this.recalculateSequences();
+                        this.$nextTick(() => this.initAllOperationSelects());
+                    } else {
+                        if (typeof confirmAction === 'function') {
+                            confirmAction({
+                                title: @js(__('production.validation_failed') ?? 'Validation Warning'),
+                                message: @js(__('production.requires_at_least_one_operation')),
+                                variant: 'warning',
+                                confirmText: 'OK'
+                            });
+                        } else {
+                            alert(@js(__('production.requires_at_least_one_operation')));
+                        }
+                    }
+                },
+
+                duplicateOperation(index) {
+                    const original = this.operations[index];
+                    const clone = JSON.parse(JSON.stringify(original));
+
+                    clone.uid = this.uidCounter++;
+                    if (clone.materials && Array.isArray(clone.materials)) {
+                        clone.materials.forEach(m => {
+                            m.uid = this.matUidCounter++;
+                        });
+                    }
+
+                    let newSeq = parseInt(original.sequence) + 5;
+                    const existingSeqs = this.operations.map(o => parseInt(o.sequence));
+                    while (existingSeqs.includes(newSeq)) {
+                        newSeq += 5;
+                    }
+                    clone.sequence = newSeq;
+
+                    this.operations.splice(index + 1, 0, clone);
+                    this.recalculateSequences();
+
+                    if (clone.work_center_id) {
+                        this.loadMachinesForOperation(index + 1);
+                    }
+                    this.$nextTick(() => this.initAllOperationSelects());
+                },
+
+                moveUp(index) {
+                    if (index > 0) {
+                        const temp = this.operations[index];
+                        this.operations[index] = this.operations[index - 1];
+                        this.operations[index - 1] = temp;
+                        this.recalculateSequences();
+                        this.$nextTick(() => this.initAllOperationSelects());
+                    }
+                },
+
+                moveDown(index) {
+                    if (index < this.operations.length - 1) {
+                        const temp = this.operations[index];
+                        this.operations[index] = this.operations[index + 1];
+                        this.operations[index + 1] = temp;
+                        this.recalculateSequences();
+                        this.$nextTick(() => this.initAllOperationSelects());
+                    }
+                },
+
+                recalculateSequences() {
+                    if (this.autoSequence) {
+                        this.operations.forEach((op, index) => {
+                            op.sequence = (index + 1) * 10;
+                        });
+                    }
+                },
+
+                workCenterChanged(index) {
+                    const op = this.operations[index];
+                    op.machine_id = '';
+                    op.availableMachines = [];
+
+                    if (op.work_center_id) {
+                        this.loadMachinesForOperation(index);
+                    }
+                    this.$nextTick(() => this.initAllOperationSelects());
+                },
+
+                loadMachinesForOperation(index, selectedMachineId = null) {
+                    const op = this.operations[index];
+                    if (!op || !op.work_center_id) return;
+                    fetch(`{{ url('production/machines/by-work-center') }}/${op.work_center_id}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            op.availableMachines = data;
+                            if (selectedMachineId) {
+                                op.machine_id = selectedMachineId;
+                            }
+                            this.$nextTick(() => this.initAllOperationSelects());
+                        })
+                        .catch(err => console.error('Failed to load machines:', err));
+                },
+
+                initOperationSelects(rowEl, operation) {
+                    var self = this;
+                    $(rowEl).find('[data-select2-selector="default"]').each(function() {
+                        var $select = $(this);
+                        var nameAttr = $select.attr('name') || '';
+                        var isDynamic = nameAttr.indexOf('machine_id') !== -1 || nameAttr.indexOf('predecessor_sequence') !== -1;
+
+                        if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
+                            if (isDynamic) {
+                                $select.select2('destroy');
+                            } else {
+                                $select.trigger('change.select2');
+                                return;
+                            }
+                        }
+
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+
+                        $select.data('select2-initialized', true);
+                        $select.select2(self.select2RowOptions());
+
+                        // Sync values for select2
+                        if (nameAttr.indexOf('operation_type') !== -1) {
+                            if (operation.operation_type) $select.val(operation.operation_type).trigger('change.select2');
+                        } else if (nameAttr.indexOf('work_center_id') !== -1) {
+                            if (operation.work_center_id) $select.val(operation.work_center_id).trigger('change.select2');
+                        } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                            if (operation.predecessor_sequence !== undefined && operation.predecessor_sequence !== '') {
+                                $select.val(operation.predecessor_sequence).trigger('change.select2');
+                            }
+                        } else if (nameAttr.indexOf('machine_id') !== -1) {
+                            if (operation.machine_id) {
+                                $select.val(operation.machine_id).trigger('change.select2');
+                            }
+                        }
+
+                        $select.off('change.routing-operation-select').on('change.routing-operation-select', function() {
+                            var val = $select.val();
+                            var nameAttr = $select.attr('name') || '';
+
+                            if (nameAttr.indexOf('operation_type') !== -1) {
+                                operation.operation_type = val;
+                            } else if (nameAttr.indexOf('work_center_id') !== -1) {
+                                operation.work_center_id = val;
+                                self.workCenterChanged(self.operations.indexOf(operation));
+                            } else if (nameAttr.indexOf('machine_id') !== -1) {
+                                operation.machine_id = val;
+                            } else if (nameAttr.indexOf('predecessor_sequence') !== -1) {
+                                operation.predecessor_sequence = val;
+                            }
+
+                            this.dispatchEvent(new Event('input', { bubbles: true }));
+                        });
+                    });
+                },
+
+                initAllOperationSelects() {
+                    var self = this;
+                    $('.routing-operation-row').each(function(index) {
+                        if (self.operations[index]) {
+                            self.initOperationSelects(this, self.operations[index]);
+                        }
+                    });
+                },
+
+                select2RowOptions() {
+                    return {
+                        theme: "bootstrap-5",
+                        width: '100%',
+                        dropdownParent: $('body'),
+                        dropdownCssClass: 'routing-select2-dropdown'
+                    };
                 }
             }
+        }
         </script>
 @endsection

@@ -62,7 +62,9 @@ class DatabaseSeeder extends Seeder
             // // PoonaRadiatorsProductionSeeder::class,
 
             TableManufacturingProductSeeder::class,
-            TableManufacturingProductionSeeder::class,
+            // Kept for future standard table manufacturing demo usage:
+            // TableManufacturingProductionSeeder::class,
+            ProductionVariationDemoSeeder::class,
             HrmsDemoSeeder::class,
         ]);
 

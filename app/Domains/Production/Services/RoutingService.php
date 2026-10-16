@@ -8,6 +8,7 @@ use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Repositories\RoutingRepositoryInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,8 @@ class RoutingService
 {
     public function __construct(
         private readonly RoutingRepositoryInterface $routingRepository,
-        private readonly RoutingNumberService $numberService
+        private readonly RoutingNumberService $numberService,
+        private readonly RoutingLifecycleService $routingLifecycleService
     ) {}
 
     /**
@@ -40,6 +42,13 @@ class RoutingService
 
         // Check version conflicts for this product
         $this->checkRoutingConflicts($dto->product_id, $dto->version, $tenantId);
+        $this->routingLifecycleService->validateEffectiveDates(
+            $dto->effective_from,
+            $dto->effective_to,
+            $dto->product_id,
+            null,
+            $tenantId
+        );
 
         return DB::transaction(function () use ($dto, $routingNumber, $tenantId, $creatorUserId) {
             $routing = $this->routingRepository->create(array_merge($dto->toArray(), [
@@ -84,6 +93,13 @@ class RoutingService
         }
 
         $this->checkRoutingConflicts($dto->product_id, $dto->version, $routing->tenant_id, $id);
+        $this->routingLifecycleService->validateEffectiveDates(
+            $dto->effective_from,
+            $dto->effective_to,
+            $dto->product_id,
+            $id,
+            $routing->tenant_id
+        );
 
         return DB::transaction(function () use ($routing, $dto) {
             $data = $dto->toArray();
@@ -185,33 +201,14 @@ class RoutingService
             }
         }
 
-        if (!$bom || !in_array($bom->status, ['approved', 'active'])) {
+        if (!$bom || !in_array($bom->status, ['approved', 'active', 'scheduled'])) {
             throw new InvalidArgumentException('Cannot approve routing: The linked Bill of Materials (BOM) must be approved and active first.');
         }
 
         return DB::transaction(function () use ($routing, $approverUserId) {
-            // Archive previously active routings for the same product
-            Routing::withoutGlobalScopes()
-                ->where('tenant_id', $routing->tenant_id)
-                ->where('product_id', $routing->product_id)
-                ->where('status', Routing::STATUS_ACTIVE)
-                ->where('id', '!=', $routing->id)
-                ->update(['status' => Routing::STATUS_HISTORICAL]);
-
-            // Activate this routing
-            $this->routingRepository->update($routing->id, [
-                'status'      => Routing::STATUS_ACTIVE,
-                'approved_by' => $approverUserId,
-                'approved_at' => Carbon::now(),
-            ]);
-
-            RoutingApproval::create([
-                'tenant_id'  => $routing->tenant_id,
-                'routing_id' => $routing->id,
-                'user_id'    => $approverUserId,
-                'action'     => RoutingApproval::ACTION_APPROVED,
-                'comments'   => 'Routing approved and set as active manufacturing process.',
-            ]);
+            // Centralized routing approval lifecycle transition: archives previous active versions
+            // and sets their effective_to date to the new version's effective_from date
+            $this->routingLifecycleService->transitionOnApproval($routing, $approverUserId);
 
             event(new \App\Domains\Production\Events\RoutingApproved($routing->fresh()));
 
@@ -265,15 +262,7 @@ class RoutingService
         }
 
         return DB::transaction(function () use ($routing, $userId, $comments) {
-            $this->routingRepository->update($routing->id, ['status' => Routing::STATUS_CANCELLED]);
-
-            RoutingApproval::create([
-                'tenant_id'  => $routing->tenant_id,
-                'routing_id' => $routing->id,
-                'user_id'    => $userId,
-                'action'     => RoutingApproval::ACTION_CANCELLED,
-                'comments'   => $comments ?: 'Routing cancelled.',
-            ]);
+            $this->routingLifecycleService->transitionOnCancellation($routing, $userId, $comments);
 
             return $routing->fresh();
         });
@@ -292,6 +281,13 @@ class RoutingService
 
         $tenantId = $original->tenant_id;
         $this->checkRoutingConflicts($original->product_id, $newVersion, $tenantId);
+        $this->routingLifecycleService->validateEffectiveDates(
+            Carbon::now()->toDateString(),
+            null,
+            $original->product_id,
+            null,
+            $tenantId
+        );
 
         return DB::transaction(function () use ($original, $newVersion, $creatorUserId, $tenantId) {
             $bomId = $original->bom_id;
@@ -319,9 +315,10 @@ class RoutingService
                 'tenant_id'      => $tenantId,
                 'routing_number' => $this->numberService->generateNextNumber($tenantId),
                 'name'           => $original->name,
-                'product_id'     => $original->product_id,
-                'bom_id'         => $bomId,
-                'version'        => $newVersion,
+                'product_id'             => $original->product_id,
+                'bom_id'                 => $bomId,
+                'material_quantity_mode' => $original->material_quantity_mode ?? 'per_unit',
+                'version'                => $newVersion,
                 'revision'       => $original->revision + 1,
                 'is_default'     => $original->is_default,
                 'effective_from' => Carbon::now()->toDateString(),
@@ -331,9 +328,9 @@ class RoutingService
                 'created_by'     => $creatorUserId,
             ]);
 
-            // Copy all operations
+            // Copy all operations and their materials
             foreach ($original->operations as $op) {
-                RoutingOperation::create(array_merge($op->toArray(), [
+                $newOp = RoutingOperation::create(array_merge($op->toArray(), [
                     'id'         => null,
                     'tenant_id'  => $tenantId,
                     'routing_id' => $newRouting->id,
@@ -341,6 +338,18 @@ class RoutingService
                     'updated_at' => null,
                     'deleted_at' => null,
                 ]));
+
+                foreach ($op->materials as $mat) {
+                    RoutingOperationMaterial::create([
+                        'tenant_id'            => $tenantId,
+                        'routing_operation_id' => $newOp->id,
+                        'material_id'          => $mat->material_id,
+                        'quantity'             => $mat->quantity,
+                        'uom_id'               => $mat->uom_id,
+                        'consumption_type'     => $mat->consumption_type,
+                        'sequence'             => $mat->sequence,
+                    ]);
+                }
             }
 
             RoutingApproval::create([
@@ -407,17 +416,27 @@ class RoutingService
             $createdOps[] = ['model' => $createdOp, 'dto' => $opDto];
             $opsBySeq[$seq] = $createdOp->id;
 
-            if (!empty($opDto->material_id)) {
-                $matProd = \App\Domains\Inventory\Models\Product::find($opDto->material_id);
-                $uomId = $matProd?->uom_id ?? \App\Domains\Inventory\Models\Uom::first()?->id ?? 1;
+            $materialsToSync = !empty($opDto->materials) 
+                ? $opDto->materials 
+                : (!empty($opDto->material_id) ? [['material_id' => $opDto->material_id, 'quantity' => 1.0]] : []);
 
-                \App\Domains\Production\Models\RoutingOperationMaterial::updateOrCreate(
-                    ['tenant_id' => $tenantId, 'routing_operation_id' => $createdOp->id, 'material_id' => $opDto->material_id],
-                    [
-                        'quantity' => 1.0,
-                        'uom_id' => $uomId,
-                    ]
-                );
+            foreach ($materialsToSync as $matIndex => $mat) {
+                if (empty($mat['material_id'])) {
+                    continue;
+                }
+                $matProd = \App\Domains\Inventory\Models\Product::find($mat['material_id']);
+                $uomId = !empty($mat['uom_id']) ? (int) $mat['uom_id'] : ($matProd?->uom_id ?? \App\Domains\Inventory\Models\Uom::first()?->id ?? 1);
+                $qty = isset($mat['quantity']) ? (float) $mat['quantity'] : 1.0;
+
+                \App\Domains\Production\Models\RoutingOperationMaterial::create([
+                    'tenant_id'            => $tenantId,
+                    'routing_operation_id' => $createdOp->id,
+                    'material_id'          => (int) $mat['material_id'],
+                    'quantity'             => $qty,
+                    'uom_id'               => $uomId,
+                    'consumption_type'     => $mat['consumption_type'] ?? null,
+                    'sequence'             => $matIndex + 1,
+                ]);
             }
         }
 

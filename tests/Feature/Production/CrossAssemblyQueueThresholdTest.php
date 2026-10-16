@@ -106,7 +106,7 @@ class CrossAssemblyQueueThresholdTest extends TestCase
             'name' => 'Precision SFG 2-Step Routing',
             'product_id' => $product->id,
             'version' => '1.0.0',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'is_default' => '1',
             'operations' => [
                 [
@@ -153,7 +153,7 @@ class CrossAssemblyQueueThresholdTest extends TestCase
             'name' => 'Precision SFG 2-Step Routing Updated',
             'product_id' => $product->id,
             'version' => '1.0.1',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'operations' => [
                 [
                     'id' => $routing->operations->firstWhere('sequence', 10)->id,

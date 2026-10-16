@@ -77,12 +77,13 @@ class ProductionBom extends BaseModel
     public function routing(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Routing::class, 'bom_id')
-            ->where('status', Routing::STATUS_ACTIVE);
+            ->whereIn('status', [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED]);
     }
 
     public function getActiveRoutingAttribute(): ?Routing
     {
-        return $this->routing ?: Routing::where('product_id', $this->product_id)->where('status', Routing::STATUS_ACTIVE)->first();
+        return Routing::where('bom_id', $this->id)->active()->first()
+            ?: Routing::where('product_id', $this->product_id)->active()->first();
     }
 
     public function items(): HasMany
@@ -123,7 +124,34 @@ class ProductionBom extends BaseModel
 
     public function isApproved(): bool
     {
-        return $this->status === 'approved';
+        return in_array($this->status, ['approved', 'scheduled'], true);
+    }
+
+    public function isScheduled(): bool
+    {
+        return $this->status === 'scheduled'
+            || (in_array($this->status, ['approved', 'active'], true) && $this->effective_date && $this->effective_date->toDateString() > Carbon::today()->toDateString());
+    }
+
+    public function isCurrentlyActive(): bool
+    {
+        if (!in_array($this->status, ['approved', 'active', 'scheduled'], true)) {
+            return false;
+        }
+
+        $today = Carbon::today()->toDateString();
+        $startDate = $this->effective_date ? $this->effective_date->toDateString() : null;
+        $endDate = $this->expiry_date ? $this->expiry_date->toDateString() : null;
+
+        if ($startDate && $startDate > $today) {
+            return false;
+        }
+
+        if ($endDate && $endDate < $today) {
+            return false;
+        }
+
+        return true;
     }
 
     public function isInactive(): bool
@@ -141,15 +169,17 @@ class ProductionBom extends BaseModel
         return $this->status === 'under_revision';
     }
 
-    // Active scope (approved and current date fits effective range)
+    // Active scope (approved/scheduled and current date fits effective range)
     public function scopeActive(Builder $query): void
     {
         $today = Carbon::today()->toDateString();
-        $query->where('status', 'approved')
+        $query->whereIn('status', ['approved', 'active', 'scheduled'])
             ->where('effective_date', '<=', $today)
             ->where(function (Builder $q) use ($today): void {
                 $q->whereNull('expiry_date')
                     ->orWhere('expiry_date', '>=', $today);
-            });
+            })
+            ->orderBy('effective_date', 'desc')
+            ->orderBy('id', 'desc');
     }
 }

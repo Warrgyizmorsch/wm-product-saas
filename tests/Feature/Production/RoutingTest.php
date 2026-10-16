@@ -96,7 +96,7 @@ class RoutingTest extends TestCase
             'name' => 'Cabinet Z Cutting and Drilling',
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'is_default' => '1',
             'operations' => [
                 [
@@ -150,7 +150,7 @@ class RoutingTest extends TestCase
             'name' => 'Invalid Routing Seq',
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
             'operations' => [
                 [
                     'sequence' => 10, // Duplicate sequence
@@ -184,7 +184,7 @@ class RoutingTest extends TestCase
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
 
         $routing->operations()->create([
@@ -230,15 +230,38 @@ class RoutingTest extends TestCase
             'version' => '1.0.0',
             'revision' => 0,
             'status' => Routing::STATUS_ACTIVE,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
 
-        $routing->operations()->create([
+        $op = $routing->operations()->create([
             'tenant_id' => $this->tenantA->id,
             'sequence' => 10,
             'operation_number' => 'OP-010',
             'name' => 'Operation 1',
             'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        $uom = \App\Domains\Inventory\Models\Uom::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Piece',
+            'code' => 'Pcs',
+        ]);
+
+        $rawMaterial = Product::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Raw Wood Board',
+            'sku' => 'RM-WOOD-01',
+            'type' => 'raw_material',
+            'uom_id' => $uom->id,
+            'status' => 'active',
+        ]);
+
+        $op->materials()->create([
+            'tenant_id' => $this->tenantA->id,
+            'material_id' => $rawMaterial->id,
+            'quantity' => 2.5,
+            'uom_id' => $uom->id,
+            'sequence' => 1,
         ]);
 
         // Duplicate via manager
@@ -258,6 +281,9 @@ class RoutingTest extends TestCase
         $this->assertEquals(1, $newRouting->revision);
         $this->assertCount(1, $newRouting->operations);
         $this->assertEquals('Operation 1', $newRouting->operations[0]->name);
+        $this->assertCount(1, $newRouting->operations[0]->materials);
+        $this->assertEquals($rawMaterial->id, $newRouting->operations[0]->materials[0]->material_id);
+        $this->assertEquals(2.5, (float) $newRouting->operations[0]->materials[0]->quantity);
 
         // Verify update on cloned routing maintains routing_number
         $updateResponse = $this->actingAs($this->adminA)
@@ -267,7 +293,7 @@ class RoutingTest extends TestCase
                 'name' => 'Updated Duplicated Routing',
                 'product_id' => $this->finishedProductA->id,
                 'version' => '1.1.0',
-                'effective_from' => '2026-06-30',
+                'effective_from' => now()->toDateString(),
                 'operations' => [
                     [
                         'sequence' => 10,
@@ -315,7 +341,7 @@ class RoutingTest extends TestCase
             'product_id' => $this->finishedProductA->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
         $routing1->operations()->create([
             'tenant_id' => $this->tenantA->id,
@@ -332,7 +358,7 @@ class RoutingTest extends TestCase
             'product_id' => $finishedProductB->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
-            'effective_from' => '2026-06-30',
+            'effective_from' => now()->toDateString(),
         ]);
         $routing2->operations()->create([
             'tenant_id' => $this->tenantA->id,

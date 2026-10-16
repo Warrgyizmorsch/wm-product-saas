@@ -302,10 +302,48 @@ class ProductionReadinessService
                 ->where('bom_id', $op->source_bom_id)
                 ->where('is_alternative', false)
                 ->get();
-            $bomMaterialIds = $bomItems->pluck('material_id')->all();
-            $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));
+        }
+
+        $routingOpMaterials = collect();
+        if ($op->routing_operation_id) {
+            $routingOpMaterials = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
+                ->where('routing_operation_id', $op->routing_operation_id)
+                ->get();
+        }
+
+        // Check if the routing defines operation material assignments
+        $hasRoutingAllocations = false;
+        if ($op->source_routing_id) {
+            $hasRoutingAllocations = \App\Domains\Production\Models\RoutingOperationMaterial::withoutGlobalScopes()
+                ->whereHas('routingOperation', function ($q) use ($op) {
+                    $q->where('routing_id', $op->source_routing_id);
+                })->exists();
+        }
+
+        if ($hasRoutingAllocations) {
+            if ($routingOpMaterials->isEmpty()) {
+                // This operation has no assigned material requirements -> Ready
+                return [
+                    'status' => self::STATUS_READY,
+                    'required_qty' => $orderQty,
+                    'issued_qty' => $orderQty,
+                    'reserved_qty' => 0.0,
+                    'available_stock' => 0.0,
+                    'shortage_qty' => 0.0,
+                    'ready_qty' => $orderQty,
+                    'blockers' => [],
+                    'warnings' => [],
+                ];
+            }
+            $assignedMaterialIds = $routingOpMaterials->pluck('material_id')->all();
+            $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $assignedMaterialIds, true));
         } else {
-            $reservations = $reservations->filter(fn($r) => !in_array($r->product_id, $sfgProductIds, true));
+            if ($op->source_bom_id) {
+                $bomMaterialIds = $bomItems->pluck('material_id')->all();
+                $reservations = $reservations->filter(fn($r) => in_array($r->product_id, $bomMaterialIds, true) && !in_array($r->product_id, $sfgProductIds, true));
+            } else {
+                $reservations = $reservations->filter(fn($r) => !in_array($r->product_id, $sfgProductIds, true));
+            }
         }
 
         if ($reservations->isEmpty()) {
@@ -332,14 +370,38 @@ class ProductionReadinessService
         $minExecutableFromMaterial = $orderQty;
 
         foreach ($reservations as $res) {
-            $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
-            if ($bomItem && (float) $bomItem->quantity > 0) {
-                $scrapFactor = 1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0);
-                $bomRatio = (float) $bomItem->quantity * $scrapFactor;
+            $rom = $routingOpMaterials->firstWhere('material_id', $res->product_id);
+            if ($rom && (float) $rom->quantity > 0) {
+                $routing = $op->routingOperation?->routing ?: \App\Domains\Production\Models\Routing::find($op->source_routing_id);
+                $bom = $op->source_bom_id ? \App\Domains\Production\Models\ProductionBom::find($op->source_bom_id) : null;
+                $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
+
+                $normalizedOpAlloc = ($routing && $routing->isPerBomBaseQuantity())
+                    ? ((float) $rom->quantity / $baseQty)
+                    : (float) $rom->quantity;
+
+                $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
+                $scrapFactor = $bomItem ? (1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0)) : 1.0;
+
+                $bomRatio = $normalizedOpAlloc * $scrapFactor;
                 $req = round($bomRatio * $orderQty, 4);
             } else {
-                $req = (float) $res->quantity_planned;
-                $bomRatio = ($req / max(1.0, $orderQty));
+                $bomItem = $bomItems->firstWhere('material_id', $res->product_id);
+                if ($bomItem && (float) $bomItem->quantity > 0) {
+                    $baseQty = 1.0;
+                    if ($op->source_bom_id) {
+                        $bom = \App\Domains\Production\Models\ProductionBom::find($op->source_bom_id);
+                        if ($bom && (float) $bom->base_quantity > 0) {
+                            $baseQty = (float) $bom->base_quantity;
+                        }
+                    }
+                    $scrapFactor = 1.0 + ((float) ($bomItem->material_scrap_percentage ?? 0) / 100.0);
+                    $bomRatio = ((float) $bomItem->quantity / $baseQty) * $scrapFactor;
+                    $req = round($bomRatio * $orderQty, 4);
+                } else {
+                    $req = (float) $res->quantity_planned;
+                    $bomRatio = ($req / max(1.0, $orderQty));
+                }
             }
 
             $iss = (float) $res->quantity_issued;

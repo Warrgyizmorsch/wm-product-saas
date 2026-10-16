@@ -150,6 +150,7 @@
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="input" :label="__('production.start_date') ?? 'Start Date'"
                                     name="effective_date" inputType="date" :value="old('effective_date', $bom->effective_date ? $bom->effective_date->format('Y-m-d') : date('Y-m-d'))"
+                                    min="{{ date('Y-m-d') }}"
                                     :required="true" :error-text="$errors->first('effective_date')"
                                     alpineError="errors.effective_date" />
                             </div>

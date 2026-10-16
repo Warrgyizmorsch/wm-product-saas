@@ -93,16 +93,23 @@
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <h4 class="fw-bold text-dark mb-0">{{ __('production.bom_details') }} (BOM #{{ $bom->bom_number }})</h4>
             <div>
-                @if($bom->status === 'approved' || $bom->status === 'active')
-                    <span class="erp-badge-active">{{ __('production.active') }}</span>
-                @elseif($bom->status === 'draft')
+                @php
+                    $todayStr = now()->toDateString();
+                    $effDateStr = $bom->effective_date ? $bom->effective_date->toDateString() : null;
+                    $expDateStr = $bom->expiry_date ? $bom->expiry_date->toDateString() : null;
+                @endphp
+                @if($bom->status === 'draft')
                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                 @elseif($bom->status === 'pending_approval')
                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
                 @elseif($bom->status === 'cancelled')
                     <span class="erp-badge-cancelled">{{ __('production.cancelled') }}</span>
-                @elseif($bom->status === 'inactive')
+                @elseif($bom->status === 'scheduled' || (in_array($bom->status, ['approved', 'active']) && $effDateStr && $effDateStr > $todayStr))
+                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 font-monospace fw-bold">{{ __('production.scheduled') }}</span>
+                @elseif($bom->status === 'inactive' || ($expDateStr && $expDateStr <= $todayStr && !$bom->isCurrentlyActive()))
                     <span class="erp-badge-inactive">{{ __('production.inactive') }}</span>
+                @elseif(in_array($bom->status, ['approved', 'active']))
+                    <span class="erp-badge-active">{{ __('production.active') }}</span>
                 @else
                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) ?? $bom->status }}</span>
                 @endif
@@ -192,6 +199,19 @@
                         </span>
                     </div>
                 </div>
+
+                @if($bom->approved_at)
+                    <div class="row erp-form-row mb-2">
+                        <div class="col-md-4">
+                            <span class="fw-semibold text-muted fs-13">Action / Approved Date:</span>
+                        </div>
+                        <div class="col-md-8">
+                            <span class="text-dark fw-bold fs-13">
+                                {{ $bom->approved_at->format('d/m/Y') }}
+                            </span>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="row erp-form-row mb-2">
                     <div class="col-md-4">

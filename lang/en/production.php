@@ -74,6 +74,7 @@ return array (
   'active' => 'Active',
   'draft' => 'Draft',
   'pending_approval' => 'Pending Approval',
+  'scheduled' => 'Scheduled',
   'under_revision' => 'Under Revision',
   'obsolete' => 'Obsolete',
   'pending' => 'Pending',

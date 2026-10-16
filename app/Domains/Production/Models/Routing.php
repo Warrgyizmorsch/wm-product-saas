@@ -23,6 +23,7 @@ class Routing extends BaseModel
     public const STATUS_DRAFT            = 'draft';
     public const STATUS_PENDING_APPROVAL = 'pending_approval';
     public const STATUS_ACTIVE           = 'active';
+    public const STATUS_SCHEDULED        = 'scheduled';
     public const STATUS_HISTORICAL       = 'historical';
     public const STATUS_CANCELLED        = 'cancelled';
 
@@ -30,8 +31,18 @@ class Routing extends BaseModel
         self::STATUS_DRAFT,
         self::STATUS_PENDING_APPROVAL,
         self::STATUS_ACTIVE,
+        self::STATUS_SCHEDULED,
         self::STATUS_HISTORICAL,
         self::STATUS_CANCELLED,
+    ];
+
+    // Material quantity entry modes
+    public const MODE_PER_UNIT              = 'per_unit';
+    public const MODE_PER_BOM_BASE_QUANTITY = 'per_bom_base_quantity';
+
+    public const MATERIAL_QUANTITY_MODES = [
+        self::MODE_PER_UNIT,
+        self::MODE_PER_BOM_BASE_QUANTITY,
     ];
 
     protected $fillable = [
@@ -40,6 +51,7 @@ class Routing extends BaseModel
         'name',
         'product_id',
         'bom_id',
+        'material_quantity_mode',
         'version',
         'revision',
         'is_default',       // A3: routing alternatives flag
@@ -53,12 +65,23 @@ class Routing extends BaseModel
     ];
 
     protected $casts = [
-        'effective_from' => 'date',
-        'effective_to'   => 'date',
-        'approved_at'    => 'datetime',
-        'revision'       => 'integer',
-        'is_default'     => 'boolean',
+        'effective_from'         => 'date',
+        'effective_to'           => 'date',
+        'approved_at'            => 'datetime',
+        'revision'               => 'integer',
+        'is_default'             => 'boolean',
+        'material_quantity_mode' => 'string',
     ];
+
+    public function isPerUnit(): bool
+    {
+        return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_UNIT;
+    }
+
+    public function isPerBomBaseQuantity(): bool
+    {
+        return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_BOM_BASE_QUANTITY;
+    }
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
@@ -111,6 +134,33 @@ class Routing extends BaseModel
         return $this->status === self::STATUS_ACTIVE;
     }
 
+    public function isScheduled(): bool
+    {
+        return $this->status === self::STATUS_SCHEDULED
+            || ($this->status === self::STATUS_ACTIVE && $this->effective_from && $this->effective_from->toDateString() > Carbon::today()->toDateString());
+    }
+
+    public function isCurrentlyActive(): bool
+    {
+        if ($this->status !== self::STATUS_ACTIVE && $this->status !== self::STATUS_SCHEDULED) {
+            return false;
+        }
+
+        $today = Carbon::today()->toDateString();
+        $startDate = $this->effective_from ? $this->effective_from->toDateString() : null;
+        $endDate = $this->effective_to ? $this->effective_to->toDateString() : null;
+
+        if ($startDate && $startDate > $today) {
+            return false;
+        }
+
+        if ($endDate && $endDate < $today) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function isHistorical(): bool
     {
         return $this->status === self::STATUS_HISTORICAL;
@@ -130,6 +180,7 @@ class Routing extends BaseModel
     {
         return in_array($this->status, [
             self::STATUS_ACTIVE,
+            self::STATUS_SCHEDULED,
             self::STATUS_HISTORICAL,
             self::STATUS_CANCELLED,
         ], true);
@@ -138,17 +189,19 @@ class Routing extends BaseModel
     // ─── Scopes ───────────────────────────────────────────────────────────────
 
     /**
-     * Active routing: status=active and current date falls within effective range.
+     * Active routing: status in active/scheduled and current date falls within effective range.
      */
     public function scopeActive(Builder $query): void
     {
         $today = Carbon::today()->toDateString();
-        $query->where('status', self::STATUS_ACTIVE)
+        $query->whereIn('status', [self::STATUS_ACTIVE, self::STATUS_SCHEDULED])
             ->where('effective_from', '<=', $today)
             ->where(function (Builder $q) use ($today): void {
                 $q->whereNull('effective_to')
                   ->orWhere('effective_to', '>=', $today);
-            });
+            })
+            ->orderBy('effective_from', 'desc')
+            ->orderBy('id', 'desc');
     }
 
     public function scopePrimary(Builder $query): void

@@ -239,6 +239,7 @@
                                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>{{ __('production.draft') }}</option>
                                     <option value="pending_approval" {{ request('status') === 'pending_approval' ? 'selected' : '' }}>{{ __('production.pending_approval') }}</option>
                                     <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>{{ __('production.active') }}</option>
+                                    <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>{{ __('production.scheduled') }}</option>
                                     <option value="historical" {{ request('status') === 'historical' ? 'selected' : '' }}>{{ __('production.historical') }}</option>
                                     <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>{{ __('production.cancelled') }}</option>
                                 </x-ui.odoo-form-ui>
@@ -341,16 +342,25 @@
                                 @endif
                             </td>
                             <td>
+                                @php
+                                    $todayStr = now()->toDateString();
+                                    $effFromStr = $routing->effective_from ? $routing->effective_from->toDateString() : null;
+                                    $effToStr = $routing->effective_to ? $routing->effective_to->toDateString() : null;
+                                @endphp
                                 @if ($routing->isDraft())
                                     <span class="erp-badge-draft">{{ __('production.draft') }}</span>
                                 @elseif ($routing->isPendingApproval())
                                     <span class="erp-badge-pending">{{ __('production.pending') }}</span>
+                                @elseif ($routing->isCancelled())
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.cancelled') }}</span>
+                                @elseif ($routing->status === \App\Domains\Production\Models\Routing::STATUS_SCHEDULED || ($routing->isActive() && $effFromStr && $effFromStr > $todayStr))
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1 font-monospace fw-bold">{{ __('production.scheduled') }}</span>
+                                @elseif ($routing->isHistorical() || ($effToStr && $effToStr <= $todayStr && !$routing->isCurrentlyActive()))
+                                    <span class="badge bg-soft-info text-info rounded-pill px-2 py-1">{{ __('production.historical') }}</span>
                                 @elseif ($routing->isActive())
                                     <span class="erp-badge-active">{{ __('production.active') }}</span>
-                                @elseif ($routing->isHistorical())
-                                    <span class="badge bg-soft-info text-info rounded-pill px-2 py-1">{{ __('production.historical') }}</span>
                                 @else
-                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.cancelled') }}</span>
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2 py-1">{{ ucfirst($routing->status) }}</span>
                                 @endif
                             </td>
                             <td class="text-end">
@@ -398,7 +408,7 @@
                                     @endif
 
                                     {{-- Cancel --}}
-                                    @if($routing->isActive())
+                                    @if($routing->isActive() || $routing->isScheduled())
                                         @can('cancel', $routing)
                                             <li>
                                                 <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $routing->id }}">

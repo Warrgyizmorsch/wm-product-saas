@@ -28,15 +28,16 @@ class StoreRoutingRequest extends FormRequest
 
         return [
             // Header
-            'routing_number'     => 'nullable|string|max:50',
-            'name'               => 'required|string|max:255',
-            'product_id'         => 'required|exists:products,id',
-            'bom_id'             => 'nullable|exists:production_boms,id',
-            'version'            => 'nullable|string|max:50',
-            'is_default'         => 'boolean',
-            'effective_from'     => 'nullable|date',
-            'effective_to'       => 'nullable|date|after_or_equal:effective_from',
-            'description'        => 'nullable|string',
+            'routing_number'         => 'nullable|string|max:50',
+            'name'                   => 'required|string|max:255',
+            'product_id'             => 'required|exists:products,id',
+            'bom_id'                 => 'nullable|exists:production_boms,id',
+            'material_quantity_mode' => 'nullable|in:per_unit,per_bom_base_quantity',
+            'version'                => 'nullable|string|max:50',
+            'is_default'             => 'boolean',
+            'effective_from'         => 'nullable|date',
+            'effective_to'           => 'nullable|date|after_or_equal:effective_from',
+            'description'            => 'nullable|string',
 
             // Operations grid
             'operations'                                      => 'required|array|min:1',
@@ -68,6 +69,10 @@ class StoreRoutingRequest extends FormRequest
             'operations.*.transfer_batch_quantity'            => 'nullable|numeric|min:0',
             'operations.*.transfer_lag_minutes'               => 'nullable|numeric|min:0',
             'operations.*.material_id'                        => 'nullable|exists:products,id',
+            'operations.*.materials'                          => 'nullable|array',
+            'operations.*.materials.*.material_id'            => 'required|exists:products,id',
+            'operations.*.materials.*.quantity'               => 'required|numeric|gt:0',
+            'operations.*.materials.*.uom_id'                 => 'nullable|exists:uoms,id',
             'operations.*.is_parallel'                        => 'nullable|boolean',
             'operations.*.parallel_group'                     => 'nullable|string|max:50',
             'operations.*.predecessor_sequence'               => 'nullable',
@@ -78,6 +83,19 @@ class StoreRoutingRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
+            // Date lifecycle validation
+            try {
+                app(\App\Domains\Production\Services\RoutingLifecycleService::class)->validateEffectiveDates(
+                    $this->input('effective_from'),
+                    $this->input('effective_to'),
+                    (int) $this->input('product_id'),
+                    null,
+                    tenant_id() ?? 1
+                );
+            } catch (\InvalidArgumentException $e) {
+                $validator->errors()->add('effective_from', $e->getMessage());
+            }
+
             $operations = $this->input('operations', []);
             usort($operations, fn($a, $b) => ($a['sequence'] ?? 0) <=> ($b['sequence'] ?? 0));
             $totalOps = count($operations);
@@ -159,6 +177,145 @@ class StoreRoutingRequest extends FormRequest
                                 "The selected machine does not belong to the chosen work center."
                             );
                         }
+                    }
+                }
+            }
+
+            // Rule 4: BOM Component Assignment & Over-Allocation Validation
+            $mode = $this->input('material_quantity_mode', \App\Domains\Production\Models\Routing::MODE_PER_UNIT);
+            $allocatedByMaterial = [];
+            $allAssignedMaterialIds = [];
+
+            foreach ($operations as $opIndex => $op) {
+                $matRows = [];
+                if (!empty($op['materials']) && is_array($op['materials'])) {
+                    foreach ($op['materials'] as $mIdx => $mat) {
+                        if (!empty($mat['material_id'])) {
+                            $qty = isset($mat['quantity']) ? (float) $mat['quantity'] : 0.0;
+                            if ($qty <= 0) {
+                                $validator->errors()->add(
+                                    "operations.{$opIndex}.materials.{$mIdx}.quantity",
+                                    "Material quantity must be greater than zero."
+                                );
+                            }
+                            $matRows[] = [
+                                'material_id' => (int) $mat['material_id'],
+                                'quantity'    => $qty,
+                            ];
+                        }
+                    }
+                } elseif (!empty($op['material_id'])) {
+                    $qty = isset($op['material_quantity']) ? (float) $op['material_quantity'] : 1.0;
+                    $matRows[] = [
+                        'material_id' => (int) $op['material_id'],
+                        'quantity'    => $qty,
+                    ];
+                }
+
+                foreach ($matRows as $m) {
+                    $mId = $m['material_id'];
+                    $q = $m['quantity'];
+                    $allAssignedMaterialIds[] = $mId;
+                    $allocatedByMaterial[$mId] = ($allocatedByMaterial[$mId] ?? 0.0) + $q;
+                }
+            }
+
+            $bomId = $this->input('bom_id');
+            $bom = null;
+            if ($bomId) {
+                $bom = \App\Domains\Production\Models\ProductionBom::with(['items.material', 'items.uom'])->find($bomId);
+            } elseif ($this->input('product_id')) {
+                $bom = \App\Domains\Production\Models\ProductionBom::with(['items.material', 'items.uom'])
+                    ->where('product_id', $this->input('product_id'))
+                    ->whereIn('status', ['approved', 'active', 'draft'])
+                    ->latest('id')
+                    ->first();
+            }
+
+            if ($bom) {
+                $baseQuantity = (float) $bom->base_quantity;
+                if ($baseQuantity <= 0) {
+                    $validator->errors()->add('bom_id', "The selected BOM '{$bom->bom_number}' has an invalid base quantity ({$baseQuantity}). Base quantity must be greater than zero.");
+                    return;
+                }
+
+                $bomItems = $bom->items->where('is_alternative', false);
+
+                if ($bomItems->isNotEmpty()) {
+                    $bomMaterialIds = $bomItems->pluck('material_id')->all();
+
+                    // Check foreign components not belonging to the selected BOM
+                    foreach (array_unique($allAssignedMaterialIds) as $assignedMatId) {
+                        if (!in_array($assignedMatId, $bomMaterialIds, true)) {
+                            $matProd = \App\Domains\Inventory\Models\Product::find($assignedMatId);
+                            $matName = $matProd?->name ?? "Material #{$assignedMatId}";
+                            $validator->errors()->add(
+                                'operations',
+                                "Component '{$matName}' does not belong to the selected Bill of Materials '{$bom->bom_number}'."
+                            );
+                        }
+                    }
+
+                    // Rule A: Every BOM component must be assigned to at least one operation
+                    $unassignedComponents = [];
+                    foreach ($bomItems as $item) {
+                        if (!in_array($item->material_id, $allAssignedMaterialIds, true)) {
+                            $compName = $item->material?->name ?? "Product #{$item->material_id}";
+                            $compSku = $item->material?->sku ?? '';
+                            $unassignedComponents[] = $compSku ? "{$compName} ({$compSku})" : $compName;
+                        }
+                    }
+
+                    if (!empty($unassignedComponents)) {
+                        $missingList = implode(', ', $unassignedComponents);
+                        $validator->errors()->add(
+                            'operations',
+                            "Every BOM component must be assigned to at least one routing operation. Unassigned component(s): {$missingList}."
+                        );
+                    }
+
+                    // Rule C: Over-allocation is prohibited (normalized comparison)
+                    $partialWarnings = [];
+
+                    foreach ($bomItems as $item) {
+                        $matId = $item->material_id;
+                        $enteredTotalAlloc = $allocatedByMaterial[$matId] ?? 0.0;
+
+                        if ($mode === \App\Domains\Production\Models\Routing::MODE_PER_BOM_BASE_QUANTITY) {
+                            $normalizedAlloc = $enteredTotalAlloc / $baseQuantity;
+                            $bomReqInMode = (float) $item->quantity;
+                            $enteredBasisLabel = "per BOM base quantity ({$baseQuantity})";
+                        } else {
+                            $normalizedAlloc = $enteredTotalAlloc;
+                            $bomReqInMode = (float) $item->quantity / $baseQuantity;
+                            $enteredBasisLabel = "per 1 unit";
+                        }
+
+                        $normalizedBomReq = (float) $item->quantity / $baseQuantity;
+                        $compName = $item->material?->name ?? "Product #{$matId}";
+                        $compSku = $item->material?->sku ?? '';
+                        $uomName = $item->uom?->name ?? $item->uom?->code ?? 'units';
+                        $displayName = $compSku ? "{$compName} ({$compSku})" : $compName;
+
+                        if ($normalizedAlloc > ($normalizedBomReq + 0.00001)) {
+                            $excessNormalized = $normalizedAlloc - $normalizedBomReq;
+                            $excessInMode = $mode === \App\Domains\Production\Models\Routing::MODE_PER_BOM_BASE_QUANTITY 
+                                ? ($excessNormalized * $baseQuantity) 
+                                : $excessNormalized;
+
+                            $validator->errors()->add(
+                                'operations',
+                                "Component '{$displayName}' is over-allocated. BOM requirement is " . round($bomReqInMode, 4) . " {$uomName} {$enteredBasisLabel}, but total allocated across operations is " . round($enteredTotalAlloc, 4) . " {$uomName} (exceeds by " . round($excessInMode, 4) . " {$uomName})."
+                            );
+                        } elseif ($normalizedAlloc < ($normalizedBomReq - 0.00001) && in_array($matId, $allAssignedMaterialIds, true)) {
+                            $remainingInMode = $bomReqInMode - $enteredTotalAlloc;
+                            $partialWarnings[] = "Component '{$displayName}' has " . round($remainingInMode, 4) . " {$uomName} unallocated ({$enteredBasisLabel}).";
+                        }
+                    }
+
+                    if (!empty($partialWarnings)) {
+                        session()->flash('routing_allocation_warnings', $partialWarnings);
+                        session()->flash('warning', 'Partially Allocated Components: ' . implode('; ', $partialWarnings));
                     }
                 }
             }

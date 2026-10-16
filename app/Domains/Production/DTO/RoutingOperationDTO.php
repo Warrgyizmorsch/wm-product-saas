@@ -38,6 +38,7 @@ class RoutingOperationDTO
         public readonly ?string $parallel_group = null,
         public readonly ?int    $predecessor_sequence = null,
         public readonly ?int    $previous_operation_id = null,
+        public readonly array   $materials = [],
     ) {}
 
     public static function fromArray(array $data): self
@@ -49,6 +50,29 @@ class RoutingOperationDTO
             : (isset($data['run_time_per_unit_minutes'])
                 ? (float) $data['run_time_per_unit_minutes']
                 : (isset($data['run_time_minutes']) ? (float) $data['run_time_minutes'] : 0.0));
+
+        $materials = [];
+        if (!empty($data['materials']) && is_array($data['materials'])) {
+            foreach ($data['materials'] as $m) {
+                if (!empty($m['material_id'])) {
+                    $materials[] = [
+                        'material_id'      => (int) $m['material_id'],
+                        'quantity'         => isset($m['quantity']) ? (float) $m['quantity'] : 1.0,
+                        'uom_id'           => !empty($m['uom_id']) ? (int) $m['uom_id'] : null,
+                        'consumption_type' => $m['consumption_type'] ?? null,
+                    ];
+                }
+            }
+        } elseif (!empty($data['material_id'])) {
+            $materials[] = [
+                'material_id'      => (int) $data['material_id'],
+                'quantity'         => isset($data['material_quantity']) ? (float) $data['material_quantity'] : 1.0,
+                'uom_id'           => !empty($data['uom_id']) ? (int) $data['uom_id'] : null,
+                'consumption_type' => null,
+            ];
+        }
+
+        $primaryMaterialId = !empty($materials) ? $materials[0]['material_id'] : (!empty($data['material_id']) ? (int) $data['material_id'] : null);
 
         return new self(
             sequence:                       $sequence,
@@ -79,11 +103,12 @@ class RoutingOperationDTO
             subcontract_input_type:         $data['subcontract_input_type'] ?? 'bom_raw_materials',
             dispatch_buffer_days:          isset($data['dispatch_buffer_days']) ? (int) $data['dispatch_buffer_days'] : 0,
             return_buffer_days:            isset($data['return_buffer_days']) ? (int) $data['return_buffer_days'] : 0,
-            material_id:                   !empty($data['material_id']) ? (int) $data['material_id'] : null,
+            material_id:                   $primaryMaterialId,
             is_parallel:                   !empty($data['is_parallel']),
             parallel_group:                !empty($data['parallel_group']) ? trim((string) $data['parallel_group']) : null,
             predecessor_sequence:          isset($data['predecessor_sequence']) && $data['predecessor_sequence'] !== '' && $data['predecessor_sequence'] !== 'none' ? (int) $data['predecessor_sequence'] : null,
             previous_operation_id:         !empty($data['previous_operation_id']) ? (int) $data['previous_operation_id'] : null,
+            materials:                     $materials,
         );
     }
 
@@ -122,6 +147,7 @@ class RoutingOperationDTO
             'is_parallel'                    => $this->is_parallel,
             'parallel_group'                 => $this->parallel_group,
             'previous_operation_id'         => $this->previous_operation_id,
+            'materials'                      => $this->materials,
         ];
     }
 }

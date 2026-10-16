@@ -75,8 +75,14 @@ class RoutingRepository implements RoutingRepositoryInterface
     {
         return Routing::with([
             'product',
+            'bom.items.material',
+            'bom.items.uom',
+            'bom.baseUom',
+            'bom.product.uom',
             'operations.workCenter',
             'operations.machine',
+            'operations.materials.material',
+            'operations.materials.uom',
             'creator',
             'approver',
             'approvals.user',

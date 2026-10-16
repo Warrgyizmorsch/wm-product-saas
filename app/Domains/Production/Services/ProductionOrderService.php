@@ -175,11 +175,15 @@ class ProductionOrderService
                                 if ((int) $mat->material_id === (int) $order->product_id) {
                                     continue;
                                 }
-                                $matProduct = $mat->material ?: Product::find($mat->material_id);
-                                if ($matProduct && $matProduct->type === 'raw_material') {
-                                    continue;
+                                $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
+                                $ratio = $opRouting->isPerBomBaseQuantity()
+                                    ? ((float) $mat->quantity / $baseQty)
+                                    : (float) $mat->quantity;
+
+                                if ($ratio <= 0) {
+                                    $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
                                 }
-                                $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
+
                                 if ($ratio !== null && $ratio > 0) {
                                     $calculatedTarget = round((float) $order->quantity_ordered * $ratio, 4);
                                     if ($calculatedTarget > 0) {
@@ -1331,11 +1335,15 @@ class ProductionOrderService
                         if ((int) $mat->material_id === (int) $order->product_id) {
                             continue;
                         }
-                        $matProduct = $mat->material ?: Product::find($mat->material_id);
-                        if ($matProduct && $matProduct->type === 'raw_material') {
-                            continue;
+                        $baseQty = ($bom && (float) $bom->base_quantity > 0) ? (float) $bom->base_quantity : 1.0;
+                        $ratio = $routing->isPerBomBaseQuantity()
+                            ? ((float) $mat->quantity / $baseQty)
+                            : (float) $mat->quantity;
+
+                        if ($ratio <= 0) {
+                            $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
                         }
-                        $ratio = $this->calculateBomComponentRatio($bom, $mat->material_id);
+
                         if ($ratio !== null && $ratio > 0) {
                             $calculatedTarget = round($targetQty * $ratio, 4);
                             if ($calculatedTarget > 0) {

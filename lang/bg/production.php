@@ -83,6 +83,7 @@ return [
     'active' => 'Активен',
     'draft' => 'Чернова',
     'pending_approval' => 'Изчаква одобрение',
+    'scheduled' => 'Планиран',
     'rejected' => 'Отхвърлен',
     'cancelled' => 'Анулиран',
     'under_revision' => 'В ревизия',

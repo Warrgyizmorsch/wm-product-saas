@@ -77,6 +77,26 @@ class UpdateProductionBomRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             $productId = (int) $this->input('product_id');
+
+            // Date lifecycle validation
+            $bomParam = $this->route('bom') ?? $this->route('production_bom');
+            $bomId = $bomParam instanceof \App\Domains\Production\Models\ProductionBom
+                ? $bomParam->id
+                : (int) $bomParam;
+
+            try {
+                app(\App\Domains\Production\Services\BomLifecycleService::class)->validateEffectiveDates(
+                    $this->input('effective_date'),
+                    $this->input('expiry_date'),
+                    $productId,
+                    $bomId ?: null,
+                    tenant_id() ?? 1,
+                    $this->input('bom_type')
+                );
+            } catch (\InvalidArgumentException $e) {
+                $validator->errors()->add('effective_date', $e->getMessage());
+            }
+
             $items = $this->input('items', []);
             $materialIds = [];
             $allRows = [];

@@ -741,6 +741,8 @@ class TableManufacturingProductionSeeder extends Seeder
             [
                 'name' => 'Table Leg Steel Pipe Cutting Routing',
                 'product_id' => $sfgLeg->id,
+                'bom_id' => $boms['leg']->id,
+                'material_quantity_mode' => Routing::MODE_PER_UNIT,
                 'status' => 'active',
                 'version' => '1.0',
                 'created_by' => $userId,
@@ -785,6 +787,8 @@ class TableManufacturingProductionSeeder extends Seeder
             [
                 'name' => 'Horizontal Support Pipe Cutting Routing',
                 'product_id' => $sfgSupport->id,
+                'bom_id' => $boms['support']->id,
+                'material_quantity_mode' => Routing::MODE_PER_UNIT,
                 'status' => 'active',
                 'version' => '1.0',
                 'created_by' => $userId,
@@ -824,6 +828,8 @@ class TableManufacturingProductionSeeder extends Seeder
             [
                 'name' => 'Table Frame Welding & Finishing Routing',
                 'product_id' => $sfgFrame->id,
+                'bom_id' => $boms['frame']->id,
+                'material_quantity_mode' => Routing::MODE_PER_UNIT,
                 'status' => 'active',
                 'version' => '1.0',
                 'created_by' => $userId,
@@ -888,6 +894,8 @@ class TableManufacturingProductionSeeder extends Seeder
             [
                 'name' => 'Table Top Processing Routing',
                 'product_id' => $sfgTop->id,
+                'bom_id' => $boms['top']->id,
+                'material_quantity_mode' => Routing::MODE_PER_UNIT,
                 'status' => 'active',
                 'version' => '1.0',
                 'created_by' => $userId,
@@ -927,6 +935,8 @@ class TableManufacturingProductionSeeder extends Seeder
             [
                 'name' => 'Industrial Dining Table Master Assembly Routing',
                 'product_id' => $fgTable->id,
+                'bom_id' => $boms['fg']->id,
+                'material_quantity_mode' => Routing::MODE_PER_UNIT,
                 'status' => 'active',
                 'version' => '1.0',
                 'created_by' => $userId,

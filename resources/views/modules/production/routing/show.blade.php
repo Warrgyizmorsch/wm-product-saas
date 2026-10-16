@@ -55,12 +55,15 @@
                         @elseif ($routing->isPendingApproval())
                             <span class="badge bg-soft-warning text-warning font-monospace fw-bold text-uppercase">{{ __('production.pending_approval') }}</span>
                             — {{ __('production.pending_desc') }}
-                        @elseif ($routing->isActive())
-                            <span class="badge bg-soft-success text-success font-monospace fw-bold text-uppercase">{{ __('production.active') }}</span>
-                            — {{ __('production.active_desc') }}
+                        @elseif ($routing->isScheduled())
+                            <span class="badge bg-soft-warning text-warning font-monospace fw-bold text-uppercase">{{ __('production.scheduled') }}</span>
+                            — Approved on {{ $routing->approved_at ? $routing->approved_at->format('Y-m-d') : '-' }}. Scheduled to take effect on {{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '-' }}.
                         @elseif ($routing->isHistorical())
                             <span class="badge bg-soft-info text-info font-monospace fw-bold text-uppercase">{{ __('production.historical') }}</span>
                             — {{ __('production.historical_desc') }}
+                        @elseif ($routing->isActive())
+                            <span class="badge bg-soft-success text-success font-monospace fw-bold text-uppercase">{{ __('production.active') }}</span>
+                            — {{ __('production.active_desc') }}
                         @else
                             <span class="badge bg-soft-danger text-danger font-monospace fw-bold text-uppercase">{{ __('production.cancelled') }}</span>
                             — {{ __('production.cancelled_desc') }}
@@ -99,7 +102,7 @@
                     @endcan
                 @endif
 
-                @if ($routing->isActive())
+                @if ($routing->isActive() || $routing->isScheduled())
                     @can('cancel', $routing)
                         <x-ui.button type="button" variant="outline-danger" icon="feather-slash" class="px-3" data-bs-toggle="modal" data-bs-target="#cancelModal">
                             {{ __('production.cancel_routing') }}
@@ -163,6 +166,22 @@
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted fs-13">Qty Entry Basis:</span>
+                        <span class="text-end">
+                            @if ($routing->isPerBomBaseQuantity())
+                                <span class="badge bg-soft-info text-info font-monospace fw-bold">Per BOM Base Quantity</span>
+                                @if ($routing->bom)
+                                    <small class="text-muted d-block fs-11">
+                                        BOM Base: {{ number_format($routing->bom->base_quantity, 2) }} {{ $routing->bom->baseUom->name ?? $routing->bom->product->uom->name ?? 'Units' }}
+                                    </small>
+                                @endif
+                            @else
+                                <span class="badge bg-soft-primary text-primary font-monospace fw-bold">Per 1 Finished Unit</span>
+                                <small class="text-muted d-block fs-11">1 Finished Product Unit</small>
+                            @endif
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted fs-13">{{ __('production.version') }}:</span>
                         <span class="fw-semibold text-dark">{{ $routing->version }} (Rev {{ $routing->revision }})</span>
                     </div>
@@ -174,6 +193,14 @@
                             {{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}
                         </span>
                     </div>
+                    @if ($routing->approved_at)
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted fs-13">Action / Approved Date:</span>
+                            <span class="fw-semibold text-dark text-end fs-12">
+                                {{ $routing->approved_at->format('Y-m-d') }}
+                            </span>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -289,13 +316,31 @@
                                 </td>
                                 <td class="align-middle">
                                     @php
-                                        $opMat = \App\Domains\Production\Models\RoutingOperationMaterial::with('material')->where('routing_operation_id', $op->id)->first();
+                                        $materials = $op->materials;
+                                        $basisLabel = $routing->isPerBomBaseQuantity()
+                                            ? ($routing->bom ? ' / ' . number_format($routing->bom->base_quantity, 2) . ' ' . ($routing->bom->baseUom->name ?? $routing->bom->product->uom->name ?? 'units') : ' / BOM Base')
+                                            : ' / unit';
                                     @endphp
-                                    @if ($opMat && $opMat->material)
-                                        <span class="fw-semibold text-dark fs-12"><i class="feather-box text-primary me-1"></i>{{ $opMat->material->name }}</span>
-                                        <small class="text-muted d-block fs-10 font-monospace">{{ $opMat->material->sku }}</small>
+                                    @if ($materials && $materials->isNotEmpty())
+                                        <div class="d-flex flex-column gap-1">
+                                            @foreach ($materials as $mat)
+                                                <div class="p-1 px-2 rounded bg-light border border-light">
+                                                    <div class="d-flex align-items-center justify-content-between gap-2">
+                                                        <span class="fw-semibold text-dark fs-11">
+                                                            <i class="feather-box text-primary me-1"></i>{{ $mat->material->name ?? 'Material #' . $mat->material_id }}
+                                                        </span>
+                                                        <span class="badge bg-white text-dark border font-monospace fs-10 text-nowrap">
+                                                            {{ number_format($mat->quantity, 4) }} {{ $mat->uom->name ?? '' }}<span class="text-muted">{{ $basisLabel }}</span>
+                                                        </span>
+                                                    </div>
+                                                    @if ($mat->material && $mat->material->sku)
+                                                        <small class="text-muted d-block font-monospace fs-9">{{ $mat->material->sku }}</small>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     @else
-                                        <span class="text-muted fs-11 fst-italic">BOM Auto-Mapped</span>
+                                        <span class="text-muted fs-11 fst-italic">No Material Consumed</span>
                                     @endif
                                 </td>
                                 <td class="align-middle">
@@ -380,6 +425,117 @@
                 </table>
             </div>
         </div>
+
+        <!-- BOM Component Material Allocation Summary -->
+        @if ($routing->bom && $routing->bom->items->isNotEmpty())
+            @php
+                $baseQty = (float) ($routing->bom->base_quantity > 0 ? $routing->bom->base_quantity : 1);
+                $isPerBom = $routing->isPerBomBaseQuantity();
+                $allOpMaterials = $routing->operations->flatMap->materials;
+            @endphp
+            <div class="mb-4 pb-4 border-bottom">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0">BOM Component Material Allocation Summary</h5>
+                        <p class="fs-12 text-muted mb-0">
+                            BOM: <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="fw-semibold text-primary text-decoration-none">{{ $routing->bom->bom_number }}</a> &bull; 
+                            Base Quantity: <span class="fw-semibold text-dark">{{ number_format($baseQty, 2) }} {{ $routing->bom->baseUom->name ?? $routing->bom->product->uom->name ?? 'units' }}</span> &bull;
+                            Routing Mode: <span class="badge @if($isPerBom) bg-soft-info text-info @else bg-soft-primary text-primary @endif font-monospace">{{ $isPerBom ? 'Per BOM Base Quantity' : 'Per 1 Finished Product Unit' }}</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="erp-thin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 22%">BOM Component</th>
+                                <th style="width: 8%">UOM</th>
+                                <th class="text-end" style="width: 14%">BOM Requirement</th>
+                                <th class="text-end" style="width: 14%">Norm. BOM Req (Per Unit)</th>
+                                <th class="text-end" style="width: 14%">Total Allocated</th>
+                                <th class="text-end" style="width: 14%">Remaining</th>
+                                <th class="text-center" style="width: 14%">Status & Operations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($routing->bom->items as $item)
+                                @php
+                                    $matId = $item->material_id;
+                                    $bomQty = (float) $item->quantity;
+                                    $normBomReq = $bomQty / $baseQty;
+
+                                    $matchingAllocs = $allOpMaterials->filter(fn($m) => (int)$m->material_id === (int)$matId);
+                                    $totalAllocEntered = (float) $matchingAllocs->sum('quantity');
+                                    $normAlloc = $isPerBom ? ($totalAllocEntered / $baseQty) : $totalAllocEntered;
+
+                                    $normDiff = $normAlloc - $normBomReq;
+                                    $isOver = $normDiff > 0.00001;
+                                    $isFull = abs($normDiff) <= 0.00001;
+                                    $normRemaining = max(0, $normBomReq - $normAlloc);
+                                    $remainingEntered = $isPerBom ? ($normRemaining * $baseQty) : $normRemaining;
+
+                                    $assignedOpSequences = [];
+                                    foreach ($routing->operations as $op) {
+                                        if ($op->materials && $op->materials->contains(fn($m) => (int)$m->material_id === (int)$matId)) {
+                                            $assignedOpSequences[] = 'Op ' . $op->sequence;
+                                        }
+                                    }
+                                @endphp
+                                <tr>
+                                    <td class="align-middle">
+                                        <span class="fw-semibold text-dark fs-12">{{ $item->material->name ?? 'Material #' . $matId }}</span>
+                                        <small class="text-muted d-block fs-10 font-monospace">{{ $item->material->sku ?? '' }}</small>
+                                    </td>
+                                    <td class="align-middle fs-12 text-muted">
+                                        {{ $item->uom->name ?? '' }}
+                                    </td>
+                                    <td class="text-end align-middle font-monospace fs-12">
+                                        <span class="fw-semibold text-dark">{{ number_format($bomQty, 4) }}</span>
+                                        <small class="text-muted d-block fs-10">per {{ number_format($baseQty, 2) }} {{ $routing->bom->baseUom->name ?? 'units' }}</small>
+                                    </td>
+                                    <td class="text-end align-middle font-monospace fs-12 text-muted">
+                                        {{ number_format($normBomReq, 4) }} / unit
+                                    </td>
+                                    <td class="text-end align-middle font-monospace fs-12">
+                                        <span class="fw-bold @if($isOver) text-danger @else text-primary @endif">
+                                            {{ number_format($totalAllocEntered, 4) }}
+                                        </span>
+                                        <small class="text-muted d-block fs-10">({{ number_format($normAlloc, 4) }} / unit)</small>
+                                    </td>
+                                    <td class="text-end align-middle font-monospace fs-12">
+                                        @if ($isOver)
+                                            <span class="text-danger fw-bold">+{{ number_format($isPerBom ? $normDiff * $baseQty : $normDiff, 4) }} over</span>
+                                        @elseif ($isFull)
+                                            <span class="text-success fw-bold">0.0000</span>
+                                        @else
+                                            <span class="text-warning fw-bold">{{ number_format($remainingEntered, 4) }}</span>
+                                            <small class="text-muted d-block fs-10">({{ number_format($normRemaining, 4) }} / unit)</small>
+                                        @endif
+                                    </td>
+                                    <td class="text-center align-middle">
+                                        <div class="d-flex flex-column align-items-center gap-1">
+                                            @if (empty($assignedOpSequences))
+                                                <span class="badge bg-soft-danger text-danger fs-10">Unassigned</span>
+                                            @elseif ($isOver)
+                                                <span class="badge bg-soft-danger text-danger fs-10">Over-Allocated</span>
+                                            @elseif ($isFull)
+                                                <span class="badge bg-soft-success text-success fs-10">Fully Allocated</span>
+                                            @else
+                                                <span class="badge bg-soft-warning text-warning fs-10">Partially Allocated</span>
+                                            @endif
+
+                                            @if (!empty($assignedOpSequences))
+                                                <span class="text-muted fs-10 font-monospace">{{ implode(', ', $assignedOpSequences) }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
 
         <!-- Approval Audit History -->
         <div>

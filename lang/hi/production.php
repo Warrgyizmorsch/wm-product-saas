@@ -83,6 +83,7 @@ return [
     'active' => 'सक्रिय',
     'draft' => 'ड्राफ्ट',
     'pending_approval' => 'अनुमोदन लंबित',
+    'scheduled' => 'अनुसूचित',
     'rejected' => 'अस्वीकृत',
     'cancelled' => 'रद्द किया गया',
     'under_revision' => 'संशोधन के तहत',

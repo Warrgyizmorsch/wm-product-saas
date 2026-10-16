@@ -51,8 +51,8 @@ class RoutingController extends Controller
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
         $operationTypes = config('production.operation_types', []);
-        $boms        = ProductionBom::whereIn('status', ['approved', 'active', 'draft'])
-            ->select(['id', 'bom_number', 'bom_name', 'product_id', 'version', 'status'])
+        $boms        = ProductionBom::with(['baseUom', 'product.uom', 'items.material', 'items.uom'])
+            ->whereIn('status', ['approved', 'active', 'draft'])
             ->orderBy('bom_number')
             ->get();
 
@@ -87,9 +87,15 @@ class RoutingController extends Controller
             $dto      = RoutingDTO::fromArray($data);
             $routing  = $this->routingService->create($dto, $tenantId, auth()->id() ?: 1);
 
-            return redirect()
+            $redirect = redirect()
                 ->route('production.routing.show', $routing->id)
                 ->with('success', "Routing '{$routing->routing_number}' created successfully in draft.");
+
+            if (session()->has('warning')) {
+                $redirect->with('warning', session('warning'));
+            }
+
+            return $redirect;
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -129,8 +135,8 @@ class RoutingController extends Controller
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
-        $boms           = ProductionBom::whereIn('status', ['approved', 'active', 'draft'])
-            ->select(['id', 'bom_number', 'bom_name', 'product_id', 'version', 'status'])
+        $boms           = ProductionBom::with(['baseUom', 'product.uom', 'items.material', 'items.uom'])
+            ->whereIn('status', ['approved', 'active', 'draft'])
             ->orderBy('bom_number')
             ->get();
 
@@ -167,9 +173,15 @@ class RoutingController extends Controller
             $dto     = RoutingDTO::fromArray($data);
             $routing = $this->routingService->update($id, $dto);
 
-            return redirect()
+            $redirect = redirect()
                 ->route('production.routing.show', $routing->id)
                 ->with('success', 'Routing updated successfully.');
+
+            if (session()->has('warning')) {
+                $redirect->with('warning', session('warning'));
+            }
+
+            return $redirect;
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
