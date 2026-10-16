@@ -22,6 +22,7 @@
 | **UC-PROD-09** | Sheet Metal Cutting & Dimensional Remnant Inventory | Machine Operator | `MesExecutionService`, `RemnantAllocationService` | Offcut saved to remnant catalog for reuse |
 | **UC-PROD-10** | Contaminated Supplier Lot Recall (Bidirectional Trace) | Quality Manager | `LotTraceabilityService` | Multi-tier forward trace resolves customer orders |
 | **UC-PROD-11** | Order Cost Variance & Unplanned Cost Adjustment | Plant Controller | `ProductionCostAdjustmentService`, `ReportingService` | Manual adjustment attached and reported |
+| **UC-PROD-12** | Project Task-Linked Production Order Execution & Aggregate Yield Milestone Completion | Project Manager / Production Planner | `ProductionOrderService`, `SyncProductionTaskCompletionListener`, `MilestoneService` | Task auto-completed upon aggregate yield threshold; Shortfall logged if output is deficient |
 
 ---
 
@@ -311,3 +312,68 @@ Record an unplanned mid-production expense (e.g., expedited courier transit or s
 
 ### 4. Acceptance Criteria & Test Evidence
 * `tests/Feature/Production/ProductionCostAdjustmentTest.php`, `ProductionMisReportsTest.php` pass.
+
+---
+
+## UC-PROD-12: Project Task-Linked Production Order Execution & Aggregate Yield Milestone Completion
+
+### 1. Business Objective
+Execute manufacturing orders tied directly to a Project Management deliverable, automatically verifying finished goods yield across one or more sibling production orders, completing the project task, and advancing milestone progress without manual intervention or double-entry.
+
+### 2. Actors & Permissions
+* **Actors:** Project Manager, Production Planner, Machine Operator, Storekeeper.
+* **Permissions:**
+  * Project Management: `projects.tasks.update` or `projects.projects.update` (to link an order from the task drawer via `TaskPolicy::update`).
+  * Production: `production.order.create`, `production.order.update`, `production.orders.view` (or admin).
+
+### 3. Preconditions
+* A Project (`PRJ-2026-088`), Milestone (`MS-01: Fabrication Phase`), and Task (`TSK-104: Custom Steel Assemblies`) exist in `IN_PROGRESS` status in the Project Management module.
+* The Project, Milestone, and Task share the same `company_id` and `branch_id` under the active `tenant_id`.
+* The finished product (`FG-PUMP-ASSEMBLY`) has an active, approved BOM and routing.
+
+### 4. Sample Data
+* Target Deliverable: 100 units of `FG-PUMP-ASSEMBLY` for Task `TSK-104`.
+* Production Orders Split:
+  * Order A: `PO-2026-0101` planned for `60` units (`quantity_ordered = 60.0000`).
+  * Order B: `PO-2026-0102` planned for `40` units (`quantity_ordered = 40.0000`).
+* Total Required Quantity: `100.0000` units.
+
+### 5. Main Flow (Successful Aggregate Yield Path)
+1. Planner creates `PO-2026-0101` and `PO-2026-0102` via `/production/orders/create?project_id={id}&project_task_id={id}` (or PM links them via `POST /projects/{project}/tasks/{task}/link-production-order`).
+2. Both orders store `project_id`, `project_milestone_id`, and `project_task_id`.
+3. Shopfloor releases and completes `PO-2026-0101`:
+   * Raw materials issued, operations completed, and 60 finished units received via `POST /production/orders/{id}/receive-fg`.
+   * Planner marks `PO-2026-0101` as completed (`POST /production/orders/{id}/complete`).
+   * `ProductionOrderCompleted` event fires.
+   * `SyncProductionTaskCompletionListener` evaluates sibling orders: `PO-2026-0102` is still `in_progress`.
+   * **Evaluation Outcome:** Sibling orders remain open; Task `TSK-104` stays `IN_PROGRESS`.
+4. Shopfloor releases and completes `PO-2026-0102`:
+   * 40 finished units received via `POST /production/orders/{id}/receive-fg`.
+   * Planner marks `PO-2026-0102` as completed.
+   * `ProductionOrderCompleted` event fires.
+   * `SyncProductionTaskCompletionListener` re-evaluates all orders linked to `project_task_id = TSK-104`:
+     * Total orders: 2. Completed orders: 2 (100%).
+     * Total planned: $\sum \text{quantity\_ordered} = 60 + 40 = 100.0000$.
+     * Total produced: $\sum \text{quantity\_produced} = 60 + 40 = 100.0000$.
+     * Yield Condition: $\sum \text{quantity\_produced} \ge \left( \sum \text{quantity\_ordered} - 0.0001 \right)$ is satisfied.
+5. System marks Task `TSK-104` as `Completed`, sets `completed_at = now()`, and records an audit log entry (`production.completed`).
+6. `MilestoneService::recalculateProgress()` recalculates the milestone's overall progress percentage based on completed task weights.
+
+### 6. Alternate & Failure Flows
+* **Aggregate Yield Shortfall (Scrap Deficit):**
+  * During execution of `PO-2026-0102`, 5 units are scrapped due to casting defects. Only `35` good units are received into finished goods (`quantity_produced = 35.0000`).
+  * Planner marks `PO-2026-0102` as completed.
+  * `SyncProductionTaskCompletionListener` calculates aggregate yield:
+    $$\sum \text{quantity\_produced} = 95.0000 < \sum \text{quantity\_ordered} - 0.0001 = 99.9999$$
+  * **System Outcome:** Task `TSK-104` remains `IN_PROGRESS`. The listener logs an audit warning (`production.shortfall_warning`) with the 5-unit deficit. Milestone progress does not advance.
+  * **Resolution:** The standard operational resolution is for production planning to review demand and issue an authorized supplementary production order (`PO-2026-0103`) for the 5-unit deficit. Note that while Project Management permits an authorized user with `projects.tasks.update` to manually mark the task `Completed` (`PATCH /projects/{project}/tasks/{task}/status`), this action bypasses the manufacturing completion safeguards and desynchronizes physical yield auditability; it must never be used as a routine shortcut without formal administrative exception.
+* **Company / Branch Mismatch Validation:**
+  * If a user attempts to link a production order belonging to Branch A to a project task assigned to Branch B, `StoreProductionOrderRequest` or `TaskController::linkProductionOrder` rejects the request with `projects.branch_mismatch_error`.
+
+### 7. Explicit Commercial & Financial Boundaries
+* The automated synchronization strictly manages manufacturing operational status (Task status and Milestone progress).
+* It does **not** generate customer delivery notes, trigger sales order fulfillment, or post customer invoice vouchers. Invoicing against project milestones remains governed by Project Management billing gates.
+
+### 8. Acceptance Criteria & Test Evidence
+* `tests/Feature/Phase12ProductionSyncTest.php` (tests 10 passed assertions for single/multiple orders, sibling completion, and shortfall warnings).
+* `tests/Feature/Phase13ProductionProjectIntegrationTest.php` (tests 12 passed assertions for company/branch validation and UI integration).

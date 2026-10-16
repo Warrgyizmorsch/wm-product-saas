@@ -80,3 +80,36 @@ When completing a breakdown or corrective maintenance ticket on `/production/mai
 
 ### Q12: Can maintenance engineers request spare parts without specifying a warehouse?
 **Yes.** When adding a spare part request to a Maintenance Work Order, specifying a `warehouse_id` is optional. The system automatically creates or appends to a central Store Requisition Slip (`ProductionRequisitionSlip` with `source_type = 'maintenance_work_order'`). Storekeepers can view the pending requisition in `/inventory/material-requests`, select the appropriate warehouse, reserve stock, and issue the parts. The work order's spare costs and total cost are updated automatically.
+
+---
+
+## 5. Cross-Module Integration & Costing FAQs
+
+### Q13: How does linking a Production Order to a Project Task work, and what triggers automatic task completion?
+A Production Order can be associated with a Project Management task through two methods:
+1. **Creation from Task Context:** Navigating to `/production/orders/create?project_id={id}&project_task_id={id}`, where product specifications and quantity prefill and a "Linked to Project" banner displays.
+2. **Direct Link from Task Workspace:** In the Project Management task workspace via `POST /projects/{project}/tasks/{task}/link-production-order` (`projects.tasks.link-production-order`).
+
+**Validation Rules:** The system enforces strict organizational consistency across `tenant_id`, `company_id`, and `branch_id`. If the order and project task belong to different companies or branches, creation or linking is rejected with validation errors (`projects.company_mismatch_error` or `projects.branch_mismatch_error`).
+
+**Automatic Completion Evaluation:**
+When an order transitions to `completed` via `ProductionOrderService::completeOrder()`, the `ProductionOrderCompleted` event triggers `SyncProductionTaskCompletionListener`. The listener evaluates all orders linked to that task (`project_task_id = $task->id`):
+* **Sibling Gate:** If any sibling order remains in `draft`, `released`, or `in_progress`, the task remains `IN_PROGRESS`.
+* **Aggregate Yield Check:** If all sibling orders are completed, the listener sums good produced quantities against ordered quantities:
+  $$\sum \text{quantity\_produced} \ge \left( \sum \text{quantity\_ordered} - 0.0001 \right)$$
+* **Outcome:** If good yield meets or exceeds the threshold, the task is marked `Completed`, `completed_at` is set, an audit log entry (`production.completed`) is recorded in `project_activity_logs`, and `MilestoneService::recalculateProgress()` recalculates the milestone's overall progress. If aggregate yield falls short (due to scrap or partial receipts), the task remains `IN_PROGRESS` and records an audit log warning (`production.shortfall_warning`).
+* **Commercial Boundaries:** This synchronization is purely operational. It does **not** generate customer delivery notes, dispatch challans, sales invoices, or financial billing milestones.
+
+### Q14: How are Rework labor and machine rates calculated, and what happens if Work Center rates are unconfigured?
+In `ReworkService`, rework costing is partitioned across three distinct stages:
+1. **Initial Planned Estimate (`cost_estimate`):** Stored in `production_rework_orders.cost_estimate`. When creating a rework order (`createReworkOrder`), if a planned estimate is not explicitly passed in the creation payload, it is dynamically computed via `calculateDynamicCostEstimate()` based on planned operation minutes (standard default 30 minutes per planned stage) and assigned resource rates.
+2. **Actual Incurred Execution Cost (`actual_cost`):** During operation completion (`completeOperation`), non-material costs accumulate dynamically on `production_rework_orders.actual_cost`:
+   * **Labor Cost:** Calculated as $\text{actual\_minutes} \times \left( \frac{\text{WorkCenter.cost\_per\_hour}}{60.0} \right)$.
+   * **Overhead Cost:** Calculated as $\text{actual\_minutes} \times \left( \frac{\text{WorkCenter.overhead\_rate}}{60.0} \right)$.
+   * **Machine Cost:** Calculated as $\text{actual\_minutes} \times \text{RoutingOperation.machine\_cost\_rate}$ (if a machine is assigned).
+3. **Posted Cost Adjustments:** When all rework operations are finalized, non-material expenses (labor, machine, overhead) roll up into `production_cost_adjustments` records on the parent production order under category `rework_expense`. Materials are excluded from this adjustment to prevent double-counting against store outflow records (`ProductionOrderIssue`).
+
+**Missing Configuration Behavior:**
+If an operation is executed without an assigned Work Center, or if the assigned Work Center has its `cost_per_hour` or `overhead_rate` set to `0.00` or `null`, the calculated rates evaluate to `0.00` per minute in `calculateDynamicCostEstimate` and `completeOperation`, resulting in `$0.00` recorded actual labor and overhead costs.
+* *Note on Historical Defaults:* Earlier development seeds and test fixtures referenced internal figures of `$35.00/hr` for labor and `$50.00/hr` for machines. These values do not exist in live calculation paths.
+* *Best Practice:* Always ensure Work Centers have appropriate `cost_per_hour` and `overhead_rate` values defined in `/production/work-centers` before executing shopfloor rework.

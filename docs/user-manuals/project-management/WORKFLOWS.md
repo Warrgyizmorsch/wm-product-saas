@@ -1,245 +1,283 @@
 # Project Management Module — End-to-End Operational Workflows
 
-## 1. Project Lifecycle & State Machine
+## 1. Project Lifecycle & Canonical State Machine
 
-Projects follow a governed lifecycle from initial planning to final sign-off. Transitions are managed by `ProjectService` and guarded by authorization policies.
+Projects follow a strictly governed state machine from scoping to formal closure. Transitions are managed by `ProjectService` and guarded by authorization policies.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Planning: Created via /projects/create
-    Planning --> Active: Project Kickoff / Tasks Activated
-    Active --> OnHold: Temporarily Blocked / Scope Paused
-    OnHold --> Active: Resumed
-    Active --> InReview: Tasks Complete / UAT Initiated
-    InReview --> Active: UAT Rework Required
-    InReview --> Closed: 5 Closure Gates Cleared (ProjectClosureService)
-    Planning --> Cancelled: Cancelled prior to kickoff
+    [*] --> Draft: Created via /projects/create (Quick Create)
+    [*] --> Active: Direct Store / Sales Order Conversion
+    Draft --> Active: Project Kickoff / Tasks Activated
+    Active --> On_Hold: Operational Pause / Temporarily Blocked
+    On_Hold --> Active: Resumed Execution
+    Active --> Completed: Deliverables Finished / Ready for Closure Audit
+    Completed --> Closed: All 5 Closure Gates Cleared (ProjectClosureService)
+    Draft --> Cancelled: Cancelled Prior to Kickoff
     Active --> Cancelled: Cancelled by Management
-    Closed --> [*]
-    Cancelled --> [*]
+    On_Hold --> Cancelled: Cancelled by Management
+    Closed --> [*]: Permanent Read-Only Immutability
+    Cancelled --> [*]: Terminal State
 ```
 
-### Lifecycle Transition Rules
-1. **Planning**: Project structure, task lists, and initial member allocations are configured. Financial budget and target delivery dates are set.
-2. **Active**: Team members log time, execute tasks, report issues, and complete subtasks.
-3. **On Hold**: Pauses timeline calculations and alerts team members that active work is deferred.
-4. **In Review**: Formal UAT or milestone sign-off is underway.
-5. **Closed**: Final closure state; requires passing all 5 closure validation gates. The project becomes read-only.
-6. **Cancelled**: Premature termination; preserves historical timesheets and audit logs.
+### Canonical Lifecycle States:
+1. **Draft**: Initial scoping state. Child deliverables (tasks, milestones) can be drafted without triggering external notifications.
+2. **Active**: Normal execution state. Team members log time, execute tasks, report issues, and link shop-floor production jobs.
+3. **On Hold**: Temporarily paused. Time logging and scheduling updates are restricted.
+4. **Completed**: All delivery work has concluded. Awaiting formal closure audit.
+5. **Closed**: Terminal state. Can only be reached if all **5 Quality & Financial Gates** pass. Once closed, the project and all child records are permanently read-only and immutable.
+6. **Cancelled**: Abandoned or terminated project. Cannot be reopened.
 
 ---
 
-## 2. Task Execution & Subtask Progress Aggregation
+## 2. Commercial Sales Order Conversion Workflow
 
-```mermaid
-flowchart TD
-    Start([Task Created in 'Open' Status]) --> Assigned[Assigned to Team Member: TaskAssigned Event]
-    Assigned --> InProg[Member Transitions to 'In Progress']
-    InProg --> WorkChecklist{Subtasks Exist?}
-    
-    WorkChecklist -- Yes --> SubCheck[Member Ticks Subtask Checkbox]
-    SubCheck --> RecalcProg[SubTaskService Recalculates Task Progress %]
-    RecalcProg --> SubAllDone{All Subtasks Completed?}
-    SubAllDone -- No --> InProg
-    SubAllDone -- Yes --> ReqReview[Submit for Review: Status = 'Review']
-    
-    WorkChecklist -- No --> ReqReview
-    ReqReview --> PMReview{Lead / PM Review}
-    PMReview -- Rework Needed --> InProg
-    PMReview -- Approved --> Completed[Task Marked 'Completed': TaskCompleted Event]
-    Completed --> TriggerDep[Trigger CPM Successor Early Dates]
-    Completed --> End([Task Finished])
-```
-
----
-
-## 3. Dependency Validation & CPM Schedule Calculation
-
-```mermaid
-flowchart TD
-    AddDep([User Adds Predecessor Dependency]) --> CycleCheck{TaskDependencyService: DFS Cycle Detection}
-    CycleCheck -- Cycle Detected --> AbortCycle[Throw ValidationException: Circular Dependency]
-    CycleCheck -- No Cycle --> PersistDep[Persist to project_task_dependencies table]
-    
-    PersistDep --> RunCPM[ProjectScheduleService: Run 2-Pass CPM Engine]
-    RunCPM --> FwdPass[Forward Pass: Compute Early Start & Early Finish]
-    FwdPass --> BwdPass[Backward Pass: Compute Late Start & Late Finish]
-    BwdPass --> FloatCalc[Compute Total Float = LS - ES]
-    FloatCalc --> CritFlag{Total Float <= 0?}
-    CritFlag -- Yes --> SetCrit[Set is_critical = true, Highlight Red]
-    CritFlag -- No --> SetNonCrit[Set is_critical = false]
-    SetCrit --> RenderGantt([Update Interactive Gantt Chart])
-    SetNonCrit --> RenderGantt
-```
-
----
-
-## 4. Time Tracking & Timesheet Approval Flow
-
-```mermaid
-flowchart TD
-    LogStart([User Logs Hours Worked]) --> ValTime{Validate Hours & Project Membership}
-    ValTime -- Invalid --> ShowErr[Display Form Validation Error]
-    ValTime -- Valid --> LookRate[TimeLogService: Resolve Member rate_per_hour]
-    LookRate --> SavePending[Save project_time_logs: approval_status = 'Pending']
-    SavePending --> EmitEvt[Dispatch TimesheetSubmitted Event]
-    EmitEvt --> NotifPM[In-App Notification Sent to Project Manager]
-    
-    NotifPM --> PMApprove{PM Approvals Page: /timesheets/approvals}
-    PMApprove -- Reject --> ReasonReq[Enter Rejection Remarks]
-    ReasonReq --> SetRej[approval_status = 'Rejected': TimesheetRejected Event]
-    SetRej --> NotifUserRej[Notify Submitter of Rejection]
-    
-    PMApprove -- Approve --> SetAppr[approval_status = 'Approved': TimesheetApproved Event]
-    SetAppr --> LockLog[Lock Record Against Submitter Modification]
-    LockLog --> BillEligible[Eligible for Sales Invoicing Bridge]
-```
-
----
-
-## 5. Issue Tracking & Resolution Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Open: Defect Logged (IssueLogged Event)
-    Open --> Assigned: Assigned to Developer
-    Assigned --> InProgress: Fix Under Investigation
-    InProgress --> Resolved: Fix Implemented (IssueResolved Event)
-    Resolved --> Closed: Verified by QA / Reporter
-    Resolved --> Retested: Defect Persists (IssueRetested Event)
-    Retested --> InProgress: Re-investigation
-    Closed --> [*]
-```
-
-### Issue Gate Rules
-- Any issue with status `Open`, `Assigned`, or `In Progress` acts as a hard block (Gate 2) against project closure.
-- Resolving an issue records the `resolved_at` timestamp.
-
----
-
-## 6. Milestone Sign-off, Client UAT & Change Requests
+Delivery projects can be initiated directly from confirmed commercial contracts:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Dev as Project Lead
-    actor Reviewer as QA / Client Reviewer
     actor PM as Project Manager
-    participant PRS as ProjectReviewService
-    participant CRS as ChangeRequestService
-    participant DB as Database
+    participant UI as Create Project Modal (/projects/create)
+    participant Ctrl as ProjectController
+    participant Bridge as SalesOrderProjectBridgeService
+    participant SO as SalesOrder (Sales Domain)
+    participant DB as Database (Projects Domain)
 
-    Dev->>PRS: Request Review (Milestone / UAT)
-    PRS->>DB: Create project_reviews (status = 'Pending')
-    PRS-->>Reviewer: Dispatch ProjectReviewRequested Event
-    
-    alt Review Approved
-        Reviewer->>PRS: Submit Review Decision (Approved)
-        PRS->>DB: Update Review (status = 'Approved', sign_off_date)
-        PRS->>DB: Mark Milestone (status = 'Completed', completion_percentage = 100)
-        PRS-->>PM: Dispatch ProjectReviewSignedOff Event
-    else Rework Required
-        Reviewer->>PRS: Submit Decision (Rework Required)
-        PRS->>DB: Update Review (status = 'Rework Required')
-        Dev->>CRS: Create ChangeRequest (schedule impact, budget delta)
-        CRS->>DB: Store project_change_requests (status = 'Pending')
-        CRS-->>PM: Dispatch ChangeRequestCreated Event
-        PM->>CRS: Approve Change Request (status = 'Approved')
-        CRS->>DB: Update Project Baseline (Budget & End Date)
+    PM->>UI: Select Confirmed Sales Order from Dropdown
+    UI->>Ctrl: POST /projects (store) with sales_order_id
+    Ctrl->>SO: Verify order->status === 'Confirmed'
+    Ctrl->>SO: Verify order has no existing projects (whereDoesntHave)
+
+    Ctrl->>Bridge: convertSalesOrderToProject($order, $data)
+
+    Bridge->>DB: Create Project (inherits customer_id, crm_deal_id, client_contact_id, budget_amount)
+    Bridge->>DB: Create Task List ('Fulfillment & Delivery')
+
+    loop For Each SalesOrderItem
+        Bridge->>DB: Create Milestone ('Deliver: ' + item_name, billing_amount)
+        Bridge->>DB: Create Task ('Fulfill ' + item_name, milestone_id, task_list_id)
     end
+
+    Bridge-->>Ctrl: Return Created Project
+    Ctrl-->>PM: Redirect to /projects/{project} with Success Banner
 ```
+
+### Conversion Safeguards:
+- **Eligibility**: Only orders with `status === 'Confirmed'` appear in the selection dropdown and pass backend validation.
+- **Duplicate Protection**: A Sales Order cannot be converted twice; `whereDoesntHave('projects')` filters the list, and pre-store validation rejects duplicate attempts.
+- **Traceability**: Source Sales Order, CRM Deal, and Client Contact references are persisted directly onto the project header.
 
 ---
 
-## 7. Project Billing & Invoicing Bridge Flow
+## 3. Work Breakdown, Task Execution & Subtasks
+
+Tasks enforce structured execution rules to prevent skipping stages:
 
 ```mermaid
 flowchart TD
-    StartBill([Project Manager Navigates to /projects/{project}/billing]) --> AggUnbilled[ProjectBillingService: Fetch Unbilled Items]
-    AggUnbilled --> LockCheck[Pessimistic lockForUpdate on time_logs & milestones]
-    LockCheck --> ItemsCheck{Unbilled Items Found?}
-    ItemsCheck -- None --> NoAction[Display 'No Unbilled Work Found']
-    
-    ItemsCheck -- Items Present --> GatherLines[Build Invoice Line Items: Approved TimeLogs + Completed Milestones]
-    GatherLines --> ItemType[Resolve Inventory 'Service' SKU for GST/Tax]
-    GatherLines --> CallSales[Invoke SalesInvoiceCreationService::createDraftInvoice]
-    CallSales --> CreateInv[Sales Domain: Create Invoice with status = 'Draft']
-    CreateInv --> LinkProj[Store project_id on invoices table]
-    LinkProj --> FlagLogs[Update project_time_logs: is_invoiced = 1, invoice_id = inv.id]
-    FlagLogs --> FlagMiles[Update project_milestones: is_invoiced = 1, invoice_id = inv.id]
-    FlagMiles --> ShowInv[Display Draft Sales Invoice Details & Link]
-    
-    ShowInv --> SalesPost{Sales Officer Posts Invoice}
-    SalesPost --> PostEvt[Sales Domain Emits InvoicePosted Event]
-    PostEvt --> AccGL[Sales Listener: PostSalesInvoiceJournal]
-    AccGL --> CallSAS[SalesAccountingService::postInvoiceJournal]
-    CallSAS --> PostJournals[Create GL Double-Entry: Dr Accounts Receivable / Cr Sales Revenue]
+    Start([Task Created: Status = 'Open']) --> Assign[Assigned to Active Project Member]
+    Assign --> StepInProg[Assignee Starts Work: Status = 'In Progress']
+
+    StepInProg --> DirectCompCheck{Attempt to Skip Directly to 'Completed'?}
+    DirectCompCheck -- Yes --> RejectJump[Blocked by Workflow: Must Move Through In Progress]
+    DirectCompCheck -- No --> CheckDeps{Predecessors Finished?}
+
+    CheckDeps -- Blocked by Dependency --> BlockStart[Status Change Blocked by Dependency Engine]
+    CheckDeps -- Satisfied --> ExecTask[Execute Work]
+
+    ExecTask --> HasSub{Subtasks Exist?}
+    HasSub -- Yes --> ToggleSub[Toggle Subtask Checkbox: Sets completed_at]
+    ToggleSub --> DynCalc[Dynamically Compute Subtask Progress %]
+    DynCalc --> SubRule[Rule: Completing Subtasks Does NOT Auto-Complete Task]
+    SubRule --> SendReview
+
+    HasSub -- No --> SendReview[Transition to 'Under Review']
+    SendReview --> PMReview{Lead / PM Review}
+    PMReview -- Rework Required --> StepInProg
+    PMReview -- Approved --> MarkComp[Status = 'Completed', Sets completed_at]
+    MarkComp --> RecalcMile[MilestoneService::recalculateProgress]
+    RecalcMile --> EndTask([Task Finished])
 ```
+
+### Execution Rules:
+1. **Sequential Progression**: Allowed task flow is `Open` → `In Progress` → `Under Review` → `Completed` (or `Cancelled`). Skipping directly from `Open` to `Completed` is prohibited.
+2. **Subtask Independence**: Subtask checklist completion percentage is **computed dynamically** in real time (`(completed / total) * 100`). Completing all subtasks does **not** automatically mark the parent task completed.
+3. **Dependency Blocking**: A task cannot transition to `In Progress` or `Completed` if upstream predecessor dependencies (FS, SS, FF, SF) are unsatisfied, unless overridden by an authorized manager.
 
 ---
 
-## 8. Controlled Project Closure Flow (5 Gates)
+## 4. Manufacturing & Procurement Task Integration Workflow
+
+Project Management tasks connect directly to shop-floor Production Orders and Purchase Requisitions:
 
 ```mermaid
 flowchart TD
-    ReqClose([PM Initiates Closure at /projects/{project}/closure]) --> Gate1{Gate 1: Any Open Tasks or Incomplete Subtasks?}
-    Gate1 -- Yes --> Fail1[Block Closure: Complete/Cancel Tasks & Checklist Items]
-    Gate1 -- No --> Gate2{Gate 2: Any Unresolved Issues?}
-    Gate2 -- Yes --> Fail2[Block Closure: Resolve or Close All Issues]
-    Gate2 -- No --> Gate3{Gate 3: Milestone Exists Without Approved UAT, or Reviews/CRs Pending?}
-    Gate3 -- Yes --> Fail3[Block Closure: Complete Reviews & Change Requests]
-    Gate3 -- No --> Gate4{Gate 4: Unbilled Approved TimeLogs, Pending Timesheets, or Unbilled Milestones?}
-    Gate4 -- Yes --> Fail4[Block Closure: Invoice Approved Work or Settle Timesheets]
-    Gate4 -- No --> Gate5{Gate 5: Any Incomplete Milestones?}
-    Gate5 -- Yes --> Fail5[Block Closure: Complete Incomplete Milestones]
-    Gate5 -- No --> PassAll[All 5 Gates Cleared]
-    
-    PassAll --> CollectNotes[Collect: Closure Status, Lessons Learned, Client Rating]
-    CollectNotes --> ExecClose[ProjectClosureService::close]
-    ExecClose --> SetClosed[Set status = 'closed', closed_at = NOW(), closed_by = user.id]
-    SetClosed --> EmitCloseEvt[Dispatch ProjectClosed Event]
-    EmitCloseEvt --> AuditLog[Record Closure in Activity Log]
+    subgraph TaskWorkspace [Task Workspace: /projects/{project}/tasks/{task}]
+        Task[Task: Fulfill CNC Machine]
+        LinkPO[Action: Link Production Order]
+        LinkPR[Action: Link Purchase Requisition Item]
+    end
+
+    subgraph Validation [Scope Guards]
+        BranchCheck{Same Company & Branch as Project?}
+    end
+
+    subgraph Execution [Shop Floor & Procurement]
+        PRItem[Purchase Requisition Line: project_task_id set]
+        PO1[Production Order 1: MO-001]
+        PO2[Production Order 2: MO-002]
+        ShopComp[Shop Floor Marks Order Completed]
+    end
+
+    subgraph SyncEngine [SyncProductionTaskCompletionListener]
+        EvalOrders[Evaluate All Production Orders Linked to Task]
+        CheckAllDone{All Linked Orders Completed?}
+        CheckYield{Aggregate Produced Yield >= Total Ordered Quantity?}
+        AutoTask[Set Task status = Completed, completed_at = NOW]
+        Recalc[MilestoneService::recalculateProgress]
+        ShortfallWarn[Task Remains In Progress\nLog Activity Warning: production.shortfall_warning]
+    end
+
+    LinkPO --> BranchCheck
+    LinkPR --> BranchCheck
+    BranchCheck -- Mismatch --> AbortLink[ValidationException: Scope Mismatch]
+    BranchCheck -- Valid --> PRItem
+    BranchCheck -- Valid --> PO1
+    BranchCheck -- Valid --> PO2
+
+    PO1 --> ShopComp
+    PO2 --> ShopComp
+    ShopComp --> EvalOrders
+    EvalOrders --> CheckAllDone
+
+    CheckAllDone -- No: Sibling Order Open --> ShortfallWarn
+    CheckAllDone -- Yes --> CheckYield
+    CheckYield -- No: Scrap/Shortfall --> ShortfallWarn
+    CheckYield -- Yes: Yield Satisfied --> AutoTask
+    AutoTask --> Recalc
+```
+
+### Key Integration Rules:
+1. **Scope Protection**: Linked Production Orders and Purchase Requisitions must belong to the **same company and branch** as the parent project.
+2. **Aggregate Yield Completion Rule**:
+   - The task is marked `Completed` **only** when all linked Production Orders reach `Completed` AND total good produced units satisfy ordered quantity:
+     $$\sum \text{quantity\_produced} \ge \left(\sum \text{quantity\_ordered} - 0.0001\right)$$
+   - If scrap causes an aggregate shortfall, the task remains open and records a warning note in the project activity audit drawer.
+3. **Unlinked Orders**: Production Orders with no project task link (`project_task_id = null`) execute normally without project overhead.
+
+---
+
+## 5. Timeline, CPM & Interactive Rescheduling
+
+The Gantt timeline (`/projects/{project}?tab=timeline` or `/projects/{project}/timeline`) provides interactive scheduling:
+
+```mermaid
+flowchart TD
+    UserDrag[User Adjusts Task Dates on Gantt Timeline] --> ModeSelect{Selected Reschedule Mode}
+
+    ModeSelect -- Isolated Mode --> IsoCheck{Violates Predecessor or Successor Boundaries?}
+    IsoCheck -- Yes --> RejectIso[Reject Adjustment: Boundary Violation Error]
+    IsoCheck -- No --> SaveIso[Update Task Dates Independently]
+
+    ModeSelect -- Ripple Mode --> CalcDelta[Calculate Date Delta]
+    CalcDelta --> ShiftSuccessors[Shift Downstream Successor Tasks by Delta]
+    ShiftSuccessors --> SafeCompleted[Guard Rule: Completed Tasks are NEVER Modified]
+    SafeCompleted --> PersistRipple[Transactionally Update Successor Chain]
+
+    SaveIso --> RecalcCPM[Run 2-Pass CPM Engine: Recalculate Floats]
+    PersistRipple --> RecalcCPM
+    RecalcCPM --> UpdateCrit[Update Critical Path: Highlight Zero-Float Tasks]
+```
+
+### Rescheduling Modes:
+- **Isolated Mode**: Moves the selected task independently. Rejects changes that violate predecessor finish dates or successor start dates.
+- **Ripple Mode**: Automatically shifts all downstream successor tasks by the same delta, preserving lag buffers while strictly safeguarding already `Completed` tasks from accidental modification.
+
+---
+
+## 6. Time Tracking & Timesheet Approvals
+
+```mermaid
+flowchart TD
+    LogStart([User Logs Hours Worked on Task]) --> ValTime{Validate: min 0.01h, max 24.00h, Active Member?}
+    ValTime -- Invalid --> ShowErr[Display Form Validation Error]
+    ValTime -- Valid --> LookRate[Inherit Member rate_per_hour]
+    LookRate --> SavePending[Save project_time_logs: approval_status = 'Pending']
+    SavePending --> EmitEvt[Dispatch TimesheetSubmitted Event]
+
+    EmitEvt --> PMQueue[Manager Navigates to /projects/timesheets/approval]
+    PMQueue --> PMDecision{Manager Decision}
+
+    PMDecision -- Reject --> EnterNotes[Enter Mandatory Rejection Feedback]
+    EnterNotes --> MarkRej[approval_status = 'Rejected': Dispatches TimesheetRejected]
+
+    PMDecision -- Approve --> MarkAppr[approval_status = 'Approved': Dispatches TimesheetApproved]
+    MarkAppr --> LockLog[Permanently Lock Record Against Modification]
+    MarkAppr --> ReadyBill[Eligible for Client Invoicing & Closure Gate 4]
 ```
 
 ---
 
-## 9. Domain Events & Notification Dispatch Flow
+## 7. Project Billing & Invoicing Bridge Workflow
 
 ```mermaid
-flowchart LR
-    subgraph Producers [Domain Services]
-        TS[TaskService]
-        IS[IssueService]
-        TLS[TimeLogService]
-        PRS[ProjectReviewService]
-        CRS[ChangeRequestService]
-        PCS[ProjectClosureService]
-    end
+flowchart TD
+    StartBill([User Opens /projects/{project}?tab=billing]) --> ClickGen[Click 'Generate Invoice']
+    ClickGen --> AuthCheck{Dual Permission Check:\nprojects.billing.generate_invoice AND sales.invoices.create?}
+    AuthCheck -- No --> DenyAuth[HTTP 403: Forbidden]
+    AuthCheck -- Yes --> PrereqCheck{Prerequisites Met:\nCustomer Assigned AND Active Service Product Exists?}
+    PrereqCheck -- No --> AbortPrereq[Display Prerequisite Validation Alert]
+    PrereqCheck -- Yes --> OpenModal[Display Generate Invoice Modal]
 
-    subgraph Bus [Event Bus (AppServiceProvider)]
-        Evts["12 Domain Events
-        TaskAssigned, TaskCompleted
-        IssueLogged, IssueResolved, IssueRetested
-        TimesheetSubmitted, Approved, Rejected
-        ProjectReviewRequested, SignedOff
-        ChangeRequestCreated, ProjectClosed"]
-    end
+    OpenModal --> SelectItems[Select Unbilled Approved TimeLogs & Completed Milestones]
+    SelectItems --> SubmitGen[Submit Invoice Generation]
 
-    subgraph Listener [Domain Listener]
-        PNL[ProjectNotificationListener]
-    end
+    SubmitGen --> DBTrans[DB::transaction with lockForUpdate]
+    DBTrans --> CheckAlreadyInv{Any Selected Item Already Invoiced?}
+    CheckAlreadyInv -- Yes --> AbortDoubleBill[Throw InvalidArgumentException: Double-Billing Guard]
+    CheckAlreadyInv -- No --> CallSales[SalesInvoiceCreationService::createDraftInvoice]
 
-    subgraph Consumers [Notification Pipeline]
-        PNS[ProjectNotificationService]
-        InApp[In-App ERP Topbar Notifications]
-        QueueJob[SendProjectNotificationEmailJob]
-        ActLog[Activity Audit Log]
-    end
+    CallSales --> CreateInv[Insert Sales Invoice: status = 'Draft', project_id = project.id]
+    CreateInv --> FlagItems[Update time_logs & milestones: is_invoiced = true, invoice_id = inv.id]
+    FlagItems --> SuccessBan[Display Draft Invoice Link in Billing Tab]
 
-    Producers --> Evts
-    Evts --> PNL
-    PNL --> PNS
-    PNS --> InApp
-    PNS --> QueueJob
-    PNL --> ActLog
+    SuccessBan --> PostSales{Sales Officer Verifies & Posts Invoice}
+    PostSales --> DispatPost[Dispatch InvoicePosted Event]
+    DispatPost --> AccListener[Sales Listener: PostSalesInvoiceJournal]
+    AccListener --> PostGL[Write General Ledger Double-Entry in Accounting]
 ```
+
+---
+
+## 8. Controlled Project Closure Workflow (The 5 Gates)
+
+Project closure enforces formal audit verification via `ProjectClosureService`:
+
+```mermaid
+flowchart TD
+    ReqClose([PM Clicks 'Close Project' on Show Page]) --> Gate1{Gate 1: Tasks Clean?\nZero Open/Active Tasks & Zero Incomplete Subtasks}
+    Gate1 -- Fail --> Block1[Block Closure: Complete or Cancel All Tasks]
+    Gate1 -- Pass --> Gate2{Gate 2: Issues Resolved?\nZero Open/Active Issues}
+    Gate2 -- Fail --> Block2[Block Closure: Resolve or Close All Issues]
+    Gate2 -- Pass --> Gate3{Gate 3: Reviews Signed Off?\nLatest Review Approved & Zero Pending Reviews/CRs}
+    Gate3 -- Fail --> Block3[Block Closure: Complete UAT Signoff & Clear Pending CRs]
+    Gate3 -- Pass --> Gate4{Gate 4: Financial Settlement?\nZero Unbilled Approved Hours, Zero Pending Timesheets, Zero Unbilled Milestones}
+    Gate4 -- Fail --> Block4[Block Closure: Invoice Approved Hours or Settle Timesheets]
+    Gate4 -- Pass --> Gate5{Gate 5: Milestones Delivered?\nZero Incomplete Milestones}
+    Gate5 -- Fail --> Block5[Block Closure: Complete All Milestone Deliverables]
+    Gate5 -- Pass --> OpenModal[Display Closure Modal: Closure Status, Client Ref, Final Remarks]
+
+    OpenModal --> ExecClose[ProjectClosureService::close Transaction]
+    ExecClose --> SetClosed[Set status = 'Closed', closure_date = NOW, closed_by = user.id]
+    SetClosed --> EmitClose[Dispatch ProjectClosed Event & Record Activity Log]
+    SetClosed --> LockAll[Enforce Read-Only Immutability Across All Policies]
+```
+
+### The 5 Closure Gates:
+1. **Gate 1 — Tasks Clean**: All tasks must be `Completed` or `Cancelled`, and all subtasks completed.
+2. **Gate 2 — Issues Resolved**: All defects must be `Resolved` or `Closed`.
+3. **Gate 3 — Formal Review Signoff**: If milestones exist, at least one approved review is required. No reviews or change requests may be `Pending`.
+4. **Gate 4 — Financial Settlement**: Zero unbilled approved billable time logs, zero pending timesheets, and zero unbilled completed milestones.
+5. **Gate 5 — Milestones Delivered**: All milestones must be in `Completed` or `Closed` status.
+6. **Permanent Immutability**: Once `Closed`, all domain policies reject further mutations. Closed projects cannot be reopened.
