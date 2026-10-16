@@ -19,6 +19,7 @@ graph TD
     W1 & W2 --> W5["5. Bidirectional Lot & Serial Traceability"]
     W2 --> W6["6. Plant Maintenance & Equipment Reliability"]
     W2 & W4 --> W7["7. Inventory & Accounting Effects"]
+    W2 & W8["8. Make-to-Project Order Execution & Milestone Synchronization"] --> W7
 ```
 
 ---
@@ -305,3 +306,81 @@ flowchart TD
 1. **Automated WIP Accounting Voucher:** When raw materials are issued to a production order, `PostProductionConsumptionJournal` captures `StockOutflowRecorded` and immediately books a General Ledger double-entry voucher: **Debiting Work-in-Progress (Account 1204 / Asset)** and **Crediting Raw Material Inventory**.
 2. **Finished Goods Valuation:** Receiving finished goods updates warehouse quantities and weighted-average unit costs in `product_warehouse_stocks`. Capitalization of finished goods and clearing of WIP is performed via periodic accounting inventory valuation adjustments.
 3. **Scrap & Maintenance Spares:** Write down physical stock and update operational job costs in base currency; downstream write-off journals are booked through periodic accounting ledger reconciliations.
+
+---
+
+## 9. Workflow 8: Make-to-Project Order Execution & Milestone Synchronization
+
+### 9.1 Process Flow Diagram
+
+```mermaid
+flowchart TD
+    subgraph Project_Management["Project Management Domain"]
+        Task["Project Task (status: IN_PROGRESS)"]
+        Milestone["Project Milestone (progress: X%)"]
+    end
+
+    subgraph Linkage_Establishment["Relational Linkage & Validation"]
+        Task --> ModeA["A. Create New Order via Prefilled URL<br><code>/production/orders/create?project_id=...&project_task_id=...</code>"]
+        Task --> ModeB["B. Link Existing Order from Task Drawer<br><code>POST /projects/{project}/tasks/{task}/link-production-order</code>"]
+        ModeA & ModeB --> ValGate{"Validate Tenancy, Company & Branch Consistency"}
+        ValGate -- Mismatch --> RejErr["Throw ValidationException<br>(projects.company_mismatch_error / branch_mismatch)"]
+        ValGate -- Pass --> LinkPersist["Persist Linkage on ProductionOrder:<br><code>project_id, project_milestone_id, project_task_id</code>"]
+    end
+
+    subgraph Production_Execution["Manufacturing Execution"]
+        LinkPersist --> OrderDraft["Production Order (status: draft)"]
+        OrderDraft --> ReleaseOrder["Release Order (status: released)"]
+        ReleaseOrder --> IssueMat["Issue Raw Materials (StockService::recordOutflow)"]
+        IssueMat --> ShopfloorOps["Execute Shopfloor Operations / Job Cards (MES)"]
+        ShopfloorOps --> ReceiveFG["Receive Finished Goods (StockService::recordInflow)"]
+        ReceiveFG --> CompletePO["Complete Order (ProductionOrderService::completeOrder)<br><code>status: completed</code>"]
+    end
+
+    subgraph Event_Driven_Sync["Cross-Domain Completion Synchronization"]
+        CompletePO --> EmitEvent["Emit ProductionOrderCompleted Event"]
+        EmitEvent --> Listener["SyncProductionTaskCompletionListener"]
+
+        Listener --> QuerySiblings["Query All Orders Where:<br><code>project_task_id = task.id</code>"]
+        QuerySiblings --> CheckStatus{"Are ALL Linked Sibling Orders Completed?"}
+
+        CheckStatus -- No (Draft/Released/In-Progress Orders Exist) --> KeepOpen["Leave Task Status IN_PROGRESS<br>No Milestone Recalculation"]
+
+        CheckStatus -- Yes --> EvalYield{"Aggregate Good Yield Check:<br><code>∑ quantity_produced ≥ (∑ quantity_ordered - 0.0001)</code>"}
+
+        EvalYield -- Insufficient (Scrap Shortfall) --> ShortfallPath["Leave Task Status IN_PROGRESS<br>Log Activity: <code>production.shortfall_warning</code><br>Include shortfall delta in log"]
+
+        EvalYield -- Meets or Exceeds Threshold --> SuccessPath["Update Task Status: COMPLETED<br>Set <code>completed_at = now()</code><br>Log Activity: <code>production.completed</code>"]
+
+        SuccessPath --> RecalcMilestone["MilestoneService::recalculateProgress(milestone)<br>Recalculate Weighted Progress %"]
+    end
+
+    subgraph Commercial_Boundaries["Commercial & Financial Boundary (Non-Automated)"]
+        SuccessPath -.-> NonAutoNote["Note: Automated synchronization updates Task status and Milestone progress only.<br>It does NOT auto-generate Customer Delivery Challans, Sales Invoices, or Revenue Vouchers.<br>Commercial billing remains under Project Management / Finance authorization."]
+    end
+```
+
+### 9.2 Workflow Breakdown
+* **Initiating Action:** A project deliverable requires manufacturing fulfillment. A user initiates linking either:
+  1. From the Task Details drawer in Project Management using **Link Production Order** (`POST /projects/{project}/tasks/{task}/link-production-order`), or
+  2. In Production by navigating to `/production/orders/create?project_id={id}&project_task_id={id}`, where the UI displays a "Linked to Project" banner and preselects target parameters.
+* **Validation & Security Invariants:**
+  * Tenancy check (`tenant_id`).
+  * Company check: `production_orders.company_id` must match `tasks.company_id` (or `projects.company_id`).
+  * Branch check: `production_orders.branch_id` must match `tasks.branch_id` (or `projects.branch_id`).
+  * Task hierarchy: `project_task_id` must belong to `project_id`.
+* **Execution & Completion:**
+  * The production order advances through standard manufacturing steps (release, material issuance, MES operations, and finished goods receipt).
+  * When `ProductionOrderService::completeOrder()` transitions the order to `completed`, it dispatches the `ProductionOrderCompleted` domain event.
+* **Aggregate Yield Evaluation (`SyncProductionTaskCompletionListener`):**
+  * The listener retrieves all production orders associated with the parent task: `project_task_id = $task->id`.
+  * **Sibling Status Gate:** If any sibling production order remains incomplete (`draft`, `released`, or `in_progress`), the listener stops without altering task status.
+  * **Yield Threshold Gate:** If all sibling orders are completed, the listener sums the total planned quantity and total finished goods output:
+    $$\sum \text{quantity\_produced} \ge \left( \sum \text{quantity\_ordered} - 0.0001 \right)$$
+    The small tolerance (`0.0001`) prevents floating-point rounding discrepancies from blocking completion.
+* **Outcome Paths:**
+  * **Success Path:** If aggregate good output meets or exceeds the threshold, the listener marks the task as `Completed`, sets `completed_at`, records an audit event (`production.completed`) in `project_activity_logs`, and calls `MilestoneService::recalculateProgress()` to update the milestone's weighted percentage.
+  * **Shortfall Path:** If machining scrap or rejected parts cause aggregate output to fall short of the required total, the task remains `IN_PROGRESS` and records an audit warning (`production.shortfall_warning`) with the deficit amount. Planners can conditionally spawn an authorized supplementary order after demand review. While Project Management status transitions (`PATCH /projects/{project}/tasks/{task}/status`) allow authorized users with `projects.tasks.update` to set task status directly, this bypasses the manufacturing completion safeguards and should only occur under verified administrative exception.
+* **Explicit Operational Boundaries:**
+  * Synchronization is strictly one-directional upon manufacturing completion: Production order completion drives task and milestone status. Project Management actions do not force-close incomplete production orders.
+  * No downstream commercial transactions (customer invoices, billing milestones, dispatch gate passes, or accounting journals) are triggered automatically by this synchronization.

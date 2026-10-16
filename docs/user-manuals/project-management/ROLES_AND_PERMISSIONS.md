@@ -3,10 +3,10 @@
 ## 1. Access Control Architecture
 
 The Project Management module implements a multi-tiered authorization architecture combining:
-1. **Multi-Tenant Scoping**: All operations are strictly sandboxed by `tenant_id` at the database query level via `App\Core\Database\BaseModel` and tenant middleware (`tenant.context`). Users cannot view or mutate records belonging to other tenants.
-2. **System-Level Permissions (RBAC)**: Managed by `App\Services\Access\AccessService`, checking whether the authenticated user possesses discrete module permission keys (e.g., `projects.projects.view`, `projects.projects.create`).
+1. **Multi-Tenant & Branch Scoping**: All operations are strictly sandboxed by `tenant_id`, `company_id`, and `branch_id` at the database query level via `App\Core\Database\BaseModel` and context middleware. Users cannot view, mutate, or link records belonging to incompatible tenants or branches.
+2. **System-Level Permissions (RBAC)**: Managed by `App\Services\Access\AccessService`, checking whether the authenticated user possesses discrete module permission keys (e.g., `projects.projects.view`, `projects.projects.create`, `projects.projects.update`).
 3. **Project-Level Role Scoping**: Controlled via the `project_members` roster. A user may have system-wide project access but only possess edit privileges on projects where they are explicitly assigned as a `Project Manager`, `Technical Lead`, or `Member`.
-4. **Record-Level Ownership (Own Scope)**: Certain resources (such as pending time logs and issues) permit individual authors to edit their own submissions while restricting changes by peer team members.
+4. **Record-Level Ownership (Own Scope)**: Certain resources (such as pending time logs and reported issues) permit individual authors to edit their own submissions while restricting changes by peer team members.
 5. **Super-Admin Override**: Users with the canonical `admin` or `super_admin` role bypass member-level restrictions while remaining strictly confined within their active tenant boundary.
 
 ---
@@ -15,8 +15,8 @@ The Project Management module implements a multi-tiered authorization architectu
 
 | Role Name | Scope of Authority | Typical Enterprise Assignments |
 | :--- | :--- | :--- |
-| **System Admin** | Global tenant access to all projects, settings, reports, and administrative overrides. | IT Administrator, ERP Superuser |
-| **Project Manager (PM)** | Full lifecycle control over assigned projects: schedule, members, rate cards, approvals, billing, and closure. | Senior Project Manager, Delivery Director, Engagement Manager |
+| **System Admin** | Global tenant access to all projects, settings, reports, bulk actions, and administrative overrides. | IT Administrator, ERP Superuser |
+| **Project Manager (PM)** | Full lifecycle control over assigned projects: schedule, team members, rate cards, reviews, timesheet approvals, billing, and closure. | Senior Project Manager, Delivery Director, Engagement Manager |
 | **Technical Lead** | Task management, WBS decomposition, dependency planning, review requests, and issue triaging. | Lead Architect, Engineering Lead, Scrum Master |
 | **Team Member / Contributor** | Execute assigned tasks, complete subtasks, submit time logs, and report issues. | Software Engineer, Designer, Consultant, Specialist |
 | **Project Viewer / Stakeholder** | Read-only access to project overview, Gantt charts, documents, and status reports. | Executive Sponsor, Client Observer, External Auditor |
@@ -25,35 +25,50 @@ The Project Management module implements a multi-tiered authorization architectu
 
 ## 3. Master Permission Matrix
 
-The following matrix documents every system permission key recognized by the Project domain:
+The following matrix documents every system permission key recognized by the Project domain, verified against `Database\Seeders\RbacSeeder` and domain policies:
 
-| Permission Key | Resource | Action | Default Roles | Policy Method | Scope & Restrictions |
+| Permission Key | Resource | Action | Default Roles | Policy / Controller Method | Scope & Restrictions |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `projects.projects.view` | `Project` | List and view project details | Admin, PM, Lead, Member, Viewer | `ProjectPolicy::view()` | Tenant scope. Members can view projects they are assigned to; Admins view all tenant projects. |
-| `projects.projects.create` | `Project` | Initialize a new project | Admin, PM | `ProjectPolicy::create()` | Tenant scope. Grants authority to allocate budgets and assign project managers. |
-| `projects.projects.edit` | `Project` | Update metadata, settings, dates | Admin, PM | `ProjectPolicy::update()` | Enforces PM membership or Admin override. Closed projects are read-only. |
-| `projects.projects.delete` | `Project` | Delete project | Admin only | `ProjectPolicy::delete()` | Enforces Admin role. Projects with billed invoices or posted time cannot be hard-deleted. |
-| `projects.members.manage` | `ProjectMember` | Add/remove team members & rate cards | Admin, PM | `ProjectMemberPolicy::manage()` | Restricts rate card modifications (`rate_per_hour`, `cost_per_hour`) to designated PMs and admins. |
-| `projects.tasks.view` | `Task` | View tasks, Gantt, and WBS | Admin, PM, Lead, Member, Viewer | `TaskPolicy::view()` | Inherits project view authorization. |
-| `projects.tasks.create` | `Task` | Create tasks and checklists | Admin, PM, Lead | `TaskPolicy::create()` | Allows leads and PMs to build and restructure task lists. |
-| `projects.tasks.edit` | `Task` | Edit task status, dates, assignees | Admin, PM, Lead, Assignee | `TaskPolicy::update()` | Assignees can update status/progress; only PM/Lead can alter estimated hours/due dates. |
-| `projects.tasks.delete` | `Task` | Delete tasks | Admin, PM | `TaskPolicy::delete()` | Tasks with logged time cannot be deleted; must be marked cancelled. |
-| `projects.timelogs.create` | `TimeLog` | Submit time entries | Admin, PM, Lead, Member | `TimeLogPolicy::create()` | User must be an active project member. |
-| `projects.timelogs.edit` | `TimeLog` | Edit or delete time entries | Submitter (Own), Admin | `TimeLogPolicy::update()` | **Own Scope**: Submitter can edit while `approval_status = 'Pending'`. Approved or invoiced logs are locked. |
-| `projects.timesheets.approve`| `TimeLog` | Approve/reject timesheets | Admin, PM | `TimeLogPolicy::approve()` | User must be designated Project Manager or possess Admin role. |
+| `projects.projects.view` | `Project` | List and view project details | Admin, PM, Lead, Member, Viewer | `ProjectPolicy::view()` | Tenant and branch scope. Members can view projects they are assigned to; Admins view all tenant projects. |
+| `projects.projects.create` | `Project` | Initialize a new standalone project or convert a Sales Order | Admin, PM | `ProjectPolicy::create()` | Tenant scope. Grants authority to allocate budgets, assign owners, and initialize project WBS. |
+| `projects.projects.update` | `Project` | Update metadata, settings, dates, inline fields, collaborators | Admin, PM | `ProjectPolicy::update()` | Enforces PM membership or Admin override. Closed projects are permanently read-only. |
+| `projects.projects.delete` | `Project` | Soft-delete project or execute bulk deletion | Admin, Tenant Owner | `ProjectPolicy::delete()` | Enforces Admin role. Projects with invoiced milestones or posted time cannot be deleted. |
+| `projects.projects.close` | `Project` | Execute project closure | Admin, PM | `ProjectPolicy::close()` | Evaluates 5 mandatory business gates via `ProjectClosureService`. Once closed, project becomes permanently immutable. |
+| `projects.members.manage` | `ProjectMember` | Add/remove team members & manage rate cards | Admin, PM | `ProjectMemberPolicy::manage()` | Manages `rate_per_hour`, `cost_per_hour`, and `budget_hours`. Cannot remove active project owner or manager. |
+| `projects.milestones.manage` | `Milestone` | Create, edit, reorder, and complete milestones | Admin, PM | `MilestonePolicy::manage()` | Milestone owner must be an active project collaborator. |
+| `projects.tasklists.manage` | `TaskList` | Create, edit, reorder, and delete task lists | Admin, PM, Lead | `TaskListPolicy::manage()` | Scoped to parent project. Deleting a list cascades to child tasks. |
+| `projects.tasks.view` | `Task` | View tasks, Gantt timeline, and WBS | Admin, PM, Lead, Member, Viewer | `TaskPolicy::view()` | Inherits project view authorization. |
+| `projects.tasks.create` | `Task` | Create tasks and checklists | Admin, PM, Lead | `TaskPolicy::create()` | Allows building deliverables. Assignee must be an active project member. |
+| `projects.tasks.update` | `Task` | Edit task status, dates, assignees, subtasks, dependencies | Admin, PM, Lead, Assignee | `TaskPolicy::update()` | Assignees can update status/progress; PM/Lead can alter estimates and dependencies. Cannot jump directly from Open to Completed. |
+| `projects.tasks.delete` | `Task` | Delete tasks | Admin, PM | `TaskPolicy::delete()` | Tasks with approved or invoiced time cannot be deleted. |
+| `projects.timetracking.view` | `TimeLog` | View time logs and timesheets | Admin, PM, Lead, Member | `TimeLogPolicy::view()` | Active project members can view logs; viewers can inspect summaries. |
+| `projects.timetracking.log` | `TimeLog` | Submit time entries against tasks | Admin, PM, Lead, Member | `TimeLogPolicy::create()` | User must be an active project member. Validates hours between 0.01 and 24.00. |
+| `projects.timetracking.approve` | `TimeLog` | Approve or reject timesheets | Admin, PM | `TimeLogPolicy::approve()` | User must be designated PM or Admin. Approved logs are permanently locked against modification. |
+| `projects.issues.view` | `Issue` | View defects and issue logs | Admin, PM, Lead, Member, Viewer | `IssuePolicy::view()` | Inherits project view authorization. |
 | `projects.issues.create` | `Issue` | Log a defect or blocker | Admin, PM, Lead, Member | `IssuePolicy::create()` | Any active project member can report issues. |
-| `projects.issues.edit` | `Issue` | Update issue status/severity | Admin, PM, Lead, Assignee | `IssuePolicy::update()` | Assignee and Leads can transition status; PM can change severity and closure. |
-| `projects.documents.upload`| `ProjectDocument` | Upload deliverables & files | Admin, PM, Lead, Member | `ProjectDocumentPolicy::upload()` | Validates file size (max 25MB) and approved MIME types. |
-| `projects.documents.delete`| `ProjectDocument` | Delete uploaded documents | Admin, PM, Document Owner | `ProjectDocumentPolicy::delete()` | Document uploader or PM can remove unneeded files. |
-| `projects.billing.manage` | `Project`, `Invoice` | Trigger Sales invoice bridge | Admin, PM | `ProjectPolicy::manageBilling()` | Requires edit permission; checks presence of unbilled approved logs or milestones. |
-| `projects.closure.execute` | `Project` | Execute project closure gates | Admin, PM | `ProjectPolicy::close()` | Evaluates 5 condition gates; requires PM or Admin authority. |
-| `projects.reports.view` | Reports | View executive reports and export | Admin, PM, Lead | `ProjectReportController::authorizeReports()` | Tenant scope; allows viewing and exporting CSV/XLSX summaries. |
+| `projects.issues.update` | `Issue` | Update issue description, assignee, priority | Admin, PM, Lead, Assignee | `IssuePolicy::update()` | Assignees and Leads can update investigation notes. |
+| `projects.issues.resolve` | `Issue` | Mark issue as resolved | Admin, PM, Lead, Assignee | `IssuePolicy::resolve()` | Records resolution timestamp. Open issues block project closure Gate 2. |
+| `projects.issues.retest` | `Issue` | Retest defect if fix is incomplete | Admin, PM, Lead, Reporter | `IssuePolicy::retest()` | Transitions status back to In Progress with retest notes. |
+| `projects.issues.delete` | `Issue` | Remove invalid issue records | Admin, PM | `IssuePolicy::delete()` | Restricted to management. |
+| `projects.documents.view` | `ProjectDocument` | View and download attached files | Admin, PM, Lead, Member, Viewer | `ProjectDocumentPolicy::view()` | Download endpoints enforce tenant and project authorization. |
+| `projects.documents.upload` | `ProjectDocument` | Upload deliverables and attachments | Admin, PM, Lead, Member | `ProjectDocumentPolicy::create()` | Validates maximum file size (25 MB / 25,600 KB) and allowed MIME types. |
+| `projects.documents.delete` | `ProjectDocument` | Delete uploaded documents | Admin, PM, Document Uploader | `ProjectDocumentPolicy::delete()` | Uploader or PM can remove unneeded files. |
+| `projects.reviews.view` | `ProjectReview` | View review history and UAT signoffs | Admin, PM, Lead, Member, Viewer | `ProjectReviewPolicy::view()` | Historic reviews are preserved for audit traceability. |
+| `projects.reviews.create` | `ProjectReview` | Initiate formal milestone or UAT review | Admin, PM, Lead | `ProjectReviewPolicy::create()` | Requires all project milestones to be completed. |
+| `projects.reviews.signoff` | `ProjectReview` | Record review decision (Approved / Rework) | Admin, PM, Designee | `ProjectReviewPolicy::signoff()` | Approved signoff clears Gate 3 of project closure. |
+| `projects.changerequests.view` | `ChangeRequest` | View change requests | Admin, PM, Lead, Member | `ChangeRequestPolicy::view()` | View scope/budget impact estimates. |
+| `projects.changerequests.create` | `ChangeRequest` | Submit a scope change request | Admin, PM, Lead | `ChangeRequestPolicy::create()` | Captures schedule impact and budget delta. |
+| `projects.changerequests.approve` | `ChangeRequest` | Approve or reject change requests | Admin, PM | `ChangeRequestPolicy::approve()` | Approved budget deltas automatically revise the project's baseline budget. |
+| `projects.billing.view` | `Project` | View financial billing tab and invoices | Admin, PM | `ProjectPolicy::viewBilling()` | Displays unbilled time amount, unbilled milestones, and invoice history. |
+| `projects.billing.generate_invoice` | `Project`, `Invoice` | Trigger Sales draft invoice generation | Admin, PM *(Requires `sales.invoices.create`)* | `ProjectPolicy::generateInvoice()` | **Dual Permission Required**: Must have `projects.billing.generate_invoice` (or `projects.projects.update`) **AND** `sales.invoices.create`. |
+| `projects.dashboard.view` | Dashboard | View executive KPI dashboard | Admin, PM, Lead, Member, Viewer | `DashboardController::index()` | Tenant-wide executive metrics and health indicators. |
+| `projects.reports.view` | Reports | View operational reports and export CSV/XLSX | Admin, PM, Lead | `ProjectReportController::authorizeReports()` | Grants access to all 7 analytical reports and data exports. |
 
 ---
 
 ## 4. Policy Implementation & Scoping Logic
 
-All 10 project policies are bound to their respective models in `app/Providers/AppServiceProvider.php` (lines 873–921):
+All project policies are bound to their respective domain models in `app/Providers/AppServiceProvider.php`:
 
 ```php
 Gate::policy(\App\Domains\Projects\Models\Project::class, \App\Domains\Projects\Policies\ProjectPolicy::class);
@@ -70,56 +85,59 @@ Gate::policy(\App\Domains\Projects\Models\ChangeRequest::class, \App\Domains\Pro
 
 *(Note: `SubTask` and `TaskDependency` do not have standalone policies; their authorization is inherited through parent `TaskPolicy` and controller authorization checks).*
 
-### Authorization Scope Hierarchy
+### Dual-Permission Enforcement on Client Invoicing
+Generating an invoice from project deliverables mutates the Sales ledger. `ProjectPolicy::generateInvoice()` strictly enforces dual permissions:
+```php
+public function generateInvoice(User $user, Project $project): bool
+{
+    // 1. Project Management authorization
+    $hasProjectScope = $this->access->allows($user, 'projects.billing.generate_invoice', [
+        'tenant_id' => $project->tenant_id,
+        'owner_id'  => $project->owner_id,
+    ]) || $this->access->allows($user, 'projects.projects.update', [
+        'tenant_id' => $project->tenant_id,
+        'owner_id'  => $project->owner_id,
+    ]);
 
-```mermaid
-flowchart TD
-    Req[Incoming HTTP Request] --> TenScope{1. Multi-Tenant Gate: Same tenant_id?}
-    TenScope -- No --> DenyTen[HTTP 403 / 404: Tenant Isolation]
-    TenScope -- Yes --> AdminCheck{2. Super-Admin Check: User has admin/super_admin role?}
-    AdminCheck -- Yes --> Allow[Access Granted]
-    AdminCheck -- No --> PermCheck{3. RBAC Check: AccessService::allows permission?}
-    PermCheck -- No --> DenyPerm[HTTP 403: Missing System Permission]
-    PermCheck -- Yes --> ProjMemberCheck{4. Project Scope: Is User Member / Manager?}
-    ProjMemberCheck -- No --> DenyProj[HTTP 403: Not a Project Collaborator]
-    ProjMemberCheck -- Yes --> OwnCheck{5. Own Scope Check: Does Action Require Record Ownership?}
-    OwnCheck -- Own Required & Not Owner --> DenyOwn[HTTP 403: Cannot Edit Peer's Record]
-    OwnCheck -- Valid --> Allow
+    // 2. Sales domain authorization
+    $hasSalesScope = $this->access->allows($user, 'sales.invoices.create', [
+        'tenant_id' => $project->tenant_id,
+    ]);
+
+    return $hasProjectScope && $hasSalesScope;
+}
 ```
 
-### Code Example: Own-Scope Enforcement in `TimeLogPolicy`
+### Own-Scope Enforcement on Time Tracking
+`TimeLogPolicy::update()` enforces that team members can only edit or delete their own time logs while in `Pending` status:
 ```php
 public function update(User $user, TimeLog $timeLog): bool
 {
-    // Tenant isolation verification
     if ($user->tenant_id !== $timeLog->tenant_id) {
         return false;
     }
 
-    // Admins have override access
     if ($this->access->hasRole($user, 'admin') || $this->access->hasRole($user, 'super_admin')) {
         return true;
     }
 
-    // Approved or invoiced logs cannot be modified by anyone
+    // Approved or invoiced logs are permanently locked
     if ($timeLog->approval_status === TimeLog::STATUS_APPROVED || $timeLog->is_invoiced) {
         return false;
     }
 
-    // Submitter can only edit their own pending logs
     return (int) $user->id === (int) $timeLog->user_id;
 }
 ```
 
 ---
 
-## 5. Security Audit & Common Misconfigurations
+## 5. Security Audit & Invariants
 
-1. **Member Cannot View Project**:
-   - Cause: User has `projects.projects.view` permission but has not been added to `project_members`.
-   - Resolution: Project Manager must navigate to Members tab and add the user.
-2. **Project Manager Cannot Approve Own Timesheet**:
-   - Cause: Segregation of duties rule; if the PM is the submitter of a time log, an independent Admin or co-manager must approve the entry to prevent self-approval compliance violations.
-3. **Closed Project Appears Read-Only**:
-   - Cause: When `projects.status = 'closed'`, all mutating policies deliberately return `false` to preserve audit immutability.
-   - Resolution: Reopening requires an Admin to transition project status back to `active`.
+1. **Terminal Closed Status (Immutability)**:
+   - When a project reaches `status = 'Closed'`, every mutating policy (`update`, `create`, `delete` across projects, tasks, milestones, time logs, issues, reviews, and documents) immediately returns `false`.
+   - **Strict Invariant**: A closed project is permanently read-only and cannot be reopened. If additional delivery is required, a follow-on phase or maintenance project must be initialized.
+2. **Rate Card Confidentiality**:
+   - `rate_per_hour` (client billing rate) and `cost_per_hour` (internal labor cost) are restricted to authorized project managers and administrators via `ProjectMemberPolicy::manage()`. Standard contributors cannot inspect peer cost rates.
+3. **Branch Isolation**:
+   - Auto-generated project codes (`PRJ-0001`) and task linking to Production Orders or Purchase Requisitions strictly enforce branch boundaries. A project manager in Branch A cannot link or view manufacturing orders from Branch B.

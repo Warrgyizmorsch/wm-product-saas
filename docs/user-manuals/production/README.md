@@ -1,80 +1,90 @@
 # Production Planning & Manufacturing Execution (MES) — Documentation Suite
 
-> **Application:** Multi-Tenant SaaS ERP (`wm-product-saas`)  
-> **Module:** Production Planning & Shopfloor MES (`app/Domains/Production`)  
-> **Framework:** Laravel 12 / PHP 8.3 / MySQL / DDD Architecture  
-> **Target Location:** `docs/user-manuals/production/`
+> **Application:** Multi-Tenant SaaS ERP (`wm-product-saas`)
+> **Module:** Production Planning & Shopfloor MES (`app/Domains/Production`)
+> **Framework:** Laravel 12 / PHP 8.3 / MySQL / Domain-Driven Design (DDD)
+> **Location:** `docs/user-manuals/production/`
+> **Verification Status:** Source-Verified & Cross-Document Aligned (October 2026)
 
 ---
 
-## 1. Documentation Suite Overview
+## 1. Overview & Documentation Index
 
-Welcome to the canonical documentation suite for the **Production Planning & Manufacturing Execution (MES)** module of `wm-product-saas`. 
+This directory contains the canonical documentation suite for the **Production Planning & Manufacturing Execution (MES)** module of `wm-product-saas`. The documentation is compiled from an evidence-based audit of active domain models (74 Eloquent models), domain services (79 services), web/API controllers (69 controllers), policies (13 policies), database migrations, and cross-domain integrations (Inventory, Accounting, Purchasing, Sales, HRMS, and Project Management).
 
-This documentation package has been compiled through a comprehensive source code audit of the live implementation (74 Eloquent models, 79 domain services, 54 controllers, 13 policies, and 65 automated test suites). It serves three core audiences:
-1. **End Users:** Plant managers, master schedulers, storekeepers, machine operators, quality inspectors, and maintenance technicians.
-2. **Software Engineers:** Laravel developers, integration specialists, and SaaS architects maintaining and extending the platform.
-3. **Business Stakeholders:** Manufacturing consultants, plant controllers, and ERP analysts mapping industrial processes to software automation.
-
----
-
-## 2. Documentation Directory Map
-
-Every document in this suite is purpose-built, implementation-verified, and cross-referenced:
-
-| Document | File Name | Primary Audience | Key Contents |
+| Document | File | Target Audience | Primary Focus & Contents |
 |---|---|---|---|
-| **1. Implementation Audit** | [`IMPLEMENTATION_AUDIT.md`](IMPLEMENTATION_AUDIT.md) | Architects, Leads | Complete feature-by-feature implementation matrix, evidence files, test references, and verified vs partial capabilities |
-| **2. End-User Manual** | [`USER_MANUAL.md`](USER_MANUAL.md) | Planners, Operators, Leads | Step-by-step user instructions with real UI navigation paths, fields, validations, status changes, and mistake resolutions |
-| **3. Developer Manual** | [`DEVELOPER_MANUAL.md`](DEVELOPER_MANUAL.md) | Laravel Developers | 4-layer architecture, 74 models, 79 services, database constraints, business algorithms (MRP, scheduling, WIP), and REST APIs |
-| **4. Manufacturing Workflows** | [`WORKFLOWS.md`](WORKFLOWS.md) | Consultants, Engineers | 7 end-to-end Mermaid process lifecycles (Demand-to-Order, Execution, WIP, Quality/Rework, Traceability, Maintenance, Accounting) |
-| **5. Business Use Cases** | [`USE_CASES.md`](USE_CASES.md) | BAs, QA Engineers | 11 detailed operating scenarios with preconditions, sample data, step flows, alternate paths, acceptance criteria, and test links |
-| **6. Roles & Permissions** | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) | Security, Admins | RBAC security architecture, 13 domain policies, permission keys reference, controller gates, and role mapping matrix |
-| **7. Cross-Module Integrations** | [`INTEGRATIONS.md`](INTEGRATIONS.md) | Integration Engineers | Touchpoints with Inventory (`StockService`), Purchase (subcontract POs), Sales (demand), Accounting (assets/costing), and HRMS |
-| **8. Troubleshooting Guide** | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | SysAdmins, Support | Diagnostic playbooks, machine lockout resolutions, stock shortages, WIP orphans, scanner errors, and safe read-only SQL |
-| **9. Frequently Asked Questions** | [`FAQ.md`](FAQ.md) | All Personas | Answers to 11 practical questions regarding BOM revisions, scrap math, accounting GL boundaries, and machine decommissioning |
-| **10. Industry Glossary** | [`GLOSSARY.md`](GLOSSARY.md) | New Users, BAs | A-to-Z dictionary of manufacturing terminology (BOM, Routing, OEE, MRP, Andon, WIP, NCR, CAPA, Remnants, Gate Pass) |
-| **11. Documentation QA Report** | [`DOCUMENTATION_QA_REPORT.md`](DOCUMENTATION_QA_REPORT.md) | QA Leads, Release Managers | Comprehensive verification report validating doc accuracy against live code, schemas, routes, and test outcomes |
+| **End-User Manual** | [`USER_MANUAL.md`](USER_MANUAL.md) | Planners, Operators, Leads, QC | Complete operational handbook: navigation, step-by-step UI actions, fields, statuses, material issuing, MES console, and source-based control checklist. |
+| **Developer Manual** | [`DEVELOPER_MANUAL.md`](DEVELOPER_MANUAL.md) | Software Engineers, Architects | 4-layer DDD architecture, model relations, domain services, MRP algorithms, finite scheduling, REST API catalog, and extension points. |
+| **Implementation Audit** | [`IMPLEMENTATION_AUDIT.md`](IMPLEMENTATION_AUDIT.md) | Technical Leads, Auditors | Feature-by-feature verification matrix, codebase references, database schema mappings, verified capabilities, and technical boundaries. |
+| **Cross-Module Integrations** | [`INTEGRATIONS.md`](INTEGRATIONS.md) | Systems & Integration Engineers | Formal integration contracts with Inventory (`StockService`), Accounting (`PostProductionConsumptionJournal`), Purchasing, Sales, and Project Management. |
+| **Manufacturing Workflows** | [`WORKFLOWS.md`](WORKFLOWS.md) | Process Engineers, Consultants | 7 end-to-end Mermaid workflow diagrams: Demand-to-Order, Shopfloor MES, WIP transfers, Quality/Rework, Subcontracting, Maintenance, and Accounting. |
+| **Business Use Cases** | [`USE_CASES.md`](USE_CASES.md) | Product Managers, QA Engineers | 11 industrial scenarios with complete preconditions, step-by-step execution, alternate flows, database impacts, and acceptance criteria. |
+| **Troubleshooting Playbook** | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Support Engineers, SysAdmins | Diagnostic procedures, error resolution playbooks, and verified, safe, read-only SQL diagnostic queries for operational anomalies. |
+| **Frequently Asked Questions** | [`FAQ.md`](FAQ.md) | All Personas | 12 practical operational and technical answers covering BOM revisions, yield math, GL boundaries, overflow batches, and project sync. |
+| **Industry Glossary** | [`GLOSSARY.md`](GLOSSARY.md) | New Users, Business Analysts | Standardized manufacturing terminology reference (BOM, Routing, OEE, MRP, Andon, WIP, NCR, CAPA, Remnants, Gate Pass). |
+| **Roles & Permissions** | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) | Security Leads, Admins | Role-Based Access Control (RBAC) matrix, 13 domain policies, 21 permission keys, controller gates, and tenant boundary enforcement. |
+| **Documentation QA Report** | [`DOCUMENTATION_QA_REPORT.md`](DOCUMENTATION_QA_REPORT.md) | Release Leads, QA Auditors | Comprehensive multi-phase QA audit report, cross-document consistency findings, test evidence record, and acceptance certification. |
+
+---
+
+## 2. Recommended Entry Points by Persona
+
+Select the appropriate starting document based on your role and operational objective:
+
+* **For Normal End Users (Planners, Machine Operators, Storekeepers, QC Inspectors):**
+  Start with [`USER_MANUAL.md`](USER_MANUAL.md) for day-to-day navigation, screen-by-screen actions, and shopfloor execution.
+* **For Developers & Maintainers:**
+  Start with [`DEVELOPER_MANUAL.md`](DEVELOPER_MANUAL.md) for system architecture, service contracts, data structures, and APIs.
+* **For System Architects & Code Auditors:**
+  Start with [`IMPLEMENTATION_AUDIT.md`](IMPLEMENTATION_AUDIT.md) for feature matrices, schema mappings, and verified implementation status.
+* **For Integration & Cross-Module Engineers:**
+  Start with [`INTEGRATIONS.md`](INTEGRATIONS.md) for touchpoints with Inventory, Accounting, Purchasing, Sales, and Project Management.
+* **For Support Engineers & System Administrators:**
+  Start with [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) for diagnostic workflows and read-only SQL investigation queries.
+* **For Security Administrators:**
+  Start with [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) for permission keys, policies, and authorization gates.
+* **For QA Leads & Release Reviewers:**
+  Start with [`DOCUMENTATION_QA_REPORT.md`](DOCUMENTATION_QA_REPORT.md) for audit history, cross-document consistency verification, and evidence records.
 
 ---
 
 ## 3. Persona-Based Reading Paths
 
-Depending on your role in the organization, follow these recommended reading sequences:
-
 ```mermaid
-graph LR
-    subgraph Operations_Path["Shopfloor & Planning Path"]
-        OP1["README.md"] --> OP2["USER_MANUAL.md"]
-        OP2 --> OP3["WORKFLOWS.md"]
-        OP3 --> OP4["TROUBLESHOOTING.md"]
+graph TD
+    subgraph End_User_Path["End-User & Operational Path"]
+        EU1["README.md"] --> EU2["USER_MANUAL.md"]
+        EU2 --> EU3["WORKFLOWS.md"]
+        EU3 --> EU4["TROUBLESHOOTING.md"]
+        EU4 --> EU5["FAQ.md"]
     end
 
-    subgraph Developer_Path["Engineering & Technical Path"]
-        DEV1["README.md"] --> DEV2["IMPLEMENTATION_AUDIT.md"]
-        DEV2 --> DEV3["DEVELOPER_MANUAL.md"]
+    subgraph Technical_Path["Developer & Technical Path"]
+        DEV1["README.md"] --> DEV2["DEVELOPER_MANUAL.md"]
+        DEV2 --> DEV3["IMPLEMENTATION_AUDIT.md"]
         DEV3 --> DEV4["INTEGRATIONS.md"]
         DEV4 --> DEV5["ROLES_AND_PERMISSIONS.md"]
     end
 
-    subgraph Business_Path["Consulting & Business Path"]
-        BA1["README.md"] --> BA2["WORKFLOWS.md"]
-        BA2 --> BA3["USE_CASES.md"]
-        BA3 --> BA4["INTEGRATIONS.md"]
-        BA4 --> BA5["GLOSSARY.md"]
+    subgraph Consulting_Path["Business & QA Path"]
+        BI1["README.md"] --> BI2["USE_CASES.md"]
+        BI2 --> BI3["WORKFLOWS.md"]
+        BI3 --> BI4["GLOSSARY.md"]
+        BI4 --> BI5["DOCUMENTATION_QA_REPORT.md"]
     end
 ```
 
 ---
 
-## 4. Key Architectural Standards & Golden Rules
+## 4. Key Architectural Standards & Domain Boundaries
 
-When developing or configuring the Production module:
-1. **Repository Pattern Is Mandatory:** Controllers never perform direct model queries or calls to `Model::create()`. All persistence delegates to aggregate repositories in `app/Domains/Production/Repositories/`.
-2. **Transaction Boundaries Belong in Services:** Multi-step business operations encapsulate database transactions via `DB::transaction(...)` in domain services.
-3. **Strict Base Currency Normalization:** All internal math, database columns, and service parameters operate strictly in **Base Currency**. Conversions occur symmetrically at the boundary:
-   * View rendering: `format_currency($amount)` or `active_currency_symbol()`.
-   * Form preloading: `convert_from_base($amount)`.
-   * Controller input: `convert_to_base((float) $input)`.
-4. **Tenant Isolation:** Enforced automatically via `BaseModel` and `require_tenant_id()`. No cross-tenant data leaks can occur.
-5. **Clean Accounting Event Integration:** Production delegates physical stock transactions to `StockService`. Material issues dispatch `StockOutflowRecorded`, which `PostProductionConsumptionJournal` in the Accounting domain listens to for automated Work-in-Progress (WIP) general ledger postings. Finished goods capitalization is managed via periodic inventory valuation in Accounting.
+When maintaining or extending the Production module:
+1. **Repository & Service Layering:** Controllers never perform direct Eloquent queries or unvalidated persistence. Operations encapsulate transactional boundaries (`DB::transaction`) inside domain services.
+2. **Base Currency Standardization:** All monetary fields (`labor_cost_rate`, `machine_cost_rate`, `actual_cost`, etc.) are calculated and stored in **Base Currency**. Display formatting utilizes `format_currency()` or `active_currency_symbol()`.
+3. **Tenant & Organizational Isolation:** Strictly enforces multi-tenancy and organizational consistency (`tenant_id`, `company_id`, `branch_id`). Cross-company dispatches or project associations are blocked at the request validation layer.
+4. **Automated Inventory & Accounting Boundaries:**
+   * Material issues trigger `StockOutflowRecorded`, prompting `PostProductionConsumptionJournal` to post automated WIP journal vouchers (Dr. WIP 1204 / Cr. Raw Materials).
+   * Finished goods receipts record inventory inflow at moving-average cost without automated GL posting; finished goods capitalization and WIP clearing occur via periodic accounting valuation.
+   * Maintenance work order completion triggers `MaintenanceWorkOrderJournalService` (Dr. Repairs 5530 / Cr. Spares 1200, Creditors 2015, Outstanding Expenses 2070).
+5. **Event-Driven Project Synchronization:** When linked to project deliverables, order completion dispatches `ProductionOrderCompleted`, enabling `SyncProductionTaskCompletionListener` to evaluate sibling order completion and aggregate good-yield thresholds ($\sum \text{quantity\_produced} \ge \sum \text{quantity\_ordered} - 0.0001$).

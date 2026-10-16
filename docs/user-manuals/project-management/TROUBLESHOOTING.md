@@ -5,12 +5,14 @@
 ```mermaid
 flowchart TD
     Issue([Encountered an Error / Blocked Action]) --> CheckType{Error Category}
-    
+
     CheckType -- Access / 403 Forbidden --> SecDiag[Check Tenant Context & Project Membership]
     CheckType -- Circular Dependency --> CPMDiag[Inspect Predecessor Chain via Gantt Chart]
-    CheckType -- Billing Bridge Failed --> BillDiag[Verify Approved TimeLogs & Service Product SKU]
+    CheckType -- Billing Bridge Failed --> BillDiag[Verify Dual Permissions, Approved TimeLogs & Service SKU]
     CheckType -- Cannot Close Project --> GateDiag[Inspect 5 Closure Gates via Diagnostic Query]
     CheckType -- In-App Alert Missing --> QueueDiag[Verify Event Listener & Queue Workers]
+    CheckType -- Sales Order Conversion --> SODiag[Verify Confirmed Order Status & Duplicate Check]
+    CheckType -- Production Task Sync --> ProdDiag[Verify Company/Branch Scope & Aggregate Yield]
 ```
 
 ---
@@ -26,7 +28,7 @@ flowchart TD
 - **Diagnostic Action (Read-Only SQL)**:
   ```sql
   -- Verify project exists in the active tenant and inspect user membership
-  SELECT p.id, p.code, p.tenant_id, p.status, pm.project_role 
+  SELECT p.id, p.code, p.tenant_id, p.status, pm.project_role
   FROM projects p
   LEFT JOIN project_members pm ON p.id = pm.project_id AND pm.user_id = :current_user_id
   WHERE p.id = :target_project_id;
@@ -66,7 +68,7 @@ flowchart TD
   -- Find tasks with invalid or missing date parameters
   SELECT id, title, start_date, due_date, estimated_hours, total_float, is_critical
   FROM project_tasks
-  WHERE project_id = :project_id 
+  WHERE project_id = :project_id
     AND (start_date IS NULL OR due_date IS NULL OR due_date < start_date);
   ```
 - **Recovery Steps**:
@@ -76,11 +78,12 @@ flowchart TD
 ---
 
 ### Playbook 04: Project Billing Generation Fails
-- **Symptom**: Clicking **Generate Invoice** on the Billing tab produces an error or displays *"No unbilled items found to invoice."*
+- **Symptom**: Clicking **Generate Invoice** on the Billing tab produces an error, displays HTTP 403, or displays *"No unbilled items found to invoice."*
 - **Root Causes**:
-  1. Time logs have been submitted but remain in `approval_status = 'Pending'`. Only `Approved` time logs can be billed.
-  2. Time logs or milestones have already been marked `is_invoiced = true`.
-  3. The ERP Inventory master lacks an active product with `item_type = 'Service'`, preventing the Sales invoice creation service from resolving a default line-item SKU.
+  1. The user lacks required dual permissions: `projects.billing.generate_invoice` (or `projects.projects.update`) AND `sales.invoices.create`.
+  2. Time logs have been submitted but remain in `approval_status = 'Pending'`. Only `Approved` time logs can be billed.
+  3. Time logs or milestones have already been marked `is_invoiced = true`.
+  4. The ERP Inventory master lacks an active product with `item_type = 'Service'`, preventing the Sales invoice creation service from resolving a default line-item SKU.
 - **Diagnostic Action (Read-Only SQL)**:
   ```sql
   -- Check for approved unbilled time logs
@@ -94,14 +97,15 @@ flowchart TD
   WHERE project_id = :project_id AND status = 'Completed' AND is_invoiced = 0;
 
   -- Verify active Service product exists in Inventory
-  SELECT id, name, sku, item_type, is_active
+  SELECT id, name, sku, item_type, status
   FROM products
-  WHERE tenant_id = :tenant_id AND item_type = 'Service'
+  WHERE tenant_id = :tenant_id AND item_type = 'Service' AND status = 'active'
   LIMIT 1;
   ```
 - **Recovery Steps**:
-  1. Have the Project Manager approve pending timesheets at `/timesheets/approvals`.
-  2. If the Service product query returns no rows, an Administrator must create an active Service product in the Inventory module.
+  1. Verify the user has both `projects.billing.generate_invoice` (or `projects.projects.update`) and `sales.invoices.create` permissions.
+  2. Have the Project Manager approve pending timesheets at `/projects/timesheets/approval`.
+  3. If the Service product query returns no rows, an Administrator must create an active Service product in the Inventory module.
 
 ---
 
@@ -111,7 +115,7 @@ flowchart TD
 - **Diagnostic Action (Read-Only SQL)**:
   ```sql
   -- Gate 1: Check open tasks & incomplete subtasks
-  SELECT id, title, status FROM project_tasks 
+  SELECT id, title, status FROM project_tasks
   WHERE project_id = :project_id AND status NOT IN ('Completed', 'Cancelled');
 
   SELECT st.id, st.title FROM project_sub_tasks st
@@ -119,14 +123,14 @@ flowchart TD
   WHERE pt.project_id = :project_id AND st.is_completed = 0;
 
   -- Gate 2: Check unresolved issues
-  SELECT id, title, severity, status FROM project_issues 
+  SELECT id, title, severity, status FROM project_issues
   WHERE project_id = :project_id AND status NOT IN ('Resolved', 'Closed');
 
   -- Gate 3: Check pending reviews & change requests
-  SELECT id, review_type, status FROM project_reviews 
+  SELECT id, review_type, status FROM project_reviews
   WHERE project_id = :project_id AND status = 'Pending';
 
-  SELECT id, title, status FROM project_change_requests 
+  SELECT id, title, status FROM project_change_requests
   WHERE project_id = :project_id AND status = 'Pending';
 
   -- Gate 4: Check unbilled approved time logs, pending timesheets, & unbilled milestones
@@ -158,8 +162,8 @@ flowchart TD
 - **Diagnostic Action**:
   Check failed queue jobs in the database:
   ```sql
-  SELECT id, queue, payload, exception, failed_at 
-  FROM failed_jobs 
+  SELECT id, queue, payload, exception, failed_at
+  FROM failed_jobs
   ORDER BY failed_at DESC LIMIT 5;
   ```
 - **Recovery Steps**:
@@ -174,3 +178,68 @@ flowchart TD
 - **Recovery Steps**:
   1. Narrow the report filter date range using `ReportFilterDTO` presets (e.g., query by Quarter rather than All Time).
   2. Select **Export CSV** instead of **Export Excel (XLSX)**, as the streaming CSV export consumes minimal memory.
+
+---
+
+### Playbook 08: Sales Order Conversion Fails
+- **Symptom**: Converting a Sales Order into a project displays an error: *"Only Confirmed Sales Orders can be converted to a Delivery Project"* or *"This Sales Order is already linked to an existing project."*
+- **Root Causes**:
+  1. The Sales Order is still in `Draft`, `Pending Approval`, or `Cancelled` status.
+  2. The Sales Order has already been converted to a delivery project, and duplicate conversion is strictly forbidden.
+- **Diagnostic Action (Read-Only SQL)**:
+  ```sql
+  -- Inspect Sales Order status and existing project associations
+  SELECT so.id, so.sales_order_number, so.status, p.id AS linked_project_id, p.code AS project_code
+  FROM sales_orders so
+  LEFT JOIN projects p ON so.id = p.sales_order_id
+  WHERE so.id = :sales_order_id;
+  ```
+- **Recovery Steps**:
+  1. In the Sales module, ensure the order is approved and transitioned to `Confirmed`.
+  2. If a linked project already exists, open the existing project rather than re-converting.
+
+---
+
+### Playbook 09: Production Order Task Linking or Auto-Completion Fails
+- **Symptom**: Attempting to link a Production Order fails with validation error, or a linked Production Order completes but the project task remains in `In Progress`.
+- **Root Causes**:
+  1. The Production Order belongs to a different company or branch than the project. Cross-branch linking is blocked.
+  2. Another Production Order linked to the same task has not yet reached `Completed`.
+  3. Aggregate yield shortfall: the total produced quantity across all linked orders is below the threshold $\sum \text{produced} < (\sum \text{quantity} - 0.0001)$. A `production.shortfall_warning` was logged in activity history.
+- **Diagnostic Action (Read-Only SQL)**:
+  ```sql
+  -- Verify organizational alignment between Task and Production Order
+  SELECT pt.id AS task_id, pt.company_id AS task_comp, pt.branch_id AS task_branch,
+         po.id AS order_id, po.company_id AS po_comp, po.branch_id AS po_branch,
+         po.status, po.quantity, po.produced_quantity
+  FROM project_tasks pt, production_orders po
+  WHERE pt.id = :task_id AND po.id = :production_order_id;
+
+  -- Inspect aggregate yield for all linked orders on the task
+  SELECT po.id, po.order_number, po.status, po.quantity, po.produced_quantity
+  FROM production_orders po
+  WHERE po.project_task_id = :task_id;
+  ```
+- **Recovery Steps**:
+  1. Ensure both the project and the Production Order are assigned to the identical company and branch.
+  2. If an aggregate yield shortfall occurred, inspect scrap and rework in Production. Either adjust the task manually to `Completed` if the customer accepts the yield, or launch a supplementary work order.
+
+---
+
+### Playbook 10: Purchase Requisition Item Link Fails
+- **Symptom**: Cannot link a Purchase Requisition item to a task, receiving HTTP 422.
+- **Root Causes**:
+  1. The requisition item belongs to a different company or branch than the project task.
+- **Diagnostic Action (Read-Only SQL)**:
+  ```sql
+  -- Verify company and branch alignment
+  SELECT pt.id AS task_id, pt.company_id AS task_comp, pt.branch_id AS task_branch,
+         pri.id AS req_item_id, pr.company_id AS req_comp, pr.branch_id AS req_branch
+  FROM project_tasks pt
+  CROSS JOIN purchase_requisition_items pri
+  JOIN purchase_requisitions pr ON pri.purchase_requisition_id = pr.id
+  WHERE pt.id = :task_id AND pri.id = :requisition_item_id;
+  ```
+- **Recovery Steps**:
+  1. Verify the Purchase Requisition was raised within the same company and branch workspace.
+  2. Note that linking requisition items associates material requirements for cost tracking; automated PO generation directly from tasks is not supported and must be performed in Purchasing.

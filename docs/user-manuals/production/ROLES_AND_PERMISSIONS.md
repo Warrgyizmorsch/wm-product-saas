@@ -44,48 +44,52 @@ All Production policies reside in `app/Domains/Production/Policies/` and are reg
 
 | Policy Class | Enforced Entity | Policy Methods | Core Authorization Logic |
 |---|---|---|---|
-| `ProductionOrderPolicy` | `ProductionOrder` | `viewAny`, `view`, `create`, `update`, `delete`, `release`, `issue`, `return`, `logProgress`, `receive` | `viewAny`: true; `view`: tenant match; `create`: `production.order.create` or `admin`; `update`/`release`: order not frozen + `production.order.update` |
-| `ProductionBomPolicy` | `ProductionBom` | `viewAny`, `view`, `create`, `update`, `delete`, `submit`, `approve`, `reject` | `approve`: `production.bom.approve` or `admin`; `create`/`update`: `production.bom.create`/`manage`; enforces revision locking |
-| `RoutingPolicy` | `Routing` | `viewAny`, `view`, `create`, `update`, `delete`, `approve` | `approve`: `production.routing.approve`; `create`/`update`: `production.routing.manage`; prevents editing locked routings |
-| `ProductionSchedulePolicy` | `ProductionSchedule`| `viewAny`, `view`, `create`, `delete`, `release`, `cancel` | `release`: `production.schedules.release`; `create`: `production.schedules.manage` |
+| `ProductionOrderPolicy` | `ProductionOrder` | `viewAny`, `view`, `create`, `update`, `delete`, `release`, `issue`, `return`, `logProgress`, `receiveFg`, `complete`, `close`, `cancel` | `viewAny`: true; `view`: tenant match; `create`: `production.order.create` or `admin`; `update`/`release`/`issue`/`return`/`logProgress`/`receiveFg`/`complete`/`close`: order not frozen + (`production.order.update` or `admin`); `cancel`: not completed/closed/cancelled + (`production.order.cancel` or `admin`) |
+| `ProductionBomPolicy` | `ProductionBom` | `viewAny`, `view`, `create`, `update`, `delete`, `submit`, `approve`, `reject` | `approve`: `production.bom.approve` or `admin`; `create`: `production.bom.create`; `update`: `production.bom.update`; enforces revision locking |
+| `RoutingPolicy` | `Routing` | `viewAny`, `view`, `create`, `update`, `delete`, `approve`, `cancel` | `approve`: `production.routing.approve`; `create`: `production.routing.create`; `update`: `production.routing.update`; `cancel`: `production.routing.cancel`; prevents editing locked routings |
+| `ProductionSchedulePolicy` | `ProductionSchedule`| `viewAny`, `view`, `create`, `delete`, `release`, `cancel` | `create`/`release`/`cancel`: `production.schedule.manage` or `admin` |
 | `WorkCenterPolicy` | `WorkCenter` | `viewAny`, `view`, `create`, `update`, `delete` | `create`/`update`/`delete`: `production.work_center.manage` or `admin` |
-| `MachinePolicy` | `Machine` | `viewAny`, `view`, `create`, `update`, `delete` | `create`/`update`: `production.work_center.manage` or `admin` |
-| `ProductionPlanPolicy` | `ProductionPlan` | `viewAny`, `view`, `create`, `update`, `release`, `mrp` | `release`/`mrp`: `production.plans.manage` or `admin`; validates approval before release |
-| `QualityPlanPolicy` | `ProductionQualityPlan` | `viewAny`, `create`, `update`, `delete` | `create`/`update`: `production.quality.inspect` or `admin` |
-| `QualityInspectionPolicy` | `ProductionQualityInspection` | `viewAny`, `create`, `approve` | `create`: inspector role; `approve`: quality lead or `admin` |
-| `ProductionEcoPolicy` | `ProductionEco` | `viewAny`, `create`, `approve`, `release` | `approve`/`release`: engineering manager or `admin` |
-| `DeliveryChallanPolicy` | `DeliveryChallan` | `viewAny`, `create`, `dispatch`, `receive` | `create`/`dispatch`: `production.subcontract.manage` or `admin` |
-| `ShiftPolicy` | `ProductionShift` | `viewAny`, `create`, `update`, `delete` | `create`/`update`: `production.work_center.manage` or `admin` |
-| `CalendarPolicy` | `ProductionCalendar` | `viewAny`, `create`, `update`, `delete` | `create`/`update`: `production.work_center.manage` or `admin` |
+| `MachinePolicy` | `Machine` | `viewAny`, `view`, `create`, `update`, `delete` | `create`/`update`/`delete`: `production.machine.manage` or `admin` |
+| `ProductionPlanPolicy` | `ProductionPlan` | `viewAny`, `view`, `create`, `update`, `release`, `mrp`, `approve`, `cancel` | `create`: `production.planning.create`; `update`/`release`/`mrp`: `production.planning.update` or `admin`; `approve`: `production.planning.approve`; `cancel`: `production.planning.cancel` |
+| `QualityPlanPolicy` | `ProductionQualityPlan` | `viewAny`, `create`, `update`, `delete` | `create`/`update`/`delete`: `production.quality.manage` or `admin` |
+| `QualityInspectionPolicy` | `ProductionQualityInspection` | `viewAny`, `create`, `approve` | `create`: `production.quality.manage` or `admin`; `approve`: `production.quality.approve` or `admin` |
+| `QualityManagementPolicy` | `ProductionNcr`, `ProductionCapa`, `ProductionReworkOrder` | `viewAny`, `create`, `update`, `approve` | `create`/`update`: `production.quality.manage` or `admin`; `approve`: `production.quality.approve` or `admin` |
+| `ManufacturingIntelligencePolicy` | Reports, Andon, Alerts | `viewAny`, `view` | `production.intelligence.view` or `admin` |
+| `ShiftPolicy` | `ProductionShift` | `viewAny`, `create`, `update`, `delete` | `create`/`update`/`delete`: `production.work_center.manage` or `admin` |
+| `CalendarPolicy` | `ProductionCalendar` | `viewAny`, `create`, `update`, `delete` | `create`/`update`/`delete`: `production.work_center.manage` or `admin` |
 
 ---
 
 ## 3. Production Permission Keys Reference
 
-The following table documents all granular permission strings recognized by `hasProductionPermission()` and `AccessService`:
+The following table documents all verified granular permission strings registered in `RbacSeeder.php` and enforced across policies, middleware, and controllers:
 
-| Permission String | Description | Permitted Actions |
-|---|---|---|
-| `production.dashboard.view` | View plant dashboards | Read executive OEE, Andon boards, and plant overview metrics |
-| `production.work_center.manage` | Master data administration | Create and edit Work Centers, Machines, Shifts, and Calendars |
-| `production.boms.manage` | BOM Engineering | Create, edit, submit, and duplicate Bills of Materials |
-| `production.boms.approve` | BOM Authorization | Formally approve or reject submitted BOM revisions |
-| `production.routing.manage` | Routing Engineering | Configure operations, runtimes, work center links, and subcontract setups |
-| `production.routing.approve` | Routing Authorization | Formally approve or reject routing revisions |
-| `production.plans.manage` | Master Planning | Create aggregate plans, run MRP engine, and generate child orders |
-| `production.orders.view` | Order Inquiries | Browse order directories, view picking slips, and inspect variance logs |
-| `production.orders.create` | Order Creation | Create new discrete production work orders |
-| `production.orders.update` | Order Lifecycle Management | Release orders, process material picking, and issue goods |
-| `production.orders.receive` | Finished Goods Intake | Execute commercial receipts of manufactured goods into warehouse inventory |
-| `production.schedules.manage` | Scheduling & Dispatch | Generate schedules, adjust Gantt bars, level capacity, and lock operations |
-| `production.schedules.release` | Schedule Shopfloor Release | Formally push optimized schedule to shopfloor MES terminals |
-| `production.mes.execute` | Shopfloor Operation Execution | Start, pause, resume, and complete operations; report Andon; log scrap |
-| `production.quality.inspect` | Quality Inspection | Record parameter measurements, approve inspections, and generate NCRs |
-| `production.wip.manage` | WIP Inventory Management | Transfer WIP between work centers, perform manual adjustments, convert to FG |
-| `production.subcontract.manage` | Subcontract Administration | Create Delivery Challans (Gate Passes), dispatch to vendors, receive returns |
-| `production.maintenance.manage` | Equipment Maintenance | Manage PM schedules, report breakdowns, assign mechanics, and issue spares |
-| `production.cost_adjustment.manage`| Cost Administration | Post manual cost adjustments and variance write-offs on orders |
-| `production.settings.manage` | Module Configuration | Configure subcontract procurement workflows and auto-approval limits |
+| Permission String | Entity | Action | Permitted Operations |
+|---|---|---|---|
+| `production.work_center.manage` | `work_center` | `manage` | Create, update, and configure Work Centers, Shifts, Calendars, and subcontract settings |
+| `production.machine.manage` | `machine` | `manage` | Create and maintain Machine master records, operational parameters, and maintenance links |
+| `production.routing.create` | `routing` | `create` | Define new manufacturing routing headers and sequence steps |
+| `production.routing.update` | `routing` | `update` | Modify operation runtimes, work center assignments, and tooling requirements on draft routings |
+| `production.routing.approve` | `routing` | `approve` | Formally approve routing revisions for production release |
+| `production.routing.cancel` | `routing` | `cancel` | Cancel or obsolete superseded routing versions |
+| `production.bom.create` | `bom` | `create` | Create new Bill of Materials headers, components, and parameterized formulas |
+| `production.bom.update` | `bom` | `update` | Modify raw material quantities, scrap percentages, and item lines on draft BOMs |
+| `production.bom.approve` | `bom` | `approve` | Formally approve BOM revisions for MRP and production release |
+| `production.planning.create` | `planning` | `create` | Create aggregate production plans and forecast schedules |
+| `production.planning.update` | `planning` | `update` | Update production plans, execute MRP engine runs, and release plans to shopfloor |
+| `production.planning.approve` | `planning` | `approve` | Formally authorize master production plans |
+| `production.planning.cancel` | `planning` | `cancel` | Cancel unreleased or superseded master production plans |
+| `production.order.create` | `order` | `create` | Create discrete production work orders, including project-linked orders |
+| `production.order.update` | `order` | `update` | Release orders, issue raw materials, record returns, log progress, receive finished goods, complete, and close orders |
+| `production.order.cancel` | `order` | `cancel` | Cancel uncompleted or draft production orders |
+| `production.mes.execute` | `mes` | `execute` | Start, pause, resume, and complete shopfloor operations, report Andon alerts, and log scrap on MES terminals |
+| `production.schedule.manage` | `schedule` | `manage` | Create production schedules, adjust Gantt dispatch board, level capacity, and release schedules |
+| `production.intelligence.view` | `intelligence` | `view` | Access Executive Dashboard, Live Andon Board, Manufacturing Reports, Alerts, and KPI Targets |
+| `production.quality.manage` | `quality` | `manage` | Manage Quality Plans, record inspections, log NCRs, CAPAs, Rework Orders, and Scrap Disposals |
+| `production.quality.approve` | `quality` | `approve` | Formally approve quality inspection results, NCR dispositions, and CAPA resolutions |
+| `production.cost_adjustment.create` | `cost_adjustment` | `create` | Record manual cost adjustments (rework, tooling, scrap write-offs) on production orders |
+| `production.cost_adjustment.update` | `cost_adjustment` | `update` | Edit or review posted manual cost adjustment entries |
+| `production.orders.view` | `order` | `view` | View production orders and linked badges (checked in TaskController and cross-module UI navigation) |
 
 ---
 
@@ -97,19 +101,41 @@ In `wm-product-saas`, users are assigned roles that bundle specific permission s
 |---|---|---|
 | **System Admin (`admin`)** | Full technical and administrative control | Full access across all permissions (bypasses individual checks) |
 | **Plant Manager** | Complete operational authority over manufacturing | All `production.*` permissions except developer APIs |
-| **Production Planner** | Master scheduling and inventory planning | `plans.manage`, `orders.create`, `orders.update`, `boms.manage`, `schedules.manage`, `schedules.release` |
-| **Process / Manufacturing Engineer** | Product structure and routing definitions | `boms.manage`, `boms.approve`, `routing.manage`, `routing.approve`, `work_center.manage` |
-| **Shopfloor Supervisor / Lead** | Daily shift supervision and dispatching | `orders.view`, `mes.execute`, `wip.manage`, `subcontract.manage`, `dashboard.view` |
+| **Production Planner** | Master scheduling and inventory planning | `planning.create`, `planning.update`, `order.create`, `order.update`, `bom.create`, `bom.update`, `schedule.manage`, `intelligence.view` |
+| **Process / Manufacturing Engineer** | Product structure and routing definitions | `bom.create`, `bom.update`, `bom.approve`, `routing.create`, `routing.update`, `routing.approve`, `work_center.manage`, `machine.manage` |
+| **Shopfloor Supervisor / Lead** | Daily shift supervision and dispatching | `order.update`, `mes.execute`, `intelligence.view`, `quality.manage` |
 | **Machine Operator** | Workstation execution | `mes.execute`, `orders.view` (scoped to assigned operations) |
-| **Quality Inspector (QC)** | Quality assurance and compliance | `quality.inspect`, `orders.view`, `dashboard.view` |
-| **Warehouse Storekeeper** | Material picking and store fulfillment | `orders.update` (issue/return), `maintenance.manage` (issue spares), `orders.receive` |
-| **Maintenance Engineer** | Machinery uptime and PM execution | `maintenance.manage`, `work_center.manage` (machine states), `dashboard.view` |
-| **Plant Financial Controller** | Cost accounting and variance auditing | `orders.view`, `dashboard.view`, `cost_adjustment.manage` |
+| **Quality Inspector (QC)** | Quality assurance and compliance | `quality.manage`, `quality.approve`, `intelligence.view` |
+| **Warehouse Storekeeper** | Material picking and store fulfillment | `order.update` (issue/return raw materials, receive finished goods) |
+| **Maintenance Engineer** | Machinery uptime and PM execution | `machine.manage`, `work_center.manage`, `intelligence.view` |
+| **Plant Financial Controller** | Cost accounting and variance auditing | `cost_adjustment.create`, `cost_adjustment.update`, `intelligence.view` |
 
 ---
 
 ## 5. UI Visibility vs. Backend Enforcement Security Check
 
-* **UI Directive Checks:** Blade templates conditionally display action buttons using `@can(...)` or `@if(auth()->user()->hasProductionPermission(...))` directives. For example, the **Approve BOM** button is only rendered if the user has `production.boms.approve`.
+* **UI Directive Checks:** Blade templates conditionally display action buttons using `@can(...)` or `@if(auth()->user()->hasProductionPermission(...))` directives. For example, the **Approve BOM** button is only rendered if the user has `production.bom.approve`.
 * **Backend Invariant:** Hiding an element in the browser does not constitute security. If an operator bypasses the UI and dispatches a direct HTTP POST request to `/production/boms/{id}/approve`, the controller executes `Gate::authorize('approve', $bom)`, resulting in an immediate `403 Forbidden` response.
 * **Tenant Boundary Protection:** Even if a user possesses the `admin` role in Tenant A, attempting to view or modify an order in Tenant B triggers a 403 or 404 response because all database queries are scoped by `require_tenant_id()`.
+
+---
+
+## 6. Cross-Module Authorization: Production & Project Management Integration
+
+The integration between Production and Project Management spans distinct permission boundaries:
+
+### 6.1 Creating a Linked Production Order from Production
+* **Route & Action:** `POST /production/orders` with `project_id`, `project_milestone_id`, and `project_task_id`.
+* **Required Permission:** `production.order.create` (or `admin`).
+* **Cross-Module Verification:** `StoreProductionOrderRequest` validates that the project, milestone, and task exist and strictly match the authenticated user's `tenant_id`, `company_id`, and `branch_id`. No Project Management editing permission is required to create a production order with project attributes.
+
+### 6.2 Linking an Existing Production Order from Project Management
+* **Route & Action:** `POST /projects/{project}/tasks/{task}/link-production-order` (`projects.tasks.link-production-order`).
+* **Required Project Permission:** `projects.tasks.update` (or project-level `projects.projects.update`, evaluated via `TaskPolicy::update($user, $task)`).
+* **Required Production Permission:** `production.orders.view` or `production.view` (enforced via `TaskController::canViewProduction()`, also satisfied by role-based bypasses for `tenant_owner` or `super_admin`).
+* **Unlinking Permission:** `DELETE /projects/{project}/tasks/{task}/production-orders/{productionOrder}` (`projects.tasks.unlink-production-order`) requires `projects.tasks.update` or `projects.projects.update`.
+
+### 6.3 Automated Completion Synchronization Security Context
+* **Listener Execution:** When a shopfloor operator or supervisor completes a production order (`POST /production/orders/{id}/complete`), the `ProductionOrderCompleted` event triggers `SyncProductionTaskCompletionListener`.
+* **Decoupled System Execution:** The listener operates with system authority to evaluate aggregate yield and update `tasks.status` and `milestones.progress_percentage`. Shopfloor operators completing orders do **not** need Project Management permissions for the background task synchronization to succeed.
+* **Commercial Boundary Protection:** Automated completion synchronization does **not** generate customer deliveries or sales invoices. Downstream commercial milestone billing remains gated by `projects.billing.generate_invoice` and Project Management financial policies.
