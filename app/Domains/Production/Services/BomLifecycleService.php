@@ -257,5 +257,8 @@ class BomLifecycleService
         }
 
         $proposedBom->update($updateData);
+
+        // Synchronize unsubmitted draft routings to point to the newly approved BOM
+        app(RoutingLifecycleService::class)->syncDraftRoutingsToApprovedBom($proposedBom);
     }
 }

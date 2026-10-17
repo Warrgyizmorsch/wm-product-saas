@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use Illuminate\Support\Carbon;
@@ -215,7 +216,27 @@ class RoutingLifecycleService
     }
 
     /**
-     * Archive active routings when their connected BOM is deactivated or cancelled.
+     * Synchronize unsubmitted draft routings to point to the newly approved BOM.
+     * Only routings in 'draft' status (not submitted for approval) get updated.
+     * Submitted routings ('pending_approval') and active/historical routings are NOT modified.
+     */
+    public function syncDraftRoutingsToApprovedBom(ProductionBom $bom): void
+    {
+        $draftRoutings = Routing::withoutGlobalScopes()
+            ->where('tenant_id', $bom->tenant_id)
+            ->where('product_id', $bom->product_id)
+            ->where('status', Routing::STATUS_DRAFT)
+            ->get();
+
+        foreach ($draftRoutings as $draftRouting) {
+            $draftRouting->update([
+                'bom_id' => $bom->id,
+            ]);
+        }
+    }
+
+    /**
+     * Archive active routings when their connected BOM is deactivated or superseded.
      */
     public function archiveRoutingsForDeactivatedBoms(
         array|int $deactivatedBomIds,
@@ -250,6 +271,80 @@ class RoutingLifecycleService
                 'user_id'    => $userId,
                 'action'     => RoutingApproval::ACTION_ARCHIVED,
                 'comments'   => $comments,
+            ]);
+        }
+    }
+
+    /**
+     * Handle connected routings when a BOM gets cancelled.
+     *
+     * Rules:
+     * - Any connected routing that is scheduled ('scheduled') must be cancelled ('cancelled')
+     *   along with the cancellation reason provided for the BOM.
+     * - Any connected routing that is active ('active') becomes historical ('historical')
+     *   with effective_to set to today (current flow).
+     */
+    public function handleRoutingsOnBomCancellation(
+        ProductionBom $bom,
+        int $userId,
+        ?string $cancelReason = null
+    ): void {
+        $today = Carbon::now()->toDateString();
+        $reasonText = $cancelReason ? " Reason: {$cancelReason}" : '';
+
+        // 1. Scheduled routings -> cancelled with BOM cancellation reason
+        $scheduledRoutings = Routing::withoutGlobalScopes()
+            ->where('tenant_id', $bom->tenant_id)
+            ->where(function ($q) use ($bom) {
+                $q->where('bom_id', $bom->id)
+                  ->orWhere(function ($sub) use ($bom) {
+                      $sub->whereNull('bom_id')
+                          ->where('product_id', $bom->product_id);
+                  });
+            })
+            ->where('status', Routing::STATUS_SCHEDULED)
+            ->get();
+
+        foreach ($scheduledRoutings as $routing) {
+            $routing->update([
+                'status'       => Routing::STATUS_CANCELLED,
+                'effective_to' => $today,
+            ]);
+
+            RoutingApproval::create([
+                'tenant_id'  => $routing->tenant_id,
+                'routing_id' => $routing->id,
+                'user_id'    => $userId,
+                'action'     => RoutingApproval::ACTION_CANCELLED,
+                'comments'   => "Automatically cancelled because connected BOM ({$bom->bom_number}) was cancelled.{$reasonText}",
+            ]);
+        }
+
+        // 2. Active routings -> historical (existing flow)
+        $activeRoutings = Routing::withoutGlobalScopes()
+            ->where('tenant_id', $bom->tenant_id)
+            ->where(function ($q) use ($bom) {
+                $q->where('bom_id', $bom->id)
+                  ->orWhere(function ($sub) use ($bom) {
+                      $sub->whereNull('bom_id')
+                          ->where('product_id', $bom->product_id);
+                  });
+            })
+            ->where('status', Routing::STATUS_ACTIVE)
+            ->get();
+
+        foreach ($activeRoutings as $routing) {
+            $routing->update([
+                'status'       => Routing::STATUS_HISTORICAL,
+                'effective_to' => $today,
+            ]);
+
+            RoutingApproval::create([
+                'tenant_id'  => $routing->tenant_id,
+                'routing_id' => $routing->id,
+                'user_id'    => $userId,
+                'action'     => RoutingApproval::ACTION_ARCHIVED,
+                'comments'   => "Automatically archived because connected BOM ({$bom->bom_number}) was cancelled.{$reasonText}",
             ]);
         }
     }

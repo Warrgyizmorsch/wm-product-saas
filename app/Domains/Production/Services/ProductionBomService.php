@@ -200,7 +200,10 @@ class ProductionBomService
                 );
             }
 
-            // 3. Log approval history
+            // 3. Synchronize unsubmitted draft routings to point to the newly approved BOM
+            $this->routingLifecycleService->syncDraftRoutingsToApprovedBom($bom);
+
+            // 4. Log approval history
             ProductionBomApproval::create([
                 'tenant_id' => $bom->tenant_id,
                 'bom_id' => $bom->id,
@@ -283,13 +286,12 @@ class ProductionBomService
         return DB::transaction(function () use ($bom, $userId, $comments) {
             $this->bomLifecycleService->transitionOnCancellation($bom, $userId, $comments);
 
-            // Archive any active routings connected to this cancelled BOM
-            $this->routingLifecycleService->archiveRoutingsForDeactivatedBoms(
-                [$bom->id],
-                $bom->product_id,
+            // Handle connected routings on BOM cancellation:
+            // Scheduled routings get cancelled with reason, active routings get historical (current flow)
+            $this->routingLifecycleService->handleRoutingsOnBomCancellation(
+                $bom,
                 $userId,
-                'Automatically archived because connected BOM (' . $bom->bom_number . ') was cancelled.',
-                Carbon::now()->toDateString()
+                $comments
             );
 
             return $bom->fresh();

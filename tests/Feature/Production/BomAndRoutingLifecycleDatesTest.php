@@ -8,6 +8,7 @@ use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionEco;
 use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Services\ProductionBomService;
 use App\Domains\Production\Services\ProductionEcoService;
@@ -895,5 +896,169 @@ class BomAndRoutingLifecycleDatesTest extends TestCase
 
         $routing->refresh();
         $this->assertEquals('Original Routing description.', $routing->description);
+    }
+
+    public function test_bom_approval_updates_unsubmitted_draft_routings_to_new_bom_while_leaving_submitted_routings_unchanged(): void
+    {
+        $today = Carbon::today()->toDateString();
+
+        // 1. Initial approved BOM v1
+        $bomV1 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-WIDGET-001',
+            'bom_name' => 'Widget BOM v1',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->productA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'status' => 'approved',
+            'version' => '1.0.0',
+            'effective_date' => $today,
+        ]);
+
+        // 2. Draft routing (unsubmitted, status = 'draft') pointing to BOM v1
+        $draftRouting = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-WIDGET-DRAFT',
+            'name' => 'Widget Routing Draft',
+            'product_id' => $this->productA->id,
+            'bom_id' => $bomV1->id,
+            'version' => '1.0.0',
+            'revision' => 0,
+            'is_default' => true,
+            'effective_from' => $today,
+            'status' => Routing::STATUS_DRAFT,
+            'created_by' => $this->adminA->id,
+        ]);
+
+        // 3. Submitted routing (pending_approval, status = 'pending_approval') pointing to BOM v1
+        $submittedRouting = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-WIDGET-SUBMITTED',
+            'name' => 'Widget Routing Submitted',
+            'product_id' => $this->productA->id,
+            'bom_id' => $bomV1->id,
+            'version' => '1.1.0',
+            'revision' => 0,
+            'is_default' => false,
+            'effective_from' => $today,
+            'status' => Routing::STATUS_PENDING_APPROVAL,
+            'created_by' => $this->adminA->id,
+        ]);
+
+        // 4. Create and approve new BOM v2
+        $bomV2 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-WIDGET-002',
+            'bom_name' => 'Widget BOM v2',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->productA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'status' => 'pending_approval',
+            'version' => '2.0.0',
+            'effective_date' => $today,
+        ]);
+
+        $bomService = app(ProductionBomService::class);
+        $bomService->approve($bomV2->id, $this->adminA->id);
+
+        $draftRouting->refresh();
+        $submittedRouting->refresh();
+
+        // Unsubmitted draft routing MUST be updated to point to new BOM v2
+        $this->assertEquals($bomV2->id, $draftRouting->bom_id);
+        $this->assertEquals(Routing::STATUS_DRAFT, $draftRouting->status);
+
+        // Submitted routing (pending approval) MUST NOT be changed
+        $this->assertEquals($bomV1->id, $submittedRouting->bom_id);
+        $this->assertEquals(Routing::STATUS_PENDING_APPROVAL, $submittedRouting->status);
+    }
+
+    public function test_bom_cancellation_cancels_scheduled_routings_with_reason_and_archives_active_routings_to_historical(): void
+    {
+        $today = Carbon::today()->toDateString();
+        $futureDate = Carbon::today()->addDays(10)->toDateString();
+
+        // 1. Approved BOM
+        $bom = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-WIDGET-CANCEL-TEST',
+            'bom_name' => 'Widget BOM Cancel Test',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->productA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'status' => 'approved',
+            'version' => '1.0.0',
+            'effective_date' => $today,
+        ]);
+
+        // 2. Active routing connected to this BOM
+        $activeRouting = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-WIDGET-ACTIVE',
+            'name' => 'Widget Routing Active',
+            'product_id' => $this->productA->id,
+            'bom_id' => $bom->id,
+            'version' => '1.0.0',
+            'revision' => 0,
+            'is_default' => true,
+            'effective_from' => $today,
+            'status' => Routing::STATUS_ACTIVE,
+            'created_by' => $this->adminA->id,
+        ]);
+
+        // 3. Scheduled routing connected to this BOM
+        $scheduledRouting = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RT-WIDGET-SCHEDULED',
+            'name' => 'Widget Routing Scheduled',
+            'product_id' => $this->productA->id,
+            'bom_id' => $bom->id,
+            'version' => '2.0.0',
+            'revision' => 0,
+            'is_default' => false,
+            'effective_from' => $futureDate,
+            'status' => Routing::STATUS_SCHEDULED,
+            'created_by' => $this->adminA->id,
+        ]);
+
+        // 4. Cancel the BOM with a specific cancellation reason
+        $cancelReason = 'Design obsolete due to defect report #99.';
+        $bomService = app(ProductionBomService::class);
+        $bomService->cancel($bom->id, $this->adminA->id, $cancelReason);
+
+        $bom->refresh();
+        $activeRouting->refresh();
+        $scheduledRouting->refresh();
+
+        // BOM is cancelled
+        $this->assertEquals('cancelled', $bom->status);
+        $this->assertEquals($today, $bom->expiry_date?->toDateString());
+
+        // Scheduled routing MUST be cancelled
+        $this->assertEquals(Routing::STATUS_CANCELLED, $scheduledRouting->status);
+        $this->assertEquals($today, $scheduledRouting->effective_to?->toDateString());
+
+        // Scheduled routing approval log must contain ACTION_CANCELLED and the cancellation reason
+        $scheduledApproval = RoutingApproval::where('routing_id', $scheduledRouting->id)
+            ->where('action', RoutingApproval::ACTION_CANCELLED)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($scheduledApproval);
+        $this->assertStringContainsString($cancelReason, $scheduledApproval->comments);
+        $this->assertStringContainsString($bom->bom_number, $scheduledApproval->comments);
+
+        // Active routing transitions to historical (current flow)
+        $this->assertEquals(Routing::STATUS_HISTORICAL, $activeRouting->status);
+        $this->assertEquals($today, $activeRouting->effective_to?->toDateString());
+
+        // Active routing approval log must contain ACTION_ARCHIVED
+        $activeApproval = RoutingApproval::where('routing_id', $activeRouting->id)
+            ->where('action', RoutingApproval::ACTION_ARCHIVED)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($activeApproval);
     }
 }
