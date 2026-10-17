@@ -197,7 +197,11 @@ class PurchaseRfqService
 
             foreach ($validated['items'] as $item) {
                 $baseRate = convert_to_base((float)$item['rate']);
+                $discAmount = convert_to_base((float)($item['discount_amount'] ?? 0.00));
                 $amount = $item['quantity'] * $baseRate;
+                $taxAmount = convert_to_base((float)($item['tax_amount'] ?? 0.00));
+                $lineTotal = max(0, $amount - $discAmount) + $taxAmount;
+
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
                     'product_id' => $item['product_id'],
@@ -206,7 +210,7 @@ class PurchaseRfqService
                     'rate' => $baseRate,
                     'amount' => $amount,
                     'discount_percent' => $item['discount_percent'] ?? 0.00,
-                    'discount_amount' => convert_to_base((float)($item['discount_amount'] ?? 0.00)),
+                    'discount_amount' => $discAmount,
                     'tax_percent' => $item['tax_percent'] ?? 0.00,
                     'cgst_percent' => $item['cgst_percent'] ?? 0.00,
                     'sgst_percent' => $item['sgst_percent'] ?? 0.00,
@@ -214,8 +218,8 @@ class PurchaseRfqService
                     'cgst_amount' => convert_to_base((float)($item['cgst_amount'] ?? 0.00)),
                     'sgst_amount' => convert_to_base((float)($item['sgst_amount'] ?? 0.00)),
                     'igst_amount' => convert_to_base((float)($item['igst_amount'] ?? 0.00)),
-                    'tax_amount' => convert_to_base((float)($item['tax_amount'] ?? 0.00)),
-                    'total_amount' => convert_to_base((float)($item['total_amount'] ?? $amount)),
+                    'tax_amount' => $taxAmount,
+                    'total_amount' => $lineTotal,
                 ]);
             }
 

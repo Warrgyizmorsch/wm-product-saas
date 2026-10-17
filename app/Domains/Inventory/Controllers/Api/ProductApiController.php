@@ -1330,15 +1330,9 @@ class ProductApiController extends Controller
             ->where('warehouse_id', $warehouseId)
             ->first();
 
-        $reserved = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->where('warehouse_id', $warehouseId)
-            ->where('status', 'Active')
-            ->sum('reserved_qty');
-
-        $physicalQty  = (float)($stock?->quantity ?? 0);
-        $reservedQty  = (float)$reserved;
-        $availableQty = max(0, $physicalQty - $reservedQty);
+        $physicalQty  = $stock ? (float)$stock->quantity : 0.0;
+        $reservedQty  = $stock ? (float)$stock->reserved_qty : 0.0;
+        $availableQty = $stock ? (float)$stock->available_qty : 0.0;
 
         return response()->json([
             'success' => true,

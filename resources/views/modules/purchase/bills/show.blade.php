@@ -15,7 +15,7 @@
         {{-- A bill held by 3-way match can't be paid or offset until released. --}}
         @if($bill->due_amount > 0 && !$bill->isOnHold())
             @php
-                $availAdvAction = max($availableAdvance ?? 0, $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0);
+                $availAdvAction = (float)($availableAdvance ?? 0);
             @endphp
             @if($availAdvAction > 0)
                 <form action="{{ route('purchase.bills.apply-advance', $bill->id) }}" method="POST" class="d-inline">
@@ -80,7 +80,7 @@
         </div>
 
         @php
-            $availAdv = max($availableAdvance ?? 0, $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0);
+            $availAdv = (float)($availableAdvance ?? 0);
             $isFreightEligible = ($bill->freight_terms === 'to_pay' || $bill->freight_terms === 'to_be_billed');
             $isProRata = ($bill->tax_type === 'item_wise_tax' && $isFreightEligible && $bill->freight_tax_method === 'pro_rata' && $bill->freight_amount > 0);
         @endphp

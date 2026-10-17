@@ -248,6 +248,14 @@ class LeadService
             ];
         }
 
+        // Lock Check: Once a lead is in Dealing, it cannot be changed to another status manually
+        if (strcasecmp($oldStatus, 'Dealing') === 0 && strcasecmp($newStatus, 'Dealing') !== 0 && !$isSystemTriggered) {
+            return [
+                'success' => false,
+                'message' => "Lead status in '{$oldStatus}' stage is locked. Status cannot be changed."
+            ];
+        }
+
         if ($oldStatus === $newStatus) {
             return ['success' => true, 'message' => "Lead status is already {$newStatus}."];
         }

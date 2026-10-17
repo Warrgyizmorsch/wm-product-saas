@@ -136,9 +136,11 @@ class VendorApiController extends Controller
             'status'           => $validated['status'] ?? 'active',
             'billing_address'  => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
-            'opening_balance'  => $validated['opening_balance'] ?? 0.00,
+            'opening_balance'  => isset($validated['opening_balance']) ? convert_to_base((float)$validated['opening_balance']) : 0.00,
             'payment_terms'    => $validated['payment_terms'] ?? null,
         ]);
+
+        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
 
         return response()->json([
             'success' => true,
@@ -228,7 +230,15 @@ class VendorApiController extends Controller
             ], 422);
         }
 
-        $vendor->update($validator->validated());
+        $data = $validator->validated();
+        if (array_key_exists('opening_balance', $data)) {
+            $data['opening_balance'] = $data['opening_balance'] !== null
+                ? convert_to_base((float) $data['opening_balance'])
+                : 0.00;
+        }
+        $vendor->update($data);
+
+        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
 
         return response()->json([
             'success' => true,

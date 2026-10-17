@@ -75,6 +75,49 @@ class ApAgingController extends Controller
             $buckets[$bucket] += $balance;
         }
 
+        // Include vendors with unsettled Opening Balances (historical dues bucketed into 90_plus)
+        $vendorsWithOpening = \App\Domains\Inventory\Models\Vendor::where('tenant_id', auth()->user()->tenant_id)
+            ->where('opening_balance', '>', 0)
+            ->get();
+
+        foreach ($vendorsWithOpening as $vendor) {
+            $unallocatedPaid = (float) \App\Domains\Purchase\Models\VendorPayment::where('tenant_id', auth()->user()->tenant_id)
+                ->where('vendor_id', $vendor->id)
+                ->whereIn('payment_type', ['Opening Balance', 'Advance'])
+                ->whereDoesntHave('allocations')
+                ->where('status', '!=', 'cancelled')
+                ->sum('amount');
+
+            $remainingOpening = max(0.0, (float) $vendor->opening_balance - $unallocatedPaid);
+
+            if ($remainingOpening > 0.001) {
+                $vendorId = $vendor->id;
+                $vendorName = $vendor->name ?? 'Unknown Vendor';
+
+                $vendors[$vendorId] ??= [
+                    'vendor_id' => $vendorId,
+                    'name' => $vendorName,
+                    'buckets' => $buckets,
+                    'total' => 0.0,
+                    'bills' => [],
+                ];
+
+                $vendors[$vendorId]['buckets']['90_plus'] += $remainingOpening;
+                $vendors[$vendorId]['total'] += $remainingOpening;
+                $vendors[$vendorId]['bills'][] = [
+                    'bill' => (object)[
+                        'bill_number' => 'OPENING-BAL',
+                    ],
+                    'due_date' => null,
+                    'days_overdue' => 90,
+                    'bucket' => '90_plus',
+                    'balance' => $remainingOpening,
+                ];
+
+                $buckets['90_plus'] += $remainingOpening;
+            }
+        }
+
         $grandTotal = array_sum($buckets);
 
         usort($vendors, fn ($a, $b) => $b['total'] <=> $a['total']);

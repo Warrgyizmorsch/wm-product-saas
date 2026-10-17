@@ -639,6 +639,18 @@ class PurchaseRfqController extends Controller
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric',
             'items.*.rate' => 'required|numeric',
+            'items.*.amount' => 'nullable|numeric',
+            'items.*.discount_percent' => 'nullable|numeric',
+            'items.*.discount_amount' => 'nullable|numeric',
+            'items.*.tax_percent' => 'nullable|numeric',
+            'items.*.cgst_percent' => 'nullable|numeric',
+            'items.*.sgst_percent' => 'nullable|numeric',
+            'items.*.igst_percent' => 'nullable|numeric',
+            'items.*.cgst_amount' => 'nullable|numeric',
+            'items.*.sgst_amount' => 'nullable|numeric',
+            'items.*.igst_amount' => 'nullable|numeric',
+            'items.*.tax_amount' => 'nullable|numeric',
+            'items.*.total_amount' => 'nullable|numeric',
         ]);
 
         $po = $this->rfqService->createPoFromRfq($rfq, $validated, $tenantId);

@@ -17,6 +17,41 @@
     </div>
 @endsection
 
+@push('styles')
+<style>
+    .dispatch-action-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        padding: 3px 8px !important;
+        border-radius: 5px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #ffffff !important;
+        text-decoration: none !important;
+        transition: all 0.15s ease !important;
+    }
+    .dispatch-action-btn:hover {
+        border-color: var(--bs-primary) !important;
+        color: var(--bs-primary) !important;
+        background: color-mix(in srgb, var(--bs-primary) 8%, white) !important;
+    }
+    .dispatch-popup-item {
+        transition: background-color 0.15s ease;
+    }
+    .dispatch-popup-item:hover {
+        background-color: #f8fafc;
+    }
+    .dispatch-count-badge {
+        font-size: 9px !important;
+        padding: 2px 5px !important;
+        transform: translate(-30%, -20%) !important;
+        box-shadow: 0 0 0 2px #ffffff !important;
+    }
+</style>
+@endpush
+
 @section('content')
 
     @php
@@ -108,7 +143,7 @@
 
             <!-- TAB 1: PENDING DISPATCH ORDERS (Sales Orders awaiting fulfillment) -->
             <div class="tab-pane fade {{ $isPendingActive ? 'show active' : '' }}" id="tab-pending-dispatches" role="tabpanel" aria-labelledby="tab-pending-dispatches-tab">
-                <div class="table-responsive">
+                <div class="table-responsive" style="min-height: 280px;">
                     <x-ui.odoo-form-ui type="table" id="pendingDispatchesTable" class="mb-0">
                         <thead>
                             <tr style="background-color: #f1f5f9 !important;">
@@ -170,7 +205,7 @@
                                                             <span class="text-muted">({{ $item['sku'] }})</span>
                                                         @endif
                                                         <div class="fs-10 text-muted">
-                                                            {{ __('crm.stock_available') }}: <span class="fw-bold {{ $item['available_stock'] >= $item['pending_qty'] ? 'text-success' : 'text-danger' }}">{{ (int)$item['available_stock'] }}</span>
+                                                            {{ __('crm.stock_available') }}: <span class="fw-bold {{ $item['available_stock'] >= $item['pending_qty'] ? 'text-success' : 'text-danger' }}">{{ fmod($item['available_stock'], 1) == 0.0 ? number_format($item['available_stock'], 0) : number_format($item['available_stock'], 2) }}</span>
                                                         </div>
                                                     </div>
                                                     <div class="text-end ps-2">
@@ -219,11 +254,24 @@
                                                title="{{ __('crm.dispatch_now') }}">
                                                 <i class="feather-truck me-1 fs-11"></i>{{ __('crm.dispatch_now') }}
                                             </a>
-                                            <a href="{{ route('sales.orders.show', $so->id) }}" 
-                                               class="btn btn-sm btn-icon btn-light" 
-                                               title="{{ __('crm.view_sales_order') }}">
+
+                                            @php
+                                                $relatedDispatches = $so->dispatches ?? collect();
+                                                $dispCount = $relatedDispatches->count();
+                                            @endphp
+
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-icon {{ $dispCount > 0 ? 'btn-soft-primary text-primary' : 'btn-light text-muted' }} position-relative" 
+                                                    data-bs-toggle="offcanvas" 
+                                                    data-bs-target="#dispatchesDrawer_{{ $so->id }}"
+                                                    title="{{ $dispCount > 0 ? "View {$dispCount} Dispatch Order(s)" : 'No Dispatches Created Yet' }}">
                                                 <i class="feather-eye fs-12"></i>
-                                            </a>
+                                                @if ($dispCount > 0)
+                                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary text-white dispatch-count-badge">
+                                                        {{ $dispCount }}
+                                                    </span>
+                                                @endif
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -239,6 +287,194 @@
                         </tbody>
                     </x-ui.odoo-form-ui>
                 </div>
+
+                {{-- Offcanvas Drawers for Related Dispatches (Side Drawer View) --}}
+                @foreach ($pendingSalesOrders as $so)
+                    @php
+                        $relatedDispatches = $so->dispatches ?? collect();
+                        $dispCount = $relatedDispatches->count();
+                        $prog = $so->dispatch_progress ?? 0;
+                        $statusBadgeClass = ($so->dispatch_status_label === 'Partially Dispatched') 
+                            ? 'bg-soft-info text-info' 
+                            : 'bg-soft-warning text-warning';
+                    @endphp
+                    <div class="offcanvas offcanvas-end border-0 shadow-lg" 
+                         tabindex="-1" 
+                         id="dispatchesDrawer_{{ $so->id }}" 
+                         aria-labelledby="dispatchesDrawerLabel_{{ $so->id }}"
+                         style="width: min(580px, 94vw); z-index: 1060;">
+                        
+                        {{-- Drawer Header --}}
+                        <div class="offcanvas-header bg-light border-bottom py-3 px-4">
+                            <div class="d-flex align-items-center gap-2.5">
+                                <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded">
+                                    <i class="feather-truck fs-15"></i>
+                                </div>
+                                <div>
+                                    <h6 class="offcanvas-title fw-bold text-dark mb-0 fs-14" id="dispatchesDrawerLabel_{{ $so->id }}">
+                                        {{ __('crm.dispatch_orders') }} — <span class="text-primary font-monospace">{{ $so->sales_order_number }}</span>
+                                    </h6>
+                                    <span class="text-muted fs-11">
+                                        {{ $so->customer?->name ?? '—' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                        </div>
+
+                        {{-- Drawer Body --}}
+                        <div class="offcanvas-body p-4" style="overflow-y: auto;">
+                            
+                            {{-- Sales Order Overview Box --}}
+                            <div class="card border border-gray-200 bg-light-subtle mb-4 shadow-none">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2.5">
+                                        <div>
+                                            <span class="fs-10 text-uppercase fw-bold text-muted d-block">Customer Details</span>
+                                            <span class="fw-bold text-dark fs-13">{{ $so->customer?->name ?? '—' }}</span>
+                                            @if ($so->customer?->phone)
+                                                <span class="text-muted fs-11 ms-1"><i class="feather-phone me-1 fs-10"></i>{{ $so->customer->phone }}</span>
+                                            @endif
+                                        </div>
+                                        <span class="badge {{ $statusBadgeClass }} fs-11 px-2.5 py-1 fw-bold">{{ $so->dispatch_status_label }} ({{ $prog }}%)</span>
+                                    </div>
+
+                                    {{-- Metric Counters --}}
+                                    <div class="row g-2 text-center pt-2 border-top">
+                                        <div class="col-4">
+                                            <div class="bg-white p-2 rounded border">
+                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block">{{ __('crm.total_ordered') }}</span>
+                                                <span class="font-monospace fw-bold text-dark fs-14">{{ (int)$so->total_ordered_qty }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="bg-white p-2 rounded border">
+                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block">{{ __('crm.total_dispatched') }}</span>
+                                                <span class="font-monospace fw-bold text-info fs-14">{{ (int)$so->total_dispatched_qty }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="bg-white p-2 rounded border">
+                                                <span class="fs-10 text-muted text-uppercase fw-bold d-block">{{ __('crm.pending_qty') }}</span>
+                                                <span class="font-monospace fw-bold text-danger fs-14">{{ (int)$so->total_pending_qty }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Section Heading --}}
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h6 class="fw-bold text-dark mb-0 fs-12 text-uppercase letter-spacing-1">
+                                    <i class="feather-layers me-1.5 text-primary"></i>Dispatches Created ({{ $dispCount }})
+                                </h6>
+                                @if ($dispCount > 0)
+                                    <span class="badge bg-soft-primary text-primary fs-11">{{ $dispCount }} Record{{ $dispCount > 1 ? 's' : '' }}</span>
+                                @endif
+                            </div>
+
+                            {{-- Dispatches Cards List --}}
+                            @if ($dispCount > 0)
+                                <div class="d-flex flex-column gap-3 mb-3">
+                                    @foreach ($relatedDispatches as $disp)
+                                        @php
+                                            $dispBadgeClass = match($disp->status) {
+                                                'Pending' => 'bg-soft-warning text-warning',
+                                                'Confirmed' => 'bg-soft-primary text-primary',
+                                                'Dispatched', 'Shipped' => 'bg-soft-info text-info',
+                                                'Delivered' => 'bg-soft-success text-success',
+                                                'Cancelled' => 'bg-soft-danger text-danger',
+                                                default => 'bg-soft-secondary text-secondary',
+                                            };
+                                        @endphp
+                                        <div class="card border border-gray-200 shadow-sm rounded-3">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <div class="avatar-text avatar-xs bg-soft-primary text-primary rounded font-monospace fw-bold" style="width: 24px; height: 24px; font-size: 11px;">
+                                                            <i class="feather-send"></i>
+                                                        </div>
+                                                        <a href="{{ route('sales.dispatches.show', $disp->id) }}" class="fw-bold text-primary font-monospace fs-13 text-decoration-none">
+                                                            {{ $disp->dispatch_number }}
+                                                        </a>
+                                                    </div>
+                                                    <span class="badge {{ $dispBadgeClass }} fs-11 px-2.5 py-1 rounded-pill fw-bold">
+                                                        {{ $disp->status }}
+                                                    </span>
+                                                </div>
+
+                                                {{-- Dispatched Items Breakdown --}}
+                                                <div class="bg-light p-2.5 rounded border border-gray-100 mb-2.5 fs-12">
+                                                    <div class="d-flex justify-content-between text-muted fs-11 mb-1 pb-1 border-bottom">
+                                                        <span class="fw-semibold text-dark">Items Dispatched:</span>
+                                                        <span><i class="feather-calendar me-1 fs-10"></i>{{ $disp->dispatch_date ? $disp->dispatch_date->format('d M Y') : ($disp->created_at ? $disp->created_at->format('d M Y') : 'N/A') }}</span>
+                                                    </div>
+                                                    @forelse ($disp->items as $dItem)
+                                                        <div class="d-flex justify-content-between align-items-center fw-medium text-dark py-0.5">
+                                                            <span>{{ $dItem->product?->name ?? 'Product' }}</span>
+                                                            <span class="badge bg-white border text-dark font-monospace fs-11">
+                                                                {{ (float)$dItem->quantity_dispatched }} {{ $dItem->product?->uom?->code ?? '' }}
+                                                            </span>
+                                                        </div>
+                                                    @empty
+                                                        <span class="text-muted fs-11">—</span>
+                                                    @endforelse
+                                                </div>
+
+                                                {{-- Logistics & Action Buttons --}}
+                                                <div class="d-flex align-items-center justify-content-between pt-1">
+                                                    <div class="text-muted fs-11">
+                                                        <i class="feather-truck me-1 text-primary fs-11"></i>
+                                                        <span class="fw-medium text-dark">{{ $disp->shipping_agent ?: ($disp->carrier ?: 'Standard Delivery') }}</span>
+                                                        @if ($disp->vehicle_number)
+                                                            <span class="ms-1 font-monospace text-muted">({{ $disp->vehicle_number }})</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2" style="gap: 8px !important;">
+                                                        <a href="{{ route('sales.dispatches.download-challan', $disp->id) }}" 
+                                                           target="_blank" 
+                                                           class="btn btn-sm btn-light border px-2.5 py-1 fs-11 text-secondary fw-semibold" 
+                                                           title="{{ __('crm.delivery_challan_pdf') ?? 'Challan' }}">
+                                                            <i class="feather-printer me-1 fs-10"></i>Challan
+                                                        </a>
+                                                        <a href="{{ route('sales.dispatches.show', $disp->id) }}" 
+                                                           class="btn btn-sm btn-primary px-3 py-1 fs-11 fw-bold" 
+                                                           title="{{ __('crm.view_dispatch') }}">
+                                                            <i class="feather-eye me-1 fs-10"></i>View Details
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="p-5 text-center text-muted border rounded-3 bg-light my-3">
+                                    <i class="feather-inbox d-block mb-3 text-muted fs-32 opacity-50"></i>
+                                    <h6 class="fw-bold text-dark mb-1">No Dispatches Created Yet</h6>
+                                    <p class="fs-12 text-muted mb-3">No dispatch orders have been created for this sales order so far.</p>
+                                    <a href="{{ route('sales.dispatches.create', ['sales_order_id' => $so->id]) }}" class="btn btn-sm btn-primary fw-bold px-3">
+                                        <i class="feather-truck me-1.5"></i>Create First Dispatch
+                                    </a>
+                                </div>
+                            @endif
+
+                        </div>
+
+                        {{-- Drawer Footer --}}
+                        <div class="offcanvas-footer bg-light p-3 px-4 border-top d-flex align-items-center justify-content-between">
+                            <a href="{{ route('sales.orders.show', $so->id) }}" class="btn btn-sm btn-light border text-muted">
+                                <i class="feather-file-text me-1"></i>View Sales Order
+                            </a>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="offcanvas">Close</button>
+                                <a href="{{ route('sales.dispatches.create', ['sales_order_id' => $so->id]) }}" class="btn btn-sm btn-primary fw-bold">
+                                    <i class="feather-truck me-1"></i>New Dispatch
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
 
                 @if ($pendingSalesOrders instanceof \Illuminate\Pagination\LengthAwarePaginator && $pendingSalesOrders->hasPages())
                     <div class="pt-3">

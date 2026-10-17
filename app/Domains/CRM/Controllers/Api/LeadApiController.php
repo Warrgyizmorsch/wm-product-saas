@@ -925,6 +925,13 @@ class LeadApiController extends Controller
             ], 422);
         }
 
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead status in '{$lead->status}' stage is locked.",
+            ], 422);
+        }
+
         if (strcasecmp($newStatus, 'Won') === 0) {
             return response()->json([
                 'success' => false,

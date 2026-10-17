@@ -20,7 +20,26 @@ class VendorPaymentService
     {
         $billId = $validated['vendor_bill_id'] ?? $validated['allocations'][0]['vendor_bill_id'] ?? null;
         $bill = $billId ? $this->billRepo->find($billId) : null;
-        $paymentType = $bill ? 'Bill Payment' : 'Advance';
+        $paymentType = 'Advance';
+        if ($bill) {
+            $paymentType = 'Bill Payment';
+        } else {
+            // Check if vendor has unsettled Opening Balance
+            $vendor = \App\Domains\Inventory\Models\Vendor::find($validated['vendor_id']);
+            $openingBal = (float) ($vendor?->opening_balance ?? 0);
+            if ($openingBal > 0) {
+                $unallocatedPaid = (float) VendorPayment::where('tenant_id', $tenantId)
+                    ->where('vendor_id', $validated['vendor_id'])
+                    ->whereIn('payment_type', ['Opening Balance', 'Advance'])
+                    ->whereDoesntHave('allocations')
+                    ->where('status', '!=', 'cancelled')
+                    ->sum('amount');
+                $remainingOpening = max(0.0, $openingBal - $unallocatedPaid);
+                if ($remainingOpening > 0.001) {
+                    $paymentType = 'Opening Balance';
+                }
+            }
+        }
 
         if ($bill?->isOnHold()) {
             throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch and cannot be paid until it is released.");

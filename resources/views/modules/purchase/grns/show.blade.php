@@ -427,8 +427,8 @@
                                             <td class="text-center font-monospace fw-bold text-primary">{{ number_format($item->received_qty, 2) }}</td>
                                             <td class="text-center font-monospace text-danger fw-semibold">{{ number_format($item->rejected_qty, 2) }}</td>
                                             <td class="text-center font-monospace text-success fw-bold">{{ number_format($item->accepted_qty, 2) }}</td>
-                                            <td class="text-end font-monospace">{{ number_format($item->unit_rate, 2) }}</td>
-                                            <td class="text-end pe-3 font-monospace fw-bold text-dark">{{ number_format($item->total_amount, 2) }}</td>
+                                            <td class="text-end font-monospace">{{ format_currency($item->unit_rate) }}</td>
+                                            <td class="text-end pe-3 font-monospace fw-bold text-dark">{{ format_currency($item->total_amount) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>

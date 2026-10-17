@@ -393,25 +393,57 @@ class VendorBillService
         });
     }
 
-    public function getAvailableVendorAdvance(int $vendorId, int $tenantId): float
+    public function getAvailableVendorAdvance(int $vendorId, int $tenantId, ?int $purchaseOrderId = null): float
     {
-        $directAdvances = VendorPayment::where('tenant_id', $tenantId)
+        // Self-heal: ensure any existing PurchaseAdvancePayment records are mirrored in VendorPayment
+        $missingPoAdvances = PurchaseAdvancePayment::where('tenant_id', $tenantId)
+            ->where('vendor_id', $vendorId)
+            ->whereNotIn('payment_number', function ($q) use ($tenantId) {
+                $q->select('payment_number')->from('vendor_payments')->where('tenant_id', $tenantId);
+            })
+            ->get();
+
+        foreach ($missingPoAdvances as $poAdv) {
+            VendorPayment::create([
+                'tenant_id'         => $tenantId,
+                'company_id'        => $poAdv->company_id,
+                'branch_id'         => $poAdv->branch_id,
+                'payment_number'    => $poAdv->advance_number,
+                'vendor_id'         => $poAdv->vendor_id,
+                'purchase_order_id' => $poAdv->purchase_order_id,
+                'payment_type'      => 'Advance',
+                'payment_method'    => $poAdv->payment_method,
+                'payment_date'      => $poAdv->payment_date,
+                'amount'            => $poAdv->amount,
+                'reference_number'  => $poAdv->reference_number,
+                'status'            => 'Posted',
+                'notes'             => $poAdv->notes,
+                'created_by'        => $poAdv->created_by,
+            ]);
+        }
+
+        $advancesQuery = VendorPayment::where('tenant_id', $tenantId)
             ->where('vendor_id', $vendorId)
             ->where('payment_type', 'Advance')
-            ->sum('amount');
+            ->where('status', '!=', 'cancelled');
 
-        $poAdvances = PurchaseAdvancePayment::where('tenant_id', $tenantId)
-            ->where('vendor_id', $vendorId)
-            ->sum('amount');
+        if ($purchaseOrderId) {
+            $advancesQuery->where(function ($q) use ($purchaseOrderId) {
+                $q->where('purchase_order_id', $purchaseOrderId)
+                  ->orWhereNull('purchase_order_id');
+            });
+        }
 
-        $usedAsAdvance = VendorPaymentAllocation::where('tenant_id', $tenantId)
-            ->whereHas('vendorPayment', function ($q) use ($vendorId) {
-                $q->where('vendor_id', $vendorId)
-                  ->where('payment_type', 'Advance');
-            })
-            ->sum('allocated_amount');
+        $advances = $advancesQuery->get();
 
-        return max(0.0, round(($directAdvances + $poAdvances) - $usedAsAdvance, 2));
+        $totalAvailable = 0.0;
+        foreach ($advances as $adv) {
+            $allocated = (float) $adv->allocations()->sum('allocated_amount');
+            $remaining = max(0.0, (float) $adv->amount - $allocated);
+            $totalAvailable += $remaining;
+        }
+
+        return round($totalAvailable, 2);
     }
 
     public function applyAdvanceCredit(VendorBill $bill, int $tenantId): bool
@@ -422,17 +454,64 @@ class VendorBillService
 
         return DB::transaction(function () use ($bill, $tenantId) {
             $due = (float) $bill->due_amount;
-            if ($due <= 0) {
+            if ($due <= 0.001) {
                 return false;
             }
 
-            $advAvailable = $this->getAvailableVendorAdvance($bill->vendor_id, $tenantId);
-            if ($advAvailable <= 0) {
+            $poId = $bill->purchase_order_id ?? $bill->goodsReceiptNote?->purchase_order_id;
+            $advAvailable = $this->getAvailableVendorAdvance($bill->vendor_id, $tenantId, $poId);
+            if ($advAvailable <= 0.001) {
                 return false;
             }
 
-            $apply = min($due, $advAvailable);
-            $newPaid = (float)($bill->paid_amount ?? 0) + $apply;
+            $amountToApply = min($due, $advAvailable);
+            $remainingToAllocate = $amountToApply;
+
+            $advancesQuery = VendorPayment::where('tenant_id', $tenantId)
+                ->where('vendor_id', $bill->vendor_id)
+                ->where('payment_type', 'Advance')
+                ->where('status', '!=', 'cancelled');
+
+            if ($poId) {
+                $advances = $advancesQuery->where(function ($q) use ($poId) {
+                        $q->where('purchase_order_id', $poId)
+                          ->orWhereNull('purchase_order_id');
+                    })
+                    ->orderByRaw("CASE WHEN purchase_order_id = ? THEN 0 ELSE 1 END", [$poId])
+                    ->orderBy('payment_date')
+                    ->orderBy('id')
+                    ->get();
+            } else {
+                $advances = $advancesQuery->orderBy('payment_date')->orderBy('id')->get();
+            }
+
+            foreach ($advances as $adv) {
+                if ($remainingToAllocate <= 0.001) {
+                    break;
+                }
+
+                $alreadyAllocated = (float) $adv->allocations()->sum('allocated_amount');
+                $unallocated = max(0.0, (float) $adv->amount - $alreadyAllocated);
+
+                if ($unallocated <= 0.001) {
+                    continue;
+                }
+
+                $chunk = min($remainingToAllocate, $unallocated);
+
+                VendorPaymentAllocation::create([
+                    'tenant_id'         => $tenantId,
+                    'company_id'        => $bill->company_id,
+                    'branch_id'         => $bill->branch_id,
+                    'vendor_payment_id' => $adv->id,
+                    'vendor_bill_id'    => $bill->id,
+                    'allocated_amount'  => $chunk,
+                ]);
+
+                $remainingToAllocate -= $chunk;
+            }
+
+            $newPaid = round((float)($bill->paid_amount ?? 0) + $amountToApply, 2);
             $billTotal = (float)($bill->grand_total ?: $bill->total_amount);
             $newDue = max(0.0, round($billTotal - $newPaid, 2));
             $status = ($newDue <= 0.001) ? 'Paid' : 'Partially Paid';
@@ -443,22 +522,7 @@ class VendorBillService
                 'status'      => $status,
             ]);
 
-            $advPayment = VendorPayment::where('tenant_id', $tenantId)
-                ->where('vendor_id', $bill->vendor_id)
-                ->where('payment_type', 'Advance')
-                ->latest()
-                ->first();
-
-            if ($advPayment) {
-                VendorPaymentAllocation::create([
-                    'tenant_id'         => $tenantId,
-                    'vendor_payment_id' => $advPayment->id,
-                    'vendor_bill_id'    => $bill->id,
-                    'allocated_amount'  => $apply,
-                ]);
-            }
-
-            $this->postAdvanceSettlementJournal($bill, $apply, $tenantId);
+            $this->postAdvanceSettlementJournal($bill, $amountToApply, $tenantId);
 
             return true;
         });

@@ -92,13 +92,13 @@ class GoodsReceiptNoteService
                     $totalItemDisc = ($po && $po->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
                     
                     $unitRate = isset($item['unit_rate']) && (float)$item['unit_rate'] >= 0
-                        ? (float)$item['unit_rate']
+                        ? convert_to_base((float)$item['unit_rate'])
                         : (($poQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $poQty, 2) : $grossPrice);
                 } else {
                     $orderedQty = 0.0;
                     $prevReceived = 0.0;
                     $remainingQty = 0.0;
-                    $unitRate = isset($item['unit_rate']) ? (float)$item['unit_rate'] : (float)($product?->cost_price ?? $product?->unit_cost ?? 0.00);
+                    $unitRate = isset($item['unit_rate']) ? convert_to_base((float)$item['unit_rate']) : (float)($product?->cost_price ?? $product?->unit_cost ?? 0.00);
                 }
 
                 $totalAmount = round($qtyAccepted * $unitRate, 2);

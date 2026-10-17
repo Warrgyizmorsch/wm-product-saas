@@ -131,7 +131,7 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="{{ __('purchase.opening_balance') }} ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" value="{{ old('opening_balance', $vendor->opening_balance) }}" placeholder="0.00" :error-text="$errors->first('opening_balance')" />
+                                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="{{ __('purchase.opening_balance') }} ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" value="{{ old('opening_balance', number_format(convert_from_base($vendor->opening_balance ?? 0), 2, '.', '')) }}" placeholder="0.00" :error-text="$errors->first('opening_balance')" />
                             </div>
                         </div>
 

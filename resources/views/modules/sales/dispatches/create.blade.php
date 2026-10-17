@@ -587,8 +587,8 @@
                             </td>
                             <td class="align-top"><span class="text-muted fs-12">—</span></td>
                             <td class="text-end align-top">${item.quantity_ordered}</td>
-                            <td class="text-end fw-semibold text-success align-top">${item.available_qty ?? 0}</td>
-                            <td class="text-end align-top">${item.quantity_reserved ?? 0}</td>
+                            <td class="text-end fw-semibold text-success align-top">${(Number(item.available_qty) || 0) % 1 === 0 ? (Number(item.available_qty) || 0) : parseFloat(Number(item.available_qty).toFixed(2))}</td>
+                            <td class="text-end align-top">${(Number(item.quantity_reserved) || 0) % 1 === 0 ? (Number(item.quantity_reserved) || 0) : parseFloat(Number(item.quantity_reserved).toFixed(2))}</td>
                             <td class="text-end fw-bold text-success align-top">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-muted align-top">0</td>
                             <td class="text-end align-top">
@@ -607,8 +607,8 @@
                             </td>
                             <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2 item-warehouse-select">${options}</select></td>
                             <td class="text-end fw-semibold mr-col align-top">${item.quantity_ordered}</td>
-                            <td class="text-end fw-semibold text-success mr-col align-top avail-qty-cell">${item.available_qty ?? 0}</td>
-                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${item.quantity_reserved ?? 0}</td>
+                            <td class="text-end fw-semibold text-success mr-col align-top avail-qty-cell">${(Number(item.available_qty) || 0) % 1 === 0 ? (Number(item.available_qty) || 0) : parseFloat(Number(item.available_qty).toFixed(2))}</td>
+                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${(Number(item.quantity_reserved) || 0) % 1 === 0 ? (Number(item.quantity_reserved) || 0) : parseFloat(Number(item.quantity_reserved).toFixed(2))}</td>
                             <td class="text-end fw-bold mr-col align-top ${item.already_dispatched > 0 ? 'text-warning' : 'text-muted'}">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-primary mr-col align-top">${item.remaining_qty}</td>
                             <td class="text-end pe-2 align-top qty-cell">
@@ -971,21 +971,26 @@
                     if (response && response.success) {
                         const avail = parseFloat(response.available_qty) || 0;
                         const itemReserved = parseFloat(response.item_reserved_qty) || 0;
+                        const whReserved = parseFloat(response.reserved_qty) || 0;
 
                         $tr.attr('data-available-qty', avail);
 
+                        const formattedAvail = (avail % 1 === 0) ? avail : parseFloat(avail.toFixed(2));
+                        const displayReserved = itemReserved > 0 ? itemReserved : whReserved;
+                        const formattedReserved = (displayReserved % 1 === 0) ? displayReserved : parseFloat(displayReserved.toFixed(2));
+
                         if ($availCell.length) {
-                            $availCell.text(avail);
+                            $availCell.text(formattedAvail);
                             $availCell.removeClass('text-success text-danger');
                             $availCell.addClass(avail > 0 ? 'text-success' : 'text-danger');
                         }
 
                         if ($reservedCell.length) {
-                            $reservedCell.text(itemReserved);
+                            $reservedCell.text(formattedReserved);
                         }
 
                         if ($availBadgeSpan.length) {
-                            $availBadgeSpan.text(avail);
+                            $availBadgeSpan.text(formattedAvail);
                             if (avail <= 0) {
                                 $badgeBox.removeClass('bg-soft-info text-info bg-soft-success text-success').addClass('bg-soft-danger text-danger border-danger');
                             } else {

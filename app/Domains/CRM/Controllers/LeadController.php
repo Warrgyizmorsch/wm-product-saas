@@ -600,7 +600,7 @@ class LeadController extends Controller
             return redirect()->back()->withErrors(['status' => "Lead status in '{$lead->status}' stage is locked."]);
         }
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
-        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
+        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost', 'Converted'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);

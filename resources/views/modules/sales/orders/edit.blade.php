@@ -92,7 +92,7 @@
                     </x-ui.odoo-form-ui>
 
                     <div id="soFreightAmountContainer" class="{{ old('freight_terms', $order->freight_terms) === 'To Be Billed' ? '' : 'd-none' }}">
-                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', convert_from_base($order->freight_amount ?? 0))" min="0" step="0.01" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount')" name="freight_amount" id="freightAmountInput" :value="old('freight_amount', round(convert_from_base($order->freight_amount ?? 0), 2))" min="0" step="0.01" />
                     </div>
                 </div>
             </div>

@@ -120,18 +120,18 @@
                         <i class="feather-layers text-primary me-1"></i>{{ __('purchase.returned_items') }}
                     </h5>
                 </div>
-                <div class="table-responsive border rounded">
+                <div class="table-responsive border rounded bg-white">
                     <x-ui.odoo-form-ui type="table" id="itemsTable" class="mb-0">
-                        <thead>
-                            <tr style="background-color: #e8ecf1 !important;">
-                                <th style="width: 35%; background-color: #e8ecf1 !important;" class="ps-3">{{ __('purchase.product') }}</th>
-                                <th style="width: 25%; background-color: #e8ecf1 !important;">{{ __('purchase.warehouse') ?? 'Warehouse' }}</th>
-                                <th class="text-end" style="width: 15%; background-color: #e8ecf1 !important;">{{ __('purchase.quantity') }}</th>
-                                <th class="text-end" style="width: 18%; background-color: #e8ecf1 !important;">{{ __('purchase.unit_price') }} ({{ active_currency_symbol() }})</th>
-                                <th class="text-center" style="width: 7%; background-color: #e8ecf1 !important;"></th>
+                        <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
+                            <tr>
+                                <th style="width: 38%;" class="ps-3 text-start">{{ __('purchase.product') }}</th>
+                                <th style="width: 25%;" class="text-start">{{ __('purchase.warehouse') ?? 'Warehouse' }}</th>
+                                <th style="width: 16%;" class="text-end">{{ __('purchase.quantity') }}</th>
+                                <th style="width: 16%;" class="text-end pe-3">{{ __('purchase.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                <th style="width: 5%;" class="text-center"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="itemsTableBody">
                             <!-- Dynamic Rows -->
                         </tbody>
                     </x-ui.odoo-form-ui>
@@ -184,26 +184,26 @@
                 const price = data.unit_price !== undefined ? data.unit_price : 0.00;
 
                 return `
-                    <tr class="item-row" data-row-id="${index}">
-                        <td class="ps-3">
-                            <select name="items[${index}][product_id]" class="form-select odoo-table-select odoo-select2 product-select" required>
+                    <tr class="item-row align-middle" data-row-id="${index}">
+                        <td class="ps-3 py-2 text-start align-middle">
+                            <select name="items[${index}][product_id]" class="form-select form-select-sm odoo-select2 product-select w-100" required>
                                 ${buildOptions(productsList, p => p.sku ? `${p.sku} - ${p.name}` : p.name, prodId)}
                             </select>
                         </td>
-                        <td>
-                            <select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2 warehouse-select" required>
+                        <td class="py-2 text-start align-middle">
+                            <select name="items[${index}][warehouse_id]" class="form-select form-select-sm odoo-select2 warehouse-select w-100" required>
                                 ${buildOptions(warehousesList, w => w.name, whId)}
                             </select>
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end" value="${qty}" min="0.0001" step="0.0001" style="width: 90px; margin-left: auto;" placeholder="0.00">
+                        <td class="text-end py-2 align-middle">
+                            <input type="number" name="items[${index}][quantity]" class="form-control form-control-sm text-end font-monospace fw-semibold w-100" value="${qty}" min="0.0001" step="any" placeholder="0.00" required>
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end" value="${parseFloat(price).toFixed(2)}" min="0" step="0.01" style="width: 110px; margin-left: auto;" placeholder="0.00">
+                        <td class="text-end pe-3 py-2 align-middle">
+                            <input type="number" name="items[${index}][unit_price]" class="form-control form-control-sm text-end font-monospace fw-semibold w-100" value="${parseFloat(price).toFixed(2)}" min="0" step="0.01" placeholder="0.00" required>
                         </td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn mt-1">
-                                <i class="feather-trash-2"></i>
+                        <td class="text-center py-2 align-middle">
+                            <button type="button" class="btn btn-sm btn-link text-danger remove-row-btn p-1 border-0" title="{{ __('purchase.delete') }}">
+                                <i class="feather-trash-2 fs-15"></i>
                             </button>
                         </td>
                     </tr>
@@ -229,6 +229,15 @@
                     $(this).closest('tr').remove();
                 } else {
                     showAppToast('warning', 'At least one item row is required.');
+                }
+            });
+
+            $(document).on('change', '.product-select', function() {
+                const prodId = $(this).val();
+                const row = $(this).closest('tr');
+                const prod = productsList.find(p => p.id == prodId);
+                if (prod && prod.price !== undefined) {
+                    row.find('input[name*="[unit_price]"]').val(parseFloat(prod.price).toFixed(2));
                 }
             });
 

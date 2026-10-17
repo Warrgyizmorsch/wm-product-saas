@@ -216,6 +216,11 @@ if (! function_exists('active_currency')) {
             return $sessionCurrency;
         }
 
+        $tenantCurrency = tenant()?->settings['currency'] ?? null;
+        if ($tenantCurrency && isset($currencies[$tenantCurrency])) {
+            return $tenantCurrency;
+        }
+
         return config('currency.base', 'USD');
     }
 }

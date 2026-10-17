@@ -297,9 +297,9 @@
                     <th style="width: 45%;">Product Description</th>
                     <th class="text-center" style="width: 10%;">Qty</th>
                     <th class="text-right" style="width: 13%;">Rate</th>
-                    <th class="text-right" style="width: 13%;">Amount</th>
                     
                     @if($order->discount_type === 'item_wise')
+                        <th class="text-right" style="width: 13%;">Gross Amount</th>
                         <th class="text-right" style="width: 10%;">Disc Amt</th>
                     @endif
 
@@ -314,21 +314,26 @@
                 @php
                     $groupedItems = $order->items->groupBy('product_id')->map(function($items) {
                         $first = $items->first();
+                        $qty = $items->sum('quantity');
+                        $rate = $first->rate;
+                        $amount = $qty * $rate;
+                        $discAmt = $items->sum('discount_amount');
+                        $taxAmt = $items->sum('tax_amount');
                         return (object) [
                             'id' => $first->id,
                             'product' => $first->product,
                             'product_id' => $first->product_id,
-                            'quantity' => $items->sum('quantity'),
-                            'rate' => $first->rate,
-                            'amount' => $items->sum('amount'),
+                            'quantity' => $qty,
+                            'rate' => $rate,
+                            'amount' => $amount,
                             'discount_percent' => $first->discount_percent,
-                            'discount_amount' => $items->sum('discount_amount'),
+                            'discount_amount' => $discAmt,
                             'tax_percent' => $first->tax_percent,
                             'cgst_percent' => $first->cgst_percent,
                             'sgst_percent' => $first->sgst_percent,
                             'igst_percent' => $first->igst_percent,
-                            'tax_amount' => $items->sum('tax_amount'),
-                            'total_amount' => $items->sum('total_amount'),
+                            'tax_amount' => $taxAmt,
+                            'total_amount' => max(0, $amount - $discAmt) + $taxAmt,
                         ];
                     })->values();
                 @endphp
@@ -342,22 +347,22 @@
                             @endif
                         </td>
                         <td class="text-center">{{ (float)$item->quantity }}</td>
-                        <td class="text-right">{{ $currencySymbol }}{{ number_format($item->rate, 2) }}</td>
-                        <td class="text-right">{{ $currencySymbol }}{{ number_format($item->amount, 2) }}</td>
+                        <td class="text-right">{{ format_currency($item->rate) }}</td>
                         
                         @if($order->discount_type === 'item_wise')
+                            <td class="text-right">{{ format_currency($item->amount) }}</td>
                             <td class="text-right" style="color: #b91c1c;">
-                                -{{ $currencySymbol }}{{ number_format($item->discount_amount, 2) }}
+                                -{{ format_currency($item->discount_amount) }}
                             </td>
                         @endif
 
                         @if($order->tax_type === 'item_wise_tax')
                             <td class="text-right" style="color: #64748b;">
-                                +{{ $currencySymbol }}{{ number_format($item->tax_amount, 2) }}
+                                +{{ format_currency($item->tax_amount) }}
                             </td>
                         @endif
 
-                        <td class="text-right" style="font-weight: bold;">{{ $currencySymbol }}{{ number_format($item->total_amount, 2) }}</td>
+                        <td class="text-right" style="font-weight: bold;">{{ format_currency($item->total_amount) }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -371,28 +376,28 @@
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                         <tr>
                             <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Subtotal:</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->subtotal, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ format_currency($order->subtotal) }}</td>
                         </tr>
                         @if($order->discount_type !== 'without_discount' && $order->discount_amount > 0)
                             <tr style="color: #b91c1c;">
                                 <td style="padding: 4px 0; text-align: left; border: 0;">Discount:</td>
-                                <td style="text-align: right; font-weight: bold; padding: 4px 0; border: 0;">-{{ $currencySymbol }}{{ number_format($order->discount_amount, 2) }}</td>
+                                <td style="text-align: right; font-weight: bold; padding: 4px 0; border: 0;">-{{ format_currency($order->discount_amount) }}</td>
                             </tr>
                             <tr>
                                 <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Gross Total (Before Tax):</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->subtotal - $order->discount_amount, 2) }}</td>
+                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ format_currency(max(0, $order->subtotal - $order->discount_amount)) }}</td>
                             </tr>
                         @endif
                         @if($order->tax_type !== 'without_tax' && $order->tax_amount > 0)
                             @php
-                                $grossTotal = $order->subtotal - $order->discount_amount;
+                                $grossTotal = max(0, $order->subtotal - $order->discount_amount);
                                 $taxPercent = $grossTotal > 0 ? ($order->tax_amount / $grossTotal) * 100 : 0;
                                 $taxPercentRounded = round($taxPercent, 2);
                             @endphp
                             @if($order->gst_type === 'igst')
                                 <tr>
                                     <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">IGST ({{ $taxPercentRounded }}%):</td>
-                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ $currencySymbol }}{{ number_format($order->tax_amount, 2) }}</td>
+                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ format_currency($order->tax_amount) }}</td>
                                 </tr>
                             @else
                                 @php
@@ -401,17 +406,17 @@
                                 @endphp
                                 <tr>
                                     <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">CGST ({{ $halfTaxPercent }}%):</td>
-                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ $currencySymbol }}{{ number_format($halfTaxAmount, 2) }}</td>
+                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ format_currency($halfTaxAmount) }}</td>
                                 </tr>
                                 <tr>
                                     <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">SGST ({{ $halfTaxPercent }}%):</td>
-                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ $currencySymbol }}{{ number_format($halfTaxAmount, 2) }}</td>
+                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ format_currency($halfTaxAmount) }}</td>
                                 </tr>
                             @endif
                         @endif
                         <tr style="border-top: 1px solid #cbd5e1;">
                             <td style="font-weight: bold; color: #0f172a; padding: 6px 0 0 0; font-size: 11px; text-align: left; border: 0;">Total Amount:</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 11px; border: 0;">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 11px; border: 0;">{{ format_currency($order->grand_total) }}</td>
                         </tr>
                     </table>
                 </div>

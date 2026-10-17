@@ -39,6 +39,27 @@ class PurchaseAdvancePaymentService
                 'created_by' => auth()->id() ?: 1,
             ]);
 
+            \App\Domains\Purchase\Models\VendorPayment::updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'payment_number' => $advanceNumber,
+                ],
+                [
+                    'company_id' => $advance->company_id,
+                    'branch_id' => $advance->branch_id,
+                    'vendor_id' => $advance->vendor_id,
+                    'purchase_order_id' => $advance->purchase_order_id,
+                    'payment_type' => 'Advance',
+                    'payment_method' => $advance->payment_method,
+                    'payment_date' => $advance->payment_date,
+                    'amount' => $advance->amount,
+                    'reference_number' => $advance->reference_number,
+                    'status' => 'Posted',
+                    'notes' => $advance->notes,
+                    'created_by' => $advance->created_by,
+                ]
+            );
+
             // Post Double-Entry Journal to Accounting Module
             $this->postAccountingJournal($advance, $tenantId);
 

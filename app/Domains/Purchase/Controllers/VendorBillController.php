@@ -249,7 +249,8 @@ class VendorBillController extends Controller
         if ($bill) {
             $this->authorize('view', $bill);
         }
-        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId) : 0.0;
+        $poId = $bill ? ($bill->purchase_order_id ?? $bill->goodsReceiptNote?->purchase_order_id) : null;
+        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId, $poId) : 0.0;
         return view('modules.purchase.bills.show', compact('bill', 'availableAdvance'));
     }
 

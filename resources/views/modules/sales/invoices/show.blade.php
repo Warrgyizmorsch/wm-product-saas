@@ -675,7 +675,7 @@
 
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">{{ __('crm.payment_status') }}</span>
-                                <span class="fw-bold {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">{{ $balanceDue > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
+                                <span class="fw-bold {{ ($balanceDue ?? 0) > 0 ? 'text-danger' : 'text-success' }}">{{ ($balanceDue ?? 0) > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
                             </div>
                         </div>
                     </div>
@@ -727,96 +727,57 @@
                 </div>
 
                 <!-- 4. Summary & Calculations Row -->
-                <div class="row pt-2 fs-13 text-dark mb-4">
-                    <!-- Left: GST Tax Rate Summary, Bank Details & Terms -->
-                    <div class="col-7">
-                        @php
-                            $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
-                        @endphp
-                        @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
-                            <div class="card border shadow-none mb-3 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
-                                <div class="py-1 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
-                                    <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }}</span>
-                                    <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $invoice->gst_type === 'igst' ? 'IGST' : 'CGST + SGST' }}</span>
-                                </div>
-                                <div class="table-responsive" style="overflow-x: visible;">
-                                    <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
-                                        <thead class="bg-light text-secondary fw-bold">
-                                            @if($invoice->gst_type === 'igst')
-                                                <tr>
-                                                    <th class="py-1" style="width: 30%;">{{ __('crm.tax_rate') }}</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">{{ __('crm.total_amount') }}</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">IGST</th>
-                                                </tr>
-                                            @else
-                                                <tr>
-                                                    <th class="py-1" style="width: 25%;">{{ __('crm.tax_rate') }}</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">{{ __('crm.total_amount') }}</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">CGST</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">SGST</th>
-                                                </tr>
-                                            @endif
-                                        </thead>
-                                        <tbody>
-                                            @php
-                                                $totCgst = 0;
-                                                $totSgst = 0;
-                                                $totIgst = 0;
-                                                $totTax = 0;
-                                            @endphp
-                                            @foreach($taxGroups as $rateStr => $gItems)
-                                                @php
-                                                    $rate = floatval($rateStr);
-                                                    $grpTax = $gItems->sum('tax_amount');
-                                                    $totTax += $grpTax;
-                                                @endphp
-                                                @if($invoice->gst_type === 'igst')
-                                                    @php
-                                                        $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
-                                                        $totIgst += $grpIgst;
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpIgst) }}</td>
-                                                    </tr>
-                                                @else
-                                                    @php
-                                                        $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
-                                                        $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
-                                                        $totCgst += $grpCgst;
-                                                        $totSgst += $grpSgst;
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpCgst) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpSgst) }}</td>
-                                                    </tr>
-                                                @endif
-                                            @endforeach
-                                        </tbody>
-                                        <tfoot class="bg-light fw-bold text-dark">
-                                            @if($invoice->gst_type === 'igst')
-                                                <tr>
-                                                    <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totIgst) }}</td>
-                                                </tr>
-                                            @else
-                                                <tr>
-                                                    <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totCgst) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totSgst) }}</td>
-                                                </tr>
-                                            @endif
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        @endif
+                @php
+                    $grossSubtotal = 0;
+                    $totalItemDiscount = 0;
+                    $itemsTaxAmount = 0;
+                    $maxItemTaxRate = 0;
+                    foreach($invoice->items as $it) {
+                        $grossSubtotal += ($it->quantity * $it->unit_price);
+                        $totalItemDiscount += $it->discount;
+                        if ($invoice->tax_type === 'item_wise_tax') {
+                            $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                            $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
+                            if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
+                        }
+                    }
+                    $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
+                    $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
 
+                    if ($invoice->tax_type === 'order_wise_tax') {
+                        $itemsTaxAmount = $taxableBase * (($invoice->order_tax_rate ?: 18) / 100);
+                    } elseif ($invoice->tax_type === 'without_tax') {
+                        $itemsTaxAmount = 0;
+                    }
+
+                    $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                    $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
+
+                    $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
+                    $freightTaxRatePercent = 18;
+                    if ($freightTaxRateOpt === 'highest') {
+                        if ($invoice->tax_type === 'order_wise_tax') {
+                            $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
+                        } else {
+                            $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
+                        }
+                    } else {
+                        $freightTaxRatePercent = floatval($freightTaxRateOpt);
+                    }
+
+                    $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
+                    $totalFreightInclGst = $freightAmount + $freightTax;
+                    $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
+                    $adjustment = (float)($invoice->adjustment ?? 0);
+                    $grandTotal = ($taxableBase + $freightAmount) + $totalInvoiceTaxAmount + $adjustment;
+                    $gstType = $invoice->gst_type ?? 'cgst_sgst';
+                    $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
+                    $hasFreightTax = ($freightAmount > 0 && $freightTax > 0);
+                @endphp
+
+                <div class="row pt-2 fs-13 text-dark mb-4">
+                    <!-- Left: Bank Details & Terms -->
+                    <div class="col-7">
                         <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box" style="border-color: #cbd5e1 !important;">
                             <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('crm.bank_payment_details') }}</h6>
                             <div class="row fs-11 text-secondary g-2">
@@ -838,51 +799,6 @@
                     <!-- Right: Subtotal Calculations -->
                     <div class="col-5 summary-table-box ms-auto">
                         <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
-                            @php
-                                $grossSubtotal = 0;
-                                $totalItemDiscount = 0;
-                                $itemsTaxAmount = 0;
-                                $maxItemTaxRate = 0;
-                                foreach($invoice->items as $it) {
-                                    $grossSubtotal += ($it->quantity * $it->unit_price);
-                                    $totalItemDiscount += $it->discount;
-                                    if ($invoice->tax_type === 'item_wise_tax') {
-                                        $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
-                                        $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
-                                        if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
-                                    }
-                                }
-                                $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
-                                $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
-
-                                if ($invoice->tax_type === 'order_wise_tax') {
-                                    $itemsTaxAmount = $taxableBase * (($invoice->order_tax_rate ?: 18) / 100);
-                                } elseif ($invoice->tax_type === 'without_tax') {
-                                    $itemsTaxAmount = 0;
-                                }
-
-                                $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
-                                $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
-
-                                $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
-                                $freightTaxRatePercent = 18;
-                                if ($freightTaxRateOpt === 'highest') {
-                                    if ($invoice->tax_type === 'order_wise_tax') {
-                                        $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
-                                    } else {
-                                        $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
-                                    }
-                                } else {
-                                    $freightTaxRatePercent = floatval($freightTaxRateOpt);
-                                }
-
-                                $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
-                                $totalFreightInclGst = $freightAmount + $freightTax;
-                                $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
-                                $adjustment = (float)($invoice->adjustment ?? 0);
-                                $grandTotal = $itemsTotalInclGst + $totalFreightInclGst + $adjustment;
-                                $gstType = $invoice->gst_type ?? 'cgst_sgst';
-                            @endphp
 
                             <!-- 1. Subtotal (Excl. Tax) -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
@@ -904,36 +820,15 @@
                                 <span class="fw-bold text-dark">{{ format_currency($taxableBase) }}</span>
                             </div>
 
-                            <!-- 4. Add: Items GST Tax -->
-                            @if($invoice->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
-                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-medium">{{ __('crm.add_items_gst_tax') }}</span>
-                                    <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount) }}</span>
-                                </div>
-                            @endif
-
-                            <!-- 5. Billed Items Total (Incl. GST) -->
-                            <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
-                                <span>{{ __('crm.billed_items_total') }}</span>
-                                <span>{{ format_currency($itemsTotalInclGst) }}</span>
-                            </div>
-
-                            <!-- 6. Freight Charges -->
+                            <!-- 4. Freight Charges -->
                             @if($freightAmount > 0)
-                                <hr class="my-2 border-slate">
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">{{ __('crm.freight_charges') }}</span>
                                     <span class="fw-bold text-primary">{{ format_currency($freightAmount) }}</span>
                                 </div>
-                                @if($freightTax > 0)
-                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-semibold">{{ __('crm.add_freight_gst_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($freightTax) }}</span>
-                                    </div>
-                                @endif
-                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-primary">
-                                    <span>{{ __('crm.total_freight_incl_gst') }}</span>
-                                    <span>{{ format_currency($totalFreightInclGst) }}</span>
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-dark">
+                                    <span>Total Taxable Value</span>
+                                    <span>{{ format_currency($taxableBase + $freightAmount) }}</span>
                                 </div>
                             @endif
 
@@ -989,6 +884,163 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 5. Full-Width GST Tax Summary / Tax Analysis (A4 Optimized) -->
+                @if (($taxGroups->count() > 0 && $invoice->tax_amount > 0) || $hasFreightTax)
+                    <div class="card border shadow-none mb-4 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
+                        <div class="py-1.5 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
+                            <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }} / TAX ANALYSIS</span>
+                            <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $gstType === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                        </div>
+                        <div class="table-responsive" style="overflow-x: visible;">
+                            <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
+                                <thead class="bg-light text-secondary fw-bold">
+                                    @if($gstType === 'igst')
+                                        <tr>
+                                            <th class="py-1.5 text-start ps-3" style="width: 35%;">Tax Rate / Description</th>
+                                            <th class="py-1.5 text-end" style="width: 25%;">Taxable Value</th>
+                                            <th class="py-1.5 text-end" style="width: 20%;">Total Tax</th>
+                                            <th class="py-1.5 text-end pe-3" style="width: 20%;">IGST Amount</th>
+                                        </tr>
+                                    @else
+                                        <tr>
+                                            <th class="py-1.5 text-start ps-3" style="width: 32%;">Tax Rate / Description</th>
+                                            <th class="py-1.5 text-end" style="width: 20%;">Taxable Value</th>
+                                            <th class="py-1.5 text-end" style="width: 16%;">Total Tax</th>
+                                            <th class="py-1.5 text-end" style="width: 16%;">CGST Amount</th>
+                                            <th class="py-1.5 text-end pe-3" style="width: 16%;">SGST Amount</th>
+                                        </tr>
+                                    @endif
+                                </thead>
+                                <tbody>
+                                    @php
+                                        $totTaxable = 0;
+                                        $totCgst = 0;
+                                        $totSgst = 0;
+                                        $totIgst = 0;
+                                        $totTax = 0;
+                                    @endphp
+                                    @if($invoice->tax_type === 'order_wise_tax')
+                                        @php
+                                            $orderTaxRate = $invoice->order_tax_rate ?: 18;
+                                            $totTaxable += $taxableBase;
+                                            $totTax += $itemsTaxAmount;
+                                        @endphp
+                                        @if($gstType === 'igst')
+                                            @php $totIgst += $itemsTaxAmount; @endphp
+                                            <tr>
+                                                <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $orderTaxRate }}% (Order Level)</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($taxableBase) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($itemsTaxAmount) }}</td>
+                                                <td class="py-1.5 text-end pe-3">{{ format_currency($itemsTaxAmount) }}</td>
+                                            </tr>
+                                        @else
+                                            @php
+                                                $oCgst = round($itemsTaxAmount / 2, 2);
+                                                $oSgst = round($itemsTaxAmount - $oCgst, 2);
+                                                $totCgst += $oCgst;
+                                                $totSgst += $oSgst;
+                                            @endphp
+                                            <tr>
+                                                <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $orderTaxRate }}% (Order Level)</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($taxableBase) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($itemsTaxAmount) }}</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($oCgst) }}</td>
+                                                <td class="py-1.5 text-end pe-3">{{ format_currency($oSgst) }}</td>
+                                            </tr>
+                                        @endif
+                                    @else
+                                        {{-- 1. Pure Items-wise Tax Rows (No freight mixed in) --}}
+                                        @foreach($taxGroups as $rateStr => $gItems)
+                                            @php
+                                                $rate = floatval($rateStr);
+                                                $grpTaxable = $gItems->sum(fn($it) => max(0, ($it->quantity * $it->unit_price) - $it->discount));
+                                                $grpTax = $gItems->sum('tax_amount');
+                                                $totTaxable += $grpTaxable;
+                                                $totTax += $grpTax;
+                                            @endphp
+                                            @if($gstType === 'igst')
+                                                @php
+                                                    $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
+                                                    $totIgst += $grpIgst;
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $rate }}%</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpTaxable) }}</td>
+                                                    <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                    <td class="py-1.5 text-end pe-3">{{ format_currency($grpIgst) }}</td>
+                                                </tr>
+                                            @else
+                                                @php
+                                                    $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
+                                                    $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
+                                                    $totCgst += $grpCgst;
+                                                    $totSgst += $grpSgst;
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $rate }}%</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpTaxable) }}</td>
+                                                    <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpCgst) }}</td>
+                                                    <td class="py-1.5 text-end pe-3">{{ format_currency($grpSgst) }}</td>
+                                                </tr>
+                                            @endif
+                                        @endforeach
+                                    @endif
+
+                                    {{-- 2. Dedicated Freight Tax Row (Separate & Clean) --}}
+                                    @if($hasFreightTax)
+                                        @php
+                                            $totTaxable += $freightAmount;
+                                            $totTax += $freightTax;
+                                        @endphp
+                                        @if($gstType === 'igst')
+                                            @php $totIgst += $freightTax; @endphp
+                                            <tr class="table-light">
+                                                <td class="py-1.5 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($freightAmount) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-primary">{{ format_currency($freightTax) }}</td>
+                                                <td class="py-1.5 text-end pe-3 text-primary">{{ format_currency($freightTax) }}</td>
+                                            </tr>
+                                        @else
+                                            @php
+                                                $fCgst = round($freightTax / 2, 2);
+                                                $fSgst = round($freightTax - $fCgst, 2);
+                                                $totCgst += $fCgst;
+                                                $totSgst += $fSgst;
+                                            @endphp
+                                            <tr class="table-light">
+                                                <td class="py-1.5 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($freightAmount) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-primary">{{ format_currency($freightTax) }}</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($fCgst) }}</td>
+                                                <td class="py-1.5 text-end pe-3 text-primary">{{ format_currency($fSgst) }}</td>
+                                            </tr>
+                                        @endif
+                                    @endif
+                                </tbody>
+                                <tfoot class="bg-light fw-bold text-dark">
+                                    @if($gstType === 'igst')
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3">Total</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totTaxable) }}</td>
+                                            <td class="py-1.5 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                            <td class="py-1.5 text-end pe-3">{{ format_currency($totIgst) }}</td>
+                                        </tr>
+                                    @else
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3">Total</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totTaxable) }}</td>
+                                            <td class="py-1.5 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totCgst) }}</td>
+                                            <td class="py-1.5 text-end pe-3">{{ format_currency($totSgst) }}</td>
+                                        </tr>
+                                    @endif
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                @endif
 
                 <!-- 5. Signature Footer Block -->
                 <div class="row pt-4 border-top fs-11 text-muted align-items-end mt-4 signature-footer-block">

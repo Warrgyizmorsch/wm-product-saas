@@ -151,9 +151,13 @@ class VendorController extends Controller
         $validated['company_id'] = $companyId;
         $validated['branch_id'] = $branchId;
         $validated['status'] = strtolower($validated['status']);
-        $validated['opening_balance'] = $validated['opening_balance'] ?? 0.00;
+        $validated['opening_balance'] = isset($validated['opening_balance'])
+            ? convert_to_base((float) $validated['opening_balance'])
+            : 0.00;
 
         $vendor = Vendor::create($validated);
+
+        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
@@ -237,13 +241,16 @@ class VendorController extends Controller
             ->latest()
             ->get();
 
+        $openingBalance = (float) ($vendor->opening_balance ?? 0.00);
+
         $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->total_amount);
         $totalPaid = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->amount_paid);
         if ($totalPaid == 0 && $payments->isNotEmpty()) {
             $totalPaid = (float) $payments->where('status', 'completed')->sum('amount');
         }
 
-        $netOutstanding = $totalBilled - $totalPaid;
+        // Net outstanding includes Opening Balance (historical dues owed to supplier)
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid;
         $outstandingPayable = max(0, $netOutstanding);
         $vendorAdvanceCredit = $netOutstanding < 0 ? abs($netOutstanding) : 0;
 
@@ -357,7 +364,14 @@ class VendorController extends Controller
         ]);
 
         $validated['status'] = strtolower($validated['status']);
+        if (array_key_exists('opening_balance', $validated)) {
+            $validated['opening_balance'] = $validated['opening_balance'] !== null
+                ? convert_to_base((float) $validated['opening_balance'])
+                : 0.00;
+        }
         $vendor->update($validated);
+
+        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)

@@ -48,7 +48,14 @@ class PartyLedgerController extends Controller
         }
 
         if ($party) {
-            $ledger = $this->journals->partyLedger($partyType, $partyId, $from, $to, (float) ($party->opening_balance ?? 0));
+            $hasOpeningJournal = \App\Domains\Accounting\Models\Journal::where('tenant_id', auth()->user()->tenant_id)
+                ->where('reference_type', $partyType . '_opening_balance')
+                ->where('reference_id', $partyId)
+                ->where('status', \App\Domains\Accounting\Models\Journal::STATUS_POSTED)
+                ->exists();
+
+            $seed = $hasOpeningJournal ? 0.0 : (float) ($party->opening_balance ?? 0);
+            $ledger = $this->journals->partyLedger($partyType, $partyId, $from, $to, $seed);
         }
 
         return view('modules.accounting.reports.party-ledger', [

@@ -650,7 +650,6 @@ class ProductService
             'inventory_account' => $validated['inventory_account'] ?? null,
             'preferred_vendor_id' => $validated['preferred_vendor_id'] ?? null,
             'status' => 'active',
-            'planning_type' => $validated['supplier_method'] === 'manufacture' ? 'manufacture' : 'purchase',
             'variation_type' => 'Single',
         ]);
     }

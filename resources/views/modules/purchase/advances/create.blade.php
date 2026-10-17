@@ -75,8 +75,13 @@
                     <x-ui.odoo-form-ui type="select" name="purchase_order_id" :errorText="$errors->first('purchase_order_id')">
                         <option value="">{{ __('purchase.select_po_optional') }}</option>
                         @foreach($purchaseOrders as $po)
+                            @php
+                                $paidAdv = (float) \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('purchase_order_id', $po->id)->where('status', '!=', 'cancelled')->sum('amount');
+                                $pTotal = (float) ($po->grand_total ?: $po->total_amount);
+                                $advDue = max(0.0, $pTotal - $paidAdv);
+                            @endphp
                             <option value="{{ $po->id }}" @selected(old('purchase_order_id', $prefillPo?->id) == $po->id)>
-                                {{ $po->order_number }} - {{ $po->vendor?->name }} ({{ format_currency($po->grand_total ?? $po->total_amount ?? 0) }})
+                                {{ $po->purchase_order_number }} - {{ $po->vendor?->name }} (PO Total: {{ format_currency($pTotal) }} | Advance Due: {{ format_currency($advDue) }})
                             </option>
                         @endforeach
                     </x-ui.odoo-form-ui>

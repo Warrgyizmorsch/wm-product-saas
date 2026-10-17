@@ -236,10 +236,6 @@
                                             <td class="fw-semibold text-capitalize">{{ strtolower($product->supplier_method ?? '') === 'buy' || strtolower($product->supplier_method ?? '') === 'trade' || empty($product->supplier_method) ? __('inventory.trade') : (strtolower($product->supplier_method ?? '') === 'manufacture' ? __('inventory.manufacture') : ucfirst($product->supplier_method)) }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="text-muted">{{ __('inventory.planning_type') }}</td>
-                                            <td class="fw-semibold text-capitalize">{{ strtolower($product->planning_type ?? '') === 'stock' || empty($product->planning_type) ? __('inventory.stock') : (strtolower($product->planning_type ?? '') === 'manufacture' ? __('inventory.manufacture') : ucfirst($product->planning_type)) }}</td>
-                                        </tr>
-                                        <tr>
                                             <td class="text-muted">{{ __('inventory.brand') }}</td>
                                             <td class="fw-semibold">{{ $product->brand ?: '—' }}</td>
                                         </tr>
@@ -478,9 +474,9 @@
                                                 <tr>
                                                     <td class="fw-semibold">{{ $wh->code }}</td>
                                                     <td>{{ $wh->name }}</td>
-                                                    <td class="text-end fw-bold text-dark">{{ number_format($qty, 0) }}</td>
-                                                    <td class="text-end text-warning fw-semibold">{{ number_format($reserved, 0) }}</td>
-                                                    <td class="text-end text-success fw-bold">{{ number_format($available, 0) }}</td>
+                                                    <td class="text-end fw-bold text-dark">{{ fmod($qty, 1) == 0.0 ? number_format($qty, 0) : number_format($qty, 2) }}</td>
+                                                    <td class="text-end text-warning fw-semibold">{{ fmod($reserved, 1) == 0.0 ? number_format($reserved, 0) : number_format($reserved, 2) }}</td>
+                                                    <td class="text-end text-success fw-bold">{{ fmod($available, 1) == 0.0 ? number_format($available, 0) : number_format($available, 2) }}</td>
                                                     <td class="text-end">{{ format_currency($cost) }}</td>
                                                     <td class="text-end fw-bold">{{ format_currency($totalValuation) }}</td>
                                                     <td>{{ number_format($product->reorder_point, 0) }}</td>
@@ -491,9 +487,9 @@
                                                 <tr>
                                                     <td class="fw-semibold">{{ $ws->warehouse?->code ?? 'N/A' }}</td>
                                                     <td>{{ $ws->warehouse?->name ?? 'N/A' }}</td>
-                                                    <td class="text-end fw-bold text-dark">{{ number_format($ws->quantity, 0) }}</td>
-                                                    <td class="text-end text-warning fw-semibold">{{ number_format($ws->reserved_qty, 0) }}</td>
-                                                    <td class="text-end text-success fw-bold">{{ number_format($ws->available_qty, 0) }}</td>
+                                                    <td class="text-end fw-bold text-dark">{{ fmod($ws->quantity, 1) == 0.0 ? number_format($ws->quantity, 0) : number_format($ws->quantity, 2) }}</td>
+                                                    <td class="text-end text-warning fw-semibold">{{ fmod($ws->reserved_qty, 1) == 0.0 ? number_format($ws->reserved_qty, 0) : number_format($ws->reserved_qty, 2) }}</td>
+                                                    <td class="text-end text-success fw-bold">{{ fmod($ws->available_qty, 1) == 0.0 ? number_format($ws->available_qty, 0) : number_format($ws->available_qty, 2) }}</td>
                                                     <td class="text-end">{{ format_currency($ws->unit_cost) }}</td>
                                                     <td class="text-end fw-bold">{{ format_currency($ws->quantity * $ws->unit_cost) }}</td>
                                                     <td>

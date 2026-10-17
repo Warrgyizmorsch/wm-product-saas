@@ -41,6 +41,7 @@ class PostVendorPaymentJournal
             }
 
             $isAdvance = $payment->payment_type === 'Advance';
+            $isOpeningBalance = $payment->payment_type === 'Opening Balance';
             $debitKey = $isAdvance ? SystemAccount::ADVANCE_TO_SUPPLIERS : SystemAccount::AP;
             $debitAccount = $this->systemAccounts->get($debitKey, $payment->tenant_id);
 
@@ -57,15 +58,21 @@ class PostVendorPaymentJournal
             $vendorName = $payment->vendor?->name ?? ('Vendor #' . $payment->vendor_id);
             $memo = $isAdvance
                 ? "Advance Payment to Vendor {$vendorName} ({$payment->payment_number})"
-                : "Vendor Payment {$payment->payment_number} for Bill";
+                : ($isOpeningBalance
+                    ? "Vendor Payment {$payment->payment_number} for Opening Balance"
+                    : "Vendor Payment {$payment->payment_number} for Bill");
+
+            $lineDescription = $isAdvance
+                ? "Advance to Vendor ({$vendorName})"
+                : ($isOpeningBalance
+                    ? "Opening Balance settled ({$vendorName})"
+                    : "Accounts Payable settled ({$vendorName})");
 
             $this->journals->postOnce([
                 [
                     'chart_of_account_id' => $debitAccount->id,
                     'debit' => (float) $payment->amount,
-                    'description' => $isAdvance
-                        ? "Advance to Vendor ({$vendorName})"
-                        : "Accounts Payable settled ({$vendorName})",
+                    'description' => $lineDescription,
                     'party_type' => JournalEntry::PARTY_VENDOR,
                     'party_id' => $payment->vendor_id,
                 ],
