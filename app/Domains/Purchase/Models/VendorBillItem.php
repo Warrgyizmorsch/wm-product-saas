@@ -30,9 +30,9 @@ class VendorBillItem extends BaseModel
 
     protected $casts = [
         'quantity' => 'decimal:3',
-        'unit_rate' => 'decimal:2',
+        'unit_rate' => 'decimal:4',
         'tax_percentage' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'total_amount' => 'decimal:4',
     ];
 
     public function bill(): BelongsTo
