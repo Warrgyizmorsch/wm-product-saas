@@ -346,6 +346,23 @@ class QualityInspectionService
                 throw new \InvalidArgumentException('Inspected quantity must be greater than zero.');
             }
 
+            $skipPendingQcCheck = (bool) ($data['skip_pending_qc_check'] ?? false);
+            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
+
+            if (!$skipPendingQcCheck) {
+                if (!$isQcRequired) {
+                    throw new \InvalidArgumentException("Quality inspection cannot be recorded for operation #{$orderOp->operation_number} because Quality Control is not required.");
+                }
+
+                $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOpId, $batchId);
+                if ($pendingQcQty <= 0) {
+                    throw new \InvalidArgumentException("Cannot record quality inspection: There are no pending QC units for operation #{$orderOp->operation_number}. Output must be logged first.");
+                }
+                if ($inspectedQty > ($pendingQcQty + 0.0001)) {
+                    throw new \InvalidArgumentException("Total inspected quantity ({$inspectedQty}) cannot exceed pending QC units ({$pendingQcQty}) for operation #{$orderOp->operation_number}.");
+                }
+            }
+
             $result = ($rejectedQty > 0) ? ($acceptedQty > 0 ? 'partially_passed' : 'failed') : 'passed';
 
             // Find or fallback Quality Plan

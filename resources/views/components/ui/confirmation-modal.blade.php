@@ -9,6 +9,9 @@
 @once
     @push('styles')
         <style>
+            .erp-confirm-modal {
+                z-index: 1070 !important;
+            }
             .erp-confirm-modal .modal-content {
                 border-radius: 16px !important;
                 border: none !important;
@@ -135,10 +138,15 @@
             messageEl.textContent = message || 'Are you sure you want to perform this action?';
         }
 
-        // Set Cancel Button Text
+        // Set Cancel Button Text / Visibility
         const cancelBtn = document.getElementById('{{ $id }}CancelBtn');
         if (cancelBtn) {
-            cancelBtn.textContent = opts.cancelButtonText || '{{ $cancelText }}';
+            if (opts.hideCancel === true || opts.cancelButtonText === false || opts.cancelButtonText === '') {
+                cancelBtn.style.display = 'none';
+            } else {
+                cancelBtn.style.display = '';
+                cancelBtn.textContent = opts.cancelButtonText || '{{ $cancelText }}';
+            }
         }
 
         // Set Confirm Button Text
@@ -209,11 +217,30 @@
 
         freshConfirmBtn.addEventListener('click', function() {
             bsModal.hide();
+            if (cancelBtn) {
+                cancelBtn.style.display = '';
+            }
             if (typeof callback === 'function') {
                 callback();
             }
         }, { once: true });
 
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            if (cancelBtn) {
+                cancelBtn.style.display = '';
+            }
+            if (document.querySelector('.modal.show')) {
+                document.body.classList.add('modal-open');
+            }
+        }, { once: true });
+
+        modalEl.style.zIndex = '1070';
         bsModal.show();
+        setTimeout(function() {
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            if (backdrops.length > 1) {
+                backdrops[backdrops.length - 1].style.zIndex = '1065';
+            }
+        }, 50);
     };
 </script>
