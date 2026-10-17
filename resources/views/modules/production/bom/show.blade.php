@@ -53,6 +53,58 @@
     </x-ui.button>
 @endsection
 
+@push('styles')
+    <style>
+        .bom-table-enhanced {
+            font-variant-numeric: tabular-nums;
+        }
+        .bom-table-enhanced th,
+        .bom-table-enhanced td {
+            padding: 9px 12px !important;
+            vertical-align: middle !important;
+            font-family: inherit !important;
+        }
+        .bom-table-enhanced thead th {
+            background-color: #f8fafc !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px !important;
+            color: #475569 !important;
+            text-transform: uppercase;
+        }
+        .bom-table-enhanced tbody tr {
+            transition: background-color 0.15s ease-in-out;
+        }
+        .bom-table-enhanced tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
+        .sub-bom-link-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: rgba(40, 167, 69, 0.1) !important;
+            color: #198754 !important;
+            border: 1px solid rgba(40, 167, 69, 0.28) !important;
+            border-radius: 6px;
+            text-decoration: none !important;
+            transition: all 0.2s ease-in-out;
+            max-width: 100%;
+            line-height: 1.35;
+        }
+        .sub-bom-link-box:hover {
+            background-color: rgba(40, 167, 69, 0.2) !important;
+            border-color: #198754 !important;
+            color: #0f5132 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(40, 167, 69, 0.15);
+        }
+    </style>
+@endpush
+
 @section('content')
     <div class="erp-single-panel bg-white">
         <!-- Success & Error Banners (Rendered via Toast Component) -->
@@ -278,50 +330,61 @@
             <div class="tab-pane fade show active" id="tab-components" role="tabpanel" aria-labelledby="tab-components-tab">
                 <h5 class="fw-bold text-dark mb-3">{{ __('production.bom_specification') }}</h5>
                 <div class="table-responsive">
-                    <x-ui.odoo-form-ui type="table">
+                    <x-ui.odoo-form-ui type="table" class="bom-table-enhanced">
                         <thead>
                             <tr>
-                                <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
-                                <th style="width: 35%">{{ __('production.component_product') }}</th>
-                                <th style="width: 15%" class="text-end">{{ __('production.quantity') }}</th>
-                                <th style="width: 10%">{{ __('production.unit') }}</th>
-                                <th style="width: 15%" class="text-end">{{ __('production.scrap_percent') }}</th>
-                                <th style="width: 20%" class="text-end">{{ __('production.unit_cost') ?? 'Cost' }} / {{ __('production.total_item_cost') ?? 'Total' }}</th>
+                                <th style="width: 6%" class="text-center">{{ __('production.seq') }}</th>
+                                <th style="width: 29%">{{ __('production.component_product') }}</th>
+                                <th style="width: 11%" class="text-end text-nowrap">{{ __('production.net_qty') }}</th>
+                                <th style="width: 8%" class="text-end text-nowrap">{{ __('production.scrap_percent') }}</th>
+                                <th style="width: 11%" class="text-end text-nowrap">{{ __('production.gross_qty') }}</th>
+                                <th style="width: 11%" class="text-end text-nowrap">{{ __('production.unit_cost') }}</th>
+                                <th style="width: 11%" class="text-end text-nowrap">{{ __('production.net_cost') }}</th>
+                                <th style="width: 13%" class="text-end text-nowrap">{{ __('production.gross_total') }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             @php
                                 if (!function_exists('renderComponentTreeRows')) {
-                                    function renderComponentTreeRows($items, $level = 1) {
+                                    function renderComponentTreeRows($items, $level = 1, $seqPrefix = '', $parentMultiplier = 1.0) {
+                                        $idx = 1;
                                         foreach ($items as $item) {
-                                            $padding = ($level - 1) * 24;
-                                            $scrapFactor = 1 + (($item->material_scrap_percentage ?? 0) / 100);
-                                            $grossQty = $item->quantity * $scrapFactor;
-                                            $unitCost = $item->material?->unit_cost ?? 0.0;
-                                            $itemTotalCost = $grossQty * $unitCost;
+                                            $padding = ($level - 1) * 20;
+                                            
+                                            // Hierarchical sequence numbering (e.g. 1, 1.1, 1.1.1)
+                                            $itemSeqNum = $item->sequence ?: $idx;
+                                            $seq = $seqPrefix !== '' ? ($seqPrefix . '.' . $itemSeqNum) : (string) $itemSeqNum;
+                                            
+                                            // Effective Scaled Quantities down the multi-level tree
+                                            $effectiveNetQty = (float) $item->quantity * $parentMultiplier;
+                                            $scrapPct = (float) ($item->material_scrap_percentage ?? 0.0);
+                                            $scrapFactor = 1 + ($scrapPct / 100);
+                                            $effectiveGrossQty = $effectiveNetQty * $scrapFactor;
+                                            
+                                            // Financial Costing
+                                            $unitCost = (float) ($item->material?->unit_cost ?? 0.0);
+                                            $netCost = $effectiveNetQty * $unitCost;
+                                            $grossCost = $effectiveGrossQty * $unitCost;
+                                            $uomCode = $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS';
                                             
                                             echo '<tr class="' . ($level > 1 ? 'table-light bg-light-soft erp-child-bom-row' : '') . '">';
                                             
-                                            // Sequence
-                                            echo '<td class="text-center fw-semibold text-muted align-middle">';
-                                            if ($level > 1) {
-                                                echo '—';
-                                            } else {
-                                                echo $item->sequence;
-                                            }
+                                            // 1. Sequence Number
+                                            echo '<td class="text-center align-middle">';
+                                            echo '<span class="badge bg-light text-secondary border px-2 py-1 fs-11 rounded-1 fw-medium">' . e($seq) . '</span>';
                                             echo '</td>';
                                             
-                                            // Material Component details with Indentation
+                                            // 2. Component Product with Hierarchy Indentation
                                             echo '<td class="align-middle">';
                                             echo '<div style="padding-left: ' . $padding . 'px;" class="d-flex align-items-center">';
                                             if ($level > 1) {
-                                                echo '<i class="feather-corner-down-right text-muted me-2 fs-12"></i>';
+                                                echo '<i class="feather-corner-down-right text-muted me-2 fs-11 opacity-75"></i>';
                                             }
                                             echo '<div class="d-flex flex-column">';
                                             $matName = $item->material?->name ?? 'Unknown Component';
                                             $matSku = $item->material?->sku ?? '—';
-                                            echo '<span class="fw-bold text-dark">' . e($matName) . '</span>';
-                                            echo '<small class="text-muted font-monospace fs-10">' . e($matSku) . '</small>';
+                                            echo '<span class="fw-semibold text-dark fs-13 mb-0.5">' . e($matName) . '</span>';
+                                            echo '<span class="text-muted fs-11">' . e($matSku) . '</span>';
                                             
                                             if (!empty($item->notes)) {
                                                 echo '<small class="text-muted fst-italic fs-11 mt-0.5"><i class="feather-file-text me-1 text-secondary"></i>' . e($item->notes) . '</small>';
@@ -330,74 +393,71 @@
                                             if ($item->is_alternative) {
                                                 $parentName = $item->primaryItem?->material?->name ?? ('Primary #' . $item->replaces_item_id);
                                                 $parentSku = $item->primaryItem?->material?->sku ?? '';
-                                                echo '<span class="badge bg-soft-warning text-warning fs-10 mt-1 d-inline-block">';
+                                                echo '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 mt-1 d-inline-block px-1.5 py-0.5">';
                                                 echo '<i class="feather-shuffle me-1"></i>' . __('production.alternative_of') . ': ' . e($parentName) . ($parentSku ? ' (' . e($parentSku) . ')' : '') . ' • Priority ' . $item->priority;
                                                 echo '</span>';
                                             }
-
-                                            if ($item->childBom) {
-                                                echo '<small class="mt-1 d-flex align-items-center gap-1 flex-wrap">';
-                                                echo '<a href="' . route('production.boms.show', $item->childBom->id) . '" class="badge bg-soft-success text-success">';
-                                                echo '<i class="feather-link me-1"></i>' . __('production.sub_bom') . ': ' . e($item->childBom->bom_name ?: $item->childBom->bom_number) . ' v' . e($item->childBom->version);
-                                                echo '</a>';
-
-                                                if ($item->childBom->status === 'cancelled') {
-                                                    echo '<span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10 px-1 py-0.5"><i class="feather-x-circle me-0.5"></i>Cancelled</span>';
-                                                } elseif (in_array($item->childBom->status, ['inactive', 'superseded'])) {
-                                                    echo '<span class="badge bg-soft-secondary text-secondary border fs-10 px-1 py-0.5"><i class="feather-alert-circle me-0.5"></i>Inactive</span>';
-                                                }
-
-                                                // Check if a newer version is available for this material
-                                                $itemNewerApproved = \App\Domains\Production\Models\ProductionBom::withoutGlobalScopes()
-                                                    ->where('tenant_id', $item->tenant_id)
-                                                    ->where('product_id', $item->material_id)
-                                                    ->whereIn('status', ['approved', 'active'])
-                                                    ->where('id', '>', $item->childBom->id)
-                                                    ->orderByDesc('id')
-                                                    ->first();
-                                                if ($itemNewerApproved) {
-                                                    echo '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1 py-0.5" title="Newer approved version v' . e($itemNewerApproved->version) . ' available"><i class="feather-alert-triangle me-0.5"></i>Newer Version Available (v' . e($itemNewerApproved->version) . ')</span>';
-                                                }
-
-                                                echo '</small>';
-                                            }
                                             echo '</div>';
                                             echo '</div>';
                                             echo '</td>';
                                             
-                                            // Quantity & Type
-                                            echo '<td class="text-end fw-bold align-middle">';
+                                            // 3. Net Quantity with UOM
+                                            echo '<td class="text-end align-middle text-nowrap">';
                                             if ($item->quantity_type === 'formula' && !empty($item->formula)) {
-                                                echo '<span class="badge bg-soft-primary text-primary fs-10 mb-1 d-inline-block"><i class="feather-cpu me-1"></i>Formula</span>';
-                                                echo '<span class="fw-bold text-dark d-block">' . number_format($item->quantity, 2) . '</span>';
-                                                echo '<small class="text-muted font-monospace fs-10 d-block" title="Formula Expression">Fx: ' . e($item->formula) . '</small>';
+                                                echo '<span class="badge bg-soft-primary text-primary fs-10 mb-0.5 d-inline-block"><i class="feather-cpu me-1"></i>Formula</span>';
+                                                echo '<span class="fw-semibold text-dark d-block fs-13">' . number_format($effectiveNetQty, (round($effectiveNetQty, 2) == 0 && $effectiveNetQty > 0) ? 4 : 2) . ' <span class="text-muted fw-normal fs-11 ms-1">' . e($uomCode) . '</span></span>';
+                                                echo '<small class="text-muted fs-10 d-block" title="Formula Expression">Fx: ' . e($item->formula) . '</small>';
                                             } else {
-                                                echo '<span class="fw-bold text-dark d-block">' . number_format($item->quantity, 2) . '</span>';
-                                                echo '<small class="text-muted fs-10 d-block">Fixed</small>';
+                                                echo '<span class="fw-semibold text-dark fs-13">' . number_format($effectiveNetQty, (round($effectiveNetQty, 2) == 0 && $effectiveNetQty > 0) ? 4 : 2) . ' <span class="text-muted fw-normal fs-11 ms-1">' . e($uomCode) . '</span></span>';
                                             }
                                             echo '</td>';
                                             
-                                            // Unit
-                                            echo '<td class="align-middle text-muted">' . e($item->uom?->code ?? $item->material?->uom?->code ?? 'PCS') . '</td>';
+                                            // 4. Scrap %
+                                            echo '<td class="text-end align-middle text-nowrap">';
+                                            if ($scrapPct > 0) {
+                                                echo '<span class="badge bg-soft-danger text-danger border border-danger-subtle fs-11 fw-semibold px-2 py-0.5">+' . number_format($scrapPct, 2) . '%</span>';
+                                            } else {
+                                                echo '<span class="text-danger fs-12 fw-medium" style="opacity: 0.85;">0.00%</span>';
+                                            }
+                                            echo '</td>';
                                             
-                                            // Scrap %
-                                            echo '<td class="text-end text-danger fw-semibold align-middle">' . number_format($item->material_scrap_percentage, 2) . '%</td>';
+                                            // 5. Gross Qty with UOM
+                                            echo '<td class="text-end align-middle text-nowrap">';
+                                            if ($scrapPct > 0) {
+                                                echo '<span class="fw-semibold text-danger fs-13">' . number_format($effectiveGrossQty, (round($effectiveGrossQty, 2) == 0 && $effectiveGrossQty > 0) ? 4 : 2) . ' <span class="text-muted fw-normal fs-11 ms-1">' . e($uomCode) . '</span></span>';
+                                            } else {
+                                                echo '<span class="fw-semibold text-dark fs-13">' . number_format($effectiveGrossQty, (round($effectiveGrossQty, 2) == 0 && $effectiveGrossQty > 0) ? 4 : 2) . ' <span class="text-muted fw-normal fs-11 ms-1">' . e($uomCode) . '</span></span>';
+                                            }
+                                            echo '</td>';
                                             
-                                            // Cost (Line Total & Unit Cost)
-                                            echo '<td class="text-end align-middle">';
-                                            echo '<span class="fw-bold text-dark d-block">' . format_currency($itemTotalCost) . '</span>';
-                                            echo '<small class="text-muted font-monospace fs-10">@ ' . format_currency($unitCost) . ' / ' . e($item->uom?->code ?? $item->material?->uom?->code ?? 'PCS') . '</small>';
+                                            // 6. Unit Cost
+                                            echo '<td class="text-end align-middle text-nowrap">';
+                                            echo '<span class="text-secondary fs-12 fw-normal">' . format_currency($unitCost) . '</span>';
+                                            echo '</td>';
+                                            
+                                            // 7. Net Cost
+                                            echo '<td class="text-end align-middle text-nowrap">';
+                                            echo '<span class="text-secondary fs-12 fw-semibold">' . format_currency($netCost) . '</span>';
+                                            echo '</td>';
+                                            
+                                            // 8. Gross Total Cost
+                                            echo '<td class="text-end align-middle text-nowrap">';
+                                            echo '<span class="fw-bold text-dark fs-13 d-block">' . format_currency($grossCost) . '</span>';
                                             if ($item->is_alternative) {
-                                                echo '<span class="badge bg-soft-secondary text-muted fs-10 mt-0.5 d-inline-block">Alternative (Excluded from base cost)</span>';
+                                                echo '<span class="badge bg-soft-secondary text-muted border fs-10 mt-0.5 d-inline-block">Alternative</span>';
                                             }
                                             echo '</td>';
-
+                                            
                                             echo '</tr>';
                                             
-                                            // Recursively render child components if linked BOM exists
-                                            if ($item->childBom && $item->childBom->items->count() > 0) {
-                                                renderComponentTreeRows($item->childBom->items, $level + 1);
+                                            // Recursively render child components with scaled quantities
+                                            if ($item->childBom && $item->childBom->items && $item->childBom->items->count() > 0) {
+                                                $childBase = (float) ($item->childBom->base_quantity > 0 ? $item->childBom->base_quantity : 1.0);
+                                                $childMultiplier = $parentMultiplier * ((float) $item->quantity / $childBase);
+                                                renderComponentTreeRows($item->childBom->items, $level + 1, $seq, $childMultiplier);
                                             }
+                                            
+                                            $idx++;
                                         }
                                     }
                                 }
@@ -407,7 +467,7 @@
                                 @php renderComponentTreeRows($bom->items) @endphp
                             @else
                                 <tr>
-                                    <td colspan="6" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
+                                    <td colspan="8" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
                                 </tr>
                             @endif
                         </tbody>
@@ -425,47 +485,102 @@
                         function renderExplosionTableRows($node, $level = 1) {
                             $padding = ($level - 1) * 20;
                             $isLeaf = empty($node['children']);
-                            $bomVersion = $node['bom_version'] ?? 'N/A';
-                            
+                            $hasSubBom = !empty($node['has_sub_bom']) && !empty($node['bom_id']);
+                            $bomVersion = $node['bom_version'] ?? null;
                             $qty = isset($node['net_quantity']) ? $node['net_quantity'] : $node['quantity'];
-                            $gross = isset($node['gross_quantity']) ? $node['gross_quantity'] : $node['quantity'];
-                            $scrap = isset($node['material_scrap_percentage']) ? $node['material_scrap_percentage'] : 0.0;
+                            $uom = $node['uom_code'] ?? 'PCS';
                             
                             echo '<tr>';
-                            echo '<td class="font-monospace text-center">' . $level . '</td>';
-                            echo '<td>';
+                            // 1. Level
+                            echo '<td class="text-center align-middle">';
+                            echo '<span class="badge rounded-circle ' . ($level === 1 ? 'bg-primary text-white shadow-sm' : ($level === 2 ? 'bg-info text-white' : 'bg-light text-secondary border')) . ' fs-11 fw-semibold" style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;">' . $level . '</span>';
+                            echo '</td>';
+                            
+                            // 2. Component Product
+                            echo '<td class="align-middle">';
                             echo '<div style="padding-left: ' . $padding . 'px;" class="d-flex align-items-center">';
-                            if (!$isLeaf) {
-                                echo '<i class="feather-package text-primary me-2 fs-14"></i>';
+                            if ($level === 1) {
+                                echo '<i class="feather-layers text-primary me-2 fs-14"></i>';
+                            } elseif (!$isLeaf) {
+                                echo '<i class="feather-package text-info me-2 fs-13"></i>';
                             } else {
                                 echo '<i class="feather-box text-muted me-2 fs-12"></i>';
                             }
                             echo '<div class="d-flex flex-column">';
-                            echo '<span class="fw-bold text-dark">' . e($node['product_name']) . '</span>';
-                            echo '<small class="text-muted font-monospace fs-10">' . e($node['product_sku']) . '</small>';
+                            echo '<div class="d-flex align-items-center flex-wrap gap-1">';
+                            echo '<span class="fw-semibold text-dark fs-13">' . e($node['product_name']) . '</span>';
+                            if ($level === 1) {
+                                echo '<span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 rounded-pill px-2 py-0.5 fw-semibold ms-1">Finished Product</span>';
+                            }
+                            echo '</div>';
+                            echo '<span class="text-muted fs-11">' . e($node['product_sku']) . '</span>';
                             echo '</div>';
                             echo '</div>';
                             echo '</td>';
                             
-                            echo '<td class="text-end fw-bold">' . number_format($qty, 2) . '</td>';
-                            echo '<td>' . e($node['uom_code']) . '</td>';
-                            echo '<td class="text-end text-danger">' . number_format($scrap, 2) . '%</td>';
-                            echo '<td class="text-end fw-bold text-primary">' . number_format($gross, 2) . '</td>';
-                            echo '<td>' . e($bomVersion !== 'N/A' ? "v{$bomVersion}" : '—') . '</td>';
-                            echo '<td>';
-                            if (isset($node['has_sub_bom']) && $node['has_sub_bom']) {
-                                $st = strtolower($node['bom_status'] ?? 'approved');
-                                if ($st === 'approved' || $st === 'active') {
-                                    echo '<span class="badge bg-soft-success text-success">' . __('production.active') . '</span>';
-                                } elseif ($st === 'cancelled') {
-                                    echo '<span class="badge bg-soft-danger text-danger">Cancelled</span>';
-                                } elseif ($st === 'inactive' || $st === 'superseded') {
-                                    echo '<span class="badge bg-soft-secondary text-secondary">' . ucfirst($st) . '</span>';
-                                } else {
-                                    echo '<span class="badge bg-soft-warning text-warning">' . ucfirst($st) . '</span>';
+                            // 3. Linked Sub-BOM (Clickable Green Box)
+                            echo '<td class="align-middle">';
+                            if ($hasSubBom) {
+                                $bomTitle = $node['bom_name'] ?: $node['bom_number'];
+                                $bomRoute = route('production.boms.show', $node['bom_id']);
+                                echo '<a href="' . $bomRoute . '" class="sub-bom-link-box" title="View Sub-BOM Details">';
+                                echo '<i class="feather-link fs-11 flex-shrink-0"></i>';
+                                echo '<span>Sub-BOM: <strong>' . e($bomTitle) . '</strong></span>';
+                                if (!empty($bomVersion)) {
+                                    echo '<span class="badge bg-success text-white fs-10 px-1.5 py-0.2 ms-1 rounded-1">v' . e($bomVersion) . '</span>';
+                                }
+                                echo '</a>';
+                                if (!empty($node['bom_number']) && !empty($node['bom_name']) && $node['bom_name'] !== $node['bom_number']) {
+                                    echo '<span class="text-muted fs-10 d-block mt-0.5 ps-1">' . e($node['bom_number']) . '</span>';
                                 }
                             } else {
-                                echo '<span class="badge bg-soft-secondary text-secondary">—</span>';
+                                echo '<span class="text-muted fs-12 opacity-50">—</span>';
+                            }
+                            echo '</td>';
+                            
+                            // 4. BOM Base Qty
+                            echo '<td class="text-end align-middle">';
+                            if ($hasSubBom) {
+                                echo '<span class="text-secondary fw-semibold fs-12">' . number_format($node['bom_base_quantity'] ?? 1.0, 2) . '</span>';
+                            } else {
+                                echo '<span class="text-muted fs-12 opacity-50">—</span>';
+                            }
+                            echo '</td>';
+                            
+                            // 5. Qty Required for Production
+                            echo '<td class="text-end fw-bold text-dark align-middle fs-13">';
+                            echo number_format($qty, (round($qty, 2) == 0 && $qty > 0) ? 4 : 2);
+                            echo '</td>';
+                            
+                            // 6. UOM
+                            echo '<td class="text-center align-middle">';
+                            echo '<span class="badge bg-light text-secondary border fs-11 px-2 py-0.5 rounded-1 fw-medium">' . e($uom) . '</span>';
+                            echo '</td>';
+                            
+                            // 7. Version
+                            echo '<td class="text-center align-middle">';
+                            if ($hasSubBom && $bomVersion) {
+                                echo '<span class="badge bg-light text-dark border fs-11 px-1.5 py-0.5 rounded-1 fw-medium">v' . e($bomVersion) . '</span>';
+                            } else {
+                                echo '<span class="text-muted fs-12 opacity-50">—</span>';
+                            }
+                            echo '</td>';
+                            
+                            // 8. Lifecycle Status
+                            echo '<td class="text-center align-middle">';
+                            if ($hasSubBom) {
+                                $st = strtolower($node['bom_status'] ?? 'approved');
+                                if ($st === 'approved' || $st === 'active') {
+                                    echo '<span class="badge bg-soft-success text-success border border-success-subtle fs-11 px-2 py-0.5 rounded-1">' . __('production.active') . '</span>';
+                                } elseif ($st === 'cancelled') {
+                                    echo '<span class="badge bg-soft-danger text-danger border border-danger-subtle fs-11 px-2 py-0.5 rounded-1">Cancelled</span>';
+                                } elseif (in_array($st, ['inactive', 'superseded'])) {
+                                    echo '<span class="badge bg-soft-secondary text-secondary border fs-11 px-2 py-0.5 rounded-1">' . ucfirst($st) . '</span>';
+                                } else {
+                                    echo '<span class="badge bg-soft-warning text-warning border fs-11 px-2 py-0.5 rounded-1">' . ucfirst($st) . '</span>';
+                                }
+                            } else {
+                                echo '<span class="text-muted fs-12 opacity-50">—</span>';
                             }
                             echo '</td>';
                             echo '</tr>';
@@ -480,21 +595,27 @@
                 @endphp
 
                 <div class="table-responsive">
-                    <x-ui.odoo-form-ui type="table">
+                    <x-ui.odoo-form-ui type="table" class="bom-table-enhanced">
                         <thead>
                             <tr>
-                                <th style="width: 8%" class="text-center">{{ __('production.component_level') }}</th>
-                                <th style="width: 32%">{{ __('production.component_product') }}</th>
-                                <th style="width: 15%" class="text-end">{{ __('production.net_qty_required') }}</th>
-                                <th style="width: 10%">{{ __('production.uom') }}</th>
-                                <th style="width: 10%" class="text-end">{{ __('production.scrap_percent') }}</th>
-                                <th style="width: 15%" class="text-end">{{ __('production.gross_qty_required') }}</th>
-                                <th style="width: 10%">{{ __('production.version') }}</th>
-                                <th style="width: 10%">{{ __('production.status') }}</th>
+                                <th style="width: 6%" class="text-center">{{ __('production.level') }}</th>
+                                <th style="width: 27%">{{ __('production.component_product') }}</th>
+                                <th style="width: 24%">{{ __('production.linked_sub_bom') }}</th>
+                                <th style="width: 11%" class="text-end text-nowrap">{{ __('production.bom_base_qty') }}</th>
+                                <th style="width: 14%" class="text-end text-nowrap">{{ __('production.qty_required') }}</th>
+                                <th style="width: 6%" class="text-center">{{ __('production.uom') ?? 'UOM' }}</th>
+                                <th style="width: 6%" class="text-center">{{ __('production.version') }}</th>
+                                <th style="width: 6%" class="text-center">{{ __('production.status') }}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @php renderExplosionTableRows($explosion['tree']) @endphp
+                            @if(!empty($explosion['tree']))
+                                @php renderExplosionTableRows($explosion['tree']) @endphp
+                            @else
+                                <tr>
+                                    <td colspan="8" class="text-center py-4 text-muted">{{ __('production.no_components_spec_yet') }}</td>
+                                </tr>
+                            @endif
                         </tbody>
                     </x-ui.odoo-form-ui>
                 </div>

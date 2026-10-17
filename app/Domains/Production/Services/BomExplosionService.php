@@ -78,13 +78,15 @@ class BomExplosionService
 
         if ($bom) {
             $node['has_sub_bom'] = true;
+            $node['bom_id'] = $bom->id;
             $node['bom_number'] = $bom->bom_number;
             $node['bom_name'] = $bom->bom_name;
             $node['bom_version'] = $bom->version;
             $node['bom_status'] = $bom->status;
             $node['bom_type'] = $bom->bom_type;
+            $node['bom_base_quantity'] = (float) $bom->base_quantity;
             $node['is_phantom'] = ($bom->bom_type === 'phantom');
-            $node['uom_code'] = $bom->baseUom ? $bom->baseUom->code : 'PCS';
+            $node['uom_code'] = $bom->baseUom ? $bom->baseUom->code : ($product->uom ? $product->uom->code : 'PCS');
 
             $node['children'] = $this->resolveChildren($bom, $quantity, $tenantId, $level, $visited, $parameters);
         }
