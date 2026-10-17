@@ -291,6 +291,14 @@ class ShopfloorQcScrapReworkArchitectureTest extends TestCase
         $this->assertEquals('running', $orderOp->status);
 
         // Re-QC on reworked 3 units passes
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $orderOp->id,
+            'quantity_produced' => 3,
+            'recorded_at' => now(),
+        ]);
+
         app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [
             'production_order_operation_id' => $orderOp->id,
             'accepted_qty' => 3,
@@ -339,6 +347,14 @@ class ShopfloorQcScrapReworkArchitectureTest extends TestCase
         $this->assertEquals(2.25, $result['requested_qty']);
 
         // Replacement run logs 3 good legs and passes QC
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $orderOp->id,
+            'quantity_produced' => 3,
+            'recorded_at' => now(),
+        ]);
+
         app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [
             'production_order_operation_id' => $orderOp->id,
             'accepted_qty' => 3,
@@ -475,6 +491,15 @@ class ShopfloorQcScrapReworkArchitectureTest extends TestCase
         $order = $this->createTestOrder(40);
         $orderOp = $order->operations->first();
 
+        // Log 40 units progress so pending QC is 40
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $orderOp->id,
+            'quantity_produced' => 40,
+            'recorded_at' => now(),
+        ]);
+
         // Perform inspection with 37 passed and 3 rejected
         app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [
             'production_order_operation_id' => $orderOp->id,
@@ -525,4 +550,357 @@ class ShopfloorQcScrapReworkArchitectureTest extends TestCase
         $this->assertEquals(0.0, $orderOp->quantity_rejected); // 1 - 1 scrap = 0 remaining
         $this->assertEquals(1.0, $orderOp->quantity_scrapped);
     }
+
+    public function test_qc_inspection_fails_when_operation_has_no_pending_qc_units(): void
+    {
+        $order = $this->createTestOrder(40);
+        $orderOp = $order->operations->first();
+
+        // No progress logged yet (operation has not started output, pending QC is 0)
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('There are no pending QC units');
+
+        app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [
+            'production_order_operation_id' => $orderOp->id,
+            'accepted_qty' => 10,
+            'rejected_qty' => 0,
+        ], $this->user->id);
+    }
+
+    public function test_qc_inspection_fails_when_inspected_quantity_exceeds_pending_qc(): void
+    {
+        $order = $this->createTestOrder(40);
+        $orderOp = $order->operations->first();
+
+        // Log 15 units progress
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $orderOp->id,
+            'quantity_produced' => 15,
+            'recorded_at' => now(),
+        ]);
+
+        // Trying to inspect 12 accepted + 5 rejected = 17 > 15 pending
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Total inspected quantity (17) cannot exceed pending QC units (15)');
+
+        app(QualityInspectionService::class)->processShopfloorInspection($this->tenant->id, [
+            'production_order_operation_id' => $orderOp->id,
+            'accepted_qty' => 12,
+            'rejected_qty' => 5,
+        ], $this->user->id);
+    }
+
+    public function test_qc_cannot_be_logged_via_endpoint_when_no_pending_qc(): void
+    {
+        $order = $this->createTestOrder(40);
+        $orderOp = $order->operations->first();
+
+        // Post to quality inspection endpoint with 0 pending QC
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.quality-inspection', $orderOp->id), [
+                'accepted_qty' => 10,
+                'rejected_qty' => 0,
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+
+        $orderOp->refresh();
+        $this->assertEquals(0.0, $orderOp->quantity_produced);
+        $this->assertEquals(0.0, $orderOp->quantity_rejected);
+    }
+
+    public function test_run_qc_button_is_not_visible_when_pending_qc_is_zero(): void
+    {
+        $order = $this->createTestOrder(40);
+        $orderOp = $order->operations->first();
+
+        // 1. When pending QC is 0 (operation output not yet logged), Run QC action button is NOT visible
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertDontSee('data-bs-target="#qcModal' . $orderOp->id . '"', false);
+        $response->assertDontSee('title="Run Quality Inspection"', false);
+
+        // 2. Now log 10 units progress -> Run QC button becomes visible with badge 10
+        \App\Domains\Production\Models\ProductionOrderProgressLog::create([
+            'tenant_id' => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'operation_id' => $orderOp->id,
+            'quantity_produced' => 10,
+            'recorded_at' => now(),
+        ]);
+
+        $responseWithQc = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+
+        $responseWithQc->assertStatus(200);
+        $responseWithQc->assertSee('data-bs-target="#qcModal' . $orderOp->id . '"', false);
+        $responseWithQc->assertSee('title="Run Quality Inspection"', false);
+        $responseWithQc->assertSee('QC: 10');
+    }
+
+    public function test_remaining_production_autofill_accounts_for_pending_qc(): void
+    {
+        // Target planned = 5 units
+        $order = $this->createTestOrder(5);
+        $orderOp = $order->operations->first();
+        $schedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $orderOp->id)->first();
+        $schedOp->update(['status' => 'running', 'actual_start' => now()->subHour()]);
+
+        // 1. Operator logs 2 units produced -> They enter Pending QC
+        $responseLog1 = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.complete', $schedOp->id), [
+                'log_date' => now()->format('Y-m-d'),
+                'start_time' => '09:00',
+                'end_time' => '10:00',
+                'quantity_produced' => 2,
+                'quantity_rejected' => 0,
+                'quantity_scrapped' => 0,
+            ]);
+        $responseLog1->assertRedirect();
+        $responseLog1->assertSessionHas('success');
+
+        $this->assertEquals(2.0, app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOp->id));
+
+        // 2. QC approves 1 unit -> 1 unit remains in Pending QC, 1 unit is accepted
+        $responseQc1 = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.quality-inspection', $orderOp->id), [
+                'accepted_qty' => 1,
+                'rejected_qty' => 0,
+                'inspection_date' => now()->format('Y-m-d'),
+            ]);
+        $responseQc1->assertRedirect();
+        $responseQc1->assertSessionHas('success');
+
+        $orderOp->refresh();
+        $this->assertEquals(1.0, (float) $orderOp->quantity_produced);
+        $this->assertEquals(1.0, app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOp->id));
+
+        // 3. Inspect Dashboard & Operator views: Remaining quantity to log MUST be 3 (5 - (1 done + 1 pending QC)), NOT 4!
+        $dashboardResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+        $dashboardResponse->assertStatus(200);
+        // The modal input value for quantity_produced must be 3
+        $dashboardResponse->assertSee('value="3"', false);
+        $dashboardResponse->assertDontSee('value="4"', false);
+
+        $operatorResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.operator.execution', $orderOp->id));
+        $operatorResponse->assertStatus(200);
+        $operatorResponse->assertSee('3.00');
+
+        // 4. Log remaining 3 units -> Must succeed without overproduction or WIP violation!
+        $schedOp->refresh();
+        $schedOp->update(['status' => 'running', 'actual_start' => now()->subHour()]);
+        $responseLog2 = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.complete', $schedOp->id), [
+                'log_date' => now()->format('Y-m-d'),
+                'start_time' => '10:00',
+                'end_time' => '11:00',
+                'quantity_produced' => 3,
+                'quantity_rejected' => 0,
+                'quantity_scrapped' => 0,
+            ]);
+        $responseLog2->assertRedirect();
+        $responseLog2->assertSessionHas('success');
+
+        // Now pending QC is 4 (1 previous + 3 new)
+        $this->assertEquals(4.0, app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOp->id));
+    }
+
+    public function test_assign_to_and_executed_by_are_decoupled_on_shopfloor(): void
+    {
+        $order = $this->createTestOrder(10);
+        $orderOp = $order->operations->first();
+        $schedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $orderOp->id)->first();
+        $schedOp->update(['status' => 'running', 'actual_start' => now()->subHour()]);
+
+        // 1. Initial State: Unassigned
+        $initialResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+        $initialResponse->assertStatus(200);
+        $initialResponse->assertSee('Executed By');
+        $initialResponse->assertSee('Unassigned');
+
+        // 2. User logs production output (e.g. $this->user)
+        $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.complete', $schedOp->id), [
+                'log_date' => now()->format('Y-m-d'),
+                'start_time' => '09:00',
+                'end_time' => '10:00',
+                'quantity_produced' => 2,
+                'quantity_rejected' => 0,
+                'quantity_scrapped' => 0,
+            ]);
+
+        // Dashboard check: Executed By shows logger's name, Assign To MUST still remain Unassigned!
+        $afterLogResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+        $afterLogResponse->assertStatus(200);
+        $afterLogResponse->assertSee('Executed / Logged by ' . $this->user->name, false);
+        $afterLogResponse->assertSee('Unassigned');
+
+        // 3. Assign operation to a different user
+        $operatorUser = \App\Models\User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Designated Machine Operator',
+        ]);
+        \App\Domains\Production\Models\ProductionOperatorSkill::create([
+            'tenant_id' => $this->tenant->id,
+            'user_id' => $operatorUser->id,
+            'skill_name' => 'General Operations',
+            'skill_code' => 'SKL-ALL',
+            'proficiency_level' => 'expert',
+            'active' => true,
+        ]);
+
+        app(\App\Domains\Production\Services\OperatorAssignmentService::class)->assign(
+            $this->tenant->id,
+            $orderOp->id,
+            $operatorUser->id,
+            $this->user->id,
+            'Assigned for morning shift'
+        );
+
+        // Dashboard check: Assign To now shows the designated operator, Executed By still shows logger!
+        $afterAssignResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+        $afterAssignResponse->assertStatus(200);
+        $afterAssignResponse->assertSee('Pending: Designated Machine Operator');
+        $afterAssignResponse->assertSee('Executed / Logged by ' . $this->user->name, false);
+        // Since operation is running and operator is assigned, Edit button must NOT be visible
+        $afterAssignResponse->assertDontSee('#assignOperatorModal' . $schedOp->id, false);
+    }
+
+    public function test_cannot_change_or_edit_operator_once_operation_is_started(): void
+    {
+        $order = $this->createTestOrder(10);
+        $orderOp = $order->operations->first();
+        $schedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $orderOp->id)->first();
+        $schedOp->update(['status' => 'ready', 'actual_start' => null]);
+        $orderOp->update(['status' => 'ready', 'actual_start_time' => null]);
+
+        $op1 = \App\Models\User::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Operator Alpha']);
+        $op2 = \App\Models\User::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Operator Beta']);
+
+        \App\Domains\Production\Models\ProductionOperatorSkill::create([
+            'tenant_id' => $this->tenant->id,
+            'user_id' => $op1->id,
+            'skill_name' => 'General Operations',
+            'skill_code' => 'SKL-ALL',
+            'proficiency_level' => 'expert',
+            'active' => true,
+        ]);
+        \App\Domains\Production\Models\ProductionOperatorSkill::create([
+            'tenant_id' => $this->tenant->id,
+            'user_id' => $op2->id,
+            'skill_name' => 'General Operations',
+            'skill_code' => 'SKL-ALL',
+            'proficiency_level' => 'expert',
+            'active' => true,
+        ]);
+
+        // 1. Initial assignment before operation starts:
+        $assignment = app(\App\Domains\Production\Services\OperatorAssignmentService::class)->assign(
+            $this->tenant->id,
+            $orderOp->id,
+            $op1->id,
+            $this->user->id
+        );
+
+        // Before starting: Dashboard should show Operator Alpha and the Edit button
+        $beforeStartResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+        $beforeStartResponse->assertStatus(200);
+        $beforeStartResponse->assertSee('Pending: Operator Alpha');
+        $beforeStartResponse->assertSee('#assignOperatorModal' . $schedOp->id, false);
+        $beforeStartResponse->assertSee('Edit');
+
+        // Before starting: Production order screen also shows Reassign button
+        $orderShowBefore = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-operations']));
+        $orderShowBefore->assertStatus(200);
+        $orderShowBefore->assertSee('title="Reassign"', false);
+
+        // Before starting: Reassigning to Operator Beta is allowed
+        $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.assignments.assign'), [
+                'production_order_operation_id' => $orderOp->id,
+                'user_id' => $op2->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertEquals($op2->id, $orderOp->fresh()->operator_id);
+
+        // 2. Start the operation
+        $schedOp->update(['status' => 'running', 'actual_start' => now()]);
+        $orderOp->update(['status' => 'running', 'actual_start_time' => now()]);
+
+        // Once started: Edit button and assign modal MUST NOT be rendered on shopfloor
+        $afterStartResponse = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.mes.dashboard'));
+        $afterStartResponse->assertStatus(200);
+        $afterStartResponse->assertSee('Pending: Operator Beta');
+        $afterStartResponse->assertDontSee('#assignOperatorModal' . $schedOp->id, false);
+
+        // Once started: Production order screen MUST NOT render the Reassign button
+        $orderShowAfter = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->get(route('production.orders.show', ['order' => $order->id, 'tab' => 'vtab-operations']));
+        $orderShowAfter->assertStatus(200);
+        $orderShowAfter->assertDontSee('title="Reassign"', false);
+
+        // Attempting to reassign once started via HTTP POST must be rejected
+        $failedPost = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', $this->tenant->slug)
+            ->withSession(['tenant_id' => $this->tenant->id])
+            ->post(route('production.mes.assignments.assign'), [
+                'production_order_operation_id' => $orderOp->id,
+                'user_id' => $op1->id,
+            ]);
+        $failedPost->assertRedirect();
+        $failedPost->assertSessionHas('error', 'Cannot change operator: This operation has already started.');
+
+        // Operator remains Operator Beta
+        $this->assertEquals($op2->id, $orderOp->fresh()->operator_id);
+    }
 }
+

@@ -52,6 +52,9 @@ class MesController extends Controller
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
             'operations.orderOperation.operatorAssignments.user',
+            'operations.orderOperation.operator',
+            'operations.orderOperation.executedBy',
+            'operations.orderOperation.progressLogs.user',
         ])
             ->where('tenant_id', $tenantId);
 
@@ -140,6 +143,10 @@ class MesController extends Controller
             'operations.orderOperation.vendor',
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
+            'operations.orderOperation.operatorAssignments.user',
+            'operations.orderOperation.operator',
+            'operations.orderOperation.executedBy',
+            'operations.orderOperation.progressLogs.user',
         ])
             ->where('tenant_id', $tenantId)
             ->where('status', ProductionSchedule::STATUS_COMPLETED)
@@ -331,14 +338,39 @@ class MesController extends Controller
 
         try {
             $tenantId = require_tenant_id();
+            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+            $batchId = $request->input('batch_id');
+
+            $acceptedQty = (float) $request->input('accepted_qty');
+            $rejectedQty = (float) $request->input('rejected_qty');
+            $totalInspected = $acceptedQty + $rejectedQty;
+
+            if ($totalInspected <= 0) {
+                return redirect()->back()->with('error', 'Total inspected quantity (Accepted + Rejected) must be greater than zero.');
+            }
+
+            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
+            if (!$isQcRequired) {
+                return redirect()->back()->with('error', "Quality inspection cannot be recorded for operation #{$orderOp->operation_number} because Quality Control is not required.");
+            }
+
+            $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op, $batchId);
+            if ($pendingQcQty <= 0) {
+                return redirect()->back()->with('error', "Cannot record quality inspection: There are no pending QC units for operation #{$orderOp->operation_number}. Output must be logged first.");
+            }
+
+            if ($totalInspected > ($pendingQcQty + 0.0001)) {
+                return redirect()->back()->with('error', "Total inspected quantity ({$totalInspected}) cannot exceed pending QC units ({$pendingQcQty}) for operation #{$orderOp->operation_number}.");
+            }
+
             app(\App\Domains\Production\Services\QualityInspectionService::class)->processShopfloorInspection($tenantId, [
                 'production_order_operation_id' => $op,
-                'accepted_qty' => (float) $request->input('accepted_qty'),
-                'rejected_qty' => (float) $request->input('rejected_qty'),
+                'accepted_qty' => $acceptedQty,
+                'rejected_qty' => $rejectedQty,
                 'quality_plan_id' => $request->input('quality_plan_id'),
                 'audited_by' => $request->input('audited_by'),
                 'defect_reason' => $request->input('defect_reason'),
-                'batch_id' => $request->input('batch_id'),
+                'batch_id' => $batchId,
                 'remarks' => $request->input('remarks'),
             ], $request->input('audited_by') ?? auth()->id());
 
@@ -938,7 +970,7 @@ class MesController extends Controller
                 ->sum('quantity')
         );
         $rejectedQty = (float) ($op->quantity_rejected ?? 0.0);
-        $remainingQty = max(0.0, $targetQty - ($doneQty + $scrapQty + $rejectedQty));
+        $remainingQty = max(0.0, $targetQty - ($doneQty + $pendingQcQty + $scrapQty + $rejectedQty));
         $progressPercent = $targetQty > 0 ? min(100.0, round(($doneQty / $targetQty) * 100, 1)) : ($op->status === 'completed' ? 100.0 : 0.0);
 
         return view('modules.production.mes.operator.operation-execution', compact(
