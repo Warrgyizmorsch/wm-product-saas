@@ -81,6 +81,7 @@ class BomExplosionService
             $node['bom_number'] = $bom->bom_number;
             $node['bom_name'] = $bom->bom_name;
             $node['bom_version'] = $bom->version;
+            $node['bom_status'] = $bom->status;
             $node['bom_type'] = $bom->bom_type;
             $node['is_phantom'] = ($bom->bom_type === 'phantom');
             $node['uom_code'] = $bom->baseUom ? $bom->baseUom->code : 'PCS';

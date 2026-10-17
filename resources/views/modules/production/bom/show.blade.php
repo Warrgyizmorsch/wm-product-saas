@@ -113,8 +113,39 @@
                 @else
                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) ?? $bom->status }}</span>
                 @endif
+
+                @php
+                    $bomComponentWarnings = $bom->getComponentWarnings();
+                    $isCancelledOrInactive = in_array($bom->status, ['cancelled', 'inactive'], true);
+                @endphp
+                @if(!$isCancelledOrInactive && (!empty($bomComponentWarnings) || $bom->has_warning))
+                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill px-2 py-1 font-monospace fw-bold ms-1"
+                          title="{{ $bom->warning_reason ?: $bom->getComponentWarningSummary() }}">
+                        <i class="feather-alert-triangle me-1"></i>Component Warning
+                    </span>
+                @endif
             </div>
         </div>
+
+        @if(!$isCancelledOrInactive && !empty($bomComponentWarnings))
+            <div class="alert alert-warning border-warning bg-soft-warning p-3 mb-4 rounded shadow-sm" role="alert">
+                <div class="d-flex align-items-start">
+                    <div class="avatar-text avatar-sm bg-warning text-white me-3 mt-1 flex-shrink-0">
+                        <i class="feather-alert-triangle"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading fw-bold mb-1 text-warning-800">
+                            Component BOM Warning
+                        </h6>
+                        <ul class="mb-0 ps-3 fs-12 text-dark">
+                            @foreach($bomComponentWarnings as $warn)
+                                <li>{{ $warn['message'] }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div class="row g-4 mb-4">
             <div class="col-md-6 border-end">
@@ -305,10 +336,29 @@
                                             }
 
                                             if ($item->childBom) {
-                                                echo '<small class="mt-1">';
+                                                echo '<small class="mt-1 d-flex align-items-center gap-1 flex-wrap">';
                                                 echo '<a href="' . route('production.boms.show', $item->childBom->id) . '" class="badge bg-soft-success text-success">';
                                                 echo '<i class="feather-link me-1"></i>' . __('production.sub_bom') . ': ' . e($item->childBom->bom_name ?: $item->childBom->bom_number) . ' v' . e($item->childBom->version);
                                                 echo '</a>';
+
+                                                if ($item->childBom->status === 'cancelled') {
+                                                    echo '<span class="badge bg-soft-danger text-danger border border-danger-subtle fs-10 px-1 py-0.5"><i class="feather-x-circle me-0.5"></i>Cancelled</span>';
+                                                } elseif (in_array($item->childBom->status, ['inactive', 'superseded'])) {
+                                                    echo '<span class="badge bg-soft-secondary text-secondary border fs-10 px-1 py-0.5"><i class="feather-alert-circle me-0.5"></i>Inactive</span>';
+                                                }
+
+                                                // Check if a newer version is available for this material
+                                                $itemNewerApproved = \App\Domains\Production\Models\ProductionBom::withoutGlobalScopes()
+                                                    ->where('tenant_id', $item->tenant_id)
+                                                    ->where('product_id', $item->material_id)
+                                                    ->whereIn('status', ['approved', 'active'])
+                                                    ->where('id', '>', $item->childBom->id)
+                                                    ->orderByDesc('id')
+                                                    ->first();
+                                                if ($itemNewerApproved) {
+                                                    echo '<span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1 py-0.5" title="Newer approved version v' . e($itemNewerApproved->version) . ' available"><i class="feather-alert-triangle me-0.5"></i>Newer Version Available (v' . e($itemNewerApproved->version) . ')</span>';
+                                                }
+
                                                 echo '</small>';
                                             }
                                             echo '</div>';
@@ -404,7 +454,16 @@
                             echo '<td>' . e($bomVersion !== 'N/A' ? "v{$bomVersion}" : '—') . '</td>';
                             echo '<td>';
                             if (isset($node['has_sub_bom']) && $node['has_sub_bom']) {
-                                echo '<span class="badge bg-soft-success text-success">' . __('production.active') . '</span>';
+                                $st = strtolower($node['bom_status'] ?? 'approved');
+                                if ($st === 'approved' || $st === 'active') {
+                                    echo '<span class="badge bg-soft-success text-success">' . __('production.active') . '</span>';
+                                } elseif ($st === 'cancelled') {
+                                    echo '<span class="badge bg-soft-danger text-danger">Cancelled</span>';
+                                } elseif ($st === 'inactive' || $st === 'superseded') {
+                                    echo '<span class="badge bg-soft-secondary text-secondary">' . ucfirst($st) . '</span>';
+                                } else {
+                                    echo '<span class="badge bg-soft-warning text-warning">' . ucfirst($st) . '</span>';
+                                }
                             } else {
                                 echo '<span class="badge bg-soft-secondary text-secondary">—</span>';
                             }

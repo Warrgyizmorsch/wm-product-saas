@@ -338,6 +338,7 @@ class TableManufacturingProductSeeder extends Seeder
                     'branch_id' => null,
                     'name' => $item['name'],
                     'type' => $item['type'],
+                    'supplier_method' => ($item['planning_type'] === 'manufacture') ? 'manufacture' : 'trade',
                     'planning_type' => $item['planning_type'],
                     'default_production_model' => $item['default_production_model'] ?? Product::MODEL_PURE_MANUFACTURING,
                     'uom_id' => $item['uom_id'],

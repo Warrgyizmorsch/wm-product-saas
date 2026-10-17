@@ -235,7 +235,7 @@ class MrpShortageService
             ->with(['items.material', 'items.uom'])
             ->first();
 
-        $isManufactured = ($bom !== null || $product->planning_type === 'manufacture' || $product->type === 'finished_good' || $product->type === 'semi_finished');
+        $isManufactured = ($bom !== null || in_array($product->supplier_method, ['manufacture', 'both'], true) || $product->type === 'finished_good' || $product->type === 'semi_finished');
         
         if ($isManufactured && $level === 1) {
             $summary['mfg_products_count']++;
@@ -253,7 +253,7 @@ class MrpShortageService
             'product_name' => $product->name,
             'sku' => $product->sku,
             'type' => $product->type ?? 'goods',
-            'planning_type' => $product->planning_type ?? ($bom ? 'manufacture' : 'purchase'),
+            'supplier_method' => $product->supplier_method ?? ($bom ? 'manufacture' : 'trade'),
             'uom_code' => $product->uom?->code ?? 'PCS',
             'unit_cost' => (float) ($product->unit_cost ?? $product->cost_price ?? 0.0),
             'level' => $level,

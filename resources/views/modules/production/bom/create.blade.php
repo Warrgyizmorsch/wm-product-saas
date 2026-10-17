@@ -202,8 +202,10 @@
                                                             ({{ $material->sku }})</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
-                                                <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'"
-                                                    x-model="item.child_bom_id">
+                                                <template x-if="!item.child_bom_versions || item.child_bom_versions.length === 0">
+                                                    <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'"
+                                                        x-model="item.child_bom_id">
+                                                </template>
                                                 <template x-if="item.child_bom_loading">
                                                     <div class="mt-1 text-muted fs-11">
                                                         <span class="spinner-border spinner-border-sm text-secondary me-1"
@@ -239,23 +241,12 @@
                                                                         class="feather-eye me-0.5"></i>{{ __('production.view') }}
                                                                 </a>
                                                                 <template
-                                                                    x-if="item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status !== 'approved'">
+                                                                    x-if="item.child_bom_id && (!item.child_bom_versions.find(x => x.id == item.child_bom_id) || !['approved', 'active', 'scheduled'].includes(item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status))">
                                                                     <span
                                                                         class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1 py-0.5"
-                                                                        title="Draft / non-approved version"><i
+                                                                        title="Draft, inactive, or non-approved version"><i
                                                                             class="feather-alert-triangle me-0.5"></i>{{ __('production.non_approved') }}</span>
                                                                 </template>
-                                                                <form
-                                                                    :action="'{{ url('production/boms') }}/' + item.child_bom_id + '/create-revision'"
-                                                                    method="POST" target="_blank" class="d-inline">
-                                                                    @csrf
-                                                                    <button type="submit"
-                                                                        class="btn btn-link p-0 text-secondary text-decoration-none fs-11 ms-1"
-                                                                        title="{{ __('production.revise') }}">
-                                                                        <i
-                                                                            class="feather-copy me-0.5"></i>{{ __('production.revise') }}
-                                                                    </button>
-                                                                </form>
                                                             </span>
                                                         </template>
                                                     </div>
@@ -480,7 +471,7 @@
                         .then(res => res.json())
                         .then(data => {
                             item.child_bom_status = data.status;
-                            item.child_bom_id = item.child_bom_id || null;
+                            item.child_bom_id = item.child_bom_id || (data.bom_id ? String(data.bom_id) : null);
                             item.child_bom_number = data.bom_number;
                             item.child_bom_version = data.version;
                             item.child_bom_name = data.bom_name;

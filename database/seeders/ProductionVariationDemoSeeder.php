@@ -403,85 +403,6 @@ class ProductionVariationDemoSeeder extends Seeder
         $rmTopBoard,
         $rmFastener
     ): array {
-        // ─── BOM 1: Standard FG Master BOM (Base Qty: 1 Piece) ─────────────
-        $bomFgStd = ProductionBom::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-FG-STD'],
-            [
-                'bom_name' => 'Industrial Dining Table Master BOM (1 Pcs)',
-                'product_id' => $fgTable->id,
-                'base_quantity' => 1.0,
-                'base_uom_id' => $pcs->id,
-                'effective_date' => now()->toDateString(),
-                'status' => 'approved',
-                'bom_type' => 'manufacturing',
-                'version' => '1.0',
-                'created_by' => $userId,
-            ]
-        );
-
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomFgStd->id, 'material_id' => $sfgFrame->id],
-            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 1]
-        );
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomFgStd->id, 'material_id' => $sfgTop->id],
-            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 2]
-        );
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomFgStd->id, 'material_id' => $rmFastener->id],
-            ['quantity' => 16.0, 'uom_id' => $pcs->id, 'sequence' => 3]
-        );
-
-        // ─── BOM 2: Table Frame Batch BOM (Base Qty: 10 Pieces) ─────────────
-        $bomFrameB10 = ProductionBom::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-FRAME-B10'],
-            [
-                'bom_name' => 'Table Frame Batch Production BOM (10 Frames)',
-                'product_id' => $sfgFrame->id,
-                'base_quantity' => 10.0,
-                'base_uom_id' => $pcs->id,
-                'effective_date' => now()->toDateString(),
-                'status' => 'approved',
-                'bom_type' => 'manufacturing',
-                'version' => '1.0',
-                'created_by' => $userId,
-            ]
-        );
-
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomFrameB10->id, 'material_id' => $sfgLeg->id],
-            ['quantity' => 40.0, 'uom_id' => $pcs->id, 'sequence' => 1] // 4 legs per frame * 10 = 40
-        );
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomFrameB10->id, 'material_id' => $sfgSupport->id],
-            ['quantity' => 20.0, 'uom_id' => $pcs->id, 'sequence' => 2] // 2 supports per frame * 10 = 20
-        );
-
-        // ─── BOM 3: Table Top with Secondary Hardware (Base Qty: 1 Piece) ───
-        $bomTopPartial = ProductionBom::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-TOP-PARTIAL'],
-            [
-                'bom_name' => 'Engineered Wood Table Top with Inserts BOM',
-                'product_id' => $sfgTop->id,
-                'base_quantity' => 1.0,
-                'base_uom_id' => $pcs->id,
-                'effective_date' => now()->toDateString(),
-                'status' => 'approved',
-                'bom_type' => 'manufacturing',
-                'version' => '1.0',
-                'created_by' => $userId,
-            ]
-        );
-
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomTopPartial->id, 'material_id' => $rmTopBoard->id],
-            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 1]
-        );
-        ProductionBomItem::updateOrCreate(
-            ['tenant_id' => $tenantId, 'bom_id' => $bomTopPartial->id, 'material_id' => $rmFastener->id],
-            ['quantity' => 8.0, 'uom_id' => $pcs->id, 'sequence' => 2]
-        );
-
         // ─── BOM 4: Table Leg Set Batch (Base Qty: 4 Pieces = 1 Set) ────────
         $bomLegB4 = ProductionBom::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-LEG-BATCH4'],
@@ -522,6 +443,85 @@ class ProductionVariationDemoSeeder extends Seeder
         ProductionBomItem::updateOrCreate(
             ['tenant_id' => $tenantId, 'bom_id' => $bomSupportB50->id, 'material_id' => $rmPipe->id],
             ['quantity' => 30.0, 'uom_id' => $mtr->id, 'sequence' => 1] // 0.60m * 50 = 30m
+        );
+
+        // ─── BOM 2: Table Frame Batch BOM (Base Qty: 10 Pieces) ─────────────
+        $bomFrameB10 = ProductionBom::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-FRAME-B10'],
+            [
+                'bom_name' => 'Table Frame Batch Production BOM (10 Frames)',
+                'product_id' => $sfgFrame->id,
+                'base_quantity' => 10.0,
+                'base_uom_id' => $pcs->id,
+                'effective_date' => now()->toDateString(),
+                'status' => 'approved',
+                'bom_type' => 'manufacturing',
+                'version' => '1.0',
+                'created_by' => $userId,
+            ]
+        );
+
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomFrameB10->id, 'material_id' => $sfgLeg->id],
+            ['quantity' => 40.0, 'uom_id' => $pcs->id, 'sequence' => 1, 'child_bom_id' => $bomLegB4->id]
+        );
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomFrameB10->id, 'material_id' => $sfgSupport->id],
+            ['quantity' => 20.0, 'uom_id' => $pcs->id, 'sequence' => 2, 'child_bom_id' => $bomSupportB50->id]
+        );
+
+        // ─── BOM 3: Table Top with Secondary Hardware (Base Qty: 1 Piece) ───
+        $bomTopPartial = ProductionBom::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-TOP-PARTIAL'],
+            [
+                'bom_name' => 'Engineered Wood Table Top with Inserts BOM',
+                'product_id' => $sfgTop->id,
+                'base_quantity' => 1.0,
+                'base_uom_id' => $pcs->id,
+                'effective_date' => now()->toDateString(),
+                'status' => 'approved',
+                'bom_type' => 'manufacturing',
+                'version' => '1.0',
+                'created_by' => $userId,
+            ]
+        );
+
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomTopPartial->id, 'material_id' => $rmTopBoard->id],
+            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 1]
+        );
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomTopPartial->id, 'material_id' => $rmFastener->id],
+            ['quantity' => 8.0, 'uom_id' => $pcs->id, 'sequence' => 2]
+        );
+
+        // ─── BOM 1: Standard FG Master BOM (Base Qty: 1 Piece) ─────────────
+        $bomFgStd = ProductionBom::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_number' => 'BOM-TBL-FG-STD'],
+            [
+                'bom_name' => 'Industrial Dining Table Master BOM (1 Pcs)',
+                'product_id' => $fgTable->id,
+                'base_quantity' => 1.0,
+                'base_uom_id' => $pcs->id,
+                'effective_date' => now()->toDateString(),
+                'status' => 'approved',
+                'bom_type' => 'manufacturing',
+                'version' => '1.0',
+                'created_by' => $userId,
+            ]
+        );
+
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomFgStd->id, 'material_id' => $sfgFrame->id],
+            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 1, 'child_bom_id' => $bomFrameB10->id]
+        );
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomFgStd->id, 'material_id' => $sfgTop->id],
+            ['quantity' => 1.0, 'uom_id' => $pcs->id, 'sequence' => 2, 'child_bom_id' => $bomTopPartial->id]
+        );
+        ProductionBomItem::updateOrCreate(
+            ['tenant_id' => $tenantId, 'bom_id' => $bomFgStd->id, 'material_id' => $rmFastener->id],
+            ['quantity' => 16.0, 'uom_id' => $pcs->id, 'sequence' => 3]
         );
 
         return [

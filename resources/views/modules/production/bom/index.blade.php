@@ -307,6 +307,15 @@
                                 @else
                                     <span class="erp-badge-draft text-uppercase">{{ __('production.' . $bom->status) }}</span>
                                 @endif
+
+                                @if(!in_array($bom->status, ['cancelled', 'inactive']) && ($bom->has_warning || $bom->hasComponentWarning()))
+                                    <div class="mt-1">
+                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5 rounded-pill d-inline-flex align-items-center gap-1"
+                                              title="{{ $bom->warning_reason ?: $bom->getComponentWarningSummary() }}">
+                                            <i class="feather-alert-triangle fs-10"></i> Warning
+                                        </span>
+                                    </div>
+                                @endif
                             </td>
                             <td>
                                 <span class="text-muted text-truncate d-inline-block" style="max-width: 150px;" title="{{ $bom->notes }}">

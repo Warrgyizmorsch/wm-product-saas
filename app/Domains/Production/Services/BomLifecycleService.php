@@ -154,8 +154,10 @@ class BomLifecycleService
             } else {
                 // Immediate/today start: supersede current active version to inactive
                 $activeBom->update([
-                    'status'      => 'inactive',
-                    'expiry_date' => $startDate,
+                    'status'         => 'inactive',
+                    'expiry_date'    => $startDate,
+                    'has_warning'    => false,
+                    'warning_reason' => null,
                 ]);
 
                 ProductionBomApproval::create([
@@ -209,8 +211,10 @@ class BomLifecycleService
         $today = Carbon::now()->toDateString();
 
         $bom->update([
-            'status'      => 'cancelled',
-            'expiry_date' => $today,
+            'status'         => 'cancelled',
+            'expiry_date'    => $today,
+            'has_warning'    => false,
+            'warning_reason' => null,
         ]);
 
         ProductionBomApproval::create([
@@ -234,8 +238,10 @@ class BomLifecycleService
     ): void {
         if ($currentBom) {
             $currentBom->update([
-                'status'      => 'inactive',
-                'expiry_date' => $effectiveDate,
+                'status'         => 'inactive',
+                'expiry_date'    => $effectiveDate,
+                'has_warning'    => false,
+                'warning_reason' => null,
             ]);
 
             ProductionBomApproval::create([

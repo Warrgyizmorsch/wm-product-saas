@@ -15,6 +15,7 @@ use App\Domains\Production\Services\BomExplosionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class ProductionBomController extends Controller
@@ -36,7 +37,9 @@ class ProductionBomController extends Controller
         $filters = $request->only(['product_id', 'status', 'search', 'sort_by', 'sort_order']);
         $boms = $this->bomRepository->paginateAll($filters, 10)->withQueryString();
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
+            ->whereIn('supplier_method', ['manufacture', 'both'])
+            ->get();
 
         return view('modules.production.bom.index', compact('boms', 'products'));
     }
@@ -46,28 +49,46 @@ class ProductionBomController extends Controller
         $tenantId = require_tenant_id();
 
         $boms = $this->bomRepository->getBomsByProductUnscoped($productId, $tenantId);
+        $today = Carbon::today()->toDateString();
 
-        $versions = $boms->map(function ($bom) {
+        // Only approved BOMs that are currently active or scheduled (exclude cancelled, draft, inactive, expired)
+        $validBoms = $boms->filter(function ($bom) use ($today) {
+            if (!in_array($bom->status, ['approved', 'active', 'scheduled'], true)) {
+                return false;
+            }
+            if ($bom->expiry_date && Carbon::parse($bom->expiry_date)->toDateString() < $today) {
+                return false;
+            }
+            return true;
+        })->values();
+
+        $versions = $validBoms->map(function ($bom) use ($today) {
+            $effectiveDate = $bom->effective_date ? Carbon::parse($bom->effective_date)->toDateString() : null;
+            $isScheduled = ($bom->status === 'scheduled') || ($effectiveDate && $effectiveDate > $today);
+            $displayStatus = $isScheduled ? 'scheduled' : 'active';
+
             return [
                 'id' => $bom->id,
                 'bom_number' => $bom->bom_number,
                 'version' => $bom->version,
                 'bom_name' => $bom->bom_name,
-                'status' => $bom->status,
-                'effective_date' => $bom->effective_date ? $bom->effective_date->toDateString() : null,
-                'expiry_date' => $bom->expiry_date ? $bom->expiry_date->toDateString() : null,
+                'status' => $displayStatus,
+                'effective_date' => $effectiveDate,
+                'expiry_date' => $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null,
             ];
         });
 
-        $approved = $boms->firstWhere('status', 'approved');
-        $draft = $boms->firstWhere('status', 'draft') ?? $boms->firstWhere('status', 'under_revision') ?? $boms->firstWhere('status', 'pending_approval');
+        $activeBom = $validBoms->first(function ($bom) use ($today) {
+            $effectiveDate = $bom->effective_date ? Carbon::parse($bom->effective_date)->toDateString() : null;
+            return !$effectiveDate || $effectiveDate <= $today;
+        }) ?? $validBoms->first();
 
         return response()->json([
-            'status' => $approved ? 'approved' : ($draft ? 'draft' : 'none'),
-            'bom_id' => $approved ? $approved->id : ($draft ? $draft->id : null),
-            'bom_number' => $approved ? $approved->bom_number : ($draft ? $draft->bom_number : null),
-            'version' => $approved ? $approved->version : ($draft ? $draft->version : null),
-            'bom_name' => $approved ? $approved->bom_name : ($draft ? $draft->bom_name : null),
+            'status' => $activeBom ? 'approved' : 'none',
+            'bom_id' => $activeBom?->id,
+            'bom_number' => $activeBom?->bom_number,
+            'version' => $activeBom?->version,
+            'bom_name' => $activeBom?->bom_name,
             'versions' => $versions,
         ]);
     }
@@ -191,7 +212,9 @@ class ProductionBomController extends Controller
     {
         $this->authorize('create', ProductionBom::class);
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
+            ->whereIn('supplier_method', ['manufacture', 'both'])
+            ->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
         $selectedProductId = $request->query('product_id');
@@ -231,7 +254,9 @@ class ProductionBomController extends Controller
 
         $this->authorize('update', $bom);
 
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
+        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])
+            ->whereIn('supplier_method', ['manufacture', 'both'])
+            ->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
 

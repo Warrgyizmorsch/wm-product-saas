@@ -18,9 +18,11 @@ class ProductionBomService
     public function __construct(
         private readonly ProductionBomRepositoryInterface $bomRepository,
         private readonly ProductionBomNumberService $numberService,
-        private readonly BomLifecycleService $bomLifecycleService,
-        private readonly RoutingLifecycleService $routingLifecycleService
+        private ?BomLifecycleService $bomLifecycleService = null,
+        private ?RoutingLifecycleService $routingLifecycleService = null
     ) {
+        $this->bomLifecycleService = $bomLifecycleService ?? app(BomLifecycleService::class);
+        $this->routingLifecycleService = $routingLifecycleService ?? app(RoutingLifecycleService::class);
     }
 
     /**
@@ -127,7 +129,10 @@ class ProductionBomService
 
             $this->persistBomItems($bom, $dto->items, $tenantId);
 
-            return $bom->load('items');
+            $bom->load('items');
+            $bom->refreshWarningStatus();
+
+            return $bom;
         });
     }
 
@@ -212,6 +217,11 @@ class ProductionBomService
                 'comments' => 'BOM version approved and set active.',
             ]);
 
+            $bom->refreshWarningStatus();
+
+            // 5. Update warning status for any parent BOMs referencing this component
+            $this->updateParentBomWarningsForComponent($bom->product_id, $bom->id);
+
             event(new \App\Domains\Production\Events\BomApproved($bom));
 
             return $bom;
@@ -293,6 +303,9 @@ class ProductionBomService
                 $userId,
                 $comments
             );
+
+            // Notify parent BOMs using this component that its sub-BOM was cancelled
+            $this->updateParentBomWarningsForComponent($bom->product_id, $bom->id);
 
             return $bom->fresh();
         });
@@ -412,14 +425,32 @@ class ProductionBomService
 
         // Pass 1: create all items with base attributes
         foreach ($itemDtos as $index => $itemDto) {
-            if ($itemDto->child_bom_id) {
+            $childBomId = $itemDto->child_bom_id;
+
+            if ($childBomId) {
                 $this->validateChildBomLink(
-                    $itemDto->child_bom_id,
+                    $childBomId,
                     $itemDto->material_id,
                     $bom->id,
                     Carbon::parse($bom->effective_date)->toDateString(),
                     $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
                 );
+            } else {
+                // If not explicitly set, auto-bind to the currently active/approved BOM for this material
+                $defaultChildBom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $itemDto->material_id)
+                    ->whereIn('status', ['approved', 'active'])
+                    ->where(function ($q) {
+                        $q->whereNull('expiry_date')
+                          ->orWhere('expiry_date', '>=', Carbon::today()->toDateString());
+                    })
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($defaultChildBom) {
+                    $childBomId = $defaultChildBom->id;
+                }
             }
 
             $itemData = $itemDto->toArray();
@@ -428,6 +459,7 @@ class ProductionBomService
             $itemData = array_merge($itemData, [
                 'tenant_id' => $tenantId,
                 'bom_id' => $bom->id,
+                'child_bom_id' => $childBomId,
                 'sequence' => $itemDto->sequence ?: ($index + 1),
                 'replaces_item_id' => null, // resolved in pass 2
                 'priority' => $itemDto->priority ?? 1,
@@ -584,6 +616,30 @@ class ProductionBomService
                 if ($item->child_bom_id) {
                     $this->detectCircularChildLink($item->child_bom_id, $parentBomId, $visited);
                 }
+            }
+        }
+    }
+
+    /**
+     * Update warning status for all parent BOMs that use a specific component product or child BOM.
+     */
+    public function updateParentBomWarningsForComponent(int $productId, ?int $bomId = null): void
+    {
+        $parentBomIds = ProductionBomItem::withoutGlobalScopes()
+            ->where(function ($q) use ($productId, $bomId) {
+                $q->where('material_id', $productId);
+                if ($bomId) {
+                    $q->orWhere('child_bom_id', $bomId);
+                }
+            })
+            ->pluck('bom_id')
+            ->unique()
+            ->filter();
+
+        foreach ($parentBomIds as $parentBomId) {
+            $parentBom = ProductionBom::withoutGlobalScopes()->find($parentBomId);
+            if ($parentBom) {
+                $parentBom->refreshWarningStatus();
             }
         }
     }
