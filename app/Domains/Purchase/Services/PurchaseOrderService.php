@@ -69,8 +69,8 @@ class PurchaseOrderService
                 if ($gstType === 'igst') {
                     $igstAmount = $taxAmount;
                 } else {
-                    $cgstAmount = round($taxAmount / 2, 2);
-                    $sgstAmount = round($taxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($taxAmount / 2, 4);
+                    $sgstAmount = round($taxAmount - $cgstAmount, 4);
                 }
             }
 

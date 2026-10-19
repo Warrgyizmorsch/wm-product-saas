@@ -63,6 +63,11 @@ class CrmAccount extends BaseModel
         return $this->belongsTo(Customer::class, 'customer_id');
     }
 
+    public function getOpeningBalanceAttribute(): float
+    {
+        return (float) ($this->customer?->opening_balance ?? 0.00);
+    }
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'owner_id');

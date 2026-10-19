@@ -72,40 +72,23 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'email' => [
-                'required', 
-                'email', 
-                'max:255', 
-                Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId);
-                })
-            ],
-            'phone' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'phone')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('phone');
-                })
-            ],
-            'gstin' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'gstin')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('gstin');
-                })
-            ],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'gstin' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+            'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', 'in:active,inactive'],
-        ], [
-            'email.unique' => 'Customer with this email address already exists.',
-            'phone.unique' => 'Customer with this phone number already exists.',
-            'gstin.unique' => 'Customer with this GSTIN already exists.',
         ]);
 
-        $this->customers->create($validated);
+        $validated['opening_balance'] = isset($validated['opening_balance'])
+            ? convert_to_base((float) $validated['opening_balance'])
+            : 0.00;
+        $validated['tenant_id'] = $tenantId;
+
+        $customer = $this->customers->create($validated);
+
+        app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
 
         return redirect()
             ->route('crm.customers.index')
@@ -120,38 +103,14 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'email' => [
-                'required', 
-                'email', 
-                'max:255', 
-                Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId);
-                })
-            ],
-            'phone' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'phone')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('phone');
-                })
-            ],
-            'gstin' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'gstin')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('gstin');
-                })
-            ],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'gstin' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-        ], [
-            'email.unique' => 'Customer with this email address already exists.',
-            'phone.unique' => 'Customer with this phone number already exists.',
-            'gstin.unique' => 'Customer with this GSTIN already exists.',
         ]);
 
+        $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'active';
         $customer = $this->customers->create($validated);
 
@@ -188,7 +147,8 @@ class CustomerController extends Controller
             return floatval($r->total_amount ?: $r->total_refund_amount);
         });
 
-        $netOutstanding = $totalBilled - $totalPaid - $totalReturns;
+        $openingBalance = floatval($customer->opening_balance ?? 0);
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
         $outstandingBalance = max(0, $netOutstanding);
         $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
         

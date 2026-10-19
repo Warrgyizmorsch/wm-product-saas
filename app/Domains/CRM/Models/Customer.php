@@ -52,12 +52,8 @@ class Customer extends BaseModel
             }
 
             $alreadyExists = CrmAccount::where('tenant_id', $customer->tenant_id)
-                ->where(function ($q) use ($customer) {
-                    $q->where('customer_id', $customer->id);
-                    if (!empty($customer->email)) {
-                        $q->orWhere('email', $customer->email);
-                    }
-                })->exists();
+                ->where('customer_id', $customer->id)
+                ->exists();
 
             if (!$alreadyExists) {
                 CrmAccount::create([

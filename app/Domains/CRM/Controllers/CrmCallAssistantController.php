@@ -1520,10 +1520,19 @@ PROMPT;
                 }
             }
 
-            // 4. Update Deal Stage
+            // 4. Update Deal Stage (only if not already Won)
+            $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
             $stage = $request->input('deal_stage') ?: ($request->input('stage') ?: null);
-            if (!empty($stage) && $stage !== 'Select an Option' && $stage !== 'Select Option') {
-                $deal->stage = $stage;
+            if (!$isDealWon && !empty($stage) && $stage !== 'Select an Option' && $stage !== 'Select Option') {
+                if (in_array(strtolower($stage), ['won', 'closed won'])) {
+                    $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+                    $hasCustomer = !empty($deal->account?->customer_id);
+                    if ($hasAcceptedQuote && $hasCustomer) {
+                        $deal->stage = 'Won';
+                    }
+                } else {
+                    $deal->stage = $stage;
+                }
             }
             $deal->save();
 

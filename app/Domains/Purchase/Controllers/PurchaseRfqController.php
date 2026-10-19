@@ -134,7 +134,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => round(convert_from_base($costRate), 2),
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -177,7 +177,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => round(convert_from_base($costRate), 2),
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -582,7 +582,7 @@ class PurchaseRfqController extends Controller
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
                 'quantity' => (float)$item->quantity,
-                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 2),
+                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 4),
             ];
         }
 

@@ -37,10 +37,10 @@ class VendorOpeningBalanceService
                 $vendor->id
             );
 
-            $balance = round((float) ($vendor->opening_balance ?? 0), 2);
+            $balance = round((float) ($vendor->opening_balance ?? 0), 4);
 
             // If an existing posting exists and amount has changed, reverse it
-            if ($existing && round((float) $existing->total_credit, 2) !== $balance) {
+            if ($existing && round((float) $existing->total_credit, 4) !== $balance) {
                 $this->journals->reverse($existing->id, 'Vendor opening balance changed or removed');
                 $existing = null;
             }

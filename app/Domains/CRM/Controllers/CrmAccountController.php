@@ -61,21 +61,12 @@ class CrmAccountController extends Controller
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'gstin'         => 'nullable|string|max:50',
-            'email'         => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('crm_accounts', 'email')->where(fn($q) => $q->where('tenant_id', $tenantId))
-            ],
-            'phone'         => [
-                'nullable',
-                'string',
-                'max:50',
-                Rule::unique('crm_accounts', 'phone')->where(fn($q) => $q->where('tenant_id', $tenantId))
-            ],
+            'email'         => 'required|email|max:255',
+            'phone'         => 'nullable|string|max:50',
             'website'       => 'nullable|string|max:255',
             'industry_type' => 'nullable|string|max:255',
             'credit_limit'  => 'nullable|numeric|min:0',
+            'opening_balance' => 'nullable|numeric|min:0',
             'owner_id'      => 'nullable|exists:users,id',
             'street'        => 'nullable|string|max:255',
             'city'          => 'nullable|string|max:100',
@@ -90,6 +81,8 @@ class CrmAccountController extends Controller
             'contact_phone' => 'nullable|string|max:50',
         ]);
 
+        $openingBalance = !empty($validated['opening_balance']) ? convert_to_base((float)$validated['opening_balance']) : 0.00;
+
         // 1. Sync or Create ERP Customer
         $customer = null;
         if (!empty($validated['email']) || !empty($validated['phone'])) {
@@ -102,18 +95,8 @@ class CrmAccountController extends Controller
         }
 
         if ($customer) {
-            // Check if an Account already exists for this customer
-            $existingAccount = CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
-            if ($existingAccount) {
-                if ($request->ajax() || $request->wantsJson()) {
-                    return response()->json([
-                        'success' => false,
-                        'errors'  => ['name' => ['An Account for this Customer / Email / Phone already exists (' . $existingAccount->name . ').']]
-                    ], 422);
-                }
-                return redirect()->back()
-                    ->withInput()
-                    ->withErrors(['name' => 'An Account for this Customer / Email / Phone already exists (' . $existingAccount->name . ').']);
+            if ($openingBalance > 0 && (float)($customer->opening_balance ?? 0) == 0) {
+                $customer->update(['opening_balance' => $openingBalance]);
             }
         }
 
@@ -126,9 +109,14 @@ class CrmAccountController extends Controller
                 'phone'     => $validated['phone'] ?? null,
                 'gstin'     => $validated['gstin'] ?? null,
                 'billing_address' => $validated['street'] ?? null,
+                'opening_balance' => $openingBalance,
                 'status'    => 'active',
             ]);
             Customer::$skipAccountAutoCreate = false;
+        }
+
+        if ($customer) {
+            app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
         }
 
         // 2. Create CRM Account
@@ -206,6 +194,7 @@ class CrmAccountController extends Controller
         $outstandingBalance = 0;
         $customerCreditBalance = 0;
         $overdueAmount = 0;
+        $openingBalance = 0;
         $creditLimit = floatval($account->credit_limit ?? 0);
         $availableCredit = $creditLimit;
         $invoiceCount = 0;
@@ -232,7 +221,8 @@ class CrmAccountController extends Controller
             $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function($r) {
                 return floatval($r->total_amount ?: $r->total_refund_amount);
             });
-            $netOutstanding = $totalBilled - $totalPaid - $totalReturns;
+            $openingBalance = floatval($customer->opening_balance ?? 0);
+            $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
             $outstandingBalance = max(0, $netOutstanding);
             $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
             $overdueAmount = $invoices->where('status', 'unpaid')
@@ -257,7 +247,8 @@ class CrmAccountController extends Controller
             'invoices',
             'payments',
             'salesOrders',
-            'salesReturns'
+            'salesReturns',
+            'openingBalance'
         ));
     }
 
@@ -266,7 +257,7 @@ class CrmAccountController extends Controller
     {
         $this->authorize('update', $account);
 
-        $account->load('primaryContact');
+        $account->load(['primaryContact', 'customer']);
         $users = \App\Models\User::orderBy('name')->get();
         return view('modules.crm.accounts.edit', compact('account', 'users'));
     }
@@ -280,16 +271,12 @@ class CrmAccountController extends Controller
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'gstin'         => 'nullable|string|max:50',
-            'email'         => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('crm_accounts', 'email')->where(fn($q) => $q->where('tenant_id', $tenantId))->ignore($account->id)
-            ],
+            'email'         => 'required|email|max:255',
             'phone'         => 'nullable|string|max:50',
             'website'       => 'nullable|string|max:255',
             'industry_type' => 'nullable|string|max:255',
             'credit_limit'  => 'nullable|numeric|min:0',
+            'opening_balance' => 'nullable|numeric|min:0',
             'owner_id'      => 'nullable|exists:users,id',
             'street'        => 'nullable|string|max:255',
             'city'          => 'nullable|string|max:100',
@@ -306,11 +293,30 @@ class CrmAccountController extends Controller
         $account->update($validated);
 
         if ($account->customer_id) {
-            Customer::where('id', $account->customer_id)->update([
+            $customerUpdate = [
                 'name'  => $validated['name'],
                 'email' => $validated['email'] ?? null,
                 'phone' => $validated['phone'] ?? null,
-            ]);
+                'gstin' => $validated['gstin'] ?? null,
+            ];
+            if (array_key_exists('opening_balance', $validated)) {
+                $customerUpdate['opening_balance'] = $validated['opening_balance'] !== null
+                    ? convert_to_base((float) $validated['opening_balance'])
+                    : 0.00;
+            }
+            $customer = Customer::where('id', $account->customer_id)->first();
+            if ($customer) {
+                // If another customer already has this email, avoid breaking customers table unique constraint
+                $otherCustomerWithEmail = Customer::where('tenant_id', $tenantId)
+                    ->where('email', $customerUpdate['email'])
+                    ->where('id', '!=', $customer->id)
+                    ->exists();
+                if ($otherCustomerWithEmail) {
+                    unset($customerUpdate['email']);
+                }
+                $customer->update($customerUpdate);
+                app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
+            }
         }
 
         return redirect()->route('crm.accounts.show', $account)->with('success', 'Account updated successfully.');

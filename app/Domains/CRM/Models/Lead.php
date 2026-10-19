@@ -75,6 +75,18 @@ class Lead extends Model
                 }
             }
         });
+
+        static::saved(function ($lead) {
+            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
+        });
+
+        static::deleted(function ($lead) {
+            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
+        });
     }
 
     public static bool $allowWonTransition = false;

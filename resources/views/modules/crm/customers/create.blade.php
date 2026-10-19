@@ -62,6 +62,14 @@
                                 </div>
 
                                 <div class="mb-3">
+                                    <label class="form-label fw-semibold text-dark">Opening Balance ({{ active_currency_symbol() }})</label>
+                                    <input type="number" step="0.01" name="opening_balance" class="form-control @error('opening_balance') is-invalid @enderror" value="{{ old('opening_balance', '0.00') }}" placeholder="0.00">
+                                    @error('opening_balance')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="mb-3">
                                     <label class="form-label fw-semibold text-dark">{{ __('crm.status') }} <span class="text-danger">*</span></label>
                                     <select name="status" class="form-select @error('status') is-invalid @enderror" required>
                                         <option value="active" @selected(old('status', 'active') === 'active')>{{ __('crm.active_account') }}</option>

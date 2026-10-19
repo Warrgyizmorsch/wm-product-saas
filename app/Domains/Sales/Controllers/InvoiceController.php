@@ -446,7 +446,7 @@ class InvoiceController extends Controller
             }
 
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
-            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 2) : 0;
+            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 4) : 0;
             $totalTaxAmount = $taxAmount + $freightTax;
 
             $cgstAmount = 0;
@@ -457,8 +457,8 @@ class InvoiceController extends Controller
                 if ($gstType === 'igst') {
                     $igstAmount = $totalTaxAmount;
                 } else {
-                    $cgstAmount = round($totalTaxAmount / 2, 2);
-                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($totalTaxAmount / 2, 4);
+                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 4);
                 }
             }
 
@@ -521,8 +521,8 @@ class InvoiceController extends Controller
                     } else {
                         $lineCgstPercent = round($taxR / 2, 2);
                         $lineSgstPercent = round($taxR / 2, 2);
-                        $lineCgstAmt = round($lineTax / 2, 2);
-                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 2);
+                        $lineCgstAmt = round($lineTax / 2, 4);
+                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 4);
                     }
                 }
 

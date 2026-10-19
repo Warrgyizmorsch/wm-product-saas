@@ -125,14 +125,14 @@ class VendorPaymentService
      */
     public function payBills(array $data): VendorPayment
     {
-        $amount = round((float) $data['amount'], 2);
-        $allocations = array_filter(array_map(fn ($value) => round((float) $value, 2), $data['allocations'] ?? []), fn ($value) => $value > 0);
+        $amount = round((float) $data['amount'], 4);
+        $allocations = array_filter(array_map(fn ($value) => round((float) $value, 4), $data['allocations'] ?? []), fn ($value) => $value > 0);
 
         if ($amount <= 0) {
             throw new \InvalidArgumentException('A payment must be for a positive amount.');
         }
 
-        if ((int) round(array_sum($allocations) * 100) > (int) round($amount * 100)) {
+        if ((int) round(array_sum($allocations) * 10000) > (int) round($amount * 10000)) {
             throw new \InvalidArgumentException('Amounts applied to bills are more than the amount paid.');
         }
 
@@ -150,8 +150,8 @@ class VendorPaymentService
                     throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch and cannot be paid until it is released.");
                 }
 
-                if ((int) round($apply * 100) > (int) round((float) $bill->due_amount * 100)) {
-                    throw new \InvalidArgumentException("Bill {$bill->bill_number} only has " . number_format((float) $bill->due_amount, 2) . ' due.');
+                if ((int) round($apply * 10000) > (int) round((float) $bill->due_amount * 10000)) {
+                    throw new \InvalidArgumentException("Bill {$bill->bill_number} only has " . number_format((float) $bill->due_amount, 4) . ' due.');
                 }
             }
 
@@ -186,13 +186,13 @@ class VendorPaymentService
                     'allocated_amount' => $apply,
                 ]);
 
-                $paid = round((float) ($bill->paid_amount ?? 0) + $apply, 2);
-                $due = max(0.0, round((float) ($bill->grand_total ?: $bill->total_amount) - $paid, 2));
+                $paid = round((float) ($bill->paid_amount ?? 0) + $apply, 4);
+                $due = max(0.0, round((float) ($bill->grand_total ?: $bill->total_amount) - $paid, 4));
 
                 $this->billRepo->update($bill, [
                     'paid_amount' => $paid,
                     'due_amount' => $due,
-                    'status' => $due <= 0.001 ? 'Paid' : 'Partially Paid',
+                    'status' => $due <= 0.0001 ? 'Paid' : 'Partially Paid',
                 ]);
             }
 

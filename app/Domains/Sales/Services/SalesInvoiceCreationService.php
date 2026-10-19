@@ -83,9 +83,9 @@ class SalesInvoiceCreationService
                     $taxRate = 0.0;
                 }
 
-                $lineSubtotal = round($qty * $price, 2);
+                $lineSubtotal = round($qty * $price, 4);
                 $lineTaxable = max(0, $lineSubtotal - $disc);
-                $lineTax = round($lineTaxable * ($taxRate / 100), 2);
+                $lineTax = round($lineTaxable * ($taxRate / 100), 4);
 
                 $lineCgstPercent = 0.0;
                 $lineSgstPercent = 0.0;
@@ -101,8 +101,8 @@ class SalesInvoiceCreationService
                     } else {
                         $lineCgstPercent = round($taxRate / 2, 2);
                         $lineSgstPercent = round($taxRate / 2, 2);
-                        $lineCgstAmt = round($lineTax / 2, 2);
-                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 2);
+                        $lineCgstAmt = round($lineTax / 2, 4);
+                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 4);
                     }
                 }
 
@@ -141,8 +141,8 @@ class SalesInvoiceCreationService
                 if ($gstType === 'igst') {
                     $igstAmount = $totalTaxAmount;
                 } else {
-                    $cgstAmount = round($totalTaxAmount / 2, 2);
-                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($totalTaxAmount / 2, 4);
+                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 4);
                 }
             }
 

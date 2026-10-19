@@ -6,14 +6,11 @@
     <title>Sales Quotation - {{ $quotation->quotation_number }}</title>
     <style>
         @page {
-            margin: 0;
+            margin-top: 18mm;
+            margin-bottom: 22mm;
+            margin-left: 15mm;
+            margin-right: 15mm;
             size: A4 portrait;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
         }
 
         body {
@@ -21,17 +18,39 @@
             font-size: 10px;
             color: #1e293b;
             background: #ffffff;
-            padding: 25px 30px;
-            position: relative;
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+        }
+
+        /* ── PERSISTENT FOOTER ON EVERY PAGE (REFRENS STYLE) ── */
+        footer.doc-page-footer {
+            position: fixed;
+            bottom: -16mm;
+            left: 0;
+            right: 0;
+            height: 14mm;
+        }
+        .footer-dashed-line {
+            border-top: 1.2px dashed #94a3b8;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+        .footer-meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8.5px;
+            color: #64748b;
         }
 
         /* ── HEADER SECTION ──────────────────────── */
         .header-table {
             width: 100%;
             border-collapse: collapse;
-            padding-bottom: 14px;
-            border-bottom: 1px solid #e2e8f0;
-            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #cbd5e1;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
         }
         .company-avatar {
             display: inline-block;
@@ -61,14 +80,14 @@
             color: #64748b;
         }
         .company-address {
-            font-size: 10px;
+            font-size: 9.5px;
             color: #475569;
-            margin-top: 6px;
-            line-height: 1.4;
+            margin-top: 5px;
+            line-height: 1.35;
         }
 
         .doc-title {
-            font-size: 19px;
+            font-size: 18px;
             font-weight: 900;
             color: #1e40af;
             text-align: right;
@@ -76,7 +95,7 @@
             letter-spacing: 0.5px;
         }
         .doc-number {
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: bold;
             color: #1e293b;
             text-align: right;
@@ -87,8 +106,8 @@
             margin-top: 6px;
         }
         .meta-table td {
-            padding: 1.5px 0;
-            font-size: 10.5px;
+            padding: 2px 0;
+            font-size: 10px;
         }
         .meta-label {
             color: #64748b;
@@ -108,13 +127,14 @@
             border-spacing: 12px 0;
             margin-left: -12px;
             margin-right: -12px;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
         }
         .info-box {
             background-color: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
-            padding: 12px 14px;
+            padding: 10px 12px;
             vertical-align: top;
             width: 50%;
         }
@@ -124,33 +144,33 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #64748b;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
         }
         .client-name {
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: bold;
             color: #0f172a;
             margin-bottom: 3px;
         }
         .client-contact {
-            font-size: 10.5px;
-            color: #475569;
-            margin-bottom: 6px;
-        }
-        .address-block {
             font-size: 10px;
             color: #475569;
+            margin-bottom: 5px;
+        }
+        .address-block {
+            font-size: 9.5px;
+            color: #475569;
             border-top: 1px solid #e2e8f0;
-            padding-top: 6px;
+            padding-top: 5px;
             margin-top: 4px;
             line-height: 1.35;
         }
 
         .ref-row {
             width: 100%;
-            padding: 3px 0;
+            padding: 2.5px 0;
             border-bottom: 1px solid #e2e8f0;
-            font-size: 10.5px;
+            font-size: 10px;
         }
         .ref-row:last-child {
             border-bottom: none;
@@ -168,97 +188,89 @@
             text-align: right;
         }
 
-        /* ── ITEMS TABLE ─────────────────────────── */
+        /* ── ITEMS TABLE WITH DISTINCT COLUMN BORDERS ── */
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
+            page-break-inside: auto;
+            border: 1px solid #cbd5e1;
+        }
+        .items-table thead {
+            display: table-header-group;
+        }
+        .items-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
         }
         .items-table th {
             background-color: #f8fafc;
             color: #475569;
-            font-size: 9.5px;
+            font-size: 9px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 2px solid #cbd5e1;
-            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            padding: 7px 8px;
         }
         .items-table td {
-            padding: 9px 10px;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 10.5px;
+            padding: 7px 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 10px;
             color: #1e293b;
             vertical-align: top;
         }
         .item-title {
             font-weight: bold;
             color: #0f172a;
-            font-size: 11px;
+            font-size: 10.5px;
         }
         .item-desc {
-            font-size: 9px;
+            font-size: 8.5px;
             color: #64748b;
             margin-top: 2px;
         }
 
-        /* ── SUMMARY SECTION ─────────────────────── */
-        .summary-wrapper {
+        /* ── SUMMARY / CALCULATIONS SECTION ──────── */
+        .calc-wrapper {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #e2e8f0;
+            margin-top: 8px;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
         }
-        .terms-column {
-            width: 55%;
+        .calc-notes-col {
+            width: 52%;
             vertical-align: top;
             padding-right: 15px;
         }
-        .summary-column {
-            width: 45%;
+        .calc-summary-col {
+            width: 48%;
             vertical-align: top;
-        }
-        .section-label {
-            font-size: 9px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #64748b;
-            margin-bottom: 4px;
-        }
-        .terms-content {
-            font-size: 10px;
-            color: #475569;
-            line-height: 1.4;
-        }
-        .terms-content p {
-            margin-bottom: 4px;
         }
 
         .summary-box {
             background-color: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
-            padding: 10px 12px;
+            padding: 8px 12px;
         }
         .summary-line {
             width: 100%;
             padding: 3px 0;
-            font-size: 10.5px;
+            font-size: 10px;
             border-bottom: 1px solid #f1f5f9;
         }
         .summary-lbl {
             color: #64748b;
             display: inline-block;
-            width: 50%;
+            width: 48%;
         }
         .summary-num {
             color: #0f172a;
             font-weight: bold;
             display: inline-block;
-            width: 48%;
+            width: 50%;
             text-align: right;
         }
         .total-payable-box {
@@ -270,43 +282,71 @@
         .total-payable-lbl {
             font-weight: bold;
             color: #0f172a;
-            font-size: 11.5px;
+            font-size: 11px;
             display: inline-block;
-            width: 48%;
+            width: 46%;
         }
         .total-payable-num {
             font-weight: bold;
             color: #1e40af;
-            font-size: 12.5px;
+            font-size: 12px;
             display: inline-block;
-            width: 50%;
+            width: 52%;
             text-align: right;
         }
 
-        /* ── FOOTER SIGNATURE ────────────────────── */
-        .footer-table {
+        /* ── TERMS & CONDITIONS SECTION ──────────── */
+        .terms-section {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            page-break-inside: auto;
+        }
+        .section-label {
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        .terms-content {
+            font-size: 9px;
+            color: #475569;
+            line-height: 1.45;
+        }
+        .terms-content p {
+            margin: 0 0 3px 0;
+            padding-top: 3px;
+            padding-bottom: 1px;
+            page-break-inside: avoid;
+        }
+
+        /* ── SIGNATURE SECTION ───────────────────── */
+        .signature-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 30px;
-            padding-top: 12px;
+            margin-top: 25px;
+            padding-top: 10px;
             border-top: 1px solid #e2e8f0;
+            page-break-inside: avoid;
         }
-        .footer-text {
-            font-size: 9.5px;
+        .sig-note {
+            font-size: 9px;
             color: #64748b;
             vertical-align: bottom;
             width: 60%;
-            line-height: 1.35;
+            line-height: 1.4;
         }
-        .sig-block {
+        .sig-space {
             text-align: right;
             vertical-align: bottom;
             width: 40%;
         }
         .sig-line {
             display: inline-block;
-            border-top: 1px solid #cbd5e1;
-            width: 170px;
+            border-top: 1px solid #94a3b8;
+            width: 160px;
             text-align: center;
             padding-top: 4px;
             font-size: 9px;
@@ -319,6 +359,22 @@
 </head>
 <body>
 
+    <!-- 0. PERSISTENT FOOTER ON EVERY PAGE (REFRENS STYLE) -->
+    <footer class="doc-page-footer">
+        <div class="footer-dashed-line"></div>
+        <table class="footer-meta-table">
+            <tr>
+                <td style="text-align: left; width: 75%;">
+                    Quotation #: <strong style="color: #0f172a;">{{ $quotation->quotation_number }}</strong> &nbsp;|&nbsp;
+                    Date: {{ $quotation->quotation_date ? date('d-M-Y', strtotime($quotation->quotation_date)) : '—' }} &nbsp;|&nbsp;
+                    Prepared For: <strong style="color: #0f172a;">{{ $quotation->prepared_for_name }}</strong>
+                </td>
+                <td style="text-align: right; width: 25%;">
+                    <!-- Space reserved for Page X of Y rendered by canvas script -->
+                </td>
+            </tr>
+        </table>
+    </footer>
 
     <!-- 1. HEADER SECTION -->
     <table class="header-table">
@@ -417,7 +473,7 @@
         </tr>
     </table>
 
-    <!-- 3. ORDER LINES TABLE -->
+    <!-- 3. ORDER LINES TABLE WITH COLUMN DIVIDERS -->
     @php
         $rawSymbol = active_currency_symbol();
         $currencySymbol = ($rawSymbol === '₹' || active_currency() === 'INR') ? '&#8377;' : $rawSymbol;
@@ -427,10 +483,10 @@
             <tr>
                 <th style="width: 5%; text-align: center;">#</th>
                 <th style="width: 45%;">Item & Description</th>
-                <th style="width: 12%; text-align: right;">Qty</th>
-                <th style="width: 13%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
+                <th style="width: 10%; text-align: right;">Qty</th>
+                <th style="width: 14%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
                 <th style="width: 10%; text-align: right;">Tax %</th>
-                <th style="width: 15%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
+                <th style="width: 16%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
             </tr>
         </thead>
         <tbody>
@@ -452,24 +508,19 @@
         </tbody>
     </table>
 
-    <!-- 4. CALCULATIONS & TERMS SECTION -->
-    <table class="summary-wrapper">
+    <!-- 4. CALCULATIONS SECTION -->
+    <table class="calc-wrapper">
         <tr>
-            <!-- Left Column: Terms & Conditions and Internal Notes -->
-            <td class="terms-column">
-                @if($quotation->terms_conditions)
-                    <div class="section-label">Terms & Conditions:</div>
-                    <div class="terms-content">{!! $quotation->terms_conditions !!}</div>
-                @endif
-
-                @if($quotation->notes)
-                    <div class="section-label" style="margin-top: 8px;">Internal Notes:</div>
-                    <div class="terms-content" style="font-style: italic;">{{ $quotation->notes }}</div>
+            <!-- Left: Notes or empty space -->
+            <td class="calc-notes-col">
+                @if(!empty($quotation->notes))
+                    <div class="section-label">Internal Notes / Remarks:</div>
+                    <div class="terms-content" style="font-style: italic; color: #64748b;">{{ $quotation->notes }}</div>
                 @endif
             </td>
 
-            <!-- Right Column: Totals Summary -->
-            <td class="summary-column">
+            <!-- Right: Totals Box -->
+            <td class="calc-summary-col">
                 <div class="summary-box">
                     <div class="summary-line">
                         <span class="summary-lbl">Subtotal:</span>
@@ -494,18 +545,43 @@
         </tr>
     </table>
 
-    <!-- 5. SIGNATURE FOOTER BLOCK -->
-    <table class="footer-table">
+    <!-- 5. TERMS & CONDITIONS SECTION -->
+    @if($quotation->terms_conditions)
+        <div class="terms-section">
+            <div class="section-label">Terms & Conditions:</div>
+            <div class="terms-content">
+                {!! $quotation->terms_conditions !!}
+            </div>
+        </div>
+    @endif
+
+    <!-- 6. SIGNATURE BLOCK -->
+    <table class="signature-table">
         <tr>
-            <td class="footer-text">
+            <td class="sig-note">
                 This sales quotation is valid until {{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : 'the expiry date' }}.<br>
                 For any queries, please contact our support at {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}.
             </td>
-            <td class="sig-block">
+            <td class="sig-space">
                 <div class="sig-line">Authorized Signature</div>
             </td>
         </tr>
     </table>
+
+    <!-- 7. INLINE CANVAS SCRIPT FOR PAGE NUMBER (Page 1 of 2, Page 2 of 2) -->
+    <script type="text/php">
+        if (isset($pdf)) {
+            $pdf->page_script(function ($pageNumber, $pageCount, $canvas, $fontMetrics) {
+                $text = "Page " . $pageNumber . " of " . $pageCount;
+                $font = $fontMetrics->getFont("Helvetica", "normal");
+                $size = 8.5;
+                $color = array(100/255, 116/255, 139/255);
+                $w = $canvas->get_width();
+                $h = $canvas->get_height();
+                $canvas->text($w - 95, $h - 24, $text, $font, $size, $color);
+            });
+        }
+    </script>
 
 </body>
 </html>

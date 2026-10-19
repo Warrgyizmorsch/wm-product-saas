@@ -1633,12 +1633,19 @@
                         if ($stgTitleTrans === 'crm.stages.' . $stg) {
                             $stgTitleTrans = $stg;
                         }
+                        $isDisabledClick = $isDealWon && $stg !== $currentStageKey;
                     @endphp
                     <button type="button" 
                             class="pipeline-step {{ $stepClass }}" 
-                            onclick="submitDealStage('{{ $stg }}')" 
-                            title="{{ $stgTitleTrans }} ({{ $prob }}%)">
-                        {{ $stgTitleTrans }} ({{ $prob }}%)
+                            @if($isDisabledClick)
+                                onclick="alert('This deal is already Won and locked. Its stage cannot be changed.')"
+                                style="opacity: 0.6; cursor: not-allowed;"
+                                title="Stage is locked (Deal is Won)"
+                            @else
+                                onclick="submitDealStage('{{ $stg }}')" 
+                                title="{{ $stgTitleTrans }} ({{ $prob }}%)"
+                            @endif>
+                        @if($stg === 'Won' && $isDealWon) <i class="feather-lock me-1"></i> @endif{{ $stgTitleTrans }} ({{ $prob }}%)
                     </button>
                 @endforeach
             </div>
@@ -3089,14 +3096,19 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.deal_stage') }}</label>
-                    <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
-                        @php
-                            $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
-                        @endphp
-                        @foreach($dStatuses as $stg)
-                            <option value="{{ $stg->name }}" @selected(old('stage', $deal->stage) === $stg->name)>{{ $stg->name }}</option>
-                        @endforeach
-                    </select>
+                    @if($isDealWon)
+                        <input type="text" class="form-control form-control-sm bg-light text-success fw-bold shadow-2xs" value="{{ $deal->stage }} (Locked)" readonly>
+                        <input type="hidden" name="stage" value="{{ $deal->stage }}">
+                    @else
+                        <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
+                            @php
+                                $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
+                            @endphp
+                            @foreach($dStatuses as $stg)
+                                <option value="{{ $stg->name }}" @selected(old('stage', $deal->stage) === $stg->name)>{{ $stg->name }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
@@ -3155,6 +3167,10 @@
         };
 
         function submitDealStage(stageVal) {
+            @if($isDealWon)
+                alert('This deal is already Won and locked. Its stage cannot be changed.');
+                return false;
+            @endif
             document.getElementById('dealStageInput').value = stageVal;
             document.getElementById('dealStageForm').submit();
         }
@@ -3686,6 +3702,10 @@
         });
 
         window.submitDealStage = function(stage) {
+            @if($isDealWon)
+                alert('This deal is already Won and locked. Its stage cannot be changed.');
+                return false;
+            @endif
             var form = $('#dealStageForm');
             if (form.length) {
                 $('#dealStageInput').val(stage);

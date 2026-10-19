@@ -202,7 +202,13 @@
                 <div class="col-md-3 border-end">
                     <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-alert-circle me-1 text-warning"></i>{{ __('crm.outstanding_receivables') }}</span>
                     <h4 class="fw-bold text-warning mb-0 fs-18">{{ format_currency($outstandingBalance) }}</h4>
-                    <span class="fs-11 text-muted">Total Uncollected</span>
+                    <span class="fs-11 text-muted">
+                        @if(($openingBalance ?? 0) > 0)
+                            Total Uncollected <span class="text-warning-emphasis fw-medium" title="Includes Opening Balance">(incl. {{ format_currency($openingBalance) }} OB)</span>
+                        @else
+                            Total Uncollected
+                        @endif
+                    </span>
                 </div>
                 <div class="col-md-3 border-end">
                     <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-clock me-1 text-danger"></i>{{ __('crm.overdue_amount') }}</span>
@@ -284,6 +290,10 @@
                                 <div class="col-6">
                                     <div class="zoho-field-label">{{ __('crm.credit_limit') }}</div>
                                     <div class="zoho-field-value text-dark fw-bold">{{ format_currency($account->credit_limit ?: 0) }}</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">{{ __('crm.opening_balance') ?? 'Opening Balance' }}</div>
+                                    <div class="zoho-field-value text-dark fw-bold">{{ format_currency($openingBalance ?? 0) }}</div>
                                 </div>
                             </div>
                         </div>
@@ -746,6 +756,19 @@
 
                 @php
                     $ledgerRows = collect();
+                    if (($openingBalance ?? 0) > 0) {
+                        $obDate = $account->customer?->created_at ?: $account->created_at ?: now();
+                        $ledgerRows->push([
+                            'date' => $obDate,
+                            'type' => 'Opening Balance',
+                            'reference' => 'OB-' . str_pad($account->customer?->id ?? $account->id, 4, '0', STR_PAD_LEFT),
+                            'description' => 'Customer Opening Balance',
+                            'deal_no' => null, 'deal_title' => null, 'deal_id' => null,
+                            'so_no' => null,
+                            'debit' => floatval($openingBalance),
+                            'credit' => 0.00,
+                        ]);
+                    }
                     foreach($invoices as $inv) {
                         $linkedSO = $inv->salesOrder;
                         $linkedDeal = $linkedSO?->quotation?->deal;
@@ -806,8 +829,11 @@
                         ]);
                     }
                     $sortedLedger = $ledgerRows->sortBy(function ($row) {
+                        if ($row['type'] === 'Opening Balance') {
+                            return '000000000000_0';
+                        }
                         $ts = \Carbon\Carbon::parse($row['date'])->timestamp;
-                        $typePriority = match($row['type']) { 'Invoice' => 0, 'Payment Receipt' => 1, 'Credit Note' => 2, default => 4 };
+                        $typePriority = match($row['type']) { 'Invoice' => 1, 'Payment Receipt' => 2, 'Credit Note' => 3, default => 4 };
                         return sprintf('%012d_%d', $ts, $typePriority);
                     })->values();
                 @endphp
@@ -833,7 +859,7 @@
                                     @php $running += ($row['debit'] - $row['credit']); @endphp
                                     <tr>
                                         <td>{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
-                                        <td><span class="badge {{ $row['type'] === 'Invoice' ? 'bg-soft-danger text-danger' : ($row['type'] === 'Credit Note' ? 'bg-soft-info text-info' : 'bg-soft-success text-success') }} fs-11">{{ $row['type'] }}</span></td>
+                                        <td><span class="badge {{ $row['type'] === 'Opening Balance' ? 'bg-soft-warning text-warning border border-warning-subtle' : ($row['type'] === 'Invoice' ? 'bg-soft-danger text-danger' : ($row['type'] === 'Credit Note' ? 'bg-soft-info text-info' : 'bg-soft-success text-success')) }} fs-11">{{ $row['type'] }}</span></td>
                                         <td class="font-monospace text-dark fw-bold">{{ $row['reference'] }}</td>
                                         <td>{{ $row['description'] }}</td>
                                         <td>

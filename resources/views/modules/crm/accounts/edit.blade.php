@@ -34,13 +34,16 @@
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" label="Website URL" name="website" :value="old('website', $account->website)" />
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type', $account->industry_type)" />
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.credit_limit') . ' (' . active_currency_symbol() . ')'" name="credit_limit" :value="old('credit_limit', $account->credit_limit ? round(convert_from_base((float)$account->credit_limit), 2) : 0)" step="0.01" />
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Opening Balance ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" :value="old('opening_balance', $account->customer?->opening_balance ? number_format(convert_from_base((float)$account->customer->opening_balance), 2, '.', '') : '0.00')" placeholder="0.00" :error-text="$errors->first('opening_balance')" />
+                </div>
+                <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" :label="__('crm.account_manager_owner')" name="owner_id">
                         <option value="">Select Account Manager...</option>
                         @foreach($users as $user)
@@ -50,7 +53,7 @@
                         @endforeach
                     </x-ui.odoo-form-ui>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Account Status" name="status">
                         <option value="active" {{ $account->status === 'active' ? 'selected' : '' }}>Active</option>
                         <option value="inactive" {{ $account->status === 'inactive' ? 'selected' : '' }}>Inactive</option>

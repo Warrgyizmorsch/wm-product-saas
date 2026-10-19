@@ -254,7 +254,9 @@ class QuotationService
             }
         }
 
-        // 2. Automatic Won Transition when Quotation is Accepted
+        // 2. Customer Acceptance & Stage Transition when Quotation is Accepted
+        // Note: A Deal/Lead is transitioned to 'Won' only if an ERP Customer is already linked.
+        // If not linked yet, conversion to 'Won' happens when user explicitly completes "Convert to Customer".
         if ($status === 'Accepted') {
             $deal = $quotation->crm_deal_id ? CrmDeal::find($quotation->crm_deal_id) : null;
             if (!$lead && $deal) {
@@ -266,8 +268,17 @@ class QuotationService
                 }
             }
 
-            // Auto-transition Deal stage to Won
-            if ($deal && !in_array($deal->stage, ['Won', 'Closed Won'])) {
+            $dealHasCustomer = false;
+            if ($deal) {
+                $dealHasCustomer = !empty($deal->account?->customer_id);
+            } elseif ($quotation->crmAccount) {
+                $dealHasCustomer = !empty($quotation->crmAccount->customer_id);
+            } elseif ($lead) {
+                $dealHasCustomer = !empty($lead->customer_id) || $lead->is_customer;
+            }
+
+            // Auto-transition Deal stage to Won ONLY if an ERP customer is already linked
+            if ($deal && $dealHasCustomer && !in_array($deal->stage, ['Won', 'Closed Won'])) {
                 $deal->update([
                     'stage'        => 'Won',
                     'probability'  => 100,
@@ -275,13 +286,13 @@ class QuotationService
                 ]);
             }
 
-            // Auto-transition Lead status to Won
-            if ($lead && strcasecmp((string)$lead->status, 'Won') !== 0) {
+            // Auto-transition Lead status to Won ONLY if customer exists
+            if ($lead && $dealHasCustomer && strcasecmp((string)$lead->status, 'Won') !== 0) {
                 $leadService = app(\App\Domains\CRM\Services\LeadService::class);
                 $leadService->updateLeadStatus($lead, 'Won', true);
             }
 
-            if ($lead) {
+            if ($lead && $dealHasCustomer) {
                 LeadHistory::logEvent(
                     $lead, 'quotation_accepted', $lead->status, 'Won',
                     "Quotation {$quotation->quotation_number} was accepted. Lead automatically marked as Won."

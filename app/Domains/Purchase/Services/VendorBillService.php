@@ -161,10 +161,10 @@ class VendorBillService
 
             if ($taxAmount > 0) {
                 if ($gstType === 'igst') {
-                    $igstAmount = round($taxAmount, 2);
+                    $igstAmount = round($taxAmount, 4);
                 } else {
-                    $cgstAmount = round($taxAmount / 2, 2);
-                    $sgstAmount = round($taxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($taxAmount / 2, 4);
+                    $sgstAmount = round($taxAmount - $cgstAmount, 4);
                 }
             }
 
@@ -210,16 +210,16 @@ class VendorBillService
                 $freightShare = 0.0;
                 if ($hasFreightRevaluation) {
                     if ($freightAllocationMethod === 'by_quantity' && $totalQtySum > 0) {
-                        $freightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 2);
+                        $freightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 4);
                     } else {
                         // by_amount (default)
-                        $freightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 2) : 0;
+                        $freightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 4) : 0;
                     }
                 }
 
-                $freightPerUnit = ($row['qty'] > 0 && $hasFreightRevaluation) ? round($freightShare / $row['qty'], 2) : 0;
+                $freightPerUnit = ($row['qty'] > 0 && $hasFreightRevaluation) ? round($freightShare / $row['qty'], 4) : 0;
                 $baseUnitCost = $row['price'];
-                $newLandedCost = round($baseUnitCost + $freightPerUnit, 2);
+                $newLandedCost = round($baseUnitCost + $freightPerUnit, 4);
 
                 if ($hasFreightRevaluation) {
                     $revaluationItems[] = [
@@ -248,9 +248,9 @@ class VendorBillService
                     if ($matchedTxn) {
                         $processedTxnIds[] = $matchedTxn->id;
                         // Only perform update and queue for avg cost recalculation if the cost actually changed!
-                        if (abs((float)$matchedTxn->unit_cost - $newLandedCost) > 0.001) {
+                        if (abs((float)$matchedTxn->unit_cost - $newLandedCost) > 0.0001) {
                             $matchedTxn->unit_cost = $newLandedCost;
-                            $matchedTxn->total_value = round($newLandedCost * (float)$matchedTxn->quantity, 2);
+                            $matchedTxn->total_value = round($newLandedCost * (float)$matchedTxn->quantity, 4);
                             $matchedTxn->save();
 
                             $key = "{$productId}_{$grn->warehouse_id}";
@@ -288,7 +288,7 @@ class VendorBillService
                     $inTxns = $activeInTxns[$pId] ?? collect();
                     $totalVal = $inTxns->sum(fn($t) => (float)$t->unit_cost * (float)$t->balance_qty);
                     $totalQty = $inTxns->sum(fn($t) => (float)$t->balance_qty);
-                    $newAvgCost = ($totalQty > 0) ? round($totalVal / $totalQty, 2) : 0.0;
+                    $newAvgCost = ($totalQty > 0) ? round($totalVal / $totalQty, 4) : 0.0;
 
                     if (isset($warehouseStocks[$pId])) {
                         $whStock = $warehouseStocks[$pId];
@@ -341,7 +341,7 @@ class VendorBillService
                 'adjustment'                   => $adjustment,
                 'grand_total'                  => $grandTotal,
                 'paid_amount'                  => 0,
-                'due_amount'                   => round($grandTotal, 2),
+                'due_amount'                   => round($grandTotal, 4),
                 'notes'                        => $validated['notes'] ?? null,
                 'created_by'                   => auth()->id() ?: 1,
             ]);
@@ -357,15 +357,15 @@ class VendorBillService
                 $itemFreightShare = 0.0;
                 if ($isFreightBilledOnInvoice && $freightAmount > 0) {
                     if ($freightAllocationMethod === 'by_quantity' && $totalQtySum > 0) {
-                        $itemFreightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 2);
+                        $itemFreightShare = round($freightAmount * ($row['qty'] / $totalQtySum), 4);
                     } else {
-                        $itemFreightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 2) : 0;
+                        $itemFreightShare = ($grossBeforeTax > 0) ? round($freightAmount * ($itemNetSub / $grossBeforeTax), 4) : 0;
                     }
                 }
 
                 $lineTaxableBase = $itemNetSub + $itemFreightShare;
                 $lineTax = $lineTaxableBase * ($itemTaxRate / 100);
-                $finalLineTotal = round($lineTaxableBase + $lineTax, 2);
+                $finalLineTotal = round($lineTaxableBase + $lineTax, 4);
 
                 VendorBillItem::create([
                     'tenant_id'                  => $tenantId,
@@ -443,7 +443,7 @@ class VendorBillService
             $totalAvailable += $remaining;
         }
 
-        return round($totalAvailable, 2);
+        return round($totalAvailable, 4);
     }
 
     public function applyAdvanceCredit(VendorBill $bill, int $tenantId): bool
@@ -511,10 +511,10 @@ class VendorBillService
                 $remainingToAllocate -= $chunk;
             }
 
-            $newPaid = round((float)($bill->paid_amount ?? 0) + $amountToApply, 2);
+            $newPaid = round((float)($bill->paid_amount ?? 0) + $amountToApply, 4);
             $billTotal = (float)($bill->grand_total ?: $bill->total_amount);
-            $newDue = max(0.0, round($billTotal - $newPaid, 2));
-            $status = ($newDue <= 0.001) ? 'Paid' : 'Partially Paid';
+            $newDue = max(0.0, round($billTotal - $newPaid, 4));
+            $status = ($newDue <= 0.0001) ? 'Paid' : 'Partially Paid';
 
             $bill->update([
                 'paid_amount' => $newPaid,

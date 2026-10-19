@@ -57,9 +57,10 @@
         @if ($quotation->status === 'Accepted')
             @php
                 $deal = $quotation->crmDeal;
-                $hasCustomer = ($deal && strtolower($deal->stage) === 'won')
-                    || !empty($deal?->account?->customer_id)
-                    || !empty($quotation->account?->customer_id);
+                $hasCustomer = !empty($deal?->account?->customer_id)
+                    || !empty($quotation->crmAccount?->customer_id)
+                    || !empty($quotation->account?->customer_id)
+                    || !empty($quotation->customer);
             @endphp
             @if (!$hasCustomer)
                 @if ($quotation->crm_deal_id)
