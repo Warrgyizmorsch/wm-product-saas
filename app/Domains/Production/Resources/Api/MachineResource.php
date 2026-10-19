@@ -19,6 +19,7 @@ class MachineResource extends JsonResource
     {
         return [
             'id'                        => $this->id,
+            'section_id'                => $this->section_id,
             'work_center_id'            => $this->work_center_id,
             'name'                      => $this->name,
             'code'                      => $this->code,
@@ -31,6 +32,11 @@ class MachineResource extends JsonResource
             'current_state_reason'      => $this->current_state_reason,
             'last_maintenance_date'     => $this->last_maintenance_date?->format('Y-m-d'),
             'next_maintenance_due_date' => $this->next_maintenance_due_date?->format('Y-m-d'),
+            'section'                   => $this->whenLoaded('section', fn () => [
+                'id'   => $this->section->id,
+                'name' => $this->section->name,
+                'code' => $this->section->code,
+            ]),
             'work_center'               => $this->whenLoaded('workCenter', fn () => [
                 'id'   => $this->workCenter->id,
                 'name' => $this->workCenter->name,

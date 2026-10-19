@@ -42,6 +42,7 @@ class UpdateWorkCenterRequest extends FormRequest
                 'integer',
                 Rule::exists('production_shifts', 'id')->where('tenant_id', $tenantId)
             ],
+            'confirm_section_shift_removal' => 'nullable|boolean',
         ];
     }
 }

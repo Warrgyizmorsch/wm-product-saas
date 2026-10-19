@@ -9,10 +9,14 @@ class MachineRepository implements MachineRepositoryInterface
 {
     public function getAll(array $filters = []): Collection
     {
-        $query = Machine::query()->with('workCenter');
+        $query = Machine::query()->with(['workCenter', 'section']);
 
         if (!empty($filters['work_center_id'])) {
             $query->where('work_center_id', $filters['work_center_id']);
+        }
+
+        if (!empty($filters['section_id'])) {
+            $query->where('section_id', $filters['section_id']);
         }
 
         if (!empty($filters['status'])) {
@@ -33,10 +37,14 @@ class MachineRepository implements MachineRepositoryInterface
 
     public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = Machine::query()->with('workCenter');
+        $query = Machine::query()->with(['workCenter', 'section']);
 
         if (!empty($filters['work_center_id'])) {
             $query->where('work_center_id', $filters['work_center_id']);
+        }
+
+        if (!empty($filters['section_id'])) {
+            $query->where('section_id', $filters['section_id']);
         }
 
         if (!empty($filters['status'])) {
@@ -57,7 +65,7 @@ class MachineRepository implements MachineRepositoryInterface
 
     public function find(int $id): ?Machine
     {
-        return Machine::with(['workCenter'])->find($id);
+        return Machine::with(['workCenter', 'section'])->find($id);
     }
 
     public function create(array $data): Machine

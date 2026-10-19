@@ -5,10 +5,11 @@ namespace App\Domains\Production\DTO;
 class MachineDTO
 {
     public function __construct(
-        public readonly int     $work_center_id,
+        public readonly int     $section_id,
         public readonly string  $name,
         public readonly string  $code,
         public readonly string  $status,
+        public readonly ?int    $work_center_id = null,
         public readonly ?string $machine_type = null,
         public readonly ?string $manufacturer = null,
         public readonly ?string $model_number = null,
@@ -20,10 +21,11 @@ class MachineDTO
     public static function fromArray(array $data): self
     {
         return new self(
-            work_center_id:     (int) $data['work_center_id'],
+            section_id:         (int) ($data['section_id'] ?? 0),
             name:               $data['name'],
             code:               strtoupper(trim($data['code'])),
             status:             $data['status'] ?? 'active',
+            work_center_id:     isset($data['work_center_id']) ? (int) $data['work_center_id'] : null,
             machine_type:       $data['machine_type'] ?? null,
             manufacturer:       $data['manufacturer'] ?? null,
             model_number:       $data['model_number'] ?? null,
@@ -36,6 +38,7 @@ class MachineDTO
     public function toArray(): array
     {
         return [
+            'section_id'         => $this->section_id,
             'work_center_id'     => $this->work_center_id,
             'name'               => $this->name,
             'code'               => $this->code,

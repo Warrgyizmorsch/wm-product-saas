@@ -33,6 +33,7 @@ class Machine extends BaseModel
     protected $fillable = [
         'tenant_id',
         'work_center_id',
+        'section_id',
         'asset_id',
         'name',
         'code',
@@ -56,7 +57,26 @@ class Machine extends BaseModel
         'next_maintenance_due_date' => 'date',
     ];
 
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::saving(function (Machine $machine) {
+            if ($machine->section_id) {
+                $section = WorkCenterSection::find($machine->section_id);
+                if ($section) {
+                    $machine->work_center_id = $section->work_center_id;
+                }
+            }
+        });
+    }
+
     // ─── Relationships ────────────────────────────────────────────────────────
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
 
     public function workCenter(): BelongsTo
     {
@@ -135,6 +155,11 @@ class Machine extends BaseModel
     public function scopeForWorkCenter(Builder $query, int $workCenterId): void
     {
         $query->where('work_center_id', $workCenterId);
+    }
+
+    public function scopeForSection(Builder $query, int $sectionId): void
+    {
+        $query->where('section_id', $sectionId);
     }
 
     public function scopeAvailableForProduction(Builder $query): void

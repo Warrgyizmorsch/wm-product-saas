@@ -20,6 +20,7 @@ class StoreShiftRequest extends FormRequest
             'end_time'         => 'required|date_format:H:i',
             'break_minutes'    => 'required|integer|min:0',
             'overtime_allowed' => 'nullable|boolean',
+            'hourly_labor_rate'=> 'nullable|numeric|min:0|max:9999999999.9999',
             'active'           => 'nullable|boolean',
         ];
     }

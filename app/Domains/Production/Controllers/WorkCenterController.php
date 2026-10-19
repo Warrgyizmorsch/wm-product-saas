@@ -65,15 +65,13 @@ class WorkCenterController extends Controller
 
             // Sync shifts
             $shifts = $request->input('shifts', []);
-            $syncData = [];
-            foreach ($shifts as $shiftId) {
-                $syncData[$shiftId] = ['tenant_id' => $tenantId];
-            }
-            $wc->shifts()->sync($syncData);
+            $this->service->syncShifts($wc, $shifts, $tenantId, true);
 
             return redirect()
                 ->route('production.work-centers.show', $wc->id)
                 ->with('success', "Work center '{$wc->name}' created successfully.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -123,17 +121,16 @@ class WorkCenterController extends Controller
             $wc  = $this->service->update($id, $dto);
 
 
-            // Sync shifts
+            // Sync shifts with section cascading rules
             $shifts = $request->input('shifts', []);
-            $syncData = [];
-            foreach ($shifts as $shiftId) {
-                $syncData[$shiftId] = ['tenant_id' => $tenantId];
-            }
-            $wc->shifts()->sync($syncData);
+            $confirmed = $request->boolean('confirm_section_shift_removal');
+            $this->service->syncShifts($wc, $shifts, $tenantId, $confirmed);
 
             return redirect()
                 ->route('production.work-centers.show', $wc->id)
                 ->with('success', "Work center '{$wc->name}' updated successfully.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }

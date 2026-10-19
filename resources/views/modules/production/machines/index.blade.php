@@ -215,6 +215,9 @@
                                         <a href="{{ route('production.work-centers.show', $machine->work_center_id) }}" class="fw-semibold text-primary hover-primary">
                                             {{ $machine->workCenter->name }}
                                         </a>
+                                        @if ($machine->section)
+                                            <span class="text-dark fs-11"><i class="feather-grid fs-10 text-muted me-1"></i>{{ $machine->section->name }}</span>
+                                        @endif
                                         <small class="text-muted font-monospace fs-10">{{ $machine->workCenter->code }}</small>
                                     </div>
                                 @else

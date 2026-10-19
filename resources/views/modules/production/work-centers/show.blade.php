@@ -20,6 +20,15 @@
 @section('content')
     <div class="erp-single-panel bg-white">
         <!-- Success & Error Alerts -->
+        @if (session('success'))
+            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+        @endif
+        @if (session('error'))
+            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
+        @endif
+        @if ($errors->any())
+            <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
+        @endif
 
         <!-- Profile / Metrics Layout -->
         <div class="row g-4 mb-4 pb-4 border-bottom">
@@ -193,12 +202,116 @@
             @endif
         </div>
 
+        <!-- Sections Management Section -->
+        <div class="mb-4 pb-4 border-bottom">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">{{ __('production.work_center_sections') }}</h5>
+                    <small class="text-muted">{{ __('production.section_management') }}</small>
+                </div>
+                @can('create', App\Domains\Production\Models\WorkCenterSection::class)
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createSectionModal">
+                        <i class="feather-plus me-1"></i>{{ __('production.add_section') }}
+                    </button>
+                @endcan
+            </div>
+
+            <div class="table-responsive">
+                <x-ui.odoo-form-ui type="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%">{{ __('production.section_code') }}</th>
+                            <th style="width: 20%">{{ __('production.section_name') }}</th>
+                            <th style="width: 12%">{{ __('production.workers_required') }}</th>
+                            <th style="width: 25%">{{ __('production.section_shifts') }}</th>
+                            <th style="width: 10%">{{ __('production.machines_count') }}</th>
+                            <th style="width: 10%">{{ __('production.status') }}</th>
+                            <th style="width: 8%" class="text-end">{{ __('production.actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($workCenter->sections as $section)
+                            <tr>
+                                <td class="align-middle">
+                                    <span class="font-monospace fw-bold text-dark">{{ $section->code }}</span>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="fw-semibold text-dark">{{ $section->name }}</div>
+                                    @if($section->description)
+                                        <small class="text-muted fs-11 text-truncate d-block" style="max-width: 250px;">{{ $section->description }}</small>
+                                    @endif
+                                </td>
+                                <td class="align-middle">
+                                    <span class="badge bg-soft-info text-info rounded-pill px-2.5 py-1 fs-12">
+                                        <i class="feather-users me-1 fs-11"></i>{{ $section->workers_required }}
+                                    </span>
+                                </td>
+                                <td class="align-middle">
+                                    @forelse ($section->shifts as $shift)
+                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2 py-1 mb-1 me-1">
+                                            {{ $shift->name }} ({{ substr($shift->start_time, 0, 5) }}-{{ substr($shift->end_time, 0, 5) }})
+                                        </span>
+                                    @empty
+                                        <span class="text-danger fs-11"><i class="feather-alert-triangle me-1"></i>No shifts</span>
+                                    @endforelse
+                                </td>
+                                <td class="align-middle">
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2.5 py-1 fs-12">
+                                        <i class="feather-cpu me-1 fs-11"></i>{{ $section->machines->count() }}
+                                    </span>
+                                </td>
+                                <td class="align-middle">
+                                    @if ($section->isActive())
+                                        <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">{{ __('production.active') }}</span>
+                                    @else
+                                        <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.inactive') }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-end align-middle">
+                                    <x-ui.action-dropdown>
+                                        @can('update', $section)
+                                            <li>
+                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editSectionModal_{{ $section->id }}">
+                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_section') }}
+                                                </button>
+                                            </li>
+                                        @endcan
+                                        @can('create', App\Domains\Production\Models\Machine::class)
+                                            <li>
+                                                <a href="{{ route('production.machines.create', ['section_id' => $section->id]) }}" class="dropdown-item">
+                                                    <i class="feather-plus-circle me-2 text-muted fs-12"></i>{{ __('production.add_machine') }}
+                                                </a>
+                                            </li>
+                                        @endcan
+                                        @can('delete', $section)
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal_{{ $section->id }}">
+                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_section') }}
+                                                </button>
+                                            </li>
+                                        @endcan
+                                    </x-ui.action-dropdown>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <i class="feather-info me-2"></i>{{ __('production.no_sections_found') }}
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </x-ui.odoo-form-ui>
+            </div>
+        </div>
+
         <!-- Assigned Machines List -->
         <div>
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold text-dark mb-0">{{ __('production.assigned_equipment') }}</h5>
                 @can('create', App\Domains\Production\Models\Machine::class)
-                    <x-ui.button :href="route('production.machines.create', ['work_center_id' => $workCenter->id])" variant="light" icon="feather-plus">
+                    <x-ui.button :href="route('production.machines.create')" variant="light" icon="feather-plus">
                         {{ __('production.add_machine') }}
                     </x-ui.button>
                 @endcan
@@ -208,13 +321,14 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 15%">{{ __('production.machine_code') }}</th>
-                            <th style="width: 20%">{{ __('production.machine_name') }}</th>
-                            <th style="width: 15%">{{ __('production.machine_type') }}</th>
-                            <th style="width: 15%">{{ __('production.manufacturer') }}</th>
-                            <th style="width: 12%">{{ __('production.model_number') }}</th>
-                            <th style="width: 10%" class="text-end">{{ __('production.capacity_hr') }}</th>
-                            <th style="width: 8%">{{ __('production.status') }}</th>
+                            <th style="width: 12%">{{ __('production.machine_code') }}</th>
+                            <th style="width: 18%">{{ __('production.machine_name') }}</th>
+                            <th style="width: 15%">{{ __('production.sections') }}</th>
+                            <th style="width: 13%">{{ __('production.machine_type') }}</th>
+                            <th style="width: 12%">{{ __('production.manufacturer') }}</th>
+                            <th style="width: 10%">{{ __('production.model_number') }}</th>
+                            <th style="width: 8%" class="text-end">{{ __('production.capacity_hr') }}</th>
+                            <th style="width: 7%">{{ __('production.status') }}</th>
                             <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                         </tr>
                     </thead>
@@ -230,6 +344,15 @@
                                     <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-semibold text-dark hover-primary">
                                         {{ $machine->name }}
                                     </a>
+                                </td>
+                                <td class="align-middle">
+                                    @if ($machine->section)
+                                        <span class="badge bg-soft-info text-dark font-monospace fs-11">
+                                            <i class="feather-grid me-1 text-muted"></i>{{ $machine->section->name }} ({{ $machine->section->code }})
+                                        </span>
+                                    @else
+                                        <span class="text-muted fs-11 fst-italic">—</span>
+                                    @endif
                                 </td>
                                 <td class="align-middle">{{ $machine->machine_type ?? '—' }}</td>
                                 <td class="align-middle">{{ $machine->manufacturer ?? '—' }}</td>
@@ -265,7 +388,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-4 text-muted">
+                                <td colspan="9" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_machines_registered') }}
                                 </td>
                             </tr>
@@ -275,4 +398,311 @@
             </div>
         </div>
     </div>
+
+    <!-- Modals for Section Management -->
+
+    <!-- Create Section Modal -->
+    @can('create', App\Domains\Production\Models\WorkCenterSection::class)
+        <div class="modal fade" id="createSectionModal" tabindex="-1" aria-labelledby="createSectionModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header border-bottom py-3">
+                        <h5 class="modal-title fw-bold text-dark fs-15" id="createSectionModalLabel">
+                            <i class="feather-plus-circle text-primary me-2"></i>{{ __('production.create_section') }} &mdash; {{ $workCenter->name }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="POST" action="{{ route('production.work-center-sections.store') }}">
+                        @csrf
+                        <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
+                        <input type="hidden" name="_modal" value="createSectionModal">
+
+                        <div class="modal-body p-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_name') }} <span class="text-danger">*</span></label>
+                                    <input type="text" name="name" class="form-control" 
+                                           placeholder="{{ __('production.section_placeholder_name') }}" 
+                                           value="{{ old('_modal') === 'createSectionModal' ? old('name') : '' }}" required>
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('name'))
+                                        <div class="text-danger fs-11 mt-1">{{ $errors->first('name') }}</div>
+                                    @endif
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_code') }} <span class="text-danger">*</span></label>
+                                    <input type="text" name="code" class="form-control font-monospace text-uppercase" 
+                                           placeholder="{{ __('production.section_placeholder_code') }}" 
+                                           value="{{ old('_modal') === 'createSectionModal' ? old('code') : '' }}" required>
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('code'))
+                                        <div class="text-danger fs-11 mt-1">{{ $errors->first('code') }}</div>
+                                    @endif
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold fs-12 text-dark">{{ __('production.workers_required') }} <span class="text-danger">*</span></label>
+                                    <input type="number" name="workers_required" min="1" class="form-control" 
+                                           value="{{ old('_modal') === 'createSectionModal' ? old('workers_required', 1) : 1 }}" required>
+                                    <div class="form-text fs-11 text-muted">{{ __('production.workers_required_helper') }}</div>
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('workers_required'))
+                                        <div class="text-danger fs-11 mt-1">{{ $errors->first('workers_required') }}</div>
+                                    @endif
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold fs-12 text-dark">{{ __('production.status') }} <span class="text-danger">*</span></label>
+                                    <select name="status" class="form-select" required>
+                                        <option value="active" @selected((old('_modal') === 'createSectionModal' ? old('status') : 'active') === 'active')>{{ __('production.active') }}</option>
+                                        <option value="inactive" @selected((old('_modal') === 'createSectionModal' ? old('status') : '') === 'inactive')>{{ __('production.inactive') }}</option>
+                                    </select>
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('status'))
+                                        <div class="text-danger fs-11 mt-1">{{ $errors->first('status') }}</div>
+                                    @endif
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-bold fs-12 text-dark d-block">
+                                        {{ __('production.section_shifts') }} <span class="text-danger">*</span>
+                                        <span class="fw-normal text-muted fs-11 ms-1">({{ __('production.section_shifts_helper') }})</span>
+                                    </label>
+
+                                    @if($workCenter->shifts->count() > 0)
+                                        <div class="p-3 border rounded bg-light">
+                                            <div class="row g-2">
+                                                @foreach($workCenter->shifts as $sh)
+                                                    <div class="col-md-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="shifts[]" value="{{ $sh->id }}" 
+                                                                   id="create_shift_{{ $sh->id }}"
+                                                                   @checked(is_array(old('shifts')) && old('_modal') === 'createSectionModal' ? in_array($sh->id, old('shifts')) : false)>
+                                                            <label class="form-check-label text-dark fs-12" for="create_shift_{{ $sh->id }}">
+                                                                <span class="fw-bold font-monospace">{{ $sh->code }}</span> &mdash; {{ $sh->name }}
+                                                                <span class="text-muted fs-11">({{ substr($sh->start_time, 0, 5) }}-{{ substr($sh->end_time, 0, 5) }})</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
+                                            <i class="feather-alert-triangle me-1"></i>{{ __('production.section_shifts_none_available') }}
+                                        </div>
+                                    @endif
+
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('shifts'))
+                                        <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('shifts') }}</div>
+                                    @endif
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_description') }}</label>
+                                    <textarea name="description" rows="3" class="form-control fs-12" placeholder="{{ __('production.description') }}...">{{ old('_modal') === 'createSectionModal' ? old('description') : '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-light border" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                            <button type="submit" class="btn btn-primary" @if($workCenter->shifts->count() === 0) disabled @endif>
+                                <i class="feather-check me-1"></i>{{ __('production.save_section') }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endcan
+
+    <!-- Edit and Delete Modals for Each Section -->
+    @foreach($workCenter->sections as $section)
+        @can('update', $section)
+            <div class="modal fade" id="editSectionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="editSectionModalLabel_{{ $section->id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg rounded-3">
+                        <div class="modal-header border-bottom py-3">
+                            <h5 class="modal-title fw-bold text-dark fs-15" id="editSectionModalLabel_{{ $section->id }}">
+                                <i class="feather-edit text-primary me-2"></i>{{ __('production.edit_section') }} &mdash; {{ $section->code }}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ route('production.work-center-sections.update', $section->id) }}">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
+                            <input type="hidden" name="_modal" value="editSectionModal_{{ $section->id }}">
+
+                            <div class="modal-body p-4">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_name') }} <span class="text-danger">*</span></label>
+                                        <input type="text" name="name" class="form-control" 
+                                               value="{{ old('_modal') === 'editSectionModal_'.$section->id ? old('name') : $section->name }}" required>
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('name'))
+                                            <div class="text-danger fs-11 mt-1">{{ $errors->first('name') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_code') }} <span class="text-danger">*</span></label>
+                                        <input type="text" name="code" class="form-control font-monospace text-uppercase" 
+                                               value="{{ old('_modal') === 'editSectionModal_'.$section->id ? old('code') : $section->code }}" required>
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('code'))
+                                            <div class="text-danger fs-11 mt-1">{{ $errors->first('code') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold fs-12 text-dark">{{ __('production.workers_required') }} <span class="text-danger">*</span></label>
+                                        <input type="number" name="workers_required" min="1" class="form-control" 
+                                               value="{{ old('_modal') === 'editSectionModal_'.$section->id ? old('workers_required') : $section->workers_required }}" required>
+                                        <div class="form-text fs-11 text-muted">{{ __('production.workers_required_helper') }}</div>
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('workers_required'))
+                                            <div class="text-danger fs-11 mt-1">{{ $errors->first('workers_required') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold fs-12 text-dark">{{ __('production.status') }} <span class="text-danger">*</span></label>
+                                        <select name="status" class="form-select" required>
+                                            @php
+                                                $currStatus = old('_modal') === 'editSectionModal_'.$section->id ? old('status') : $section->status;
+                                            @endphp
+                                            <option value="active" @selected($currStatus === 'active')>{{ __('production.active') }}</option>
+                                            <option value="inactive" @selected($currStatus === 'inactive')>{{ __('production.inactive') }}</option>
+                                        </select>
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('status'))
+                                            <div class="text-danger fs-11 mt-1">{{ $errors->first('status') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold fs-12 text-dark d-block">
+                                            {{ __('production.section_shifts') }} <span class="text-danger">*</span>
+                                            <span class="fw-normal text-muted fs-11 ms-1">({{ __('production.section_shifts_helper') }})</span>
+                                        </label>
+
+                                        @php
+                                            $selectedShifts = old('_modal') === 'editSectionModal_'.$section->id 
+                                                ? (array) old('shifts', []) 
+                                                : $section->shifts->pluck('id')->toArray();
+                                        @endphp
+
+                                        @if($workCenter->shifts->count() > 0)
+                                            <div class="p-3 border rounded bg-light">
+                                                <div class="row g-2">
+                                                    @foreach($workCenter->shifts as $sh)
+                                                        <div class="col-md-6">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="shifts[]" value="{{ $sh->id }}" 
+                                                                       id="edit_shift_{{ $section->id }}_{{ $sh->id }}"
+                                                                       @checked(in_array($sh->id, $selectedShifts))>
+                                                                <label class="form-check-label text-dark fs-12" for="edit_shift_{{ $section->id }}_{{ $sh->id }}">
+                                                                    <span class="fw-bold font-monospace">{{ $sh->code }}</span> &mdash; {{ $sh->name }}
+                                                                    <span class="text-muted fs-11">({{ substr($sh->start_time, 0, 5) }}-{{ substr($sh->end_time, 0, 5) }})</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
+                                                <i class="feather-alert-triangle me-1"></i>{{ __('production.section_shifts_none_available') }}
+                                            </div>
+                                        @endif
+
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('shifts'))
+                                            <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('shifts') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_description') }}</label>
+                                        <textarea name="description" rows="3" class="form-control fs-12" placeholder="{{ __('production.description') }}...">{{ old('_modal') === 'editSectionModal_'.$section->id ? old('description') : $section->description }}</textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                                <button type="submit" class="btn btn-primary" @if($workCenter->shifts->count() === 0) disabled @endif>
+                                    <i class="feather-check me-1"></i>{{ __('production.update_section') }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endcan
+
+        @can('delete', $section)
+            <div class="modal fade" id="deleteSectionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="deleteSectionModalLabel_{{ $section->id }}" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg rounded-3">
+                        <div class="modal-header border-bottom py-3 bg-soft-danger">
+                            <h5 class="modal-title fw-bold text-danger fs-15" id="deleteSectionModalLabel_{{ $section->id }}">
+                                <i class="feather-alert-triangle text-danger me-2"></i>{{ __('production.delete_section') }}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ route('production.work-center-sections.destroy', $section->id) }}">
+                            @csrf
+                            @method('DELETE')
+
+                            <div class="modal-body p-4">
+                                @if($section->machines->count() > 0)
+                                    <div class="alert alert-danger border border-danger d-flex align-items-start gap-2 mb-3">
+                                        <i class="feather-slash fs-18 text-danger mt-1 flex-shrink-0"></i>
+                                        <div>
+                                            <h6 class="fw-bold text-danger mb-1">{{ __('production.cannot_delete_has_machines') }}</h6>
+                                            <p class="fs-12 text-dark mb-0">{{ __('production.delete_section_has_machines_warning') }}</p>
+                                            <div class="mt-2 fw-semibold fs-12 text-dark">
+                                                Assigned Machines ({{ $section->machines->count() }}):
+                                                <span class="text-muted">{{ $section->machines->pluck('name')->join(', ') }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @else
+                                    <p class="text-dark fs-13 mb-2">{{ __('production.delete_section_confirm') }}</p>
+                                    <div class="p-3 bg-light rounded border">
+                                        <span class="fw-bold text-dark">{{ $section->name }}</span>
+                                        <span class="font-monospace text-muted ms-2">({{ $section->code }})</span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                                @if($section->machines->count() === 0)
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="feather-trash-2 me-1"></i>{{ __('production.delete_section') }}
+                                    </button>
+                                @else
+                                    <button type="submit" class="btn btn-danger" disabled title="{{ __('production.cannot_delete_has_machines') }}">
+                                        <i class="feather-slash me-1"></i>{{ __('production.cannot_delete_has_machines') }}
+                                    </button>
+                                @endif
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endcan
+    @endforeach
+
+    @if($errors->any() && old('_modal'))
+        @push('scripts')
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var modalId = "{{ old('_modal') }}";
+                    var modalEl = document.getElementById(modalId);
+                    if (modalEl && typeof bootstrap !== 'undefined') {
+                        var modal = new bootstrap.Modal(modalEl);
+                        modal.show();
+                    }
+                });
+            </script>
+        @endpush
+    @endif
 @endsection

@@ -7,6 +7,7 @@ use App\Domains\Production\DTO\MachineDTO;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Repositories\MachineRepositoryInterface;
 use App\Domains\Production\Repositories\WorkCenterRepositoryInterface;
+use App\Domains\Production\Repositories\WorkCenterSectionRepositoryInterface;
 use App\Domains\Production\Requests\StoreMachineRequest;
 use App\Domains\Production\Requests\UpdateMachineRequest;
 use App\Domains\Production\Services\MachineService;
@@ -22,6 +23,7 @@ class MachineController extends Controller
     public function __construct(
         private readonly MachineRepositoryInterface $repository,
         private readonly WorkCenterRepositoryInterface $workCenterRepository,
+        private readonly WorkCenterSectionRepositoryInterface $sectionRepository,
         private readonly MachineService $service
     ) {}
 
@@ -42,9 +44,9 @@ class MachineController extends Controller
     {
         Gate::authorize('create', Machine::class);
 
-        $workCenters = $this->workCenterRepository->getActiveWorkCenters();
+        $sections    = $this->sectionRepository->getAll(['status' => 'active']);
         $statuses    = config('production.machine_statuses', []);
-        $selectedWorkCenterId = $request->query('work_center_id');
+        $selectedSectionId = $request->query('section_id');
 
         $linkedAsset = null;
         $assetId = $request->query('asset_id');
@@ -53,7 +55,7 @@ class MachineController extends Controller
                 ->find((int) $assetId);
         }
 
-        return view('modules.production.machines.create', compact('workCenters', 'statuses', 'selectedWorkCenterId', 'linkedAsset'));
+        return view('modules.production.machines.create', compact('sections', 'statuses', 'selectedSectionId', 'linkedAsset'));
     }
 
     public function store(StoreMachineRequest $request): RedirectResponse
@@ -131,14 +133,17 @@ class MachineController extends Controller
 
         Gate::authorize('update', $machine);
 
-        $machine->loadMissing('asset.category');
-        $workCenters = $this->workCenterRepository->getActiveWorkCenters();
-        $statuses    = config('production.machine_statuses', []);
+        $machine->loadMissing(['asset.category', 'section.workCenter']);
+        $sections = $this->sectionRepository->getAll(['status' => 'active']);
+        if ($machine->section && ! $sections->contains('id', $machine->section_id)) {
+            $sections->push($machine->section);
+        }
+        $statuses = config('production.machine_statuses', []);
         $linkableAssets = $machine->isLinkedToAsset()
             ? collect()
             : $this->unregisteredMachineryAssetsQuery(require_tenant_id())->get();
 
-        return view('modules.production.machines.edit', compact('machine', 'workCenters', 'statuses', 'linkableAssets'));
+        return view('modules.production.machines.edit', compact('machine', 'sections', 'statuses', 'linkableAssets'));
     }
 
     public function update(UpdateMachineRequest $request, int $id): RedirectResponse

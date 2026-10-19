@@ -34,6 +34,7 @@
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" label="End Time (HH:MM)" name="end_time" placeholder="e.g. 16:00" :value="old('end_time', substr($shift->end_time, 0, 5))" :required="true" :error-text="$errors->first('end_time')" />
                         <x-ui.odoo-form-ui type="input" label="Break Minutes" name="break_minutes" inputType="number" placeholder="e.g. 30, 45" :value="old('break_minutes', $shift->break_minutes)" :required="true" :error-text="$errors->first('break_minutes')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.hourly_labor_rate') . ' (' . active_currency_symbol() . ')'" name="hourly_labor_rate" inputType="number" step="0.0001" placeholder="0.0000" :value="old('hourly_labor_rate', $shift->hourly_labor_rate !== null ? number_format(convert_from_base($shift->hourly_labor_rate), 4, '.', '') : '')" :helper-text="__('production.hourly_labor_rate_helper')" :error-text="$errors->first('hourly_labor_rate')" />
                         
                         <div class="mt-4 pt-2">
                             <div class="form-check form-switch mb-2">

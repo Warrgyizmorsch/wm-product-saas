@@ -40,6 +40,11 @@ class WorkCenter extends BaseModel
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
+    public function sections(): HasMany
+    {
+        return $this->hasMany(WorkCenterSection::class, 'work_center_id');
+    }
+
     public function machines(): HasMany
     {
         return $this->hasMany(Machine::class, 'work_center_id');

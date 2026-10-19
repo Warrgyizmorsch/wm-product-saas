@@ -18,7 +18,11 @@ class StoreMachineRequest extends FormRequest
         $tenantId = require_tenant_id();
 
         return [
-            'work_center_id'     => 'required|exists:production_work_centers,id',
+            'section_id'         => [
+                'required',
+                'integer',
+                Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
+            ],
             'asset_id'           => 'nullable|integer|exists:assets,id',
             'name'               => 'required|string|max:255',
             'code'               => [
@@ -38,8 +42,9 @@ class StoreMachineRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'code.unique' => 'A machine with this code already exists in your organization.',
-            'work_center_id.exists' => 'The selected work center does not exist.',
+            'code.unique'        => 'A machine with this code already exists in your organization.',
+            'section_id.required'=> 'A section must be selected for the machine.',
+            'section_id.exists'  => 'The selected section does not exist.',
         ];
     }
 }

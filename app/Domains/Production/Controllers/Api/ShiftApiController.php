@@ -70,6 +70,11 @@ class ShiftApiController extends ApiBaseController
         $data['tenant_id'] = $tenantId;
         $data['overtime_allowed'] = $request->boolean('overtime_allowed');
         $data['active'] = $request->boolean('active', true);
+        if (isset($data['hourly_labor_rate']) && $data['hourly_labor_rate'] !== null && $data['hourly_labor_rate'] !== '') {
+            $data['hourly_labor_rate'] = convert_to_base((float) $data['hourly_labor_rate']);
+        } else {
+            $data['hourly_labor_rate'] = null;
+        }
 
         try {
             $shift = $this->workCenterRepository->createShift($data);
@@ -100,6 +105,11 @@ class ShiftApiController extends ApiBaseController
         $data = $request->validated();
         $data['overtime_allowed'] = $request->boolean('overtime_allowed');
         $data['active'] = $request->boolean('active');
+        if (isset($data['hourly_labor_rate']) && $data['hourly_labor_rate'] !== null && $data['hourly_labor_rate'] !== '') {
+            $data['hourly_labor_rate'] = convert_to_base((float) $data['hourly_labor_rate']);
+        } else {
+            $data['hourly_labor_rate'] = null;
+        }
 
         try {
             $updated = $this->workCenterRepository->updateShift($id, $data);

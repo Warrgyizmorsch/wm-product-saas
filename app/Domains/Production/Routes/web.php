@@ -38,6 +38,7 @@ use App\Domains\Production\Controllers\SerialNumberController;
 use App\Domains\Production\Controllers\ShiftController;
 use App\Domains\Production\Controllers\WipController;
 use App\Domains\Production\Controllers\WorkCenterController;
+use App\Domains\Production\Controllers\WorkCenterSectionController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
@@ -107,6 +108,10 @@ Route::prefix('production')
         // ── Work Centers ──────────────────────────────────────────────────────
         Route::post('work-centers/bulk-action', [WorkCenterController::class, 'bulkAction'])->name('work-centers.bulk-action');
         Route::resource('work-centers', WorkCenterController::class);
+
+        // ── Work Center Sections ──────────────────────────────────────────────
+        Route::get('sections/by-work-center/{workCenter}', [WorkCenterSectionController::class, 'byWorkCenter'])->name('work-center-sections.by-work-center');
+        Route::resource('work-center-sections', WorkCenterSectionController::class);
 
         // ── Machines (AJAX endpoint must be before resource to avoid routing conflict) ──
         Route::get('machines/by-work-center/{workCenter}', [MachineController::class, 'byWorkCenter'])

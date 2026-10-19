@@ -12,7 +12,11 @@ class StoreMachineApiRequest extends ApiFormRequest
         $tenantId = require_tenant_id();
 
         return [
-            'work_center_id'     => 'required|exists:production_work_centers,id',
+            'section_id'         => [
+                'required',
+                'integer',
+                Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
+            ],
             'name'               => 'required|string|max:255',
             'code'               => [
                 'required', 'string', 'max:50',

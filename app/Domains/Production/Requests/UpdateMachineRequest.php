@@ -19,7 +19,11 @@ class UpdateMachineRequest extends FormRequest
         $machineId = $this->route('machine');
 
         return [
-            'work_center_id'     => 'required|exists:production_work_centers,id',
+            'section_id'         => [
+                'required',
+                'integer',
+                Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
+            ],
             'name'               => 'required|string|max:255',
             'code'               => [
                 'required', 'string', 'max:50',
@@ -34,6 +38,15 @@ class UpdateMachineRequest extends FormRequest
             'status'             => ['required', Rule::in(Machine::STATUSES)],
             'installation_date'  => 'nullable|date',
             'maintenance_status' => 'nullable|string|max:255',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'code.unique'        => 'A machine with this code already exists in your organization.',
+            'section_id.required'=> 'A section must be selected for the machine.',
+            'section_id.exists'  => 'The selected section does not exist.',
         ];
     }
 }

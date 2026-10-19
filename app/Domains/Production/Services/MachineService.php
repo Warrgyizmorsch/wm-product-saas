@@ -6,7 +6,9 @@ use App\Domains\HRMS\Models\Asset;
 use App\Domains\Production\DTO\MachineDTO;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Repositories\MachineRepositoryInterface;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class MachineService
@@ -17,10 +19,14 @@ class MachineService
 
     public function create(MachineDTO $dto, int $tenantId, ?int $assetId = null): Machine
     {
-        // Validate work center belongs to tenant
-        $workCenter = WorkCenter::find($dto->work_center_id);
-        if (!$workCenter || $workCenter->tenant_id !== $tenantId) {
-            throw new InvalidArgumentException('Invalid work center selected.');
+        // Validate section belongs to tenant
+        $section = WorkCenterSection::find($dto->section_id);
+        if (!$section || $section->tenant_id !== $tenantId) {
+            throw new InvalidArgumentException('Invalid section selected.');
+        }
+
+        if (!$section->isActive()) {
+            throw new InvalidArgumentException('The selected section is inactive.');
         }
 
         // Validate unique code per tenant
@@ -30,13 +36,19 @@ class MachineService
             );
         }
 
-        $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
+        return DB::transaction(function () use ($dto, $section, $tenantId, $assetId) {
+            $data = array_merge($dto->toArray(), [
+                'tenant_id'      => $tenantId,
+                'section_id'     => $section->id,
+                'work_center_id' => $section->work_center_id,
+            ]);
 
-        if ($assetId !== null) {
-            $data['asset_id'] = $this->validateAssetForLinking($assetId, $tenantId);
-        }
+            if ($assetId !== null) {
+                $data['asset_id'] = $this->validateAssetForLinking($assetId, $tenantId);
+            }
 
-        return $this->repository->create($data);
+            return $this->repository->create($data);
+        });
     }
 
     /**
@@ -99,10 +111,14 @@ class MachineService
             throw new InvalidArgumentException('Machine not found.');
         }
 
-        // Validate work center belongs to same tenant
-        $workCenter = WorkCenter::find($dto->work_center_id);
-        if (!$workCenter || $workCenter->tenant_id !== $machine->tenant_id) {
-            throw new InvalidArgumentException('Invalid work center selected.');
+        // Validate section belongs to machine's tenant
+        $section = WorkCenterSection::find($dto->section_id);
+        if (!$section || $section->tenant_id !== $machine->tenant_id) {
+            throw new InvalidArgumentException('Invalid section selected.');
+        }
+
+        if (!$section->isActive()) {
+            throw new InvalidArgumentException('The selected section is inactive.');
         }
 
         // Validate unique code (excluding self)
@@ -113,7 +129,14 @@ class MachineService
             );
         }
 
-        return $this->repository->update($id, $dto->toArray());
+        return DB::transaction(function () use ($id, $dto, $section) {
+            $data = array_merge($dto->toArray(), [
+                'section_id'     => $section->id,
+                'work_center_id' => $section->work_center_id,
+            ]);
+
+            return $this->repository->update($id, $data);
+        });
     }
 
     public function delete(int $id): bool

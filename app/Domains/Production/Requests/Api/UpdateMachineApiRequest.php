@@ -13,7 +13,12 @@ class UpdateMachineApiRequest extends ApiFormRequest
         $machineId = $this->route('machine') ?? $this->route('id');
 
         return [
-            'work_center_id'     => 'sometimes|required|exists:production_work_centers,id',
+            'section_id'         => [
+                'sometimes',
+                'required',
+                'integer',
+                Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
+            ],
             'name'               => 'sometimes|required|string|max:255',
             'code'               => [
                 'sometimes', 'required', 'string', 'max:50',

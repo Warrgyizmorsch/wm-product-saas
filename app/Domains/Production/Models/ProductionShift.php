@@ -21,13 +21,15 @@ class ProductionShift extends BaseModel
         'end_time',
         'break_minutes',
         'overtime_allowed',
+        'hourly_labor_rate',
         'active',
     ];
 
     protected $casts = [
-        'break_minutes'    => 'integer',
-        'overtime_allowed' => 'boolean',
-        'active'           => 'boolean',
+        'break_minutes'     => 'integer',
+        'overtime_allowed'  => 'boolean',
+        'hourly_labor_rate' => 'float',
+        'active'            => 'boolean',
     ];
 
     public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -43,5 +45,15 @@ class ProductionShift extends BaseModel
             'shift_id',
             'work_center_id'
         );
+    }
+
+    public function sections(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            WorkCenterSection::class,
+            'production_work_center_section_shifts',
+            'shift_id',
+            'section_id'
+        )->distinct()->withTimestamps();
     }
 }
