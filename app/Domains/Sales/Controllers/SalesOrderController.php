@@ -63,6 +63,14 @@ class SalesOrderController extends Controller
             if ($prefillQuotation) {
                 // Ensure customer object & ID are resolved/synced for the quotation
                 $prefillCustomer = $prefillQuotation->customer;
+                if (!$prefillCustomer) {
+                    $dealId = $prefillQuotation->crm_deal_id;
+                    $convertUrl = $dealId
+                        ? route('crm.deals.showConvertForm', $dealId)
+                        : route('crm.quotations.showConvertForm', $prefillQuotation->id);
+
+                    return redirect($convertUrl)->with('warning', 'Please convert this quotation/deal to a customer before creating a Sales Order.');
+                }
             }
         }
 
@@ -72,8 +80,10 @@ class SalesOrderController extends Controller
         
         $quotations = Quotation::query()
             ->where('is_current', true)
+            ->whereIn('status', ['Accepted', 'Converted', 'Won'])
             ->latest()
-            ->get();
+            ->get()
+            ->filter(fn ($q) => !empty($q->customer));
 
         $warehouses = Warehouse::query()->orderBy('name')->get();
         $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();

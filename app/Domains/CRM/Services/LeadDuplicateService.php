@@ -4,113 +4,153 @@ namespace App\Domains\CRM\Services;
 
 use App\Domains\CRM\Models\Lead;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class LeadDuplicateService
 {
     /**
-     * Detect and annotate duplicate leads where BOTH Email AND Phone match.
+     * Compute or retrieve the cached duplicate relationship graph for the tenant.
+     * Uses an O(N) inverted-index single pass lookup rather than O(N^2) pairwise comparisons.
      */
-    public function annotateDuplicates($leads, int $tenantId): void
+    public function getDuplicateGraph(int $tenantId): array
     {
-        if (empty($leads)) {
-            return;
-        }
+        $cacheKey = "tenant_{$tenantId}_dup_graph";
 
-        // Fetch all active tenant leads to build duplicate graph
-        $allLeads = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
-            ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
-            ->orderBy('id', 'asc')
-            ->get();
+        return Cache::remember($cacheKey, 60, function () use ($tenantId) {
+            $allLeads = Lead::query()
+                ->where('tenant_id', $tenantId)
+                ->whereNull('deleted_at')
+                ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
+                ->orderBy('id', 'asc')
+                ->get();
 
-        // Lead lookup map
-        $leadMetaMap = [];
-        foreach ($allLeads as $l) {
-            $gstin = !empty($l->gstin) ? strtoupper(trim($l->gstin)) : null;
-            $ce = !empty($l->email) ? strtolower(trim($l->email)) : null;
-            $compE = !empty($l->company_email) ? strtolower(trim($l->company_email)) : null;
-            $cp = !empty($l->phone) ? preg_replace('/[^0-9]/', '', $l->phone) : null;
-            $compP = !empty($l->company_phone) ? preg_replace('/[^0-9]/', '', $l->company_phone) : null;
+            $leadMetaMap = [];
+            $gstinIndex = [];
+            $emailIndex = [];
+            $phoneIndex = [];
 
-            $emails = array_values(array_unique(array_filter([$ce, $compE])));
-            $phones = array_values(array_unique(array_filter([$cp, $compP], fn($p) => strlen($p) >= 5)));
+            $duplicateOfMap = [];
+            $originalHasDuplicates = [];
 
-            $num = $l->lead_number ?: ('LD-' . str_pad($l->id, 4, '0', STR_PAD_LEFT));
+            foreach ($allLeads as $l) {
+                $id = $l->id;
+                $gstin = !empty($l->gstin) ? strtoupper(trim($l->gstin)) : null;
+                $ce = !empty($l->email) ? strtolower(trim($l->email)) : null;
+                $compE = !empty($l->company_email) ? strtolower(trim($l->company_email)) : null;
+                $cp = !empty($l->phone) ? preg_replace('/[^0-9]/', '', $l->phone) : null;
+                $compP = !empty($l->company_phone) ? preg_replace('/[^0-9]/', '', $l->company_phone) : null;
 
-            $leadMetaMap[$l->id] = [
-                'id' => $l->id,
-                'lead_number' => $num,
-                'gstin' => $gstin,
-                'contact_email' => $ce,
-                'company_email' => $compE,
-                'contact_phone' => $cp,
-                'company_phone' => $compP,
-                'emails' => $emails,
-                'phones' => $phones,
-            ];
-        }
+                $emails = array_values(array_unique(array_filter([$ce, $compE])));
+                $phones = array_values(array_unique(array_filter([$cp, $compP], fn($p) => strlen($p) >= 5)));
 
-        // Determine original vs duplicate relationships
-        $duplicateOfMap = [];        // child_id -> parent_original_id
-        $originalHasDuplicates = []; // parent_original_id -> true
+                $num = $l->lead_number ?: ('LD-' . str_pad((string)$id, 4, '0', STR_PAD_LEFT));
 
-        foreach ($leadMetaMap as $id => $meta) {
-            if (empty($meta['gstin']) && empty($meta['emails']) && empty($meta['phones'])) {
-                continue;
-            }
+                $leadMetaMap[$id] = [
+                    'id' => $id,
+                    'lead_number' => $num,
+                    'gstin' => $gstin,
+                    'contact_email' => $ce,
+                    'company_email' => $compE,
+                    'contact_phone' => $cp,
+                    'company_phone' => $compP,
+                    'emails' => $emails,
+                    'phones' => $phones,
+                ];
 
-            // Find all matching lead IDs
-            $matchingIds = [];
-            foreach ($leadMetaMap as $otherId => $otherMeta) {
-                if ($id === $otherId) {
-                    continue;
+                // Find matches from earlier leads using inverted indexes (O(1) lookups)
+                $earlierMatches = [];
+
+                if (!empty($gstin) && isset($gstinIndex[$gstin])) {
+                    foreach ($gstinIndex[$gstin] as $mId) {
+                        $earlierMatches[$mId] = true;
+                    }
                 }
 
-                $gstinMatched = !empty($meta['gstin']) && !empty($otherMeta['gstin']) && ($meta['gstin'] === $otherMeta['gstin']);
-                $emailMatched = !empty(array_intersect($meta['emails'], $otherMeta['emails']));
+                foreach ($emails as $em) {
+                    if (isset($emailIndex[$em])) {
+                        foreach ($emailIndex[$em] as $mId) {
+                            $earlierMatches[$mId] = true;
+                        }
+                    }
+                }
 
-                $phoneMatched = false;
-                if (!empty($meta['phones']) && !empty($otherMeta['phones'])) {
-                    foreach ($meta['phones'] as $p1) {
-                        foreach ($otherMeta['phones'] as $p2) {
-                            if ($p1 === $p2 || (strlen($p1) >= 5 && strlen($p2) >= 5 && (str_contains($p1, $p2) || str_contains($p2, $p1)))) {
-                                $phoneMatched = true;
-                                break 2;
+                foreach ($phones as $ph) {
+                    if (isset($phoneIndex[$ph])) {
+                        foreach ($phoneIndex[$ph] as $mId) {
+                            $earlierMatches[$mId] = true;
+                        }
+                    }
+                    if (strlen($ph) >= 10) {
+                        $suffix = substr($ph, -10);
+                        if (isset($phoneIndex[$suffix])) {
+                            foreach ($phoneIndex[$suffix] as $mId) {
+                                $earlierMatches[$mId] = true;
                             }
                         }
                     }
                 }
 
-                if ($gstinMatched || $emailMatched || $phoneMatched) {
-                    $matchingIds[] = $otherId;
-                }
-            }
-
-            if (!empty($matchingIds)) {
-                // Find matching leads created BEFORE this one (smaller ID)
-                $earlierMatches = array_filter($matchingIds, fn($mId) => $mId < $id);
-
                 if (!empty($earlierMatches)) {
-                    // This lead was created AFTER an existing match -> it is DUPLICATE of the oldest match!
-                    $origId = min($earlierMatches);
+                    $origId = min(array_keys($earlierMatches));
                     while (isset($duplicateOfMap[$origId])) {
                         $origId = $duplicateOfMap[$origId];
                     }
                     $duplicateOfMap[$id] = $origId;
                     $originalHasDuplicates[$origId] = true;
                 }
+
+                // Register this lead into inverted indexes for subsequent leads
+                if (!empty($gstin)) {
+                    $gstinIndex[$gstin][] = $id;
+                }
+                foreach ($emails as $em) {
+                    $emailIndex[$em][] = $id;
+                }
+                foreach ($phones as $ph) {
+                    $phoneIndex[$ph][] = $id;
+                    if (strlen($ph) >= 10) {
+                        $phoneIndex[substr($ph, -10)][] = $id;
+                    }
+                }
             }
+
+            $allDuplicateAndOriginalIds = array_values(array_unique(array_merge(
+                array_keys($duplicateOfMap),
+                array_keys($originalHasDuplicates)
+            )));
+
+            return [
+                'duplicateOfMap' => $duplicateOfMap,
+                'originalHasDuplicates' => $originalHasDuplicates,
+                'leadMetaMap' => $leadMetaMap,
+                'allDuplicateAndOriginalIds' => $allDuplicateAndOriginalIds,
+                'duplicatesCount' => count($allDuplicateAndOriginalIds),
+            ];
+        });
+    }
+
+    /**
+     * Detect and annotate duplicate leads where GSTIN, Email or Phone match.
+     * Returns total duplicates count for display.
+     */
+    public function annotateDuplicates($leads, int $tenantId): int
+    {
+        $graph = $this->getDuplicateGraph($tenantId);
+        $duplicateOfMap = $graph['duplicateOfMap'];
+        $originalHasDuplicates = $graph['originalHasDuplicates'];
+        $leadMetaMap = $graph['leadMetaMap'];
+
+        if (empty($leads)) {
+            return $graph['duplicatesCount'];
         }
 
-        // Annotate passed leads collection
         foreach ($leads as $lead) {
             $id = $lead->id;
 
             if (isset($duplicateOfMap[$id])) {
                 $origId = $duplicateOfMap[$id];
                 $origMeta = $leadMetaMap[$origId] ?? null;
-                $origNumber = $origMeta['lead_number'] ?? ('LD-' . str_pad($origId, 4, '0', STR_PAD_LEFT));
+                $origNumber = $origMeta['lead_number'] ?? ('LD-' . str_pad((string)$origId, 4, '0', STR_PAD_LEFT));
 
                 $lead->is_duplicate = true;
                 $lead->is_original = false;
@@ -129,12 +169,10 @@ class LeadDuplicateService
                 $reasons = [];
 
                 if ($origMeta) {
-                    // GSTIN
                     if (!empty($meta['gstin']) && !empty($origMeta['gstin']) && $meta['gstin'] === $origMeta['gstin']) {
                         $reasons[] = 'GSTIN';
                     }
 
-                    // Contact Email
                     if (!empty($meta['contact_email'])) {
                         $e = $meta['contact_email'];
                         if ($e === $origMeta['contact_email'] || $e === $origMeta['company_email']) {
@@ -142,7 +180,6 @@ class LeadDuplicateService
                         }
                     }
 
-                    // Company Email
                     if (!empty($meta['company_email'])) {
                         $e = $meta['company_email'];
                         if ($e === $origMeta['company_email'] || $e === $origMeta['contact_email']) {
@@ -150,7 +187,6 @@ class LeadDuplicateService
                         }
                     }
 
-                    // Contact Phone
                     if (!empty($meta['contact_phone']) && strlen($meta['contact_phone']) >= 5) {
                         $p = $meta['contact_phone'];
                         $op1 = $origMeta['contact_phone'];
@@ -161,7 +197,6 @@ class LeadDuplicateService
                         }
                     }
 
-                    // Company Phone
                     if (!empty($meta['company_phone']) && strlen($meta['company_phone']) >= 5) {
                         $p = $meta['company_phone'];
                         $op1 = $origMeta['company_phone'];
@@ -182,6 +217,8 @@ class LeadDuplicateService
                 $lead->duplicate_reason = null;
             }
         }
+
+        return $graph['duplicatesCount'];
     }
 
     /**

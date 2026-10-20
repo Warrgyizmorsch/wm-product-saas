@@ -37,7 +37,6 @@ class Product extends BaseModel
         'name',
         'sku',
         'type', // finished_good, raw_material, component, etc.
-        'planning_type', // stock, manufacture, purchase, manual
         'default_production_model', // pure_manufacturing, subcontract_complete, subcontract_company_material, hybrid
         'supplier_method',
         'item_type', // Goods, Service

@@ -179,9 +179,9 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="text-end font-monospace">{{ number_format($order->subtotal, 2) }}</td>
-                            <td class="text-end font-monospace text-muted">{{ number_format($order->tax_amount, 2) }}</td>
-                            <td class="text-end font-monospace fw-bold text-success">{{ number_format($order->grand_total, 2) }}</td>
+                            <td class="text-end font-monospace">{{ format_currency($order->subtotal) }}</td>
+                            <td class="text-end font-monospace text-muted">{{ format_currency($order->tax_amount) }}</td>
+                            <td class="text-end font-monospace fw-bold text-success">{{ format_currency($order->grand_total) }}</td>
                             <td>
                                 @if($order->reminder_count > 0)
                                     @php

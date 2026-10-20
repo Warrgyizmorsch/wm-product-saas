@@ -150,7 +150,8 @@ class InvoiceController extends Controller
 
         if (!$dispatchOrderId && $mode !== 'dispatch_order') {
             if ($salesOrderId) {
-                $matchingSO = $salesOrders->firstWhere('id', (int)$salesOrderId);
+                $matchingSO = $salesOrders->firstWhere('id', (int)$salesOrderId)
+                    ?: SalesOrder::with(['customer', 'items.product', 'items.warehouse'])->find((int)$salesOrderId);
                 if ($matchingSO) {
                     $salesOrder = $matchingSO;
                 } else {
@@ -212,9 +213,11 @@ class InvoiceController extends Controller
                         continue; // Skip items already fully invoiced
                     }
 
-                    $unitPrice = $soItem ? floatval($soItem->unit_price) : floatval($doItem->product?->selling_price ?? 0);
+                    $unitPriceInBase = $soItem ? floatval($soItem->unit_price) : floatval($doItem->product?->selling_price ?? 0);
+                    $unitPrice = round(convert_from_base($unitPriceInBase), 2);
                     $taxRate = $soItem ? floatval($soItem->tax_rate) : 0.0;
-                    $discount = $soItem ? floatval($soItem->discount) : 0.0;
+                    $discountInBase = $soItem ? floatval($soItem->discount) : 0.0;
+                    $discount = round(convert_from_base($discountInBase), 2);
 
                     $subtotal = $unbilledQty * $unitPrice;
                     $discountAmt = $discount;
@@ -255,9 +258,9 @@ class InvoiceController extends Controller
                     continue; // Skip items already fully invoiced
                 }
 
-                $unitPrice = floatval($soItem->unit_price);
+                $unitPrice = round(convert_from_base(floatval($soItem->unit_price)), 2);
                 $taxRate = floatval($soItem->tax_rate);
-                $discount = floatval($soItem->discount);
+                $discount = round(convert_from_base(floatval($soItem->discount)), 2);
 
                 $subtotal = $unbilledQty * $unitPrice;
                 $discountAmt = $discount;
@@ -389,7 +392,7 @@ class InvoiceController extends Controller
         $gstType      = $request->input('gst_type', 'cgst_sgst');
 
         $freightTerms  = $validated['freight_terms'] ?? $salesOrder?->freight_terms ?? 'To Pay';
-        $freightAmount = floatval($validated['freight_amount'] ?? 0);
+        $freightAmount = convert_to_base(floatval($validated['freight_amount'] ?? 0));
 
         $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $branchId, $companyId, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
             $subtotal = 0;
@@ -398,8 +401,8 @@ class InvoiceController extends Controller
 
             foreach ($validated['items'] as $item) {
                 $qty   = floatval($item['quantity']);
-                $price = floatval($item['unit_price']);
-                $disc  = ($discountType === 'item_wise') ? floatval($item['discount'] ?? 0) : 0;
+                $price = convert_to_base(floatval($item['unit_price']));
+                $disc  = ($discountType === 'item_wise') ? convert_to_base(floatval($item['discount'] ?? 0)) : 0;
                 $taxR  = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
 
                 $lineSubtotal = $qty * $price;
@@ -412,7 +415,7 @@ class InvoiceController extends Controller
             }
 
             if ($discountType === 'order_wise') {
-                $discountAmount = floatval($request->input('discount_amount', 0));
+                $discountAmount = convert_to_base(floatval($request->input('discount_amount', 0)));
             } elseif ($discountType === 'without_discount') {
                 $discountAmount = 0;
             }
@@ -443,7 +446,7 @@ class InvoiceController extends Controller
             }
 
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
-            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 2) : 0;
+            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 4) : 0;
             $totalTaxAmount = $taxAmount + $freightTax;
 
             $cgstAmount = 0;
@@ -454,12 +457,12 @@ class InvoiceController extends Controller
                 if ($gstType === 'igst') {
                     $igstAmount = $totalTaxAmount;
                 } else {
-                    $cgstAmount = round($totalTaxAmount / 2, 2);
-                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($totalTaxAmount / 2, 4);
+                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 4);
                 }
             }
 
-            $adjustment = floatval($request->input('adjustment', 0));
+            $adjustment = convert_to_base(floatval($request->input('adjustment', 0)));
             $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
 
             $invoice = Invoice::create([
@@ -496,8 +499,8 @@ class InvoiceController extends Controller
 
             foreach ($validated['items'] as $item) {
                 $qty = floatval($item['quantity']);
-                $price = floatval($item['unit_price']);
-                $disc = floatval($item['discount'] ?? 0);
+                $price = convert_to_base(floatval($item['unit_price']));
+                $disc = convert_to_base(floatval($item['discount'] ?? 0));
                 $taxR = floatval($item['tax_rate'] ?? 0);
 
                 $lineSubtotal = $qty * $price;
@@ -518,8 +521,8 @@ class InvoiceController extends Controller
                     } else {
                         $lineCgstPercent = round($taxR / 2, 2);
                         $lineSgstPercent = round($taxR / 2, 2);
-                        $lineCgstAmt = round($lineTax / 2, 2);
-                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 2);
+                        $lineCgstAmt = round($lineTax / 2, 4);
+                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 4);
                     }
                 }
 
@@ -758,3 +761,4 @@ class InvoiceController extends Controller
         }
     }
 }
+

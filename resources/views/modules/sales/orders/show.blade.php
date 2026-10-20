@@ -353,7 +353,7 @@
         $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
         $freightAmount = ($order->freight_terms === 'To Be Billed') ? (float)($order->freight_amount ?: $order->shipping_charges ?: 0) : 0;
         $adjustment = (float)$order->adjustment;
-        $grandTotal = $itemsTotalInclGst + $freightAmount + $adjustment;
+        $grandTotal = (float)($order->total_amount ?? ($itemsTotalInclGst + $freightAmount + $adjustment));
         $gstType = $order->gst_type ?? 'cgst_sgst';
 
         $totalInvoicedAmount = $order->invoices->where('status', '!=', 'Cancelled')->sum(function($inv) {

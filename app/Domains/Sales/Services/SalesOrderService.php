@@ -130,6 +130,7 @@ class SalesOrderService
             $data['discount'] = $discountVal;
             $data['subtotal'] = $subtotal;
             $data['tax'] = $totalTax;
+            $data['adjustment'] = $adjustment;
             $data['total_amount'] = max(0, $totalAmount);
 
             $salesOrder = $this->salesOrders->create($data);
@@ -247,6 +248,7 @@ class SalesOrderService
             $data['discount'] = $discountVal;
             $data['subtotal'] = $subtotal;
             $data['tax'] = $totalTax;
+            $data['adjustment'] = $adjustment;
             $data['total_amount'] = max(0, $totalAmount);
 
             $salesOrder->update($data);

@@ -235,6 +235,7 @@ class QuotationController extends Controller
         $this->authorize('view', $quotation);
 
         $pdf = Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+        $pdf->setOption('isPhpEnabled', true);
         if (request()->has('preview') || request()->has('stream')) {
             return $pdf->stream("Quotation_{$quotation->quotation_number}.pdf");
         }

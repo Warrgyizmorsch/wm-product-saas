@@ -208,7 +208,7 @@
                     <td class="text-center font-mono" style="font-weight: bold; color: #2563eb;">{{ number_format($item->received_qty, 2) }}</td>
                     <td class="text-center font-mono" style="color: #dc2626;">{{ number_format($item->rejected_qty, 2) }}</td>
                     <td class="text-center font-mono" style="font-weight: bold; color: #166534;">{{ number_format($item->accepted_qty, 2) }}</td>
-                    <td class="text-right font-mono" style="font-weight: bold;">{{ number_format($item->total_amount, 2) }}</td>
+                    <td class="text-right font-mono" style="font-weight: bold;">{{ number_format(convert_from_base($item->total_amount), 2) }}</td>
                 </tr>
             @endforeach
             <tr style="background-color: #f8fafc; font-weight: bold;">
@@ -216,7 +216,7 @@
                 <td class="text-center font-mono" style="color: #2563eb;">{{ number_format($totRec, 2) }}</td>
                 <td class="text-center font-mono" style="color: #dc2626;">{{ number_format($totRej, 2) }}</td>
                 <td class="text-center font-mono" style="color: #166534;">{{ number_format($totAcc, 2) }}</td>
-                <td class="text-right font-mono" style="color: #1e293b;">{{ $currency }} {{ number_format($totAmt, 2) }}</td>
+                <td class="text-right font-mono" style="color: #1e293b;">{{ $currency }} {{ number_format(convert_from_base($totAmt), 2) }}</td>
             </tr>
         </tbody>
     </table>

@@ -346,6 +346,13 @@ class GoogleCalendarIntegrationService
             return true;
         }
 
+        $cacheKey = "google_cal_connected_{$userId}";
+        if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
+            $cached = (bool)\Illuminate\Support\Facades\Cache::get($cacheKey);
+            session(['google_calendar_connected' => $cached]);
+            return $cached;
+        }
+
         try {
             $queryParams = [
                 'user_id' => $userId,
@@ -354,18 +361,21 @@ class GoogleCalendarIntegrationService
                 'access_token' => $token,
             ];
 
-            $httpClient = Http::timeout(3)->withToken($token);
+            $httpClient = Http::timeout(2)->withToken($token);
 
             $response = $httpClient->get($this->baseUrl . '/workspace/calendar/events', $queryParams);
             if ($response->successful()) {
                 $data = $response->json();
                 if (!empty($data['authenticated']) || !empty($data['connected']) || (isset($data['total']) && $data['total'] > 0) || is_array($data)) {
                     session(['google_calendar_connected' => true]);
+                    \Illuminate\Support\Facades\Cache::put($cacheKey, true, 600);
                     return true;
                 }
             }
         } catch (\Throwable $e) {}
 
+        session(['google_calendar_connected' => false]);
+        \Illuminate\Support\Facades\Cache::put($cacheKey, false, 120);
         return false;
     }
 
@@ -374,6 +384,9 @@ class GoogleCalendarIntegrationService
      */
     public function disconnectAccount(): void
     {
+        $resolvedUserId = auth()->id() ?? 1;
+        \Illuminate\Support\Facades\Cache::forget("google_cal_connected_{$resolvedUserId}");
+
         session()->forget([
             'google_token',
             'google_access_token',
@@ -392,7 +405,7 @@ class GoogleCalendarIntegrationService
         }
 
         try {
-            Http::timeout(3)->get($this->baseUrl . '/auth/logout');
+            Http::timeout(2)->get($this->baseUrl . '/auth/logout');
         } catch (\Throwable $e) {}
     }
 

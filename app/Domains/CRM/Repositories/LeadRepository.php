@@ -21,7 +21,46 @@ class LeadRepository
      */
     public function getPaginatedLeads(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Lead::query()->with(['quotations', 'owner', 'followups']);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $query = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->select([
+                'id',
+                'tenant_id',
+                'lead_number',
+                'company_name',
+                'company_email',
+                'company_phone',
+                'gstin',
+                'lead_type',
+                'contact_person',
+                'email',
+                'phone',
+                'expected_amount',
+                'expected_sale_date',
+                'source',
+                'priority',
+                'segment',
+                'status',
+                'is_customer',
+                'lead_owner_id',
+                'crm_deal_id',
+                'crm_account_id',
+                'next_followup_date',
+                'call_date',
+                'additional_contacts',
+                'created_at',
+                'updated_at',
+            ])
+            ->with([
+                'owner:id,name,email',
+                'followups' => function ($q) {
+                    $q->select(['id', 'lead_id', 'status', 'followup_date', 'title', 'notes'])
+                      ->whereNull('crm_deal_id')
+                      ->orderBy('followup_date', 'desc');
+                }
+            ]);
 
         // Search Keywords
         if (!empty($filters['search'])) {
@@ -37,16 +76,22 @@ class LeadRepository
 
         // Duplicates Only Filter (Tenant-wise & Non-deleted Only)
         if (!empty($filters['duplicates_only']) && $filters['duplicates_only'] === '1') {
-            $tenantId = tenant_id() ?? 1;
-            $query->where('tenant_id', $tenantId)
-                ->whereNull('deleted_at')
-                ->where(function ($q) {
+            if (isset($filters['duplicate_lead_ids'])) {
+                $dupIds = (array) $filters['duplicate_lead_ids'];
+                if (empty($dupIds)) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->whereIn('id', $dupIds);
+                }
+            } else {
+                $query->where(function ($q) {
                     $q->whereNotNull('email')->where('email', '!=', '')
                       ->orWhereNotNull('company_email')->where('company_email', '!=', '')
                       ->orWhereNotNull('phone')->where('phone', '!=', '')
                       ->orWhereNotNull('company_phone')->where('company_phone', '!=', '');
                 });
-            $query->orderByRaw("LOWER(email) ASC, phone ASC, id ASC");
+            }
+            $query->orderByRaw("LOWER(COALESCE(email, company_email, '')) ASC, phone ASC, id ASC");
         } else {
             if (!empty($filters['priority'])) {
                 $query->where('priority', $filters['priority']);
@@ -92,7 +137,7 @@ class LeadRepository
             $sortOrder = $filters['sort_order'] ?? 'desc';
             
             if ($sortBy === 'duplicates') {
-                $query->orderByRaw("LOWER(email) ASC, phone ASC, id ASC");
+                $query->orderByRaw("LOWER(COALESCE(email, company_email, '')) ASC, phone ASC, id ASC");
             } else {
                 $allowedSorts = ['call_date', 'company_name', 'expected_amount', 'priority', 'status'];
                 if (in_array($sortBy, $allowedSorts)) {

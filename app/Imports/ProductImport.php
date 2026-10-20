@@ -100,7 +100,6 @@ class ProductImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmp
         // Supplier Method normalization (buy, trade, manufacture)
         $supplierMethodInput = strtolower(trim($row['supplier_method'] ?? ($row['supplier'] ?? ($row['sourcing_method'] ?? 'buy'))));
         $supplierMethod = in_array($supplierMethodInput, ['buy', 'trade', 'manufacture']) ? $supplierMethodInput : 'buy';
-        $planningType = $supplierMethod === 'manufacture' ? 'manufacture' : 'purchase';
 
         // Auto-resolve UOM / Unit
         $uomInput = $row['unit_uom'] ?? ($row['uom'] ?? ($row['unit'] ?? null));
@@ -168,7 +167,6 @@ class ProductImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmp
                 'type' => $row['type'] ?? 'finished_good',
                 'item_type' => $row['item_type'] ?? 'Goods',
                 'supplier_method' => $supplierMethod,
-                'planning_type' => $planningType,
                 'uom_id' => $uomId,
                 'selling_price' => isset($row['selling_price']) && is_numeric($row['selling_price']) ? (float)$row['selling_price'] : 0.0,
                 'cost_price' => $costPrice,

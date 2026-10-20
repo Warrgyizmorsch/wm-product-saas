@@ -87,7 +87,14 @@ class DispatchOrderRepository
         $salesOrdersQuery = \App\Domains\Sales\Models\SalesOrder::query()
             ->where('tenant_id', $tenantId)
             ->whereIn('status', ['Confirmed', 'Partially Shipped'])
-            ->with(['customer', 'items.product.uom', 'items.warehouse'])
+            ->with([
+                'customer',
+                'items.product.uom',
+                'items.warehouse',
+                'dispatches' => function ($q) {
+                    $q->with(['items.product.uom'])->latest('dispatch_date')->latest('id');
+                }
+            ])
             ->latest('order_date');
 
         if (!empty($filters['search'])) {

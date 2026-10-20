@@ -46,49 +46,31 @@ class LeadController extends Controller
             'search', 'duplicates_only', 'priority', 'segment', 'status', 'lead_owner_id', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
 
-        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
-        $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
-
         if ($request->input('duplicates_only') === '1') {
-            $filtered = array_values(array_filter($leads->items(), function ($lead) {
-                return !empty($lead->is_duplicate) || !empty($lead->is_original);
-            }));
-
-            usort($filtered, function ($a, $b) {
-                $groupA = $a->is_duplicate ? $a->duplicate_of_id : $a->id;
-                $groupB = $b->is_duplicate ? $b->duplicate_of_id : $b->id;
-                if ($groupA === $groupB) {
-                    return $a->id <=> $b->id;
-                }
-                return $groupA <=> $groupB;
-            });
-
-            $leads->setCollection(collect($filtered));
+            $graph = $this->duplicateService->getDuplicateGraph($tenantId);
+            $filters['duplicate_lead_ids'] = $graph['allDuplicateAndOriginalIds'];
         }
 
-        $quotations = $this->quotationService->latest();
-        $users = \App\Models\User::orderBy('name')->get();
+        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
+        $duplicatesCount = $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
 
+        $users = \App\Models\User::select(['id', 'name', 'email'])->orderBy('name')->get();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
 
-        $statusCounts = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->select('status', \DB::raw('count(*) as aggregate'))
-            ->groupBy('status')
-            ->pluck('aggregate', 'status')
-            ->toArray();
+        $statusCounts = \Illuminate\Support\Facades\Cache::remember(
+            "tenant_{$tenantId}_lead_status_counts",
+            30,
+            fn() => Lead::query()
+                ->where('tenant_id', $tenantId)
+                ->select('status', \DB::raw('count(*) as aggregate'))
+                ->groupBy('status')
+                ->pluck('aggregate', 'status')
+                ->toArray()
+        );
 
-        $totalLeadsCount = Lead::query()->where('tenant_id', $tenantId)->whereNull('deleted_at')->count();
+        $totalLeadsCount = array_sum($statusCounts);
 
-        $allTenantLeads = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
-            ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
-            ->get();
-        $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
-        $duplicatesCount = $allTenantLeads->filter(fn($l) => $l->is_duplicate || $l->is_original)->count();
-
-        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
+        return view('modules.crm.leads.index', compact('leads', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
     }
 
     public function kanban(Request $request)
@@ -600,7 +582,7 @@ class LeadController extends Controller
             return redirect()->back()->withErrors(['status' => "Lead status in '{$lead->status}' stage is locked."]);
         }
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
-        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
+        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost', 'Converted'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);

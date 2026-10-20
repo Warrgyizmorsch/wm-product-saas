@@ -134,7 +134,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => round(convert_from_base($costRate), 2),
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -177,7 +177,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => round(convert_from_base($costRate), 2),
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -582,7 +582,7 @@ class PurchaseRfqController extends Controller
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
                 'quantity' => (float)$item->quantity,
-                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 2),
+                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 4),
             ];
         }
 
@@ -639,6 +639,18 @@ class PurchaseRfqController extends Controller
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric',
             'items.*.rate' => 'required|numeric',
+            'items.*.amount' => 'nullable|numeric',
+            'items.*.discount_percent' => 'nullable|numeric',
+            'items.*.discount_amount' => 'nullable|numeric',
+            'items.*.tax_percent' => 'nullable|numeric',
+            'items.*.cgst_percent' => 'nullable|numeric',
+            'items.*.sgst_percent' => 'nullable|numeric',
+            'items.*.igst_percent' => 'nullable|numeric',
+            'items.*.cgst_amount' => 'nullable|numeric',
+            'items.*.sgst_amount' => 'nullable|numeric',
+            'items.*.igst_amount' => 'nullable|numeric',
+            'items.*.tax_amount' => 'nullable|numeric',
+            'items.*.total_amount' => 'nullable|numeric',
         ]);
 
         $po = $this->rfqService->createPoFromRfq($rfq, $validated, $tenantId);

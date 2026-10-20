@@ -149,7 +149,7 @@ $masterDefinitions = [
             ['component' => 'input', 'props' => ['label' => 'Customer Name',  'name' => 'name',  'placeholder' => 'e.g. Acme Corp or Manish Patidar', 'required' => true]],
             ['component' => 'input', 'props' => ['label' => 'GSTIN',          'name' => 'gstin', 'placeholder' => 'e.g. 22AAAAA0000A1Z5']],
             ['component' => 'input', 'props' => ['label' => 'Email Address',  'name' => 'email', 'placeholder' => 'e.g. contact@acme.com',   'type' => 'email', 'required' => true]],
-            ['component' => 'input', 'props' => ['label' => 'Phone Number',   'name' => 'phone', 'placeholder' => 'e.g. +91-9876543210']],
+            ['component' => 'input', 'props' => ['label' => 'Phone Number',   'name' => 'phone', 'placeholder' => '02240001122', 'type' => 'tel']],
             ['component' => 'textarea', 'props' => ['label' => 'Billing Address',  'name' => 'billing_address', 'placeholder' => 'Billing address...', 'rows' => 2]],
             ['component' => 'textarea', 'props' => ['label' => 'Shipping Address', 'name' => 'shipping_address', 'placeholder' => 'Shipping address...', 'rows' => 2]],
         ],
@@ -160,7 +160,7 @@ $masterDefinitions = [
         'fields' => [
             ['component' => 'input', 'props' => ['label' => 'Supplier Name',  'name' => 'name',  'placeholder' => 'e.g. Steel Works Ltd',    'required' => true]],
             ['component' => 'input', 'props' => ['label' => 'Email Address',  'name' => 'email', 'placeholder' => 'e.g. sales@steelworks.com', 'type' => 'email']],
-            ['component' => 'input', 'props' => ['label' => 'Phone Number',   'name' => 'phone', 'placeholder' => 'e.g. +91-9876543210']],
+            ['component' => 'input', 'props' => ['label' => 'Phone Number',   'name' => 'phone', 'placeholder' => '02240001122', 'type' => 'tel']],
         ],
     ],
     'warehouse' => [
@@ -178,7 +178,7 @@ $masterDefinitions = [
         'fields' => [
             ['component' => 'input', 'props' => ['label' => 'Contact Name', 'name' => 'name', 'placeholder' => 'e.g. Prakash Sharma', 'required' => true]],
             ['component' => 'input', 'props' => ['label' => 'Designation', 'name' => 'designation', 'placeholder' => 'e.g. Purchase Manager']],
-            ['component' => 'input', 'props' => ['label' => 'Mobile / Phone', 'name' => 'phone', 'placeholder' => 'e.g. +91 9876543210']],
+            ['component' => 'input', 'props' => ['label' => 'Mobile / Phone', 'name' => 'phone', 'placeholder' => '02240001122', 'type' => 'tel']],
             ['component' => 'input', 'props' => ['label' => 'Email Address', 'name' => 'email', 'placeholder' => 'e.g. prakash@company.com', 'type' => 'email']],
         ],
     ],
@@ -371,7 +371,8 @@ $masterDefinitions = [
                                 inputType="tel"
                                 label="Mobile / Phone"
                                 name="phone"
-                                placeholder="e.g. +91 9876543210"
+                                placeholder="02240001122"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                             />
                         </div>
                         <div class="col-md-6">
@@ -428,6 +429,7 @@ $masterDefinitions = [
                                 :label="__('crm.phone_number')"
                                 name="phone"
                                 :placeholder="__('crm.company_phone_placeholder')"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                             />
                         </div>
 
@@ -501,6 +503,7 @@ $masterDefinitions = [
                                 :label="__('crm.contact_phone')"
                                 name="phone"
                                 :placeholder="__('crm.contact_phone_placeholder')"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                             />
 
                             <x-ui.odoo-form-ui
@@ -546,6 +549,7 @@ $masterDefinitions = [
                                 :label="__('crm.contact_phone')"
                                 name="contact_phone"
                                 :placeholder="__('crm.primary_contact_phone_placeholder')"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                             />
 
                             <x-ui.odoo-form-ui
@@ -605,6 +609,9 @@ $masterDefinitions = [
                                         :value="$field['props']['value'] ?? ''"
                                         step="{{ $field['props']['step'] ?? '' }}"
                                         :required="!empty($field['props']['required'])"
+                                        @if(in_array($field['props']['name'], ['phone', 'contact_phone', 'mobile', 'zip_code']))
+                                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                        @endif
                                     />
                                 @elseif($field['component'] === 'select')
                                     <x-ui.odoo-form-ui

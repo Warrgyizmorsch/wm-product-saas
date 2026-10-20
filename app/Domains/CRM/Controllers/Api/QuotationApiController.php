@@ -415,6 +415,7 @@ class QuotationApiController extends Controller
         }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+        $pdf->setOption('isPhpEnabled', true);
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 }

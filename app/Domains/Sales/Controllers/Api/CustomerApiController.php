@@ -110,12 +110,15 @@ class CustomerApiController extends Controller
             'name'             => ['required', 'string', 'max:255'],
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255'],
-            'phone'            => ['nullable', 'string', 'max:50'],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance'  => ['nullable', 'numeric'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {
@@ -211,12 +214,15 @@ class CustomerApiController extends Controller
             'name'             => ['sometimes', 'required', 'string', 'max:255'],
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255'],
-            'phone'            => ['nullable', 'string', 'max:50'],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance'  => ['nullable', 'numeric'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {

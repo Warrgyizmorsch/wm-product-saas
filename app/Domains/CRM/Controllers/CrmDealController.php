@@ -409,7 +409,13 @@ class CrmDealController extends Controller
         if ($stage === 'Closed Won') $stage = 'Won';
         if ($stage === 'Closed Lost') $stage = 'Lost';
 
-        if ($stage === 'Won') {
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isCurrentlyWon && strtolower((string)$stage) !== 'won') {
+            return back()->withErrors(['stage' => 'This deal is already Won and finalized. Its stage cannot be changed.'])->withInput();
+        }
+
+        if (!$isCurrentlyWon && $stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
                 return back()->withErrors(['stage' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.'])->withInput();
@@ -488,6 +494,30 @@ class CrmDealController extends Controller
         if ($stage === 'Closed Lost') $stage = 'Lost';
         if ($stage === 'New') $stage = 'Qualification';
         if ($stage === 'Qualified') $stage = 'Needs Analysis';
+
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isCurrentlyWon) {
+            if (strtolower((string)$stage) !== 'won') {
+                $errMsg = 'This deal is already Won and finalized. Its stage cannot be changed.';
+                if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errMsg
+                    ], 422);
+                }
+                return redirect()->back()->with('error', $errMsg);
+            }
+
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Deal is already Won.',
+                    'stage' => $deal->stage
+                ]);
+            }
+            return redirect()->back()->with('info', 'Deal is already Won.');
+        }
 
         if ($stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();

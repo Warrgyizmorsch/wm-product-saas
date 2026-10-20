@@ -481,13 +481,13 @@ class LeadApiController extends Controller
             'company_name'       => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'gstin'              => 'nullable|string|max:100',
             'company_email'      => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
-            'company_phone'      => 'nullable|string|max:50',
+            'company_phone'      => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Contact Person Details
             'contact_person'     => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
             'designation'        => 'nullable|string|max:255',
             'email'              => $isB2B ? 'nullable|email|max:255' : 'required|email|max:255',
-            'phone'              => 'nullable|string|max:50',
+            'phone'              => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Sales Rep / Owner
             'lead_owner_id'      => 'nullable|integer',
@@ -520,7 +520,7 @@ class LeadApiController extends Controller
             'additional_contacts'               => 'nullable|array',
             'additional_contacts.*.name'        => 'nullable|string|max:255',
             'additional_contacts.*.designation' => 'nullable|string|max:255',
-            'additional_contacts.*.phone'       => 'nullable|string|max:50',
+            'additional_contacts.*.phone'       => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'additional_contacts.*.email'       => 'nullable|email|max:255',
             'is_customer'                       => 'nullable|boolean',
         ];
@@ -532,10 +532,13 @@ class LeadApiController extends Controller
     private function leadValidationMessages(): array
     {
         return [
-            'company_name.required'   => 'company_name is required when company_email is provided.',
-            'company_email.required'  => 'company_email is required when company_name is provided.',
-            'contact_person.required' => 'contact_person is required for B2C leads (when company details are not provided).',
-            'email.required'          => 'email (contact email) is required for B2C leads (when company details are not provided).',
+            'company_name.required'             => 'company_name is required when company_email is provided.',
+            'company_email.required'            => 'company_email is required when company_name is provided.',
+            'contact_person.required'           => 'contact_person is required for B2C leads (when company details are not provided).',
+            'email.required'                    => 'email (contact email) is required for B2C leads (when company details are not provided).',
+            'phone.regex'                       => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'company_phone.regex'               => 'Company phone must contain digits/numbers only (no special characters or letters).',
+            'additional_contacts.*.phone.regex' => 'Additional contact phone must contain digits/numbers only (no special characters or letters).',
         ];
     }
 
@@ -922,6 +925,13 @@ class LeadApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Please provide status or status_id.',
+            ], 422);
+        }
+
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead status in '{$lead->status}' stage is locked.",
             ], 422);
         }
 

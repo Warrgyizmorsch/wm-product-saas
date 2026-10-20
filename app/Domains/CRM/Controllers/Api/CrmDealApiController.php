@@ -504,6 +504,33 @@ class CrmDealApiController extends Controller
         $validated = $validator->validated();
         $newStage = $validated['stage'];
 
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isDealWon && !in_array(strtolower((string)$newStage), ['won', 'closed won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This deal is already Won and finalized. Its stage cannot be changed.',
+            ], 422);
+        }
+
+        if (in_array(strtolower((string)$newStage), ['won', 'closed won'])) {
+            $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+            if (!$hasAcceptedQuote) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.',
+                ], 422);
+            }
+            $hasCustomer = !empty($deal->account?->customer_id);
+            if (!$hasCustomer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer conversion required! Please convert Deal to Customer first before marking Deal as Won.',
+                ], 422);
+            }
+            $newStage = 'Won';
+        }
+
         $deal->stage = $newStage;
         if (!empty($validated['close_reason'])) {
             $deal->close_reason = $validated['close_reason'];
@@ -538,6 +565,33 @@ class CrmDealApiController extends Controller
     {
         $this->authorize('update', $deal);
 
+        if (in_array(strtolower((string)$deal->stage), ['won', 'closed won'])) {
+            return response()->json([
+                'success' => true,
+                'message' => "Deal #{$deal->deal_number} is already Won.",
+                'data'    => [
+                    'id'    => $deal->id,
+                    'stage' => 'Won',
+                ],
+            ]);
+        }
+
+        $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+        if (!$hasAcceptedQuote) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.',
+            ], 422);
+        }
+
+        $hasCustomer = !empty($deal->account?->customer_id);
+        if (!$hasCustomer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer conversion required! Please click "Convert to Customer" button first before marking Deal as Won.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'close_reason' => 'nullable|string|max:255',
         ]);
@@ -564,6 +618,13 @@ class CrmDealApiController extends Controller
     public function markLost(Request $request, CrmDeal $deal): JsonResponse
     {
         $this->authorize('update', $deal);
+
+        if (in_array(strtolower((string)$deal->stage), ['won', 'closed won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This deal is already Won and finalized. It cannot be marked as Lost.',
+            ], 422);
+        }
 
         $validator = Validator::make($request->all(), [
             'close_reason' => 'required|string|max:255',

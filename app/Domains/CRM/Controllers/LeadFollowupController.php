@@ -177,8 +177,21 @@ class LeadFollowupController extends Controller
         $actionMode = $request->input('action_mode', 'log_note');
 
         if (!empty($validated['stage'])) {
-            $deal->stage = $validated['stage'];
-            $deal->save();
+            $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+            if (!$isCurrentlyWon) {
+                $targetStage = $validated['stage'];
+                if (in_array(strtolower($targetStage), ['won', 'closed won'])) {
+                    $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+                    $hasCustomer = !empty($deal->account?->customer_id);
+                    if ($hasAcceptedQuote && $hasCustomer) {
+                        $deal->stage = 'Won';
+                        $deal->save();
+                    }
+                } else {
+                    $deal->stage = $targetStage;
+                    $deal->save();
+                }
+            }
         }
 
         $tenantId = tenant_id() ?? $deal->tenant_id ?? 1;

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Domains\Purchase\Repositories\PurchaseAdvancePaymentRepository;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
 use App\Domains\Purchase\Services\PurchaseAdvancePaymentService;
+use App\Domains\Purchase\Models\PurchaseOrder;
+use App\Domains\Purchase\Models\PurchaseAdvancePayment;
 use App\Domains\Inventory\Models\Vendor;
 use App\Services\Access\AccessService;
 use Illuminate\Http\Request;
@@ -39,7 +41,20 @@ class PurchaseAdvancePaymentController extends Controller
         }
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
-        $purchaseOrders = $this->orderRepo->getPaginatedOrders([], 100);
+
+        // Only show active/approved POs that have pending advance balance left
+        $purchaseOrders = PurchaseOrder::where('tenant_id', $tenantId)
+            ->whereNotIn('status', ['Completed', 'Cancelled', 'Draft'])
+            ->with(['vendor'])
+            ->orderBy('id', 'desc')
+            ->get()
+            ->filter(function ($po) {
+                $paidAdvance = (float) PurchaseAdvancePayment::where('purchase_order_id', $po->id)
+                    ->where('status', '!=', 'cancelled')
+                    ->sum('amount');
+                $poTotal = (float) ($po->grand_total ?: $po->total_amount);
+                return ($poTotal - $paidAdvance) > 0.01;
+            });
 
         return view('modules.purchase.advances.create', compact('vendors', 'purchaseOrders', 'prefillPo'));
     }
@@ -59,6 +74,30 @@ class PurchaseAdvancePaymentController extends Controller
             'reference_number' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
         ]);
+
+        if (!empty($validated['purchase_order_id'])) {
+            $po = PurchaseOrder::where('tenant_id', $tenantId)->find($validated['purchase_order_id']);
+            if ($po) {
+                if (in_array($po->status, ['Completed', 'Cancelled'])) {
+                    return back()->withInput()->withErrors([
+                        'purchase_order_id' => "Cannot record advance payment for a {$po->status} Purchase Order."
+                    ]);
+                }
+                $paidAdvance = (float) PurchaseAdvancePayment::where('purchase_order_id', $po->id)
+                    ->where('status', '!=', 'cancelled')
+                    ->sum('amount');
+                $poTotal = (float) ($po->grand_total ?: $po->total_amount);
+                $remainingAdvance = max(0.0, $poTotal - $paidAdvance);
+                $enteredBase = convert_to_base((float) $validated['amount']);
+
+                if ($enteredBase > ($remainingAdvance + 0.01)) {
+                    $formattedRemaining = format_currency($remainingAdvance);
+                    return back()->withInput()->withErrors([
+                        'amount' => "Advance amount cannot exceed remaining PO advance limit of {$formattedRemaining}."
+                    ]);
+                }
+            }
+        }
 
         $advance = $this->advanceService->recordAdvancePayment($validated, $tenantId);
 

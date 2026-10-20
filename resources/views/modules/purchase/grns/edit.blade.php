@@ -127,8 +127,8 @@
                                                     <input type="number" step="0.0001" min="0" class="odoo-table-input text-center font-monospace input-reject text-danger" name="items[{{ $idx }}][rejected_qty]" value="{{ (float)$item->rejected_qty }}">
                                                 </td>
                                                 <td class="text-center font-monospace fw-bold text-success cell-accepted">{{ number_format($item->accepted_qty, 2) }}</td>
-                                                <td class="text-end font-monospace">{{ number_format($item->unit_rate, 2) }}</td>
-                                                <td class="text-end font-monospace fw-bold text-dark cell-total">{{ number_format($item->total_amount, 2) }}</td>
+                                                <td class="text-end font-monospace">{{ format_currency($item->unit_rate) }}</td>
+                                                <td class="text-end font-monospace fw-bold text-dark cell-total">{{ format_currency($item->total_amount) }}</td>
                                             </tr>
                                             <tr id="remark_row_{{ $idx }}" class="remark-row bg-white" style="{{ $item->remarks ? '' : 'display: none;' }}">
                                                 <td class="border-0"></td>
