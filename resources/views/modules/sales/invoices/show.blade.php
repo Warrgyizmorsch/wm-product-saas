@@ -1350,7 +1350,7 @@
                     <x-ui.modal-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" class="text-uppercase font-monospace" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.modal-form-ui type="input" label="Primary Phone" name="phone" placeholder="Contact number" />
+                    <x-ui.modal-form-ui type="input" inputType="tel" label="Primary Phone" name="phone" placeholder="Contact number" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                 </div>
                 <div class="col-md-6">
                     <x-ui.modal-form-ui type="input" inputType="email" label="Official Email Address" name="email" placeholder="dispatch@transporter.com" />
@@ -1877,6 +1877,22 @@
         const btn = $('#saveQuickTransporterBtn');
         const origHtml = btn.html();
 
+        // Clear previous errors
+        form.find('.is-invalid').removeClass('is-invalid');
+        form.find('.invalid-feedback.ajax-feedback').remove();
+        form.find('.transporter-alert-error').remove();
+
+        // Client-side email validation check
+        const emailInput = form.find('input[name="email"]');
+        const emailVal = emailInput.val().trim();
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            emailInput.addClass('is-invalid');
+            emailInput.parent().find('.invalid-feedback.ajax-feedback').remove();
+            emailInput.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+            emailInput.focus();
+            return false;
+        }
+
         btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Saving...');
 
         $.ajax({
@@ -1910,16 +1926,54 @@
                     const modalInstance = bootstrap.Modal.getInstance(modalEl);
                     if (modalInstance) modalInstance.hide();
                     form[0].reset();
+                    form.find('.is-invalid').removeClass('is-invalid');
+                    form.find('.invalid-feedback.ajax-feedback').remove();
                 } else {
-                    alert(res.message || 'Could not create transporter.');
+                    form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + (res.message || 'Could not create transporter.') + '</div>');
                 }
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
-                const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to save transporter.';
-                alert('Error: ' + errMsg);
+                if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                    const errors = xhr.responseJSON.errors;
+                    let firstField = null;
+                    $.each(errors, function(field, messages) {
+                        const $input = form.find('[name="' + field + '"]');
+                        if ($input.length) {
+                            $input.addClass('is-invalid');
+                            $input.parent().find('.invalid-feedback.ajax-feedback').remove();
+                            $input.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">' + messages[0] + '</div>');
+                            if (!firstField) firstField = $input;
+                        } else {
+                            form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + messages[0] + '</div>');
+                        }
+                    });
+                    if (firstField) {
+                        firstField.focus();
+                    }
+                } else {
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to save transporter.';
+                    form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + errMsg + '</div>');
+                }
             }
         });
+    });
+
+    // Realtime clear invalid feedback on input/change
+    $(document).on('input change', '#quickTransporterForm input, #quickTransporterForm select', function() {
+        $(this).removeClass('is-invalid');
+        $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+        $('#quickTransporterForm').find('.transporter-alert-error').remove();
+    });
+
+    // Email blur validation for quick transporter form
+    $(document).on('blur', '#quickTransporterForm input[name="email"]', function() {
+        const val = $(this).val().trim();
+        if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            $(this).addClass('is-invalid');
+            $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+            $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+        }
     });
 </script>
 @endpush

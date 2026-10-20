@@ -43,10 +43,14 @@ class VendorController extends Controller
         $activeCount = Vendor::where('tenant_id', $tenantId)->whereIn('status', ['active', 'Active'])->count();
         $inactiveCount = Vendor::where('tenant_id', $tenantId)->whereIn('status', ['inactive', 'Inactive'])->count();
 
-        // Calculate total outstanding payable across all vendors
-        $totalOutstandingPayable = (float) VendorBill::where('tenant_id', $tenantId)
+        // Calculate total outstanding payable across all vendors (normalized in base USD in DB, convert to active currency at fetch time)
+        $rawOutstandingPayableUSD = (float) VendorBill::where('tenant_id', $tenantId)
             ->whereIn('status', ['posted', 'unpaid', 'partially_paid', 'approved'])
             ->sum('due_amount');
+
+        $totalOutstandingPayable = function_exists('convert_from_base')
+            ? convert_from_base($rawOutstandingPayableUSD)
+            : $rawOutstandingPayableUSD;
 
         $query = Vendor::query()->where('tenant_id', $tenantId);
 
@@ -121,18 +125,23 @@ class VendorController extends Controller
                 'max:255',
                 Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'pan' => ['nullable', 'string', 'max:20'],
             'bank_name' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:50'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if (empty($validated['code'])) {
@@ -185,9 +194,13 @@ class VendorController extends Controller
                 'max:255',
                 Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
@@ -349,18 +362,23 @@ class VendorController extends Controller
                 'max:255',
                 Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'pan' => ['nullable', 'string', 'max:20'],
             'bank_name' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:50'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         $validated['status'] = strtolower($validated['status']);

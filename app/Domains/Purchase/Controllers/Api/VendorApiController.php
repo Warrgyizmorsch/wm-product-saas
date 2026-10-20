@@ -102,14 +102,23 @@ class VendorApiController extends Controller
             'name'             => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
-            'phone'            => ['nullable', 'string', 'max:50'],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => ['nullable', 'string', 'max:50'],
             'pan'              => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
+            'address'          => ['nullable', 'string'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+            'bank_name'        => ['nullable', 'string', 'max:150'],
+            'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'opening_balance'  => ['nullable', 'numeric'],
             'payment_terms'    => ['nullable', 'string'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if ($validator->fails()) {
@@ -134,8 +143,12 @@ class VendorApiController extends Controller
             'gstin'            => $validated['gstin'] ?? null,
             'pan'              => $validated['pan'] ?? null,
             'status'           => $validated['status'] ?? 'active',
+            'address'          => $validated['address'] ?? null,
             'billing_address'  => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
+            'bank_name'        => $validated['bank_name'] ?? null,
+            'account_number'   => $validated['account_number'] ?? null,
+            'ifsc_code'        => $validated['ifsc_code'] ?? null,
             'opening_balance'  => isset($validated['opening_balance']) ? convert_to_base((float)$validated['opening_balance']) : 0.00,
             'payment_terms'    => $validated['payment_terms'] ?? null,
         ]);
@@ -212,14 +225,23 @@ class VendorApiController extends Controller
             'name'             => ['sometimes', 'required', 'string', 'max:255', Rule::unique('vendors', 'name')->ignore($vendor->id)->where($uniqueScope)],
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope)],
-            'phone'            => ['nullable', 'string', 'max:50'],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => ['nullable', 'string', 'max:50'],
             'pan'              => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
+            'address'          => ['nullable', 'string'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+            'bank_name'        => ['nullable', 'string', 'max:150'],
+            'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'opening_balance'  => ['nullable', 'numeric'],
             'payment_terms'    => ['nullable', 'string'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if ($validator->fails()) {
@@ -290,9 +312,13 @@ class VendorApiController extends Controller
         $validator = Validator::make($request->all(), [
             'name'         => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'phone'        => ['nullable', 'string', 'max:50'],
+            'phone'        => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'email'        => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
             'gstin'        => ['nullable', 'string', 'max:50'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {

@@ -9,9 +9,9 @@
         <a href="{{ route('platform.transporters.index') }}" class="btn btn-light border p-2 d-inline-flex align-items-center justify-content-center" title="{{ __('crm.back_to_transporters') }}">
             <i class="feather-arrow-left fs-16"></i>
         </a>
-        <button type="button" class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#editTransporterModal" title="{{ __('crm.edit_transporter_master') }}">
+        <a href="{{ route('platform.transporters.edit', $transporter) }}" class="btn btn-light border" title="{{ __('crm.edit_transporter_master') }}">
             <i class="feather-edit-2 me-1"></i>{{ __('crm.edit_profile') }}
-        </button>
+        </a>
         @if(Route::has('inventory.dispatches.create'))
             <x-ui.button href="{{ route('inventory.dispatches.create', ['transporter_id' => $transporter->id]) }}" variant="primary" icon="feather-send">
                 {{ __('crm.create_dispatch_order_btn') }}
