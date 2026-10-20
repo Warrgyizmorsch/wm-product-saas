@@ -188,7 +188,7 @@ class OrgApiController extends Controller
 
         $logo = null;
         if ($request->hasFile('logo')) {
-            $logo = $request->file('logo')->store('legal_entities', 'public');
+            $logo = $request->file('logo')->storeTenantFile('legal_entities', 'public');
         }
 
         $currency = null;
@@ -262,7 +262,7 @@ class OrgApiController extends Controller
 
         $logo = $company->logo;
         if ($request->hasFile('logo')) {
-            $logo = $request->file('logo')->store('legal_entities', 'public');
+            $logo = $request->file('logo')->storeTenantFile('legal_entities', 'public');
         }
 
         $currency = null;

@@ -192,7 +192,7 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
         if ($files) {
             foreach ($files as $file) {
-                $path = $file->store("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
+                $path = $file->storeTenantFile("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
                 HelpdeskTicketAttachment::create([
                     'ticket_id' => $ticket->id,
                     'file_path' => $path,
@@ -230,7 +230,7 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
         if ($files) {
             foreach ($files as $file) {
-                $path = $file->store("helpdesk/{$ticket->tenant_id}/tickets/{$ticket->id}", 'public');
+                $path = $file->storeTenantFile("helpdesk/{$ticket->tenant_id}/tickets/{$ticket->id}", 'public');
                 HelpdeskTicketAttachment::create([
                     'ticket_id' => $ticket->id,
                     'reply_id'  => $reply->id,

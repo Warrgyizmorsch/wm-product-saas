@@ -46,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         // Per request / job: caches each tenant's excluded plan features for that request only.
         $this->app->scoped(\App\Domains\Platform\Services\PlanFeatureGate::class);
         $this->app->scoped(\App\Domains\Platform\Services\UsageLimitService::class);
+        $this->app->scoped(\App\Domains\Platform\Services\TenantStorage::class);
 
         // Loads every module's Dashboard/widgets.php once per request.
         $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
@@ -481,6 +482,17 @@ class AppServiceProvider extends ServiceProvider
 
         // Plan usage caps (config/plan_limits.php) on every capped model's creating event.
         \App\Domains\Platform\Services\UsageLimitService::guardModels();
+
+        // Uploads counted against the tenant's storage allowance: same arguments
+        // as store()/storeAs(), but checked and recorded by TenantStorage.
+        \Illuminate\Http\UploadedFile::macro('storeTenantFile', function (string $path = '', array|string $options = []) {
+            /** @var \Illuminate\Http\UploadedFile $this */
+            return tenant_storage()->store($this, $path, $options);
+        });
+        \Illuminate\Http\UploadedFile::macro('storeTenantFileAs', function (string $path, ?string $name = null, array|string $options = []) {
+            /** @var \Illuminate\Http\UploadedFile $this */
+            return tenant_storage()->store($this, $path, $options, $name ?? $this->hashName());
+        });
 
         // ── Production Module Named API Rate Limiters ─────────────────────────
         $productionRateLimitKey = function (\Illuminate\Http\Request $request): string {

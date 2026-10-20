@@ -107,7 +107,7 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
     {
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('shift_change_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('shift_change_attachments', 'public');
         }
 
         $user = auth()->user();

@@ -34,7 +34,7 @@ class ProjectDocumentService
             $hashName = Str::random(40) . '.' . $extension;
             $directory = sprintf('tenants/%d/projects/%d/documents', $project->tenant_id, $project->id);
 
-            $filePath = $file->storeAs($directory, $hashName, 'local');
+            $filePath = $file->storeTenantFileAs($directory, $hashName, 'local');
 
             $document = $this->documents->create([
                 'tenant_id'       => $project->tenant_id,

@@ -360,7 +360,7 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                 }
             }
             $attachmentPath = $request->hasFile('attachment')
-                ? $request->file('attachment')->store('leave_attachments', 'public')
+                ? $request->file('attachment')->storeTenantFile('leave_attachments', 'public')
                 : null;
             $leaveRequest = LeaveRequest::create([
                 'tenant_id'         => $emp?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null),

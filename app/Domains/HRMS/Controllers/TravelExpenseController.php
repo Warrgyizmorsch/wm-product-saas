@@ -1477,7 +1477,7 @@ class TravelExpenseController extends Controller
 
         // If not an image or GD library not available, fallback to standard file storage
         if (!in_array($extension, $imageExtensions) || !extension_loaded('gd')) {
-            return $uploadedFile->store('expense_receipts', 'public');
+            return $uploadedFile->storeTenantFile('expense_receipts', 'public');
         }
 
         try {
@@ -1508,7 +1508,7 @@ class TravelExpenseController extends Controller
             }
 
             if (!$image) {
-                return $uploadedFile->store('expense_receipts', 'public');
+                return $uploadedFile->storeTenantFile('expense_receipts', 'public');
             }
 
             // Get dimensions
@@ -1560,7 +1560,7 @@ class TravelExpenseController extends Controller
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning("Receipt compression fallback: " . $e->getMessage());
-            return $uploadedFile->store('expense_receipts', 'public');
+            return $uploadedFile->storeTenantFile('expense_receipts', 'public');
         }
     }
 

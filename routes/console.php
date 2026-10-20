@@ -21,6 +21,11 @@ Schedule::command('billing:reconcile-subscriptions')
     ->hourly()
     ->withoutOverlapping();
 
+// Tenant storage usage: drop deleted files, record untracked ones.
+Schedule::command('tenant:storage-sync')
+    ->dailyAt('02:30')
+    ->withoutOverlapping();
+
 Artisan::command('fcm:test {target : User ID, Email, or FCM registration token} {--title=MossiERP Push Notification Test} {--message=Firebase Cloud Messaging is active and working! 🚀}', function ($target) {
     $this->info("Checking Firebase configuration...");
 

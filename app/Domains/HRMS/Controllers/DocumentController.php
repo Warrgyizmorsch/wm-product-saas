@@ -229,7 +229,7 @@ class DocumentController extends Controller
             $hrSigUrl = null;
             if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                 $file = $request->file('hr_signature_file');
-                $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
                 $hrSigUrl = asset('storage/' . $hrSigPath);
             } elseif ($request->filled('hr_signature_data')) {
                 $hrSigData = $request->input('hr_signature_data');
@@ -237,7 +237,7 @@ class DocumentController extends Controller
                     $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                     $imageName = 'hr_sig_' . time() . '_' . \Illuminate\Support\Str::random(6) . '.png';
                     $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                    tenant_storage()->put('public', $hrSigPath, base64_decode($image));
                     $hrSigUrl = asset('storage/' . $hrSigPath);
                 } else {
                     $hrSigUrl = $hrSigData;
@@ -272,11 +272,11 @@ class DocumentController extends Controller
                         ->setPaper('a4', 'portrait')
                         ->setWarnings(false);
                     $pdfContent = $pdf->output();
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdfContent);
+                    tenant_storage()->put('public', $path, $pdfContent);
                 } catch (\Throwable $e) {
                     // Fallback to storing standalone HTML if DomPDF is unavailable
                     $htmlPath = "documents/tenant_{$tenantId}/employee_{$employee->id}/" . \Illuminate\Support\Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.html';
-                    \Illuminate\Support\Facades\Storage::disk('public')->put($htmlPath, $templateService->toPrintableDocument($renderedContent, $title));
+                    tenant_storage()->put('public', $htmlPath, $templateService->toPrintableDocument($renderedContent, $title));
                     $path = $htmlPath;
                 }
 
@@ -357,7 +357,7 @@ class DocumentController extends Controller
             return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document.'])->withInput();
         }
 
-        $baseStoredPath = $file->store("documents/tenant_{$tenantId}/bulk_temp", 'public');
+        $baseStoredPath = $file->storeTenantFile("documents/tenant_{$tenantId}/bulk_temp", 'public');
         $originalName = $file->getClientOriginalName();
         $originalExt = $file->getClientOriginalExtension();
         $fileSize = $file->getSize();

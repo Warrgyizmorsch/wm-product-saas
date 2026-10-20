@@ -184,11 +184,13 @@ class UsageLimitService
                 $used = $tenant->users_count;
                 // One count per capped resource per tenant — fine for an admin console.
                 $resources = $this->resourceUsage($tenant);
+                $storage = app(TenantStorage::class)->usage($tenant);
                 $userPercent = $max === null || $max === 0 ? null : min(100, round(($used / $max) * 100));
-                $percents = array_filter([$userPercent, ...array_column($resources, 'percent')], fn ($p) => $p !== null);
+                $percents = array_filter([$userPercent, $storage['percent'], ...array_column($resources, 'percent')], fn ($p) => $p !== null);
 
                 return [
                     'resources' => $resources,
+                    'storage' => $storage,
                     // Highest share of any cap (users or resources) — drives the row status.
                     'worst_percent' => $percents === [] ? null : max($percents),
                     'tenant' => $tenant,

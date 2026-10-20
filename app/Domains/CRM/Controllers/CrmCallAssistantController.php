@@ -125,7 +125,7 @@ class CrmCallAssistantController extends Controller
                 if ($rawAudio && strlen($rawAudio) > 100) {
                     $ext = ($audioMime === 'audio/mp3' || $audioMime === 'audio/mpeg') ? 'mp3' : 'webm';
                     $fileName = 'call_' . $lead->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 8) . '.' . $ext;
-                    Storage::disk('public')->put('call_recordings/' . $fileName, $rawAudio);
+                    tenant_storage()->put('public', 'call_recordings/' . $fileName, $rawAudio);
                     $recordingUrl = 'storage/call_recordings/' . $fileName;
                 }
             } catch (\Throwable $fileErr) {
@@ -1252,7 +1252,7 @@ PROMPT;
                 if ($rawAudio && strlen($rawAudio) > 100) {
                     $ext = ($audioMime === 'audio/mp3' || $audioMime === 'audio/mpeg') ? 'mp3' : 'webm';
                     $fileName = 'deal_call_' . $deal->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 8) . '.' . $ext;
-                    Storage::disk('public')->put('call_recordings/' . $fileName, $rawAudio);
+                    tenant_storage()->put('public', 'call_recordings/' . $fileName, $rawAudio);
                     $recordingUrl = 'storage/call_recordings/' . $fileName;
                 }
             } catch (\Throwable $fileErr) {

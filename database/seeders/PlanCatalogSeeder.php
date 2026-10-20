@@ -84,6 +84,7 @@ class PlanCatalogSeeder extends Seeder
                     'fixed_assets',
                 ],
                 'limits' => ['companies' => 1, 'branches' => 1, 'warehouses' => 1, 'products' => 2000, 'customers' => 5000, 'invoices_per_month' => 500],
+                'max_storage_mb' => 5120,
                 'sort_order' => 1,
             ],
             'pro' => [
@@ -108,6 +109,7 @@ class PlanCatalogSeeder extends Seeder
                     'projects.reviews',
                 ],
                 'limits' => ['companies' => 3, 'branches' => 10, 'warehouses' => 10, 'products' => 25000, 'customers' => 50000, 'invoices_per_month' => 5000],
+                'max_storage_mb' => 25600,
                 'sort_order' => 2,
             ],
             'enterprise' => [
@@ -120,6 +122,7 @@ class PlanCatalogSeeder extends Seeder
                 'features' => self::ALL_MODULES,
                 'excluded_features' => [],
                 'limits' => [],
+                'max_storage_mb' => 102400,
                 'sort_order' => 3,
             ],
         ];

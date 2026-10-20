@@ -265,7 +265,7 @@ class DocumentMasterController extends Controller
             if (!empty($extractedContent)) {
                 $validated['body_content'] = $extractedContent;
             }
-            $validated['template_file_path'] = $file->store('document_templates', 'public');
+            $validated['template_file_path'] = $file->storeTenantFile('document_templates', 'public');
         }
 
         DocumentTemplate::create($validated);
@@ -314,7 +314,7 @@ class DocumentMasterController extends Controller
             if ($template->template_file_path && Storage::disk('public')->exists($template->template_file_path)) {
                 Storage::disk('public')->delete($template->template_file_path);
             }
-            $validated['template_file_path'] = $file->store('document_templates', 'public');
+            $validated['template_file_path'] = $file->storeTenantFile('document_templates', 'public');
         }
 
         $template->update($validated);

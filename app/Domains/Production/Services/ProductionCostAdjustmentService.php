@@ -17,7 +17,7 @@ class ProductionCostAdjustmentService
     {
         $newAttachment = null;
         if ($file) {
-            $newAttachment = $file->store('cost_adjustments', 'local');
+            $newAttachment = $file->storeTenantFile('cost_adjustments', 'local');
         }
 
         try {
@@ -68,7 +68,7 @@ class ProductionCostAdjustmentService
         $newAttachment = null;
 
         if ($file) {
-            $newAttachment = $file->store('cost_adjustments', 'local');
+            $newAttachment = $file->storeTenantFile('cost_adjustments', 'local');
         }
 
         $oldAmount    = $adjustment->amount;

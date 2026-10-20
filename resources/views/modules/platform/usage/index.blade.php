@@ -13,6 +13,7 @@
                     <th class="ps-4">Tenant</th>
                     <th>Plan</th>
                     <th style="min-width: 200px;">Users</th>
+                    <th style="min-width: 160px;">Storage</th>
                     <th style="min-width: 360px;">Resources</th>
                     <th>Limit Source</th>
                     <th class="text-end pe-4">Status</th>
@@ -53,6 +54,18 @@
                             @endif
                         </td>
                         <td>
+                            @php $storage = $row['storage']; @endphp
+                            <div class="fs-12 mb-1">
+                                {{ \App\Domains\Platform\Services\TenantStorage::format($storage['used']) }}
+                                / {{ $storage['limit'] === null ? '∞' : \App\Domains\Platform\Services\TenantStorage::format($storage['limit']) }}
+                            </div>
+                            @if ($storage['percent'] !== null)
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{{ $barVariant($storage['percent']) }}" role="progressbar" style="width: {{ $storage['percent'] }}%;" aria-label="Storage usage" aria-valuenow="{{ $storage['percent'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            @endif
+                        </td>
+                        <td>
                             <div class="row g-2">
                                 @foreach ($row['resources'] as $resource)
                                     <div class="col-6">
@@ -76,7 +89,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-5">No tenants yet.</td>
+                        <td colspan="7" class="text-center text-muted py-5">No tenants yet.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -84,6 +97,6 @@
     </x-ui.card>
 
     <p class="text-muted fs-12 mt-3">
-        Resource caps come from each tenant's plan (Plans → Edit → Usage Limits); ∞ = no cap. "Limit Source" applies to users. Storage consumption is not tracked yet.
+        Resource caps come from each tenant's plan (Plans → Edit → Usage Limits); ∞ = no cap. "Limit Source" applies to users and storage. Storage counts uploaded files and is recounted nightly (tenant:storage-sync).
     </p>
 @endsection

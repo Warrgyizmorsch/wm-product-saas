@@ -344,12 +344,12 @@ class DocumentApiController extends Controller
 
             if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                 $file = $request->file('hr_signature_file');
-                $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
                 $hrSigUrl = asset('storage/' . $hrSigPath);
                 $hrSigImageInput = $hrSigPath;
             } elseif ($request->hasFile('signature_image') && $request->file('signature_image')->isValid()) {
                 $file = $request->file('signature_image');
-                $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
                 $hrSigUrl = asset('storage/' . $hrSigPath);
                 $hrSigImageInput = $hrSigPath;
             } elseif ($request->filled('hr_signature_data') || $request->filled('signature_image')) {
@@ -358,7 +358,7 @@ class DocumentApiController extends Controller
                     $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                     $imageName = 'hr_sig_' . time() . '_' . \Str::random(6) . '.png';
                     $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                    \Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                    \tenant_storage()->put('public', $hrSigPath, base64_decode($image));
                     $hrSigUrl = asset('storage/' . $hrSigPath);
                     $hrSigImageInput = $hrSigPath;
                 } else {
@@ -397,7 +397,7 @@ class DocumentApiController extends Controller
 
                 $fileName = \Str::slug($docTemplate->name . '-' . $employee->full_name) . '-' . time() . '.pdf';
                 $path = "documents/tenant_{$tenantId}/employee_{$employee->id}/{$fileName}";
-                \Storage::disk('public')->put($path, $pdfContent);
+                \tenant_storage()->put('public', $path, $pdfContent);
 
                 $masterId = null;
                 if ($docTemplate->document_category_id) {
@@ -479,7 +479,7 @@ class DocumentApiController extends Controller
                 continue;
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $document = Document::where('documentable_type', Employee::class)
                 ->where('documentable_id', $employee->id)
@@ -554,7 +554,7 @@ class DocumentApiController extends Controller
         $approvalRequired = (bool) $documentMaster->approval_required;
         $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
-        $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+        $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
         $document = Document::where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
@@ -702,13 +702,13 @@ class DocumentApiController extends Controller
             $file = $request->file('signature_file');
             $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
             $userId = auth()->id() ?? 'guest';
-            $path = $file->store("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
+            $path = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
             $signatureInput = $path;
         } elseif ($request->hasFile('signature_image') && $request->file('signature_image')->isValid()) {
             $file = $request->file('signature_image');
             $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
             $userId = auth()->id() ?? 'guest';
-            $path = $file->store("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
+            $path = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
             $signatureInput = $path;
         } else {
             $validator = Validator::make($request->all(), [
@@ -784,7 +784,7 @@ class DocumentApiController extends Controller
             $file = $request->file('hr_signature_file');
             $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
             $userId = auth()->id() ?? 'guest';
-            $sigInput = $file->store("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
+            $sigInput = $file->storeTenantFile("signatures/tenant_{$tenantId}/user_{$userId}", 'public');
         }
 
         // Support single or all employees

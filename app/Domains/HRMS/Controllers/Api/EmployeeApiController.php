@@ -399,7 +399,7 @@ class EmployeeApiController extends Controller
             $validated['status'] = $request->input('status', '1') === '1' || $request->input('status') === 'true' || $request->input('status') === true;
 
             if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('employees', 'public');
+                $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             }
 
             $employee = Employee::create($validated);
@@ -454,7 +454,7 @@ class EmployeeApiController extends Controller
             }
 
             if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('employees', 'public');
+                $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             } else {
                 unset($validated['photo']);
             }
@@ -696,7 +696,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = true;
             if ($document->document_master_id) {
@@ -728,7 +728,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $status = $approvalRequired ? 'uploaded' : 'approved';
