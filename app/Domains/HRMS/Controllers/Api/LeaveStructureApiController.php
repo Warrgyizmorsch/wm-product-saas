@@ -315,7 +315,7 @@ class LeaveStructureApiController extends Controller
             'company_id'     => 'nullable|integer|exists:companies,id',
             'effective_from' => 'required|date',
             'description'    => 'nullable|string',
-            'status'         => 'required',
+            'status'         => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
@@ -355,7 +355,7 @@ class LeaveStructureApiController extends Controller
             'company_id'     => 'nullable|integer|exists:companies,id',
             'effective_from' => 'required|date',
             'description'    => 'nullable|string',
-            'status'         => 'required',
+            'status'         => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
@@ -487,7 +487,7 @@ class LeaveStructureApiController extends Controller
             'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
             'description'   => 'nullable|string',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
@@ -533,7 +533,7 @@ class LeaveStructureApiController extends Controller
             'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
             'description'   => 'nullable|string',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);

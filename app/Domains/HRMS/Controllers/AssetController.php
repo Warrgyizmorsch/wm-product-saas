@@ -476,6 +476,18 @@ class AssetController extends Controller
         ]);
 
         $employee    = \App\Domains\HRMS\Models\Employee::findOrFail($validated['employee_id']);
+        $user        = auth()->user();
+        $isOwner     = $user && (int) $employee->user_id === (int) $user->id;
+        $canManage   = $user && (
+            $user->hasHrPermission('hrms.assets.manage') ||
+            $user->hasHrPermission('hrms.assets.create') ||
+            $user->hasHrPermission('hr.settings.manage')
+        );
+
+        if (!$isOwner && !$canManage) {
+            abort(403, __('hrms.assets.error_unauthorized_request'));
+        }
+
         $companyId   = $employee->company_id;
         $requestDate = date('Y-m-d');
         $reason      = $validated['reason'];
@@ -517,13 +529,15 @@ class AssetController extends Controller
 
         if (!$isOwner) {
             $this->authorize('approve', Asset::class);
+        } elseif ($assetRequest->status !== 'pending') {
+            return redirect()->back()->with('error', __('hrms.assets.error_only_pending_withdrawn'));
         }
 
         $validated = $request->validate([
             'admin_notes' => 'nullable|string|max:1000',
         ]);
 
-        $defaultNote = $isOwner ? 'Withdrawn by employee.' : 'Rejected by administrator.';
+        $defaultNote = $isOwner ? __('hrms.assets.note_withdrawn_by_employee') : __('hrms.assets.note_rejected_by_admin');
         $assetRequest->update([
             'status'      => 'rejected',
             'admin_notes' => $validated['admin_notes'] ?? $defaultNote,

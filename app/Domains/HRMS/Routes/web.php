@@ -367,7 +367,14 @@ Route::prefix('hrms')
         // Documents Registry (All uploaded documents)
         Route::prefix('documents')->group(function (): void {
             Route::get('/', [\App\Domains\HRMS\Controllers\DocumentController::class, 'index'])->name('documents.index');
+            Route::post('/', [\App\Domains\HRMS\Controllers\DocumentController::class, 'store'])->name('documents.store');
+            Route::put('/{document}', [\App\Domains\HRMS\Controllers\DocumentController::class, 'update'])->name('documents.update');
+            Route::patch('/{document}/status', [\App\Domains\HRMS\Controllers\DocumentController::class, 'updateStatus'])->name('documents.status');
+            Route::delete('/{document}', [\App\Domains\HRMS\Controllers\DocumentController::class, 'destroy'])->name('documents.destroy');
             Route::post('/bulk-upload', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkUpload'])->name('documents.bulk-upload');
+            Route::post('/bulk-approve', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkApprove'])->name('documents.bulk-approve');
+            Route::post('/bulk-reject', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkReject'])->name('documents.bulk-reject');
+            Route::post('/bulk-delete', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkDelete'])->name('documents.bulk-delete');
         });
 
 

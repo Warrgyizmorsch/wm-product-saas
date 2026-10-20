@@ -669,7 +669,7 @@ class EmployeeApiController extends Controller
         $request->validate([
             'document_id'        => 'nullable|exists:documents,id',
             'document_master_id' => 'required_without:document_id|exists:document_masters,id',
-            'file'               => 'required|file|max:10240', // Max 10MB
+            'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240', // Max 10MB
             'expiry_date'        => 'nullable|date',
         ]);
 
@@ -1063,8 +1063,8 @@ class EmployeeApiController extends Controller
             'permanent_address'           => ['nullable', 'string'],
             'city'                        => ['nullable', 'string', 'max:255'],
             'postal_code'                 => ['nullable', 'string', 'max:20'],
-            'personal_mobile_number'      => ['nullable', 'string', 'max:20'],
-            'home_phone'                  => ['nullable', 'string', 'max:20'],
+            'personal_mobile_number'      => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
+            'home_phone'                  => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'personal_email'              => ['nullable', 'email', 'max:255', Rule::unique('employees', 'personal_email')->ignore($employee?->id)],
             'experience'                  => ['nullable', 'numeric', 'min:0'],
             'source_of_hire'              => ['nullable', 'string', 'max:255'],
@@ -1072,7 +1072,7 @@ class EmployeeApiController extends Controller
             'current_salary'              => ['nullable', 'numeric', 'min:0'],
             'qualification'               => ['nullable', 'string', 'max:255'],
             'reporting_manager_id'        => ['nullable', 'integer', 'exists:employees,id'],
-            'date_of_birth'               => ['nullable', 'date'],
+            'date_of_birth'               => ['nullable', 'date', 'before_or_equal:today'],
             'probation_end_date'          => ['nullable', 'date'],
             'confirmation_date'           => ['nullable', 'date'],
             'shift_id'                    => ['nullable', 'integer', 'exists:production_shifts,id'],
@@ -1081,9 +1081,9 @@ class EmployeeApiController extends Controller
             'account_number'              => ['nullable', 'string', 'max:255'],
             'ifsc_code'                   => ['nullable', 'string', 'max:50'],
             'emergency_contact_name'      => ['nullable', 'string', 'max:255'],
-            'emergency_contact_number'    => ['nullable', 'string', 'max:50'],
+            'emergency_contact_number'    => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'emergency_contact_relation'  => ['nullable', 'string', 'max:100'],
-            'status'                      => ['required'],
+            'status'                      => ['required', 'boolean'],
             'weekly_pattern'              => ['nullable', 'array'],
             'weekly_pattern.*'            => ['nullable', 'string'],
         ]);

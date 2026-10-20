@@ -3,6 +3,8 @@
 namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Repositories\GoalRepositoryInterface;
+use App\Domains\HRMS\Models\GoalCategory;
+use App\Domains\HRMS\Models\GoalCycle;
 use App\Http\Controllers\Controller;
 use Exception;
 use Illuminate\Http\RedirectResponse;
@@ -11,6 +13,18 @@ use Illuminate\View\View;
 
 class GoalController extends Controller
 {
+    private function goalReferenceRule(string $model, int $tenantId): array
+    {
+        return ['nullable', function ($attribute, $value, $fail) use ($model, $tenantId) {
+            if ($value === '__custom__') {
+                return;
+            }
+            if (!ctype_digit((string) $value) || !$model::where('tenant_id', $tenantId)->whereKey((int) $value)->exists()) {
+                $fail('The selected goal reference is invalid.');
+            }
+        }];
+    }
+
     public function __construct(
         private readonly GoalRepositoryInterface $goalRepository
     ) {}
@@ -59,9 +73,9 @@ class GoalController extends Controller
 
         $request->validate([
             'title'                => 'required|string|max:255',
-            'goal_cycle_id'        => 'nullable',
+            'goal_cycle_id'        => $this->goalReferenceRule(GoalCycle::class, $tenantId),
             'custom_goal_cycle'    => 'nullable|string|max:255',
-            'goal_category_id'     => 'nullable',
+            'goal_category_id'     => $this->goalReferenceRule(GoalCategory::class, $tenantId),
             'custom_goal_category' => 'nullable|string|max:255',
             'owner_type'           => 'required|in:company,department,employee',
             'department_id'        => 'nullable|exists:departments,id',
@@ -114,9 +128,9 @@ class GoalController extends Controller
 
         $request->validate([
             'title'                => 'required|string|max:255',
-            'goal_cycle_id'        => 'nullable',
+            'goal_cycle_id'        => $this->goalReferenceRule(GoalCycle::class, $tenantId),
             'custom_goal_cycle'    => 'nullable|string|max:255',
-            'goal_category_id'     => 'nullable',
+            'goal_category_id'     => $this->goalReferenceRule(GoalCategory::class, $tenantId),
             'custom_goal_category' => 'nullable|string|max:255',
             'owner_type'           => 'required|in:company,department,employee',
             'department_id'        => 'nullable|exists:departments,id',

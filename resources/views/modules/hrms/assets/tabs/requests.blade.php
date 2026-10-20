@@ -169,7 +169,7 @@
                                                     foreach ($unitsList as $aUnit) {
                                                         $allocatedUnitsData[] = [
                                                             'code' => $aUnit->asset_code,
-                                                            'serial' => $aUnit->serial_number ?: 'N/A',
+                                                            'serial' => $aUnit->serial_number ?: __('hrms.common.na'),
                                                             'name' => $aUnit->name ?: ($req->item->name ?? $req->category->name),
                                                             'date' => $aUnit->allocated_at ? $aUnit->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                         ];
@@ -177,7 +177,7 @@
                                                 } elseif ($req->allocatedAsset) {
                                                     $allocatedUnitsData[] = [
                                                         'code' => $req->allocatedAsset->asset_code,
-                                                        'serial' => $req->allocatedAsset->serial_number ?: 'N/A',
+                                                        'serial' => $req->allocatedAsset->serial_number ?: __('hrms.common.na'),
                                                         'name' => $req->allocatedAsset->name ?: ($req->item->name ?? $req->category->name),
                                                         'date' => $req->allocatedAsset->allocated_at ? $req->allocatedAsset->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                     ];
@@ -196,7 +196,7 @@
                                             data-alloc-qty="{{ $allocatedCount }}"
                                             data-rem-qty="{{ $remainingQty }}"
                                             data-status-raw="{{ $req->status }}"
-                                            data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                            data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : ($req->status === 'approved' ? __('hrms.assets.status_approved') : ($req->status === 'withdrawn' ? __('hrms.assets.status_withdrawn') : __('hrms.assets.status_pending'))))) }}"
                                             data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
                                             data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
                                             data-reason="{{ $req->reason ?: __('hrms.assets.no_description_provided') }}"
@@ -214,7 +214,7 @@
                                                 data-employee-id="{{ $req->employee_id }}"
                                                 data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
                                                 data-asset-item-id="{{ $req->asset_item_id }}"
-                                                data-item-name="{{ $req->item->name ?? 'N/A' }}"
+                                                data-item-name="{{ $req->item->name ?? __('hrms.common.na') }}"
                                                 data-quantity="{{ $req->quantity }}"
                                                 data-allocated-count="{{ $allocatedCount }}"
                                                 data-remaining-qty="{{ $remainingQty }}">
@@ -403,11 +403,11 @@
                         <div class="d-flex align-items-start justify-content-between">
                             <div>
                                 <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-0.5">{{ __('hrms.assets.lbl_requested_by') }}</span>
-                                <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">Employee Name</h6>
-                                <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">EMP0000</div>
+                                <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">{{ __('hrms.assets.employee') }}</h6>
+                                <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">-</div>
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">Company</span>
+                                <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">{{ __('hrms.assets.company') }}</span>
                                 <div class="fs-11 text-muted fw-medium mt-0.5">
                                     <i class="feather-calendar me-1 text-primary"></i><span id="req_detail_date">-</span>
                                 </div>
@@ -425,13 +425,13 @@
                     <div class="d-flex align-items-center justify-content-between mb-1">
                         <div>
                             <span class="fs-10 text-uppercase fw-bold text-muted me-2">{{ __('hrms.assets.req_asset') }}</span>
-                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-10" id="req_detail_category">Category</span>
+                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-10" id="req_detail_category">{{ __('hrms.assets.category') }}</span>
                         </div>
                         <div id="req_detail_status_container">
                             <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11" id="req_detail_status">{{ __('hrms.assets.status_pending') }}</span>
                         </div>
                     </div>
-                    <h6 class="fw-bold text-dark mb-2 fs-14" id="req_detail_asset_name">Asset Name</h6>
+                    <h6 class="fw-bold text-dark mb-2 fs-14" id="req_detail_asset_name">{{ __('hrms.assets.asset_name_label') }}</h6>
 
                     <div class="d-flex align-items-center gap-2 mt-1">
                         <div class="flex-fill border rounded py-1 px-2 text-center bg-light">

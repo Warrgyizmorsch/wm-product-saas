@@ -67,7 +67,7 @@ class BroadcastController extends Controller
             'is_pinned'                   => 'nullable|boolean',
             'is_acknowledgement_required' => 'nullable|boolean',
             'allow_comments'              => 'nullable|boolean',
-            'attachments.*'               => 'nullable|file|max:10240',
+            'attachments.*'               => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $broadcast = $this->broadcastRepository->storeBroadcast($validated, $request, $tenantId);
@@ -98,7 +98,7 @@ class BroadcastController extends Controller
             'is_pinned'                   => 'nullable|boolean',
             'is_acknowledgement_required' => 'nullable|boolean',
             'allow_comments'              => 'nullable|boolean',
-            'attachments.*'               => 'nullable|file|max:10240',
+            'attachments.*'               => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $this->broadcastRepository->updateBroadcast($id, $validated, $request, $tenantId);

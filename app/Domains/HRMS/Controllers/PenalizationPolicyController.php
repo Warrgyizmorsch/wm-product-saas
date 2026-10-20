@@ -31,7 +31,7 @@ class PenalizationPolicyController extends Controller
         $rules = [
             'rule_type' => 'required|in:late_arrival,under_hours,missing_logs,overtime_rules',
             'company_id' => 'nullable|integer',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ];
 
         if ($request->rule_type === 'late_arrival') {
@@ -115,7 +115,7 @@ class PenalizationPolicyController extends Controller
             'wfh_tracking_minutes'   => 'nullable|integer|min:1|max:120',
             'site_tracking_meters'   => 'nullable|integer|min:1',
             'site_tracking_minutes'  => 'nullable|integer|min:1|max:120',
-            'status'                 => 'required',
+            'status'                 => 'required|in:0,1',
         ]);
 
         $validated['office_biometric']        = $request->boolean('office_biometric');

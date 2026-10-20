@@ -963,7 +963,7 @@
                             <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" :required="true" placeholder="john.doe@example.com" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
+                            <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
                         </div>
 
                         <div class="col-12">

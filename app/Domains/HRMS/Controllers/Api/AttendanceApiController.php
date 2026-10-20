@@ -965,7 +965,7 @@ class AttendanceApiController extends Controller
     public function import(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:10240',
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);
 
         $result = $this->attendanceRepository->import($request->file('file'));

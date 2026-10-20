@@ -157,7 +157,12 @@ class ApprovalWorkflowService
             return false;
         }
 
-        if ($this->isSuperAdmin($user) || in_array(strtolower($user->role ?? ''), ['admin', 'super_admin', 'super-admin'])) {
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
+        $employee = $actor instanceof Employee ? $actor : $this->getEmployeeFromUser($user);
+        if ($employee && empty($employee->reporting_manager_id) && app(HrmsScopeService::class)->isCompanyAdmin($user)) {
             return true;
         }
 
@@ -381,7 +386,7 @@ class ApprovalWorkflowService
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $document->documentable_id) {
-            return false;
+            return $this->allowsSelfApproval($actor, $document, 'hrms.documents.manage');
         }
 
         return true;

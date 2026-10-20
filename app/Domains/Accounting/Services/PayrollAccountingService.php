@@ -54,6 +54,13 @@ class PayrollAccountingService
                 } elseif ($or->pay_group_id) {
                     $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
                     $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
+                } else {
+                    $genEmpIds = Employee::where('status', true)
+                        ->where(function($q) {
+                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                        })
+                        ->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
                 }
             }
             $excludeEmployeeIds = array_unique($excludeEmployeeIds);
@@ -63,15 +70,35 @@ class PayrollAccountingService
             $employees = Employee::whereIn('id', $run->employee_ids)
                 ->whereNotIn('id', $excludeEmployeeIds)
                 ->where('status', true)
-                ->whereNotNull('pay_group_id')
+                ->where(function($q) {
+                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                })
                 ->get();
         } else {
             $employeesQuery = Employee::where('status', true)
-                ->whereNotNull('pay_group_id')
+                ->where(function($q) {
+                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                })
+                ->where(function($q) use ($run) {
+                    $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
+                })
                 ->whereNotIn('id', $excludeEmployeeIds);
 
             if ($run->pay_group_id) {
                 $employeesQuery->where('pay_group_id', $run->pay_group_id);
+            } else {
+                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
+                    ->where('id', '!=', $run->id)
+                    ->whereNotNull('pay_group_id')
+                    ->pluck('pay_group_id')
+                    ->toArray();
+
+                if (!empty($otherProcessedPayGroupIds)) {
+                    $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
+                        $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
+                            ->orWhereNull('pay_group_id');
+                    });
+                }
             }
 
             $employees = $employeesQuery->get();
@@ -103,7 +130,7 @@ class PayrollAccountingService
         $totalNetPayout = 0.00;
 
         foreach ($employees as $employee) {
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
+            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
             $items = $calc['items'] ?? $calc['computed_components'] ?? [];
 
             $empGrossEarned = 0.00;
@@ -286,6 +313,13 @@ class PayrollAccountingService
                 } elseif ($or->pay_group_id) {
                     $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
                     $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
+                } else {
+                    $genEmpIds = Employee::where('status', true)
+                        ->where(function($q) {
+                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                        })
+                        ->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
                 }
             }
             $excludeEmployeeIds = array_unique($excludeEmployeeIds);
@@ -295,18 +329,56 @@ class PayrollAccountingService
             $employees = Employee::whereIn('id', $run->employee_ids)
                 ->whereNotIn('id', $excludeEmployeeIds)
                 ->where('status', true)
+                ->where(function($q) {
+                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                })
                 ->get();
         } else {
-            $employeesQuery = Employee::where('status', true)->whereNotIn('id', $excludeEmployeeIds);
+            $employeesQuery = Employee::where('status', true)
+                ->where(function($q) {
+                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                })
+                ->where(function($q) use ($run) {
+                    $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
+                })
+                ->whereNotIn('id', $excludeEmployeeIds);
+
             if ($run->pay_group_id) {
                 $employeesQuery->where('pay_group_id', $run->pay_group_id);
+            } else {
+                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
+                    ->where('id', '!=', $run->id)
+                    ->whereNotNull('pay_group_id')
+                    ->pluck('pay_group_id')
+                    ->toArray();
+
+                if (!empty($otherProcessedPayGroupIds)) {
+                    $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
+                        $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
+                            ->orWhereNull('pay_group_id');
+                    });
+                }
             }
+
             $employees = $employeesQuery->get();
         }
 
         foreach ($employees as $employee) {
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month);
-            $totalNetPayout += (float) ($calc['summary']['net_payout'] ?? 0.00);
+            // Exclude employees with held payouts from the payout journal
+            $isHeld = \App\Domains\HRMS\Models\PayrollHold::where('employee_id', $employee->id)
+                ->where('payroll_month', $run->payroll_month)
+                ->where('status', 'on_hold')
+                ->exists();
+
+            if ($isHeld) {
+                continue;
+            }
+
+            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
+            $payout = (float) ($calc['summary']['net_payout'] ?? 0.00);
+            if ($payout > 0) {
+                $totalNetPayout += $payout;
+            }
         }
 
         $totalNetPayout = round($totalNetPayout, 2);

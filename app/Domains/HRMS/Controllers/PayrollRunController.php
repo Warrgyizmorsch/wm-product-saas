@@ -165,8 +165,20 @@ class PayrollRunController extends Controller
     public function downloadPayslip(PayrollRun $run, Employee $employee)
     {
         $user = auth()->user();
-        if ($user->employee && $user->employee->id !== $employee->id) {
-            abort(403, 'Unauthorized access to this payslip.');
+        $isAuthorized = $user && (
+            $user->can('viewAny', PayrollRun::class)
+            || $user->can('process', $run)
+            || $user->can('approve', $run)
+            || (method_exists($user, 'hasHrPermission') && ($user->hasHrPermission('hr.payroll.manage') || $user->hasHrPermission('hrms.payroll_runs.view') || $user->hasHrPermission('hrms.payroll.manage')))
+        );
+
+        if (!$isAuthorized) {
+            if (!$user || !$user->employee || $user->employee->id !== $employee->id) {
+                abort(403, 'Unauthorized access to this payslip.');
+            }
+            if (!in_array($run->status, ['locked', 'paid'])) {
+                abort(403, 'Payslip is not yet released.');
+            }
         }
 
         $data = $this->payrollRunRepository->getPayslipData($run, $employee);

@@ -16,12 +16,20 @@ class AssetPolicy
     {
         return $this->access->allows($user, 'hrms.assets.view', [
             'tenant_id' => $user->tenant_id,
+        ]) || $this->access->allows($user, 'hrms.assets.manage', [
+            'tenant_id' => $user->tenant_id,
+        ]) || $this->access->allows($user, 'hr.settings.manage', [
+            'tenant_id' => $user->tenant_id,
         ]);
     }
 
     public function create(User $user): bool
     {
         return $this->access->allows($user, 'hrms.assets.create', [
+            'tenant_id' => $user->tenant_id,
+        ]) || $this->access->allows($user, 'hrms.assets.manage', [
+            'tenant_id' => $user->tenant_id,
+        ]) || $this->access->allows($user, 'hr.settings.manage', [
             'tenant_id' => $user->tenant_id,
         ]);
     }
@@ -32,6 +40,10 @@ class AssetPolicy
 
         return $this->access->allows($user, 'hrms.assets.update', [
             'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hrms.assets.manage', [
+            'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hr.settings.manage', [
+            'tenant_id' => $tenantId,
         ]);
     }
 
@@ -41,6 +53,10 @@ class AssetPolicy
 
         return $this->access->allows($user, 'hrms.assets.delete', [
             'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hrms.assets.manage', [
+            'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hr.settings.manage', [
+            'tenant_id' => $tenantId,
         ]);
     }
 
@@ -49,6 +65,12 @@ class AssetPolicy
         $tenantId = $asset instanceof Asset ? $asset->tenant_id : $user->tenant_id;
 
         return $this->access->allows($user, 'hrms.assets.approve', [
+            'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hrms.assets.allocate', [
+            'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hrms.assets.manage', [
+            'tenant_id' => $tenantId,
+        ]) || $this->access->allows($user, 'hr.settings.manage', [
             'tenant_id' => $tenantId,
         ]);
     }

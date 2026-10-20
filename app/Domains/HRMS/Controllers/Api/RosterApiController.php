@@ -516,8 +516,16 @@ class RosterApiController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'date'        => 'required|date',
-            'shift_id'    => 'nullable',
-            'value'       => 'nullable|string',
+            'shift_id'    => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
+            'value'       => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $employeeId = $validated['employee_id'];
@@ -564,7 +572,11 @@ class RosterApiController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'day_of_week' => 'required|integer|between:0,6',
-            'value'       => 'nullable|string',
+            'value'       => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['default', 'off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $employee = Employee::find($validated['employee_id']);
@@ -664,6 +676,11 @@ class RosterApiController extends Controller
             'employee_ids'   => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
             'pattern'        => 'required|array',
+            'pattern.*'      => ['required', function ($attribute, $value, $fail) {
+                if (!in_array((string) $value, ['off'], true) && (!ctype_digit((string) $value) || !ProductionShift::whereKey((int) $value)->exists())) {
+                    $fail('The selected shift is invalid.');
+                }
+            }],
         ]);
 
         $updatedCount = 0;
