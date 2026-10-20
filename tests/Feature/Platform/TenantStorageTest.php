@@ -167,6 +167,23 @@ class TenantStorageTest extends TestCase
         \Illuminate\Support\Facades\File::deleteDirectory($root);
     }
 
+    public function test_deleting_a_product_removes_its_image_files_and_their_usage(): void
+    {
+        $root = $this->useRealPublicDisk();
+        $product = \App\Domains\Inventory\Models\Product::query()->forceCreate(['tenant_id' => $this->tenant->id, 'name' => 'Chair', 'sku' => 'CH-1']);
+
+        UploadedFile::fake()->create('main.png', 200)
+            ->storeTenantFileAs("uploads/tenants/{$this->tenant->id}/products/{$product->id}", 'main.png', ['disk' => 'public', 'tenant_id' => $this->tenant->id]);
+        $this->assertSame(200 * 1024, $this->used());
+
+        $product->delete();
+
+        $this->assertFalse(Storage::disk('public')->exists("uploads/tenants/{$this->tenant->id}/products/{$product->id}"));
+        $this->assertSame(0, $this->used());
+
+        \Illuminate\Support\Facades\File::deleteDirectory($root);
+    }
+
     public function test_the_platform_console_includes_storage(): void
     {
         $this->upload(512);
