@@ -13,7 +13,7 @@ class StoreMachineApiRequest extends ApiFormRequest
 
         return [
             'section_id'         => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
             ],

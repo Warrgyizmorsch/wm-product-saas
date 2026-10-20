@@ -17,6 +17,122 @@
     </div>
 @endsection
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        .section-machines-popover {
+            max-width: 320px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+        }
+        .section-machines-popover .popover-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            padding: 8px 12px;
+        }
+        .section-machines-popover .popover-body {
+            padding: 8px 12px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .section-machines-badge {
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        .section-machines-badge:hover {
+            filter: brightness(0.95);
+            transform: translateY(-1px);
+        }
+
+        /* Fix Select2 accessible hidden select */
+        select.select2-hidden-accessible {
+            display: none !important;
+            visibility: hidden !important;
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Modal Select2 styling polish */
+        .modal .select2-container--bootstrap-5 {
+            width: 100% !important;
+            display: block;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--multiple {
+            min-height: 42px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 4px 8px;
+            background-color: #fff;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .modal .select2-container--bootstrap-5.select2-container--focus .select2-selection--multiple,
+        .modal .select2-container--bootstrap-5.select2-container--open .select2-selection--multiple {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            margin: 0;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice .select2-selection__choice__remove {
+            margin-right: 6px;
+            color: #3b82f6;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-weight: bold;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice .select2-selection__choice__remove:hover {
+            color: #ef4444;
+        }
+        .modal .select2-container--bootstrap-5 .select2-dropdown {
+            z-index: 1065 !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-results__option {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .modal .select2-container--bootstrap-5 .select2-results__option--highlighted {
+            background-color: #3b82f6 !important;
+            color: #ffffff !important;
+        }
+        .modal .select2-container--bootstrap-5 .select2-results__option--selected {
+            background-color: #f1f5f9 !important;
+            color: #64748b !important;
+        }
+    </style>
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('content')
     <div class="erp-single-panel bg-white">
         <!-- Success & Error Alerts -->
@@ -221,9 +337,8 @@
                     <thead>
                         <tr>
                             <th style="width: 15%">{{ __('production.section_code') }}</th>
-                            <th style="width: 20%">{{ __('production.section_name') }}</th>
-                            <th style="width: 12%">{{ __('production.workers_required') }}</th>
-                            <th style="width: 25%">{{ __('production.section_shifts') }}</th>
+                            <th style="width: 22%">{{ __('production.section_name') }}</th>
+                            <th style="width: 35%">{{ __('production.section_shifts') }}</th>
                             <th style="width: 10%">{{ __('production.machines_count') }}</th>
                             <th style="width: 10%">{{ __('production.status') }}</th>
                             <th style="width: 8%" class="text-end">{{ __('production.actions') }}</th>
@@ -236,28 +351,67 @@
                                     <span class="font-monospace fw-bold text-dark">{{ $section->code }}</span>
                                 </td>
                                 <td class="align-middle">
-                                    <div class="fw-semibold text-dark">{{ $section->name }}</div>
+                                    <div class="fw-semibold text-dark d-flex align-items-center flex-wrap gap-1">
+                                        <span>{{ $section->name }}</span>
+                                        @if($section->supports_manual_production)
+                                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="{{ __('production.manual_capacity_per_hour') }}: {{ number_format((float) $section->manual_capacity_per_hour, 2) }} {{ __('production.units_per_hour') }}">
+                                                <i class="feather-user me-0.5"></i>{{ __('production.manual_production') }} ({{ number_format((float) $section->manual_capacity_per_hour, 2) }} {{ __('production.units_per_hour') }})
+                                            </span>
+                                        @endif
+                                    </div>
                                     @if($section->description)
                                         <small class="text-muted fs-11 text-truncate d-block" style="max-width: 250px;">{{ $section->description }}</small>
                                     @endif
                                 </td>
                                 <td class="align-middle">
-                                    <span class="badge bg-soft-info text-info rounded-pill px-2.5 py-1 fs-12">
-                                        <i class="feather-users me-1 fs-11"></i>{{ $section->workers_required }}
-                                    </span>
-                                </td>
-                                <td class="align-middle">
                                     @forelse ($section->shifts as $shift)
-                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2 py-1 mb-1 me-1">
-                                            {{ $shift->name }} ({{ substr($shift->start_time, 0, 5) }}-{{ substr($shift->end_time, 0, 5) }})
-                                        </span>
+                                        @php
+                                            $shiftWorkers = (int) ($shift->pivot->workers_required ?? $section->workers_required ?? 1);
+                                        @endphp
+                                        <div class="d-inline-flex align-items-center gap-1.5 py-1 px-2 border rounded bg-light mb-1 me-1 fs-11">
+                                            <span class="fw-semibold text-dark">{{ $shift->name }}</span>
+                                            @if(!str_contains($shift->name, substr($shift->start_time, 0, 5)))
+                                                <span class="text-muted font-monospace fs-10">({{ substr($shift->start_time, 0, 5) }}–{{ substr($shift->end_time, 0, 5) }})</span>
+                                            @endif
+                                            <span class="text-muted">&mdash;</span>
+                                            <span class="badge bg-soft-info text-info rounded-pill px-2 py-0.5 fw-semibold">
+                                                <i class="feather-users me-0.5 fs-10"></i>{{ $shiftWorkers }} {{ $shiftWorkers == 1 ? __('production.worker') : __('production.workers') }}
+                                            </span>
+                                        </div>
                                     @empty
                                         <span class="text-danger fs-11"><i class="feather-alert-triangle me-1"></i>No shifts</span>
                                     @endforelse
                                 </td>
                                 <td class="align-middle">
-                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2.5 py-1 fs-12">
-                                        <i class="feather-cpu me-1 fs-11"></i>{{ $section->machines->count() }}
+                                    @php
+                                        $machineCount = $section->machines->count();
+                                        if ($machineCount > 0) {
+                                            $machineListHtml = '<ul class=\'list-unstyled mb-0 text-start fs-12\'>';
+                                            foreach ($section->machines as $sm) {
+                                                $machineListHtml .= '<li class=\'py-1 border-bottom border-light d-flex align-items-center gap-1\'>'
+                                                    . '<i class=\'feather-cpu text-primary fs-11\'></i>'
+                                                    . '<span class=\'fw-bold font-monospace text-dark\'>[' . e($sm->code) . ']</span> '
+                                                    . '<span class=\'text-dark\'>' . e($sm->name) . '</span>'
+                                                    . '</li>';
+                                            }
+                                            $machineListHtml .= '</ul>';
+                                        } else {
+                                            $machineListHtml = '<div class=\'text-muted fs-11 fst-italic py-1 text-center\'>'
+                                                . '<i class=\'feather-info text-muted me-1\'></i>' . e(__('production.no_machines_assigned'))
+                                                . '</div>';
+                                        }
+                                    @endphp
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2.5 py-1 fs-12 section-machines-badge"
+                                          role="button"
+                                          tabindex="0"
+                                          data-bs-toggle="popover"
+                                          data-bs-trigger="hover focus"
+                                          data-bs-placement="top"
+                                          data-bs-html="true"
+                                          data-bs-custom-class="section-machines-popover"
+                                          data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-cpu text-primary fs-12'></i>{{ __('production.assigned_machines') }} ({{ $machineCount }})</div>"
+                                          data-bs-content="{{ $machineListHtml }}">
+                                        <i class="feather-cpu me-1 fs-11"></i>{{ $machineCount }}
                                     </span>
                                 </td>
                                 <td class="align-middle">
@@ -276,13 +430,7 @@
                                                 </button>
                                             </li>
                                         @endcan
-                                        @can('create', App\Domains\Production\Models\Machine::class)
-                                            <li>
-                                                <a href="{{ route('production.machines.create', ['section_id' => $section->id]) }}" class="dropdown-item">
-                                                    <i class="feather-plus-circle me-2 text-muted fs-12"></i>{{ __('production.add_machine') }}
-                                                </a>
-                                            </li>
-                                        @endcan
+
                                         @can('delete', $section)
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
@@ -296,7 +444,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">
+                                <td colspan="6" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_sections_found') }}
                                 </td>
                             </tr>
@@ -306,97 +454,7 @@
             </div>
         </div>
 
-        <!-- Assigned Machines List -->
-        <div>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold text-dark mb-0">{{ __('production.assigned_equipment') }}</h5>
-                @can('create', App\Domains\Production\Models\Machine::class)
-                    <x-ui.button :href="route('production.machines.create')" variant="light" icon="feather-plus">
-                        {{ __('production.add_machine') }}
-                    </x-ui.button>
-                @endcan
-            </div>
 
-            <div class="table-responsive">
-                <x-ui.odoo-form-ui type="table">
-                    <thead>
-                        <tr>
-                            <th style="width: 12%">{{ __('production.machine_code') }}</th>
-                            <th style="width: 18%">{{ __('production.machine_name') }}</th>
-                            <th style="width: 15%">{{ __('production.sections') }}</th>
-                            <th style="width: 13%">{{ __('production.machine_type') }}</th>
-                            <th style="width: 12%">{{ __('production.manufacturer') }}</th>
-                            <th style="width: 10%">{{ __('production.model_number') }}</th>
-                            <th style="width: 8%" class="text-end">{{ __('production.capacity_hr') }}</th>
-                            <th style="width: 7%">{{ __('production.status') }}</th>
-                            <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($workCenter->machines as $machine)
-                            <tr>
-                                <td class="align-middle">
-                                    <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-bold text-primary hover-primary">
-                                        {{ $machine->code }}
-                                    </a>
-                                </td>
-                                <td class="align-middle">
-                                    <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="fw-semibold text-dark hover-primary">
-                                        {{ $machine->name }}
-                                    </a>
-                                </td>
-                                <td class="align-middle">
-                                    @if ($machine->section)
-                                        <span class="badge bg-soft-info text-dark font-monospace fs-11">
-                                            <i class="feather-grid me-1 text-muted"></i>{{ $machine->section->name }} ({{ $machine->section->code }})
-                                        </span>
-                                    @else
-                                        <span class="text-muted fs-11 fst-italic">—</span>
-                                    @endif
-                                </td>
-                                <td class="align-middle">{{ $machine->machine_type ?? '—' }}</td>
-                                <td class="align-middle">{{ $machine->manufacturer ?? '—' }}</td>
-                                <td class="align-middle">{{ $machine->model_number ?? '—' }}</td>
-                                <td class="text-end align-middle fw-semibold">
-                                    {{ $machine->capacity !== null ? number_format($machine->capacity, 2) : '—' }}
-                                </td>
-                                <td class="align-middle">
-                                    @if ($machine->isActive())
-                                        <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">{{ __('production.active') }}</span>
-                                    @elseif ($machine->isUnderMaintenance())
-                                        <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1">Maint.</span>
-                                    @elseif ($machine->isDecommissioned())
-                                        <span class="badge bg-soft-dark text-dark rounded-pill px-2 py-1">Decom.</span>
-                                    @else
-                                        <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.inactive') }}</span>
-                                    @endif
-                                </td>
-                                <td class="text-end align-middle">
-                                    <x-ui.action-dropdown>
-                                        <li>
-                                            <a href="{{ route('production.mes.machines.show', $machine->id) }}" class="dropdown-item">
-                                                <i class="feather-eye me-2 text-muted fs-12"></i>{{ __('production.view_details') ?? 'View Details' }}
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a href="{{ route('production.machines.edit', $machine->id) }}" class="dropdown-item">
-                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_machine') }}
-                                            </a>
-                                        </li>
-                                    </x-ui.action-dropdown>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="text-center py-4 text-muted">
-                                    <i class="feather-info me-2"></i>{{ __('production.no_machines_registered') }}
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </x-ui.odoo-form-ui>
-            </div>
-        </div>
     </div>
 
     <!-- Modals for Section Management -->
@@ -419,7 +477,7 @@
 
                         <div class="modal-body p-4">
                             <div class="row g-3">
-                                <div class="col-md-6">
+                                <div class="col-md-5">
                                     <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_name') }} <span class="text-danger">*</span></label>
                                     <input type="text" name="name" class="form-control" 
                                            placeholder="{{ __('production.section_placeholder_name') }}" 
@@ -429,7 +487,7 @@
                                     @endif
                                 </div>
 
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_code') }} <span class="text-danger">*</span></label>
                                     <input type="text" name="code" class="form-control font-monospace text-uppercase" 
                                            placeholder="{{ __('production.section_placeholder_code') }}" 
@@ -439,17 +497,7 @@
                                     @endif
                                 </div>
 
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold fs-12 text-dark">{{ __('production.workers_required') }} <span class="text-danger">*</span></label>
-                                    <input type="number" name="workers_required" min="1" class="form-control" 
-                                           value="{{ old('_modal') === 'createSectionModal' ? old('workers_required', 1) : 1 }}" required>
-                                    <div class="form-text fs-11 text-muted">{{ __('production.workers_required_helper') }}</div>
-                                    @if(old('_modal') === 'createSectionModal' && $errors->has('workers_required'))
-                                        <div class="text-danger fs-11 mt-1">{{ $errors->first('workers_required') }}</div>
-                                    @endif
-                                </div>
-
-                                <div class="col-md-6">
+                                <div class="col-md-3">
                                     <label class="form-label fw-bold fs-12 text-dark">{{ __('production.status') }} <span class="text-danger">*</span></label>
                                     <select name="status" class="form-select" required>
                                         <option value="active" @selected((old('_modal') === 'createSectionModal' ? old('status') : 'active') === 'active')>{{ __('production.active') }}</option>
@@ -460,6 +508,45 @@
                                     @endif
                                 </div>
 
+                                <!-- Manual Production -->
+                                <div class="col-12">
+                                    <div class="p-3 border rounded bg-light">
+                                        <div class="form-check form-switch mb-0">
+                                            <input type="hidden" name="supports_manual_production" value="0">
+                                            <input class="form-check-input manual-production-toggle" type="checkbox" name="supports_manual_production" value="1" 
+                                                   id="create_supports_manual_production" 
+                                                   data-target="#create_manual_capacity_container"
+                                                   @checked(old('_modal') === 'createSectionModal' && (bool) old('supports_manual_production'))>
+                                            <label class="form-check-label fw-bold text-dark fs-12" for="create_supports_manual_production">
+                                                 {{ __('production.manual_production') }}
+                                            </label>
+                                            <div class="form-text fs-11 text-muted">{{ __('production.manual_production_desc') }}</div>
+                                        </div>
+
+                                        <div id="create_manual_capacity_container" class="mt-3 pt-3 border-top @if(!(old('_modal') === 'createSectionModal' && (bool) old('supports_manual_production'))) d-none @endif">
+                                            <div class="row align-items-center">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold fs-12 text-dark" for="create_manual_capacity_per_hour">
+                                                        {{ __('production.manual_capacity_per_hour') }} <span class="text-danger">*</span>
+                                                    </label>
+                                                    <div class="input-group">
+                                                        <input type="number" step="any" min="0.0001" name="manual_capacity_per_hour" id="create_manual_capacity_per_hour" 
+                                                               class="form-control fs-12 manual-capacity-input" 
+                                                               placeholder="e.g. 10.00"
+                                                               value="{{ old('_modal') === 'createSectionModal' ? old('manual_capacity_per_hour') : '' }}"
+                                                               @if(!(old('_modal') === 'createSectionModal' && (bool) old('supports_manual_production'))) disabled @endif>
+                                                        <span class="input-group-text fs-11 text-muted bg-white">{{ __('production.units_per_hour') }}</span>
+                                                    </div>
+                                                    <div class="form-text fs-11 text-muted">{{ __('production.manual_capacity_hint') }}</div>
+                                                    @if(old('_modal') === 'createSectionModal' && $errors->has('manual_capacity_per_hour'))
+                                                        <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('manual_capacity_per_hour') }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="col-12">
                                     <label class="form-label fw-bold fs-12 text-dark d-block">
                                         {{ __('production.section_shifts') }} <span class="text-danger">*</span>
@@ -468,19 +555,46 @@
 
                                     @if($workCenter->shifts->count() > 0)
                                         <div class="p-3 border rounded bg-light">
-                                            <div class="row g-2">
+                                            <div class="d-flex flex-column gap-2">
                                                 @foreach($workCenter->shifts as $sh)
-                                                    <div class="col-md-6">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" name="shifts[]" value="{{ $sh->id }}" 
+                                                    @php
+                                                        $isShiftChecked = is_array(old('shifts')) && old('_modal') === 'createSectionModal' 
+                                                            ? in_array($sh->id, old('shifts')) 
+                                                            : false;
+                                                        $shiftWorkerCount = old('_modal') === 'createSectionModal' && isset(old('shift_workers')[$sh->id])
+                                                            ? old('shift_workers')[$sh->id]
+                                                            : 1;
+                                                    @endphp
+                                                    <div class="p-2 border rounded bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 shift-row">
+                                                        <div class="form-check mb-0">
+                                                            <input class="form-check-input section-shift-checkbox" type="checkbox" name="shifts[]" value="{{ $sh->id }}" 
                                                                    id="create_shift_{{ $sh->id }}"
-                                                                   @checked(is_array(old('shifts')) && old('_modal') === 'createSectionModal' ? in_array($sh->id, old('shifts')) : false)>
-                                                            <label class="form-check-label text-dark fs-12" for="create_shift_{{ $sh->id }}">
+                                                                   data-target="#create_shift_workers_wrapper_{{ $sh->id }}"
+                                                                   @checked($isShiftChecked)>
+                                                            <label class="form-check-label text-dark fs-12 cursor-pointer" for="create_shift_{{ $sh->id }}">
                                                                 <span class="fw-bold font-monospace">{{ $sh->code }}</span> &mdash; {{ $sh->name }}
-                                                                <span class="text-muted fs-11">({{ substr($sh->start_time, 0, 5) }}-{{ substr($sh->end_time, 0, 5) }})</span>
+                                                                @if(!str_contains($sh->name, substr($sh->start_time, 0, 5)))
+                                                                    <span class="text-muted fs-11">({{ substr($sh->start_time, 0, 5) }}–{{ substr($sh->end_time, 0, 5) }})</span>
+                                                                @endif
                                                             </label>
                                                         </div>
+                                                        <div id="create_shift_workers_wrapper_{{ $sh->id }}" class="d-flex align-items-center gap-1.5 ms-auto shift-workers-group @if(!$isShiftChecked) d-none @endif">
+                                                            <label class="form-label fs-11 text-muted mb-0 fw-semibold text-nowrap" for="create_shift_workers_{{ $sh->id }}">
+                                                                {{ __('production.workers_required') }}:
+                                                            </label>
+                                                            <div style="width: 85px;">
+                                                                <input type="number" name="shift_workers[{{ $sh->id }}]" id="create_shift_workers_{{ $sh->id }}"
+                                                                       class="form-control form-control-sm text-center shift-worker-input"
+                                                                       min="1" step="1"
+                                                                       value="{{ $shiftWorkerCount }}"
+                                                                       @if(!$isShiftChecked) disabled @endif>
+                                                            </div>
+                                                            <span class="fs-11 text-muted">{{ __('production.workers') }}</span>
+                                                        </div>
                                                     </div>
+                                                    @if(old('_modal') === 'createSectionModal' && $errors->has('shift_workers.'.$sh->id))
+                                                        <div class="text-danger fs-11 mt-1 ms-3">{{ $errors->first('shift_workers.'.$sh->id) }}</div>
+                                                    @endif
                                                 @endforeach
                                             </div>
                                         </div>
@@ -492,6 +606,43 @@
 
                                     @if(old('_modal') === 'createSectionModal' && $errors->has('shifts'))
                                         <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('shifts') }}</div>
+                                    @endif
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('shift_workers'))
+                                        <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('shift_workers') }}</div>
+                                    @endif
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-bold fs-12 text-dark d-block">
+                                        {{ __('production.assigned_machines') }}
+                                        <span class="fw-normal text-muted fs-11 ms-1">({{ __('production.assigned_machines_helper') }})</span>
+                                    </label>
+                                    <input type="hidden" name="sync_machines" value="1">
+
+                                    @php
+                                        $selectedMachines = old('_modal') === 'createSectionModal' ? (array) old('machine_ids', []) : [];
+                                    @endphp
+
+                                    @if($eligibleMachines->count() > 0)
+                                        <select name="machine_ids[]" id="create_section_machine_ids" class="form-select section-machine-select" multiple="multiple" data-placeholder="{{ __('production.select_machines') }}">
+                                            @foreach($eligibleMachines as $m)
+                                                <option value="{{ $m->id }}" @selected(in_array($m->id, $selectedMachines))>
+                                                    [{{ $m->code }}] {{ $m->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <div class="form-text fs-11 text-muted">{{ __('production.assigned_machines_hint') }}</div>
+                                    @else
+                                        <div class="text-muted fs-11 fst-italic p-2 bg-light rounded border">
+                                            <i class="feather-info me-1"></i>{{ __('production.no_eligible_machines_available') }}
+                                        </div>
+                                    @endif
+
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('machine_ids'))
+                                        <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('machine_ids') }}</div>
+                                    @endif
+                                    @if(old('_modal') === 'createSectionModal' && $errors->has('machine_ids.*'))
+                                        <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('machine_ids.*') }}</div>
                                     @endif
                                 </div>
 
@@ -534,7 +685,7 @@
 
                             <div class="modal-body p-4">
                                 <div class="row g-3">
-                                    <div class="col-md-6">
+                                    <div class="col-md-5">
                                         <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_name') }} <span class="text-danger">*</span></label>
                                         <input type="text" name="name" class="form-control" 
                                                value="{{ old('_modal') === 'editSectionModal_'.$section->id ? old('name') : $section->name }}" required>
@@ -543,7 +694,7 @@
                                         @endif
                                     </div>
 
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_code') }} <span class="text-danger">*</span></label>
                                         <input type="text" name="code" class="form-control font-monospace text-uppercase" 
                                                value="{{ old('_modal') === 'editSectionModal_'.$section->id ? old('code') : $section->code }}" required>
@@ -552,17 +703,7 @@
                                         @endif
                                     </div>
 
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-bold fs-12 text-dark">{{ __('production.workers_required') }} <span class="text-danger">*</span></label>
-                                        <input type="number" name="workers_required" min="1" class="form-control" 
-                                               value="{{ old('_modal') === 'editSectionModal_'.$section->id ? old('workers_required') : $section->workers_required }}" required>
-                                        <div class="form-text fs-11 text-muted">{{ __('production.workers_required_helper') }}</div>
-                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('workers_required'))
-                                            <div class="text-danger fs-11 mt-1">{{ $errors->first('workers_required') }}</div>
-                                        @endif
-                                    </div>
-
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
                                         <label class="form-label fw-bold fs-12 text-dark">{{ __('production.status') }} <span class="text-danger">*</span></label>
                                         <select name="status" class="form-select" required>
                                             @php
@@ -576,6 +717,53 @@
                                         @endif
                                     </div>
 
+                                    <!-- Manual Production -->
+                                    @php
+                                        $isManual = old('_modal') === 'editSectionModal_'.$section->id 
+                                            ? (bool) old('supports_manual_production') 
+                                            : (bool) $section->supports_manual_production;
+                                        $manualCapacity = old('_modal') === 'editSectionModal_'.$section->id 
+                                            ? old('manual_capacity_per_hour') 
+                                            : ($section->manual_capacity_per_hour !== null ? (float) $section->manual_capacity_per_hour : '');
+                                    @endphp
+                                    <div class="col-12">
+                                        <div class="p-3 border rounded bg-light">
+                                            <div class="form-check form-switch mb-0">
+                                                <input type="hidden" name="supports_manual_production" value="0">
+                                                <input class="form-check-input manual-production-toggle" type="checkbox" name="supports_manual_production" value="1" 
+                                                       id="edit_supports_manual_production_{{ $section->id }}" 
+                                                       data-target="#edit_manual_capacity_container_{{ $section->id }}"
+                                                       @checked($isManual)>
+                                                <label class="form-check-label fw-bold text-dark fs-12" for="edit_supports_manual_production_{{ $section->id }}">
+                                                    {{ __('production.manual_production') }}
+                                                </label>
+                                                <div class="form-text fs-11 text-muted">{{ __('production.manual_production_desc') }}</div>
+                                            </div>
+
+                                            <div id="edit_manual_capacity_container_{{ $section->id }}" class="mt-3 pt-3 border-top @if(!$isManual) d-none @endif">
+                                                <div class="row align-items-center">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold fs-12 text-dark" for="edit_manual_capacity_per_hour_{{ $section->id }}">
+                                                            {{ __('production.manual_capacity_per_hour') }} <span class="text-danger">*</span>
+                                                        </label>
+                                                        <div class="input-group">
+                                                            <input type="number" step="any" min="0.0001" name="manual_capacity_per_hour" id="edit_manual_capacity_per_hour_{{ $section->id }}" 
+                                                                   class="form-control fs-12 manual-capacity-input" 
+                                                                   placeholder="e.g. 10.00"
+                                                                   value="{{ $manualCapacity }}"
+                                                                   @if(!$isManual) disabled @endif>
+                                                            <span class="input-group-text fs-11 text-muted bg-white">{{ __('production.units_per_hour') }}</span>
+                                                        </div>
+                                                        <div class="form-text fs-11 text-muted">{{ __('production.manual_capacity_hint') }}</div>
+                                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('manual_capacity_per_hour'))
+                                                            <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('manual_capacity_per_hour') }}</div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div class="col-12">
                                         <label class="form-label fw-bold fs-12 text-dark d-block">
                                             {{ __('production.section_shifts') }} <span class="text-danger">*</span>
@@ -586,23 +774,49 @@
                                             $selectedShifts = old('_modal') === 'editSectionModal_'.$section->id 
                                                 ? (array) old('shifts', []) 
                                                 : $section->shifts->pluck('id')->toArray();
+                                            $savedShiftWorkers = $section->shifts->pluck('pivot.workers_required', 'id')->toArray();
                                         @endphp
 
                                         @if($workCenter->shifts->count() > 0)
                                             <div class="p-3 border rounded bg-light">
-                                                <div class="row g-2">
+                                                <div class="d-flex flex-column gap-2">
                                                     @foreach($workCenter->shifts as $sh)
-                                                        <div class="col-md-6">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="checkbox" name="shifts[]" value="{{ $sh->id }}" 
+                                                        @php
+                                                            $isShiftChecked = in_array($sh->id, $selectedShifts);
+                                                            $shiftWorkerCount = old('_modal') === 'editSectionModal_'.$section->id && isset(old('shift_workers')[$sh->id])
+                                                                ? old('shift_workers')[$sh->id]
+                                                                : ($savedShiftWorkers[$sh->id] ?? $section->workers_required ?? 1);
+                                                        @endphp
+                                                        <div class="p-2 border rounded bg-white d-flex justify-content-between align-items-center flex-wrap gap-2 shift-row">
+                                                            <div class="form-check mb-0">
+                                                                <input class="form-check-input section-shift-checkbox" type="checkbox" name="shifts[]" value="{{ $sh->id }}" 
                                                                        id="edit_shift_{{ $section->id }}_{{ $sh->id }}"
-                                                                       @checked(in_array($sh->id, $selectedShifts))>
-                                                                <label class="form-check-label text-dark fs-12" for="edit_shift_{{ $section->id }}_{{ $sh->id }}">
+                                                                       data-target="#edit_shift_workers_wrapper_{{ $section->id }}_{{ $sh->id }}"
+                                                                       @checked($isShiftChecked)>
+                                                                <label class="form-check-label text-dark fs-12 cursor-pointer" for="edit_shift_{{ $section->id }}_{{ $sh->id }}">
                                                                     <span class="fw-bold font-monospace">{{ $sh->code }}</span> &mdash; {{ $sh->name }}
-                                                                    <span class="text-muted fs-11">({{ substr($sh->start_time, 0, 5) }}-{{ substr($sh->end_time, 0, 5) }})</span>
+                                                                    @if(!str_contains($sh->name, substr($sh->start_time, 0, 5)))
+                                                                        <span class="text-muted fs-11">({{ substr($sh->start_time, 0, 5) }}–{{ substr($sh->end_time, 0, 5) }})</span>
+                                                                    @endif
                                                                 </label>
                                                             </div>
+                                                            <div id="edit_shift_workers_wrapper_{{ $section->id }}_{{ $sh->id }}" class="d-flex align-items-center gap-1.5 ms-auto shift-workers-group @if(!$isShiftChecked) d-none @endif">
+                                                                <label class="form-label fs-11 text-muted mb-0 fw-semibold text-nowrap" for="edit_shift_workers_{{ $section->id }}_{{ $sh->id }}">
+                                                                    {{ __('production.workers_required') }}:
+                                                                </label>
+                                                                <div style="width: 85px;">
+                                                                    <input type="number" name="shift_workers[{{ $sh->id }}]" id="edit_shift_workers_{{ $section->id }}_{{ $sh->id }}"
+                                                                           class="form-control form-control-sm text-center shift-worker-input"
+                                                                           min="1" step="1"
+                                                                           value="{{ $shiftWorkerCount }}"
+                                                                           @if(!$isShiftChecked) disabled @endif>
+                                                                </div>
+                                                                <span class="fs-11 text-muted">{{ __('production.workers') }}</span>
+                                                            </div>
                                                         </div>
+                                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('shift_workers.'.$sh->id))
+                                                            <div class="text-danger fs-11 mt-1 ms-3">{{ $errors->first('shift_workers.'.$sh->id) }}</div>
+                                                        @endif
                                                     @endforeach
                                                 </div>
                                             </div>
@@ -614,6 +828,46 @@
 
                                         @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('shifts'))
                                             <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('shifts') }}</div>
+                                        @endif
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('shift_workers'))
+                                            <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('shift_workers') }}</div>
+                                        @endif
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold fs-12 text-dark d-block">
+                                            {{ __('production.assigned_machines') }}
+                                            <span class="fw-normal text-muted fs-11 ms-1">({{ __('production.assigned_machines_helper') }})</span>
+                                        </label>
+                                        <input type="hidden" name="sync_machines" value="1">
+
+                                        @php
+                                            $selectedMachines = old('_modal') === 'editSectionModal_'.$section->id 
+                                                ? (array) old('machine_ids', []) 
+                                                : $section->machines->pluck('id')->toArray();
+                                            $modalMachineOptions = $section->machines->concat($eligibleMachines)->unique('id')->sortBy('code');
+                                        @endphp
+
+                                        @if($modalMachineOptions->count() > 0)
+                                            <select name="machine_ids[]" id="edit_section_machine_ids_{{ $section->id }}" class="form-select section-machine-select" multiple="multiple" data-placeholder="{{ __('production.select_machines') }}">
+                                                @foreach($modalMachineOptions as $m)
+                                                    <option value="{{ $m->id }}" @selected(in_array($m->id, $selectedMachines))>
+                                                        [{{ $m->code }}] {{ $m->name }} @if($m->section_id === $section->id) ({{ __('production.currently_assigned') }}) @endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <div class="form-text fs-11 text-muted">{{ __('production.assigned_machines_hint') }}</div>
+                                        @else
+                                            <div class="text-muted fs-11 fst-italic p-2 bg-light rounded border">
+                                                <i class="feather-info me-1"></i>{{ __('production.no_eligible_machines_available') }}
+                                            </div>
+                                        @endif
+
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('machine_ids'))
+                                            <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('machine_ids') }}</div>
+                                        @endif
+                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('machine_ids.*'))
+                                            <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('machine_ids.*') }}</div>
                                         @endif
                                     </div>
 
@@ -690,6 +944,109 @@
             </div>
         @endcan
     @endforeach
+
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Initialize Bootstrap popovers for machine badges
+                if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+                    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+                    popoverTriggerList.forEach(function (popoverTriggerEl) {
+                        if (!bootstrap.Popover.getInstance(popoverTriggerEl)) {
+                            new bootstrap.Popover(popoverTriggerEl, {
+                                sanitize: false
+                            });
+                        }
+                    });
+                }
+
+                if (typeof $ !== 'undefined' && $.fn.select2) {
+                    $('.modal').on('shown.bs.modal', function () {
+                        var $modal = $(this);
+                        $modal.find('.section-machine-select').each(function() {
+                            var $select = $(this);
+                            if ($select.hasClass('select2-hidden-accessible')) {
+                                $select.select2('destroy');
+                            }
+                            $select.select2({
+                                theme: 'bootstrap-5',
+                                dropdownParent: $modal.find('.modal-content'),
+                                width: '100%',
+                                placeholder: $select.data('placeholder') || '{{ __('production.select_machines') }}',
+                                closeOnSelect: true
+                            });
+                        });
+                    });
+
+                    // Auto-close Select2 dropdown when scrolling or hiding modal to prevent floating detached dropdowns
+                    $('.modal').on('hide.bs.modal scroll', function () {
+                        $(this).find('.section-machine-select').each(function() {
+                            if ($(this).data('select2')) {
+                                $(this).select2('close');
+                            }
+                        });
+                    });
+
+                    $('.modal-body').on('scroll', function () {
+                        $(this).find('.section-machine-select').each(function() {
+                            if ($(this).data('select2')) {
+                                $(this).select2('close');
+                            }
+                        });
+                    });
+                }
+
+                // Handle manual production toggle
+                document.addEventListener('change', function(e) {
+                    if (e.target && e.target.classList.contains('manual-production-toggle')) {
+                        var targetSelector = e.target.getAttribute('data-target');
+                        var targetEl = document.querySelector(targetSelector);
+                        if (targetEl) {
+                            var input = targetEl.querySelector('.manual-capacity-input');
+                            if (e.target.checked) {
+                                targetEl.classList.remove('d-none');
+                                if (input) {
+                                    input.removeAttribute('disabled');
+                                    input.focus();
+                                }
+                            } else {
+                                targetEl.classList.add('d-none');
+                                if (input) {
+                                    input.setAttribute('disabled', 'disabled');
+                                    input.value = '';
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Handle section shift selection toggle for worker inputs
+                document.addEventListener('change', function(e) {
+                    if (e.target && e.target.classList.contains('section-shift-checkbox')) {
+                        var targetSelector = e.target.getAttribute('data-target');
+                        var targetEl = document.querySelector(targetSelector);
+                        if (targetEl) {
+                            var input = targetEl.querySelector('.shift-worker-input');
+                            if (e.target.checked) {
+                                targetEl.classList.remove('d-none');
+                                if (input) {
+                                    input.removeAttribute('disabled');
+                                    if (!input.value || parseInt(input.value, 10) < 1) {
+                                        input.value = '1';
+                                    }
+                                }
+                            } else {
+                                targetEl.classList.add('d-none');
+                                if (input) {
+                                    input.setAttribute('disabled', 'disabled');
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        </script>
+    @endpush
 
     @if($errors->any() && old('_modal'))
         @push('scripts')

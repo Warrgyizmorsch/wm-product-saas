@@ -31,13 +31,22 @@ class WorkCenterSection extends BaseModel
         'name',
         'code',
         'workers_required',
+        'supports_manual_production',
+        'manual_capacity_per_hour',
         'description',
         'status',
     ];
 
     protected $casts = [
-        'workers_required' => 'integer',
+        'workers_required'           => 'integer',
+        'supports_manual_production' => 'boolean',
+        'manual_capacity_per_hour'   => 'decimal:4',
     ];
+
+    public function supportsManualProduction(): bool
+    {
+        return (bool) $this->supports_manual_production;
+    }
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
@@ -58,7 +67,7 @@ class WorkCenterSection extends BaseModel
             'production_work_center_section_shifts',
             'section_id',
             'shift_id'
-        )->distinct()->withTimestamps();
+        )->distinct()->withPivot('workers_required', 'tenant_id')->withTimestamps();
     }
 
     // ─── Scopes & Helpers ─────────────────────────────────────────────────────

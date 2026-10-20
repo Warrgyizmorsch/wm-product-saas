@@ -2204,6 +2204,21 @@ return array (
   'cannot_delete_has_machines' => 'Cannot Delete (Machines Assigned)',
   'save_section' => 'Save Section',
   'update_section' => 'Update Section',
+  'assigned_machines' => 'Assigned Machines',
+  'select_machines' => 'Select machines...',
+  'assigned_machines_helper' => 'Select machines to assign to this section',
+  'assigned_machines_hint' => 'Only machines not assigned to another section are eligible for assignment.',
+  'no_eligible_machines_available' => 'No eligible unassigned machines available.',
+  'currently_assigned' => 'Currently Assigned',
+  'no_machines_assigned' => 'No machines assigned',
+  'manual_production' => 'Manual Production',
+  'manual_production_desc' => 'Enable if this section supports manual operations without requiring dedicated machines.',
+  'manual_capacity_per_hour' => 'Manual Capacity Per Hour',
+  'manual_capacity_hint' => 'Achievable throughput capacity per hour for manual production (e.g. 10.00 units/hr).',
+  'units_per_hour' => 'units/hr',
+  'worker' => 'worker',
+  'workers' => 'workers',
+  'shift_worker_count' => 'Workers',
 );
 
 

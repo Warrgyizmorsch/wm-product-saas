@@ -84,7 +84,14 @@ class WorkCenterController extends Controller
 
         Gate::authorize('view', $workCenter);
 
-        return view('modules.production.work-centers.show', compact('workCenter'));
+        $tenantId = require_tenant_id();
+        $eligibleMachines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
+            ->whereNull('section_id')
+            ->where('status', '!=', \App\Domains\Production\Models\Machine::STATUS_DECOMMISSIONED)
+            ->orderBy('name')
+            ->get();
+
+        return view('modules.production.work-centers.show', compact('workCenter', 'eligibleMachines'));
     }
 
     public function edit(int $id): View

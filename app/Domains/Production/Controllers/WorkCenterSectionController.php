@@ -51,17 +51,20 @@ class WorkCenterSectionController extends Controller
         $sections = $this->repository->getByWorkCenter($workCenterId, true);
 
         return response()->json($sections->map(fn (WorkCenterSection $s) => [
-            'id'               => $s->id,
-            'work_center_id'   => $s->work_center_id,
-            'name'             => $s->name,
-            'code'             => $s->code,
-            'workers_required' => $s->workers_required,
-            'status'           => $s->status,
-            'label'            => "{$s->name} ({$s->code})",
-            'shifts'           => $s->shifts->map(fn ($sh) => [
-                'id'   => $sh->id,
-                'name' => $sh->name,
-                'code' => $sh->code,
+            'id'                         => $s->id,
+            'work_center_id'             => $s->work_center_id,
+            'name'                       => $s->name,
+            'code'                       => $s->code,
+            'workers_required'           => $s->workers_required,
+            'supports_manual_production' => (bool) $s->supports_manual_production,
+            'manual_capacity_per_hour'   => $s->manual_capacity_per_hour !== null ? (float) $s->manual_capacity_per_hour : null,
+            'status'                     => $s->status,
+            'label'                      => "{$s->name} ({$s->code})",
+            'shifts'                     => $s->shifts->map(fn ($sh) => [
+                'id'               => $sh->id,
+                'name'             => $sh->name,
+                'code'             => $sh->code,
+                'workers_required' => (int) ($sh->pivot->workers_required ?? $s->workers_required ?? 1),
             ]),
         ])->values());
     }

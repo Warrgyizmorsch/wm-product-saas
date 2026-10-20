@@ -84,15 +84,6 @@
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="select" :label="__('production.section_assignment')" name="section_id" :required="true" :errorText="$errors->first('section_id')">
-                            <option value="">{{ __('production.select_section') }}</option>
-                            @foreach($sections as $sec)
-                                <option value="{{ $sec->id }}" @selected(old('section_id', $machine->section_id) == $sec->id)>
-                                    {{ $sec->workCenter?->name ?? '—' }} — {{ $sec->name }} ({{ $sec->code }})
-                                </option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
-                        
                         <x-ui.odoo-form-ui type="input" :label="__('production.machine_name')" name="name" :value="old('name', $machine->name)" :required="true" />
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.machine_asset_code')" name="code" :value="old('code', $machine->code)" :required="true" />

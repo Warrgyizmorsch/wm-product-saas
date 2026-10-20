@@ -54,6 +54,6 @@ class ProductionShift extends BaseModel
             'production_work_center_section_shifts',
             'shift_id',
             'section_id'
-        )->distinct()->withTimestamps();
+        )->distinct()->withPivot('workers_required', 'tenant_id')->withTimestamps();
     }
 }

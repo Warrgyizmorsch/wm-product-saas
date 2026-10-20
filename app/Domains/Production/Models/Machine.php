@@ -67,6 +67,8 @@ class Machine extends BaseModel
                 if ($section) {
                     $machine->work_center_id = $section->work_center_id;
                 }
+            } elseif ($machine->isDirty('section_id') && is_null($machine->section_id)) {
+                $machine->work_center_id = null;
             }
         });
     }

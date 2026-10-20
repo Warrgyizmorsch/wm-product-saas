@@ -44,7 +44,7 @@
                                 {{ $linkedAsset->name }} &middot; {{ $linkedAsset->category->name ?? '—' }} &middot;
                                 Cost: {{ number_format($linkedAsset->purchase_cost, 2) }}
                             </div>
-                            <div class="fs-11 text-muted mt-1">Assign a section and code below to finish commissioning this machine.</div>
+                            <div class="fs-11 text-muted mt-1">Enter a name and code below to finish commissioning this machine.</div>
                         </div>
                     </div>
                 @endif
@@ -52,15 +52,6 @@
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="select" :label="__('production.section_assignment')" name="section_id" :required="true" :errorText="$errors->first('section_id')">
-                            <option value="">{{ __('production.select_section') }}</option>
-                            @foreach($sections as $sec)
-                                <option value="{{ $sec->id }}" @selected(old('section_id', $selectedSectionId ?? '') == $sec->id)>
-                                    {{ $sec->workCenter?->name ?? '—' }} — {{ $sec->name }} ({{ $sec->code }})
-                                </option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
-
                         <x-ui.odoo-form-ui type="input" :label="__('production.machine_name')" name="name" placeholder="{{ __('production.machine_name_placeholder') }}" :value="old('name', $linkedAsset->name ?? '')" :required="true" />
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.machine_asset_code')" name="code" placeholder="{{ __('production.machine_code_placeholder') }}" :value="old('code')" :required="true" />

@@ -44,9 +44,7 @@ class MachineController extends Controller
     {
         Gate::authorize('create', Machine::class);
 
-        $sections    = $this->sectionRepository->getAll(['status' => 'active']);
         $statuses    = config('production.machine_statuses', []);
-        $selectedSectionId = $request->query('section_id');
 
         $linkedAsset = null;
         $assetId = $request->query('asset_id');
@@ -55,7 +53,7 @@ class MachineController extends Controller
                 ->find((int) $assetId);
         }
 
-        return view('modules.production.machines.create', compact('sections', 'statuses', 'selectedSectionId', 'linkedAsset'));
+        return view('modules.production.machines.create', compact('statuses', 'linkedAsset'));
     }
 
     public function store(StoreMachineRequest $request): RedirectResponse
@@ -134,16 +132,12 @@ class MachineController extends Controller
         Gate::authorize('update', $machine);
 
         $machine->loadMissing(['asset.category', 'section.workCenter']);
-        $sections = $this->sectionRepository->getAll(['status' => 'active']);
-        if ($machine->section && ! $sections->contains('id', $machine->section_id)) {
-            $sections->push($machine->section);
-        }
         $statuses = config('production.machine_statuses', []);
         $linkableAssets = $machine->isLinkedToAsset()
             ? collect()
             : $this->unregisteredMachineryAssetsQuery(require_tenant_id())->get();
 
-        return view('modules.production.machines.edit', compact('machine', 'sections', 'statuses', 'linkableAssets'));
+        return view('modules.production.machines.edit', compact('machine', 'statuses', 'linkableAssets'));
     }
 
     public function update(UpdateMachineRequest $request, int $id): RedirectResponse

@@ -41,7 +41,12 @@ class WorkCenterSectionService
         return DB::transaction(function () use ($dto, $tenantId) {
             $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
             $section = $this->repository->create($data);
-            $this->repository->syncShifts($section, $dto->shift_ids, $tenantId);
+            $this->repository->syncShifts($section, $dto->shift_ids, $tenantId, $dto->shift_workers);
+
+            if ($dto->machine_ids !== null) {
+                $this->validateMachinesForAssignment($dto->machine_ids, $tenantId);
+                $this->repository->syncMachines($section, $dto->machine_ids, $tenantId);
+            }
 
             return $section->fresh(['workCenter', 'machines', 'shifts']);
         });
@@ -78,7 +83,12 @@ class WorkCenterSectionService
 
         return DB::transaction(function () use ($id, $dto, $section) {
             $updated = $this->repository->update($id, $dto->toArray());
-            $this->repository->syncShifts($updated, $dto->shift_ids, $section->tenant_id);
+            $this->repository->syncShifts($updated, $dto->shift_ids, $section->tenant_id, $dto->shift_workers);
+
+            if ($dto->machine_ids !== null) {
+                $this->validateMachinesForAssignment($dto->machine_ids, $section->tenant_id, $section->id);
+                $this->repository->syncMachines($updated, $dto->machine_ids, $section->tenant_id);
+            }
 
             return $updated->fresh(['workCenter', 'machines', 'shifts']);
         });
@@ -112,6 +122,36 @@ class WorkCenterSectionService
             throw new InvalidArgumentException(
                 'Section shifts must be selected from the shifts assigned to its parent work center.'
             );
+        }
+    }
+
+    private function validateMachinesForAssignment(array $machineIds, int $tenantId, ?int $currentSectionId = null): void
+    {
+        if (empty($machineIds)) {
+            return;
+        }
+
+        $uniqueIds = array_values(array_unique($machineIds));
+
+        $machines = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
+            ->whereIn('id', $uniqueIds)
+            ->lockForUpdate()
+            ->get();
+
+        if ($machines->count() !== count($uniqueIds)) {
+            throw new InvalidArgumentException('One or more selected machines do not exist or belong to another organization.');
+        }
+
+        foreach ($machines as $machine) {
+            if ($machine->isDecommissioned()) {
+                throw new InvalidArgumentException("Machine '{$machine->name}' is decommissioned and cannot be assigned to a section.");
+            }
+
+            if ($machine->section_id !== null && $machine->section_id !== $currentSectionId) {
+                $otherSection = $machine->section;
+                $otherName = $otherSection ? $otherSection->name : "Section #{$machine->section_id}";
+                throw new InvalidArgumentException("Machine '{$machine->name}' is already assigned to {$otherName}.");
+            }
         }
     }
 }

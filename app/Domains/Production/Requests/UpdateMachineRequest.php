@@ -20,7 +20,7 @@ class UpdateMachineRequest extends FormRequest
 
         return [
             'section_id'         => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('production_work_center_sections', 'id')->where('tenant_id', $tenantId),
             ],
@@ -45,7 +45,6 @@ class UpdateMachineRequest extends FormRequest
     {
         return [
             'code.unique'        => 'A machine with this code already exists in your organization.',
-            'section_id.required'=> 'A section must be selected for the machine.',
             'section_id.exists'  => 'The selected section does not exist.',
         ];
     }

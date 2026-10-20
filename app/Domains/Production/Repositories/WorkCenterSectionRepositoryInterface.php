@@ -24,5 +24,7 @@ interface WorkCenterSectionRepositoryInterface
 
     public function getByWorkCenter(int $workCenterId, bool $activeOnly = false): Collection;
 
-    public function syncShifts(WorkCenterSection $section, array $shiftIds, int $tenantId): void;
+    public function syncShifts(WorkCenterSection $section, array $shiftIds, ?int $tenantId = null, array $shiftWorkers = []): void;
+
+    public function syncMachines(WorkCenterSection $section, array $machineIds, int $tenantId): void;
 }

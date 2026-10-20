@@ -19,14 +19,17 @@ class MachineService
 
     public function create(MachineDTO $dto, int $tenantId, ?int $assetId = null): Machine
     {
-        // Validate section belongs to tenant
-        $section = WorkCenterSection::find($dto->section_id);
-        if (!$section || $section->tenant_id !== $tenantId) {
-            throw new InvalidArgumentException('Invalid section selected.');
-        }
+        $section = null;
+        if ($dto->section_id !== null) {
+            // Validate section belongs to tenant
+            $section = WorkCenterSection::find($dto->section_id);
+            if (!$section || $section->tenant_id !== $tenantId) {
+                throw new InvalidArgumentException('Invalid section selected.');
+            }
 
-        if (!$section->isActive()) {
-            throw new InvalidArgumentException('The selected section is inactive.');
+            if (!$section->isActive()) {
+                throw new InvalidArgumentException('The selected section is inactive.');
+            }
         }
 
         // Validate unique code per tenant
@@ -39,8 +42,8 @@ class MachineService
         return DB::transaction(function () use ($dto, $section, $tenantId, $assetId) {
             $data = array_merge($dto->toArray(), [
                 'tenant_id'      => $tenantId,
-                'section_id'     => $section->id,
-                'work_center_id' => $section->work_center_id,
+                'section_id'     => $section?->id,
+                'work_center_id' => $section?->work_center_id,
             ]);
 
             if ($assetId !== null) {
@@ -111,14 +114,27 @@ class MachineService
             throw new InvalidArgumentException('Machine not found.');
         }
 
-        // Validate section belongs to machine's tenant
-        $section = WorkCenterSection::find($dto->section_id);
-        if (!$section || $section->tenant_id !== $machine->tenant_id) {
-            throw new InvalidArgumentException('Invalid section selected.');
-        }
+        $sectionId = $machine->section_id;
+        $workCenterId = $machine->work_center_id;
 
-        if (!$section->isActive()) {
-            throw new InvalidArgumentException('The selected section is inactive.');
+        if ($dto->has_section_id) {
+            if ($dto->section_id !== null) {
+                // Validate section belongs to machine's tenant
+                $section = WorkCenterSection::find($dto->section_id);
+                if (!$section || $section->tenant_id !== $machine->tenant_id) {
+                    throw new InvalidArgumentException('Invalid section selected.');
+                }
+
+                if (!$section->isActive()) {
+                    throw new InvalidArgumentException('The selected section is inactive.');
+                }
+
+                $sectionId = $section->id;
+                $workCenterId = $section->work_center_id;
+            } else {
+                $sectionId = null;
+                $workCenterId = null;
+            }
         }
 
         // Validate unique code (excluding self)
@@ -129,10 +145,10 @@ class MachineService
             );
         }
 
-        return DB::transaction(function () use ($id, $dto, $section) {
+        return DB::transaction(function () use ($id, $dto, $sectionId, $workCenterId) {
             $data = array_merge($dto->toArray(), [
-                'section_id'     => $section->id,
-                'work_center_id' => $section->work_center_id,
+                'section_id'     => $sectionId,
+                'work_center_id' => $workCenterId,
             ]);
 
             return $this->repository->update($id, $data);

@@ -108,13 +108,52 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
         return $query->orderBy('name')->get();
     }
 
-    public function syncShifts(WorkCenterSection $section, array $shiftIds, int $tenantId): void
+    public function syncShifts(WorkCenterSection $section, array $shiftIds, ?int $tenantId = null, array $shiftWorkers = []): void
     {
+        $tenantId = $tenantId ?? (int) $section->tenant_id;
+        $existingPivotWorkers = $section->shifts->pluck('pivot.workers_required', 'id')->toArray();
+
         $syncData = [];
         foreach ($shiftIds as $shiftId) {
-            $syncData[$shiftId] = ['tenant_id' => $tenantId];
+            $workers = isset($shiftWorkers[$shiftId]) && is_numeric($shiftWorkers[$shiftId])
+                ? (int) $shiftWorkers[$shiftId]
+                : ($existingPivotWorkers[$shiftId] ?? $section->workers_required ?? 1);
+
+            $syncData[$shiftId] = [
+                'tenant_id'        => $tenantId,
+                'workers_required' => max(1, $workers),
+            ];
         }
 
         $section->shifts()->sync($syncData);
+    }
+
+    public function syncMachines(WorkCenterSection $section, array $machineIds, int $tenantId): void
+    {
+        $currentMachineIds = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
+            ->where('section_id', $section->id)
+            ->pluck('id')
+            ->toArray();
+
+        $toRemove = array_diff($currentMachineIds, $machineIds);
+        $toAdd    = array_diff($machineIds, $currentMachineIds);
+
+        if (!empty($toRemove)) {
+            \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
+                ->whereIn('id', $toRemove)
+                ->update([
+                    'section_id'     => null,
+                    'work_center_id' => null,
+                ]);
+        }
+
+        if (!empty($toAdd)) {
+            \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
+                ->whereIn('id', $toAdd)
+                ->update([
+                    'section_id'     => $section->id,
+                    'work_center_id' => $section->work_center_id,
+                ]);
+        }
     }
 }
