@@ -119,3 +119,18 @@
         </x-ui.modal>
     @endforeach
 @endsection
+
+@if ($errors->any() && old('_form'))
+    @push('scripts')
+        <script>
+            // A save failed: reopen the form that was submitted so its errors are visible.
+            document.addEventListener('DOMContentLoaded', function () {
+                const form = document.getElementById(@json(old('_form')));
+                const modal = form ? form.closest('.modal') : null;
+                if (modal) {
+                    bootstrap.Modal.getOrCreateInstance(modal).show();
+                }
+            });
+        </script>
+    @endpush
+@endif
