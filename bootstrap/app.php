@@ -76,5 +76,27 @@ return Application::configure(basePath: dirname(__DIR__))
             );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // A 403 caused by the tenant's plan (PlanFeatureGate) says so and points
+        // at the upgrade, instead of a bare "This action is unauthorized."
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, \Illuminate\Http\Request $request) {
+            $gate = app(\App\Domains\Platform\Services\PlanFeatureGate::class);
+            $feature = $e->getStatusCode() === 403 ? $gate->lastBlocked() : null;
+
+            if ($feature === null) {
+                return null;
+            }
+
+            $label = $gate->label($feature) ?? 'This feature';
+            $message = "{$label} isn't included in your plan. You can still view existing records — upgrade to create or change them.";
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message, 'plan_feature' => $feature], 403);
+            }
+
+            return response()->view('errors.plan-feature', [
+                'label' => $label,
+                'message' => $message,
+                'canUpgrade' => tenant() !== null && ($request->user()?->can('updateSubscription', tenant()) ?? false),
+            ], 403);
+        });
     })->create();

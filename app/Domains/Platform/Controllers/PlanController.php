@@ -3,6 +3,7 @@
 namespace App\Domains\Platform\Controllers;
 
 use App\Domains\Platform\Models\Plan;
+use App\Domains\Platform\Services\PlanFeatureGate;
 use App\Domains\Platform\Services\PlanService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -88,10 +89,15 @@ class PlanController extends Controller
             'currency' => ['nullable', 'string', 'max:10'],
             'billing_cycle' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
             'max_users' => ['nullable', 'integer', 'min:1'],
+            'min_users' => ['nullable', 'integer', 'min:1'],
             'max_storage_mb' => ['nullable', 'integer', 'min:1'],
             'trial_days' => ['nullable', 'integer', 'min:1'],
             'features' => ['nullable', 'array'],
             'features.*' => ['string'],
+            // Present whenever the form's feature picker was on the page; unticked = excluded.
+            'feature_picker' => ['nullable', 'boolean'],
+            'included_features' => ['nullable', 'array'],
+            'included_features.*' => ['string', Rule::in(app(PlanFeatureGate::class)->keys())],
             'is_demo' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
@@ -100,6 +106,10 @@ class PlanController extends Controller
         $mistake = ModulePriceController::yearlyTotalMistake($validated['monthly_price_per_user'] ?? null, $validated['yearly_price_per_user'] ?? null);
         if ($mistake !== null) {
             throw ValidationException::withMessages(['yearly_price_per_user' => ucfirst($mistake)]);
+        }
+
+        if (isset($validated['min_users'], $validated['max_users']) && $validated['min_users'] > $validated['max_users']) {
+            throw ValidationException::withMessages(['min_users' => "Minimum users can't be more than max users."]);
         }
 
         $validated['is_demo'] = $request->boolean('is_demo');

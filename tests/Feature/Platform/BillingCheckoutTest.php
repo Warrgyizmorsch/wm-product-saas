@@ -121,6 +121,31 @@ class BillingCheckoutTest extends TestCase
             ->assertJsonValidationErrors(['seats' => 'Your workspace already has 3 users — buy at least 3.']);
     }
 
+    public function test_a_plan_minimum_raises_the_seat_floor_above_the_workspace_head_count(): void
+    {
+        $this->standard->update(['min_users' => 5]);
+
+        $this->quote(['seats' => 4])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['seats' => 'Standard is sold for at least 5 users.']);
+
+        $this->quote(['seats' => 5])->assertOk()->assertJsonPath('seats', 5);
+    }
+
+    public function test_subscription_page_shows_both_cycles_minimum_users_custom_plan_and_comparison(): void
+    {
+        $this->standard->update(['min_users' => 5]);
+
+        $this->actingAs($this->owner)->get(route('platform.subscription.index'))
+            ->assertOk()
+            ->assertSee('data-cycle-btn="monthly"', false)
+            ->assertSee('data-cycle-btn="yearly"', false)
+            ->assertSee(route('platform.billing.checkout', ['plan' => $this->standard->id, 'cycle' => 'monthly']))
+            ->assertSee('Minimum users: 5')
+            ->assertSee('Contact us')
+            ->assertSee('Compare plans');
+    }
+
     public function test_a_plan_without_per_user_pricing_or_an_unknown_cycle_is_rejected(): void
     {
         $legacy = Plan::query()->where('slug', 'legacy-flat')->sole();

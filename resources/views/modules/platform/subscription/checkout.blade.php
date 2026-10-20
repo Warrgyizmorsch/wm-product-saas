@@ -92,6 +92,9 @@
                                                 </div>
                                                 <div class="fs-12 text-muted mb-1">/user/month <span data-cycle-note></span></div>
                                                 <div class="fs-12 text-muted" data-plan-alt="{{ $plan['id'] }}"></div>
+                                                @if ($plan['min_users'])
+                                                    <div class="fs-12 fw-semibold text-dark mt-1">Minimum users: {{ $plan['min_users'] }}</div>
+                                                @endif
                                                 @if ($plan['description'])
                                                     <p class="fs-13 text-muted mt-3 mb-0">{{ $plan['description'] }}</p>
                                                 @endif
@@ -113,6 +116,7 @@
                                 <div>
                                     <label for="seats" class="fw-semibold text-dark d-block">Number of users</label>
                                     <span class="fs-12 text-muted">Your workspace has {{ $minimumSeats }} {{ \Illuminate\Support\Str::plural('user', $minimumSeats) }} today — you can't go below that.</span>
+                                    <span class="fs-12 text-warning-emphasis d-block d-none" id="planMinimumNote"></span>
                                 </div>
                                 <div class="input-group" style="max-width: 170px">
                                     <button class="btn btn-light border" type="button" data-seat-step="-1" aria-label="Fewer users">−</button>
@@ -282,7 +286,7 @@
 (function () {
     var PLANS = @json($plans);
     var MODULES = @json($modules);
-    var MIN_SEATS = {{ (int) $minimumSeats }};
+    var WORKSPACE_SEATS = {{ (int) $minimumSeats }};
     var CURRENCY = @json($currency);
     var ROUTES = {
         quote: @json(route('platform.billing.quote')),
@@ -306,6 +310,8 @@
     }
     function rupees(n) { return symbol + Number(n).toLocaleString('en-IN'); }
     function plan() { return PLANS.find(function (p) { return p.id === state.plan_id; }) || null; }
+    // Seats can't go below the workspace's users, nor the selected plan's minimum.
+    function minSeats() { var p = plan(); return Math.max(WORKSPACE_SEATS, (p && p.min_users) || 1); }
     function planIncludes(p, key) { return p.features === null || p.features.indexOf(key) !== -1; }
     function post(url, body, method) {
         return fetch(url, {
@@ -370,7 +376,7 @@
 
     var seatsInput = document.getElementById('seats');
     function setSeats(n) {
-        state.seats = Math.max(MIN_SEATS, parseInt(n, 10) || MIN_SEATS);
+        state.seats = Math.max(minSeats(), parseInt(n, 10) || minSeats());
         if (seatsInput) seatsInput.value = state.seats;
         requestQuote();
     }
@@ -378,7 +384,7 @@
         seatsInput.addEventListener('change', function () { setSeats(seatsInput.value); });
         seatsInput.addEventListener('input', function () {
             var n = parseInt(seatsInput.value, 10);
-            if (n >= MIN_SEATS) { state.seats = n; requestQuote(); }
+            if (n >= minSeats()) { state.seats = n; requestQuote(); }
         });
     }
     root.querySelectorAll('[data-seat-step]').forEach(function (btn) {
@@ -547,7 +553,24 @@
         return change.due_now >= 100 ? 'Pay ' + money(change.due_now) + ' now' : 'Confirm change';
     }
 
+    function applyPlanMinimum() {
+        var min = minSeats();
+        var p = plan();
+        var note = document.getElementById('planMinimumNote');
+        if (seatsInput) seatsInput.min = min;
+        if (note) {
+            var shown = p && p.min_users && p.min_users > WORKSPACE_SEATS;
+            note.classList.toggle('d-none', !shown);
+            note.textContent = shown ? p.name + ' is sold for at least ' + p.min_users + ' users.' : '';
+        }
+        if (state.seats < min) {
+            state.seats = min;
+            if (seatsInput) seatsInput.value = min;
+        }
+    }
+
     function refresh() {
+        applyPlanMinimum();
         renderPlans();
         renderAddons();
         renderNav();
