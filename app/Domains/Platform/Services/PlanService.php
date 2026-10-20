@@ -11,6 +11,7 @@ class PlanService
 {
     public function __construct(
         private readonly PlanRepository $plans,
+        private readonly PlanFeatureGate $planFeatures,
     ) {
     }
 
@@ -39,7 +40,14 @@ class PlanService
 
     private function payload(array $data): array
     {
-        return [
+        // The form ticks the features a plan includes; the plan stores what it leaves out,
+        // so features added to the catalog later are included by default. Without the
+        // picker on the page (e.g. an API-style update) the stored list is left alone.
+        $features = ! empty($data['feature_picker']) ? [
+            'excluded_features' => array_values(array_diff($this->planFeatures->keys(), $data['included_features'] ?? [])) ?: null,
+        ] : [];
+
+        return $features + [
             'name' => $data['name'],
             'slug' => ($data['slug'] ?? null) ?: Str::slug($data['name']),
             'description' => ($data['description'] ?? null) ?: null,
@@ -49,6 +57,7 @@ class PlanService
             'currency' => ($data['currency'] ?? null) ?: 'INR',
             'billing_cycle' => ($data['billing_cycle'] ?? null) ?: 'monthly',
             'max_users' => ($data['max_users'] ?? null) ?: null,
+            'min_users' => ($data['min_users'] ?? null) ?: null,
             'max_storage_mb' => ($data['max_storage_mb'] ?? null) ?: null,
             'trial_days' => ($data['trial_days'] ?? null) ?: null,
             'features' => $data['features'] ?? [],

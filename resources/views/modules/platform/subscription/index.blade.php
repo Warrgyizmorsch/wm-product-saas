@@ -167,84 +167,327 @@
         @endif
     </x-ui.card>
 
-    <div class="row g-4">
-        @forelse ($plans as $plan)
-            @php $isCurrent = $currentPlan && $currentPlan->id === $plan->id; @endphp
-            <div class="col-xxl-3 col-md-6">
-                <x-ui.card stretch class="{{ $isCurrent ? 'border border-primary' : '' }}">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="mb-0">{{ $plan->name }}</h5>
-                        @if ($isCurrent)
-                            <x-ui.badge variant="primary" soft>Current</x-ui.badge>
-                        @endif
-                    </div>
-                    @php
-                        $prices = $planPrices[$plan->id];
-                        $perUserPlan = $prices['monthly'] !== null || $prices['yearly'] !== null;
-                    @endphp
-                    <div class="mb-3">
-                        @if ($perUserPlan)
-                            <span class="fs-24 fw-bold text-dark">₹{{ number_format($prices['yearly'] ?? $prices['monthly']) }}</span>
-                            <span class="fs-12 text-muted">/user/month{{ $prices['yearly'] !== null ? ' billed yearly' : '' }}</span>
-                            @if ($prices['yearly'] !== null && $prices['monthly'] !== null)
-                                <span class="d-block fs-12 text-muted">₹{{ number_format($prices['monthly']) }} /user month-to-month</span>
-                            @endif
-                        @else
-                            <span class="fs-24 fw-bold text-dark">
-                                {{ $plan->price > 0 ? $plan->currency.' '.number_format($plan->price) : 'Free' }}
-                            </span>
-                            @if ($plan->price > 0)
-                                <span class="fs-12 text-muted">/ {{ $plan->billing_cycle }}</span>
-                            @endif
-                        @endif
-                    </div>
-                    @if ($plan->description)
-                        <p class="fs-13 text-muted mb-3">{{ $plan->description }}</p>
-                    @endif
-                    <ul class="list-unstyled fs-13 mb-4">
-                        <li class="mb-2"><i class="feather-check text-success me-2"></i>{{ $plan->max_users ? $plan->max_users.' users' : 'Unlimited users' }}</li>
-                        <li class="mb-2"><i class="feather-check text-success me-2"></i>{{ $plan->max_storage_mb ? number_format($plan->max_storage_mb / 1024, 1).' GB storage' : 'Unlimited storage' }}</li>
-                        @if ($plan->features)
-                            <li class="mb-2"><i class="feather-check text-success me-2"></i>{{ count($plan->features) }} modules included</li>
-                        @else
-                            <li class="mb-2"><i class="feather-check text-success me-2"></i>All modules included</li>
-                        @endif
-                    </ul>
+    @php
+        $customPlan = config('billing.custom_plan');
+        $showCustom = (bool) ($customPlan['enabled'] ?? false);
+        $sellsMonthly = collect($planPrices)->contains(fn ($p) => $p['monthly'] !== null);
+        $sellsYearly = collect($planPrices)->contains(fn ($p) => $p['yearly'] !== null);
+        $showCycleToggle = $sellsMonthly && $sellsYearly;
+        $defaultCycle = $sellsYearly ? 'yearly' : 'monthly';
+        // Best yearly saving across plans, for the "Save up to N%" hint on the toggle.
+        $bestSaving = collect($planPrices)
+            ->filter(fn ($p) => $p['monthly'] && $p['yearly'] !== null && $p['yearly'] < $p['monthly'])
+            ->map(fn ($p) => (int) round((1 - $p['yearly'] / $p['monthly']) * 100))
+            ->max();
+        $contactHref = $customPlan['contact_url']
+            ?? (($customPlan['sales_email'] ?? null) ? 'mailto:'.$customPlan['sales_email'].'?subject='.rawurlencode('Custom plan enquiry — '.($tenant->name ?? 'workspace')) : null);
+        $includes = fn ($plan, string $module) => $plan->features === null || in_array($module, $plan->features, true);
+        $compareColumns = $plans->count() + 1 + ($showCustom ? 1 : 0);
+        $planFeatures = app(\App\Domains\Platform\Services\PlanFeatureGate::class);
+        $featureCatalog = $planFeatures->catalog();
+    @endphp
 
-                    @if ($perUserPlan)
-                        @can('updateSubscription', $tenant)
-                            <a href="{{ route('platform.billing.checkout', ['plan' => $plan->id]) }}" class="btn btn-sm w-100 {{ $isCurrent ? 'btn-light border' : 'btn-primary' }}">
-                                {{ $isCurrent ? 'Subscribe — choose users & add-ons' : 'Choose '.$plan->name }}
-                            </a>
-                        @endcan
-                    @elseif ($isCurrent)
-                        <x-ui.button variant="light" size="sm" class="w-100 border" disabled>Current Plan</x-ui.button>
-                    @elseif ($plan->price > 0)
-                        <x-ui.button type="button" variant="primary" size="sm" class="w-100 js-razorpay-checkout"
-                            data-plan-id="{{ $plan->id }}" data-plan-name="{{ $plan->name }}">
-                            Switch to {{ $plan->name }}
-                        </x-ui.button>
-                    @else
-                        <form action="{{ route('platform.subscription.update') }}" method="POST" id="switchPlanForm{{ $plan->id }}">
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="plan_id" value="{{ $plan->id }}">
-                            <x-ui.button type="button" variant="primary" size="sm" class="w-100"
-                                onclick="confirmAction({title: 'Switch Plan', message: 'Switch your subscription to the {{ $plan->name }} plan?', variant: 'primary', confirmText: 'Switch Plan'}, function() { document.getElementById('switchPlanForm{{ $plan->id }}').submit(); })">
-                                Switch to {{ $plan->name }}
-                            </x-ui.button>
-                        </form>
-                    @endif
-                </x-ui.card>
+    <x-ui.card class="mb-4 sub-pricing" id="subPricing" data-cycle="{{ $defaultCycle }}">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+            <div>
+                <span class="text-muted fs-12 text-uppercase">Plans &amp; pricing</span>
+                <p class="fs-13 text-muted mb-0">Priced per user per month. GST is added at checkout.</p>
             </div>
-        @empty
-            <div class="col-12">
-                <x-ui.card>
+            @if ($showCycleToggle)
+                <div class="sub-cycle-toggle" role="group" aria-label="Billing period">
+                    <button type="button" data-cycle-btn="monthly" aria-pressed="{{ $defaultCycle === 'monthly' ? 'true' : 'false' }}">Monthly</button>
+                    <button type="button" data-cycle-btn="yearly" aria-pressed="{{ $defaultCycle === 'yearly' ? 'true' : 'false' }}">
+                        Yearly
+                        @if ($bestSaving)
+                            <span class="sub-save">Save up to {{ $bestSaving }}%</span>
+                        @endif
+                    </button>
+                </div>
+            @endif
+        </div>
+
+        <div class="row g-3">
+            @forelse ($plans as $plan)
+                @php
+                    $isCurrent = $currentPlan && $currentPlan->id === $plan->id;
+                    $prices = $planPrices[$plan->id];
+                    $perUserPlan = $prices['monthly'] !== null || $prices['yearly'] !== null;
+                    $saving = $prices['monthly'] && $prices['yearly'] !== null && $prices['yearly'] < $prices['monthly']
+                        ? (int) round((1 - $prices['yearly'] / $prices['monthly']) * 100) : null;
+                @endphp
+                <div class="col-xxl col-md-6">
+                    <div class="sub-plan {{ $isCurrent ? 'is-current' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="sub-plan-name">{{ $plan->name }}</span>
+                            @if ($isCurrent)
+                                <x-ui.badge variant="primary" soft>Current</x-ui.badge>
+                            @endif
+                        </div>
+
+                        <div class="sub-plan-price">
+                            @if ($perUserPlan)
+                                @foreach (['monthly', 'yearly'] as $cycle)
+                                    <div data-show-cycle="{{ $cycle }}">
+                                        @if ($prices[$cycle] !== null)
+                                            <div class="sub-amount">₹{{ number_format($prices[$cycle]) }}</div>
+                                            <div class="fs-13 text-dark">per user/month <span class="text-muted">{{ $cycle === 'yearly' ? 'billed annually' : 'billed monthly' }}</span></div>
+                                            @if ($cycle === 'yearly' && $saving)
+                                                <span class="sub-save mt-2">Save {{ $saving }}% vs monthly</span>
+                                            @endif
+                                        @else
+                                            <div class="sub-amount text-muted">—</div>
+                                            <div class="fs-13 text-muted">Not sold {{ $cycle }}</div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            @else
+                                <div class="sub-amount">{{ $plan->price > 0 ? $plan->currency.' '.number_format($plan->price) : 'Free' }}</div>
+                                @if ($plan->price > 0)
+                                    <div class="fs-13 text-muted">per {{ $plan->billing_cycle === 'yearly' ? 'year' : 'month' }}</div>
+                                @endif
+                            @endif
+                        </div>
+
+                        @if ($plan->description)
+                            <p class="fs-13 text-muted mb-3">{{ $plan->description }}</p>
+                        @endif
+
+                        <div class="mt-auto">
+                            @if ($perUserPlan)
+                                @can('updateSubscription', $tenant)
+                                    @foreach (['monthly', 'yearly'] as $cycle)
+                                        <div data-show-cycle="{{ $cycle }}">
+                                            @if ($prices[$cycle] !== null)
+                                                <a href="{{ route('platform.billing.checkout', ['plan' => $plan->id, 'cycle' => $cycle]) }}" class="btn w-100 {{ $isCurrent ? 'btn-light border' : 'btn-primary' }}">
+                                                    {{ $isCurrent ? ($liveSubscription ? 'Manage users & add-ons' : 'Subscribe') : 'Choose '.$plan->name }}
+                                                </a>
+                                            @else
+                                                <button type="button" class="btn w-100 btn-light border" disabled>Not available {{ $cycle }}</button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                @endcan
+                            @elseif ($isCurrent)
+                                <x-ui.button variant="light" class="w-100 border" disabled>Current Plan</x-ui.button>
+                            @elseif ($plan->price > 0)
+                                <x-ui.button type="button" variant="primary" class="w-100 js-razorpay-checkout"
+                                    data-plan-id="{{ $plan->id }}" data-plan-name="{{ $plan->name }}">
+                                    Switch to {{ $plan->name }}
+                                </x-ui.button>
+                            @else
+                                <form action="{{ route('platform.subscription.update') }}" method="POST" id="switchPlanForm{{ $plan->id }}">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="plan_id" value="{{ $plan->id }}">
+                                    <x-ui.button type="button" variant="primary" class="w-100"
+                                        onclick="confirmAction({title: 'Switch Plan', message: 'Switch your subscription to the {{ $plan->name }} plan?', variant: 'primary', confirmText: 'Switch Plan'}, function() { document.getElementById('switchPlanForm{{ $plan->id }}').submit(); })">
+                                        Switch to {{ $plan->name }}
+                                    </x-ui.button>
+                                </form>
+                            @endif
+                            <div class="sub-min">
+                                @if ($plan->min_users)
+                                    Minimum users: {{ $plan->min_users }}
+                                @else
+                                    &nbsp;
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <div class="col-12">
                     <div class="text-center py-5 text-muted">No plans are available right now.</div>
-                </x-ui.card>
+                </div>
+            @endforelse
+
+            @if ($showCustom)
+                <div class="col-xxl col-md-6">
+                    <div class="sub-plan sub-plan-custom">
+                        <span class="sub-plan-name mb-3">Custom</span>
+                        <div class="sub-plan-price">
+                            <div class="sub-amount">Let's talk</div>
+                            <div class="fs-13 text-muted">pricing for your scale</div>
+                        </div>
+                        <p class="fs-13 text-muted mb-3">{{ $customPlan['description'] }}</p>
+                        <ul class="list-unstyled fs-13 mb-3">
+                            @foreach ($customPlan['highlights'] ?? [] as $point)
+                                <li class="mb-2 d-flex gap-2"><i class="feather-check text-primary mt-1"></i><span>{{ $point }}</span></li>
+                            @endforeach
+                        </ul>
+                        <div class="mt-auto">
+                            @if ($contactHref)
+                                <a href="{{ $contactHref }}" class="btn btn-dark w-100" @if ($customPlan['contact_url']) target="_blank" rel="noopener" @endif>
+                                    <i class="feather-message-circle me-1"></i> Contact us
+                                </a>
+                            @endif
+                            <div class="sub-min">
+                                @if ($customPlan['sales_phone'])
+                                    or call <a href="tel:{{ preg_replace('/[^0-9+]/', '', $customPlan['sales_phone']) }}">{{ $customPlan['sales_phone'] }}</a>
+                                @else
+                                    &nbsp;
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        {{-- Feature comparison (Zoho-style) --}}
+        @if ($plans->isNotEmpty())
+            <div class="sub-compare mt-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <h6 class="mb-0 fw-bold">Compare plans</h6>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <div class="sub-compare-search">
+                            <i class="feather-search"></i>
+                            <input type="search" class="form-control form-control-sm" id="compareSearch" placeholder="Search features like &quot;payroll&quot;" aria-label="Search features">
+                        </div>
+                        <label class="form-check mb-0 fs-13">
+                            <input type="checkbox" class="form-check-input" id="hideCommonRows">
+                            <span class="form-check-label">Hide common features</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table mb-0 sub-compare-table">
+                        <thead>
+                            <tr>
+                                <th class="sub-compare-feature">Feature</th>
+                                @foreach ($plans as $plan)
+                                    <th class="text-center">{{ $plan->name }}</th>
+                                @endforeach
+                                @if ($showCustom)
+                                    <th class="text-center">Custom</th>
+                                @endif
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="sub-compare-group" data-group="limits"><td colspan="{{ $compareColumns }}"><button type="button" aria-expanded="true"><i class="feather-chevron-down"></i> Plan &amp; limits</button></td></tr>
+                            <tr>
+                                <td>Price per user / month</td>
+                                @foreach ($plans as $plan)
+                                    @php
+                                        $prices = $planPrices[$plan->id];
+                                        $flat = $plan->price > 0 ? $plan->currency.' '.number_format($plan->price).' flat' : 'Free';
+                                        $perUserPlan = $prices['monthly'] !== null || $prices['yearly'] !== null;
+                                    @endphp
+                                    <td class="text-center">
+                                        @if ($perUserPlan)
+                                            @foreach (['monthly', 'yearly'] as $cycle)
+                                                <span data-show-cycle="{{ $cycle }}">{{ $prices[$cycle] !== null ? '₹'.number_format($prices[$cycle]) : '—' }}</span>
+                                            @endforeach
+                                        @else
+                                            {{ $flat }}
+                                        @endif
+                                    </td>
+                                @endforeach
+                                @if ($showCustom)
+                                    <td class="text-center">Custom quote</td>
+                                @endif
+                            </tr>
+                            <tr>
+                                <td>Minimum users</td>
+                                @foreach ($plans as $plan)
+                                    <td class="text-center">{{ $plan->min_users ?? '—' }}</td>
+                                @endforeach
+                                @if ($showCustom)
+                                    <td class="text-center">Flexible</td>
+                                @endif
+                            </tr>
+                            <tr>
+                                <td>Maximum users</td>
+                                @foreach ($plans as $plan)
+                                    <td class="text-center">{{ $plan->max_users ? number_format($plan->max_users) : 'Unlimited' }}</td>
+                                @endforeach
+                                @if ($showCustom)
+                                    <td class="text-center">Unlimited</td>
+                                @endif
+                            </tr>
+                            <tr>
+                                <td>Storage</td>
+                                @foreach ($plans as $plan)
+                                    <td class="text-center">{{ $plan->max_storage_mb ? rtrim(rtrim(number_format($plan->max_storage_mb / 1024, 1), '0'), '.').' GB' : 'Unlimited' }}</td>
+                                @endforeach
+                                @if ($showCustom)
+                                    <td class="text-center">Unlimited</td>
+                                @endif
+                            </tr>
+                            <tr>
+                                <td>Free trial</td>
+                                @foreach ($plans as $plan)
+                                    <td class="text-center">{{ $plan->trial_days ? $plan->trial_days.' days' : '—' }}</td>
+                                @endforeach
+                                @if ($showCustom)
+                                    <td class="text-center">On request</td>
+                                @endif
+                            </tr>
+
+                            {{-- One group per module (header shows whether the plan has the module), then its features. --}}
+                            @foreach ($modules as $module)
+                                @php
+                                    $addon = $isRecurring($module);
+                                    $group = $featureCatalog[$module['key']] ?? null;
+                                @endphp
+                                <tr class="sub-compare-group sub-compare-module" data-group="{{ $module['key'] }}">
+                                    <td>
+                                        <button type="button" aria-expanded="true">
+                                            <i class="feather-chevron-down"></i>
+                                            <span class="sub-compare-dot" style="background: {{ $module['color'] }}"></span>
+                                            {{ $module['label'] }}
+                                        </button>
+                                    </td>
+                                    @foreach ($plans as $plan)
+                                        <td class="text-center">
+                                            @if ($includes($plan, $module['key']))
+                                                <i class="feather-check sub-yes" aria-label="Included"></i>
+                                            @elseif ($addon)
+                                                <span class="sub-addon">Add-on</span>
+                                            @else
+                                                <i class="feather-minus sub-no" aria-label="Not included"></i>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                    @if ($showCustom)
+                                        <td class="text-center"><i class="feather-check sub-yes" aria-label="Included"></i></td>
+                                    @endif
+                                </tr>
+                                @foreach ($group['features'] ?? [] as $featureKey => $feature)
+                                    <tr>
+                                        <td class="sub-compare-sub">{{ $feature['label'] }}</td>
+                                        @foreach ($plans as $plan)
+                                            <td class="text-center">
+                                                @if (! $includes($plan, $module['key']))
+                                                    @if ($addon)
+                                                        <span class="sub-addon">Add-on</span>
+                                                    @else
+                                                        <i class="feather-minus sub-no" aria-label="Not included"></i>
+                                                    @endif
+                                                @elseif ($planFeatures->includes($plan, $featureKey))
+                                                    <i class="feather-check sub-yes" aria-label="Included"></i>
+                                                @else
+                                                    <i class="feather-x sub-x" title="View only on this plan" aria-label="View only"></i>
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                        @if ($showCustom)
+                                            <td class="text-center"><i class="feather-check sub-yes" aria-label="Included"></i></td>
+                                        @endif
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="sub-compare-legend">
+                    <span><i class="feather-check sub-yes"></i>Included</span>
+                    <span><i class="feather-x sub-x"></i>View only — existing records stay visible, upgrade to create or change</span>
+                    <span><span class="sub-addon">Add-on</span> Module can be added to this plan</span>
+                </div>
             </div>
-        @endforelse
-    </div>
+        @endif
+    </x-ui.card>
 
     <x-ui.card class="mt-4">
         <div class="mb-3">
@@ -326,6 +569,42 @@
     border: 1px solid rgba(0,0,0,.08); border-radius: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,.06);
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
+/* Plans & pricing (Zoho-style): cycle toggle, plan cards, Custom card, comparison */
+.sub-pricing[data-cycle="monthly"] [data-show-cycle="yearly"],
+.sub-pricing[data-cycle="yearly"] [data-show-cycle="monthly"] { display: none !important; }
+.sub-cycle-toggle { display: inline-flex; padding: 4px; gap: 4px; border-radius: 999px; background: var(--ax-surface-sunken, #f1f5f9); border: 1px solid var(--ax-border, #e2e8f0); }
+.sub-cycle-toggle button { border: 0; background: transparent; border-radius: 999px; padding: 7px 18px; font-size: 13px; font-weight: 600; color: var(--ax-text-muted, #64748b); display: inline-flex; align-items: center; gap: 8px; transition: background .2s, color .2s, box-shadow .2s; }
+.sub-cycle-toggle button[aria-pressed="true"] { background: var(--ax-surface, #fff); color: var(--ax-text, #0f172a); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+.sub-save { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: var(--ax-positive-strong, #047857); background: var(--ax-positive-soft, #ecfdf5); }
+.sub-plan { height: 100%; display: flex; flex-direction: column; padding: 24px 22px 18px; border-radius: 14px; border: 1px solid var(--ax-border, #e2e8f0); background: var(--ax-surface, #fff); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.sub-plan:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -14px rgba(15, 23, 42, .25); border-color: var(--ax-brand-soft-border, #c7d2fe); }
+.sub-plan.is-current { border: 2px solid var(--ax-brand, #4f46e5); }
+.sub-plan-name { display: block; font-family: var(--ax-font-display); font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ax-brand, #4f46e5); }
+.sub-plan-price { min-height: 108px; margin-bottom: 14px; }
+.sub-amount { font-family: var(--ax-font-display); font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; color: var(--ax-text, #0f172a); }
+.sub-min { min-height: 20px; margin-top: 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--ax-text-body, #334155); }
+.sub-plan-custom { background: linear-gradient(160deg, var(--ax-brand-soft, #eef2ff), var(--ax-surface, #fff) 60%); }
+.sub-compare { border-top: 1px solid var(--ax-divider, #e2e8f0); padding-top: 20px; }
+.sub-compare-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ax-text-muted, #64748b); white-space: nowrap; }
+.sub-compare-table td { vertical-align: middle; font-size: 13px; }
+.sub-compare-feature { min-width: 220px; }
+.sub-compare-group td { background: var(--ax-surface-muted, #f8fafc) !important; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ax-brand, #4f46e5); }
+.sub-compare-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.sub-yes { color: var(--ax-positive, #10b981); font-size: 16px; }
+.sub-no { color: var(--ax-text-subtle, #cbd5e1); }
+.sub-addon { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: var(--ax-pending-strong, #b45309); background: var(--ax-pending-soft, #fffbeb); }
+.sub-compare-table tr.is-common, .sub-compare-table tr.is-filtered, .sub-compare-table tr.is-collapsed { display: none; }
+.sub-compare-module td { text-transform: none !important; letter-spacing: 0 !important; font-size: 13.5px !important; color: var(--ax-text, #0f172a) !important; }
+.sub-compare-sub { padding-left: 34px !important; color: var(--ax-text-body, #334155); }
+.sub-x { color: var(--ax-text-subtle, #94a3b8); font-size: 15px; }
+.sub-compare-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--ax-text-muted, #64748b); }
+.sub-compare-legend i { margin-right: 4px; }
+.sub-compare-group button { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; display: inline-flex; align-items: center; gap: 6px; }
+.sub-compare-group button i { transition: transform .2s ease; }
+.sub-compare-group button[aria-expanded="false"] i { transform: rotate(-90deg); }
+.sub-compare-search { position: relative; }
+.sub-compare-search i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ax-text-muted, #64748b); font-size: 13px; pointer-events: none; }
+.sub-compare-search input { padding-left: 30px; min-width: 240px; }
 </style>
 
 {{--
@@ -337,6 +616,50 @@
 --}}
 @push('scripts')
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script>
+        // Plans: Monthly/Yearly switch and "Hide common features" in the comparison.
+        (function () {
+            var pricing = document.getElementById('subPricing');
+            if (!pricing) return;
+            pricing.querySelectorAll('[data-cycle-btn]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    pricing.dataset.cycle = btn.dataset.cycleBtn;
+                    pricing.querySelectorAll('[data-cycle-btn]').forEach(function (b) {
+                        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+                    });
+                });
+            });
+            // Comparison: hide rows every plan shares, filter by search, collapse a group.
+            var rows = Array.prototype.slice.call(pricing.querySelectorAll('.sub-compare-table tbody tr'));
+            var hide = document.getElementById('hideCommonRows');
+            var search = document.getElementById('compareSearch');
+            var group = null;
+            rows.forEach(function (row) {
+                if (row.classList.contains('sub-compare-group')) { group = row.dataset.group; return; }
+                row.dataset.inGroup = group;
+                var cells = Array.prototype.slice.call(row.cells, 1).map(function (c) { return c.innerHTML.replace(/\s+/g, ' ').trim(); });
+                row.dataset.common = cells.every(function (c) { return c === cells[0]; }) ? '1' : '0';
+            });
+            function applyFilters() {
+                var q = search ? search.value.trim().toLowerCase() : '';
+                rows.forEach(function (row) {
+                    if (row.classList.contains('sub-compare-group')) return;
+                    row.classList.toggle('is-common', !!(hide && hide.checked) && row.dataset.common === '1');
+                    row.classList.toggle('is-filtered', q !== '' && row.cells[0].textContent.toLowerCase().indexOf(q) === -1);
+                });
+            }
+            if (hide) hide.addEventListener('change', applyFilters);
+            if (search) search.addEventListener('input', applyFilters);
+            pricing.querySelectorAll('.sub-compare-group button').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var open = btn.getAttribute('aria-expanded') !== 'true';
+                    var key = btn.closest('tr').dataset.group;
+                    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    rows.forEach(function (row) { if (row.dataset.inGroup === key) row.classList.toggle('is-collapsed', !open); });
+                });
+            });
+        })();
+    </script>
     <script>
         function submitGatewayVerify(orderId, paymentId, signature) {
             document.getElementById('gw_order_id').value = orderId;

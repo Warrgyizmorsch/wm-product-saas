@@ -68,6 +68,9 @@
                                 </td>
                                 <td>
                                     <span class="d-block fs-12">{{ $plan->max_users ? $plan->max_users.' users' : 'Users unlimited' }}</span>
+                                    @if ($plan->min_users)
+                                        <span class="d-block fs-11 text-muted">Min {{ $plan->min_users }} users</span>
+                                    @endif
                                     <span class="d-block fs-11 text-muted">{{ $plan->max_storage_mb ? number_format($plan->max_storage_mb).' MB' : 'Storage unlimited' }}</span>
                                 </td>
                                 <td>{{ $plan->trial_days ? $plan->trial_days.' days' : '—' }}</td>

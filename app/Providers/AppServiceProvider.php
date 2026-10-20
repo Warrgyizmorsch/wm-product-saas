@@ -43,6 +43,8 @@ class AppServiceProvider extends ServiceProvider
 
         // One builder per request, so the sidebar and the header's app launcher share a single computation.
         $this->app->scoped(\App\Core\Navigation\MenuBuilder::class);
+        // Per request / job: caches each tenant's excluded plan features for that request only.
+        $this->app->scoped(\App\Domains\Platform\Services\PlanFeatureGate::class);
 
         // Loads every module's Dashboard/widgets.php once per request.
         $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);

@@ -59,7 +59,7 @@ class SubscriptionPricingTest extends TestCase
 
     public function test_every_gated_module_has_a_price_row_after_migrating(): void
     {
-        $this->assertSame(8, ModulePrice::query()->count());
+        $this->assertSame(count(\App\Http\Middleware\EnsureTenantModuleAccess::GATED_MODULES), ModulePrice::query()->count());
     }
 
     public function test_monthly_quote_is_per_user_with_gst_on_top(): void
@@ -214,6 +214,44 @@ class SubscriptionPricingTest extends TestCase
         $plan = $this->plan->fresh();
         $this->assertSame(3000, $plan->monthly_price_per_user);
         $this->assertNull($plan->yearly_price_per_user);
+    }
+
+    public function test_plan_form_saves_minimum_users_and_rejects_one_above_the_maximum(): void
+    {
+        $admin = $this->platformAdmin();
+        $base = ['name' => 'Standard', 'slug' => 'standard-test', 'billing_cycle' => 'monthly', 'price' => 0, 'features' => ['crm'], 'is_active' => '1'];
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + ['min_users' => '5', 'max_users' => ''])
+            ->assertRedirect(route('platform.plans.index'));
+        $this->assertSame(5, $this->plan->fresh()->min_users);
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + ['min_users' => '10', 'max_users' => '8'])
+            ->assertSessionHasErrors('min_users');
+        $this->assertSame(5, $this->plan->fresh()->min_users);
+    }
+
+    public function test_plan_form_stores_unticked_features_as_excluded_and_keeps_them_without_the_picker(): void
+    {
+        $admin = $this->platformAdmin();
+        $base = ['name' => 'Standard', 'slug' => 'standard-test', 'billing_cycle' => 'monthly', 'price' => 0, 'features' => ['crm', 'purchase'], 'is_active' => '1'];
+        $all = app(\App\Domains\Platform\Services\PlanFeatureGate::class)->keys();
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + [
+            'feature_picker' => '1',
+            'included_features' => array_values(array_diff($all, ['purchase.returns', 'purchase.landed_costs'])),
+        ])->assertRedirect(route('platform.plans.index'));
+        $this->assertSame(['purchase.landed_costs', 'purchase.returns'], collect($this->plan->fresh()->excluded_features)->sort()->values()->all());
+
+        // An update without the picker on the page leaves the list alone.
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base)->assertRedirect(route('platform.plans.index'));
+        $this->assertCount(2, $this->plan->fresh()->excluded_features);
+
+        // Everything ticked = nothing excluded.
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + ['feature_picker' => '1', 'included_features' => $all]);
+        $this->assertNull($this->plan->fresh()->excluded_features);
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + ['feature_picker' => '1', 'included_features' => ['not.a.feature']])
+            ->assertSessionHasErrors('included_features.0');
     }
 
     public function test_a_plan_without_its_own_price_costs_the_sum_of_its_modules(): void
