@@ -120,7 +120,7 @@ class RecruitmentController extends Controller
             'first_name'            => 'required|string|max:100',
             'last_name'             => 'nullable|string|max:100',
             'email'                 => 'required|email|max:255',
-            'phone'                 => 'nullable|string|max:20',
+            'phone'                 => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'current_location'      => 'nullable|string|max:100',
             'current_company'       => 'nullable|string|max:150',
             'current_designation'   => 'nullable|string|max:150',

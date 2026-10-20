@@ -42,7 +42,7 @@ class HelpdeskTicketController extends Controller
             'subject'       => 'required|string|max:255',
             'description'   => 'required|string',
             'priority'      => 'required|in:low,medium,high,urgent',
-            'attachments.*' => 'nullable|file|max:10240',
+            'attachments.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $files = $request->file('attachments');
@@ -113,7 +113,7 @@ class HelpdeskTicketController extends Controller
         $request->validate([
             'message'          => 'required|string',
             'is_internal_note' => 'nullable|boolean',
-            'attachments.*'    => 'nullable|file|max:10240',
+            'attachments.*'    => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240',
         ]);
 
         $tenantId = tenant_id();

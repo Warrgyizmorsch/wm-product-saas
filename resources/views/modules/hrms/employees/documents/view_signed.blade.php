@@ -98,7 +98,7 @@
             $sigPosCss = 'top: 60px; right: 40px;';
         }
 
-        $originalFile = $document->file_path;
+        $originalFile = $document->file_path ?? '';
         $originalFileUrl = asset('storage/' . $originalFile);
         $ext = strtolower(pathinfo($originalFile, PATHINFO_EXTENSION));
         $isImage = in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'gif']);

@@ -210,7 +210,7 @@ class SalaryStructureController extends Controller
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
             'description' => 'nullable',
-            'status'      => 'required',
+            'status'      => 'required|in:0,1',
         ]);
 
         $validated['status'] = in_array($request->status, ['success', '1', 'active', true], true);
@@ -228,7 +228,7 @@ class SalaryStructureController extends Controller
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
             'description' => 'nullable',
-            'status'      => 'required',
+            'status'      => 'required|in:0,1',
         ]);
 
         $validated['status'] = in_array($request->status, ['success', '1', 'active', true], true);

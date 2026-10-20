@@ -219,8 +219,39 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
 
-        $documents = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+        $tenantId = tenant_id() ?? $employee->tenant_id ?? 1;
+        $requiredMasters = \App\Domains\HRMS\Models\DocumentMaster::where('status', 'active')
+            ->where('is_required', true)
+            ->get();
+
+        foreach ($requiredMasters as $rm) {
+            $exists = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+                ->where('documentable_id', $employee->id)
+                ->where(function ($q) use ($rm) {
+                    $q->where('document_master_id', $rm->id)
+                      ->orWhere('name', $rm->name);
+                })
+                ->exists();
+
+            if (!$exists) {
+                \App\Domains\HRMS\Models\Document::create([
+                    'tenant_id'          => $tenantId,
+                    'documentable_type'  => Employee::class,
+                    'documentable_id'    => $employee->id,
+                    'document_master_id' => $rm->id,
+                    'name'               => $rm->name,
+                    'description'        => $rm->description,
+                    'status'             => 'requested',
+                    'has_expiry'         => (bool) $rm->expiry_applicable,
+                    'requires_signature' => (bool) $rm->requires_signature,
+                ]);
+            }
+        }
+
+        $documents = \App\Domains\HRMS\Models\Document::with(['documentMaster.category', 'requestedBy', 'signedBy'])
+            ->where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
+            ->orderBy('id', 'desc')
             ->paginate(10, ['*'], 'doc_page')
             ->withQueryString();
 

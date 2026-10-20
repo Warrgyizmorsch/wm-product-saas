@@ -307,7 +307,7 @@ class DocumentApiController extends Controller
             $request->validate([
                 'employee_id'        => 'required|string',
                 'document_master_id' => 'required|exists:document_masters,id',
-                'file'               => 'required|file|max:10240', // Max 10MB
+                'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240', // Max 10MB
                 'expiry_date'        => 'nullable|date',
             ]);
         }
@@ -538,7 +538,7 @@ class DocumentApiController extends Controller
 
         $validated = $request->validate([
             'document_master_id' => 'required|exists:document_masters,id',
-            'file'               => 'required|file|max:10240', // Max 10MB
+            'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240', // Max 10MB
             'expiry_date'        => 'nullable|date',
         ]);
 
@@ -770,7 +770,7 @@ class DocumentApiController extends Controller
             'document_template_id' => 'required|exists:document_templates,id',
             'employee_id'          => 'required|string',
             'signature_image'      => 'nullable|string',
-            'hr_signature_file'    => 'nullable|file|max:5120',
+            'hr_signature_file'    => 'nullable|file|mimes:png,jpg,jpeg,webp|max:5120',
             'reference_number'     => 'nullable|string',
         ]);
 

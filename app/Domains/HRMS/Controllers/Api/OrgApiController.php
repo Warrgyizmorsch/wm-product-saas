@@ -173,7 +173,7 @@ class OrgApiController extends Controller
             'cin_number'          => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
             'email'               => 'required|email|max:255',
-            'phone'               => 'nullable|max:50',
+            'phone'               => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'website'             => 'nullable|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
@@ -182,7 +182,7 @@ class OrgApiController extends Controller
             'postal_code'         => 'nullable|max:20',
             'currency'            => 'required|string|max:10',
             'time_zone'           => 'required|string|max:50',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
@@ -247,7 +247,7 @@ class OrgApiController extends Controller
             'cin_number'          => 'nullable|max:255',
             'registration_number' => 'nullable|max:255',
             'email'               => 'required|email|max:255',
-            'phone'               => 'nullable|max:50',
+            'phone'               => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'website'             => 'nullable|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
@@ -256,7 +256,7 @@ class OrgApiController extends Controller
             'postal_code'         => 'nullable|max:20',
             'currency'            => 'required|string|max:10',
             'time_zone'           => 'required|string|max:50',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
             'logo'                => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
@@ -404,7 +404,7 @@ class OrgApiController extends Controller
             'code'             => 'required|max:50',
             'description'      => 'nullable',
             'head_employee_id' => 'nullable|exists:employees,id',
-            'status'           => 'required',
+            'status'           => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -442,7 +442,7 @@ class OrgApiController extends Controller
             'code'             => 'required|max:50',
             'description'      => 'nullable',
             'head_employee_id' => 'nullable|exists:employees,id',
-            'status'           => 'required',
+            'status'           => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -569,14 +569,14 @@ class OrgApiController extends Controller
             'name'                => 'required|max:255',
             'code'                => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
-            'phone'               => 'nullable|max:20',
+            'phone'               => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'email'               => 'nullable|email|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
         ]);
 
         $companyId = $validated['company_id'] ?? null;
@@ -629,14 +629,14 @@ class OrgApiController extends Controller
             'name'                => 'required|max:255',
             'code'                => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
-            'phone'               => 'nullable|max:20',
+            'phone'               => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'email'               => 'nullable|email|max:255',
             'address'             => 'nullable|max:500',
             'city'                => 'nullable|max:100',
             'state'               => 'nullable|max:100',
             'country'             => 'nullable|max:100',
             'postal_code'         => 'nullable|max:20',
-            'status'              => 'required',
+            'status'              => 'required|in:0,1',
         ]);
 
         $companyId = $validated['company_id'] ?? null;
@@ -783,7 +783,7 @@ class OrgApiController extends Controller
             'head_employee_id'     => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
             'description'          => 'nullable',
-            'status'               => 'required',
+            'status'               => 'required|in:0,1',
         ]);
 
         $companyId      = $validated['company_id'] ?? null;
@@ -844,7 +844,7 @@ class OrgApiController extends Controller
             'head_employee_id'     => 'nullable|exists:employees,id',
             'parent_department_id' => 'nullable|exists:departments,id',
             'description'          => 'nullable',
-            'status'               => 'required',
+            'status'               => 'required|in:0,1',
         ]);
 
         $companyId      = $validated['company_id'] ?? null;
@@ -979,7 +979,7 @@ class OrgApiController extends Controller
             'name'          => 'required|max:255',
             'level'         => 'nullable|max:50',
             'description'   => 'nullable',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -1015,7 +1015,7 @@ class OrgApiController extends Controller
             'name'          => 'required|max:255',
             'level'         => 'nullable|max:50',
             'description'   => 'nullable',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);

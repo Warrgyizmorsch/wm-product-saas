@@ -303,7 +303,7 @@ class SalaryStructureApiController extends Controller
                 'name'        => 'required|string|max:255',
                 'company_id'  => 'nullable|integer|exists:companies,id',
                 'description' => 'nullable|string',
-                'status'      => 'required',
+                'status'      => 'required|in:0,1',
             ]);
 
             if ($validator->fails()) {
@@ -351,7 +351,7 @@ class SalaryStructureApiController extends Controller
                 'name'        => 'required|string|max:255',
                 'company_id'  => 'nullable|integer|exists:companies,id',
                 'description' => 'nullable|string',
-                'status'      => 'required',
+                'status'      => 'required|in:0,1',
             ]);
 
             if ($validator->fails()) {
@@ -546,7 +546,7 @@ class SalaryStructureApiController extends Controller
                 'type'             => 'required|in:earning,deduction',
                 'calculation_type' => 'nullable|string|max:50',
                 'is_adhoc'         => 'required',
-                'status'           => 'required',
+                'status'           => 'required|in:0,1',
                 'description'      => 'nullable|string',
                 'default_value'    => 'nullable|max:255',
             ]);
@@ -615,7 +615,7 @@ class SalaryStructureApiController extends Controller
                 'type'             => 'required|in:earning,deduction',
                 'calculation_type' => 'nullable|string|max:50',
                 'is_adhoc'         => 'required',
-                'status'           => 'required',
+                'status'           => 'required|in:0,1',
                 'description'      => 'nullable|string',
                 'default_value'    => 'nullable|max:255',
             ]);
@@ -766,7 +766,7 @@ class SalaryStructureApiController extends Controller
                 'pay_group_id' => 'nullable|integer|exists:pay_groups,id',
                 'min_ctc'      => 'required|numeric|min:0',
                 'max_ctc'      => 'required|numeric|gte:min_ctc',
-                'status'       => 'required',
+                'status'       => 'required|in:0,1',
                 'components'   => 'nullable|array',
             ]);
 
@@ -892,7 +892,7 @@ class SalaryStructureApiController extends Controller
                 'pay_group_id' => 'nullable|integer|exists:pay_groups,id',
                 'min_ctc'      => 'required|numeric|min:0',
                 'max_ctc'      => 'required|numeric|gte:min_ctc',
-                'status'       => 'required',
+                'status'       => 'required|in:0,1',
                 'components'   => 'nullable|array',
             ]);
 
