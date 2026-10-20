@@ -266,7 +266,18 @@
 .erp-checkout-steps li.done::before, .erp-checkout-steps li.active::before { background: var(--bs-primary, #3B82F6); }
 .erp-plan-card, .erp-addon-card { cursor: pointer; border: 1px solid rgba(0,0,0,.08); transition: border-color .15s ease, box-shadow .15s ease; }
 .erp-plan-card:hover, .erp-addon-card:hover { border-color: rgba(var(--bs-primary-rgb, 59,130,246), .4); }
-.erp-plan-card.selected, .erp-addon-card:has([data-addon-check]:checked) { border-color: var(--bs-primary, #3B82F6); box-shadow: 0 0 0 1px var(--bs-primary, #3B82F6) inset; }
+/* !important: apex-ui.css pins every .card border/shadow with !important. */
+.erp-plan-card { position: relative; }
+.erp-plan-card:hover, .erp-addon-card:hover { border-color: #a5b4fc !important; }
+.erp-plan-card.selected, .erp-addon-card:has([data-addon-check]:checked) {
+    border: 2px solid var(--ax-brand, #4f46e5) !important;
+    background: var(--ax-brand-soft, #eef2ff) !important;
+    box-shadow: 0 10px 24px -14px rgba(79, 70, 229, .55) !important;
+}
+.erp-plan-card.selected::after {
+    content: '✓'; position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: var(--ax-brand, #4f46e5);
+}
 .erp-plan-card.unavailable { opacity: .5; cursor: not-allowed; }
 .erp-addon-card.disabled { opacity: .55; cursor: not-allowed; }
 .erp-addon-icon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; }

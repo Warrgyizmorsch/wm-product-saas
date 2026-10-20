@@ -232,6 +232,25 @@ class SubscriptionPricingTest extends TestCase
             ->assertSessionHasErrors('limits');
     }
 
+    public function test_a_failed_save_only_refills_the_form_that_was_submitted(): void
+    {
+        $admin = $this->platformAdmin();
+        $other = Plan::create(['name' => 'Other Tier', 'slug' => 'other-tier', 'price' => 0, 'currency' => 'INR', 'billing_cycle' => 'monthly', 'features' => ['crm'], 'is_active' => true]);
+        $formId = 'editPlanForm'.$this->plan->id;
+
+        // 150/month and 1800 "per month" yearly is a yearly total in the wrong field — rejected.
+        $this->actingAs($admin)->from(route('platform.plans.index'))->put(route('platform.plans.update', $this->plan), [
+            '_form' => $formId, 'name' => 'Leaky Name', 'slug' => 'leaky', 'billing_cycle' => 'monthly', 'price' => 0,
+            'monthly_price_per_user' => 150, 'yearly_price_per_user' => 1800, 'features' => ['crm'],
+        ])->assertSessionHasErrors('yearly_price_per_user');
+
+        $html = $this->actingAs($admin)->get(route('platform.plans.index'))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($html, 'value="Leaky Name"'), 'old input must refill only the submitted form');
+        $this->assertStringContainsString('value="Other Tier"', $html);
+        $this->assertStringContainsString(json_encode($formId), $html); // reopens the failed modal
+    }
+
     public function test_plan_form_saves_minimum_users_and_rejects_one_above_the_maximum(): void
     {
         $admin = $this->platformAdmin();
