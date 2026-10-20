@@ -511,6 +511,12 @@ html .nxl-navigation .m-header .ax-brand .erp-brand-wordmark { color: #fff !impo
     border-color: #a5b4fc !important;
     color: #3730a3 !important;
 }
+/* Picked option in a toggle group (btn-check radios / .active) reads as solid brand. */
+.btn-check:checked + .btn-outline-primary, .btn-outline-primary.active {
+    background: var(--ax-brand) !important;
+    border-color: var(--ax-brand) !important;
+    color: #fff !important;
+}
 .btn-success { background: var(--ax-positive) !important; border: 1px solid var(--ax-positive) !important; color: #fff !important; }
 .btn-success:hover { background: var(--ax-positive-strong) !important; border-color: var(--ax-positive-strong) !important; }
 .btn-danger { background: var(--ax-negative) !important; border: 1px solid var(--ax-negative) !important; color: #fff !important; }
