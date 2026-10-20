@@ -12,6 +12,15 @@ use Illuminate\Support\Str;
 
 class RoleService
 {
+    /** Slugs only the platform's system roles may carry (AccessService treats them as platform admin). */
+    public const RESERVED_SLUGS = ['super_admin', 'admin'];
+
+    /** A tenant role named "Admin" gets slug "admin-role", never a reserved one. */
+    private function tenantSlug(string $slug): string
+    {
+        return in_array($slug, self::RESERVED_SLUGS, true) ? $slug.'-role' : $slug;
+    }
+
     public function __construct(
         private readonly AccessAuditLogger $auditLogger,
     ) {
@@ -39,7 +48,7 @@ class RoleService
         $role = Role::create([
             'tenant_id' => $tenantId,
             'name' => $data['name'],
-            'slug' => ($data['slug'] ?? null) ?: Str::slug($data['name']),
+            'slug' => $this->tenantSlug(($data['slug'] ?? null) ?: Str::slug($data['name'])),
             'level' => ($data['level'] ?? null) ?: 100,
             'description' => $data['description'] ?? null,
             'is_system' => false,

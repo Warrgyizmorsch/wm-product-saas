@@ -128,13 +128,13 @@ class BudgetController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'fiscal_year_id' => ['required', 'integer', 'exists:accounting_fiscal_years,id'],
+            'fiscal_year_id' => ['required', 'integer', tenant_exists('accounting_fiscal_years')],
             'name' => ['required', 'string', 'max:255'],
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
-            'lines.*.cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'],
-            'lines.*.department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'lines.*.project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'lines.*.chart_of_account_id' => ['required', 'integer', tenant_exists('chart_of_accounts')],
+            'lines.*.cost_center_id' => ['nullable', 'integer', tenant_exists('cost_centers')],
+            'lines.*.department_id' => ['nullable', 'integer', tenant_exists('departments')],
+            'lines.*.project_id' => ['nullable', 'integer', tenant_exists('projects')],
             'lines.*.amount' => ['required', 'numeric', 'min:0.01'],
         ]);
     }

@@ -63,7 +63,7 @@ class AssetRevaluationController extends Controller
         abort_unless($this->policy->create($request->user()), 403);
 
         $validated = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'asset_id' => ['required', 'integer', tenant_exists('assets')],
             'revaluation_date' => ['required', 'date'],
             'revalued_amount' => ['required', 'numeric', 'min:0.01'],
             'revised_useful_life_months' => ['nullable', 'integer', 'min:1'],

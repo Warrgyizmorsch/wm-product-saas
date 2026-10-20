@@ -310,7 +310,15 @@ class JournalService
         $branchId = $meta['branch_id'] ?? branch_id();
         $journalDate = Carbon::parse($meta['journal_date'] ?? now());
 
-        $this->assertLinesAreBalanced($lines);
+        $lineTenantId = $tenantId !== null ? (int) $tenantId : null;
+        $this->assertLinesAreBalanced($lines, $lineTenantId);
+        $this->assertAccountsUsable(
+            $lines,
+            $lineTenantId,
+            // Manual entries can't use a deactivated account; automatic postings and
+            // reversals of older entries still can, so they never fail mid-flow.
+            enforceActive: ($meta['source'] ?? Journal::SOURCE_MANUAL) === Journal::SOURCE_MANUAL && empty($meta['is_reversal']),
+        );
 
         if ($period !== null && !$journalDate->betweenIncluded(
             Carbon::parse($period->start_date)->startOfDay(),
@@ -410,6 +418,7 @@ class JournalService
                 'branch_id' => $original->branch_id,
                 'journal_date' => $period !== null ? $original->journal_date : now(),
                 'source' => $original->source,
+                'is_reversal' => true,
                 'voucher_type' => $original->voucher_type,
                 'journal_number_prefix' => $original->voucher_type
                     ? \App\Domains\Accounting\Support\VoucherType::prefix($original->voucher_type)
@@ -578,7 +587,7 @@ class JournalService
      * @param int $decimals minor-unit scale of the transaction currency (2 for INR/USD,
      *                      0 for JPY, 3 for KWD)
      */
-    private function assertLinesAreBalanced(array $lines, int $decimals = 2): void
+    private function assertLinesAreBalanced(array $lines, ?int $tenantId = null, int $decimals = 2): void
     {
         if (count($lines) < 2) {
             throw new InvalidArgumentException('A journal requires at least two lines.');
@@ -620,7 +629,10 @@ class JournalService
         }
 
         $accountIds = array_values(array_unique(array_column($lines, 'chart_of_account_id')));
+        // Only this tenant's sub-accounts make an account a group: another tenant
+        // must never be able to freeze these accounts by parenting under them.
         $groupAccountIds = ChartOfAccount::withoutGlobalScopes()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereIn('parent_id', $accountIds)
             ->pluck('parent_id')
             ->unique();
@@ -639,6 +651,32 @@ class JournalService
         if ($totalDebitMinor !== $totalCreditMinor) {
             throw new InvalidArgumentException(
                 "Journal is not balanced: total debit {$totalDebit} does not equal total credit {$totalCredit}."
+            );
+        }
+    }
+
+    /**
+     * Every line's account must belong to the journal's tenant (defence in depth
+     * behind the tenant-scoped request validation, and the only check for
+     * postings that don't come from a form) and, when $enforceActive, be active.
+     */
+    private function assertAccountsUsable(array $lines, ?int $tenantId, bool $enforceActive): void
+    {
+        $accountIds = array_values(array_unique(array_map('intval', array_column($lines, 'chart_of_account_id'))));
+        $accounts = ChartOfAccount::withoutGlobalScopes()->whereIn('id', $accountIds)->get(['id', 'tenant_id', 'code', 'is_active']);
+
+        if ($accounts->count() !== count($accountIds)) {
+            throw new InvalidArgumentException('One or more journal lines use an account that does not exist.');
+        }
+
+        if ($tenantId !== null && $accounts->contains(fn (ChartOfAccount $a) => (int) $a->tenant_id !== $tenantId)) {
+            throw new InvalidArgumentException('One or more journal lines use an account from another workspace.');
+        }
+
+        $inactive = $accounts->where('is_active', false);
+        if ($enforceActive && $inactive->isNotEmpty()) {
+            throw new InvalidArgumentException(
+                "Account {$inactive->pluck('code')->implode(', ')} is inactive. Reactivate it or choose another account."
             );
         }
     }
