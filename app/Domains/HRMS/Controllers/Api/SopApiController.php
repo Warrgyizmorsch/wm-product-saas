@@ -423,7 +423,7 @@ class SopApiController extends Controller
 
             if ($request->hasFile('attachment')) {
                 $file = $request->file('attachment');
-                $path = $file->store('hrms/sops', 'public');
+                $path = $file->storeTenantFile('hrms/sops', 'public');
                 $data['attachment_path'] = $path;
             }
 
@@ -492,7 +492,7 @@ class SopApiController extends Controller
 
             if ($request->hasFile('attachment')) {
                 $file = $request->file('attachment');
-                $path = $file->store('hrms/sops', 'public');
+                $path = $file->storeTenantFile('hrms/sops', 'public');
                 $data['attachment_path'] = $path;
             }
 

@@ -92,6 +92,18 @@ class PlanUsageLimitTest extends TestCase
         $this->warehouse(5);
     }
 
+    public function test_the_platform_console_rates_a_tenant_by_its_tightest_cap(): void
+    {
+        $this->warehouse(1);
+        $this->warehouse(2);
+
+        $row = app(UsageLimitService::class)->overview()->firstWhere('tenant.id', $this->tenant->id);
+
+        $this->assertNull($row['user_percent']); // no user cap on this plan
+        $this->assertEquals(100, $row['worst_percent']); // but warehouses are full
+        $this->assertSame(2, collect($row['resources'])->firstWhere('key', 'warehouses')['used']);
+    }
+
     public function test_usage_rows_report_used_and_cap(): void
     {
         $this->warehouse(1);

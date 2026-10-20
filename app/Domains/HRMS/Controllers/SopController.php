@@ -127,7 +127,7 @@ class SopController extends Controller
 
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $path = $file->store('hrms/sops', 'public');
+            $path = $file->storeTenantFile('hrms/sops', 'public');
             $validated['attachment_path'] = $path;
         }
 
@@ -174,7 +174,7 @@ class SopController extends Controller
 
         if ($request->hasFile('attachment')) {
             $file = $request->file('attachment');
-            $path = $file->store('hrms/sops', 'public');
+            $path = $file->storeTenantFile('hrms/sops', 'public');
             $validated['attachment_path'] = $path;
         }
 

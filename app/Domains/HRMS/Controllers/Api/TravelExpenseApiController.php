@@ -1023,7 +1023,7 @@ class TravelExpenseApiController extends Controller
                 $receiptPath = null;
                 $fileKey = "claims.{$index}.receipt";
                 if ($request->hasFile($fileKey)) {
-                    $receiptPath = $request->file($fileKey)->store('expense_receipts', 'public');
+                    $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 ExpenseClaim::create([
@@ -1189,7 +1189,7 @@ class TravelExpenseApiController extends Controller
                 $receiptPath = $c['existing_receipt'] ?? null;
                 $fileKey = "claims.{$index}.receipt";
                 if ($request->hasFile($fileKey)) {
-                    $receiptPath = $request->file($fileKey)->store('expense_receipts', 'public');
+                    $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 ExpenseClaim::create([

@@ -336,7 +336,7 @@ class DispatchOrderApiController extends Controller
         ];
 
         if ($request->hasFile('pod_file')) {
-            $updateData['pod_attachment_path'] = $request->file('pod_file')->store('pods', 'public');
+            $updateData['pod_attachment_path'] = $request->file('pod_file')->storeTenantFile('pods', 'public');
         }
 
         $dispatch->update($updateData);

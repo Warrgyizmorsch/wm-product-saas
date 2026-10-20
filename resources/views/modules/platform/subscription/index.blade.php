@@ -78,12 +78,22 @@
         </div>
     </x-ui.card>
 
-    @if (collect($usage)->contains(fn ($row) => $row['limit'] !== null))
+    @if ($storage['limit'] !== null || collect($usage)->contains(fn ($row) => $row['limit'] !== null))
         <x-ui.card class="mb-4">
             <div class="mb-3">
                 <span class="text-muted fs-12 text-uppercase">Plan usage</span>
             </div>
             <div class="row g-3">
+                @php $storagePercent = $storage['percent'] ?? 0; @endphp
+                <div class="col-md-4">
+                    <div class="d-flex justify-content-between fs-13 mb-1">
+                        <span>File storage</span>
+                        <span class="text-muted">{{ \App\Domains\Platform\Services\TenantStorage::format($storage['used']) }} / {{ \App\Domains\Platform\Services\TenantStorage::format($storage['limit']) }}</span>
+                    </div>
+                    <div class="progress" style="height: 6px;" role="progressbar" aria-label="File storage usage" aria-valuenow="{{ $storagePercent }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar {{ $storagePercent >= 100 ? 'bg-danger' : ($storagePercent >= 80 ? 'bg-warning' : 'bg-primary') }}" style="width: {{ $storagePercent }}%"></div>
+                    </div>
+                </div>
                 @foreach ($usage as $row)
                     <div class="col-md-4">
                         <div class="d-flex justify-content-between fs-13 mb-1">

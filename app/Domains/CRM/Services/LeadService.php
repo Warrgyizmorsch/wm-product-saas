@@ -355,7 +355,7 @@ class LeadService
         $uploadedIds = $lead->documents ?? [];
 
         foreach ($files as $file) {
-            $path = $file->store('lead_documents/' . $lead->id, 'public');
+            $path = $file->storeTenantFile('lead_documents/' . $lead->id, 'public');
 
             $document = LeadDocument::create([
                 'tenant_id' => $lead->tenant_id,

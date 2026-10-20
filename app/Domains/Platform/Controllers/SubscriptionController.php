@@ -82,6 +82,7 @@ class SubscriptionController extends Controller
             ]])->all(),
             'modules' => $modules,
             'usage' => $this->usage->resourceUsage($tenant),
+            'storage' => tenant_storage()->usage($tenant),
             'liveSubscription' => $this->subscriptions->live($tenant)?->load('plan'),
             'modulePrice' => config('navigation.module_addon_price'),
             'moduleCurrency' => 'INR',

@@ -188,7 +188,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
         $resumePath = null;
         if ($request->hasFile('resume')) {
-            $resumePath = $request->file('resume')->store('recruitment/resumes', 'local');
+            $resumePath = $request->file('resume')->storeTenantFile('recruitment/resumes', 'local');
         }
 
         $candidate = Candidate::create([
@@ -435,7 +435,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
                 if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                     $file = $request->file('hr_signature_file');
-                    $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                    $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
                     $hrSigUrl = asset('storage/' . $hrSigPath);
                 } elseif (!empty($validated['hr_signature_data'])) {
                     $hrSigData = $validated['hr_signature_data'];
@@ -443,7 +443,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
                         $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                         $imageName = 'hr_sig_' . time() . '_' . Str::random(6) . '.png';
                         $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                        Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                        tenant_storage()->put('public', $hrSigPath, base64_decode($image));
                         $hrSigUrl = asset('storage/' . $hrSigPath);
                     } else {
                         $hrSigUrl = $hrSigData;

@@ -170,7 +170,7 @@ class UsageLimitService
      * place an admin checks consumption against plan limits without opening
      * each tenant individually.
      *
-     * @return Collection<int, array{tenant: Tenant, plan_name: string, max_users: ?int, used_users: int, remaining_users: ?int, user_percent: ?float, source: string}>
+     * @return Collection<int, array{tenant: Tenant, plan_name: string, max_users: ?int, used_users: int, remaining_users: ?int, user_percent: ?float, source: string, resources: list<array>, worst_percent: ?float}>
      */
     public function overview(): Collection
     {
@@ -182,8 +182,17 @@ class UsageLimitService
             ->map(function (Tenant $tenant) {
                 $max = $this->maxUsers($tenant);
                 $used = $tenant->users_count;
+                // One count per capped resource per tenant — fine for an admin console.
+                $resources = $this->resourceUsage($tenant);
+                $storage = app(TenantStorage::class)->usage($tenant);
+                $userPercent = $max === null || $max === 0 ? null : min(100, round(($used / $max) * 100));
+                $percents = array_filter([$userPercent, $storage['percent'], ...array_column($resources, 'percent')], fn ($p) => $p !== null);
 
                 return [
+                    'resources' => $resources,
+                    'storage' => $storage,
+                    // Highest share of any cap (users or resources) — drives the row status.
+                    'worst_percent' => $percents === [] ? null : max($percents),
                     'tenant' => $tenant,
                     'plan_name' => $tenant->planCatalog?->name ?? ucfirst((string) $tenant->plan),
                     'max_users' => $max,

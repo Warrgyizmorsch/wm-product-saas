@@ -101,7 +101,7 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
     {
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('wfh_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('wfh_attachments', 'public');
         }
 
         $user = auth()->user();

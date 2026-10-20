@@ -149,7 +149,7 @@ class DocumentRepository implements DocumentRepositoryInterface
     public function storeDocument(array $validated, Request $request, ?User $user): Document
     {
         $file = $request->file('file');
-        $path = $file->store('documents/employee', 'public');
+        $path = $file->storeTenantFile('documents/employee', 'public');
 
         $docMaster = !empty($validated['document_master_id']) ? DocumentMaster::find($validated['document_master_id']) : null;
         $name = !empty($validated['name']) ? $validated['name'] : ($docMaster?->name ?? $file->getClientOriginalName());
@@ -184,7 +184,7 @@ class DocumentRepository implements DocumentRepositoryInterface
             }
 
             $file = $request->file('file');
-            $updateData['file_path'] = $file->store('documents/employee', 'public');
+            $updateData['file_path'] = $file->storeTenantFile('documents/employee', 'public');
             $updateData['file_type'] = $file->getClientOriginalExtension();
             $updateData['file_size'] = $file->getSize();
         }

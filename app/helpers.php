@@ -48,6 +48,14 @@ if (! function_exists('tenant_context')) {
     }
 }
 
+if (! function_exists('tenant_storage')) {
+    /** Quota-checked, usage-recorded file storage for the current tenant. */
+    function tenant_storage(): \App\Domains\Platform\Services\TenantStorage
+    {
+        return app(\App\Domains\Platform\Services\TenantStorage::class);
+    }
+}
+
 if (! function_exists('tenant_allowed_modules')) {
     /**
      * @return list<string>|null null means unrestricted (no plan gating; tenant
