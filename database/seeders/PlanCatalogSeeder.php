@@ -12,7 +12,8 @@ use Illuminate\Database\Seeder;
  * Starter covers the core sell/buy/stock/books loop and sells the other
  * modules as per-user add-ons; Pro has every module minus a few top-end
  * features; Enterprise has everything. Excluded features stay view-only
- * (PlanFeatureGate).
+ * (PlanFeatureGate); limits cap resource counts (UsageLimitService,
+ * config/plan_limits.php) — Enterprise has none.
  *
  * Safe to re-run — plans are matched by slug, add-ons by module. Running it
  * against a live database re-tiers existing Starter/Pro tenants, so check who
@@ -82,6 +83,7 @@ class PlanCatalogSeeder extends Seeder
                     'accounting.approvals',
                     'fixed_assets',
                 ],
+                'limits' => ['companies' => 1, 'branches' => 1, 'warehouses' => 1, 'products' => 2000, 'customers' => 5000, 'invoices_per_month' => 500],
                 'sort_order' => 1,
             ],
             'pro' => [
@@ -105,6 +107,7 @@ class PlanCatalogSeeder extends Seeder
                     'projects.changerequests',
                     'projects.reviews',
                 ],
+                'limits' => ['companies' => 3, 'branches' => 10, 'warehouses' => 10, 'products' => 25000, 'customers' => 50000, 'invoices_per_month' => 5000],
                 'sort_order' => 2,
             ],
             'enterprise' => [
@@ -116,6 +119,7 @@ class PlanCatalogSeeder extends Seeder
                 'max_users' => null,
                 'features' => self::ALL_MODULES,
                 'excluded_features' => [],
+                'limits' => [],
                 'sort_order' => 3,
             ],
         ];

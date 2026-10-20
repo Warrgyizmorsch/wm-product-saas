@@ -78,6 +78,27 @@
         </div>
     </x-ui.card>
 
+    @if (collect($usage)->contains(fn ($row) => $row['limit'] !== null))
+        <x-ui.card class="mb-4">
+            <div class="mb-3">
+                <span class="text-muted fs-12 text-uppercase">Plan usage</span>
+            </div>
+            <div class="row g-3">
+                @foreach ($usage as $row)
+                    <div class="col-md-4">
+                        <div class="d-flex justify-content-between fs-13 mb-1">
+                            <span>{{ $row['label'] }}</span>
+                            <span class="text-muted">{{ number_format($row['used']) }} / {{ $row['limit'] === null ? 'Unlimited' : number_format($row['limit']) }}</span>
+                        </div>
+                        <div class="progress" style="height: 6px;" role="progressbar" aria-label="{{ $row['label'] }} usage" aria-valuenow="{{ $row['percent'] ?? 0 }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar {{ ($row['percent'] ?? 0) >= 100 ? 'bg-danger' : (($row['percent'] ?? 0) >= 80 ? 'bg-warning' : 'bg-primary') }}" style="width: {{ $row['percent'] ?? 0 }}%"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </x-ui.card>
+    @endif
+
     @php
         $isRecurring = fn (array $module) => $module['prices']['monthly'] !== null || $module['prices']['yearly'] !== null;
         // Only modules without per-user pricing can still be bought with the old one-time fee.

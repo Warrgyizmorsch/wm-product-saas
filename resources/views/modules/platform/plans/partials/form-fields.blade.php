@@ -73,6 +73,16 @@
     </div>
 
     <div class="col-12">
+        <h6 class="fw-bold text-uppercase fs-11 text-muted mb-2 border-top pt-3 mt-2">Usage Limits</h6>
+    </div>
+    @foreach (config('plan_limits.resources', []) as $key => $resource)
+        <div class="col-md-4">
+            <x-ui.odoo-form-ui type="input" inputType="number" :label="$resource['label']" name="limits[{{ $key }}]" :value="old('limits.'.$key, $plan->limits[$key] ?? null)" min="0" helperText="Blank = unlimited." class="{{ $errors->has('limits.'.$key) ? 'is-invalid' : '' }}" />
+            @error('limits.'.$key)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        </div>
+    @endforeach
+
+    <div class="col-12">
         <h6 class="fw-bold text-uppercase fs-11 text-muted mb-2 border-top pt-3 mt-2">Features &amp; Status</h6>
     </div>
     <div class="col-12">

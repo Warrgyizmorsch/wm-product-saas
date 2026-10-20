@@ -98,6 +98,8 @@ class PlanController extends Controller
             'feature_picker' => ['nullable', 'boolean'],
             'included_features' => ['nullable', 'array'],
             'included_features.*' => ['string', Rule::in(app(PlanFeatureGate::class)->keys())],
+            'limits' => ['nullable', 'array:'.implode(',', array_keys(config('plan_limits.resources', [])))],
+            'limits.*' => ['nullable', 'integer', 'min:0'],
             'is_demo' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],

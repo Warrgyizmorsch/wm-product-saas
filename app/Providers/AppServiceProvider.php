@@ -45,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Core\Navigation\MenuBuilder::class);
         // Per request / job: caches each tenant's excluded plan features for that request only.
         $this->app->scoped(\App\Domains\Platform\Services\PlanFeatureGate::class);
+        $this->app->scoped(\App\Domains\Platform\Services\UsageLimitService::class);
 
         // Loads every module's Dashboard/widgets.php once per request.
         $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
@@ -477,6 +478,9 @@ class AppServiceProvider extends ServiceProvider
         // index keys at 1000 bytes; utf8mb4 string(255) unique columns (e.g.
         // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
         Schema::defaultStringLength(191);
+
+        // Plan usage caps (config/plan_limits.php) on every capped model's creating event.
+        \App\Domains\Platform\Services\UsageLimitService::guardModels();
 
         // ── Production Module Named API Rate Limiters ─────────────────────────
         $productionRateLimitKey = function (\Illuminate\Http\Request $request): string {

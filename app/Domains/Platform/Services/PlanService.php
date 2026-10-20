@@ -47,6 +47,12 @@ class PlanService
             'excluded_features' => array_values(array_diff($this->planFeatures->keys(), $data['included_features'] ?? [])) ?: null,
         ] : [];
 
+        // Blank cap = unlimited, so it's left out of the stored map. Without the
+        // limits fields on the page the stored caps are left alone.
+        if (array_key_exists('limits', $data)) {
+            $features['limits'] = array_map('intval', array_filter($data['limits'] ?? [], fn ($v) => $v !== null && $v !== '')) ?: null;
+        }
+
         return $features + [
             'name' => $data['name'],
             'slug' => ($data['slug'] ?? null) ?: Str::slug($data['name']),

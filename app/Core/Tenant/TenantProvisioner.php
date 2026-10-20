@@ -3,6 +3,7 @@
 namespace App\Core\Tenant;
 
 use App\Core\Tenant\Events\TenantProvisioning;
+use App\Domains\Platform\Services\UsageLimitService;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 
@@ -23,10 +24,11 @@ class TenantProvisioner
 
     public function provision(Tenant $tenant): void
     {
-        DB::transaction(fn () => $this->runner->run($tenant, function () use ($tenant): void {
+        // Starter masters (default company, branch, warehouse…) never count against plan caps.
+        UsageLimitService::withoutLimits(fn () => DB::transaction(fn () => $this->runner->run($tenant, function () use ($tenant): void {
             [$company, $branch] = $this->organization->ensure($tenant);
 
             event(new TenantProvisioning($tenant->id, $company->id, $branch->id, $tenant->planModules()));
-        }));
+        })));
     }
 }

@@ -216,6 +216,22 @@ class SubscriptionPricingTest extends TestCase
         $this->assertNull($plan->yearly_price_per_user);
     }
 
+    public function test_plan_form_saves_usage_limits_and_drops_blank_ones(): void
+    {
+        $admin = $this->platformAdmin();
+        $base = ['name' => 'Standard', 'slug' => 'standard-test', 'billing_cycle' => 'monthly', 'price' => 0, 'features' => ['crm'], 'is_active' => '1'];
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + ['limits' => ['warehouses' => '3', 'products' => '']])
+            ->assertRedirect(route('platform.plans.index'));
+        $this->assertSame(['warehouses' => 3], $this->plan->fresh()->limits);
+
+        $this->actingAs($admin)->get(route('platform.plans.edit', $this->plan))
+            ->assertOk()->assertSee('Usage Limits')->assertSee('name="limits[warehouses]"', false);
+
+        $this->actingAs($admin)->put(route('platform.plans.update', $this->plan), $base + ['limits' => ['bogus' => '1']])
+            ->assertSessionHasErrors('limits');
+    }
+
     public function test_plan_form_saves_minimum_users_and_rejects_one_above_the_maximum(): void
     {
         $admin = $this->platformAdmin();

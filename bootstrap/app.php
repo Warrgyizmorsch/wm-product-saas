@@ -76,6 +76,16 @@ return Application::configure(basePath: dirname(__DIR__))
             );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // A plan usage cap (UsageLimitService) hit from any create path: send the
+        // user back to the form with the message instead of a 500.
+        $exceptions->render(function (\App\Domains\Platform\Exceptions\UsageLimitExceededException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'plan_limit' => true], 422);
+            }
+
+            return back()->withInput()->with('error', $e->getMessage());
+        });
+
         // A 403 caused by the tenant's plan (PlanFeatureGate) says so and points
         // at the upgrade, instead of a bare "This action is unauthorized."
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, \Illuminate\Http\Request $request) {
