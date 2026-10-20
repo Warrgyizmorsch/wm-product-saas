@@ -125,6 +125,48 @@ class TenantStorageTest extends TestCase
         $this->assertSame(1, TenantFile::query()->withoutGlobalScope('tenant')->count());
     }
 
+    /** Storage::fake() bypasses custom drivers, so use the real (tracked) local driver on a temp root. */
+    private function useRealPublicDisk(): string
+    {
+        $root = sys_get_temp_dir().'/tenant-storage-'.uniqid();
+        config(['filesystems.disks.public.root' => $root]);
+        Storage::forgetDisk('public');
+
+        return $root;
+    }
+
+    public function test_deleting_a_file_drops_it_from_usage_immediately(): void
+    {
+        $root = $this->useRealPublicDisk();
+
+        $keep = $this->upload(100);
+        $gone = $this->upload(200);
+        $this->assertSame(300 * 1024, $this->used());
+
+        Storage::disk('public')->delete($gone);
+
+        $this->assertSame(100 * 1024, $this->used());
+        $this->assertTrue(Storage::disk('public')->exists($keep));
+
+        \Illuminate\Support\Facades\File::deleteDirectory($root);
+    }
+
+    public function test_deleting_a_directory_and_moving_a_file_keep_usage_right(): void
+    {
+        $root = $this->useRealPublicDisk();
+
+        $path = $this->upload(100);
+        Storage::disk('public')->move($path, 'archive/moved.pdf');
+        $this->assertSame(1, TenantFile::query()->withoutGlobalScope('tenant')->where('path', 'archive/moved.pdf')->count());
+
+        $this->upload(50);
+        Storage::disk('public')->deleteDirectory('docs');
+
+        $this->assertSame(100 * 1024, $this->used()); // only the moved file is left
+
+        \Illuminate\Support\Facades\File::deleteDirectory($root);
+    }
+
     public function test_the_platform_console_includes_storage(): void
     {
         $this->upload(512);
