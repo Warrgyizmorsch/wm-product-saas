@@ -611,6 +611,27 @@
                 }
             });
         }
+
+        // Global numeric-only restriction for Phone and Zip fields across modals and forms
+        var numericFieldSelector = 'input[name="phone"], input[name="contact_phone"], input[name="company_phone"], input[name="mobile"], input[name="zip_code"], input[name="billing_zip"]';
+        $(document).on('input', numericFieldSelector, function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+        $(document).on('keypress', numericFieldSelector, function(e) {
+            if (e.which < 48 || e.which > 57) {
+                if (e.which !== 8 && e.which !== 0 && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                }
+            }
+        });
+        $(document).on('paste', numericFieldSelector, function(e) {
+            var pasteData = (e.originalEvent.clipboardData || window.clipboardData).getData('text');
+            if (pasteData && !/^\d+$/.test(pasteData)) {
+                e.preventDefault();
+                var clean = pasteData.replace(/\D/g, '');
+                document.execCommand('insertText', false, clean);
+            }
+        });
     </script>
 
     <!-- Upgraded Custom Premium Confirmation Modal Component -->

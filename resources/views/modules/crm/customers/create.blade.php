@@ -54,7 +54,7 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label fw-semibold text-dark">{{ __('crm.phone') }}</label>
-                                        <input type="text" name="phone" class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone') }}" placeholder="e.g. +91 9876543210">
+                                        <input type="tel" name="phone" id="phone_input" class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone') }}" placeholder="02240001122" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                                         @error('phone')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
@@ -119,4 +119,35 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const numericInputs = document.querySelectorAll('input[name="phone"]');
+
+        numericInputs.forEach(input => {
+            input.addEventListener('input', function () {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+
+            input.addEventListener('keypress', function (e) {
+                if (e.which < 48 || e.which > 57) {
+                    if (e.which !== 8 && e.which !== 0 && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                    }
+                }
+            });
+
+            input.addEventListener('paste', function (e) {
+                const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+                if (!/^\d+$/.test(pasteData)) {
+                    e.preventDefault();
+                    const cleanData = pasteData.replace(/\D/g, '');
+                    document.execCommand('insertText', false, cleanData);
+                }
+            });
+        });
+    });
+</script>
+@endpush
 

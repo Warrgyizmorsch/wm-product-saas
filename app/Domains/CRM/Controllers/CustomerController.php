@@ -73,12 +73,15 @@ class CustomerController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', 'in:active,inactive'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         $validated['opening_balance'] = isset($validated['opening_balance'])
@@ -104,10 +107,13 @@ class CustomerController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         $validated['tenant_id'] = $tenantId;

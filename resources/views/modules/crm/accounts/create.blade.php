@@ -33,23 +33,23 @@
                     <div class="col-lg-6 border-end pe-lg-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-briefcase me-2"></i>{{ __('crm.company_master_details') }}</h6>
                         
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="name" :value="old('name')" :required="true" placeholder="e.g. ABC Builders Pvt Ltd" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="name" :value="old('name')" :required="true" placeholder="e.g. ABC Builders Pvt Ltd" :errorText="$errors->first('name')" />
 
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.gstin')" name="gstin" :value="old('gstin')" placeholder="e.g. 27AAAAA0000A1Z5" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.gstin')" name="gstin" :value="old('gstin')" placeholder="e.g. 27AAAAA0000A1Z5" :errorText="$errors->first('gstin')" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="email" :value="old('email')" :required="true" placeholder="info@company.com" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="email" :value="old('email')" :required="true" placeholder="info@company.com" :errorText="$errors->first('email')" />
 
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone')" placeholder="022-40001122" />
+                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('crm.contact_phone')" name="phone" id="phone_input" :value="old('phone')" placeholder="02240001122" oninput="this.value = this.value.replace(/[^0-9]/g, '')" :errorText="$errors->first('phone')" />
 
-                        <x-ui.odoo-form-ui type="input" label="Website URL" name="website" :value="old('website')" placeholder="https://company.com" />
+                        <x-ui.odoo-form-ui type="input" label="Website URL" name="website" :value="old('website')" placeholder="https://company.com" :errorText="$errors->first('website')" />
 
-                        <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type')" placeholder="e.g. Construction / Infrastructure" />
+                        <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type')" placeholder="e.g. Construction / Infrastructure" :errorText="$errors->first('industry_type')" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.credit_limit') . ' (' . active_currency_symbol() . ')'" name="credit_limit" :value="old('credit_limit', '0.00')" step="0.01" placeholder="0.00" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.credit_limit') . ' (' . active_currency_symbol() . ')'" name="credit_limit" :value="old('credit_limit', '0.00')" step="0.01" placeholder="0.00" :errorText="$errors->first('credit_limit')" />
 
                         <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Opening Balance ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" :value="old('opening_balance', '0.00')" placeholder="0.00" :error-text="$errors->first('opening_balance')" />
 
-                        <x-ui.odoo-form-ui type="select" :label="__('crm.account_manager_owner')" name="owner_id">
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.account_manager_owner')" name="owner_id" :errorText="$errors->first('owner_id')">
                             <option value="">Select Account Manager...</option>
                             @foreach($users as $user)
                                 <option value="{{ $user->id }}" @selected(old('owner_id', auth()->id()) == $user->id)>
@@ -63,34 +63,34 @@
                     <div class="col-lg-6 ps-lg-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-2"></i>{{ __('crm.primary_contact_person') }}</h6>
                         
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.primary_contact')" name="contact_name" :value="old('contact_name')" placeholder="e.g. Rahul Sharma" />
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.primary_contact')" name="contact_name" :value="old('contact_name')" placeholder="e.g. Rahul Sharma" :errorText="$errors->first('contact_name')" />
 
-                        <x-ui.odoo-form-ui type="input" label="Designation / Title" name="designation" :value="old('designation')" placeholder="e.g. Purchase Head" />
+                        <x-ui.odoo-form-ui type="input" label="Designation / Title" name="designation" :value="old('designation')" placeholder="e.g. Purchase Head" :errorText="$errors->first('designation')" />
 
-                        <x-ui.odoo-form-ui type="select" :label="__('crm.buying_center_role')" name="role">
-                            <option value="Purchase Decision Maker" selected>Purchase Decision Maker</option>
-                            <option value="Technical Evaluator">Technical Evaluator</option>
-                            <option value="Finance">Finance / Accounts</option>
-                            <option value="Influencer">Influencer</option>
-                            <option value="End User">End User</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.buying_center_role')" name="role" :errorText="$errors->first('role')">
+                            <option value="Purchase Decision Maker" @selected(old('role', 'Purchase Decision Maker') === 'Purchase Decision Maker')>Purchase Decision Maker</option>
+                            <option value="Technical Evaluator" @selected(old('role') === 'Technical Evaluator')>Technical Evaluator</option>
+                            <option value="Finance" @selected(old('role') === 'Finance')>Finance / Accounts</option>
+                            <option value="Influencer" @selected(old('role') === 'Influencer')>Influencer</option>
+                            <option value="End User" @selected(old('role') === 'End User')>End User</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="contact_email" :value="old('contact_email')" placeholder="rahul@company.com" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.contact_email')" name="contact_email" :value="old('contact_email')" placeholder="rahul@company.com" :errorText="$errors->first('contact_email')" />
 
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="contact_phone" :value="old('contact_phone')" placeholder="9876543210" />
+                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('crm.contact_phone')" name="contact_phone" id="contact_phone_input" :value="old('contact_phone')" placeholder="9876543210" oninput="this.value = this.value.replace(/[^0-9]/g, '')" :errorText="$errors->first('contact_phone')" />
 
                         <div class="border-top pt-4 mt-4">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-map-pin me-2"></i>{{ __('crm.address_location') }}</h6>
                             
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.street_address')" name="street" :value="old('street')" placeholder="Building, Street, Landmark" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.street_address')" name="street" :value="old('street')" placeholder="Building, Street, Landmark" :errorText="$errors->first('street')" />
 
-                            <x-ui.odoo-form-ui type="input" label="City" name="city" :value="old('city')" placeholder="Mumbai" />
+                            <x-ui.odoo-form-ui type="input" label="City" name="city" :value="old('city')" placeholder="Mumbai" :errorText="$errors->first('city')" />
 
-                            <x-ui.odoo-form-ui type="input" label="State" name="state" :value="old('state')" placeholder="Maharashtra" />
+                            <x-ui.odoo-form-ui type="input" label="State" name="state" :value="old('state')" placeholder="Maharashtra" :errorText="$errors->first('state')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Country" name="country" :value="old('country', 'India')" placeholder="India" />
+                            <x-ui.odoo-form-ui type="input" label="Country" name="country" :value="old('country', 'India')" placeholder="India" :errorText="$errors->first('country')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Zip / Postal Code" name="zip_code" :value="old('zip_code')" placeholder="400001" />
+                            <x-ui.odoo-form-ui type="input" inputType="text" label="Zip / Postal Code" name="zip_code" id="zip_code_input" :value="old('zip_code')" placeholder="400001" oninput="this.value = this.value.replace(/[^0-9]/g, '')" maxlength="10" :errorText="$errors->first('zip_code')" />
                         </div>
                     </div>
                 </div>
@@ -105,3 +105,25 @@
             </form>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const numericInputs = document.querySelectorAll('input[name="phone"], input[name="contact_phone"], input[name="zip_code"]');
+        numericInputs.forEach(function (inp) {
+            inp.addEventListener('keypress', function (e) {
+                // Allow control keys like backspace, tab, enter, arrow keys
+                if (e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
+                    e.preventDefault();
+                }
+            });
+            inp.addEventListener('paste', function (e) {
+                setTimeout(function () {
+                    inp.value = inp.value.replace(/[^0-9]/g, '');
+                }, 10);
+            });
+        });
+    });
+</script>
+@endpush

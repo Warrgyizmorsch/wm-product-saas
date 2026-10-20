@@ -58,28 +58,7 @@ class CrmAccountController extends Controller
 
         $tenantId = tenant_id() ?? 1;
 
-        $validated = $request->validate([
-            'name'          => 'required|string|max:255',
-            'gstin'         => 'nullable|string|max:50',
-            'email'         => 'required|email|max:255',
-            'phone'         => 'nullable|string|max:50',
-            'website'       => 'nullable|string|max:255',
-            'industry_type' => 'nullable|string|max:255',
-            'credit_limit'  => 'nullable|numeric|min:0',
-            'opening_balance' => 'nullable|numeric|min:0',
-            'owner_id'      => 'nullable|exists:users,id',
-            'street'        => 'nullable|string|max:255',
-            'city'          => 'nullable|string|max:100',
-            'state'         => 'nullable|string|max:100',
-            'country'       => 'nullable|string|max:100',
-            'zip_code'      => 'nullable|string|max:20',
-            // Primary contact fields
-            'contact_name'  => 'nullable|string|max:255',
-            'designation'   => 'nullable|string|max:255',
-            'role'          => 'nullable|string|max:100',
-            'contact_email' => 'nullable|email|max:255',
-            'contact_phone' => 'nullable|string|max:50',
-        ]);
+        $validated = $request->validate($this->getAccountValidationRules(), $this->getAccountValidationMessages());
 
         $openingBalance = !empty($validated['opening_balance']) ? convert_to_base((float)$validated['opening_balance']) : 0.00;
 
@@ -268,29 +247,46 @@ class CrmAccountController extends Controller
 
         $tenantId = tenant_id() ?? 1;
 
-        $validated = $request->validate([
-            'name'          => 'required|string|max:255',
-            'gstin'         => 'nullable|string|max:50',
-            'email'         => 'required|email|max:255',
-            'phone'         => 'nullable|string|max:50',
-            'website'       => 'nullable|string|max:255',
-            'industry_type' => 'nullable|string|max:255',
-            'credit_limit'  => 'nullable|numeric|min:0',
-            'opening_balance' => 'nullable|numeric|min:0',
-            'owner_id'      => 'nullable|exists:users,id',
-            'street'        => 'nullable|string|max:255',
-            'city'          => 'nullable|string|max:100',
-            'state'         => 'nullable|string|max:100',
-            'country'       => 'nullable|string|max:100',
-            'zip_code'      => 'nullable|string|max:20',
-            'status'        => 'required|string|in:active,inactive',
-        ]);
+        $rules = $this->getAccountValidationRules();
+        $rules['status'] = 'required|string|in:active,inactive';
+
+        $validated = $request->validate($rules, $this->getAccountValidationMessages());
 
         if (isset($validated['credit_limit'])) {
             $validated['credit_limit'] = !empty($validated['credit_limit']) ? convert_to_base((float) $validated['credit_limit']) : 0.00;
         }
 
         $account->update($validated);
+
+        // Sync Primary Contact
+        if (!empty($validated['contact_name']) || !empty($validated['contact_email']) || !empty($validated['contact_phone'])) {
+            $primaryContact = $account->primaryContact;
+            if ($primaryContact) {
+                $primaryContact->update([
+                    'name'        => $validated['contact_name'] ?? $primaryContact->name,
+                    'designation' => $validated['designation'] ?? null,
+                    'role'        => $validated['role'] ?? 'Purchase Decision Maker',
+                    'email'       => $validated['contact_email'] ?? null,
+                    'phone'       => $validated['contact_phone'] ?? null,
+                    'mobile'      => $validated['contact_phone'] ?? null,
+                ]);
+            } else {
+                CrmContact::create([
+                    'tenant_id'      => $tenantId,
+                    'company_id'     => $account->company_id,
+                    'branch_id'      => $account->branch_id,
+                    'crm_account_id' => $account->id,
+                    'name'           => $validated['contact_name'],
+                    'designation'    => $validated['designation'] ?? null,
+                    'role'           => $validated['role'] ?? 'Purchase Decision Maker',
+                    'email'          => $validated['contact_email'] ?? null,
+                    'phone'          => $validated['contact_phone'] ?? null,
+                    'mobile'         => $validated['contact_phone'] ?? null,
+                    'is_primary'     => true,
+                    'status'         => 'active',
+                ]);
+            }
+        }
 
         if ($account->customer_id) {
             $customerUpdate = [
@@ -333,10 +329,10 @@ class CrmAccountController extends Controller
             'designation' => 'nullable|string|max:255',
             'role'        => 'nullable|string|max:100',
             'email'       => 'nullable|email|max:255',
-            'phone'       => 'nullable|string|max:50',
-            'mobile'      => 'nullable|string|max:50',
+            'phone'       => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'mobile'      => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'is_primary'  => 'nullable|boolean',
-        ]);
+        ], $this->getAccountValidationMessages());
 
         if (!empty($validated['is_primary'])) {
             CrmContact::where('crm_account_id', $account->id)->update(['is_primary' => false]);
@@ -385,9 +381,9 @@ class CrmAccountController extends Controller
             'designation'    => 'nullable|string|max:255',
             'role'           => 'nullable|string|max:100',
             'email'          => 'nullable|email|max:255',
-            'phone'          => 'nullable|string|max:50',
-            'mobile'         => 'nullable|string|max:50',
-        ]);
+            'phone'          => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'mobile'         => 'nullable|string|regex:/^[0-9]+$/|max:20',
+        ], $this->getAccountValidationMessages());
 
         $account = CrmAccount::where('tenant_id', $tenantId)->findOrFail($validated['crm_account_id']);
         $this->authorize('update', $account);
@@ -535,5 +531,47 @@ class CrmAccountController extends Controller
         }
 
         return redirect()->back()->with('success', $message);
+    }
+
+    private function getAccountValidationRules(): array
+    {
+        return [
+            'name'          => 'required|string|max:255',
+            'gstin'         => 'nullable|string|max:50',
+            'email'         => 'required|email|max:255',
+            'phone'         => 'nullable|string|regex:/^[0-9]+$/|max:20',
+            'website'       => 'nullable|string|max:255',
+            'industry_type' => 'nullable|string|max:255',
+            'credit_limit'  => 'nullable|numeric|min:0',
+            'opening_balance' => 'nullable|numeric|min:0',
+            'owner_id'      => 'nullable|exists:users,id',
+            'street'        => 'nullable|string|max:255',
+            'city'          => 'nullable|string|max:100',
+            'state'         => 'nullable|string|max:100',
+            'country'       => 'nullable|string|max:100',
+            'zip_code'      => 'nullable|string|regex:/^[0-9]+$/|max:10',
+            // Primary contact fields
+            'contact_name'  => 'nullable|string|max:255',
+            'designation'   => 'nullable|string|max:255',
+            'role'          => 'nullable|string|max:100',
+            'contact_email' => 'nullable|email|max:255',
+            'contact_phone' => 'nullable|string|regex:/^[0-9]+$/|max:20',
+        ];
+    }
+
+    private function getAccountValidationMessages(): array
+    {
+        return [
+            'name.required'        => 'Company Name is required.',
+            'email.required'       => 'Contact Email is required.',
+            'email.email'          => 'Please enter a valid email address for Company Email.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'contact_phone.regex'  => 'Primary contact phone number must contain digits/numbers only (no special characters or letters).',
+            'contact_email.email'  => 'Please enter a valid email address for Primary Contact.',
+            'zip_code.regex'       => 'Zip / Postal code must contain digits/numbers only (no special characters or letters).',
+            'credit_limit.numeric' => 'Credit limit must be a valid number.',
+            'opening_balance.numeric' => 'Opening balance must be a valid number.',
+            'mobile.regex'         => 'Mobile number must contain digits/numbers only (no special characters or letters).',
+        ];
     }
 }
