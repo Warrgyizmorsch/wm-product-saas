@@ -20,7 +20,7 @@ class NotificationRuleController extends Controller
      */
     public function index(Request $request): View
     {
-        $tenantId = function_exists('tenant_id') ? tenant_id() : (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
 
         $query = NotificationRule::query()->where('tenant_id', $tenantId)->orderBy('module', 'asc')->orderBy('name', 'asc');
 
@@ -48,7 +48,7 @@ class NotificationRuleController extends Controller
      */
     public function create(Request $request): View
     {
-        $tenantId = function_exists('tenant_id') ? tenant_id() : (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
         $eventCatalog = NotificationEventCatalog::getEvents();
         $roles = Role::where('tenant_id', $tenantId)->orWhereNull('tenant_id')->orderBy('name')->get();
         $users = User::where('tenant_id', $tenantId)->orderBy('name')->get();
@@ -64,7 +64,7 @@ class NotificationRuleController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $tenantId = function_exists('tenant_id') ? tenant_id() : (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -90,7 +90,7 @@ class NotificationRuleController extends Controller
         $validated['notify_assigned_user'] = $request->boolean('notify_assigned_user');
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['created_by'] = auth()->id();
-        $validated['icon_class'] = $validated['icon_class'] ?: 'feather-bell';
+        $validated['icon_class'] = ($validated['icon_class'] ?? null) ?: 'feather-bell';
 
         NotificationRule::create($validated);
 
@@ -103,7 +103,7 @@ class NotificationRuleController extends Controller
      */
     public function edit(NotificationRule $notificationRule): View
     {
-        $tenantId = function_exists('tenant_id') ? tenant_id() : (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
         $eventCatalog = NotificationEventCatalog::getEvents();
         $roles = Role::where('tenant_id', $tenantId)->orWhereNull('tenant_id')->orderBy('name')->get();
         $users = User::where('tenant_id', $tenantId)->orderBy('name')->get();
@@ -139,7 +139,7 @@ class NotificationRuleController extends Controller
         $validated['notify_assigned_user'] = $request->boolean('notify_assigned_user');
         $validated['is_active'] = $request->boolean('is_active');
         $validated['updated_by'] = auth()->id();
-        $validated['icon_class'] = $validated['icon_class'] ?: 'feather-bell';
+        $validated['icon_class'] = ($validated['icon_class'] ?? null) ?: 'feather-bell';
 
         $notificationRule->update($validated);
 

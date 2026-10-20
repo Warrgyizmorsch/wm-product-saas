@@ -22,7 +22,7 @@ class MetaSettingController extends Controller
 
     public function index(): View
     {
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
 
@@ -66,7 +66,7 @@ class MetaSettingController extends Controller
         ]);
 
         $metaConfig = MetaConfiguration::forCurrentContext()->first();
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
         $leadgenId = 'test_meta_' . time() . '_' . rand(1000, 9999);
@@ -165,7 +165,7 @@ class MetaSettingController extends Controller
             'is_active'              => 'nullable|boolean',
         ]);
 
-        $validated['tenant_id'] = current_tenant_id() ?? 1;
+        $validated['tenant_id'] = require_tenant_id();
         $validated['company_id'] = $request->input('company_id') ?: current_company_id();
         $validated['branch_id'] = $request->input('branch_id') ?: current_branch_id();
         $validated['is_active'] = $request->boolean('is_active');

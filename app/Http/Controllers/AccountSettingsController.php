@@ -62,7 +62,7 @@ class AccountSettingsController extends Controller
         }
 
         // Authorization check for platform setting links
-        $canManagePlatformSettings = $this->accessService->allows($user, 'platform.settings.manage')
+        $canManagePlatformSettings = $this->accessService->allows($user, 'tenant.settings.manage', ['tenant_id' => tenant_id()])
             || $this->accessService->allows($user, 'platform.tenants.manage')
             || in_array($user->role, ['admin', 'super_admin', 'tenant_owner'], true);
 

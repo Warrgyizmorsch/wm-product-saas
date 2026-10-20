@@ -33,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'branch' => ResolveBranch::class,
             'module.access' => EnsureTenantModuleAccess::class,
             'billing.active' => \App\Http\Middleware\EnsureBillingActive::class,
+            'permission' => \App\Http\Middleware\RequirePermission::class,
             'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
             'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
             'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,

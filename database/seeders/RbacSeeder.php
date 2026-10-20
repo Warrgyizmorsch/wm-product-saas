@@ -496,6 +496,10 @@ class RbacSeeder extends Seeder
             // outside that special-cased prefix so its normal tenant-scoped grant
             // actually takes effect in the sidebar and the policy check.
             ['name' => 'tenant.subscription.manage', 'module' => 'tenant', 'entity' => 'subscription', 'action' => 'manage'],
+            // The workspace's own integration/master settings (SMTP, WhatsApp, GST,
+            // Meta, Twilio, payment terms, notification rules). Same reasoning as
+            // above: per-tenant, so outside the 'platform.' prefix.
+            ['name' => 'tenant.settings.manage', 'module' => 'tenant', 'entity' => 'settings', 'action' => 'manage'],
             ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'platform.payment_gateway.manage', 'module' => 'platform', 'entity' => 'payment_gateway', 'action' => 'manage'],
