@@ -14,6 +14,9 @@ class WorkCenter extends BaseModel
 {
     use HasFactory, SoftDeletes, Loggable;
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
+
     protected $table = 'production_work_centers';
 
     protected $fillable = [
@@ -24,6 +27,11 @@ class WorkCenter extends BaseModel
         'description',
         'location',
         'capacity_per_hour',
+        'total_theoretical_capacity',
+        'labor_cost_per_hour',
+        'total_scheduled_labor_cost',
+        'unique_operating_hours',
+        'calculation_details',
         'efficiency_percentage',
         'cost_per_hour',
         'overhead_rate',
@@ -32,10 +40,15 @@ class WorkCenter extends BaseModel
     ];
 
     protected $casts = [
-        'capacity_per_hour'      => 'float',
-        'efficiency_percentage'  => 'float',
-        'cost_per_hour'          => 'float',
-        'overhead_rate'          => 'float',
+        'capacity_per_hour'          => 'decimal:4',
+        'total_theoretical_capacity' => 'decimal:4',
+        'labor_cost_per_hour'        => 'decimal:4',
+        'total_scheduled_labor_cost' => 'decimal:4',
+        'unique_operating_hours'     => 'decimal:4',
+        'calculation_details'        => 'array',
+        'efficiency_percentage'      => 'float',
+        'cost_per_hour'              => 'float',
+        'overhead_rate'              => 'float',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -109,5 +122,20 @@ class WorkCenter extends BaseModel
     public function effectiveCapacityPerHour(): float
     {
         return ($this->capacity_per_hour ?? 0) * ($this->efficiency_percentage / 100);
+    }
+
+    public function getCalculationDetails(): array
+    {
+        if (is_array($this->calculation_details) && !empty($this->calculation_details)) {
+            return $this->calculation_details;
+        }
+
+        return app(\App\Domains\Production\Services\WorkCenterCalculationService::class)->calculate($this);
+    }
+
+    public function hasOverlappingAssignments(): bool
+    {
+        $details = $this->getCalculationDetails();
+        return (bool) ($details['labor_cost']['has_overlapping_assignments'] ?? false);
     }
 }

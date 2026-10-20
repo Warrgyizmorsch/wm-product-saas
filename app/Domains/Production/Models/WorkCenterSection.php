@@ -33,6 +33,11 @@ class WorkCenterSection extends BaseModel
         'workers_required',
         'supports_manual_production',
         'manual_capacity_per_hour',
+        'capacity_per_hour',
+        'labor_cost_per_hour',
+        'total_scheduled_labor_cost',
+        'unique_operating_hours',
+        'calculation_details',
         'description',
         'status',
     ];
@@ -41,11 +46,31 @@ class WorkCenterSection extends BaseModel
         'workers_required'           => 'integer',
         'supports_manual_production' => 'boolean',
         'manual_capacity_per_hour'   => 'decimal:4',
+        'capacity_per_hour'          => 'decimal:4',
+        'labor_cost_per_hour'        => 'decimal:4',
+        'total_scheduled_labor_cost' => 'decimal:4',
+        'unique_operating_hours'     => 'decimal:4',
+        'calculation_details'        => 'array',
     ];
 
     public function supportsManualProduction(): bool
     {
         return (bool) $this->supports_manual_production;
+    }
+
+    public function getCalculationDetails(): array
+    {
+        if (is_array($this->calculation_details) && !empty($this->calculation_details)) {
+            return $this->calculation_details;
+        }
+
+        return app(\App\Domains\Production\Services\SectionCalculationService::class)->calculate($this);
+    }
+
+    public function hasOverlappingShifts(): bool
+    {
+        $details = $this->getCalculationDetails();
+        return (bool) ($details['labor_cost']['has_overlapping_shifts'] ?? false);
     }
 
     // ─── Relationships ────────────────────────────────────────────────────────

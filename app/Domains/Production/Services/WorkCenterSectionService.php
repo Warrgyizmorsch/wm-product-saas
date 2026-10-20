@@ -12,7 +12,8 @@ use InvalidArgumentException;
 class WorkCenterSectionService
 {
     public function __construct(
-        private readonly WorkCenterSectionRepositoryInterface $repository
+        private readonly WorkCenterSectionRepositoryInterface $repository,
+        private readonly SectionCalculationService $calculationService,
     ) {}
 
     public function create(WorkCenterSectionDTO $dto, int $tenantId): WorkCenterSection
@@ -48,7 +49,8 @@ class WorkCenterSectionService
                 $this->repository->syncMachines($section, $dto->machine_ids, $tenantId);
             }
 
-            return $section->fresh(['workCenter', 'machines', 'shifts']);
+            $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
+            return $this->calculationService->calculateAndSave($fresh);
         });
     }
 
@@ -90,8 +92,15 @@ class WorkCenterSectionService
                 $this->repository->syncMachines($updated, $dto->machine_ids, $section->tenant_id);
             }
 
-            return $updated->fresh(['workCenter', 'machines', 'shifts']);
+            $fresh = $updated->fresh(['workCenter', 'machines', 'shifts']);
+            return $this->calculationService->calculateAndSave($fresh);
         });
+    }
+
+    public function recalculate(WorkCenterSection $section): WorkCenterSection
+    {
+        $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
+        return $this->calculationService->calculateAndSave($fresh);
     }
 
     public function delete(int $id): bool
@@ -108,8 +117,14 @@ class WorkCenterSectionService
             );
         }
 
-        return DB::transaction(function () use ($id) {
-            return $this->repository->delete($id);
+        $workCenter = $section->workCenter;
+
+        return DB::transaction(function () use ($id, $workCenter) {
+            $deleted = $this->repository->delete($id);
+            if ($deleted && $workCenter) {
+                app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
+            }
+            return $deleted;
         });
     }
 

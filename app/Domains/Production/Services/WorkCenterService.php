@@ -10,7 +10,9 @@ use InvalidArgumentException;
 class WorkCenterService
 {
     public function __construct(
-        private readonly WorkCenterRepositoryInterface $repository
+        private readonly WorkCenterRepositoryInterface $repository,
+        private readonly ?SectionCalculationService $calculationService = null,
+        private readonly ?WorkCenterCalculationService $workCenterCalculationService = null,
     ) {}
 
     public function create(WorkCenterDTO $dto, int $tenantId): WorkCenter
@@ -142,6 +144,10 @@ class WorkCenterService
         return \Illuminate\Support\Facades\DB::transaction(function () use ($workCenter, $newShiftIds, $affectedSections, $tenantId) {
             foreach ($affectedSections as $item) {
                 $item['section']->shifts()->detach($item['removed_shifts']);
+                if ($this->calculationService) {
+                    $freshSection = $item['section']->fresh(['workCenter', 'machines', 'shifts']);
+                    $this->calculationService->calculateAndSave($freshSection);
+                }
             }
 
             $syncData = [];
@@ -150,11 +156,23 @@ class WorkCenterService
             }
             $workCenter->shifts()->sync($syncData);
 
+            $this->getWorkCenterCalculationService()->calculateAndSave($workCenter);
+
             return [
                 'success' => true,
                 'requires_confirmation' => false,
                 'affected_sections' => $affectedSections,
             ];
         });
+    }
+
+    public function recalculate(WorkCenter $workCenter): WorkCenter
+    {
+        return $this->getWorkCenterCalculationService()->calculateAndSave($workCenter);
+    }
+
+    private function getWorkCenterCalculationService(): WorkCenterCalculationService
+    {
+        return $this->workCenterCalculationService ?? app(WorkCenterCalculationService::class);
     }
 }

@@ -6,6 +6,9 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal">
+            <i class="feather-pie-chart me-1"></i>{{ __('production.calculation_breakdown') }}
+        </button>
         <x-ui.button :href="route('production.work-centers.index')" variant="secondary" icon="feather-arrow-left">
             {{ __('production.back_to_list') }}
         </x-ui.button>
@@ -188,10 +191,22 @@
                 <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_metrics') }}</h5>
                 <div class="d-flex flex-column gap-4 py-2 px-2">
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.nominal_capacity') }}</span>
-                        <span class="fs-22 fw-bold text-dark">
-                            {{ $workCenter->capacity_per_hour !== null ? number_format($workCenter->capacity_per_hour, 2) . ' ' . __('production.units') : __('production.unlimited') }}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.capacity_per_hour') }}</span>
+                            <button type="button" class="btn btn-xs btn-outline-primary border-0 p-0"
+                                    data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal"
+                                    title="{{ __('production.view_calculation_breakdown') }}">
+                                <i class="feather-info fs-13 me-1"></i>{{ __('production.calculation_breakdown') }}
+                            </button>
+                        </div>
+                        <span class="fs-22 fw-bold text-dark font-monospace">
+                            {{ $workCenter->capacity_per_hour !== null ? number_format((float) $workCenter->capacity_per_hour, 2) . ' ' . __('production.units_hr') : __('production.unlimited') }}
                         </span>
+                        @if($workCenter->total_theoretical_capacity !== null)
+                            <small class="text-muted fs-11 d-block mt-0.5">
+                                {{ __('production.total_theoretical_capacity') }}: {{ number_format((float) $workCenter->total_theoretical_capacity, 2) }} units ({{ number_format((float) ($workCenter->unique_operating_hours ?? 0), 2) }} h)
+                            </small>
+                        @endif
                     </div>
                     <div>
                         <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.operational_efficiency') }}</span>
@@ -228,6 +243,23 @@
                     $totalStationCost = $directCost + $overheadCost;
                 @endphp
                 <div class="d-flex flex-column gap-3 py-1 px-1">
+                    @if($workCenter->labor_cost_per_hour !== null)
+                        <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
+                            <div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.wc_labor_cost_per_hour') }}</span>
+                                    <button type="button" class="btn btn-xs btn-outline-primary border-0 p-0"
+                                            data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal"
+                                            title="{{ __('production.view_calculation_breakdown') }}">
+                                        <i class="feather-info fs-12"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted fs-11">Scheduled Section shifts</small>
+                            </div>
+                            <span class="fs-18 fw-bold text-primary font-monospace">{{ format_currency((float) $workCenter->labor_cost_per_hour) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                        </div>
+                    @endif
+
                     <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
                         <div>
                             <span class="text-muted fs-11 text-uppercase d-block fw-semibold">{{ __('production.cost_per_hour') }}</span>
@@ -336,16 +368,25 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 15%">{{ __('production.section_code') }}</th>
-                            <th style="width: 22%">{{ __('production.section_name') }}</th>
-                            <th style="width: 35%">{{ __('production.section_shifts') }}</th>
-                            <th style="width: 10%">{{ __('production.machines_count') }}</th>
-                            <th style="width: 10%">{{ __('production.status') }}</th>
-                            <th style="width: 8%" class="text-end">{{ __('production.actions') }}</th>
+                            <th style="width: 12%">{{ __('production.section_code') }}</th>
+                            <th style="width: 17%">{{ __('production.section_name') }}</th>
+                            <th style="width: 25%">{{ __('production.section_shifts') }}</th>
+                            <th style="width: 7%">{{ __('production.machines_count') }}</th>
+                            <th style="width: 13%">{{ __('production.capacity_per_hour') }}</th>
+                            <th style="width: 16%">{{ __('production.labor_cost_per_hour') }}</th>
+                            <th style="width: 6%">{{ __('production.status') }}</th>
+                            <th style="width: 4%" class="text-end">{{ __('production.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($workCenter->sections as $section)
+                            @php
+                                $calc = $section->getCalculationDetails();
+                                $capPerHour = (float) ($section->capacity_per_hour ?? $calc['capacity']['capacity_per_hour'] ?? 0);
+                                $capUnit = $calc['capacity']['capacity_unit'] ?? __('production.units_per_hour');
+                                $laborCost = (float) ($section->labor_cost_per_hour ?? $calc['labor_cost']['labor_cost_per_hour'] ?? 0);
+                                $hasOverlaps = (bool) ($calc['labor_cost']['has_overlapping_shifts'] ?? false);
+                            @endphp
                             <tr>
                                 <td class="align-middle">
                                     <span class="font-monospace fw-bold text-dark">{{ $section->code }}</span>
@@ -415,6 +456,41 @@
                                     </span>
                                 </td>
                                 <td class="align-middle">
+                                    <div class="d-flex align-items-center gap-1.5 flex-nowrap">
+                                        <span class="fw-bold font-monospace text-dark fs-12">
+                                            {{ number_format($capPerHour, 2) }}
+                                        </span>
+                                        <small class="text-muted fs-10">{{ $capUnit }}</small>
+                                        <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
+                                                data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
+                                                title="{{ __('production.view_calculation_breakdown') }}">
+                                            <i class="feather-info fs-12"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="d-flex align-items-center gap-1.5 flex-nowrap">
+                                            <span class="fw-bold font-monospace text-dark fs-12">
+                                                {{ format_currency($laborCost) }}
+                                            </span>
+                                            <small class="text-muted fs-10">/ hr</small>
+                                            <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
+                                                    data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
+                                                    title="{{ __('production.view_calculation_breakdown') }}">
+                                                <i class="feather-info fs-12"></i>
+                                            </button>
+                                        </div>
+                                        @if($hasOverlaps)
+                                            <div>
+                                                <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="{{ __('production.overlapping_shifts') }}">
+                                                    <i class="feather-layers me-0.5"></i>{{ __('production.overlapping_shifts') }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="align-middle">
                                     @if ($section->isActive())
                                         <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">{{ __('production.active') }}</span>
                                     @else
@@ -423,6 +499,11 @@
                                 </td>
                                 <td class="text-end align-middle">
                                     <x-ui.action-dropdown>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}">
+                                                <i class="feather-bar-chart-2 me-2 text-primary fs-12"></i>{{ __('production.view_calculation_breakdown') }}
+                                            </button>
+                                        </li>
                                         @can('update', $section)
                                             <li>
                                                 <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editSectionModal_{{ $section->id }}">
@@ -444,7 +525,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">
+                                <td colspan="8" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_sections_found') }}
                                 </td>
                             </tr>
@@ -476,6 +557,14 @@
                         <input type="hidden" name="_modal" value="createSectionModal">
 
                         <div class="modal-body p-4">
+                            <div class="alert alert-soft-warning border-warning d-flex align-items-start gap-2 mb-3 py-2 px-3 fs-11">
+                                <i class="feather-alert-triangle text-warning fs-14 mt-0.5 flex-shrink-0"></i>
+                                <div>
+                                    <strong class="text-dark">{{ __('production.section_operating_hours_assumption_title') }}:</strong>
+                                    <span class="text-muted">{{ __('production.section_operating_hours_assumption_body') }}</span>
+                                </div>
+                            </div>
+
                             <div class="row g-3">
                                 <div class="col-md-5">
                                     <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_name') }} <span class="text-danger">*</span></label>
@@ -684,6 +773,14 @@
                             <input type="hidden" name="_modal" value="editSectionModal_{{ $section->id }}">
 
                             <div class="modal-body p-4">
+                                <div class="alert alert-soft-warning border-warning d-flex align-items-start gap-2 mb-3 py-2 px-3 fs-11">
+                                    <i class="feather-alert-triangle text-warning fs-14 mt-0.5 flex-shrink-0"></i>
+                                    <div>
+                                        <strong class="text-dark">{{ __('production.section_operating_hours_assumption_title') }}:</strong>
+                                        <span class="text-muted">{{ __('production.section_operating_hours_assumption_body') }}</span>
+                                    </div>
+                                </div>
+
                                 <div class="row g-3">
                                     <div class="col-md-5">
                                         <label class="form-label fw-bold fs-12 text-dark">{{ __('production.section_name') }} <span class="text-danger">*</span></label>
@@ -943,7 +1040,848 @@
                 </div>
             </div>
         @endcan
+
+        <!-- Calculation Breakdown Modal for Section -->
+        <div class="modal fade" id="sectionCalculationModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionCalculationModalLabel_{{ $section->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header border-bottom py-3 bg-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="feather-bar-chart-2"></i>
+                            </div>
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="sectionCalculationModalLabel_{{ $section->id }}">
+                                    {{ __('production.calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $section->code }}</span> ({{ $section->name }})
+                                </h5>
+                                <small class="text-muted fs-11">{{ __('production.work_center') }}: {{ $workCenter->name }} [{{ $workCenter->code }}]</small>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        @php
+                            $calcData = $section->getCalculationDetails();
+                            $capData = $calcData['capacity'] ?? [];
+                            $laborData = $calcData['labor_cost'] ?? [];
+                            $machinesBreakdown = $capData['machines'] ?? [];
+                            $shiftsBreakdown = $laborData['shifts'] ?? [];
+                            $windowsBreakdown = $laborData['timeline_windows'] ?? [];
+                            $totalSchedCost = (float) ($laborData['total_scheduled_labor_cost'] ?? 0);
+                            $uniqHours = (float) ($laborData['unique_operating_hours'] ?? 0);
+                            $avgLaborCost = (float) ($laborData['labor_cost_per_hour'] ?? 0);
+                            $totalCap = (float) ($capData['capacity_per_hour'] ?? 0);
+                            $cUnit = $capData['capacity_unit'] ?? __('production.units_per_hour');
+                            $hasOverlapping = (bool) ($laborData['has_overlapping_shifts'] ?? false);
+                        @endphp
+
+                        <!-- Top Summary Cards (KPIs) -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="p-3 rounded border bg-light h-100">
+                                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                        <i class="feather-activity me-1 text-primary"></i>{{ __('production.capacity_per_hour') }}
+                                    </span>
+                                    <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                        {{ number_format($totalCap, 2) }}
+                                    </span>
+                                    <small class="text-muted fs-11">{{ $cUnit }}</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="p-3 rounded border bg-light h-100">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-muted fs-11 text-uppercase fw-semibold">
+                                            <i class="feather-dollar-sign me-1 text-success"></i>{{ __('production.labor_cost_per_hour') }}
+                                        </span>
+                                        @if($hasOverlapping)
+                                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill">
+                                                <i class="feather-layers me-0.5"></i>{{ __('production.overlapping_shifts') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <span class="fs-20 fw-bolder text-primary font-monospace d-block">
+                                        {{ format_currency($avgLaborCost) }}
+                                    </span>
+                                    <small class="text-muted fs-11">per unique elapsed operating hour</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="p-3 rounded border bg-light h-100">
+                                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                        <i class="feather-credit-card me-1 text-info"></i>{{ __('production.total_scheduled_labor_cost') }}
+                                    </span>
+                                    <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                        {{ format_currency($totalSchedCost) }}
+                                    </span>
+                                    <small class="text-muted fs-11">Sum of all window labor costs</small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <div class="p-3 rounded border bg-light h-100">
+                                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                        <i class="feather-clock me-1 text-warning"></i>{{ __('production.unique_operating_hours') }}
+                                    </span>
+                                    <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                        {{ number_format($uniqHours, 2) }} h
+                                    </span>
+                                    <small class="text-muted fs-11">Union of active timeline hours</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 1: Capacity Per Hour Breakdown -->
+                        <div class="card border shadow-none mb-4">
+                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold text-dark mb-0 fs-13">
+                                    <i class="feather-cpu text-primary me-1.5"></i>{{ __('production.capacity_breakdown') }}
+                                </h6>
+                                <span class="badge bg-soft-primary text-primary font-monospace fs-11">
+                                    {{ number_format($totalCap, 2) }} {{ $cUnit }}
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 25%">Resource Type</th>
+                                                <th style="width: 35%">Resource Name / Identifier</th>
+                                                <th style="width: 20%" class="text-end">Base Capacity</th>
+                                                <th style="width: 20%" class="text-end">Contribution / Hr</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($machinesBreakdown as $m)
+                                                <tr>
+                                                    <td class="align-middle">
+                                                        <span class="badge bg-soft-secondary text-secondary rounded-pill">
+                                                            <i class="feather-cpu me-1"></i>Machine
+                                                        </span>
+                                                    </td>
+                                                    <td class="align-middle">
+                                                        <span class="fw-bold font-monospace text-dark">[{{ $m['code'] }}]</span>
+                                                        <span class="text-dark ms-1">{{ $m['name'] }}</span>
+                                                    </td>
+                                                    <td class="align-middle text-end font-monospace">
+                                                        {{ number_format((float)$m['capacity'], 2) }} {{ $m['capacity_unit'] ?? $cUnit }}
+                                                    </td>
+                                                    <td class="align-middle text-end font-monospace fw-semibold text-dark">
+                                                        +{{ number_format((float)$m['capacity'], 2) }} {{ $cUnit }}
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="4" class="text-muted text-center py-2 fst-italic">
+                                                        {{ __('production.no_machines_assigned_zero_cap') }}
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+
+                                            <!-- Manual Production Row -->
+                                            <tr class="{{ !empty($capData['manual_production']['enabled']) ? 'table-warning bg-soft-warning' : 'table-light' }}">
+                                                <td class="align-middle">
+                                                    <span class="badge bg-soft-warning text-warning rounded-pill">
+                                                        <i class="feather-user me-1"></i>Manual Production
+                                                    </span>
+                                                </td>
+                                                <td class="align-middle">
+                                                    @if(!empty($capData['manual_production']['enabled']))
+                                                        <span class="fw-bold text-dark">{{ __('production.manual_production') }}</span>
+                                                        <span class="badge bg-success text-white fs-10 px-1 py-0.2 ms-1">Enabled</span>
+                                                    @else
+                                                        <span class="text-muted">{{ __('production.manual_production') }}</span>
+                                                        <span class="badge bg-secondary text-white fs-10 px-1 py-0.2 ms-1">Disabled</span>
+                                                    @endif
+                                                </td>
+                                                <td class="align-middle text-end font-monospace text-muted">
+                                                    @if(!empty($capData['manual_production']['enabled']))
+                                                        {{ number_format((float)$capData['manual_production']['configured_capacity'], 2) }} {{ $cUnit }}
+                                                    @else
+                                                        &mdash;
+                                                    @endif
+                                                </td>
+                                                <td class="align-middle text-end font-monospace fw-semibold {{ !empty($capData['manual_production']['enabled']) ? 'text-dark' : 'text-muted' }}">
+                                                    @if(!empty($capData['manual_production']['enabled']))
+                                                        +{{ number_format((float)$capData['manual_production']['effective_capacity'], 2) }} {{ $cUnit }}
+                                                    @else
+                                                        0.00 {{ $cUnit }}
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot class="table-light border-top">
+                                            <tr class="fw-bold">
+                                                <td colspan="3" class="text-end text-dark">{{ __('production.total_section_capacity') }}:</td>
+                                                <td class="text-end font-monospace text-primary fs-13">
+                                                    {{ number_format($totalCap, 2) }} {{ $cUnit }}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 2: Shift-Level Labor Configuration -->
+                        <div class="card border shadow-none mb-4">
+                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold text-dark mb-0 fs-13">
+                                    <i class="feather-users text-primary me-1.5"></i>{{ __('production.shift_labor_configuration') }}
+                                </h6>
+                                <span class="text-muted fs-11">
+                                    Shift Labor Cost / Hr = Workers Required &times; Hourly Rate Per Worker
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 25%">Shift Name</th>
+                                                <th style="width: 20%">Operating Hours</th>
+                                                <th style="width: 15%" class="text-center">{{ __('production.shift_worker_count') }}</th>
+                                                <th style="width: 20%" class="text-end">{{ __('production.hourly_rate_per_worker') }}</th>
+                                                <th style="width: 20%" class="text-end">{{ __('production.shift_labor_cost_per_hour') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($shiftsBreakdown as $sh)
+                                                <tr>
+                                                    <td class="align-middle">
+                                                        <span class="fw-bold text-dark">{{ $sh['name'] }}</span>
+                                                        @if(empty($sh['hourly_labor_rate']) || (float)$sh['hourly_labor_rate'] <= 0)
+                                                            <span class="badge bg-soft-secondary text-secondary fs-10 px-1 py-0.2 ms-1" title="{{ __('production.missing_rate_note') }}">
+                                                                Rate: ₹0
+                                                            </span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="align-middle font-monospace text-muted">
+                                                        {{ $sh['start_time'] }} &ndash; {{ $sh['end_time'] }}
+                                                    </td>
+                                                    <td class="align-middle text-center">
+                                                        <span class="badge bg-soft-info text-info rounded-pill px-2 py-0.5 fw-semibold font-monospace">
+                                                            {{ $sh['workers_required'] }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="align-middle text-end font-monospace">
+                                                        {{ format_currency((float)$sh['hourly_labor_rate']) }} / worker
+                                                    </td>
+                                                    <td class="align-middle text-end font-monospace fw-bold text-dark">
+                                                        {{ format_currency((float)$sh['shift_labor_cost_per_hour']) }} / hr
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="text-muted text-center py-2 fst-italic">
+                                                        {{ __('production.no_shifts_assigned') }}
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section 3: Timeline Windows Breakdown -->
+                        <div class="card border shadow-none mb-3">
+                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                                <h6 class="fw-bold text-dark mb-0 fs-13">
+                                    <i class="feather-calendar text-primary me-1.5"></i>{{ __('production.timeline_windows') }}
+                                </h6>
+                                <span class="text-muted fs-11">
+                                    Discretized by shift boundaries; paid breaks included; gaps excluded
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 22%">{{ __('production.window_range') }}</th>
+                                                <th style="width: 12%">{{ __('production.window_duration') }}</th>
+                                                <th style="width: 26%">{{ __('production.active_shifts') }}</th>
+                                                <th style="width: 12%" class="text-center">{{ __('production.active_workers') }}</th>
+                                                <th style="width: 14%" class="text-end">{{ __('production.combined_labor_rate') }}</th>
+                                                <th style="width: 14%" class="text-end">{{ __('production.window_labor_cost') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($windowsBreakdown as $w)
+                                                <tr class="{{ !empty($w['is_overlap']) ? 'table-warning bg-soft-warning' : '' }}">
+                                                    <td class="align-middle font-monospace fw-semibold text-dark">
+                                                        {{ $w['window'] }}
+                                                        @if(!empty($w['is_overlap']))
+                                                            <span class="badge bg-warning text-dark fs-10 px-1 py-0.2 ms-1 rounded-pill">
+                                                                Overlap
+                                                            </span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="align-middle font-monospace text-muted">
+                                                        {{ number_format((float)$w['duration_hours'], 2) }} h
+                                                    </td>
+                                                    <td class="align-middle">
+                                                        <div class="d-flex flex-wrap gap-1">
+                                                            @foreach($w['active_shift_names'] as $asn)
+                                                                <span class="badge bg-soft-primary text-primary fs-11 px-1.5 py-0.5">
+                                                                    {{ $asn }}
+                                                                </span>
+                                                            @endforeach
+                                                        </div>
+                                                    </td>
+                                                    <td class="align-middle text-center font-monospace fw-semibold">
+                                                        {{ $w['active_workers'] }}
+                                                    </td>
+                                                    <td class="align-middle text-end font-monospace">
+                                                        {{ format_currency((float)$w['combined_hourly_cost']) }} / hr
+                                                    </td>
+                                                    <td class="align-middle text-end font-monospace fw-bold text-dark">
+                                                        {{ format_currency((float)$w['window_cost']) }}
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="6" class="text-muted text-center py-2 fst-italic">
+                                                        No timeline windows generated.
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                        <tfoot class="table-light border-top">
+                                            <tr class="fw-bold">
+                                                <td class="text-dark">{{ __('production.unique_operating_hours') }}:</td>
+                                                <td class="font-monospace text-primary">{{ number_format($uniqHours, 2) }} h</td>
+                                                <td colspan="3" class="text-end text-dark">{{ __('production.total_scheduled_labor_cost') }}:</td>
+                                                <td class="text-end font-monospace text-primary fs-13">{{ format_currency($totalSchedCost) }}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mathematical Summary Card -->
+                        <div class="p-3 bg-light rounded border d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <div>
+                                <div class="fw-bold text-dark fs-13 mb-1">
+                                    <i class="feather-check-circle text-success me-1"></i>{{ __('production.calculation_formula_explanation') }}
+                                </div>
+                                <div class="text-muted fs-11 font-monospace">
+                                    {{ format_currency($totalSchedCost) }} &divide; {{ number_format($uniqHours, 2) }} hrs = 
+                                    <strong class="text-primary fs-12">{{ format_currency($avgLaborCost) }} / hr</strong>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="text-muted fs-11 d-block">Resulting Section Labor Cost:</span>
+                                <span class="fs-18 fw-bolder text-primary font-monospace">{{ format_currency($avgLaborCost) }} <span class="fs-11 fw-normal text-muted">/ hr</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                            {{ __('production.close_tab') ?? 'Close' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     @endforeach
+
+    <!-- Work Center Calculation Breakdown Modal -->
+    @php
+        $wcCalc = $workCenter->getCalculationDetails();
+        $wcCapCalc = $wcCalc['capacity'] ?? [];
+        $wcLaborCalc = $wcCalc['labor_cost'] ?? [];
+        $wcCapPerHour = (float) ($workCenter->capacity_per_hour ?? $wcCapCalc['capacity_per_hour'] ?? 0);
+        $wcTotalTheoCap = (float) ($workCenter->total_theoretical_capacity ?? $wcCapCalc['total_theoretical_capacity'] ?? 0);
+        $wcLaborCostPerHour = (float) ($workCenter->labor_cost_per_hour ?? $wcLaborCalc['labor_cost_per_hour'] ?? 0);
+        $wcTotalSchedLabor = (float) ($workCenter->total_scheduled_labor_cost ?? $wcLaborCalc['total_scheduled_labor_cost'] ?? 0);
+        $wcUniqOperatingHours = (float) ($workCenter->unique_operating_hours ?? $wcCapCalc['unique_operating_hours'] ?? $wcLaborCalc['unique_operating_hours'] ?? 0);
+        $wcCapWindows = $wcCapCalc['windows'] ?? [];
+        $wcCapGaps = $wcCapCalc['gaps'] ?? [];
+        $wcLaborAssignments = $wcLaborCalc['assignments'] ?? [];
+        $wcLaborWindows = $wcLaborCalc['windows'] ?? [];
+        $wcLaborGaps = $wcLaborCalc['gaps'] ?? [];
+        $wcHasMissingRates = (bool) ($wcLaborCalc['has_missing_rates'] ?? false);
+        $wcHasOverlapping = (bool) ($wcLaborCalc['has_overlapping_assignments'] ?? false);
+    @endphp
+
+    <div class="modal fade" id="workCenterCalculationModal" tabindex="-1" aria-labelledby="workCenterCalculationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header border-bottom py-3 bg-light">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                            <i class="feather-pie-chart"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="workCenterCalculationModalLabel">
+                                {{ __('production.wc_calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $workCenter->code }}</span> ({{ $workCenter->name }})
+                            </h5>
+                            <small class="text-muted fs-11">Auditable Time-Window Aggregations across all Sections</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-4">
+                    <!-- Top Summary Cards (KPIs) -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                    <i class="feather-activity me-1 text-primary"></i>{{ __('production.capacity_per_hour') }}
+                                </span>
+                                <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                    {{ number_format($wcCapPerHour, 2) }}
+                                </span>
+                                <small class="text-muted fs-11">{{ __('production.units_hr') }}</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-muted fs-11 text-uppercase fw-semibold">
+                                        <i class="feather-dollar-sign me-1 text-success"></i>{{ __('production.labor_cost_per_hour') }}
+                                    </span>
+                                    @if($wcHasOverlapping)
+                                        <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill">
+                                            <i class="feather-layers me-0.5"></i>{{ __('production.overlapping_assignments') }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <span class="fs-20 fw-bolder text-primary font-monospace d-block">
+                                    {{ format_currency($wcLaborCostPerHour) }}
+                                </span>
+                                <small class="text-muted fs-11">per unique elapsed operating hour</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                    <i class="feather-box me-1 text-info"></i>{{ __('production.total_theoretical_capacity') }}
+                                </span>
+                                <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                    {{ number_format($wcTotalTheoCap, 2) }}
+                                </span>
+                                <small class="text-muted fs-11">Sum of window theoretical capacities</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                    <i class="feather-clock me-1 text-warning"></i>{{ __('production.unique_operating_hours') }}
+                                </span>
+                                <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                    {{ number_format($wcUniqOperatingHours, 2) }} h
+                                </span>
+                                <small class="text-muted fs-11">Union of all section shift intervals (gaps excluded)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Tabs for Capacity vs Labor Cost -->
+                    <ul class="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
+                                    id="wc-capacity-tab" data-bs-toggle="tab" data-bs-target="#wc-capacity-pane" 
+                                    type="button" role="tab" aria-controls="wc-capacity-pane" aria-selected="true">
+                                <i class="feather-activity text-primary fs-14"></i>
+                                {{ __('production.wc_capacity_breakdown') }}
+                                <span class="badge bg-soft-primary text-primary ms-1 font-monospace">{{ number_format($wcCapPerHour, 2) }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
+                                    id="wc-labor-tab" data-bs-toggle="tab" data-bs-target="#wc-labor-pane" 
+                                    type="button" role="tab" aria-controls="wc-labor-pane" aria-selected="false">
+                                <i class="feather-dollar-sign text-success fs-14"></i>
+                                {{ __('production.wc_labor_cost_breakdown') }}
+                                <span class="badge bg-soft-success text-success ms-1 font-monospace">{{ format_currency($wcLaborCostPerHour) }}</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- CAPACITY TAB CONTENT -->
+                        <div class="tab-pane fade show active" id="wc-capacity-pane" role="tabpanel" aria-labelledby="wc-capacity-tab">
+                            <!-- Formula Banner -->
+                            <div class="p-3 mb-3 rounded bg-soft-primary border border-primary-subtle text-primary fs-12">
+                                <div class="fw-bold mb-1">
+                                    <i class="feather-info me-1"></i>{{ __('production.wc_capacity_formula_explanation') }}
+                                </div>
+                                <div class="font-monospace fs-11 text-dark">
+                                    {{ number_format($wcTotalTheoCap, 2) }} units &divide; {{ number_format($wcUniqOperatingHours, 2) }} h = <strong class="text-primary fs-13">{{ number_format($wcCapPerHour, 2) }} {{ __('production.units_hr') }}</strong>
+                                </div>
+                            </div>
+
+                            <!-- Active Sections Contributing to Capacity -->
+                            <div class="card border mb-3 shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-grid me-1 text-primary"></i>Contributing Sections ({{ count($wcCapCalc['sections'] ?? []) }})
+                                    </h6>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 15%">{{ __('production.section_code') }}</th>
+                                                <th style="width: 30%">{{ __('production.section_name') }}</th>
+                                                <th style="width: 15%">Machines</th>
+                                                <th style="width: 20%">Manual Production</th>
+                                                <th style="width: 20%" class="text-end">{{ __('production.capacity_per_hour') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($wcCapCalc['sections'] ?? [] as $sec)
+                                                <tr>
+                                                    <td><span class="font-monospace fw-bold">{{ $sec['code'] }}</span></td>
+                                                    <td class="fw-semibold text-dark">{{ $sec['name'] }}</td>
+                                                    <td>
+                                                        <span class="badge bg-soft-secondary text-secondary rounded-pill px-2">
+                                                            <i class="feather-cpu me-1"></i>{{ $sec['machine_count'] }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        @if($sec['supports_manual_production'])
+                                                            <span class="badge bg-soft-warning text-warning rounded-pill px-2">
+                                                                <i class="feather-user me-1"></i>{{ number_format($sec['manual_capacity_per_hour'], 2) }} units/hr
+                                                            </span>
+                                                        @else
+                                                            <span class="text-muted fs-11">Disabled</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">
+                                                        {{ number_format($sec['capacity_per_hour'], 2) }} units/hr
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="text-center text-muted py-2">No sections configured</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Timeline Slicing Windows -->
+                            <div class="card border mb-3 shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-clock me-1 text-warning"></i>Capacity Operating Windows Breakdown ({{ count($wcCapWindows) }})
+                                    </h6>
+                                    <small class="text-muted fs-11">Split at every Section shift boundary</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover table-bordered align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 18%">{{ __('production.window_range') }}</th>
+                                                <th style="width: 10%">{{ __('production.window_duration') }}</th>
+                                                <th style="width: 32%">{{ __('production.active_sections') }}</th>
+                                                <th style="width: 20%" class="text-end">{{ __('production.combined_capacity_per_hour') }}</th>
+                                                <th style="width: 20%" class="text-end">{{ __('production.window_theoretical_capacity') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($wcCapWindows as $win)
+                                                <tr class="@if($win['is_overlapping']) bg-soft-info-subtle @endif">
+                                                    <td>
+                                                        <span class="font-monospace fw-bold text-dark">{{ $win['window_label'] }}</span>
+                                                        @if($win['is_overnight'])
+                                                            <span class="badge bg-soft-dark text-dark fs-10 px-1 py-0.5 ms-1">Overnight</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-secondary text-secondary font-monospace">{{ number_format($win['duration_hours'], 2) }} h</span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                                                            @foreach($win['active_sections'] as $as)
+                                                                <span class="badge bg-soft-primary text-primary px-2 py-0.5">
+                                                                    {{ $as['name'] }} ({{ number_format($as['capacity_per_hour'], 2) }}/h)
+                                                                </span>
+                                                            @endforeach
+                                                            @if($win['is_overlapping'])
+                                                                <span class="badge bg-soft-warning text-warning rounded-pill px-1.5 py-0.5 fs-10 ms-1">
+                                                                    <i class="feather-layers me-0.5"></i>Overlap ({{ count($win['active_sections']) }})
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">
+                                                        {{ number_format($win['combined_capacity_per_hour'], 2) }} units/hr
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-primary">
+                                                        {{ number_format($win['theoretical_capacity'], 2) }} units
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="text-center text-muted py-3">No operating windows</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                        @if(!empty($wcCapWindows))
+                                            <tfoot class="table-light fw-bold">
+                                                <tr>
+                                                    <td>Total</td>
+                                                    <td><span class="font-monospace">{{ number_format($wcUniqOperatingHours, 2) }} h</span></td>
+                                                    <td class="text-muted fs-11">Unique operating duration</td>
+                                                    <td class="text-end text-muted fs-11">Theoretical Capacity Sum:</td>
+                                                    <td class="text-end font-monospace text-primary fs-13">{{ number_format($wcTotalTheoCap, 2) }} units</td>
+                                                </tr>
+                                            </tfoot>
+                                        @endif
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Timeline Gaps Table -->
+                            @if(!empty($wcCapGaps))
+                                <div class="card border border-warning-subtle mb-0 shadow-none">
+                                    <div class="card-header bg-soft-warning py-2 px-3 border-bottom border-warning-subtle">
+                                        <h6 class="fw-bold text-warning-emphasis fs-12 mb-0">
+                                            <i class="feather-pause-circle me-1"></i>{{ __('production.timeline_gaps') }}
+                                        </h6>
+                                        <small class="text-muted fs-11">{{ __('production.timeline_gaps_desc') }}</small>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle mb-0 fs-12">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 25%">Excluded Gap Interval</th>
+                                                    <th style="width: 15%">{{ __('production.gap_duration') }}</th>
+                                                    <th style="width: 60%">Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($wcCapGaps as $gap)
+                                                    <tr>
+                                                        <td><span class="font-monospace fw-bold text-danger">{{ $gap['window_label'] }}</span></td>
+                                                        <td><span class="badge bg-soft-danger text-danger font-monospace">{{ number_format($gap['duration_hours'], 2) }} h</span></td>
+                                                        <td class="text-muted fs-11">No active section shifts operating during this period. Safely excluded from timeline.</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        <!-- LABOR COST TAB CONTENT -->
+                        <div class="tab-pane fade" id="wc-labor-pane" role="tabpanel" aria-labelledby="wc-labor-tab">
+                            <!-- Formula Banner -->
+                            <div class="p-3 mb-3 rounded bg-soft-success border border-success-subtle text-success fs-12">
+                                <div class="fw-bold mb-1">
+                                    <i class="feather-info me-1"></i>{{ __('production.wc_labor_formula_explanation') }}
+                                </div>
+                                <div class="font-monospace fs-11 text-dark">
+                                    {{ format_currency($wcTotalSchedLabor) }} &divide; {{ number_format($wcUniqOperatingHours, 2) }} h = <strong class="text-success fs-13">{{ format_currency($wcLaborCostPerHour) }} / hr</strong>
+                                </div>
+                            </div>
+
+                            <!-- Section / Shift Assignments Table -->
+                            <div class="card border mb-3 shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-users me-1 text-success"></i>{{ __('production.section_shift_assignments') }} ({{ count($wcLaborAssignments) }})
+                                    </h6>
+                                    <small class="text-muted fs-11">Costed individually using each Section's assigned worker count</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 20%">Section</th>
+                                                <th style="width: 20%">Shift</th>
+                                                <th style="width: 15%">Shift Hours</th>
+                                                <th style="width: 12%">Workers</th>
+                                                <th style="width: 15%">Hourly Rate / Worker</th>
+                                                <th style="width: 18%" class="text-end">Hourly Cost</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($wcLaborAssignments as $a)
+                                                <tr>
+                                                    <td>
+                                                        <span class="fw-semibold text-dark">{{ $a['section_name'] }}</span>
+                                                        <span class="font-monospace text-muted fs-11">[{{ $a['section_code'] }}]</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="fw-semibold text-dark">{{ $a['shift_name'] }}</span>
+                                                        <span class="font-monospace text-muted fs-11">[{{ $a['shift_code'] }}]</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="font-monospace fs-11">{{ $a['start_time'] }}–{{ $a['end_time'] }}</span>
+                                                        @if($a['is_overnight'])
+                                                            <span class="badge bg-soft-dark text-dark fs-9">Overnight</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-info text-info rounded-pill px-2">
+                                                            <i class="feather-user me-0.5"></i>{{ $a['workers_required'] }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        @if($a['is_rate_missing'])
+                                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5" title="No hourly rate configured on shift">
+                                                                {{ __('production.missing_rate_badge') }}
+                                                            </span>
+                                                        @elseif($a['effective_hourly_rate'] == 0)
+                                                            <span class="badge bg-soft-secondary text-secondary fs-10 px-1.5 py-0.5">
+                                                                {{ __('production.explicit_zero_rate_badge') }}
+                                                            </span>
+                                                        @else
+                                                            <span class="font-monospace text-dark">{{ format_currency($a['effective_hourly_rate']) }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">
+                                                        {{ format_currency($a['assignment_labor_cost_per_hour']) }} / hr
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="6" class="text-center text-muted py-2">No shift assignments configured</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Timeline Slicing Windows -->
+                            <div class="card border mb-3 shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-clock me-1 text-primary"></i>Labor Cost Operating Windows Breakdown ({{ count($wcLaborWindows) }})
+                                    </h6>
+                                    <small class="text-muted fs-11">Sum of active assignment costs &times; window duration</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover table-bordered align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 17%">{{ __('production.window_range') }}</th>
+                                                <th style="width: 9%">{{ __('production.window_duration') }}</th>
+                                                <th style="width: 32%">Active Assignments</th>
+                                                <th style="width: 10%">Workers</th>
+                                                <th style="width: 16%" class="text-end">{{ __('production.combined_labor_rate') }}</th>
+                                                <th style="width: 16%" class="text-end">{{ __('production.window_labor_cost') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($wcLaborWindows as $win)
+                                                <tr class="@if($win['is_overlapping']) bg-soft-info-subtle @endif">
+                                                    <td>
+                                                        <span class="font-monospace fw-bold text-dark">{{ $win['window_label'] }}</span>
+                                                        @if($win['is_overnight'])
+                                                            <span class="badge bg-soft-dark text-dark fs-10 px-1 py-0.5 ms-1">Overnight</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-secondary text-secondary font-monospace">{{ number_format($win['duration_hours'], 2) }} h</span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                                                            @foreach($win['active_assignments'] as $aa)
+                                                                <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11">
+                                                                    {{ $aa['section_name'] }} / {{ $aa['shift_name'] }} ({{ $aa['workers_required'] }}w &times; {{ format_currency($aa['effective_hourly_rate']) }})
+                                                                </span>
+                                                            @endforeach
+                                                            @if($win['is_overlapping'])
+                                                                <span class="badge bg-soft-warning text-warning rounded-pill px-1.5 py-0.5 fs-10 ms-1">
+                                                                    <i class="feather-layers me-0.5"></i>Overlap ({{ count($win['active_assignments']) }})
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-info text-info font-monospace">{{ $win['combined_workers'] }}</span>
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">
+                                                        {{ format_currency($win['combined_hourly_cost']) }} / hr
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-success">
+                                                        {{ format_currency($win['window_cost']) }}
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="6" class="text-center text-muted py-3">No operating windows</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                        @if(!empty($wcLaborWindows))
+                                            <tfoot class="table-light fw-bold">
+                                                <tr>
+                                                    <td>Total</td>
+                                                    <td><span class="font-monospace">{{ number_format($wcUniqOperatingHours, 2) }} h</span></td>
+                                                    <td colspan="2" class="text-muted fs-11">Union of active assignments</td>
+                                                    <td class="text-end text-muted fs-11">Total Scheduled Cost:</td>
+                                                    <td class="text-end font-monospace text-success fs-13">{{ format_currency($wcTotalSchedLabor) }}</td>
+                                                </tr>
+                                            </tfoot>
+                                        @endif
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Timeline Gaps Table -->
+                            @if(!empty($wcLaborGaps))
+                                <div class="card border border-warning-subtle mb-0 shadow-none">
+                                    <div class="card-header bg-soft-warning py-2 px-3 border-bottom border-warning-subtle">
+                                        <h6 class="fw-bold text-warning-emphasis fs-12 mb-0">
+                                            <i class="feather-pause-circle me-1"></i>{{ __('production.timeline_gaps') }}
+                                        </h6>
+                                        <small class="text-muted fs-11">{{ __('production.timeline_gaps_desc') }}</small>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle mb-0 fs-12">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 25%">Excluded Gap Interval</th>
+                                                    <th style="width: 15%">{{ __('production.gap_duration') }}</th>
+                                                    <th style="width: 60%">Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($wcLaborGaps as $gap)
+                                                    <tr>
+                                                        <td><span class="font-monospace fw-bold text-danger">{{ $gap['window_label'] }}</span></td>
+                                                        <td><span class="badge bg-soft-danger text-danger font-monospace">{{ number_format($gap['duration_hours'], 2) }} h</span></td>
+                                                        <td class="text-muted fs-11">No section shifts operating during this period. Safely excluded from timeline.</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('production.close_tab') ?? 'Close' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     @push('scripts')
         <script>
