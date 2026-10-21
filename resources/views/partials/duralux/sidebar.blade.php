@@ -17,25 +17,35 @@
 <nav class="nxl-navigation ax-sidebar">
     <div class="navbar-wrapper">
         {{-- Brand --}}
-        <div class="m-header">
-            <a href="{{ route('dashboard') }}" class="b-brand erp-tenant-brand">
-                @if ($branding['has_full_logo'])
-                    <img src="{{ $branding['full_logo'] }}" alt="{{ $branding['name'] }}" class="logo logo-lg logo-full erp-brand-logo-full">
-                @else
-                    <span class="logo logo-lg logo-full ax-brand">
-                        <span class="ax-brand-tile"><i class="feather-sliders"></i></span>
-                        <span class="ax-brand-copy">
-                            <span class="erp-brand-wordmark">{{ $branding['name'] }}</span>
-                            <span class="ax-brand-sub">{{ $shell['tenant_name'] }} · {{ $shell['plan'] }}</span>
-                        </span>
+        {{-- Expanded: logo (full, else abbreviation, else initials) + the tenant's name.
+             Collapsed rail: the abbreviation logo only, no text (swapped for the expand button
+             on hover). Deliberately avoids the theme's logo-lg/logo-sm/logo-full/logo-abbr
+             classes — its JS show()/hide()s them on resize. --}}
+        @php
+            $brandInitials = collect(preg_split('/\s+/', trim($branding['name'])))
+                ->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode('');
+            $expandedLogo = $branding['has_full_logo'] ? $branding['full_logo'] : ($branding['has_abbr_logo'] ? $branding['abbr_logo'] : null);
+        @endphp
+        <div class="m-header ax-brand-row">
+            <a href="{{ route('dashboard') }}" class="b-brand ax-brand-link" title="{{ $branding['name'] }}">
+                <span class="ax-brand-expanded">
+                    <span class="ax-brand-mark">
+                        @if ($expandedLogo)
+                            <img src="{{ $expandedLogo }}" alt="">
+                        @else
+                            {{ $brandInitials }}
+                        @endif
                     </span>
-                @endif
+                    <span class="ax-brand-name">{{ $branding['name'] }}</span>
+                </span>
 
-                @if ($branding['has_abbr_logo'])
-                    <img src="{{ $branding['abbr_logo'] }}" alt="{{ $branding['name'] }}" class="logo logo-sm logo-abbr erp-brand-logo-abbr">
-                @else
-                    <span class="logo logo-sm logo-abbr erp-brand-mark ax-brand-tile"><i class="feather-sliders"></i></span>
-                @endif
+                <span class="ax-brand-mark ax-brand-collapsed">
+                    @if ($branding['has_abbr_logo'] || $branding['has_full_logo'])
+                        <img src="{{ $branding['abbr_logo'] }}" alt="{{ $branding['name'] }}">
+                    @else
+                        {{ $brandInitials }}
+                    @endif
+                </span>
             </a>
             <button type="button" class="ax-sidebar-collapse d-none d-lg-inline-flex" id="ax-sidebar-collapse" title="{{ __('Collapse sidebar') }}" aria-label="{{ __('Collapse sidebar') }}">
                 <i class="feather-chevrons-left"></i>

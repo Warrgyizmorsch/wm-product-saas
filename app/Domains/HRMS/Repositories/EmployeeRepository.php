@@ -308,11 +308,11 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $validated['status'] = $request->input('status', '1') === '1';
 
         if ($request->hasFile('photo')) {
-            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+            $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
         }
 
         if ($request->hasFile('resume')) {
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
+            $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
         }
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
@@ -364,7 +364,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             if ($employee->photo) {
                 Storage::disk('public')->delete($employee->photo);
             }
-            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+            $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
         }
 
         if ($request->hasFile('resume')) {
@@ -376,7 +376,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                     Storage::disk('public')->delete($employee->resume_path);
                 }
             }
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
+            $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
         }
 
         $updated = $employee->update($validated);

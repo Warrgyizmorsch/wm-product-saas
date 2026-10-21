@@ -65,7 +65,11 @@ class GstConfiguration extends Model
      */
     public static function getForCurrentContext(?int $companyId = null, ?int $branchId = null): ?self
     {
-        $tenantId = current_tenant_id() ?? 1;
+        // No tenant → no config, never tenant 1's credentials.
+        $tenantId = current_tenant_id();
+        if ($tenantId === null) {
+            return null;
+        }
         $companyId = $companyId ?? current_company_id();
         $branchId = $branchId ?? current_branch_id();
 

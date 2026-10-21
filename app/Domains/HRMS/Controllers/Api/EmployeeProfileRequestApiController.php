@@ -325,7 +325,7 @@ class EmployeeProfileRequestApiController extends Controller
         // Handle Photo Upload
         if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
             $tempFileName = 'temp_' . $currentEmployee->id . '_' . time() . '_' . Str::random(6) . '.' . $request->file('photo')->getClientOriginalExtension();
-            $tempPath = $request->file('photo')->storeAs('temp/profile_requests', $tempFileName, 'public');
+            $tempPath = $request->file('photo')->storeTenantFileAs('temp/profile_requests', $tempFileName, 'public');
 
             $changes['photo'] = [
                 'old' => $currentEmployee->photo ?? '—',

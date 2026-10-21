@@ -92,7 +92,10 @@
                                             <x-ui.icon-btn href="{{ route('tenant.switch', $tenant->slug) }}" variant="soft-success" size="md" icon="feather-repeat" title="Switch" />
                                         @endif
                                         <x-ui.icon-btn href="{{ route('platform.tenants.edit', $tenant) }}" variant="soft-info" size="md" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editTenantModal{{ $tenant->id }}" aria-label="Edit {{ $tenant->name }}" />
-                                        <form action="{{ route('platform.tenants.status', $tenant) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('platform.tenants.status', $tenant) }}" method="POST" class="d-inline"
+                                            @if ($tenant->status === \App\Models\Tenant::STATUS_ACTIVE)
+                                                data-confirm-suspend="{{ $tenant->name }}"
+                                            @endif>
                                             @csrf
                                             @method('PATCH')
                                             <input type="hidden" name="status" value="{{ $tenant->status === \App\Models\Tenant::STATUS_ACTIVE ? \App\Models\Tenant::STATUS_SUSPENDED : \App\Models\Tenant::STATUS_ACTIVE }}">
@@ -139,6 +142,31 @@
         </x-ui.modal>
     @endforeach
 @endsection
+
+@push('scripts')
+    <script>
+        // Suspending locks every user of that tenant out — ask first.
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!form.dataset || !form.dataset.confirmSuspend) return;
+
+            event.preventDefault();
+            const name = form.dataset.confirmSuspend;
+            const go = function () { delete form.dataset.confirmSuspend; form.submit(); };
+
+            if (typeof window.confirmAction === 'function') {
+                window.confirmAction({
+                    title: 'Suspend ' + name + '?',
+                    message: 'Every user of ' + name + ' will be locked out until it is activated again. Its data is kept.',
+                    variant: 'danger',
+                    confirmText: 'Suspend tenant',
+                }, go);
+            } else if (window.confirm('Suspend ' + name + '? Every user will be locked out until it is activated again.')) {
+                go();
+            }
+        });
+    </script>
+@endpush
 
 @if ($errors->any())
     @push('scripts')

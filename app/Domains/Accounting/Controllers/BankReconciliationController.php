@@ -90,7 +90,7 @@ class BankReconciliationController extends Controller
         $this->authorize('create', BankReconciliation::class);
 
         $validated = $request->validate([
-            'chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
+            'chart_of_account_id' => ['required', 'integer', tenant_exists('chart_of_accounts')],
             'statement_from_date' => ['nullable', 'date'],
             'statement_date' => ['required', 'date'],
             'opening_balance' => ['nullable', 'numeric'],

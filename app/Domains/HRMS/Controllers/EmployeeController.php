@@ -496,7 +496,7 @@ class EmployeeController extends Controller
             }
 
             if ($request->hasFile('photo')) {
-                $tempPath = $request->file('photo')->store('employees/temp_requests', 'public');
+                $tempPath = $request->file('photo')->storeTenantFile('employees/temp_requests', 'public');
                 $changes['photo'] = [
                     'label'    => 'Profile Photo',
                     'old'      => $employee->photo ?: '—',
@@ -792,7 +792,7 @@ class EmployeeController extends Controller
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = true;
             $requiresSignature = false;
@@ -826,7 +826,7 @@ class EmployeeController extends Controller
                 return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document template.'])->withInput();
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $requiresSignature = (bool) $documentMaster->requires_signature;

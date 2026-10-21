@@ -16,7 +16,7 @@ class GstSettingController extends Controller
 {
     public function index(Request $request): View
     {
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $companyId = $request->query('company_id') ?: current_company_id();
         $branchId = $request->query('branch_id') ?: current_branch_id();
 
@@ -84,7 +84,7 @@ class GstSettingController extends Controller
             'is_active'             => 'nullable|boolean',
         ]);
 
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         // Auto determine base URL based on provider if empty or invalid legacy url
         if (empty($validated['api_base_url']) || str_contains($validated['api_base_url'], 'api.setu.co')) {
@@ -125,7 +125,7 @@ class GstSettingController extends Controller
 
     public function testConnection(Request $request, int $id): JsonResponse
     {
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $config = GstConfiguration::where('tenant_id', $tenantId)->findOrFail($id);
 
         if ($config->provider === 'sandbox') {
@@ -209,7 +209,7 @@ class GstSettingController extends Controller
 
     public function destroy(int $id): RedirectResponse
     {
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $config = GstConfiguration::where('tenant_id', $tenantId)->findOrFail($id);
         $config->delete();
 

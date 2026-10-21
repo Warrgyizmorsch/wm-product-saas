@@ -42,7 +42,7 @@
                     </thead>
                     <tbody>
                         @forelse ($plans as $plan)
-                            <tr>
+                            <tr class="plan-row" data-plan-modal="editPlanModal{{ $plan->id }}">
                                 <td class="ps-4">
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="avatar-text avatar-md bg-soft-primary text-primary">{{ substr($plan->name, 0, 1) }}</span>
@@ -68,6 +68,9 @@
                                 </td>
                                 <td>
                                     <span class="d-block fs-12">{{ $plan->max_users ? $plan->max_users.' users' : 'Users unlimited' }}</span>
+                                    @if ($plan->min_users)
+                                        <span class="d-block fs-11 text-muted">Min {{ $plan->min_users }} users</span>
+                                    @endif
                                     <span class="d-block fs-11 text-muted">{{ $plan->max_storage_mb ? number_format($plan->max_storage_mb).' MB' : 'Storage unlimited' }}</span>
                                 </td>
                                 <td>{{ $plan->trial_days ? $plan->trial_days.' days' : '—' }}</td>
@@ -116,3 +119,39 @@
         </x-ui.modal>
     @endforeach
 @endsection
+
+@push('styles')
+    <style>
+        /* The plan whose edit popup is open, so it's clear which one is being changed. */
+        .plan-row.is-editing > td { background: color-mix(in srgb, var(--ax-brand, #4f46e5) 10%, transparent) !important; }
+        .plan-row.is-editing > td:first-child { box-shadow: inset 3px 0 0 var(--ax-brand, #4f46e5); }
+    </style>
+@endpush
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.plan-row[data-plan-modal]').forEach(function (row) {
+                const modal = document.getElementById(row.dataset.planModal);
+                if (!modal) return;
+                modal.addEventListener('show.bs.modal', function () { row.classList.add('is-editing'); });
+                modal.addEventListener('hidden.bs.modal', function () { row.classList.remove('is-editing'); });
+            });
+        });
+    </script>
+@endpush
+
+@if ($errors->any() && old('_form'))
+    @push('scripts')
+        <script>
+            // A save failed: reopen the form that was submitted so its errors are visible.
+            document.addEventListener('DOMContentLoaded', function () {
+                const form = document.getElementById(@json(old('_form')));
+                const modal = form ? form.closest('.modal') : null;
+                if (modal) {
+                    bootstrap.Modal.getOrCreateInstance(modal).show();
+                }
+            });
+        </script>
+    @endpush
+@endif

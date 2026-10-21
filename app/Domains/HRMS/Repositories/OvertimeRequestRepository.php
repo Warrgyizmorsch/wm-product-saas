@@ -160,7 +160,7 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
     {
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('overtime_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('overtime_attachments', 'public');
         }
 
         $user = auth()->user();

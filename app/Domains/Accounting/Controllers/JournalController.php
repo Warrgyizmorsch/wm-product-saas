@@ -66,8 +66,8 @@ class JournalController extends Controller
             'journal_date' => ['required', 'date'],
             'memo' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:2'],
-            'items.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
-            'items.*.cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'],
+            'items.*.chart_of_account_id' => ['required', 'integer', tenant_exists('chart_of_accounts')],
+            'items.*.cost_center_id' => ['nullable', 'integer', tenant_exists('cost_centers')],
             // Tenant-scoped lookup, unlike a bare exists: rule, so another
             // tenant's project id can't be tagged onto a line.
             'items.*.project_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail): void {

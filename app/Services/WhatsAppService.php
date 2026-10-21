@@ -29,7 +29,13 @@ class WhatsAppService
 
     private function getBridgeToken(): string
     {
-        return $this->getConfig()->bridge_token ?: 'wm_erp_whatsapp_secret_token_2026';
+        // No shared hard-coded default: a config without a token gets its own.
+        $config = $this->getConfig();
+        if (blank($config->bridge_token)) {
+            $config->forceFill(['bridge_token' => \Illuminate\Support\Str::random(40)])->save();
+        }
+
+        return $config->bridge_token;
     }
 
     public function getStatus(): array

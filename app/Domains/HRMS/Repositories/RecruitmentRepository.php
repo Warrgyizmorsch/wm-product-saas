@@ -234,6 +234,30 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             if ($latest && preg_match('/CND-\d+-(\d+)/', $latest->candidate_code, $matches)) {
                 $nextNum = ((int) $matches[1]) + 1;
             }
+        $cndCount = Candidate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count() + 1;
+        $code = 'CND-' . date('Y') . '-' . str_pad($cndCount, 4, '0', STR_PAD_LEFT);
+
+        $resumePath = null;
+        if ($request->hasFile('resume')) {
+            $resumePath = $request->file('resume')->storeTenantFile('recruitment/resumes', 'local');
+        }
+
+        $candidate = Candidate::create([
+            'tenant_id'             => $tenantId,
+            'candidate_code'        => $code,
+            'first_name'            => $validated['first_name'],
+            'last_name'             => $validated['last_name'] ?? null,
+            'email'                 => $validated['email'],
+            'phone'                 => $validated['phone'] ?? null,
+            'current_location'      => $validated['current_location'] ?? null,
+            'current_company'       => $validated['current_company'] ?? null,
+            'current_designation'   => $validated['current_designation'] ?? null,
+            'total_experience_years'=> $validated['total_experience_years'],
+            'notice_period_days'    => $validated['notice_period_days'] ?? 30,
+            'resume_path'           => $resumePath,
+            'source'                => $validated['source'],
+            'status'                => 'active',
+        ]);
 
             $code = 'CND-' . $year . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
             while (Candidate::where('candidate_code', $code)->exists()) {
@@ -502,7 +526,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
                 if ($request->hasFile('hr_signature_file') && $request->file('hr_signature_file')->isValid()) {
                     $file = $request->file('hr_signature_file');
-                    $hrSigPath = $file->store("signatures/hr_tenant_{$tenantId}", 'public');
+                    $hrSigPath = $file->storeTenantFile("signatures/hr_tenant_{$tenantId}", 'public');
                     $hrSigUrl = asset('storage/' . $hrSigPath);
                 } elseif (!empty($validated['hr_signature_data'])) {
                     $hrSigData = $validated['hr_signature_data'];
@@ -510,7 +534,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
                         $image = str_replace(' ', '+', preg_replace('/^data:image\/\w+;base64,/', '', $hrSigData));
                         $imageName = 'hr_sig_' . time() . '_' . Str::random(6) . '.png';
                         $hrSigPath = "signatures/hr_tenant_{$tenantId}/{$imageName}";
-                        Storage::disk('public')->put($hrSigPath, base64_decode($image));
+                        tenant_storage()->put('public', $hrSigPath, base64_decode($image));
                         $hrSigUrl = asset('storage/' . $hrSigPath);
                     } else {
                         $hrSigUrl = $hrSigData;

@@ -998,7 +998,7 @@ class ProductApiController extends Controller
                     $decoded = base64_decode($matches[2]);
                     $fileName = 'api_' . time() . '_' . Str::random(6) . '.' . $ext;
                     $filePath = "uploads/tenants/{$tenantId}/products/{$product->id}/{$fileName}";
-                    Storage::disk('public')->put($filePath, $decoded);
+                    tenant_storage()->put('public', $filePath, $decoded);
                     $fileSize = strlen($decoded);
                 }
             } catch (\Throwable $e) {}

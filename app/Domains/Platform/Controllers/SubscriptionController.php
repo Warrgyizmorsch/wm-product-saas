@@ -10,6 +10,7 @@ use App\Domains\Platform\Services\SubscriptionPricing;
 use App\Domains\Platform\Services\TenantModuleService;
 use App\Domains\Platform\Services\TenantSubscriptionService;
 use App\Domains\Platform\Services\TenantService;
+use App\Domains\Platform\Services\UsageLimitService;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureTenantModuleAccess;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +38,7 @@ class SubscriptionController extends Controller
         private readonly TenantModuleService $tenantModules,
         private readonly SubscriptionPricing $pricing,
         private readonly TenantSubscriptionService $subscriptions,
+        private readonly UsageLimitService $usage,
     ) {
     }
 
@@ -79,6 +81,8 @@ class SubscriptionController extends Controller
                 'yearly' => $this->pricing->planPricePerUser($plan, 'yearly'),
             ]])->all(),
             'modules' => $modules,
+            'usage' => $this->usage->resourceUsage($tenant),
+            'storage' => tenant_storage()->usage($tenant),
             'liveSubscription' => $this->subscriptions->live($tenant)?->load('plan'),
             'modulePrice' => config('navigation.module_addon_price'),
             'moduleCurrency' => 'INR',

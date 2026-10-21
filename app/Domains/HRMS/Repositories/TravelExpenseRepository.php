@@ -303,7 +303,7 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
     {
         $receiptPath = null;
         if ($request->hasFile('receipt')) {
-            $receiptPath = $request->file('receipt')->store('expense_receipts', 'public');
+            $receiptPath = $request->file('receipt')->storeTenantFile('expense_receipts', 'public');
         }
 
         $claim = ExpenseClaim::create([

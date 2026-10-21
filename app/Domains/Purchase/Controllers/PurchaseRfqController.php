@@ -522,7 +522,7 @@ class PurchaseRfqController extends Controller
                 }
 
                 if (isset($files[$rvId]['attachment']) && $files[$rvId]['attachment']->isValid()) {
-                    $updateData['attachment_path'] = $files[$rvId]['attachment']->store('rfq_attachments', 'public');
+                    $updateData['attachment_path'] = $files[$rvId]['attachment']->storeTenantFile('rfq_attachments', 'public');
                 }
 
                 $hasRates = false;
@@ -719,7 +719,7 @@ class PurchaseRfqController extends Controller
 
         $attachmentPath = $rfqVendor->attachment_path;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('rfq_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('rfq_attachments', 'public');
         }
 
         DB::transaction(function () use ($validated, $rfqVendor, $attachmentPath, $rfq) {

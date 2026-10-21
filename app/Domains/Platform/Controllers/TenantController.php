@@ -79,6 +79,13 @@ class TenantController extends Controller
             'status' => ['required', 'string', Rule::in([Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED])],
         ]);
 
+        // Suspending the workspace you're working in locks you out of it mid-session.
+        if ($validated['status'] === Tenant::STATUS_SUSPENDED && tenant_id() === $tenant->id) {
+            return redirect()
+                ->route('platform.tenants.index')
+                ->with('error', "You can't suspend {$tenant->name} while you're working in it. Switch to another workspace first.");
+        }
+
         $this->tenants->updateStatus($tenant, $validated['status']);
 
         return redirect()

@@ -1321,6 +1321,9 @@ class TravelExpenseApiController extends Controller
                     $receiptPath = $storedPaths[0];
                 } elseif (count($storedPaths) > 1) {
                     $receiptPath = json_encode(array_values(array_unique($storedPaths)));
+                $fileKey = "claims.{$index}.receipt";
+                if ($request->hasFile($fileKey)) {
+                    $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 ExpenseClaim::create([
@@ -1566,6 +1569,10 @@ class TravelExpenseApiController extends Controller
                         $claimStatus = 'approved';
                         $approvedAmount = floatval($c['approved_amount'] ?? $existingClaim->approved_amount ?? $c['amount']);
                     }
+                $receiptPath = $c['existing_receipt'] ?? null;
+                $fileKey = "claims.{$index}.receipt";
+                if ($request->hasFile($fileKey)) {
+                    $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 ExpenseClaim::create([

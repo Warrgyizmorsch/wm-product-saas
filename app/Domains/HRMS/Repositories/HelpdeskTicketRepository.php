@@ -224,6 +224,16 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
             if (!$ticket) {
                 throw new \RuntimeException('Failed to generate unique ticket number after multiple attempts.');
+        if ($files) {
+            foreach ($files as $file) {
+                $path = $file->storeTenantFile("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
+                HelpdeskTicketAttachment::create([
+                    'ticket_id' => $ticket->id,
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_type' => $file->getClientMimeType(),
+                    'file_size' => $file->getSize(),
+                ]);
             }
 
             if ($files) {
@@ -280,7 +290,7 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
         if ($files) {
             foreach ($files as $file) {
-                $path = $file->store("helpdesk/{$ticket->tenant_id}/tickets/{$ticket->id}", 'public');
+                $path = $file->storeTenantFile("helpdesk/{$ticket->tenant_id}/tickets/{$ticket->id}", 'public');
                 HelpdeskTicketAttachment::create([
                     'ticket_id' => $ticket->id,
                     'reply_id'  => $reply->id,

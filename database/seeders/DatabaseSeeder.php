@@ -50,6 +50,7 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
+            PlanCatalogSeeder::class,
             RbacSeeder::class,
             PlatformAdminSeeder::class,
             CurrencySeeder::class,
