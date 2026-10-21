@@ -40,14 +40,13 @@
         <x-ui.odoo-form-ui type="table">
             <thead>
                 <tr>
-                    <th style="width: 12%">Shift Code</th>
-                    <th style="width: 22%">Shift Name</th>
-                    <th style="width: 12%">Start Time</th>
-                    <th style="width: 12%">End Time</th>
+                    <th style="width: 15%">Shift Code</th>
+                    <th style="width: 30%">Shift Name</th>
+                    <th style="width: 15%">Start Time</th>
+                    <th style="width: 15%">End Time</th>
                     <th style="width: 12%">Break</th>
-                    <th style="width: 15%">{{ __('production.hourly_labor_rate') }}</th>
                     <th style="width: 10%">{{ __('production.status') }}</th>
-                    <th class="text-end" style="width: 5%">{{ __('production.actions') }}</th>
+                    <th class="text-end" style="width: 3%">{{ __('production.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -62,9 +61,6 @@
                         <td class="font-monospace">{{ substr($shift->start_time, 0, 5) }}</td>
                         <td class="font-monospace">{{ substr($shift->end_time, 0, 5) }}</td>
                         <td class="text-muted">{{ $shift->break_minutes }} min</td>
-                        <td class="font-monospace fw-semibold text-dark">
-                            {{ $shift->hourly_labor_rate !== null ? format_currency($shift->hourly_labor_rate) . ' / hr' : '—' }}
-                        </td>
                         <td>
                             @if($shift->active)
                                 <span class="erp-badge-active">{{ __('production.status_active') }}</span>

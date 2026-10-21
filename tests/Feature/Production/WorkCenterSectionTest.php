@@ -68,7 +68,6 @@ class WorkCenterSectionTest extends TestCase
             'start_time'    => '06:00',
             'end_time'      => '14:00',
             'break_minutes' => 30,
-            'hourly_labor_rate' => 25.50,
             'active'        => true,
         ]);
 
@@ -79,7 +78,6 @@ class WorkCenterSectionTest extends TestCase
             'start_time'    => '14:00',
             'end_time'      => '22:00',
             'break_minutes' => 30,
-            'hourly_labor_rate' => 28.00,
             'active'        => true,
         ]);
 
@@ -90,7 +88,6 @@ class WorkCenterSectionTest extends TestCase
             'start_time'    => '22:00',
             'end_time'      => '06:00',
             'break_minutes' => 30,
-            'hourly_labor_rate' => 32.00,
             'active'        => true,
         ]);
 
@@ -528,7 +525,7 @@ class WorkCenterSectionTest extends TestCase
         $this->assertSoftDeleted('production_work_center_sections', ['id' => $section->id]);
     }
 
-    public function test_shift_hourly_labor_rate_persisted_via_convert_to_base(): void
+    public function test_shift_created_without_hourly_labor_rate(): void
     {
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
@@ -538,7 +535,6 @@ class WorkCenterSectionTest extends TestCase
                 'start_time'        => '08:00',
                 'end_time'          => '16:00',
                 'break_minutes'     => 45,
-                'hourly_labor_rate' => '45.7500',
                 'active'            => true,
             ]);
 
@@ -546,7 +542,7 @@ class WorkCenterSectionTest extends TestCase
 
         $shift = ProductionShift::where('code', 'SH-WKND')->first();
         $this->assertNotNull($shift);
-        $this->assertEquals(45.75, (float) $shift->hourly_labor_rate);
+        $this->assertNull($shift->hourly_labor_rate);
     }
 
     public function test_work_center_show_page_renders_sections_and_modals(): void
@@ -973,30 +969,28 @@ class WorkCenterSectionTest extends TestCase
         $this->assertEquals($this->workCenterA1->id, $machine->work_center_id);
     }
 
-    public function test_shift_views_render_hourly_labor_rate(): void
+    public function test_shift_views_do_not_render_hourly_labor_rate(): void
     {
         $createResponse = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->get(route('production.shifts.create'));
 
         $createResponse->assertStatus(200);
-        $createResponse->assertSee('hourly_labor_rate');
-
-        $this->shift1->update(['hourly_labor_rate' => 25.50]);
+        $createResponse->assertDontSee('hourly_labor_rate');
 
         $editResponse = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->get(route('production.shifts.edit', $this->shift1->id));
 
         $editResponse->assertStatus(200);
-        $editResponse->assertSee('hourly_labor_rate');
+        $editResponse->assertDontSee('hourly_labor_rate');
 
         $indexResponse = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->get(route('production.shifts.index'));
 
         $indexResponse->assertStatus(200);
-        $indexResponse->assertSee('Hourly Labor Rate');
+        $indexResponse->assertDontSee('Hourly Labor Rate');
     }
 
     public function test_create_section_with_manual_production_disabled_persists_defaults(): void

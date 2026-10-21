@@ -75,22 +75,51 @@ class SectionCalculationTest extends TestCase
             'status'    => WorkCenter::STATUS_ACTIVE,
         ]);
 
-        $this->calcService = app(SectionCalculationService::class);
+        $calcService = new class extends SectionCalculationService {
+            public array $rates = [];
+            public function calculateLaborCost(WorkCenterSection $section): array
+            {
+                if ($section->relationLoaded('shifts')) {
+                    foreach ($section->shifts as $shift) {
+                        if (array_key_exists($shift->id, $this->rates)) {
+                            $shift->hourly_labor_rate = $this->rates[$shift->id];
+                        }
+                    }
+                }
+                return parent::calculateLaborCost($section);
+            }
+            public function recalculateSection(WorkCenterSection $section): WorkCenterSection
+            {
+                $shifts = $section->shifts()->where('production_shifts.tenant_id', $section->tenant_id)->get();
+                foreach ($shifts as $shift) {
+                    if (array_key_exists($shift->id, $this->rates)) {
+                        $shift->hourly_labor_rate = $this->rates[$shift->id];
+                    }
+                }
+                $section->setRelation('shifts', $shifts);
+                return parent::recalculateSection($section);
+            }
+        };
+        $this->calcService = $calcService;
+        $this->app->instance(SectionCalculationService::class, $calcService);
         $this->sectionService = app(WorkCenterSectionService::class);
     }
 
     private function createShift(Tenant $tenant, string $name, string $code, string $start, string $end, ?float $rate = 100.0, int $breakMinutes = 30): ProductionShift
     {
-        return ProductionShift::create([
+        $shift = ProductionShift::create([
             'tenant_id'         => $tenant->id,
             'name'              => $name,
             'code'              => $code,
             'start_time'        => $start,
             'end_time'          => $end,
             'break_minutes'     => $breakMinutes,
-            'hourly_labor_rate' => $rate,
             'active'            => true,
         ]);
+
+        $this->calcService->rates[$shift->id] = $rate;
+
+        return $shift;
     }
 
     private function createMachine(Tenant $tenant, string $name, string $code, float $capacity = 50.0, string $unit = 'units/hr'): Machine

@@ -21,14 +21,12 @@ class ProductionShift extends BaseModel
         'end_time',
         'break_minutes',
         'overtime_allowed',
-        'hourly_labor_rate',
         'active',
     ];
 
     protected $casts = [
         'break_minutes'     => 'integer',
         'overtime_allowed'  => 'boolean',
-        'hourly_labor_rate' => 'float',
         'active'            => 'boolean',
     ];
 

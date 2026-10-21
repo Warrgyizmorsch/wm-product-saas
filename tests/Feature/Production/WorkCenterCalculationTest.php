@@ -79,7 +79,24 @@ class WorkCenterCalculationTest extends TestCase
             'status'    => WorkCenter::STATUS_ACTIVE,
         ]);
 
-        $this->wcCalcService = app(WorkCenterCalculationService::class);
+        $this->wcCalcService = new class extends WorkCenterCalculationService {
+            public array $rates = [];
+            public function calculateLaborCost(WorkCenter $workCenter): array
+            {
+                if ($workCenter->relationLoaded('sections')) {
+                    foreach ($workCenter->sections as $section) {
+                        if ($section->relationLoaded('shifts')) {
+                            foreach ($section->shifts as $shift) {
+                                if (array_key_exists($shift->id, $this->rates)) {
+                                    $shift->hourly_labor_rate = $this->rates[$shift->id];
+                                }
+                            }
+                        }
+                    }
+                }
+                return parent::calculateLaborCost($workCenter);
+            }
+        };
         $this->secCalcService = app(SectionCalculationService::class);
         $this->sectionService = app(WorkCenterSectionService::class);
         $this->workCenterService = app(WorkCenterService::class);
@@ -87,16 +104,19 @@ class WorkCenterCalculationTest extends TestCase
 
     private function createShift(Tenant $tenant, string $name, string $code, string $start, string $end, ?float $rate = 100.0, int $breakMinutes = 30): ProductionShift
     {
-        return ProductionShift::create([
+        $shift = ProductionShift::create([
             'tenant_id'         => $tenant->id,
             'name'              => $name,
             'code'              => $code,
             'start_time'        => $start,
             'end_time'          => $end,
             'break_minutes'     => $breakMinutes,
-            'hourly_labor_rate' => $rate,
             'active'            => true,
         ]);
+
+        $this->wcCalcService->rates[$shift->id] = $rate;
+
+        return $shift;
     }
 
     private function createMachine(Tenant $tenant, string $name, string $code, float $capacity = 50.0): Machine

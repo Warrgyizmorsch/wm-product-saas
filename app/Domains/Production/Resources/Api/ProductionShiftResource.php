@@ -25,7 +25,6 @@ class ProductionShiftResource extends JsonResource
             'end_time'         => $this->end_time,
             'break_minutes'    => (int) $this->break_minutes,
             'overtime_allowed' => (bool) $this->overtime_allowed,
-            'hourly_labor_rate'=> $this->hourly_labor_rate !== null ? (float) $this->hourly_labor_rate : null,
             'active'           => (bool) $this->active,
             'created_at'       => $this->created_at?->toIso8601String(),
             'updated_at'       => $this->updated_at?->toIso8601String(),
