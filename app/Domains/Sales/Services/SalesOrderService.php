@@ -205,6 +205,7 @@ class SalesOrderService
                             $deal->update([
                                 'stage' => 'Won',
                                 'probability' => 100,
+                                'estimated_value' => $salesOrder->total_amount,
                             ]);
                         }
                     }
