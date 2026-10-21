@@ -57,12 +57,12 @@ class AssetCategoryController extends Controller
         $this->authorize('create', AssetCategory::class);
 
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
+            'company_id' => ['required', tenant_exists('companies')],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
-            'accumulated_depreciation_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
-            'depreciation_expense_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'fixed_asset_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
+            'accumulated_depreciation_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
+            'depreciation_expense_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
             'default_depreciation_method' => 'nullable|string|in:straight_line,wdv',
             'default_useful_life_months' => 'nullable|integer|min:1',
             'is_production_machinery' => 'boolean',
@@ -79,12 +79,12 @@ class AssetCategoryController extends Controller
         $this->authorize('update', $category);
 
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
+            'company_id' => ['required', tenant_exists('companies')],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'fixed_asset_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
-            'accumulated_depreciation_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
-            'depreciation_expense_account_id' => 'nullable|integer|exists:chart_of_accounts,id',
+            'fixed_asset_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
+            'accumulated_depreciation_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
+            'depreciation_expense_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
             'default_depreciation_method' => 'nullable|string|in:straight_line,wdv',
             'default_useful_life_months' => 'nullable|integer|min:1',
             'is_production_machinery' => 'boolean',

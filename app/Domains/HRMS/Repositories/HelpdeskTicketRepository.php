@@ -41,7 +41,8 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
         $tenantId = tenant_id();
         $employee = Employee::resolveForUser($user);
 
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
 
         $query = HelpdeskTicket::query()
@@ -50,11 +51,14 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
         // Access Scoping: Non-management users can only view tickets they requested or are assigned to
         if (!$canManage) {
-            $empId = $employee ? $employee->id : 0;
-            $query->where(function ($q) use ($empId) {
-                $q->where('employee_id', $empId)
-                  ->orWhere('assigned_to', $empId);
-            });
+            if ($employee) {
+                $query->where(function ($q) use ($employee) {
+                    $q->where('employee_id', $employee->id)
+                      ->orWhere('assigned_to', $employee->id);
+                });
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         }
 
         // Filter tab
@@ -120,11 +124,14 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
         // Stats Computation
         $statsQuery = HelpdeskTicket::query()->where('tenant_id', $tenantId);
         if (!$canManage) {
-            $empId = $employee ? $employee->id : 0;
-            $statsQuery->where(function ($q) use ($empId) {
-                $q->where('employee_id', $empId)
-                  ->orWhere('assigned_to', $empId);
-            });
+            if ($employee) {
+                $statsQuery->where(function ($q) use ($employee) {
+                    $q->where('employee_id', $employee->id)
+                      ->orWhere('assigned_to', $employee->id);
+                });
+            } else {
+                $statsQuery->whereRaw('1 = 0');
+            }
         }
 
         $totalOpen = (clone $statsQuery)->whereNotIn('status', ['resolved', 'closed'])->count();
@@ -166,6 +173,15 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
         $tenantId = tenant_id();
         $user = auth()->user();
         $employee = Employee::resolveForUser($user);
+        if (!$employee && $user) {
+            $employee = Employee::where('tenant_id', $tenantId)->where('user_id', $user->id)->first();
+        }
+
+        if (!$employee) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'employee' => 'Your user account is not associated with an employee profile in this organization.',
+            ]);
+        }
 
         $category = HelpdeskCategory::where('tenant_id', $tenantId)->findOrFail($data['category_id']);
 
@@ -174,22 +190,40 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
         $assignedTo = $category->default_agent_id;
 
-        $ticketNumber = HelpdeskTicket::generateTicketNumber($tenantId);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($tenantId, $employee, $category, $dueAt, $assignedTo, $data, $files) {
+            $maxAttempts = 5;
+            $attempt = 0;
+            $ticket = null;
 
-        $ticket = HelpdeskTicket::create([
-            'tenant_id'       => $tenantId,
-            'ticket_number'   => $ticketNumber,
-            'employee_id'     => $employee ? $employee->id : 0,
-            'category_id'     => $category->id,
-            'priority'        => $data['priority'] ?? 'medium',
-            'status'          => 'open',
-            'subject'         => $data['subject'],
-            'description'     => $data['description'],
-            'assigned_to'     => $assignedTo,
-            'due_at'          => $dueAt,
-            'is_confidential' => $category->is_confidential || !empty($data['is_confidential']),
-        ]);
+            while ($attempt < $maxAttempts) {
+                try {
+                    $attempt++;
+                    $ticketNumber = HelpdeskTicket::generateTicketNumber($tenantId, true);
 
+                    $ticket = HelpdeskTicket::create([
+                        'tenant_id'       => $tenantId,
+                        'ticket_number'   => $ticketNumber,
+                        'employee_id'     => $employee->id,
+                        'category_id'     => $category->id,
+                        'priority'        => $data['priority'] ?? 'medium',
+                        'status'          => 'open',
+                        'subject'         => $data['subject'],
+                        'description'     => $data['description'],
+                        'assigned_to'     => $assignedTo,
+                        'due_at'          => $dueAt,
+                        'is_confidential' => $category->is_confidential || !empty($data['is_confidential']),
+                    ]);
+                    break;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if ($attempt >= $maxAttempts || (!str_contains($e->getMessage(), 'Duplicate entry') && !str_contains($e->getMessage(), 'UNIQUE'))) {
+                        throw $e;
+                    }
+                    usleep(50000);
+                }
+            }
+
+            if (!$ticket) {
+                throw new \RuntimeException('Failed to generate unique ticket number after multiple attempts.');
         if ($files) {
             foreach ($files as $file) {
                 $path = $file->storeTenantFile("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
@@ -201,26 +235,52 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
                     'file_size' => $file->getSize(),
                 ]);
             }
-        }
 
-        return $ticket;
+            if ($files) {
+                foreach ($files as $file) {
+                    $path = $file->store("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
+                    HelpdeskTicketAttachment::create([
+                        'ticket_id' => $ticket->id,
+                        'file_path' => $path,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_type' => $file->getClientMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+            }
+
+            return $ticket;
+        });
     }
 
     public function addReply(HelpdeskTicket $ticket, array $data, ?array $files = null): HelpdeskTicketReply
     {
+        if ($ticket->status === 'closed') {
+            throw new \DomainException('Cannot reply to a closed ticket.');
+        }
+
         $user = auth()->user();
         $employee = Employee::resolveForUser($user);
+        if (!$employee && $user) {
+            $employee = Employee::where('tenant_id', $ticket->tenant_id)->where('user_id', $user->id)->first();
+        }
+
+        if (!$employee) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'employee' => 'Your user account is not associated with an employee profile in this organization.',
+            ]);
+        }
 
         $reply = HelpdeskTicketReply::create([
             'tenant_id'        => $ticket->tenant_id,
             'ticket_id'        => $ticket->id,
-            'sender_id'        => $employee ? $employee->id : 0,
+            'sender_id'        => $employee->id,
             'message'          => $data['message'],
             'is_internal_note' => !empty($data['is_internal_note']),
         ]);
 
-        // If not internal note, update ticket status to in_progress or pending_employee
-        if (empty($data['is_internal_note'])) {
+        // If not internal note and ticket is not closed, update ticket status
+        if (empty($data['is_internal_note']) && $ticket->status !== 'closed') {
             if ($employee && (int)$employee->id === (int)$ticket->employee_id) {
                 $ticket->update(['status' => 'in_progress']);
             } else {

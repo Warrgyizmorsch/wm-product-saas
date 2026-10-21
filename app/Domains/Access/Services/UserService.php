@@ -181,6 +181,15 @@ class UserService
 
         abort_if($roles->count() !== count($roleIds), 404);
 
+        // Only system templates or the workspace's own roles — never a role
+        // another tenant configured.
+        $tenantId = tenant_id() ?? $actor->tenant_id;
+        abort_if(
+            $roles->contains(fn (Role $role) => $role->tenant_id !== null && (int) $role->tenant_id !== (int) $tenantId),
+            403,
+            'That role belongs to another workspace.'
+        );
+
         abort_if(
             $roles->contains(fn (Role $role) => $role->slug === 'super_admin')
                 && ! $this->access->hasRole($actor, 'super_admin'),

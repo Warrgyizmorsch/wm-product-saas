@@ -125,7 +125,7 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
         if ($reportSearch) {
             $reportQuery->where(function($q) use ($reportSearch) {
                 $q->where('title', 'like', "%{$reportSearch}%")
-                  ->orWhere('report_number', 'like', "%{$reportSearch}%")
+                  ->orWhere('id', 'like', "%{$reportSearch}%")
                   ->orWhereHas('employee', function($eq) use ($reportSearch) {
                       $eq->where('full_name', 'like', "%{$reportSearch}%");
                   });
@@ -138,10 +138,10 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
         $expenseReports = $reportQuery->paginate(10, ['*'], $reportPageName)->withQueryString();
 
         $stats = [
-            'pending_travel'  => TravelRequest::where('tenant_id', $tenantId)->where('status', 'submitted')->count(),
-            'pending_advance' => CashAdvance::where('tenant_id', $tenantId)->where('status', 'requested')->count(),
-            'pending_reports' => ExpenseReport::where('tenant_id', $tenantId)->whereIn('status', ['submitted', 'manager_approved'])->count(),
-            'total_claims'    => ExpenseClaim::where('tenant_id', $tenantId)->sum('amount'),
+            'pending_travel'  => TravelRequest::where('tenant_id', $tenantId)->whereIn('status', ['pending', 'l1_approved'])->count(),
+            'pending_advance' => CashAdvance::where('tenant_id', $tenantId)->whereIn('status', ['pending', 'l1_approved'])->count(),
+            'pending_reports' => ExpenseReport::where('tenant_id', $tenantId)->whereIn('status', ['submitted', 'l1_approved'])->count(),
+            'total_claims'    => ExpenseClaim::whereHas('report', fn($q) => $q->where('tenant_id', $tenantId))->sum('amount'),
         ];
 
         return compact(
@@ -162,68 +162,78 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
 
     public function storeTravelRequest(array $validated, ?int $tenantId): TravelRequest
     {
-        $code = 'TRV-' . strtoupper(substr(uniqid(), -6));
-
         return TravelRequest::create([
-            'tenant_id'         => $tenantId,
-            'employee_id'       => $validated['employee_id'],
-            'request_number'    => $code,
-            'purpose'           => $validated['purpose'],
-            'travel_type'       => $validated['travel_type'],
-            'destination'       => $validated['destination'],
-            'start_date'        => $validated['start_date'],
-            'end_date'          => $validated['end_date'],
-            'estimated_cost'    => $validated['estimated_cost'] ?? 0,
-            'advance_requested' => $validated['advance_requested'] ?? 0,
-            'description'       => $validated['description'] ?? null,
-            'status'            => 'submitted',
+            'tenant_id'              => $tenantId,
+            'employee_id'            => $validated['employee_id'],
+            'purpose'                => $validated['purpose'],
+            'destination'            => $validated['destination'],
+            'start_date'             => $validated['start_date'],
+            'end_date'               => $validated['end_date'],
+            'estimated_budget'       => $validated['estimated_budget'] ?? $validated['estimated_cost'] ?? 0,
+            'approved_budget'        => $validated['approved_budget'] ?? null,
+            'status'                 => $validated['status'] ?? 'pending',
+            'approval_levels'        => $validated['approval_levels'] ?? 1,
+            'current_approval_level' => 1,
         ]);
     }
 
     public function updateTravelStatus(TravelRequest $travelRequest, array $validated, ?User $user): bool
     {
         $status = $validated['status'];
-        $fields = [
-            'status'         => $status,
-            'approved_by_id' => $user?->id,
-            'approved_at'    => Carbon::now(),
-            'rejection_reason' => $status === 'rejected' ? ($validated['rejection_reason'] ?? null) : null,
-        ];
+        $fields = ['status' => $status];
+
+        if (isset($validated['approved_budget'])) {
+            $fields['approved_budget'] = $validated['approved_budget'];
+        }
+
+        if ($status === 'approved') {
+            $fields['l2_approved_by'] = $user?->id;
+            $fields['l2_approved_at'] = Carbon::now();
+            $fields['current_approval_level'] = 2;
+        } elseif ($status === 'l1_approved') {
+            $fields['l1_approved_by'] = $user?->id;
+            $fields['l1_approved_at'] = Carbon::now();
+            $fields['current_approval_level'] = 2;
+        }
 
         return $travelRequest->update($fields);
     }
 
     public function storeCashAdvance(array $validated, ?int $tenantId): CashAdvance
     {
-        $code = 'ADV-' . strtoupper(substr(uniqid(), -6));
-
         return CashAdvance::create([
-            'tenant_id'         => $tenantId,
-            'advance_number'    => $code,
-            'employee_id'       => $validated['employee_id'],
-            'travel_request_id' => $validated['travel_request_id'] ?? null,
-            'amount'            => $validated['amount'],
-            'purpose'           => $validated['purpose'],
-            'required_date'     => $validated['required_date'],
-            'status'            => 'requested',
-            'notes'             => $validated['notes'] ?? null,
+            'tenant_id'              => $tenantId,
+            'employee_id'            => $validated['employee_id'],
+            'travel_request_id'      => $validated['travel_request_id'] ?? null,
+            'amount'                 => $validated['amount'],
+            'approved_amount'        => $validated['approved_amount'] ?? null,
+            'purpose'                => $validated['purpose'],
+            'status'                 => $validated['status'] ?? 'pending',
+            'approval_levels'        => $validated['approval_levels'] ?? 1,
+            'current_approval_level' => 1,
         ]);
     }
 
     public function updateAdvanceStatus(CashAdvance $cashAdvance, array $validated, ?User $user): bool
     {
         $status = $validated['status'];
-        $fields = [
-            'status' => $status,
-            'rejection_reason' => $status === 'rejected' ? ($validated['rejection_reason'] ?? null) : null,
-        ];
+        $fields = ['status' => $status];
+
+        if (isset($validated['approved_amount'])) {
+            $fields['approved_amount'] = $validated['approved_amount'];
+        }
 
         if ($status === 'approved') {
-            $fields['approved_by_id'] = $user?->id;
-            $fields['approved_at'] = Carbon::now();
+            $fields['l2_approved_by'] = $user?->id;
+            $fields['l2_approved_at'] = Carbon::now();
+            $fields['current_approval_level'] = 2;
+        } elseif ($status === 'l1_approved') {
+            $fields['l1_approved_by'] = $user?->id;
+            $fields['l1_approved_at'] = Carbon::now();
+            $fields['current_approval_level'] = 2;
         } elseif ($status === 'disbursed') {
             $fields['disbursed_at'] = Carbon::now();
-            $fields['disbursed_by_id'] = $user?->id;
+            $fields['disbursed_by'] = $user?->id;
         }
 
         return $cashAdvance->update($fields);
@@ -231,19 +241,23 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
 
     public function storeExpenseReport(array $validated, ?int $tenantId): ExpenseReport
     {
-        $code = 'EXP-' . strtoupper(substr(uniqid(), -6));
+        $totalAmount = $validated['total_amount'] ?? 0;
+        $advanceAdjusted = $validated['advance_adjusted'] ?? 0;
+        $netReimbursement = $validated['net_reimbursement'] ?? max($totalAmount - $advanceAdjusted, 0);
 
         return ExpenseReport::create([
-            'tenant_id'         => $tenantId,
-            'report_number'     => $code,
-            'employee_id'       => $validated['employee_id'],
-            'travel_request_id' => $validated['travel_request_id'] ?? null,
-            'cash_advance_id'   => $validated['cash_advance_id'] ?? null,
-            'title'             => $validated['title'],
-            'description'       => $validated['description'] ?? null,
-            'status'            => 'draft',
-            'total_amount'      => 0,
-            'approved_amount'   => 0,
+            'tenant_id'              => $tenantId,
+            'employee_id'            => $validated['employee_id'],
+            'travel_request_id'      => $validated['travel_request_id'] ?? null,
+            'title'                  => $validated['title'],
+            'total_amount'           => $totalAmount,
+            'advance_adjusted'       => $advanceAdjusted,
+            'net_reimbursement'      => $netReimbursement,
+            'approved_amount'        => $validated['approved_amount'] ?? null,
+            'payout_channel'         => $validated['payout_channel'] ?? 'accounting',
+            'status'                 => $validated['status'] ?? 'draft',
+            'approval_levels'        => $validated['approval_levels'] ?? 1,
+            'current_approval_level' => 1,
         ]);
     }
 
@@ -267,12 +281,19 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
         $status = $validated['status'];
         $fields = ['status' => $status];
 
-        if ($status === 'approved' || $status === 'manager_approved') {
-            $fields['approved_by_id'] = $user?->id;
-            $fields['approved_at'] = Carbon::now();
-            $fields['approved_amount'] = $report->total_amount;
-        } elseif ($status === 'rejected') {
-            $fields['rejection_reason'] = $validated['rejection_reason'] ?? null;
+        if (isset($validated['approved_amount'])) {
+            $fields['approved_amount'] = $validated['approved_amount'];
+        }
+
+        if ($status === 'approved') {
+            $fields['l2_approved_by'] = $user?->id;
+            $fields['l2_approved_at'] = Carbon::now();
+            $fields['current_approval_level'] = 2;
+            $fields['approved_amount'] = $validated['approved_amount'] ?? $report->total_amount;
+        } elseif ($status === 'l1_approved') {
+            $fields['l1_approved_by'] = $user?->id;
+            $fields['l1_approved_at'] = Carbon::now();
+            $fields['current_approval_level'] = 2;
         }
 
         return $report->update($fields);
@@ -286,15 +307,15 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
         }
 
         $claim = ExpenseClaim::create([
-            'tenant_id'           => $tenantId,
             'expense_report_id'   => $report->id,
             'expense_category_id' => $validated['expense_category_id'],
-            'claim_date'          => $validated['claim_date'],
+            'expense_date'        => $validated['expense_date'] ?? $validated['claim_date'] ?? Carbon::now(),
             'amount'              => $validated['amount'],
+            'tax_amount'          => $validated['tax_amount'] ?? $validated['tax'] ?? 0.00,
             'merchant'            => $validated['merchant'] ?? null,
             'description'         => $validated['description'] ?? null,
             'receipt_path'        => $receiptPath,
-            'status'              => 'submitted',
+            'status'              => $validated['status'] ?? 'draft',
         ]);
 
         $report->increment('total_amount', $validated['amount']);
@@ -318,9 +339,7 @@ class TravelExpenseRepository implements TravelExpenseRepositoryInterface
     public function settleReport(ExpenseReport $report, array $validated, ?User $user): bool
     {
         return $report->update([
-            'status'          => 'settled',
-            'settled_at'      => Carbon::now(),
-            'settled_by_id'   => $user?->id,
+            'status'          => 'paid',
             'approved_amount' => $validated['approved_amount'] ?? $report->total_amount,
         ]);
     }

@@ -1,44 +1,18 @@
 @php
     $selectedPayGroup = $selectedPayGroup ?? null;
 
-    // Load active recurring salary components created for the current pay group (or general)
+    // Load active recurring salary components created for the current pay group
     $recurringComponentsForStructure = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)
         ->where('is_adhoc', false)
         ->where(function($q) use ($selectedPayGroup) {
             if ($selectedPayGroup) {
-                $q->where('pay_group_id', $selectedPayGroup->id)
-                  ->orWhereNull('pay_group_id');
+                $q->where('pay_group_id', $selectedPayGroup->id);
+            } else {
+                $q->whereNull('pay_group_id');
             }
         })
         ->orderBy('name', 'asc')
         ->get();
-
-    // Ensure a fixed balancing component ("Other Allowance") exists in every salary structure
-    $hasOtherComponent = $recurringComponentsForStructure->contains(function($c) {
-        $cCode = strtoupper($c->code);
-        $cName = strtolower($c->name);
-        return in_array($cCode, ['OTHER', 'OTHER_ALLOWANCE', 'SA', 'SPECIAL_ALLOWANCE']) 
-            || \Illuminate\Support\Str::contains($cName, ['other', 'special allowance', 'balancing']);
-    });
-
-    if (!$hasOtherComponent) {
-        $otherComp = \App\Domains\HRMS\Models\SalaryComponent::firstOrCreate(
-            [
-                'code' => 'OTHER',
-                'pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : null,
-                'is_adhoc' => false,
-            ],
-            [
-                'company_id' => $selectedPayGroup ? $selectedPayGroup->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
-                'name' => 'Other Allowance',
-                'type' => 'earning',
-                'calculation_type' => 'balancing',
-                'status' => true,
-                'description' => 'Fixed balance remainder component'
-            ]
-        );
-        $recurringComponentsForStructure->push($otherComp);
-    }
 
     $salaryStructures = $salaryStructures ?? collect();
     $rules = $selectedPayGroup->payroll_rules ?? [];
@@ -275,7 +249,7 @@
                 <h5 class="modal-title fw-bold" id="addSalaryStructureModalLabel">{{ __('hrms.salary.create_slab') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ route('hrms.salary-structure.structure.store') }}" method="POST">
+            <form action="{{ route('hrms.salary-structure.structure.store') }}" method="POST" id="addSalaryStructureForm">
                 @csrf
                 <div class="modal-body">
                     <div class="row g-3">
@@ -285,10 +259,10 @@
                         <input type="hidden" name="company_id" id="add_structure_company_id">
                         <input type="hidden" name="pay_group_id" id="add_structure_pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.min_yearly_ctc_lbl') }}" name="min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.min_yearly_ctc_lbl') }}" name="min_ctc" id="add_min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.max_yearly_ctc_lbl') }}" name="max_ctc" inputType="number" placeholder="600000" min="0" :required="true" :errorText="$errors->first('max_ctc')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.max_yearly_ctc_lbl') }}" name="max_ctc" id="add_max_ctc" inputType="number" placeholder="600000" min="0" :required="true" :errorText="$errors->first('max_ctc')" />
                         </div>
                         <div class="col-md-12 col-12">
                             <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
@@ -319,14 +293,8 @@
                                 <tbody id="add_structure_components_tbody">
                                     @forelse($recurringComponentsForStructure as $comp)
                                         @php
-                                             $cCode = strtoupper($comp->code);
-                                             $cName = strtolower($comp->name);
-                                             
-                                             $isBasic = in_array($cCode, ['BASIC', 'BASIC_PAY']) || \Illuminate\Support\Str::contains($cName, 'basic');
-                                             $isDefaultBalancing = !$isBasic && (
-                                                 in_array($cCode, ['OTHER', 'OTHER_ALLOWANCE', 'SA', 'SPECIAL_ALLOWANCE', 'BALANCING']) || 
-                                                 \Illuminate\Support\Str::contains($cName, ['other', 'special allowance', 'balancing', 'remainder'])
-                                             );
+                                             $isBalancing = ($comp->calculation_type === 'balancing');
+                                             $calcType = $comp->calculation_type ?: 'fixed';
                                         @endphp
                                         <tr>
                                             <td style="width: 33%;">
@@ -346,11 +314,11 @@
                                                         data-comp-id="{{ $comp->id }}"
                                                         id="add-calc-type-{{ $comp->id }}"
                                                         onchange="handleCalcTypeChange('add', {{ $comp->id }})">
-                                                    <option value="not_included" @selected(!$isDefaultBalancing)>{{ __('hrms.salary.not_included') }}</option>
-                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
-                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
-                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
-                                                    <option value="balancing" @selected($isDefaultBalancing)>{{ __('hrms.salary.auto_calculated_balancing') }}</option>
+                                                    <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                    <option value="fixed" @selected($calcType === 'fixed')>{{ __('hrms.salary.fixed_amount') }}</option>
+                                                    <option value="percentage_of_ctc" @selected($calcType === 'percentage_of_ctc')>{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                    <option value="percentage_of_basic" @selected($calcType === 'percentage_of_basic')>{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    <option value="balancing" @selected($isBalancing)>{{ __('hrms.salary.auto_calculated_balancing') }}</option>
                                                 </select>
                                             </td>
                                             <td style="width: 20%;" class="pe-3">
@@ -361,7 +329,8 @@
                                                        class="add-value-input text-end"
                                                        id="add-value-{{ $comp->id }}"
                                                        placeholder="0.00"
-                                                       :disabled="true" />
+                                                       value="{{ $isBalancing ? '0.00' : ($comp->default_value ?? '') }}"
+                                                       :disabled="$isBalancing" />
                                             </td>
                                         </tr>
                                     @empty
@@ -1107,6 +1076,74 @@
         $('#sim-slab-name').text(matched.name);
         $('#sim-results-card').fadeIn();
     }
+
+    @php
+        $simStructuresList = ($allStructuresForSimulator ?? collect())->map(function($s) {
+            return [
+                'id' => $s->id,
+                'name' => $s->name,
+                'pay_group_id' => $s->pay_group_id,
+                'min_ctc' => (float)$s->min_ctc,
+                'max_ctc' => (float)$s->max_ctc,
+                'status' => $s->status ? 1 : 0,
+            ];
+        })->values();
+    @endphp
+
+    const activePayGroupStructures = {!! json_encode($simStructuresList) !!};
+
+    function validateStructureRange(form, ignoreId = null) {
+        const minInput = form.find('input[name="min_ctc"]');
+        const maxInput = form.find('input[name="max_ctc"]');
+        const minVal = parseFloat(minInput.val());
+        const maxVal = parseFloat(maxInput.val());
+
+        if (isNaN(minVal) || isNaN(maxVal)) {
+            return true;
+        }
+
+        if (maxVal <= minVal) {
+            alert('{{ __("hrms.salary.max_ctc_must_be_greater") }}');
+            maxInput.focus();
+            return false;
+        }
+
+        const pgId = form.find('input[name="pay_group_id"]').val();
+
+        if (Array.isArray(activePayGroupStructures)) {
+            for (const s of activePayGroupStructures) {
+                if (ignoreId && s.id == ignoreId) continue;
+                if (s.status !== 1) continue;
+                
+                // Compare within same pay group
+                if (pgId && s.pay_group_id && s.pay_group_id != pgId) continue;
+
+                // Overlap condition: min_ctc <= existing.max_ctc and max_ctc >= existing.min_ctc
+                if (minVal <= s.max_ctc && maxVal >= s.min_ctc) {
+                    const msg = `Salary structure range (₹${minVal.toLocaleString('en-IN')} - ₹${maxVal.toLocaleString('en-IN')}) overlaps with existing structure "${s.name}" (₹${s.min_ctc.toLocaleString('en-IN')} - ₹${s.max_ctc.toLocaleString('en-IN')}).\n\nSlabs within the same pay group cannot have overlapping CTC ranges.`;
+                    alert(msg);
+                    minInput.focus();
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    $(document).on('submit', '#addSalaryStructureForm', function(e) {
+        if (!validateStructureRange($(this))) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    $(document).on('submit', '#editSalaryStructureForm', function(e) {
+        const editId = $('#edit_structure_id').val();
+        if (!validateStructureRange($(this), editId)) {
+            e.preventDefault();
+            return false;
+        }
+    });
 
 </script>
 @endpush

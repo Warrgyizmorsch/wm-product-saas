@@ -21,7 +21,7 @@ class EmailSettingController extends Controller
 
     public function index(): View
     {
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
 
@@ -47,7 +47,8 @@ class EmailSettingController extends Controller
                 'required',
                 'email',
                 'max:191',
-                Rule::unique('email_configurations', 'email_address')->ignore($request->input('id')),
+                // Unique within this workspace only: another tenant may use the same sender.
+                Rule::unique('email_configurations', 'email_address')->where('tenant_id', require_tenant_id())->ignore($request->input('id')),
             ],
             'from_name'           => 'nullable|string|max:191',
             'host'                => 'required|string|max:191',
@@ -71,7 +72,7 @@ class EmailSettingController extends Controller
 
         $data = $request->validate($rules, $messages);
 
-        $data['tenant_id'] = current_tenant_id() ?? 1;
+        $data['tenant_id'] = require_tenant_id();
         $data['company_id'] = $request->input('company_id') ?: current_company_id();
         $data['branch_id'] = $request->input('branch_id') ?: current_branch_id();
         $data['is_default'] = $request->boolean('is_default');

@@ -93,6 +93,89 @@ class TravelExpenseApiController extends Controller
     }
 
     /**
+     * Resolves the approval levels required (1 or 2) based on approval workflows and expense policies.
+     */
+    private function resolveApprovalLevels(?Employee $employee, float $amount = 0.00, ?int $tenantId = null): array
+    {
+        if (!$employee) {
+            return ['approval_levels' => 1, 'workflow' => null, 'policy' => null];
+        }
+        $tenantId = $tenantId ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        // 1. Check Dedicated Approval Workflows first
+        $workflow = \App\Domains\HRMS\Models\ExpenseApprovalWorkflow::where('tenant_id', $tenantId)
+            ->where('status', true)
+            ->where(function($q) use ($employee) {
+                $q->where('designation_id', $employee->designation_id)
+                  ->orWhere('department_id', $employee->department_id)
+                  ->orWhere('company_id', $employee->company_id)
+                  ->orWhere('is_default', true)
+                  ->orWhere(function($sub) {
+                      $sub->whereNull('designation_id')
+                          ->whereNull('department_id')
+                          ->whereNull('company_id');
+                  });
+            })
+            ->orderByRaw('CASE 
+                WHEN designation_id IS NOT NULL THEN 1 
+                WHEN department_id IS NOT NULL THEN 2 
+                WHEN company_id IS NOT NULL THEN 3 
+                WHEN is_default = 1 THEN 4
+                ELSE 5 
+            END')
+            ->first();
+
+        if ($workflow) {
+            $type = $workflow->approval_type ?? '1_level';
+            if ($type === '2_level') {
+                return ['approval_levels' => 2, 'workflow' => $workflow, 'policy' => null];
+            } elseif ($type === 'conditional_threshold') {
+                $threshold = floatval($workflow->amount_threshold_for_2_level ?? 0);
+                if ($threshold > 0 && $amount > $threshold) {
+                    return ['approval_levels' => 2, 'workflow' => $workflow, 'policy' => null];
+                }
+            }
+            return ['approval_levels' => 1, 'workflow' => $workflow, 'policy' => null];
+        }
+
+        // 2. Secondary fallback to Expense Policy
+        $policy = ExpensePolicy::where('tenant_id', $tenantId)
+            ->where('status', true)
+            ->where(function($q) use ($employee) {
+                $q->where('designation_id', $employee->designation_id)
+                  ->orWhere('department_id', $employee->department_id)
+                  ->orWhere('company_id', $employee->company_id)
+                  ->orWhere(function($sub) {
+                      $sub->whereNull('designation_id')
+                          ->whereNull('department_id')
+                          ->whereNull('company_id');
+                  });
+            })
+            ->orderByRaw('CASE 
+                WHEN designation_id IS NOT NULL THEN 1 
+                WHEN department_id IS NOT NULL THEN 2 
+                WHEN company_id IS NOT NULL THEN 3 
+                ELSE 4 
+            END')
+            ->first();
+
+        if ($policy) {
+            $type = $policy->approval_type ?? '1_level';
+            if ($type === '2_level') {
+                return ['approval_levels' => 2, 'workflow' => null, 'policy' => $policy];
+            } elseif ($type === 'conditional_threshold') {
+                $threshold = floatval($policy->amount_threshold_for_2_level ?? 0);
+                if ($threshold > 0 && $amount > $threshold) {
+                    return ['approval_levels' => 2, 'workflow' => null, 'policy' => $policy];
+                }
+            }
+            return ['approval_levels' => 1, 'workflow' => null, 'policy' => $policy];
+        }
+
+        return ['approval_levels' => 1, 'workflow' => null, 'policy' => null];
+    }
+
+    /**
      * GET /api/hrms/travel-expense
      * Concise summary metrics for Travel & Expense dashboard.
      */
@@ -227,7 +310,8 @@ class TravelExpenseApiController extends Controller
                     'category_id'   => $c->expense_category_id,
                     'category_name' => $c->category?->name ?? 'General',
                     'amount'        => floatval($c->amount),
-                    'spent_at'      => $c->spent_at ? $c->spent_at->format('Y-m-d') : null,
+                    'expense_date'  => $c->expense_date ? $c->expense_date->format('Y-m-d') : null,
+                    'spent_at'      => $c->expense_date ? $c->expense_date->format('Y-m-d') : null,
                     'merchant'      => $c->merchant,
                     'description'   => $c->description,
                     'receipt_path'  => $c->receipt_path,
@@ -716,26 +800,35 @@ class TravelExpenseApiController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
-        $travelRequest = DB::transaction(function () use ($validated, $request) {
+        $emp = Employee::find($validated['employee_id']);
+        $travelRes = $this->resolveApprovalLevels($emp, floatval($validated['estimated_budget']), $tenantId);
+
+        $travelRequest = DB::transaction(function () use ($validated, $request, $emp, $travelRes, $tenantId) {
             $tr = TravelRequest::create([
-                'tenant_id'        => $validated['tenant_id'],
-                'employee_id'      => $validated['employee_id'],
-                'purpose'          => $validated['purpose'],
-                'destination'      => $validated['destination'],
-                'start_date'       => $validated['start_date'],
-                'end_date'         => $validated['end_date'],
-                'estimated_budget' => $validated['estimated_budget'],
-                'status'           => $validated['status'],
+                'tenant_id'              => $validated['tenant_id'],
+                'employee_id'            => $validated['employee_id'],
+                'purpose'                => $validated['purpose'],
+                'destination'            => $validated['destination'],
+                'start_date'             => $validated['start_date'],
+                'end_date'               => $validated['end_date'],
+                'estimated_budget'       => $validated['estimated_budget'],
+                'status'                 => $validated['status'],
+                'approval_levels'        => $travelRes['approval_levels'],
+                'current_approval_level' => 1,
             ]);
 
             if ($request->boolean('request_advance')) {
+                $advAmt = floatval($validated['advance_amount']);
+                $advRes = $this->resolveApprovalLevels($emp, $advAmt, $tenantId);
                 CashAdvance::create([
-                    'tenant_id'         => $validated['tenant_id'],
-                    'employee_id'       => $validated['employee_id'],
-                    'travel_request_id' => $tr->id,
-                    'amount'            => $validated['advance_amount'],
-                    'purpose'           => $validated['purpose'],
-                    'status'            => 'pending',
+                    'tenant_id'              => $validated['tenant_id'],
+                    'employee_id'            => $validated['employee_id'],
+                    'travel_request_id'      => $tr->id,
+                    'amount'                 => $advAmt,
+                    'purpose'                => $validated['purpose'],
+                    'status'                 => 'pending',
+                    'approval_levels'        => $advRes['approval_levels'],
+                    'current_approval_level' => 1,
                 ]);
             }
 
@@ -763,12 +856,53 @@ class TravelExpenseApiController extends Controller
             return $this->sendError("Travel request with ID '{$id}' not found.", 404);
         }
 
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $travelRequest->employee_id) {
+            if (!$workflowService->allowsSelfApproval($user, $travelRequest, 'hrms.travel_expenses.approve')) {
+                return $this->sendError('Self-approval is prohibited. You cannot approve your own travel request.', 403);
+            }
+        }
+
         $approvedBudget = $request->input('approved_budget', $travelRequest->estimated_budget);
-        
+        $levels = $travelRequest->approval_levels ?: 1;
+        $currentLevel = $travelRequest->current_approval_level ?: 1;
+        $isFirstStage = ($levels == 2 && ($travelRequest->status === 'pending' || $currentLevel == 1));
+
+        if ($isFirstStage) {
+            $travelRequest->update([
+                'status'                 => 'l1_approved',
+                'current_approval_level' => 2,
+                'l1_approved_by'         => auth()->id(),
+                'l1_approved_at'         => now(),
+                'approved_budget'        => $approvedBudget,
+            ]);
+
+            return $this->sendSuccess($this->transformTravelRequest($travelRequest->fresh(), true), 'Travel request approved at Level 1. Moved to Level 2 (Final) approval.');
+        }
+
         $travelRequest->update([
-            'status' => 'approved',
-            'approved_budget' => $approvedBudget
+            'status'                 => 'approved',
+            'current_approval_level' => 2,
+            'l2_approved_by'         => auth()->id(),
+            'l2_approved_at'         => now(),
+            'approved_budget'        => $approvedBudget,
         ]);
+
+        if ($request->boolean('approve_cash_advance')) {
+            $linkedAdvance = $travelRequest->cashAdvances()->whereIn('status', ['pending', 'l1_approved'])->first();
+            if ($linkedAdvance) {
+                $approvedAdvanceAmt = $request->input('approved_advance_amount', $linkedAdvance->amount);
+                $linkedAdvance->update([
+                    'status'                 => 'approved',
+                    'current_approval_level' => 2,
+                    'l2_approved_by'         => auth()->id(),
+                    'l2_approved_at'         => now(),
+                    'approved_amount'        => $approvedAdvanceAmt,
+                ]);
+            }
+        }
 
         return $this->sendSuccess($this->transformTravelRequest($travelRequest->fresh(), true), 'Travel request approved successfully.');
     }
@@ -788,7 +922,40 @@ class TravelExpenseApiController extends Controller
         }
 
         $travelRequest->update(['status' => 'rejected']);
+        $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
+
         return $this->sendSuccess($this->transformTravelRequest($travelRequest->fresh(), true), 'Travel request rejected successfully.');
+    }
+
+    /**
+     * DELETE /api/hrms/travel-expense/travel/{travelRequest}
+     */
+    public function destroyTravelRequest(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $travelRequest = TravelRequest::find($id);
+        if (!$travelRequest) {
+            return $this->sendError("Travel request with ID '{$id}' not found.", 404);
+        }
+
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $employee && (int)$travelRequest->employee_id === (int)$employee->id;
+
+        if (!$isAdmin && !$isOwner) {
+            return $this->sendError('Unauthorized access to delete this travel request.', 403);
+        }
+
+        if (!in_array($travelRequest->status, ['pending', 'rejected'])) {
+            return $this->sendError('Only pending or rejected travel requests can be cancelled.', 400);
+        }
+
+        $travelRequest->cashAdvances()->where('status', 'pending')->delete();
+        $travelRequest->delete();
+
+        return $this->sendSuccess(null, 'Travel request cancelled successfully.');
     }
 
     /**
@@ -820,8 +987,22 @@ class TravelExpenseApiController extends Controller
             return $this->sendError('employee_id is required for HR administrators.', 422);
         }
 
+        if (!empty($validated['travel_request_id'])) {
+            $existingActiveAdv = CashAdvance::where('travel_request_id', $validated['travel_request_id'])
+                ->whereIn('status', ['pending', 'l1_approved', 'approved', 'disbursed'])
+                ->first();
+            if ($existingActiveAdv) {
+                return $this->sendError('An active cash advance (' . ucfirst(str_replace('_', ' ', $existingActiveAdv->status)) . ') already exists for this travel request. Duplicate advances for the same trip are not allowed.', 422);
+            }
+        }
+
+        $emp = Employee::find($validated['employee_id']);
+        $advRes = $this->resolveApprovalLevels($emp, floatval($validated['amount']), $tenantId);
+
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
+        $validated['approval_levels'] = $advRes['approval_levels'];
+        $validated['current_approval_level'] = 1;
 
         $cashAdvance = CashAdvance::create($validated);
 
@@ -842,11 +1023,38 @@ class TravelExpenseApiController extends Controller
             return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
 
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $cashAdvance->employee_id) {
+            if (!$workflowService->allowsSelfApproval($user, $cashAdvance, 'hrms.travel_expenses.approve')) {
+                return $this->sendError('Self-approval is prohibited. You cannot approve your own cash advance request.', 403);
+            }
+        }
+
         $approvedAmount = $request->input('approved_amount', $cashAdvance->amount);
-        
+        $levels = $cashAdvance->approval_levels ?: 1;
+        $currentLevel = $cashAdvance->current_approval_level ?: 1;
+        $isFirstStage = ($levels == 2 && ($cashAdvance->status === 'pending' || $currentLevel == 1));
+
+        if ($isFirstStage) {
+            $cashAdvance->update([
+                'status'                 => 'l1_approved',
+                'current_approval_level' => 2,
+                'l1_approved_by'         => auth()->id(),
+                'l1_approved_at'         => now(),
+                'approved_amount'        => $approvedAmount,
+            ]);
+
+            return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance approved at Level 1. Moved to Level 2 (Final) approval.');
+        }
+
         $cashAdvance->update([
-            'status' => 'approved',
-            'approved_amount' => $approvedAmount
+            'status'                 => 'approved',
+            'current_approval_level' => 2,
+            'l2_approved_by'         => auth()->id(),
+            'l2_approved_at'         => now(),
+            'approved_amount'        => $approvedAmount,
         ]);
 
         return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance request approved successfully.');
@@ -898,6 +1106,36 @@ class TravelExpenseApiController extends Controller
     }
 
     /**
+     * DELETE /api/hrms/travel-expense/advance/{cashAdvance}
+     */
+    public function destroyCashAdvance(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $cashAdvance = CashAdvance::find($id);
+        if (!$cashAdvance) {
+            return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
+        }
+
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $employee && (int)$cashAdvance->employee_id === (int)$employee->id;
+
+        if (!$isAdmin && !$isOwner) {
+            return $this->sendError('Unauthorized access to delete this cash advance.', 403);
+        }
+
+        if (!in_array($cashAdvance->status, ['pending', 'rejected'])) {
+            return $this->sendError('Only pending or rejected cash advances can be cancelled.', 400);
+        }
+
+        $cashAdvance->delete();
+
+        return $this->sendSuccess(null, 'Cash advance cancelled successfully.');
+    }
+
+    /**
      * POST /api/hrms/travel-expense/report/store
      */
     public function storeExpenseReport(Request $request): JsonResponse
@@ -921,6 +1159,8 @@ class TravelExpenseApiController extends Controller
             'claims.*.merchant'    => 'nullable|string|max:255',
             'claims.*.desc'        => 'nullable|string|max:1000',
             'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'claims.*.receipts'   => 'nullable|array',
+            'claims.*.receipts.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
         [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
@@ -972,9 +1212,10 @@ class TravelExpenseApiController extends Controller
                             $needsReceipt = true;
                         }
                         
-                        $fileKey = "claims.{$index}.receipt";
-                        if ($needsReceipt && !$request->hasFile($fileKey)) {
-                            $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims above ₹" . number_format($rule->receipt_required_threshold ?: 0, 2) . ".";
+                        $fileKeySingle = "claims.{$index}.receipt";
+                        $fileKeyMulti = "claims.{$index}.receipts";
+                        if ($needsReceipt && !$request->hasFile($fileKeySingle) && !$request->hasFile($fileKeyMulti)) {
+                            $errorMessages[$fileKeySingle] = "A receipt attachment is required for " . $rule->category->name . " claims above ₹" . number_format($rule->receipt_required_threshold ?: 0, 2) . ".";
                         }
                     }
                 }
@@ -985,34 +1226,74 @@ class TravelExpenseApiController extends Controller
             }
         }
 
-        $report = DB::transaction(function () use ($validated, $request, $tenantId) {
+        if (!empty($validated['cash_advance_id'])) {
+            $alreadyClaimedAdvance = CashAdvance::where('id', $validated['cash_advance_id'])
+                ->where(function($q) {
+                    $q->whereNotNull('expense_report_id')
+                      ->orWhere('status', 'settled');
+                })
+                ->first();
+            if ($alreadyClaimedAdvance) {
+                return $this->sendError('This cash advance has already been claimed in an expense report and cannot be reused.', 422);
+            }
+        }
+
+        if (!empty($validated['travel_request_id'])) {
+            $inProgressReport = ExpenseReport::where('travel_request_id', $validated['travel_request_id'])
+                ->whereIn('status', ['draft', 'submitted', 'l1_approved', 'approved', 'partially_approved'])
+                ->first();
+            if ($inProgressReport) {
+                return $this->sendError("An active expense claim (#{$inProgressReport->id} - {$inProgressReport->title}) is already in progress for this travel trip.", 422);
+            }
+
+            $paidReport = ExpenseReport::where('travel_request_id', $validated['travel_request_id'])
+                ->where('status', 'paid')
+                ->first();
+            if ($paidReport) {
+                $hasRejectedClaims = $paidReport->claims()->where('status', 'rejected')->exists();
+                $isSupplementary = str_contains(strtolower($validated['title']), 'supplementary');
+                if (!$hasRejectedClaims || !$isSupplementary) {
+                    return $this->sendError('Expenses for this travel trip have already been claimed and settled. Supplementary claims are only permitted if previous items were rejected.', 422);
+                }
+            }
+        }
+
+        $report = DB::transaction(function () use ($validated, $request, $tenantId, $employee) {
             $totalAmount = 0.00;
             foreach ($validated['claims'] as $c) {
                 $totalAmount += floatval($c['amount']);
             }
 
-            $advanceAdjusted = 0.00;
             $advance = null;
             $cashAdvanceId = $validated['cash_advance_id'] ?? null;
             if ($cashAdvanceId) {
                 $advance = CashAdvance::find($cashAdvanceId);
-                if ($advance) {
-                    $advanceAmountVal = floatval($advance->approved_amount ?? $advance->amount);
-                    $advanceAdjusted = min($advanceAmountVal, $totalAmount);
-                }
+            } elseif (!empty($validated['travel_request_id'])) {
+                $advance = CashAdvance::where('travel_request_id', $validated['travel_request_id'])
+                    ->whereIn('status', ['approved', 'disbursed', 'settled'])
+                    ->first();
+            }
+
+            $advanceAdjusted = 0.00;
+            if ($advance) {
+                $advanceAmountVal = floatval($advance->approved_amount ?? $advance->amount);
+                $advanceAdjusted = min($advanceAmountVal, $totalAmount);
             }
 
             $netReimbursement = max($totalAmount - $advanceAdjusted, 0.00);
+            $appRes = $this->resolveApprovalLevels($employee, $totalAmount, $tenantId);
 
             $rep = ExpenseReport::create([
-                'tenant_id'         => $tenantId,
-                'employee_id'       => $validated['employee_id'],
-                'travel_request_id' => $validated['travel_request_id'] ?? null,
-                'title'             => $validated['title'],
-                'total_amount'      => $totalAmount,
-                'advance_adjusted'  => $advanceAdjusted,
-                'net_reimbursement' => $netReimbursement,
-                'status'            => 'draft',
+                'tenant_id'              => $tenantId,
+                'employee_id'            => $validated['employee_id'],
+                'travel_request_id'      => $validated['travel_request_id'] ?? null,
+                'title'                  => $validated['title'],
+                'total_amount'           => $totalAmount,
+                'advance_adjusted'       => $advanceAdjusted,
+                'net_reimbursement'      => $netReimbursement,
+                'status'                 => 'draft',
+                'approval_levels'        => $appRes['approval_levels'],
+                'current_approval_level' => 1,
             ]);
 
             if ($advance) {
@@ -1020,7 +1301,26 @@ class TravelExpenseApiController extends Controller
             }
 
             foreach ($validated['claims'] as $index => $c) {
+                $storedPaths = [];
+                $fileKeySingle = "claims.{$index}.receipt";
+                if ($request->hasFile($fileKeySingle)) {
+                    $storedPaths[] = $request->file($fileKeySingle)->store('expense_receipts', 'public');
+                }
+
+                $fileKeyMulti = "claims.{$index}.receipts";
+                if ($request->hasFile($fileKeyMulti)) {
+                    foreach ($request->file($fileKeyMulti) as $f) {
+                        if ($f && $f->isValid()) {
+                            $storedPaths[] = $f->store('expense_receipts', 'public');
+                        }
+                    }
+                }
+
                 $receiptPath = null;
+                if (count($storedPaths) === 1) {
+                    $receiptPath = $storedPaths[0];
+                } elseif (count($storedPaths) > 1) {
+                    $receiptPath = json_encode(array_values(array_unique($storedPaths)));
                 $fileKey = "claims.{$index}.receipt";
                 if ($request->hasFile($fileKey)) {
                     $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
@@ -1065,24 +1365,30 @@ class TravelExpenseApiController extends Controller
 
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
-        if ($expenseReport->status !== 'draft') {
-            return $this->sendError('Only draft expense reports can be edited.', 400);
+        if (!in_array($expenseReport->status, ['draft', 'partially_approved', 'rejected'])) {
+            return $this->sendError('Only draft, partially approved, or rejected expense reports can be edited.', 400);
         }
 
         $validated = $request->validate([
-            'employee_id'       => 'nullable|integer|exists:employees,id',
-            'travel_request_id' => 'nullable|exists:travel_requests,id',
-            'cash_advance_id'   => 'nullable|exists:cash_advances,id',
-            'title'             => 'required|string|max:255',
-            'claims'            => 'required|array|min:1',
-            'claims.*.category_id' => 'required|exists:expense_categories,id',
-            'claims.*.date'        => 'required|date',
-            'claims.*.amount'      => 'required|numeric|min:0.01',
-            'claims.*.tax'         => 'nullable|numeric|min:0',
-            'claims.*.merchant'    => 'nullable|string|max:255',
-            'claims.*.desc'        => 'nullable|string|max:1000',
-            'claims.*.receipt'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'claims.*.existing_receipt' => 'nullable|string',
+            'employee_id'                => 'nullable|integer|exists:employees,id',
+            'travel_request_id'          => 'nullable|exists:travel_requests,id',
+            'cash_advance_id'            => 'nullable|exists:cash_advances,id',
+            'title'                      => 'required|string|max:255',
+            'claims'                     => 'required|array|min:1',
+            'claims.*.category_id'       => 'required|exists:expense_categories,id',
+            'claims.*.date'              => 'required|date',
+            'claims.*.amount'            => 'required|numeric|min:0.01',
+            'claims.*.tax'               => 'nullable|numeric|min:0',
+            'claims.*.merchant'          => 'nullable|string|max:255',
+            'claims.*.desc'              => 'nullable|string|max:1000',
+            'claims.*.receipt'           => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'claims.*.receipts'          => 'nullable|array',
+            'claims.*.receipts.*'        => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'claims.*.existing_receipt'  => 'nullable|string',
+            'claims.*.existing_receipts' => 'nullable|array',
+            'claims.*.id'                => 'nullable',
+            'claims.*.status'            => 'nullable|string',
+            'claims.*.approved_amount'   => 'nullable',
         ]);
 
         [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
@@ -1137,9 +1443,10 @@ class TravelExpenseApiController extends Controller
                             $needsReceipt = true;
                         }
                         
-                        $fileKey = "claims.{$index}.receipt";
-                        if ($needsReceipt && !$request->hasFile($fileKey) && empty($c['existing_receipt'])) {
-                            $errorMessages[$fileKey] = "A receipt attachment is required for " . $rule->category->name . " claims.";
+                        $hasUploaded = $request->hasFile("claims.{$index}.receipt") || $request->hasFile("claims.{$index}.receipts");
+                        $hasExisting = !empty($c['existing_receipt']) || !empty($c['existing_receipts']);
+                        if ($needsReceipt && !$hasUploaded && !$hasExisting) {
+                            $errorMessages["claims.{$index}.receipt"] = "A receipt attachment is required for " . $rule->category->name . " claims.";
                         }
                     }
                 }
@@ -1150,21 +1457,50 @@ class TravelExpenseApiController extends Controller
             }
         }
 
+        if (!empty($validated['cash_advance_id'])) {
+            $alreadyClaimedAdvance = CashAdvance::where('id', $validated['cash_advance_id'])
+                ->where(function($q) use ($expenseReport) {
+                    $q->where(function($sq) use ($expenseReport) {
+                        $sq->whereNotNull('expense_report_id')
+                           ->where('expense_report_id', '!=', $expenseReport->id);
+                    })->orWhere('status', 'settled');
+                })
+                ->first();
+            if ($alreadyClaimedAdvance) {
+                return $this->sendError('This cash advance has already been claimed in another expense report and cannot be reused.', 422);
+            }
+        }
+
+        if (!empty($validated['travel_request_id'])) {
+            $inProgressReport = ExpenseReport::where('travel_request_id', $validated['travel_request_id'])
+                ->where('id', '!=', $expenseReport->id)
+                ->whereIn('status', ['draft', 'submitted', 'l1_approved', 'approved', 'partially_approved'])
+                ->first();
+            if ($inProgressReport) {
+                return $this->sendError("An active expense claim (#{$inProgressReport->id}) is already in progress for this travel trip.", 422);
+            }
+        }
+
         DB::transaction(function () use ($validated, $request, $tenantId, $expenseReport) {
             $totalAmount = 0.00;
             foreach ($validated['claims'] as $c) {
                 $totalAmount += floatval($c['amount']);
             }
 
-            $advanceAdjusted = 0.00;
             $advance = null;
             $cashAdvanceId = $validated['cash_advance_id'] ?? null;
             if ($cashAdvanceId) {
                 $advance = CashAdvance::find($cashAdvanceId);
-                if ($advance) {
-                    $advanceAmountVal = floatval($advance->approved_amount ?? $advance->amount);
-                    $advanceAdjusted = min($advanceAmountVal, $totalAmount);
-                }
+            } elseif (!empty($validated['travel_request_id'])) {
+                $advance = CashAdvance::where('travel_request_id', $validated['travel_request_id'])
+                    ->whereIn('status', ['approved', 'disbursed', 'settled'])
+                    ->first();
+            }
+
+            $advanceAdjusted = 0.00;
+            if ($advance) {
+                $advanceAmountVal = floatval($advance->approved_amount ?? $advance->amount);
+                $advanceAdjusted = min($advanceAmountVal, $totalAmount);
             }
 
             $netReimbursement = max($totalAmount - $advanceAdjusted, 0.00);
@@ -1183,9 +1519,56 @@ class TravelExpenseApiController extends Controller
                 $advance->update(['expense_report_id' => $expenseReport->id]);
             }
 
+            $existingClaimsMap = $expenseReport->claims->keyBy('id');
             $expenseReport->claims()->delete();
 
             foreach ($validated['claims'] as $index => $c) {
+                $storedPaths = [];
+                if (!empty($c['existing_receipts']) && is_array($c['existing_receipts'])) {
+                    foreach ($c['existing_receipts'] as $ep) {
+                        if (!empty($ep)) $storedPaths[] = $ep;
+                    }
+                } elseif (!empty($c['existing_receipt'])) {
+                    if (str_starts_with($c['existing_receipt'], '[')) {
+                        $dec = json_decode($c['existing_receipt'], true);
+                        if (is_array($dec)) $storedPaths = array_merge($storedPaths, $dec);
+                    } else {
+                        $storedPaths[] = $c['existing_receipt'];
+                    }
+                }
+
+                if ($request->hasFile("claims.{$index}.receipt")) {
+                    $storedPaths[] = $request->file("claims.{$index}.receipt")->store('expense_receipts', 'public');
+                }
+
+                if ($request->hasFile("claims.{$index}.receipts")) {
+                    foreach ($request->file("claims.{$index}.receipts") as $uploadedFile) {
+                        if ($uploadedFile && $uploadedFile->isValid()) {
+                            $storedPaths[] = $uploadedFile->store('expense_receipts', 'public');
+                        }
+                    }
+                }
+
+                $storedPaths = array_values(array_unique($storedPaths));
+                $receiptPath = null;
+                if (count($storedPaths) === 1) {
+                    $receiptPath = $storedPaths[0];
+                } elseif (count($storedPaths) > 1) {
+                    $receiptPath = json_encode($storedPaths);
+                }
+
+                $claimId = $c['id'] ?? null;
+                $existingClaim = $claimId ? $existingClaimsMap->get($claimId) : null;
+                $claimStatus = $expenseReport->status === 'draft' ? 'draft' : 'pending';
+                $approvedAmount = null;
+
+                if ($existingClaim && $existingClaim->status === 'approved') {
+                    $claimedVal = floatval($c['amount']);
+                    $existingVal = floatval($existingClaim->amount);
+                    if (abs($claimedVal - $existingVal) < 0.01) {
+                        $claimStatus = 'approved';
+                        $approvedAmount = floatval($c['approved_amount'] ?? $existingClaim->approved_amount ?? $c['amount']);
+                    }
                 $receiptPath = $c['existing_receipt'] ?? null;
                 $fileKey = "claims.{$index}.receipt";
                 if ($request->hasFile($fileKey)) {
@@ -1201,7 +1584,8 @@ class TravelExpenseApiController extends Controller
                     'merchant'            => $c['merchant'] ?? null,
                     'description'         => $c['desc'] ?? null,
                     'receipt_path'        => $receiptPath,
-                    'status'              => $expenseReport->status ?? 'draft',
+                    'status'              => $claimStatus,
+                    'approved_amount'     => $approvedAmount,
                 ]);
             }
         });
@@ -1242,35 +1626,131 @@ class TravelExpenseApiController extends Controller
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
+        $user = $request->user();
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $actorEmpId = $workflowService->getEmployeeIdForActor($user);
+        if ($actorEmpId && (int) $actorEmpId === (int) $expenseReport->employee_id) {
+            if (!$workflowService->allowsSelfApproval($user, $expenseReport, 'hrms.travel_expenses.approve')) {
+                return $this->sendError('Self-approval is prohibited. You cannot approve your own expense report.', 403);
+            }
+        }
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $levels = $expenseReport->approval_levels ?: 1;
+        $currentLevel = $expenseReport->current_approval_level ?: 1;
+        $isFirstStage = ($levels == 2 && (int) $currentLevel === 1 && $expenseReport->status !== 'l1_approved');
+
+        if ($isFirstStage) {
+            $approvedAmount = floatval($request->input('approved_amount', $expenseReport->total_amount));
+            $expenseReport->update([
+                'status'                 => 'l1_approved',
+                'current_approval_level' => 2,
+                'l1_approved_by'         => auth()->id(),
+                'l1_approved_at'         => now(),
+                'approved_amount'        => $approvedAmount,
+            ]);
+
+            return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report approved at Level 1. Moved to Level 2 (Final) approval.');
+        }
+
+        // Itemized claim decisions support
+        $itemDecisions = $request->input('items', []);
+        $status = 'approved';
         $approvedAmount = floatval($request->input('approved_amount', $expenseReport->total_amount));
 
-        $advance = $expenseReport->cashAdvance;
-        $totalAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
+        if (!empty($itemDecisions)) {
+            $totalApproved = 0.00;
+            $hasApproved = false;
+            $hasRejected = false;
 
-        $adjusted = min($totalAdvance, $approvedAmount);
-        $approvedNet = max($approvedAmount - $totalAdvance, 0.00);
+            foreach ($itemDecisions as $claimId => $decisionData) {
+                $claim = ExpenseClaim::where('expense_report_id', $expenseReport->id)->find($claimId);
+                if ($claim) {
+                    $dec = $decisionData['decision'] ?? 'approved';
+                    $itemAmt = floatval($claim->amount);
+                    $appAmt = ($dec === 'rejected') ? 0.00 : floatval($decisionData['approved_amount'] ?? $itemAmt);
+                    $rejReason = ($dec === 'rejected') ? ($decisionData['rejection_reason'] ?? 'Rejected by Approver') : null;
+
+                    $claim->update([
+                        'status'           => $dec,
+                        'approved_amount'  => $appAmt,
+                        'rejection_reason' => $rejReason,
+                    ]);
+
+                    if ($dec === 'approved') {
+                        $hasApproved = true;
+                        $totalApproved += $appAmt;
+                    } else {
+                        $hasRejected = true;
+                    }
+                }
+            }
+
+            if ($hasApproved && $hasRejected) {
+                $status = 'partially_approved';
+            } elseif ($hasRejected && !$hasApproved) {
+                $status = 'rejected';
+            } else {
+                $status = 'approved';
+            }
+
+            $approvedAmount = $totalApproved;
+        } else {
+            foreach ($expenseReport->claims as $claim) {
+                $claim->update([
+                    'status'          => 'approved',
+                    'approved_amount' => $claim->amount,
+                ]);
+            }
+        }
+
+        // Advance calculation factoring in prior trip reports
+        $advance = $expenseReport->cashAdvance;
+        if (!$advance && $expenseReport->travel_request_id) {
+            $advance = CashAdvance::where('travel_request_id', $expenseReport->travel_request_id)
+                ->whereIn('status', ['approved', 'disbursed', 'settled', 'paid'])
+                ->first();
+        }
+        $fullAdvance = $advance ? floatval($advance->approved_amount ?? $advance->amount) : 0.00;
+
+        $tripReports = $expenseReport->travelRequest ? $expenseReport->travelRequest->expenseReports : collect([$expenseReport]);
+        $priorAdjusted = $tripReports->filter(function($r) use ($expenseReport) {
+            return $r->id < $expenseReport->id && in_array($r->status, ['approved', 'partially_approved', 'paid']);
+        })->sum(function($r) use ($fullAdvance) {
+            $rApproved = in_array($r->status, ['approved', 'paid']) ? floatval($r->approved_amount ?? $r->total_amount) : floatval($r->total_amount);
+            $adv = floatval($r->advance_adjusted);
+            if ($adv <= 0 && $fullAdvance > 0) {
+                $adv = min($fullAdvance, $rApproved);
+            }
+            return $adv;
+        });
+
+        $remAdvance = max($fullAdvance - $priorAdjusted, 0.00);
+        $adjusted = min($remAdvance, $approvedAmount);
+        $approvedNet = max($approvedAmount - $remAdvance, 0.00);
 
         $payoutChannel = $request->input('payout_channel', 'accounting');
 
-        DB::transaction(function () use ($expenseReport, $tenantId, $approvedAmount, $approvedNet, $adjusted, $payoutChannel, $advance) {
+        DB::transaction(function () use ($expenseReport, $tenantId, $approvedAmount, $approvedNet, $adjusted, $payoutChannel, $advance, $remAdvance, $status) {
             $expenseReport->update([
-                'status' => 'approved',
-                'approved_amount' => $approvedAmount,
+                'status'                     => $status,
+                'approved_amount'            => $approvedAmount,
                 'approved_net_reimbursement' => $approvedNet,
-                'advance_adjusted' => $adjusted,
-                'payout_channel' => $payoutChannel,
+                'advance_adjusted'           => $adjusted,
+                'payout_channel'             => $payoutChannel,
+                'current_approval_level'     => 2,
+                'l2_approved_by'             => auth()->id(),
+                'l2_approved_at'             => now(),
             ]);
 
-            if ($payoutChannel === 'accounting') {
-                // Do not post to accounting on approval. Accounting entry is posted only on actual payout.
-            } else {
+            if ($payoutChannel !== 'accounting' && in_array($status, ['approved', 'partially_approved'])) {
                 $employee = $expenseReport->employee;
                 if ($employee) {
                     $currentMonth = Carbon::now()->format('Y-m');
 
-                    if ($adjusted < $totalAdvance) {
-                        $surplus = $totalAdvance - $adjusted;
+                    if ($adjusted < $remAdvance) {
+                        $surplus = $remAdvance - $adjusted;
                         if ($surplus > 0) {
                             $comp = $this->getOrCreateRecoveryComponent($employee->company_id, $employee->pay_group_id);
                             if ($comp && $employee->salary_structure_id) {
@@ -1340,6 +1820,8 @@ class TravelExpenseApiController extends Controller
         }
 
         $expenseReport->update(['status' => 'rejected']);
+        $expenseReport->claims()->update(['status' => 'rejected']);
+
         return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report rejected successfully.');
     }
 
@@ -1361,8 +1843,15 @@ class TravelExpenseApiController extends Controller
 
         DB::transaction(function () use ($expenseReport, $tenantId) {
             $expenseReport->update(['status' => 'paid']);
+            $expenseReport->claims()->where('status', 'approved')->update(['status' => 'paid']);
 
             $advance = $expenseReport->cashAdvance;
+            if (!$advance && $expenseReport->travel_request_id) {
+                $advance = CashAdvance::where('travel_request_id', $expenseReport->travel_request_id)
+                    ->whereIn('status', ['approved', 'disbursed'])
+                    ->first();
+            }
+
             $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
 
             if ($isAccountingChannel) {
@@ -1374,13 +1863,56 @@ class TravelExpenseApiController extends Controller
                 }
             }
 
-            // If an advance was associated, mark it as settled
+            // If an advance was associated, check if all reports are paid/settled
             if ($advance) {
                 $advance->update(['status' => 'settled']);
             }
         });
 
         return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report marked as paid and advance settled successfully.');
+    }
+
+    /**
+     * DELETE /api/hrms/travel-expense/report/{expenseReport}
+     */
+    public function destroyExpenseReport(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $expenseReport = ExpenseReport::find($id);
+        if (!$expenseReport) {
+            return $this->sendError("Expense report with ID '{$id}' not found.", 404);
+        }
+
+        [$employee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $employee && (int)$expenseReport->employee_id === (int)$employee->id;
+
+        if (!$isAdmin && !$isOwner) {
+            return $this->sendError('Unauthorized access to delete this expense report.', 403);
+        }
+
+        if (!in_array($expenseReport->status, ['draft', 'rejected'])) {
+            return $this->sendError('Only draft or rejected expense reports can be deleted.', 400);
+        }
+
+        // Unlink cash advances
+        CashAdvance::where('expense_report_id', $expenseReport->id)->update(['expense_report_id' => null]);
+
+        // Remove files
+        foreach ($expenseReport->claims as $claim) {
+            foreach ($claim->receipt_paths as $p) {
+                if ($p && \Illuminate\Support\Facades\Storage::disk('public')->exists($p)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($p);
+                }
+            }
+        }
+
+        $expenseReport->claims()->delete();
+        $expenseReport->delete();
+
+        return $this->sendSuccess(null, 'Expense report deleted successfully.');
     }
 
     /**

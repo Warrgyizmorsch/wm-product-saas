@@ -63,7 +63,7 @@ class AssetWriteOffController extends Controller
         abort_unless($this->policy->create($request->user()), 403);
 
         $validated = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'asset_id' => ['required', 'integer', tenant_exists('assets')],
             'write_off_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:1000'],
         ]);

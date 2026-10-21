@@ -101,10 +101,10 @@ class PipController extends Controller
         ]);
 
         $validated = $request->validate([
-            'employee_id'            => 'required|exists:employees,id',
-            'manager_id'             => 'nullable|exists:employees,id',
-            'pip_category_id'        => 'nullable|exists:pip_categories,id',
-            'pip_policy_template_id' => 'nullable|exists:pip_policy_templates,id',
+            'employee_id'            => ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'manager_id'             => ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'pip_category_id'        => ['nullable', \Illuminate\Validation\Rule::exists('pip_categories', 'id')->where('tenant_id', $tenantId)],
+            'pip_policy_template_id' => ['nullable', \Illuminate\Validation\Rule::exists('pip_policy_templates', 'id')->where('tenant_id', $tenantId)],
             'reason_category'        => 'nullable|string|max:255',
             'reason_details'         => 'required|string',
             'start_date'             => 'required|date',
@@ -130,6 +130,8 @@ class PipController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('update', $plan);
 
         // Auto-resolve reason_category if not explicitly provided
         if (!$request->filled('reason_category') && $request->filled('pip_category_id')) {
@@ -153,16 +155,17 @@ class PipController extends Controller
         }
 
         $validated = $request->validate([
-            'pip_category_id'   => 'nullable|exists:pip_categories,id',
-            'reason_category'   => 'nullable|string|max:255',
-            'reason_details'    => 'nullable|string',
-            'start_date'        => 'nullable|date',
-            'end_date'          => 'nullable|date',
-            'duration_days'     => 'nullable|integer|min:1|max:365',
-            'checkin_frequency' => 'nullable|in:weekly,biweekly,monthly',
-            'support_provided'  => 'nullable|string',
-            'consequences'      => 'nullable|string',
-            'initial_notes'     => 'nullable|string',
+            'pip_category_id'        => ['nullable', \Illuminate\Validation\Rule::exists('pip_categories', 'id')->where('tenant_id', $tenantId)],
+            'pip_policy_template_id' => ['nullable', \Illuminate\Validation\Rule::exists('pip_policy_templates', 'id')->where('tenant_id', $tenantId)],
+            'reason_category'        => 'nullable|string|max:255',
+            'reason_details'         => 'nullable|string',
+            'start_date'             => 'nullable|date',
+            'end_date'               => 'nullable|date',
+            'duration_days'          => 'nullable|integer|min:1|max:365',
+            'checkin_frequency'      => 'nullable|in:weekly,biweekly,monthly',
+            'support_provided'       => 'nullable|string',
+            'consequences'           => 'nullable|string',
+            'initial_notes'          => 'nullable|string',
         ]);
 
         $this->pipRepository->updatePlan($id, $validated, $tenantId);
@@ -176,6 +179,9 @@ class PipController extends Controller
     public function destroy(int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('delete', $plan);
+
         $this->pipRepository->deletePlan($id, $tenantId);
 
         return redirect()->route('hrms.pip.index')->with('success', 'PIP record deleted successfully.');
@@ -187,6 +193,8 @@ class PipController extends Controller
     public function storeObjective(Request $request, int $pipId): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('update', $plan);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -208,6 +216,9 @@ class PipController extends Controller
     public function updateObjective(Request $request, int $objectiveId): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $objective = PipObjective::where('tenant_id', $tenantId)->findOrFail($objectiveId);
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($objective->pip_id);
+        $this->authorize('update', $plan);
 
         $validated = $request->validate([
             'title'            => 'nullable|string|max:255',
@@ -229,6 +240,8 @@ class PipController extends Controller
     public function updateObjectiveStatus(Request $request, int $pipId, int $objectiveId): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('view', $plan);
 
         $validated = $request->validate([
             'status' => 'required|in:pending,in_progress,achieved,partially_achieved,not_achieved',
@@ -245,6 +258,9 @@ class PipController extends Controller
     public function destroyObjective(int $pipId, mixed $objectiveId = null): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('update', $plan);
+
         $targetId = $objectiveId ?: $pipId;
         $this->pipRepository->deleteObjective((int)$targetId, $tenantId);
 
@@ -257,6 +273,8 @@ class PipController extends Controller
     public function storeCheckin(Request $request, int $pipId): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('update', $plan);
 
         // Support both web modal form field names and legacy names
         if ($request->filled('checkin_date') && !$request->filled('meeting_date')) {
@@ -290,14 +308,21 @@ class PipController extends Controller
     public function updateCheckin(Request $request, int $pipId, mixed $checkinId = null): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('update', $plan);
+
         $targetId = $checkinId ?: $pipId;
 
         $validated = $request->validate([
-            'checkin_date'      => 'nullable|date',
-            'rating_status'     => 'required|in:on_track,off_track,at_risk,exceeding',
-            'manager_comments'  => 'required|string',
-            'employee_comments' => 'nullable|string',
-            'action_items'      => 'nullable|string',
+            'checkin_date'         => 'nullable|date',
+            'rating_status'        => 'required|in:on_track,off_track,at_risk,exceeding',
+            'rating'               => 'nullable|numeric|min:1|max:5',
+            'manager_comments'     => 'required|string',
+            'employee_comments'    => 'nullable|string',
+            'action_items'         => 'nullable|string',
+            'concerns_noted'       => 'nullable|string',
+            'support_action_items' => 'nullable|string',
+            'next_checkin_date'    => 'nullable|date',
         ]);
 
         $this->pipRepository->updateCheckin((int)$targetId, $validated, $tenantId);
@@ -311,6 +336,9 @@ class PipController extends Controller
     public function destroyCheckin(int $pipId, mixed $checkinId = null): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('update', $plan);
+
         $targetId = $checkinId ?: $pipId;
 
         $this->pipRepository->deleteCheckin((int)$targetId, $tenantId);
@@ -323,9 +351,9 @@ class PipController extends Controller
      */
     public function evaluate(Request $request, int $pipId): RedirectResponse
     {
-        $this->authorize('update', PerformanceImprovementPlan::class);
-
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
+        $this->authorize('update', $plan);
 
         // Support both evaluation_outcome and final_outcome
         $outcome = $request->input('evaluation_outcome') ?: $request->input('final_outcome');
@@ -361,6 +389,8 @@ class PipController extends Controller
     public function acknowledge(Request $request, int $id): RedirectResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($id);
+        $this->authorize('acknowledge', $plan);
 
         $validated = $request->validate([
             'signature_data' => 'required|string',
@@ -376,6 +406,7 @@ class PipController extends Controller
      */
     public function storeCategory(Request $request): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $validated = $request->validate([
@@ -392,6 +423,7 @@ class PipController extends Controller
 
     public function storeTemplate(Request $request): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         // Support both 'name' (from modal form) and 'title' (if passed)
@@ -419,6 +451,7 @@ class PipController extends Controller
 
     public function destroyCategory(mixed $category): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $id = is_object($category) ? $category->id : $category;
 
@@ -432,6 +465,7 @@ class PipController extends Controller
 
     public function destroyTemplate(mixed $template): RedirectResponse
     {
+        $this->authorize('create', PerformanceImprovementPlan::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $id = is_object($template) ? $template->id : $template;
 

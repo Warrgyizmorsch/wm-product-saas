@@ -617,6 +617,15 @@
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="textarea" label="Reason for PIP & Core Deficiencies" name="reason_details" rows="3" placeholder="Describe the specific areas needing improvement..." :required="true" />
                         </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="textarea" label="Company Support & Resources" name="support_provided" rows="2" placeholder="e.g. Weekly mentorship, tooling access, pair programming..." />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="textarea" label="Consequences of Failure" name="consequences" rows="2" placeholder="e.g. Demotion, role reassignment, or employment termination..." />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="textarea" label="Initial Discussion Notes" name="initial_notes" rows="2" placeholder="Summary of initial HR/manager alignment meeting..." />
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">

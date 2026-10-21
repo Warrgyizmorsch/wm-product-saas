@@ -102,7 +102,7 @@ class AssetRegisterController extends Controller
         );
 
         $validated = $request->validate([
-            'asset_category_id' => 'required|exists:asset_categories,id',
+            'asset_category_id' => ['required', tenant_exists('asset_categories')],
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'brand' => 'nullable|string|max:255',

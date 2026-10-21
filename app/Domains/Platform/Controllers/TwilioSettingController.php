@@ -19,7 +19,7 @@ class TwilioSettingController extends Controller
 {
     public function index(): View
     {
-        $tenantId = current_tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
 
@@ -52,7 +52,7 @@ class TwilioSettingController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $tenantId = current_tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
 
@@ -79,15 +79,15 @@ class TwilioSettingController extends Controller
             $config->branch_id = $branchId;
         }
 
-        $config->name = $validated['name'] ?: 'Primary Twilio Account';
+        $config->name = ($validated['name'] ?? null) ?: 'Primary Twilio Account';
         $config->account_sid = trim($validated['account_sid']);
         $config->auth_token = trim($validated['auth_token']);
         $config->phone_number = !empty($validated['phone_number']) ? trim($validated['phone_number']) : null;
         $config->twiml_app_sid = !empty($validated['twiml_app_sid']) ? trim($validated['twiml_app_sid']) : null;
         $config->gemini_api_key = !empty($validated['gemini_api_key']) ? trim($validated['gemini_api_key']) : null;
         $config->default_lead_owner_id = !empty($validated['default_lead_owner_id']) ? (int)$validated['default_lead_owner_id'] : null;
-        $config->default_source = $validated['default_source'] ?: 'Twilio Call';
-        $config->default_priority = $validated['default_priority'] ?: 'Medium';
+        $config->default_source = ($validated['default_source'] ?? null) ?: 'Twilio Call';
+        $config->default_priority = ($validated['default_priority'] ?? null) ?: 'Medium';
         $config->record_calls = $request->has('record_calls');
         $config->auto_summarize_ai = $request->has('auto_summarize_ai');
         $config->is_active = $request->has('is_active');
@@ -163,7 +163,7 @@ class TwilioSettingController extends Controller
             'sample_notes' => 'nullable|string|max:500',
         ]);
 
-        $tenantId = current_tenant_id() ?? (auth()->user()?->tenant_id ?? 1);
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
         $twilioConfig = TwilioConfiguration::forCurrentContext()->first();

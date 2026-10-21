@@ -800,12 +800,8 @@ class SalaryStructureApiController extends Controller
             $maxCtc = (float)$request->input('max_ctc');
 
             $overlap = $overlapQuery->where(function ($query) use ($minCtc, $maxCtc) {
-                $query->whereBetween('min_ctc', [$minCtc, $maxCtc])
-                    ->orWhereBetween('max_ctc', [$minCtc, $maxCtc])
-                    ->orWhere(function ($q) use ($minCtc, $maxCtc) {
-                        $q->where('min_ctc', '<=', $minCtc)
-                          ->where('max_ctc', '>=', $maxCtc);
-                    });
+                $query->where('min_ctc', '<=', $maxCtc)
+                      ->where('max_ctc', '>=', $minCtc);
             })->exists();
 
             if ($overlap) {
@@ -928,12 +924,8 @@ class SalaryStructureApiController extends Controller
             }
 
             $overlap = $overlapQuery->where(function ($query) use ($minCtc, $maxCtc) {
-                $query->whereBetween('min_ctc', [$minCtc, $maxCtc])
-                    ->orWhereBetween('max_ctc', [$minCtc, $maxCtc])
-                    ->orWhere(function ($q) use ($minCtc, $maxCtc) {
-                        $q->where('min_ctc', '<=', $minCtc)
-                          ->where('max_ctc', '>=', $maxCtc);
-                    });
+                $query->where('min_ctc', '<=', $maxCtc)
+                      ->where('max_ctc', '>=', $minCtc);
             })->exists();
 
             if ($overlap) {

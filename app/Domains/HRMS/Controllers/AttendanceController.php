@@ -1558,7 +1558,27 @@ class AttendanceController extends Controller
 
     public function export(Request $request)
     {
-        return $this->attendanceRepository->export($request->all());
+        abort_unless(
+            auth()->user() && (auth()->user()->hasHrPermission('hrms.attendance.view') || auth()->user()->hasHrPermission('hr.settings.manage')),
+            403
+        );
+
+        $params = $request->all();
+
+        // If month or view is missing, fall back to referer query parameters
+        if (empty($params['month']) && empty($params['date']) && $request->headers->get('referer')) {
+            $refererQuery = parse_url($request->headers->get('referer'), PHP_URL_QUERY);
+            if ($refererQuery) {
+                parse_str($refererQuery, $refererParams);
+                foreach (['month', 'view', 'date', 'department_id', 'status', 'search', 'sort'] as $k) {
+                    if (empty($params[$k]) && !empty($refererParams[$k])) {
+                        $params[$k] = $refererParams[$k];
+                    }
+                }
+            }
+        }
+
+        return $this->attendanceRepository->export($params);
     }
 
     public function downloadTemplate()

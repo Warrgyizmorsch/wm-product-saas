@@ -73,6 +73,10 @@ class AccessService
             $isPlatformAdminRole = Role::query()
                 ->whereIn('id', $roleIds)
                 ->whereIn('slug', ['super_admin', 'admin'])
+                // Only the platform's own system roles: a tenant can create a role
+                // with slug "admin" of its own, which must never reach other tenants.
+                ->whereNull('tenant_id')
+                ->where('is_system', true)
                 ->exists();
             if ($isPlatformAdminRole) {
                 return true;
@@ -213,6 +217,10 @@ class AccessService
             $isPlatformAdminRole = Role::query()
                 ->whereIn('id', $roleIds)
                 ->whereIn('slug', ['super_admin', 'admin'])
+                // Only the platform's own system roles: a tenant can create a role
+                // with slug "admin" of its own, which must never reach other tenants.
+                ->whereNull('tenant_id')
+                ->where('is_system', true)
                 ->exists();
 
             if ($isPlatformAdminRole) {

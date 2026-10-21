@@ -48,6 +48,18 @@ if (! function_exists('tenant_context')) {
     }
 }
 
+if (! function_exists('tenant_exists')) {
+    /**
+     * `exists` validation limited to the current tenant's rows. Use instead of a
+     * bare 'exists:table,id' for any tenant-owned table, so a request can't point
+     * at another tenant's record. Fails closed when no tenant is resolved.
+     */
+    function tenant_exists(string $table, string $column = 'id'): \Illuminate\Validation\Rules\Exists
+    {
+        return \Illuminate\Validation\Rule::exists($table, $column)->where('tenant_id', tenant_id());
+    }
+}
+
 if (! function_exists('tenant_storage')) {
     /** Quota-checked, usage-recorded file storage for the current tenant. */
     function tenant_storage(): \App\Domains\Platform\Services\TenantStorage
