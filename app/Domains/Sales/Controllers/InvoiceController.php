@@ -179,6 +179,8 @@ class InvoiceController extends Controller
                 ->sum('allocated_amount');
         }
 
+        $taxMode = $salesOrder?->effective_tax_mode ?? 'exclusive';
+
         $invoiceItems = [];
         if ($mode === 'dispatch_order') {
             if ($dispatchOrder) {
@@ -221,8 +223,17 @@ class InvoiceController extends Controller
 
                     $subtotal = $unbilledQty * $unitPrice;
                     $discountAmt = $discount;
-                    $taxable = max(0, $subtotal - $discountAmt);
-                    $taxAmt = $taxable * ($taxRate / 100);
+                    $net = max(0, $subtotal - $discountAmt);
+
+                    if ($taxMode === 'inclusive') {
+                        $taxable = ($taxRate > 0) ? round($net / (1 + ($taxRate / 100)), 4) : $net;
+                        $taxAmt = round($net - $taxable, 4);
+                        $totalAmt = $net;
+                    } else {
+                        $taxable = $net;
+                        $taxAmt = $taxable * ($taxRate / 100);
+                        $totalAmt = $taxable + $taxAmt;
+                    }
 
                     $invoiceItems[] = [
                         'sales_order_item_id'          => $soItem?->id,
@@ -239,7 +250,7 @@ class InvoiceController extends Controller
                         'tax_rate'                     => $taxRate,
                         'tax_amount'                   => $taxAmt,
                         'subtotal'                     => $subtotal,
-                        'total_amount'                 => $taxable + $taxAmt,
+                        'total_amount'                 => $totalAmt,
                         'warehouse_id'                 => $doItem->warehouse_id ?? null,
                         'warehouse_name'               => $doItem->warehouse?->name ?? null,
                     ];
@@ -264,8 +275,17 @@ class InvoiceController extends Controller
 
                 $subtotal = $unbilledQty * $unitPrice;
                 $discountAmt = $discount;
-                $taxable = max(0, $subtotal - $discountAmt);
-                $taxAmt = $taxable * ($taxRate / 100);
+                $net = max(0, $subtotal - $discountAmt);
+
+                if ($taxMode === 'inclusive') {
+                    $taxable = ($taxRate > 0) ? round($net / (1 + ($taxRate / 100)), 4) : $net;
+                    $taxAmt = round($net - $taxable, 4);
+                    $totalAmt = $net;
+                } else {
+                    $taxable = $net;
+                    $taxAmt = $taxable * ($taxRate / 100);
+                    $totalAmt = $taxable + $taxAmt;
+                }
 
                 $invoiceItems[] = [
                     'sales_order_item_id'          => $soItem->id,
@@ -282,7 +302,7 @@ class InvoiceController extends Controller
                     'tax_rate'                     => $taxRate,
                     'tax_amount'                   => $taxAmt,
                     'subtotal'                     => $subtotal,
-                    'total_amount'                 => $taxable + $taxAmt,
+                    'total_amount'                 => $totalAmt,
                     'warehouse_id'                 => $soItem->warehouse_id ?? null,
                     'warehouse_name'               => $soItem->warehouse?->name ?? null,
                 ];
@@ -293,7 +313,7 @@ class InvoiceController extends Controller
 
         return view('modules.sales.invoices.create', compact(
             'mode', 'salesOrders', 'dispatchOrders', 'customers', 'products', 'warehouses', 'paymentTerms',
-            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId', 'invoicingPolicy'
+            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId', 'invoicingPolicy', 'taxMode'
         ));
     }
 
@@ -331,6 +351,7 @@ class InvoiceController extends Controller
             'invoice_date'            => ['required', 'date'],
             'due_date'                => ['required', 'date', 'after_or_equal:invoice_date'],
             'payment_terms'           => ['nullable', 'string', 'max:255'],
+            'tax_mode'                => ['nullable', 'string', 'in:exclusive,inclusive'],
             'gst_type'                => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'freight_terms'           => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
             'freight_amount'          => ['nullable', 'numeric', 'min:0'],
@@ -387,6 +408,7 @@ class InvoiceController extends Controller
         $branchId = branch_id() ?? $salesOrder?->branch_id ?? auth()->user()?->branch_id;
         $companyId = company_id() ?? $salesOrder?->company_id ?? auth()->user()?->company_id;
 
+        $taxMode      = $request->input('tax_mode') ?: ($salesOrder?->effective_tax_mode ?? 'exclusive');
         $taxType      = $request->input('tax_type', 'item_wise_tax');
         $discountType = $request->input('discount_type', 'without_discount');
         $gstType      = $request->input('gst_type', 'cgst_sgst');
@@ -394,7 +416,7 @@ class InvoiceController extends Controller
         $freightTerms  = $validated['freight_terms'] ?? $salesOrder?->freight_terms ?? 'To Pay';
         $freightAmount = convert_to_base(floatval($validated['freight_amount'] ?? 0));
 
-        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $branchId, $companyId, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
+        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $branchId, $companyId, $taxMode, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
             $subtotal = 0;
             $taxAmount = 0;
             $discountAmount = 0;
@@ -406,8 +428,15 @@ class InvoiceController extends Controller
                 $taxR  = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
 
                 $lineSubtotal = $qty * $price;
-                $lineTaxable  = max(0, $lineSubtotal - $disc);
-                $lineTax      = $lineTaxable * ($taxR / 100);
+                $lineNet      = max(0, $lineSubtotal - $disc);
+
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($taxR > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxR / 100)), 4) : $lineNet;
+                    $lineTax  = ($taxType === 'item_wise_tax') ? ($lineNet - $lineBase) : 0;
+                } else {
+                    $lineBase = $lineNet;
+                    $lineTax  = ($taxType === 'item_wise_tax') ? ($lineBase * ($taxR / 100)) : 0;
+                }
 
                 $subtotal       += $lineSubtotal;
                 $discountAmount += $disc;
@@ -423,10 +452,16 @@ class InvoiceController extends Controller
             if ($taxType === 'order_wise_tax') {
                 $orderTaxPercent = floatval($request->input('order_tax_percent', 0));
                 $taxableBase     = max(0, $subtotal - $discountAmount);
-                $taxAmount       = $taxableBase * ($orderTaxPercent / 100);
+                if ($taxMode === 'inclusive') {
+                    $taxAmount = ($orderTaxPercent > 0) ? ($taxableBase - ($taxableBase / (1 + ($orderTaxPercent / 100)))) : 0;
+                } else {
+                    $taxAmount = $taxableBase * ($orderTaxPercent / 100);
+                }
             } elseif ($taxType === 'without_tax') {
                 $taxAmount = 0;
             }
+
+            $taxAmount = round($taxAmount, 4);
 
             $freightTaxRateOpt = $request->input('freight_tax_rate', 'highest');
             $freightTaxRatePercent = 18;
@@ -463,7 +498,11 @@ class InvoiceController extends Controller
             }
 
             $adjustment = convert_to_base(floatval($request->input('adjustment', 0)));
-            $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
+            if ($taxMode === 'inclusive') {
+                $totalAmount = max(0, $subtotal - $discountAmount) + $effectiveFreight + $adjustment;
+            } else {
+                $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
+            }
 
             $invoice = Invoice::create([
                 'tenant_id'               => $tenantId,
@@ -479,6 +518,7 @@ class InvoiceController extends Controller
                 'status'                  => 'Draft',
                 'discount_type'           => $discountType,
                 'tax_type'                => $taxType,
+                'tax_mode'                => $taxMode,
                 'order_tax_rate'          => floatval($request->input('order_tax_percent', $request->input('order_tax_rate', 0))),
                 'adjustment'              => $adjustment,
                 'subtotal'                => $subtotal,
@@ -504,8 +544,17 @@ class InvoiceController extends Controller
                 $taxR = floatval($item['tax_rate'] ?? 0);
 
                 $lineSubtotal = $qty * $price;
-                $lineTaxable = max(0, $lineSubtotal - $disc);
-                $lineTax = $lineTaxable * ($taxR / 100);
+                $lineNet = max(0, $lineSubtotal - $disc);
+
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($taxR > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxR / 100)), 4) : $lineNet;
+                    $lineTax = ($taxType === 'item_wise_tax') ? ($lineNet - $lineBase) : 0;
+                    $lineTotal = $lineNet;
+                } else {
+                    $lineBase = $lineNet;
+                    $lineTax = ($taxType === 'item_wise_tax') ? ($lineBase * ($taxR / 100)) : 0;
+                    $lineTotal = $lineBase + $lineTax;
+                }
 
                 $lineCgstPercent = 0;
                 $lineSgstPercent = 0;
@@ -546,7 +595,7 @@ class InvoiceController extends Controller
                     'sgst_amount'                  => $lineSgstAmt,
                     'igst_amount'                  => $lineIgstAmt,
                     'subtotal'                     => $lineSubtotal,
-                    'total_amount'                 => $lineTaxable + $lineTax,
+                    'total_amount'                 => $lineTotal,
                 ]);
             }
 

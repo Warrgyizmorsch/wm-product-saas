@@ -481,76 +481,55 @@
         color: #64748b;
     }
 
-    /* Odoo Table UI Overrides */
-    .table.odoo-table {
+    /* Quotation Order Lines Table UI Overrides & Alignment */
+    #itemsTable {
+        table-layout: fixed !important;
+        width: 100% !important;
         margin-bottom: 0;
     }
-    .table.odoo-table th {
+    #itemsTable th {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: #475569;
         background-color: #f8fafc;
         border-bottom: 1.5px solid #cbd5e1;
-        padding: 10px 12px;
+        padding: 9px 8px !important;
         font-weight: 700;
+        vertical-align: middle;
     }
-    .table.odoo-table td {
-        padding: 10px 12px;
+    #itemsTable td {
+        padding: 8px 8px !important;
         vertical-align: top;
         border-bottom: 1px solid #f1f5f9;
     }
-
-    /* Odoo Table Input Underlines (Referenced from Lead Quotations) */
-    .table.odoo-table .odoo-table-input {
-        border: none !important;
-        border-bottom: 1px solid #cbd5e1 !important;
-        background: transparent !important;
-        border-radius: 0 !important;
-        padding: 4px 2px !important;
-        width: 100%;
-        font-size: 13px !important;
-        transition: border-color 0.2s ease-in-out;
+    #itemsTable th.text-end,
+    #itemsTable td.text-end {
+        text-align: right !important;
     }
-    .table.odoo-table .odoo-table-input:hover {
-        border-bottom-color: #94a3b8 !important;
+    #itemsTable th.text-center,
+    #itemsTable td.text-center {
+        text-align: center !important;
     }
-    .table.odoo-table .odoo-table-input:focus {
-        border-bottom-color: var(--bs-primary) !important;
-        outline: none !important;
-        box-shadow: none !important;
+    #itemsTable td.text-end .odoo-table-input {
+        width: 100% !important;
+        text-align: right !important;
+        box-sizing: border-box !important;
     }
-
-    /* Borderless Select2 theme custom override for Odoo Table */
-    .table.odoo-table .select2-container--bootstrap-5 .select2-selection {
-        border: none !important;
-        border-bottom: 1px solid #ced4da !important;
-        border-radius: 0 !important;
-        background-color: transparent !important;
-        padding-left: 2px !important;
-        height: auto !important;
-        min-height: 28px !important;
-        box-shadow: none !important;
+    #itemsTable textarea.odoo-table-input {
+        text-align: left !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
-    .table.odoo-table .select2-container--bootstrap-5 .select2-selection:focus,
-    .table.odoo-table .select2-container--bootstrap-5.select2-container--focus .select2-selection {
-        border-bottom-color: var(--bs-primary) !important;
-        box-shadow: none !important;
+    #itemsTable .select2-container {
+        width: 100% !important;
     }
-    .table.odoo-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-        padding-left: 0 !important;
-        font-size: 13px !important;
-        color: #212529 !important;
-        line-height: 26px !important;
-    }
-
-    /* Hide number input spinners for clean right alignment */
-    .table.odoo-table input[type="number"]::-webkit-outer-spin-button,
-    .table.odoo-table input[type="number"]::-webkit-inner-spin-button {
+    #itemsTable input[type="number"]::-webkit-outer-spin-button,
+    #itemsTable input[type="number"]::-webkit-inner-spin-button {
         -webkit-appearance: none !important;
         margin: 0 !important;
     }
-    .table.odoo-table input[type="number"] {
+    #itemsTable input[type="number"] {
         -moz-appearance: textfield !important;
     }
 
@@ -2309,6 +2288,23 @@
 
                                                 <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :helperText="$errors->first('email')" />
                                                 <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :helperText="$errors->first('phone')" />
+
+                                                <x-ui.select label="Tax Mode" name="tax_mode" id="taxModeSelect">
+                                                    <option value="exclusive" @selected(old('tax_mode', 'exclusive') === 'exclusive')>Tax Exclusive (Base + GST)</option>
+                                                    <option value="inclusive" @selected(old('tax_mode') === 'inclusive')>Tax Inclusive (Price incl. GST)</option>
+                                                </x-ui.select>
+
+                                                <x-ui.select label="GST / Tax Type" name="tax_type" id="taxTypeSelect">
+                                                    <option value="intra_state" @selected(old('tax_type', 'intra_state') === 'intra_state')>Intra-State (CGST + SGST)</option>
+                                                    <option value="inter_state" @selected(old('tax_type') === 'inter_state')>Inter-State (IGST)</option>
+                                                    <option value="exempt" @selected(old('tax_type') === 'exempt')>Exempt / Non-GST (0%)</option>
+                                                </x-ui.select>
+
+                                                <x-ui.select label="Discount Option" name="discount_type" id="discountTypeSelect">
+                                                    <option value="order_wise" @selected(old('discount_type', 'order_wise') === 'order_wise')>At Transaction / Order Level</option>
+                                                    <option value="item_wise" @selected(old('discount_type') === 'item_wise')>At Line / Item Level</option>
+                                                    <option value="none" @selected(old('discount_type') === 'none')>Without Discount</option>
+                                                </x-ui.select>
                                             </div>
                                             <div class="col-md-6 d-flex flex-column gap-3">
                                                 <x-ui.input :label="__('crm.quotation_number')" name="quotation_number"
@@ -2322,10 +2318,10 @@
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :helperText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.select :label="__('crm.initial_status')" name="status" :required="true" :helperText="$errors->first('status')">
-                                                         <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.draft') }}</option>
-                                                         <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
-                                                    </x-ui.select>
+                                                     <x-ui.select :label="__('crm.initial_status')" name="status" :required="true" :helperText="$errors->first('status')">
+                                                          <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.draft') }}</option>
+                                                          <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
+                                                     </x-ui.select>
                                                 @endif
                                             </div>
                                         </div>
@@ -2337,11 +2333,12 @@
                                                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 38%;">{{ __('crm.product_description') }}</th>
+                                                            <th class="ps-2" style="width: 36%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
-                                                            <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
-                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
-                                                            <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
+                                                            <th class="text-end" style="width: 16%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end col-discount" style="width: 12%; display: none;">{{ __('crm.discount') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end" style="width: 11%;">{{ __('crm.taxes') }} (%)</th>
+                                                            <th class="text-end pe-3" style="width: 15%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
@@ -2370,13 +2367,53 @@
                                                     <span class="text-muted fw-semibold">{{ __('crm.subtotal') }}</span>
                                                     <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">{{ __('crm.taxes_label') }}</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
+
+                                                <!-- Discount (Right after Subtotal) -->
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom" id="orderDiscountRow">
+                                                    <span class="text-muted fw-semibold me-2" id="orderDiscountLabel">{{ __('crm.discount_colon') }}</span>
+                                                    <div class="d-flex justify-content-end align-items-center">
+                                                        <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+                                                        <span class="fw-bold text-danger d-none" id="calcItemDiscountDisplay">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
                                                 </div>
-                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
-                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+
+                                                <!-- Taxable Amount (After Discount) -->
+                                                <div class="d-flex justify-content-between py-1 border-bottom" id="taxableAmountRow">
+                                                    <span class="text-muted fw-semibold" id="taxableAmountLabel">Taxable Value</span>
+                                                    <span class="fw-bold text-dark" id="calcTaxableBase">{{ active_currency_symbol() }}0.00</span>
+                                                </div>
+
+                                                <!-- Dynamic Intra-State (CGST + SGST) -->
+                                                <div id="intraStateTaxRows">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold cgst-label-text">CGST</span>
+                                                        <span class="fw-bold text-dark" id="calcCgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold sgst-label-text">SGST</span>
+                                                        <span class="fw-bold text-dark" id="calcSgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Inter-State (IGST) -->
+                                                <div id="interStateTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold igst-label-text">IGST</span>
+                                                        <span class="fw-bold text-dark" id="calcIgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Exempt -->
+                                                <div id="exemptTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold">GST Treatment</span>
+                                                        <span class="badge bg-soft-success text-success fw-bold">Exempt (0%)</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold tax-label-text">{{ __('crm.taxes_label') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
@@ -2416,6 +2453,23 @@
 
                                                 <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :helperText="$errors->first('email')" />
                                                 <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :helperText="$errors->first('phone')" />
+
+                                                <x-ui.select label="Tax Mode" name="tax_mode" id="taxModeSelect">
+                                                    <option value="exclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'exclusive')>Tax Exclusive (Base + GST)</option>
+                                                    <option value="inclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'inclusive')>Tax Inclusive (Price incl. GST)</option>
+                                                </x-ui.select>
+
+                                                <x-ui.select label="GST / Tax Type" name="tax_type" id="taxTypeSelect">
+                                                    <option value="intra_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'intra_state')>Intra-State (CGST + SGST)</option>
+                                                    <option value="inter_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'inter_state')>Inter-State (IGST)</option>
+                                                    <option value="exempt" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'exempt')>Exempt / Non-GST (0%)</option>
+                                                </x-ui.select>
+
+                                                <x-ui.select label="Discount Option" name="discount_type" id="discountTypeSelect">
+                                                    <option value="order_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'order_wise')>At Transaction / Order Level</option>
+                                                    <option value="item_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'item_wise')>At Line / Item Level</option>
+                                                    <option value="none" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'none')>Without Discount</option>
+                                                </x-ui.select>
                                             </div>
                                             <div class="col-md-6 d-flex flex-column gap-3">
                                                 <x-ui.input :label="__('crm.quotation_number')" name="quotation_number"
@@ -2429,10 +2483,10 @@
                                                     :value="old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')" :helperText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.select :label="__('crm.status')" name="status" :required="true" :helperText="$errors->first('status')">
-                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.draft') }}</option>
-                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
-                                                    </x-ui.select>
+                                                     <x-ui.select :label="__('crm.status')" name="status" :required="true" :helperText="$errors->first('status')">
+                                                          <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.draft') }}</option>
+                                                          <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
+                                                     </x-ui.select>
                                                 @endif
                                             </div>
                                         </div>
@@ -2444,11 +2498,12 @@
                                                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 38%;">{{ __('crm.product_description') }}</th>
+                                                            <th class="ps-2" style="width: 36%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
-                                                            <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
-                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
-                                                            <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
+                                                            <th class="text-end" style="width: 16%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end col-discount" style="width: 12%; display: none;">{{ __('crm.discount') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end" style="width: 11%;">{{ __('crm.taxes') }} (%)</th>
+                                                            <th class="text-end pe-3" style="width: 15%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
@@ -2477,13 +2532,53 @@
                                                     <span class="text-muted fw-semibold">{{ __('crm.subtotal') }}</span>
                                                     <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">{{ __('crm.taxes_label') }}</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
+
+                                                <!-- Discount (Right after Subtotal) -->
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom" id="orderDiscountRow">
+                                                    <span class="text-muted fw-semibold me-2" id="orderDiscountLabel">{{ __('crm.discount_colon') }}</span>
+                                                    <div class="d-flex justify-content-end align-items-center">
+                                                        <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount ? round(convert_from_base((float)$activeQuotation->discount), 2) : 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+                                                        <span class="fw-bold text-danger d-none" id="calcItemDiscountDisplay">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
                                                 </div>
-                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
-                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount ? round(convert_from_base((float)$activeQuotation->discount), 2) : 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+
+                                                <!-- Taxable Amount (After Discount) -->
+                                                <div class="d-flex justify-content-between py-1 border-bottom" id="taxableAmountRow">
+                                                    <span class="text-muted fw-semibold" id="taxableAmountLabel">Taxable Value</span>
+                                                    <span class="fw-bold text-dark" id="calcTaxableBase">{{ active_currency_symbol() }}0.00</span>
+                                                </div>
+
+                                                <!-- Dynamic Intra-State (CGST + SGST) -->
+                                                <div id="intraStateTaxRows">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold cgst-label-text">CGST</span>
+                                                        <span class="fw-bold text-dark" id="calcCgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold sgst-label-text">SGST</span>
+                                                        <span class="fw-bold text-dark" id="calcSgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Inter-State (IGST) -->
+                                                <div id="interStateTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold igst-label-text">IGST</span>
+                                                        <span class="fw-bold text-dark" id="calcIgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Exempt -->
+                                                <div id="exemptTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold">GST Treatment</span>
+                                                        <span class="badge bg-soft-success text-success fw-bold">Exempt (0%)</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold tax-label-text">{{ __('crm.taxes_label') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
@@ -2720,6 +2815,39 @@
                                                     </div>
                                                 @endif
                                             </div>
+
+                                            <div class="row pt-2 border-top">
+                                                <div class="col-4">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Pricing Mode</label>
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-1 fw-bold fs-11">
+                                                        {{ $activeQuotation->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}
+                                                    </span>
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Discount Option</label>
+                                                    <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2 py-1 fw-bold fs-11">
+                                                        @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                            Item-Level
+                                                        @elseif($activeQuotation->effective_discount_type === 'none')
+                                                            Without Discount
+                                                        @else
+                                                            Order-Level
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                                <div class="col-4">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">GST Tax Type</label>
+                                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-1 fw-bold fs-11">
+                                                        @if($activeQuotation->effective_tax_type === 'intra_state')
+                                                            Intra-State (CGST + SGST)
+                                                        @elseif($activeQuotation->effective_tax_type === 'inter_state')
+                                                            Inter-State (IGST)
+                                                        @else
+                                                            GST Exempt (0%)
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2733,6 +2861,9 @@
                                                     <th>{{ __('crm.product_description') }}</th>
                                                     <th class="text-end">{{ __('crm.qty') }}</th>
                                                     <th class="text-end">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                    @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                        <th class="text-end">{{ __('crm.discount') }} ({{ active_currency_symbol() }})</th>
+                                                    @endif
                                                     <th class="text-end">{{ __('crm.taxes') }} (%)</th>
                                                     <th class="text-end">{{ __('crm.amount') }} ({{ active_currency_symbol() }})</th>
                                                 </tr>
@@ -2749,12 +2880,15 @@
                                                         </td>
                                                         <td class="text-end font-monospace fw-bold">{{ $item->quantity }}</td>
                                                         <td class="text-end font-monospace">{{ format_currency($item->unit_price) }}</td>
+                                                        @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                            <td class="text-end font-monospace text-danger">{{ ($item->discount ?? 0) > 0 ? '-' . format_currency($item->discount) : '—' }}</td>
+                                                        @endif
                                                         <td class="text-end font-monospace">{{ $item->tax_rate }}%</td>
                                                         <td class="text-end font-monospace fw-bold text-success">{{ format_currency($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price))) }}</td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="6" class="text-center py-3 text-muted">{{ __('crm.no_line_items_quotation') }}</td>
+                                                        <td colspan="{{ $activeQuotation->effective_discount_type === 'item_wise' ? 7 : 6 }}" class="text-center py-3 text-muted">{{ __('crm.no_line_items_quotation') }}</td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -2776,16 +2910,44 @@
                                                 <span class="text-muted">{{ __('crm.subtotal') }}</span>
                                                 <span class="fw-bold">{{ format_currency($activeQuotation->subtotal ?? 0) }}</span>
                                             </div>
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted">{{ __('crm.taxes_label') }}</span>
-                                                <span class="fw-bold">{{ format_currency($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0) }}</span>
-                                            </div>
+
                                             @if(($activeQuotation->discount ?? 0) > 0)
                                                 <div class="d-flex justify-content-between py-1 border-bottom text-danger">
                                                     <span>{{ __('crm.discount') }}</span>
                                                     <span class="fw-bold">-{{ format_currency($activeQuotation->discount) }}</span>
                                                 </div>
                                             @endif
+
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">{{ $activeQuotation->effective_tax_mode === 'inclusive' ? 'Taxable Value (Excl. Tax)' : 'Taxable Amount' }}</span>
+                                                <span class="fw-bold text-dark">{{ format_currency($activeQuotation->taxable_amount) }}</span>
+                                            </div>
+
+                                            @if($activeQuotation->effective_tax_type === 'intra_state')
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">CGST {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->computed_cgst) }}</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">SGST {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->computed_sgst) }}</span>
+                                                </div>
+                                            @elseif($activeQuotation->effective_tax_type === 'inter_state')
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">IGST {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->computed_igst) }}</span>
+                                                </div>
+                                            @else
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">Tax (GST)</span>
+                                                    <span class="badge bg-soft-success text-success fw-bold">Exempt (0%)</span>
+                                                </div>
+                                            @endif
+
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">{{ __('crm.taxes_label') }} {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                <span class="fw-bold">{{ format_currency($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0) }}</span>
+                                            </div>
                                             <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
                                                 <span class="fw-bold text-dark">{{ __('crm.grand_total') }}</span>
                                                 <span class="fw-extrabold text-primary">{{ format_currency($activeQuotation->total_amount) }}</span>
@@ -3231,7 +3393,7 @@
             function getRowHtml(index, selectedId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
-                        <td class="ps-2">
+                        <td class="ps-2" style="vertical-align: top;">
                             <select name="items[${index}][product_id]" class="odoo-table-select odoo-select2 item-name-input erp-premium-select" required data-master="product" style="width:100%;">
                                 ${buildProductOptions(selectedId)}
                             </select>
@@ -3242,20 +3404,23 @@
                                 <i class="feather-plus me-1"></i>Add Description
                             </a>
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="0.01" step="any" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                        <td class="text-end" style="vertical-align: top;">
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="0.01" step="any" required style="width: 100%; text-align: right;">
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
+                        <td class="text-end" style="vertical-align: top;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; text-align: right;">
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                        <td class="text-end col-discount" style="vertical-align: top; display: none;">
+                            <input type="number" name="items[${index}][discount]" class="odoo-table-input text-end line-discount-input" value="0.00" min="0" step="0.01" style="width: 100%; text-align: right;">
                         </td>
-                        <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; padding-top: 8px;">
+                        <td class="text-end" style="vertical-align: top;">
+                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; text-align: right;">
+                        </td>
+                        <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; vertical-align: top; line-height: 32px;">
                             {{ active_currency_symbol() }}0.00
                         </td>
-                        <td class="text-center" style="padding-top: 6px;">
-                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
+                        <td class="text-center" style="vertical-align: top;">
+                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn" style="height: 32px; width: 32px; display: inline-flex; align-items: center; justify-content: center;">
                                 <i class="feather-trash-2"></i>
                             </button>
                         </td>
@@ -3284,7 +3449,33 @@
                 }
             });
 
-            $(document).on('input change', '.qty-input, .price-input, .tax-input, #discountInput', function() {
+            function toggleTaxAndDiscountOptions() {
+                const discountType = $('#discountTypeSelect').val() || 'order_wise';
+                if (discountType === 'item_wise') {
+                    $('.col-discount').show();
+                    $('#orderDiscountRow').show();
+                    $('#discountInput').hide();
+                    $('#calcItemDiscountDisplay').removeClass('d-none').show();
+                    $('#orderDiscountLabel').text('Item Discounts:');
+                } else if (discountType === 'order_wise') {
+                    $('.col-discount').hide();
+                    $('#orderDiscountRow').show();
+                    $('#discountInput').show();
+                    $('#calcItemDiscountDisplay').addClass('d-none').hide();
+                    $('#orderDiscountLabel').text('{{ __("crm.discount_colon") }}');
+                } else {
+                    $('.col-discount').hide();
+                    $('#orderDiscountRow').hide();
+                    $('#calcItemDiscountDisplay').addClass('d-none').hide();
+                }
+            }
+
+            $(document).on('change', '#discountTypeSelect', function() {
+                toggleTaxAndDiscountOptions();
+                calculateTotals();
+            });
+
+            $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #taxModeSelect, #taxTypeSelect', function() {
                 calculateTotals();
             });
 
@@ -3315,6 +3506,7 @@
                         }
                     }
                     newRow.find('.price-input').val(finalUnitPrice.toFixed(2));
+                    newRow.find('.line-discount-input').val(item.discount !== undefined && item.discount !== null ? parseFloat(item.discount).toFixed(2) : '0.00');
                     newRow.find('.tax-input').val(item.tax_rate !== undefined && item.tax_rate !== null ? parseFloat(item.tax_rate).toFixed(2) : '18.00');
                 }
 
@@ -3330,33 +3522,142 @@
                 });
 
                 rowIndex++;
+                toggleTaxAndDiscountOptions();
                 calculateTotals();
             }
 
             function calculateTotals() {
                 let subtotal = 0;
-                let taxTotal = 0;
+                const taxMode = $('#taxModeSelect').val() || 'exclusive';
+                const taxType = $('#taxTypeSelect').val() || 'intra_state';
+                const discountType = $('#discountTypeSelect').val() || 'order_wise';
+                let totalDiscount = 0;
 
+                // 1. Gather all rows, compute row amount (Qty * Price) and sum subtotal
+                const lineItems = [];
                 $('.item-row').each(function() {
                     const qty = parseFloat($(this).find('.qty-input').val()) || 0;
                     const price = parseFloat($(this).find('.price-input').val()) || 0;
-                    const taxRate = parseFloat($(this).find('.tax-input').val()) || 0;
+                    const lineDisc = parseFloat($(this).find('.line-discount-input').val()) || 0;
+                    let taxRate = parseFloat($(this).find('.tax-input').val()) || 0;
+                    if (taxType === 'exempt') {
+                        taxRate = 0;
+                    }
 
-                    const amount = qty * price;
-                    const tax = amount * (taxRate / 100);
+                    const lineAmount = qty * price;
+                    subtotal += lineAmount;
 
-                    subtotal += amount;
-                    taxTotal += tax;
+                    lineItems.push({
+                        row: $(this),
+                        qty: qty,
+                        price: price,
+                        lineDisc: lineDisc,
+                        taxRate: taxRate,
+                        lineAmount: lineAmount
+                    });
 
-                    $(this).find('.amount-display').text('{{ active_currency_symbol() }}' + amount.toFixed(2));
+                    $(this).find('.amount-display').text('{{ active_currency_symbol() }}' + lineAmount.toFixed(2));
                 });
 
-                const discount = parseFloat($('#discountInput').val()) || 0;
-                const grandTotal = subtotal + taxTotal - discount;
+                if (discountType === 'item_wise') {
+                    lineItems.forEach(function(item) {
+                        totalDiscount += item.lineDisc;
+                    });
+                    $('#calcItemDiscountDisplay').text('-{{ active_currency_symbol() }}' + totalDiscount.toFixed(2));
+                } else if (discountType === 'none') {
+                    totalDiscount = 0;
+                } else {
+                    totalDiscount = parseFloat($('#discountInput').val()) || 0;
+                }
+
+                // 2. Distribute discount across rows and compute taxes after discount
+                let totalTaxableBase = 0;
+                let taxTotal = 0;
+
+                lineItems.forEach(function(item) {
+                    let effectiveLineDiscount = 0;
+                    if (discountType === 'item_wise') {
+                        effectiveLineDiscount = item.lineDisc;
+                    } else if (discountType === 'none') {
+                        effectiveLineDiscount = 0;
+                    } else {
+                        effectiveLineDiscount = (subtotal > 0 && totalDiscount > 0) ? (item.lineAmount / subtotal) * totalDiscount : 0;
+                    }
+
+                    if (taxMode === 'inclusive') {
+                        const lineNet = Math.max(0, item.lineAmount - effectiveLineDiscount);
+                        const lineBase = (item.taxRate > 0 && taxType !== 'exempt') ? (lineNet / (1 + (item.taxRate / 100))) : lineNet;
+                        const lineTax = lineNet - lineBase;
+                        totalTaxableBase += lineBase;
+                        taxTotal += lineTax;
+
+                        if (item.taxRate > 0 && taxType !== 'exempt') {
+                            const rawBase = item.lineAmount / (1 + (item.taxRate / 100));
+                            item.row.find('.tax-base-hint').text('(Base: {{ active_currency_symbol() }}' + rawBase.toFixed(2) + ')').show();
+                        } else {
+                            item.row.find('.tax-base-hint').hide();
+                        }
+                    } else {
+                        const lineTaxable = Math.max(0, item.lineAmount - effectiveLineDiscount);
+                        const lineTax = (taxType === 'exempt') ? 0 : (lineTaxable * (item.taxRate / 100));
+                        totalTaxableBase += lineTaxable;
+                        taxTotal += lineTax;
+                        item.row.find('.tax-base-hint').hide();
+                    }
+                });
+
+                if (taxType === 'exempt') {
+                    taxTotal = 0;
+                }
+
+                // 3. Grand Total
+                let grandTotal = 0;
+                if (taxMode === 'inclusive') {
+                    grandTotal = Math.max(0, subtotal - totalDiscount);
+                } else {
+                    grandTotal = Math.max(0, totalTaxableBase + taxTotal);
+                }
+
+                // 4. Tax Split Breakdown
+                let cgst = 0, sgst = 0, igst = 0;
+                if (taxType === 'intra_state') {
+                    cgst = taxTotal / 2;
+                    sgst = taxTotal / 2;
+                    $('#intraStateTaxRows').show();
+                    $('#interStateTaxRow').hide();
+                    $('#exemptTaxRow').hide();
+                } else if (taxType === 'inter_state') {
+                    igst = taxTotal;
+                    $('#intraStateTaxRows').hide();
+                    $('#interStateTaxRow').show();
+                    $('#exemptTaxRow').hide();
+                } else {
+                    $('#intraStateTaxRows').hide();
+                    $('#interStateTaxRow').hide();
+                    $('#exemptTaxRow').show();
+                }
+
+                if (taxMode === 'inclusive') {
+                    $('#taxableAmountLabel').text('Taxable Value (Excl. Tax)');
+                    $('.cgst-label-text').text('CGST (Included)');
+                    $('.sgst-label-text').text('SGST (Included)');
+                    $('.igst-label-text').text('IGST (Included)');
+                    $('.tax-label-text').text('Total Tax (Included)');
+                } else {
+                    $('#taxableAmountLabel').text('Taxable Amount (After Disc.)');
+                    $('.cgst-label-text').text('CGST');
+                    $('.sgst-label-text').text('SGST');
+                    $('.igst-label-text').text('IGST');
+                    $('.tax-label-text').text('{{ __("crm.taxes_label") }}');
+                }
 
                 $('#calcSubtotal').text('{{ active_currency_symbol() }}' + subtotal.toFixed(2));
+                $('#calcTaxableBase').text('{{ active_currency_symbol() }}' + totalTaxableBase.toFixed(2));
+                $('#calcCgst').text('{{ active_currency_symbol() }}' + cgst.toFixed(2));
+                $('#calcSgst').text('{{ active_currency_symbol() }}' + sgst.toFixed(2));
+                $('#calcIgst').text('{{ active_currency_symbol() }}' + igst.toFixed(2));
                 $('#calcTax').text('{{ active_currency_symbol() }}' + taxTotal.toFixed(2));
-                $('#calcTotal').text('{{ active_currency_symbol() }}' + Math.max(0, grandTotal).toFixed(2));
+                $('#calcTotal').text('{{ active_currency_symbol() }}' + grandTotal.toFixed(2));
             }
 
 
@@ -3380,6 +3681,7 @@
                             'description' => $it->description,
                             'quantity' => (float)$it->quantity,
                             'unit_price' => round(convert_from_base((float)$it->unit_price), 2),
+                            'discount' => round(convert_from_base((float)($it->discount ?? 0)), 2),
                             'tax_rate' => (float)$it->tax_rate,
                             'amount' => round(convert_from_base((float)$it->amount), 2),
                         ];
@@ -3389,6 +3691,7 @@
             const existingItems = @json($mappedExistingItems ?? []);
 
             if (hasCreateQ || hasEditQ) {
+                toggleTaxAndDiscountOptions();
                 if (existingItems && existingItems.length > 0) {
                     existingItems.forEach(function(item) {
                         addRow(item);

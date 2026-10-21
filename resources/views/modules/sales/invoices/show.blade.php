@@ -673,6 +673,13 @@
                                 <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? __('crm.inter_state_gst') : __('crm.intra_state_gst') }}</span>
                             </div>
 
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <span class="text-muted">{{ __('crm.tax_mode') }}</span>
+                                <span class="badge {{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary' }} fw-bold">
+                                    {{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? __('crm.tax_inclusive') : __('crm.tax_exclusive') }}
+                                </span>
+                            </div>
+
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">{{ __('crm.payment_status') }}</span>
                                 <span class="fw-bold {{ ($balanceDue ?? 0) > 0 ? 'text-danger' : 'text-success' }}">{{ ($balanceDue ?? 0) > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
@@ -728,6 +735,7 @@
 
                 <!-- 4. Summary & Calculations Row -->
                 @php
+                    $taxMode = $invoice->effective_tax_mode ?? 'exclusive';
                     $grossSubtotal = 0;
                     $totalItemDiscount = 0;
                     $itemsTaxAmount = 0;
@@ -736,21 +744,39 @@
                         $grossSubtotal += ($it->quantity * $it->unit_price);
                         $totalItemDiscount += $it->discount;
                         if ($invoice->tax_type === 'item_wise_tax') {
-                            $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
-                            $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
+                            $lineNet = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                            if ($taxMode === 'inclusive') {
+                                $lineBase = ($it->tax_rate > 0) ? round($lineNet / (1 + ($it->tax_rate / 100)), 4) : $lineNet;
+                                $lineTax = $lineNet - $lineBase;
+                            } else {
+                                $lineTax = ($lineNet * ($it->tax_rate / 100));
+                            }
+                            $itemsTaxAmount += $lineTax;
                             if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
                         }
                     }
                     $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
-                    $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
+                    $itemsNet = max(0, $grossSubtotal - $effectiveDiscount);
 
                     if ($invoice->tax_type === 'order_wise_tax') {
-                        $itemsTaxAmount = $taxableBase * (($invoice->order_tax_rate ?: 18) / 100);
+                        $orderTaxRate = (float)($invoice->order_tax_rate ?: 18);
+                        if ($taxMode === 'inclusive') {
+                            $itemsTaxAmount = ($orderTaxRate > 0) ? ($itemsNet - ($itemsNet / (1 + ($orderTaxRate / 100)))) : 0;
+                        } else {
+                            $itemsTaxAmount = $itemsNet * ($orderTaxRate / 100);
+                        }
                     } elseif ($invoice->tax_type === 'without_tax') {
                         $itemsTaxAmount = 0;
                     }
 
-                    $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                    if ($taxMode === 'inclusive') {
+                        $taxableBase = max(0, $itemsNet - $itemsTaxAmount);
+                        $itemsTotalInclGst = $itemsNet;
+                    } else {
+                        $taxableBase = $itemsNet;
+                        $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                    }
+
                     $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
 
                     $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
@@ -769,7 +795,7 @@
                     $totalFreightInclGst = $freightAmount + $freightTax;
                     $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
                     $adjustment = (float)($invoice->adjustment ?? 0);
-                    $grandTotal = ($taxableBase + $freightAmount) + $totalInvoiceTaxAmount + $adjustment;
+                    $grandTotal = (float)($invoice->total_amount ?: ($taxMode === 'inclusive' ? ($itemsTotalInclGst + $freightAmount + $adjustment) : (($taxableBase + $freightAmount) + $totalInvoiceTaxAmount + $adjustment)));
                     $gstType = $invoice->gst_type ?? 'cgst_sgst';
                     $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
                     $hasFreightTax = ($freightAmount > 0 && $freightTax > 0);
@@ -800,9 +826,9 @@
                     <div class="col-5 summary-table-box ms-auto">
                         <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
 
-                            <!-- 1. Subtotal (Excl. Tax) -->
+                            <!-- 1. Subtotal -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                <span class="text-muted fw-semibold">{{ $taxMode === 'inclusive' ? __('crm.subtotal_incl_tax') : __('crm.subtotal_excl_tax') }}</span>
                                 <span class="fw-bold text-dark">{{ format_currency($grossSubtotal) }}</span>
                             </div>
 
@@ -816,7 +842,7 @@
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                <span class="text-muted fw-semibold">{{ $taxMode === 'inclusive' ? __('crm.taxable_value_excl_tax') : __('crm.items_taxable_value') }}</span>
                                 <span class="fw-bold text-dark">{{ format_currency($taxableBase) }}</span>
                             </div>
 
@@ -837,17 +863,17 @@
                                 <hr class="my-2 border-slate">
                                 @if($gstType === 'cgst_sgst')
                                     <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                 @else
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount) }}</span>
                                     </div>
                                 @endif
                             @endif
@@ -954,7 +980,10 @@
                                         @foreach($taxGroups as $rateStr => $gItems)
                                             @php
                                                 $rate = floatval($rateStr);
-                                                $grpTaxable = $gItems->sum(fn($it) => max(0, ($it->quantity * $it->unit_price) - $it->discount));
+                                                $grpTaxable = $gItems->sum(function($it) use ($taxMode) {
+                                                    $lineNet = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                                                    return $taxMode === 'inclusive' ? max(0, $lineNet - $it->tax_amount) : $lineNet;
+                                                });
                                                 $grpTax = $gItems->sum('tax_amount');
                                                 $totTaxable += $grpTaxable;
                                                 $totTax += $grpTax;

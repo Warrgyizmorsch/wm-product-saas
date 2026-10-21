@@ -60,6 +60,13 @@ class SalesInvoiceCreationService
             $gstType = $invoiceData['gst_type'] ?? $this->resolveGstType($customer, $companyId, $tenantId);
             $taxType = $invoiceData['tax_type'] ?? 'item_wise_tax';
             $discountType = $invoiceData['discount_type'] ?? 'without_discount';
+            $taxMode = $invoiceData['tax_mode'] ?? 'exclusive';
+            if (empty($invoiceData['tax_mode']) && !empty($invoiceData['sales_order_id'])) {
+                $so = \App\Domains\Sales\Models\SalesOrder::find($invoiceData['sales_order_id']);
+                if ($so && !empty($so->effective_tax_mode)) {
+                    $taxMode = $so->effective_tax_mode;
+                }
+            }
 
             // 2. Sequential Invoice Numbering
             $invoiceNumber = $invoiceData['invoice_number'] ?? $this->generateNextInvoiceNumber($tenantId);
@@ -84,8 +91,17 @@ class SalesInvoiceCreationService
                 }
 
                 $lineSubtotal = round($qty * $price, 4);
-                $lineTaxable = max(0, $lineSubtotal - $disc);
-                $lineTax = round($lineTaxable * ($taxRate / 100), 4);
+                $lineNet = max(0, $lineSubtotal - $disc);
+
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($taxRate > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxRate / 100)), 4) : $lineNet;
+                    $lineTax = ($taxType === 'item_wise_tax') ? round($lineNet - $lineBase, 4) : 0.0;
+                    $lineTotal = $lineNet;
+                } else {
+                    $lineBase = $lineNet;
+                    $lineTax = round($lineBase * ($taxRate / 100), 4);
+                    $lineTotal = $lineBase + $lineTax;
+                }
 
                 $lineCgstPercent = 0.0;
                 $lineSgstPercent = 0.0;
@@ -129,7 +145,7 @@ class SalesInvoiceCreationService
                     'sgst_amount'                  => $lineSgstAmt,
                     'igst_amount'                  => $lineIgstAmt,
                     'subtotal'                     => $lineSubtotal,
-                    'total_amount'                 => $lineTaxable + $lineTax,
+                    'total_amount'                 => $lineTotal,
                 ];
             }
 
@@ -146,7 +162,11 @@ class SalesInvoiceCreationService
                 }
             }
 
-            $grandTotal = max(0, $subtotal - $totalDiscountAmount + $totalTaxAmount);
+            if ($taxMode === 'inclusive') {
+                $grandTotal = max(0, $subtotal - $totalDiscountAmount);
+            } else {
+                $grandTotal = max(0, $subtotal - $totalDiscountAmount + $totalTaxAmount);
+            }
 
             // 4. Persist Draft Invoice
             $invoice = Invoice::create([
@@ -163,6 +183,7 @@ class SalesInvoiceCreationService
                 'status'          => 'Draft',
                 'discount_type'   => $discountType,
                 'tax_type'        => $taxType,
+                'tax_mode'        => $taxMode,
                 'order_tax_rate'  => 0,
                 'adjustment'      => 0,
                 'subtotal'        => $subtotal,

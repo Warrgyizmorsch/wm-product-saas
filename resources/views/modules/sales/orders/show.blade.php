@@ -333,24 +333,46 @@
         $grossSubtotal = 0;
         $totalItemDiscount = 0;
         $itemsTaxAmount = 0;
+        $taxMode = $order->effective_tax_mode ?? 'exclusive';
+
         foreach($order->items as $it) {
-            $grossSubtotal += ($it->quantity * $it->unit_price);
+            $lineGross = ($it->quantity * $it->unit_price);
+            $grossSubtotal += $lineGross;
             $totalItemDiscount += $it->discount;
             if ($order->tax_type === 'item_wise_tax') {
-                $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
-                $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
+                $lineTaxable = max(0, $lineGross - $it->discount);
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($it->tax_rate > 0) ? round($lineTaxable / (1 + ($it->tax_rate / 100)), 4) : $lineTaxable;
+                    $itemsTaxAmount += ($lineTaxable - $lineBase);
+                } else {
+                    $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
+                }
             }
         }
         $effectiveDiscount = ($order->discount_type === 'order_wise') ? (float)$order->discount : $totalItemDiscount;
-        $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
 
-        if ($order->tax_type === 'order_wise_tax') {
-            $itemsTaxAmount = $taxableBase * (($order->order_tax_rate ?: 18) / 100);
-        } elseif ($order->tax_type === 'without_tax') {
-            $itemsTaxAmount = 0;
+        if ($taxMode === 'inclusive') {
+            if ($order->tax_type === 'order_wise_tax') {
+                $netAmount = max(0, $grossSubtotal - $effectiveDiscount);
+                $orderTaxRate = (float)($order->order_tax_rate ?: 18);
+                $itemsTaxAmount = $netAmount - ($netAmount / (1 + ($orderTaxRate / 100)));
+            } elseif ($order->tax_type === 'without_tax') {
+                $itemsTaxAmount = 0;
+            }
+            $itemsTaxAmount = round($itemsTaxAmount, 2);
+            $taxableBase = max(0, ($grossSubtotal - $effectiveDiscount) - $itemsTaxAmount);
+            $itemsTotalInclGst = max(0, $grossSubtotal - $effectiveDiscount);
+        } else {
+            $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
+            if ($order->tax_type === 'order_wise_tax') {
+                $itemsTaxAmount = $taxableBase * (($order->order_tax_rate ?: 18) / 100);
+            } elseif ($order->tax_type === 'without_tax') {
+                $itemsTaxAmount = 0;
+            }
+            $itemsTaxAmount = round($itemsTaxAmount, 2);
+            $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
         }
 
-        $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
         $freightAmount = ($order->freight_terms === 'To Be Billed') ? (float)($order->freight_amount ?: $order->shipping_charges ?: 0) : 0;
         $adjustment = (float)$order->adjustment;
         $grandTotal = (float)($order->total_amount ?? ($itemsTotalInclGst + $freightAmount + $adjustment));
@@ -839,16 +861,21 @@
                                         <i class="feather-pie-chart text-primary me-1 fs-13"></i>
                                         <span class="fw-bold text-dark fs-11 text-uppercase tracking-wider">Financial Summary</span>
                                     </div>
-                                    <span class="badge bg-white text-muted border border-secondary-subtle px-1.5 py-0.5 fs-10 fw-semibold text-uppercase">
-                                        {{ str_replace('_', ' ', $order->tax_type ?? 'Tax Summary') }}
-                                    </span>
+                                    <div class="d-flex align-items-center gap-1.5">
+                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle px-1.5 py-0.5 fs-10 fw-semibold text-uppercase">
+                                            {{ $taxMode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}
+                                        </span>
+                                        <span class="badge bg-white text-muted border border-secondary-subtle px-1.5 py-0.5 fs-10 fw-semibold text-uppercase">
+                                            {{ str_replace('_', ' ', $order->tax_type ?? 'Tax Summary') }}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <!-- Card Body: Balanced Padding (8px top/bottom, 12px left/right) -->
                                 <div class="bg-white" style="padding: 8px 12px !important;">
                                     <!-- Subtotal -->
                                     <div class="d-flex justify-content-between align-items-center py-0.5 fs-12">
-                                        <span class="text-muted fw-medium">Subtotal (Excl. Tax)</span>
+                                        <span class="text-muted fw-medium">{{ $taxMode === 'inclusive' ? 'Subtotal (Price incl. GST)' : 'Subtotal (Excl. Tax)' }}</span>
                                         <span class="fw-bold text-dark font-monospace fs-12">{{ format_currency($grossSubtotal) }}</span>
                                     </div>
 
@@ -864,7 +891,7 @@
 
                                     <!-- Taxable Base Amount -->
                                     <div class="d-flex justify-content-between align-items-center py-0.5 fs-12 border-top border-light-subtle">
-                                        <span class="text-dark fw-semibold">Taxable Base Amount</span>
+                                        <span class="text-dark fw-semibold">{{ $taxMode === 'inclusive' ? 'Taxable Value (Excl. Tax)' : 'Taxable Base Amount' }}</span>
                                         <span class="fw-bold text-dark font-monospace fs-12">{{ format_currency($taxableBase) }}</span>
                                     </div>
 
@@ -872,27 +899,27 @@
                                     @if($order->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
                                         <div class="my-1 rounded-2 bg-light bg-opacity-60 border border-light-subtle" style="padding: 6px 10px !important;">
                                             <div class="d-flex justify-content-between align-items-center mb-1 fs-10 text-muted text-uppercase fw-bold">
-                                                <span>Tax Breakdown</span>
+                                                <span>Tax Breakdown {{ $taxMode === 'inclusive' ? '(Included)' : '' }}</span>
                                                 <span class="badge bg-soft-info text-info fs-10 py-0.5 px-1.5">{{ strtoupper(str_replace('_', ' + ', $gstType)) }}</span>
                                             </div>
                                             @if($gstType === 'cgst_sgst')
                                                 <div class="d-flex justify-content-between align-items-center py-0.5 fs-11 text-muted">
-                                                    <span>Central GST (CGST)</span>
-                                                    <span class="font-monospace fw-semibold text-dark">+{{ format_currency($itemsTaxAmount / 2) }}</span>
+                                                    <span>Central GST (CGST) {{ $taxMode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="font-monospace fw-semibold text-dark">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($itemsTaxAmount / 2) }}</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-0.5 fs-11 text-muted">
-                                                    <span>State GST (SGST)</span>
-                                                    <span class="font-monospace fw-semibold text-dark">+{{ format_currency($itemsTaxAmount / 2) }}</span>
+                                                    <span>State GST (SGST) {{ $taxMode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="font-monospace fw-semibold text-dark">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($itemsTaxAmount / 2) }}</span>
                                                 </div>
                                             @else
                                                 <div class="d-flex justify-content-between align-items-center py-0.5 fs-11 text-muted">
-                                                    <span>Integrated GST (IGST)</span>
-                                                    <span class="font-monospace fw-semibold text-dark">+{{ format_currency($itemsTaxAmount) }}</span>
+                                                    <span>Integrated GST (IGST) {{ $taxMode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="font-monospace fw-semibold text-dark">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($itemsTaxAmount) }}</span>
                                                 </div>
                                             @endif
                                             <div class="d-flex justify-content-between align-items-center pt-1 mt-0.5 border-top border-secondary-subtle fs-11">
-                                                <span class="fw-bold text-dark">Total Tax</span>
-                                                <span class="fw-bold text-dark font-monospace">+{{ format_currency($itemsTaxAmount) }}</span>
+                                                <span class="fw-bold text-dark">Total Tax {{ $taxMode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                <span class="fw-bold text-dark font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($itemsTaxAmount) }}</span>
                                             </div>
                                         </div>
                                     @endif

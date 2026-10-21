@@ -57,7 +57,7 @@
                 </div>
 
                 <div class="row g-4 mb-4 fs-13 text-dark">
-                    <!-- Column 1: Source Selector & Customer Info -->
+                    <!-- Column 1: Source Selector, Customer & Dates Info -->
                     <div class="col-md-6 border-end pe-md-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1"></i>{{ __('crm.customer_billing_reference') }}</h6>
 
@@ -77,15 +77,6 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder?->customer?->name ?: '—'" readonly="true" style="font-weight: bold; background-color: transparent;" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="salesOrderPaymentTermsSelect">
-                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
-                                @foreach ($paymentTerms as $pt)
-                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $salesOrder?->payment_terms) == $pt->name)>
-                                        {{ $pt->display_name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-
                         @elseif ($mode === 'dispatch_order')
                             <!-- Mode 2: Dispatch Order Dropdown -->
                             <x-ui.odoo-form-ui type="select" :label="__('crm.dispatch_order_reference')" name="dispatch_order_id" id="dispatchOrderSelect" class="odoo-select2" :required="true">
@@ -102,15 +93,6 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder?->customer?->name ?: ($dispatchOrder?->salesOrder?->customer?->name ?: '—')" readonly="true" style="font-weight: bold; background-color: transparent;" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="dispatchOrderPaymentTermsSelect">
-                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
-                                @foreach ($paymentTerms as $pt)
-                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $salesOrder?->payment_terms ?: $dispatchOrder?->salesOrder?->payment_terms) == $pt->name)>
-                                        {{ $pt->display_name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-
                         @else
                             <!-- Mode 3: Direct Customer Dropdown -->
                             <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="directCustomerSelect" class="odoo-select2" :required="true">
@@ -121,16 +103,25 @@
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
-
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="directPaymentTermsSelect">
-                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
-                                @foreach ($paymentTerms as $pt)
-                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms') == $pt->name)>
-                                        {{ $pt->display_name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
                         @endif
+
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.invoice_number')" name="invoice_number" :value="old('invoice_number', $nextInvoiceNumber)" :required="true" style="font-weight: bold; color: #495057;" />
+
+                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.invoice_date')" name="invoice_date" :value="old('invoice_date', date('Y-m-d'))" :required="true" />
+
+                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.due_date')" name="due_date" :value="old('due_date', date('Y-m-d', strtotime('+15 days')))" />
+
+                        @php
+                            $selectedPt = old('payment_terms', $salesOrder?->payment_terms ?: $dispatchOrder?->salesOrder?->payment_terms);
+                        @endphp
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="salesOrderPaymentTermsSelect">
+                            <option value="">{{ __('crm.choose_payment_terms') }}</option>
+                            @foreach ($paymentTerms as $pt)
+                                <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected($selectedPt == $pt->name)>
+                                    {{ $pt->display_name }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
 
                         @if ($advanceAllocations > 0)
                             <div class="alert alert-info border-0 shadow-sm mt-3 py-2 px-3 fs-12 text-info">
@@ -140,15 +131,9 @@
                         @endif
                     </div>
 
-                    <!-- Column 2: Invoice Dates, Tax & Discount Options -->
+                    <!-- Column 2: Tax & Discount Options -->
                     <div class="col-md-6 ps-md-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-sliders me-1"></i>{{ __('crm.dates_calculation_options') }}</h6>
-
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.invoice_number')" name="invoice_number" :value="old('invoice_number', $nextInvoiceNumber)" :required="true" style="font-weight: bold; color: #495057;" />
-
-                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.invoice_date')" name="invoice_date" :value="old('invoice_date', date('Y-m-d'))" :required="true" />
-
-                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.due_date')" name="due_date" :value="old('due_date', date('Y-m-d', strtotime('+15 days')))" />
 
                         <!-- Discount Option -->
                         <x-ui.odoo-form-ui type="select" :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect" :required="true">
@@ -156,6 +141,17 @@
                             <option value="item_wise" @selected(old('discount_type', $salesOrder?->discount_type ?? 'item_wise') === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
                             <option value="order_wise" @selected(old('discount_type', $salesOrder?->discount_type) === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
                         </x-ui.odoo-form-ui>
+
+                        @php
+                            $defaultTaxMode = old('tax_mode', $salesOrder?->effective_tax_mode ?? ($taxMode ?? 'exclusive'));
+                        @endphp
+                        <!-- Tax Mode Option -->
+                        <div id="taxModeContainer">
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect" :required="true">
+                                <option value="exclusive" @selected($defaultTaxMode === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                                <option value="inclusive" @selected($defaultTaxMode === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
 
                         <!-- Tax Option -->
                         <x-ui.odoo-form-ui type="select" :label="__('crm.tax_option')" name="tax_type" id="taxTypeSelect" :required="true">
@@ -333,7 +329,7 @@
                                 
                                 <!-- 1. Subtotal (Excl. Tax) -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="summarySubtotalRow">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold" id="summarySubtotalLabel">{{ __('crm.subtotal_excl_tax') }}</span>
                                     <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 </div>
 
@@ -346,7 +342,7 @@
 
                                 <!-- 3. Items Taxable Value -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="calcTaxableRow">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold" id="calcTaxableLabel">{{ __('crm.items_taxable_value') }}</span>
                                     <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 </div>
 
@@ -374,18 +370,18 @@
                                 <hr class="my-2 border-slate" id="taxDivider">
                                 <div id="cgstSgstRows">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('crm.cgst_central_tax') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summaryCgstLabel">{{ __('crm.cgst_central_tax') }}</span>
                                         <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('crm.sgst_state_tax') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summarySgstLabel">{{ __('crm.sgst_state_tax') }}</span>
                                         <input type="text" id="summarySgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                     </div>
                                 </div>
 
                                 <div id="igstRow" style="display: none;">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('crm.igst_integrated_tax') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summaryIgstLabel">{{ __('crm.igst_integrated_tax') }}</span>
                                         <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                     </div>
                                 </div>
@@ -504,7 +500,7 @@
                 }
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #orderTaxPercent, #invFreightTermsSelect').on('change input', function() {
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #taxModeSelect, #orderTaxPercent, #invFreightTermsSelect').on('change input', function() {
                 toggleTaxAndDiscountDisplay();
             });
 
@@ -646,7 +642,7 @@
                 validateAllInvoiceRows();
             });
 
-            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #invFreightAmountInput, #adjustmentInput, #discountTypeSelect, #taxTypeSelect, #gstTypeSelect', function() {
+            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #invFreightAmountInput, #adjustmentInput, #discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #taxModeSelect', function() {
                 recalculateInvoiceTotals();
             });
 
@@ -662,6 +658,7 @@
                 const discountType = $('#discountTypeSelect').val() || 'item_wise';
                 const taxType      = $('#taxTypeSelect').val() || 'item_wise_tax';
                 const gstType      = $('#gstTypeSelect').val() || 'cgst_sgst';
+                const taxMode      = $('#taxModeSelect').val() || 'exclusive';
 
                 let subtotal = 0;
                 let itemTaxTotal = 0;
@@ -679,9 +676,18 @@
                     }
 
                     const lineAmount = q * p;
-                    const lineTaxable = Math.max(0, lineAmount - d);
-                    const lineTax = lineTaxable * (t / 100);
-                    const lineTotal = lineTaxable + lineTax;
+                    const lineNet = Math.max(0, lineAmount - d);
+                    let lineTax = 0;
+                    let lineTotal = 0;
+
+                    if (taxMode === 'inclusive') {
+                        const lineBase = (t > 0 && taxType === 'item_wise_tax') ? (lineNet / (1 + (t / 100))) : lineNet;
+                        lineTax = (taxType === 'item_wise_tax') ? (lineNet - lineBase) : 0;
+                        lineTotal = lineNet;
+                    } else {
+                        lineTax = (taxType === 'item_wise_tax') ? (lineNet * (t / 100)) : 0;
+                        lineTotal = lineNet + lineTax;
+                    }
 
                     subtotal += lineAmount;
                     itemDiscTotal += d;
@@ -708,7 +714,11 @@
                     totalTax = itemTaxTotal;
                 } else if (taxType === 'order_wise_tax') {
                     const taxPercent = parseFloat($('#orderTaxPercent').val()) || 0;
-                    totalTax = grossBeforeTax * (taxPercent / 100);
+                    if (taxMode === 'inclusive') {
+                        totalTax = taxPercent > 0 ? (grossBeforeTax - (grossBeforeTax / (1 + (taxPercent / 100)))) : 0;
+                    } else {
+                        totalTax = grossBeforeTax * (taxPercent / 100);
+                    }
                 }
 
                 const itemsTaxTotal = totalTax;
@@ -731,7 +741,34 @@
 
                 const freightTax = (effectiveFreight > 0 && taxType !== 'without_tax') ? Math.round(effectiveFreight * (freightTaxRate / 100) * 100) / 100 : 0;
                 const grandTotalTax = itemsTaxTotal + freightTax;
-                const totalTaxableBase = grossBeforeTax + effectiveFreight;
+
+                let taxableBase = 0;
+                let itemsTotalInclGst = 0;
+
+                if (taxMode === 'inclusive') {
+                    itemsTotalInclGst = grossBeforeTax;
+                    taxableBase = Math.max(0, itemsTotalInclGst - itemsTaxTotal);
+                } else {
+                    taxableBase = grossBeforeTax;
+                    itemsTotalInclGst = taxableBase + itemsTaxTotal;
+                }
+
+                const totalTaxableBase = taxableBase + effectiveFreight;
+
+                // Update labels based on tax mode
+                if (taxMode === 'inclusive') {
+                    $('#summarySubtotalLabel').text("{{ __('crm.subtotal_incl_tax') }}");
+                    $('#calcTaxableLabel').text("{{ __('crm.taxable_value_excl_tax') }}");
+                    $('#summaryCgstLabel').text("{{ __('crm.cgst_central_tax') }} {{ __('crm.tax_included') }}");
+                    $('#summarySgstLabel').text("{{ __('crm.sgst_state_tax') }} {{ __('crm.tax_included') }}");
+                    $('#summaryIgstLabel').text("{{ __('crm.igst_integrated_tax') }} {{ __('crm.tax_included') }}");
+                } else {
+                    $('#summarySubtotalLabel').text("{{ __('crm.subtotal_excl_tax') }}");
+                    $('#calcTaxableLabel').text("{{ __('crm.items_taxable_value') }}");
+                    $('#summaryCgstLabel').text("{{ __('crm.cgst_central_tax') }}");
+                    $('#summarySgstLabel').text("{{ __('crm.sgst_state_tax') }}");
+                    $('#summaryIgstLabel').text("{{ __('crm.igst_integrated_tax') }}");
+                }
 
                 if (freightTerms === 'To Be Billed') {
                     $('#summaryFreightSectionContainer').removeClass('d-none').show();
@@ -755,16 +792,17 @@
 
                 if (taxType !== 'without_tax' && grandTotalTax > 0) {
                     $('#taxDivider').removeClass('d-none').show();
+                    const prefix = (taxMode === 'inclusive') ? '' : '+';
                     if (gstType === 'igst') {
                         $('#cgstSgstRows').addClass('d-none').hide();
                         $('#igstRow').removeClass('d-none').show();
-                        $('#summaryIgstText').val('+' + currencySymbol + grandTotalTax.toFixed(2));
+                        $('#summaryIgstText').val(prefix + currencySymbol + grandTotalTax.toFixed(2));
                     } else {
                         $('#cgstSgstRows').removeClass('d-none').show();
                         $('#igstRow').addClass('d-none').hide();
                         const halfTax = grandTotalTax / 2;
-                        $('#summaryCgstText').val('+' + currencySymbol + halfTax.toFixed(2));
-                        $('#summarySgstText').val('+' + currencySymbol + halfTax.toFixed(2));
+                        $('#summaryCgstText').val(prefix + currencySymbol + halfTax.toFixed(2));
+                        $('#summarySgstText').val(prefix + currencySymbol + halfTax.toFixed(2));
                     }
                 } else {
                     $('#taxDivider').addClass('d-none').hide();
@@ -773,11 +811,13 @@
                 }
 
                 const adjustment = parseFloat($('#adjustmentInput').val()) || 0;
-                const grandTotal = totalTaxableBase + grandTotalTax + adjustment;
+                const grandTotal = (taxMode === 'inclusive') 
+                    ? (itemsTotalInclGst + effectiveFreight + adjustment) 
+                    : (totalTaxableBase + grandTotalTax + adjustment);
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
                 $('#calcSubtotal').val(currencySymbol + subtotal.toFixed(2));
-                $('#calcTaxableAmount').val(currencySymbol + grossBeforeTax.toFixed(2));
+                $('#calcTaxableAmount').val(currencySymbol + taxableBase.toFixed(2));
                 $('#summaryGrandtotalText').val(currencySymbol + grandTotal.toFixed(2));
                 $('#summaryBalanceDueText').text(currencySymbol + balanceDue.toFixed(2));
 
@@ -791,14 +831,21 @@
                         const t = parseFloat($(this).find('.tax-input').val()) || 0;
 
                         const lineAmount = q * p;
-                        const lineTaxable = Math.max(0, lineAmount - d);
-                        const lineTax = lineTaxable * (t / 100);
+                        const lineNet = Math.max(0, lineAmount - d);
+                        let lineBase = lineNet;
+                        let lineTax = 0;
+                        if (taxMode === 'inclusive') {
+                            lineBase = (t > 0) ? (lineNet / (1 + (t / 100))) : lineNet;
+                            lineTax = lineNet - lineBase;
+                        } else {
+                            lineTax = lineBase * (t / 100);
+                        }
 
                         const key = t.toFixed(2);
                         if (!taxGroups[key]) {
                             taxGroups[key] = { rate: t, taxable: 0, tax: 0 };
                         }
-                        taxGroups[key].taxable += lineTaxable;
+                        taxGroups[key].taxable += lineBase;
                         taxGroups[key].tax += lineTax;
                     });
                 }
