@@ -445,13 +445,14 @@ class QuotationService
                 $dealHasCustomer = !empty($lead->customer_id) || $lead->is_customer;
             }
 
-            // Auto-transition Deal stage to Won ONLY if an ERP customer is already linked
-            if ($deal && $dealHasCustomer && !in_array($deal->stage, ['Won', 'Closed Won'])) {
-                $deal->update([
-                    'stage'        => 'Won',
-                    'probability'  => 100,
-                    'closing_date' => now(),
-                ]);
+            if ($deal) {
+                $dealUpdateData = ['estimated_value' => $quotation->total_amount];
+                if ($dealHasCustomer && !in_array($deal->stage, ['Won', 'Closed Won'])) {
+                    $dealUpdateData['stage'] = 'Won';
+                    $dealUpdateData['probability'] = 100;
+                    $dealUpdateData['closing_date'] = now();
+                }
+                $deal->update($dealUpdateData);
             }
 
             // Auto-transition Lead status to Won ONLY if customer exists

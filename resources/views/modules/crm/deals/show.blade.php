@@ -1361,7 +1361,10 @@
     $currentIndex = array_search($currentStageKey, $stageOrder);
     if ($currentIndex === false) $currentIndex = 0;
 
-    $expectedRevenue = $deal->estimated_value * ($deal->probability / 100);
+    $effectiveDealValue = ($deal->actual_value > 0 && ($deal->quotations->whereIn('status', ['Accepted', 'Converted', 'Won'])->isNotEmpty() || in_array(strtolower((string)$deal->stage), ['won', 'closed won']))) 
+        ? $deal->actual_value 
+        : ((float)$deal->estimated_value > 0 ? (float)$deal->estimated_value : (float)$deal->actual_value);
+    $expectedRevenue = $effectiveDealValue * ($deal->probability / 100);
 @endphp
 
 @section('content')
@@ -1693,7 +1696,7 @@
                                     </div>
                                      <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.estimated_deal_value') }}</span>
-                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ format_currency($deal->estimated_value) }}</span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ format_currency($effectiveDealValue) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1881,7 +1884,7 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">{{ __('crm.estimated_revenue_val') }}</div>
-                                            <div class="zoho-field-value text-dark fw-bold">{{ format_currency($deal->estimated_value) }}</div>
+                                            <div class="zoho-field-value text-dark fw-bold">{{ format_currency($effectiveDealValue) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
@@ -1972,7 +1975,8 @@
                                                             $pObj = $dealProductsMap->get($item['product_id']);
                                                             if (!$pObj) continue;
                                                             $pQty = floatval($item['quantity'] ?? 1);
-                                                            $pPrice = floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
+                                                            $quoteItem = $acceptedQuote?->items?->firstWhere('product_id', $item['product_id']);
+                                                            $pPrice = $quoteItem ? floatval($quoteItem->unit_price) : floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
                                                             $lineVal = $pQty * $pPrice;
                                                             $grandProductTotal += $lineVal;
                                                         @endphp
@@ -1991,7 +1995,12 @@
                                                     <tfoot class="table-light fw-bold">
                                                         <tr>
                                                             <td colspan="4" class="text-end text-uppercase fs-12">{{ __('crm.total_estimated_product_value') }}:</td>
-                                                            <td class="text-end text-success fs-14">{{ format_currency($grandProductTotal) }}</td>
+                                                            <td class="text-end text-success fs-14">
+                                                                {{ format_currency($acceptedQuote && $acceptedQuote->total_amount > 0 ? $acceptedQuote->total_amount : $grandProductTotal) }}
+                                                                @if($acceptedQuote && $acceptedQuote->tax > 0)
+                                                                    <span class="fs-11 fw-normal text-muted">(Incl. Taxes)</span>
+                                                                @endif
+                                                            </td>
                                                         </tr>
                                                     </tfoot>
                                                 @endif
@@ -2018,20 +2027,7 @@
                                                 $accEmail = $deal->account?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email);
                                             @endphp
                                             @if($accPhone)
-                                                <div class="fs-12 text-dark d-flex align-items-center gap-1.5 mt-1">
-                                                    <button type="button" 
-                                                            class="btn btn-xs btn-soft-success text-success p-0 rounded-circle d-inline-flex align-items-center justify-content-center btn-crm-deal-click-to-call border border-success-subtle shadow-2xs" 
-                                                            style="width: 22px; height: 22px; min-width: 22px;"
-                                                            title="Click-to-Call Company Phone"
-                                                            data-deal-id="{{ $deal->id }}"
-                                                            data-deal-title="{{ addslashes($deal->title) }}"
-                                                            data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
-                                                            data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
-                                                            data-deal-stage="{{ $deal->stage }}"
-                                                            data-deal-phone="{{ $accPhone }}"
-                                                            data-deal-numbers="{{ json_encode($dealNumbers) }}">
-                                                        <i class="feather-phone-call fs-10"></i>
-                                                    </button>
+                                                <div class="fs-12 text-dark mt-1">
                                                     <a href="javascript:void(0)" 
                                                        class="text-dark fw-semibold text-decoration-none btn-crm-deal-click-to-call hover-primary"
                                                        data-deal-id="{{ $deal->id }}"
@@ -2040,7 +2036,8 @@
                                                        data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
                                                        data-deal-stage="{{ $deal->stage }}"
                                                        data-deal-phone="{{ $accPhone }}"
-                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}">
+                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}"
+                                                       title="Click to Call">
                                                         {{ $accPhone }}
                                                     </a>
                                                 </div>
@@ -2061,20 +2058,7 @@
                                             <div class="fw-bold text-dark fs-14 mb-1">{{ $cName ?: __('crm.no_contact_person') }}</div>
                                             <div class="fs-12 text-muted mb-2">{{ $cTitle ?: '—' }}</div>
                                             @if($cPhone)
-                                                <div class="fs-12 text-dark d-flex align-items-center gap-1.5 mt-1">
-                                                    <button type="button" 
-                                                            class="btn btn-xs btn-soft-success text-success p-0 rounded-circle d-inline-flex align-items-center justify-content-center btn-crm-deal-click-to-call border border-success-subtle shadow-2xs" 
-                                                            style="width: 22px; height: 22px; min-width: 22px;"
-                                                            title="Click-to-Call Contact Person"
-                                                            data-deal-id="{{ $deal->id }}"
-                                                            data-deal-title="{{ addslashes($deal->title) }}"
-                                                            data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
-                                                            data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
-                                                            data-deal-stage="{{ $deal->stage }}"
-                                                            data-deal-phone="{{ $cPhone }}"
-                                                            data-deal-numbers="{{ json_encode($dealNumbers) }}">
-                                                        <i class="feather-phone-call fs-10"></i>
-                                                    </button>
+                                                <div class="fs-12 text-dark mt-1">
                                                     <a href="javascript:void(0)" 
                                                        class="text-dark fw-semibold text-decoration-none btn-crm-deal-click-to-call hover-primary"
                                                        data-deal-id="{{ $deal->id }}"
@@ -2083,7 +2067,8 @@
                                                        data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
                                                        data-deal-stage="{{ $deal->stage }}"
                                                        data-deal-phone="{{ $cPhone }}"
-                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}">
+                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}"
+                                                       title="Click to Call">
                                                         {{ $cPhone }}
                                                     </a>
                                                 </div>
@@ -2289,21 +2274,15 @@
                                                 <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :helperText="$errors->first('email')" />
                                                 <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :helperText="$errors->first('phone')" />
 
-                                                <x-ui.select label="Tax Mode" name="tax_mode" id="taxModeSelect">
-                                                    <option value="exclusive" @selected(old('tax_mode', 'exclusive') === 'exclusive')>Tax Exclusive (Base + GST)</option>
-                                                    <option value="inclusive" @selected(old('tax_mode') === 'inclusive')>Tax Inclusive (Price incl. GST)</option>
+                                                <x-ui.select :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect">
+                                                    <option value="exclusive" @selected(old('tax_mode', 'exclusive') === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                                                    <option value="inclusive" @selected(old('tax_mode') === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
                                                 </x-ui.select>
 
-                                                <x-ui.select label="GST / Tax Type" name="tax_type" id="taxTypeSelect">
-                                                    <option value="intra_state" @selected(old('tax_type', 'intra_state') === 'intra_state')>Intra-State (CGST + SGST)</option>
-                                                    <option value="inter_state" @selected(old('tax_type') === 'inter_state')>Inter-State (IGST)</option>
-                                                    <option value="exempt" @selected(old('tax_type') === 'exempt')>Exempt / Non-GST (0%)</option>
-                                                </x-ui.select>
-
-                                                <x-ui.select label="Discount Option" name="discount_type" id="discountTypeSelect">
-                                                    <option value="order_wise" @selected(old('discount_type', 'order_wise') === 'order_wise')>At Transaction / Order Level</option>
-                                                    <option value="item_wise" @selected(old('discount_type') === 'item_wise')>At Line / Item Level</option>
-                                                    <option value="none" @selected(old('discount_type') === 'none')>Without Discount</option>
+                                                <x-ui.select :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect">
+                                                    <option value="order_wise" @selected(old('discount_type', 'order_wise') === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
+                                                    <option value="item_wise" @selected(old('discount_type') === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
+                                                    <option value="none" @selected(old('discount_type') === 'none')>{{ __('crm.without_discount') }}</option>
                                                 </x-ui.select>
                                             </div>
                                             <div class="col-md-6 d-flex flex-column gap-3">
@@ -2323,6 +2302,12 @@
                                                           <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
                                                      </x-ui.select>
                                                 @endif
+
+                                                <x-ui.select :label="__('crm.gst_type')" name="tax_type" id="taxTypeSelect">
+                                                    <option value="intra_state" @selected(old('tax_type', 'intra_state') === 'intra_state')>{{ __('crm.intra_state_gst') }}</option>
+                                                    <option value="inter_state" @selected(old('tax_type') === 'inter_state')>{{ __('crm.inter_state_gst') }}</option>
+                                                    <option value="exempt" @selected(old('tax_type') === 'exempt')>Exempt / Non-GST (0%)</option>
+                                                </x-ui.select>
                                             </div>
                                         </div>
 
@@ -2454,21 +2439,15 @@
                                                 <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :helperText="$errors->first('email')" />
                                                 <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :helperText="$errors->first('phone')" />
 
-                                                <x-ui.select label="Tax Mode" name="tax_mode" id="taxModeSelect">
-                                                    <option value="exclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'exclusive')>Tax Exclusive (Base + GST)</option>
-                                                    <option value="inclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'inclusive')>Tax Inclusive (Price incl. GST)</option>
+                                                <x-ui.select :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect">
+                                                    <option value="exclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                                                    <option value="inclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
                                                 </x-ui.select>
 
-                                                <x-ui.select label="GST / Tax Type" name="tax_type" id="taxTypeSelect">
-                                                    <option value="intra_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'intra_state')>Intra-State (CGST + SGST)</option>
-                                                    <option value="inter_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'inter_state')>Inter-State (IGST)</option>
-                                                    <option value="exempt" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'exempt')>Exempt / Non-GST (0%)</option>
-                                                </x-ui.select>
-
-                                                <x-ui.select label="Discount Option" name="discount_type" id="discountTypeSelect">
-                                                    <option value="order_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'order_wise')>At Transaction / Order Level</option>
-                                                    <option value="item_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'item_wise')>At Line / Item Level</option>
-                                                    <option value="none" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'none')>Without Discount</option>
+                                                <x-ui.select :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect">
+                                                    <option value="order_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
+                                                    <option value="item_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
+                                                    <option value="none" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'none')>{{ __('crm.without_discount') }}</option>
                                                 </x-ui.select>
                                             </div>
                                             <div class="col-md-6 d-flex flex-column gap-3">
@@ -2488,6 +2467,12 @@
                                                           <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
                                                      </x-ui.select>
                                                 @endif
+
+                                                <x-ui.select :label="__('crm.gst_type')" name="tax_type" id="taxTypeSelect">
+                                                    <option value="intra_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'intra_state')>{{ __('crm.intra_state_gst') }}</option>
+                                                    <option value="inter_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'inter_state')>{{ __('crm.inter_state_gst') }}</option>
+                                                    <option value="exempt" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'exempt')>Exempt / Non-GST (0%)</option>
+                                                </x-ui.select>
                                             </div>
                                         </div>
 
@@ -2792,64 +2777,74 @@
                                                     <div class="fw-semibold text-danger">{{ $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('d M Y') : '—' }}</div>
                                                 </div>
                                             </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_status') }}</label>
-                                                @php
-                                                    $qColors = [
-                                                        'Draft' => 'secondary',
-                                                        'Approved' => 'info',
-                                                        'Sent' => 'primary',
-                                                        'Quotation Sent' => 'primary',
-                                                        'Accepted' => 'success',
-                                                        'Rejected' => 'danger',
-                                                    ];
-                                                    $qBadgeColor = $qColors[$activeQuotation->status] ?? 'secondary';
-                                                @endphp
-                                                <span class="badge bg-soft-{{ $qBadgeColor }} text-{{ $qBadgeColor }} border border-{{ $qBadgeColor }}-subtle px-2.5 py-1 fw-bold fs-12">
-                                                    {{ $activeQuotation->status }}
-                                                </span>
-                                                @if ($activeQuotation->status === 'Rejected' && $activeQuotation->rejection_reason)
-                                                    <div class="mt-1.5 fs-12 text-danger fw-semibold d-flex align-items-center">
-                                                        <i class="feather-alert-triangle me-1 fs-13"></i>
-                                                        <span><strong>Reason:</strong> {{ $activeQuotation->rejection_reason }}</span>
-                                                    </div>
-                                                @endif
+                                                <div>
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_status') }}</label>
+                                                    @php
+                                                        $qColors = [
+                                                            'Draft' => 'secondary',
+                                                            'Approved' => 'info',
+                                                            'Sent' => 'primary',
+                                                            'Quotation Sent' => 'primary',
+                                                            'Accepted' => 'success',
+                                                            'Rejected' => 'danger',
+                                                        ];
+                                                        $qBadgeColor = $qColors[$activeQuotation->status] ?? 'secondary';
+                                                    @endphp
+                                                    <span class="badge bg-soft-{{ $qBadgeColor }} text-{{ $qBadgeColor }} border border-{{ $qBadgeColor }}-subtle px-2.5 py-1 fw-bold fs-12">
+                                                        {{ $activeQuotation->status }}
+                                                    </span>
+                                                    @if ($activeQuotation->status === 'Rejected' && $activeQuotation->rejection_reason)
+                                                        <div class="mt-1.5 fs-12 text-danger fw-semibold d-flex align-items-center">
+                                                            <i class="feather-alert-triangle me-1 fs-13"></i>
+                                                            <span><strong>Reason:</strong> {{ $activeQuotation->rejection_reason }}</span>
+                                                        </div>
+                                                    @endif
+                                                </div>
                                             </div>
 
-                                            <div class="row pt-2 border-top">
-                                                <div class="col-4">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Pricing Mode</label>
-                                                    <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-1 fw-bold fs-11">
-                                                        {{ $activeQuotation->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}
-                                                    </span>
-                                                </div>
-                                                <div class="col-4">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Discount Option</label>
-                                                    <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2 py-1 fw-bold fs-11">
-                                                        @if($activeQuotation->effective_discount_type === 'item_wise')
-                                                            Item-Level
-                                                        @elseif($activeQuotation->effective_discount_type === 'none')
-                                                            Without Discount
-                                                        @else
-                                                            Order-Level
-                                                        @endif
-                                                    </span>
-                                                </div>
-                                                <div class="col-4">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">GST Tax Type</label>
-                                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-1 fw-bold fs-11">
-                                                        @if($activeQuotation->effective_tax_type === 'intra_state')
-                                                            Intra-State (CGST + SGST)
-                                                        @elseif($activeQuotation->effective_tax_type === 'inter_state')
-                                                            Inter-State (IGST)
-                                                        @else
-                                                            GST Exempt (0%)
-                                                        @endif
-                                                    </span>
+                                            <!-- Commercial & Tax Calculation Strip -->
+                                            <div class="col-12 pt-3 border-top">
+                                                <div class="row g-3">
+                                                    <div class="col-md-4 col-sm-6">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.tax_mode') }}</label>
+                                                        <span class="badge bg-soft-info text-info border border-info-subtle px-2.5 py-1.5 fw-bold fs-11 text-wrap text-start d-inline-flex align-items-center" style="max-width: 100%;">
+                                                            <i class="feather-tag me-1.5 flex-shrink-0"></i>
+                                                            <span>{{ $activeQuotation->effective_tax_mode === 'inclusive' ? __('crm.tax_inclusive') : __('crm.tax_exclusive') }}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="col-md-4 col-sm-6">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.discount_option') }}</label>
+                                                        <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2.5 py-1.5 fw-bold fs-11 text-wrap text-start d-inline-flex align-items-center" style="max-width: 100%;">
+                                                            <i class="feather-percent me-1.5 flex-shrink-0"></i>
+                                                            <span>
+                                                                @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                                    {{ __('crm.item_level_discount') }}
+                                                                @elseif($activeQuotation->effective_discount_type === 'none')
+                                                                    {{ __('crm.without_discount') }}
+                                                                @else
+                                                                    {{ __('crm.order_level_discount') }}
+                                                                @endif
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="col-md-4 col-sm-12">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.gst_type') }}</label>
+                                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2.5 py-1.5 fw-bold fs-11 text-wrap text-start d-inline-flex align-items-center" style="max-width: 100%;">
+                                                            <i class="feather-shield me-1.5 flex-shrink-0"></i>
+                                                            <span>
+                                                                @if($activeQuotation->effective_tax_type === 'intra_state')
+                                                                    {{ __('crm.intra_state_gst') }}
+                                                                @elseif($activeQuotation->effective_tax_type === 'inter_state')
+                                                                    {{ __('crm.inter_state_gst') }}
+                                                                @else
+                                                                    GST Exempt (0%)
+                                                                @endif
+                                                            </span>
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
                                     <!-- Order Lines Table -->
                                     <h6 class="fw-bold text-dark mb-2 fs-13">{{ __('crm.order_lines') }}</h6>

@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
  * user to click the header currency dropdown.
  *
  * If the tenant has no saved currency, the system falls back to the config base
- * currency (USD). The session is set once per session (not on every request) to
+ * currency (INR). The session is set once per session (not on every request) to
  * avoid unnecessary writes, and only when the session value is absent.
  */
 class SetCurrency
@@ -32,6 +32,8 @@ class SetCurrency
             // Always sync the session from tenant settings so that any change
             // made in the Tenant Edit screen takes effect immediately.
             $request->session()->put('active_currency', $code);
+        } elseif (! $request->session()->has('active_currency')) {
+            $request->session()->put('active_currency', config('currency.base', 'INR'));
         }
 
         return $next($request);

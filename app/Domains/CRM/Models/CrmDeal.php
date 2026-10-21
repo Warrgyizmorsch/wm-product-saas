@@ -126,10 +126,16 @@ class CrmDeal extends BaseModel
 
     public function getActualValueAttribute(): float
     {
-        $acceptedQuote = $this->quotations()->where('status', 'Accepted')->first();
-        if ($acceptedQuote) {
+        $so = $this->salesOrders()->whereNotIn('status', ['Cancelled'])->orderByDesc('id')->first();
+        if ($so && (float)$so->total_amount > 0) {
+            return (float) $so->total_amount;
+        }
+
+        $acceptedQuote = $this->quotations()->whereIn('status', ['Accepted', 'Converted', 'Won'])->orderByDesc('id')->first();
+        if ($acceptedQuote && (float)$acceptedQuote->total_amount > 0) {
             return (float) $acceptedQuote->total_amount;
         }
+
         return (float) $this->estimated_value;
     }
 

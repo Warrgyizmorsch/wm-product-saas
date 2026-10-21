@@ -241,7 +241,7 @@ if (! function_exists('active_currency')) {
             return $tenantCurrency;
         }
 
-        return config('currency.base', 'USD');
+        return config('currency.base', 'INR');
     }
 }
 
@@ -252,9 +252,9 @@ if (! function_exists('active_currency_info')) {
         $currencies = config('currency.currencies', []);
 
         return $currencies[$code] ?? [
-            'code' => 'USD',
-            'name' => 'US Dollar',
-            'symbol' => '$',
+            'code' => 'INR',
+            'name' => 'Indian Rupee',
+            'symbol' => '₹',
             'rate' => 1.0,
             'position' => 'prefix',
         ];
@@ -264,7 +264,7 @@ if (! function_exists('active_currency_info')) {
 if (! function_exists('active_currency_symbol')) {
     function active_currency_symbol(): string
     {
-        return active_currency_info()['symbol'] ?? '$';
+        return active_currency_info()['symbol'] ?? '₹';
     }
 }
 
@@ -346,7 +346,7 @@ if (! function_exists('format_currency')) {
         }
 
         $info = active_currency_info();
-        $symbol = $info['symbol'] ?? '$';
+        $symbol = $info['symbol'] ?? '₹';
         $position = $info['position'] ?? 'prefix';
 
         if ($position === 'suffix') {
