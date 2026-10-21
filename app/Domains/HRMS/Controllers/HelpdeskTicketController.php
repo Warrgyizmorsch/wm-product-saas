@@ -6,11 +6,14 @@ use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\HelpdeskCategory;
 use App\Domains\HRMS\Models\HelpdeskSatisfactionRating;
 use App\Domains\HRMS\Models\HelpdeskTicket;
+use App\Domains\HRMS\Models\HelpdeskTicketAttachment;
 use App\Domains\HRMS\Repositories\HelpdeskTicketRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class HelpdeskTicketController extends Controller
@@ -37,8 +40,9 @@ class HelpdeskTicketController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $tenantId = tenant_id();
         $request->validate([
-            'category_id'   => 'required|exists:helpdesk_categories,id',
+            'category_id'   => ['required', Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'subject'       => 'required|string|max:255',
             'description'   => 'required|string',
             'priority'      => 'required|in:low,medium,high,urgent',
@@ -85,14 +89,31 @@ class HelpdeskTicketController extends Controller
         $user = auth()->user();
         $currentEmployee = Employee::resolveForUser($user);
 
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+        $isSuperAdmin = $user && (strtolower($user->role ?? '') === 'super_admin'
+            || strtolower($user->role ?? '') === 'super-admin'
+            || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
+            || $user->is_admin);
+
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
 
-        if (!$canManage && $currentEmployee) {
-            if ((int)$currentEmployee->id !== (int)$ticket->employee_id && (int)$currentEmployee->id !== (int)$ticket->assigned_to) {
+        $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
+        $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
+
+        if (!$canManage) {
+            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent)) {
                 abort(403, 'Unauthorized access to this support ticket.');
             }
+            // Defend internal notes from ticket owners and assigned agents
+            $ticket->setRelation(
+                'replies',
+                $ticket->replies->filter(fn ($r) => !$r->is_internal_note)->values()
+            );
         }
+
+        // Anti-conflict-of-interest check: ticket creator cannot manage/update their own ticket unless Super Admin
+        $canUpdate = ($canManage || $isAssignedAgent) && (!$isOwnTicket || $isSuperAdmin);
 
         $agents = Employee::where('tenant_id', $tenantId)
             ->where(function ($q) {
@@ -105,7 +126,7 @@ class HelpdeskTicketController extends Controller
         }
         $categories = HelpdeskCategory::where('tenant_id', $tenantId)->where('is_active', true)->get();
 
-        return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'currentEmployee', 'agents', 'categories'));
+        return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'canUpdate', 'currentEmployee', 'isOwnTicket', 'agents', 'categories'));
     }
 
     public function reply(Request $request, int $id): RedirectResponse
@@ -119,9 +140,24 @@ class HelpdeskTicketController extends Controller
         $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
+        if ($ticket->status === 'closed') {
+            return redirect()->back()->with('error', 'Cannot post replies to a closed ticket.');
+        }
+
         $user = auth()->user();
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+        $currentEmployee = Employee::resolveForUser($user);
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+
+        $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
+        $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
+
+        if (!$canManage) {
+            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent)) {
+                abort(403, 'Unauthorized to reply to this support ticket.');
+            }
+        }
 
         if ($request->boolean('is_internal_note') && !$canManage) {
             return redirect()->back()->with('error', 'Only authorized HR staff can post internal notes.');
@@ -159,13 +195,13 @@ class HelpdeskTicketController extends Controller
 
     public function updateStatus(Request $request, int $id): RedirectResponse
     {
+        $tenantId = tenant_id();
         $request->validate([
             'status'      => 'required|in:open,in_progress,pending_employee,resolved,closed',
-            'assigned_to' => 'nullable|exists:employees,id',
+            'assigned_to' => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'priority'    => 'nullable|in:low,medium,high,urgent',
         ]);
 
-        $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
         app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement(auth()->user(), $ticket);
@@ -218,6 +254,15 @@ class HelpdeskTicketController extends Controller
         $tenantId = tenant_id();
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
+        if (!in_array($ticket->status, ['resolved', 'closed'])) {
+            return redirect()->back()->with('error', 'Satisfaction feedback can only be submitted for resolved or closed tickets.');
+        }
+
+        $employee = Employee::resolveForUser(auth()->user());
+        if (!$employee || (int)$employee->id !== (int)$ticket->employee_id) {
+            return redirect()->back()->with('error', 'Only the employee who raised the ticket can submit satisfaction feedback.');
+        }
+
         HelpdeskSatisfactionRating::updateOrCreate(
             ['ticket_id' => $ticket->id],
             [
@@ -228,5 +273,37 @@ class HelpdeskTicketController extends Controller
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
             ->with('success', 'Thank you for your feedback!');
+    }
+
+    public function downloadAttachment(int $ticketId, int $attachmentId)
+    {
+        $tenantId = tenant_id();
+        $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($ticketId);
+
+        $user = auth()->user();
+        $currentEmployee = Employee::resolveForUser($user);
+
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+
+        $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
+        $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
+
+        if (!$canManage && (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent))) {
+            abort(403, 'Unauthorized access to this support ticket.');
+        }
+
+        $attachment = HelpdeskTicketAttachment::where('ticket_id', $ticket->id)->findOrFail($attachmentId);
+
+        if ($attachment->reply && $attachment->reply->is_internal_note && !$canManage) {
+            abort(403, 'Unauthorized access to internal note attachments.');
+        }
+
+        if (!Storage::disk('public')->exists($attachment->file_path)) {
+            abort(404, 'Attachment file not found on disk.');
+        }
+
+        return Storage::disk('public')->download($attachment->file_path, $attachment->file_name);
     }
 }

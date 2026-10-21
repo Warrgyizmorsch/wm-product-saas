@@ -42,6 +42,6 @@ class Candidate extends BaseModel
 
     public function applications(): HasMany
     {
-        return $this->hasMany(CandidateApplication::class, 'candidate_id');
+        return $this->hasMany(CandidateApplication::class, 'candidate_id')->latest('id');
     }
 }

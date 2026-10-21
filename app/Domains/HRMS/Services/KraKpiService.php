@@ -517,27 +517,31 @@ class KraKpiService
             $plan->pip_triggered = true;
             $plan->save();
 
-            // Notify Employee and Supervisor of PIP Action Plan
-            NotificationService::sendToEmployee(
-                employee: $employee,
-                title: 'Performance Improvement Plan (PIP) Initiated',
-                message: "A 60-day Performance Improvement Plan (#{$pipNumber}) has been initiated. Review your objectives and support guidelines.",
-                actionUrl: route('hrms.pip.show', $pip->id),
-                module: 'hrms',
-                type: 'pip',
-                iconClass: 'feather-alert-triangle'
-            );
-
-            if ($pip->manager_id) {
+            // Notify Employee and Supervisor of PIP Action Plan (wrapped in try-catch so delivery failures never roll back PIP creation)
+            try {
                 NotificationService::sendToEmployee(
-                    employee: $pip->manager_id,
-                    title: 'PIP Supervised Action Plan Assigned',
-                    message: "You are assigned as supervisor for {$employee?->full_name}'s PIP (#{$pipNumber}).",
+                    employee: $employee,
+                    title: 'Performance Improvement Plan (PIP) Initiated',
+                    message: "A 60-day Performance Improvement Plan (#{$pipNumber}) has been initiated. Review your objectives and support guidelines.",
                     actionUrl: route('hrms.pip.show', $pip->id),
                     module: 'hrms',
                     type: 'pip',
-                    iconClass: 'feather-user-check'
+                    iconClass: 'feather-alert-triangle'
                 );
+
+                if ($pip->manager_id) {
+                    NotificationService::sendToEmployee(
+                        employee: $pip->manager_id,
+                        title: 'PIP Supervised Action Plan Assigned',
+                        message: "You are assigned as supervisor for {$employee?->full_name}'s PIP (#{$pipNumber}).",
+                        actionUrl: route('hrms.pip.show', $pip->id),
+                        module: 'hrms',
+                        type: 'pip',
+                        iconClass: 'feather-user-check'
+                    );
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Appraisal PIP notification skipped: " . $e->getMessage());
             }
 
             return $pip;

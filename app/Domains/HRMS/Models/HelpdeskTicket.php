@@ -69,13 +69,17 @@ class HelpdeskTicket extends BaseModel
         return $this->due_at && $this->due_at->isPast() && !in_array($this->status, ['resolved', 'closed']);
     }
 
-    public static function generateTicketNumber(int $tenantId): string
+    public static function generateTicketNumber(int $tenantId, bool $lock = false): string
     {
         $year = date('Y');
-        $latest = static::where('tenant_id', $tenantId)
-            ->where('ticket_number', 'like', "TICK-{$year}-%")
-            ->latest('id')
-            ->first();
+        $query = static::where('tenant_id', $tenantId)
+            ->where('ticket_number', 'like', "TICK-{$year}-%");
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $latest = $query->latest('id')->first();
 
         if ($latest && preg_match('/TICK-\d{4}-(\d+)/', $latest->ticket_number, $matches)) {
             $nextSeq = intval($matches[1]) + 1;

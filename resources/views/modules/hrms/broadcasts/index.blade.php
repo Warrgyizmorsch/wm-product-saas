@@ -558,7 +558,8 @@
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
                     <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Publish Broadcast</x-ui.button>
+                    <x-ui.button type="submit" name="status" value="draft" variant="light" size="sm" class="fw-bold border text-dark">Save as Draft</x-ui.button>
+                    <x-ui.button type="submit" name="status" value="published" variant="primary" size="sm" class="fw-bold px-4">Publish Broadcast</x-ui.button>
                 </div>
             </form>
         </div>

@@ -426,12 +426,14 @@ Route::prefix('hrms')
             Route::post('/travel/store', [TravelExpenseController::class, 'storeTravelRequest'])->name('travel-expense.travel.store');
             Route::post('/travel/{travelRequest}/approve', [TravelExpenseController::class, 'approveTravelRequest'])->name('travel-expense.travel.approve');
             Route::post('/travel/{travelRequest}/reject', [TravelExpenseController::class, 'rejectTravelRequest'])->name('travel-expense.travel.reject');
+            Route::delete('/travel/{travelRequest}', [TravelExpenseController::class, 'destroyTravelRequest'])->name('travel-expense.travel.destroy');
             
             // Cash Advances
             Route::post('/advance/store', [TravelExpenseController::class, 'storeCashAdvance'])->name('travel-expense.advance.store');
             Route::post('/advance/{cashAdvance}/approve', [TravelExpenseController::class, 'approveCashAdvance'])->name('travel-expense.advance.approve');
             Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseController::class, 'disburseCashAdvance'])->name('travel-expense.advance.disburse');
             Route::post('/advance/{cashAdvance}/reject', [TravelExpenseController::class, 'rejectCashAdvance'])->name('travel-expense.advance.reject');
+            Route::delete('/advance/{cashAdvance}', [TravelExpenseController::class, 'destroyCashAdvance'])->name('travel-expense.advance.destroy');
             
             // Expense Reports
             Route::post('/report/store', [TravelExpenseController::class, 'storeExpenseReport'])->name('travel-expense.report.store');
@@ -440,6 +442,7 @@ Route::prefix('hrms')
             Route::post('/report/{expenseReport}/approve', [TravelExpenseController::class, 'approveExpenseReport'])->name('travel-expense.report.approve');
             Route::post('/report/{expenseReport}/reject', [TravelExpenseController::class, 'rejectExpenseReport'])->name('travel-expense.report.reject');
             Route::post('/report/{expenseReport}/pay', [TravelExpenseController::class, 'payExpenseReport'])->name('travel-expense.report.pay');
+            Route::delete('/report/{expenseReport}', [TravelExpenseController::class, 'destroyExpenseReport'])->name('travel-expense.report.destroy');
             Route::get('/employee-policy/{employee}', [TravelExpenseController::class, 'getEmployeePolicy'])->name('travel-expense.employee-policy');
         });
 
@@ -516,6 +519,7 @@ Route::prefix('hrms')
             Route::delete('/{pip}/objective/{objective}', [PipController::class, 'destroyObjective'])->name('objective.destroy');
 
             Route::post('/{pip}/evaluate', [PipController::class, 'evaluate'])->name('evaluate');
+            Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
 
             // Masters (Categories & Templates)
             Route::post('/category/store', [PipController::class, 'storeCategory'])->name('category.store');
@@ -533,6 +537,7 @@ Route::prefix('hrms')
             Route::post('/tickets/{ticket}/reply', [HelpdeskTicketController::class, 'reply'])->name('tickets.reply');
             Route::post('/tickets/{ticket}/status', [HelpdeskTicketController::class, 'updateStatus'])->name('tickets.status');
             Route::post('/tickets/{ticket}/csat', [HelpdeskTicketController::class, 'submitCsat'])->name('tickets.csat');
+            Route::get('/tickets/{ticket}/attachments/{attachment}', [HelpdeskTicketController::class, 'downloadAttachment'])->name('tickets.attachment');
 
             // Categories Management
             Route::get('/categories', [HelpdeskCategoryController::class, 'index'])->name('categories.index');
@@ -586,6 +591,8 @@ Route::prefix('hrms')
 
             // Offers & Employee Conversion
             Route::post('/application/{application}/offer', [RecruitmentController::class, 'createOffer'])->name('offer.create');
+            Route::post('/offer/{offer}/status', [RecruitmentController::class, 'updateOfferStatus'])->name('offer.status');
+            Route::get('/offer/{offer}/download-pdf', [RecruitmentController::class, 'downloadOfferPdf'])->name('offer.download');
             Route::post('/offer/{offer}/send-email', [RecruitmentController::class, 'sendOfferEmail'])->name('offer.send-email');
             Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
         });

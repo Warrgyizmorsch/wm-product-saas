@@ -502,156 +502,106 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        // Salary Components
-        // 1. Basic Salary
-        $compBasic = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'BASIC'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+        // Salary Components - defined per pay group
+        $componentDefs = [
+            'BASIC' => [
                 'name' => 'Basic Salary',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_ctc',
                 'default_value' => '40',
-                'description' => 'Primary taxable base earnings (50% of Annual CTC)',
+                'description' => 'Primary taxable base earnings (40-50% of Annual CTC)',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 2. House Rent Allowance
-        $compHra = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'HRA'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'HRA' => [
                 'name' => 'House Rent Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '40',
                 'description' => 'Housing allowance (50% of Basic for Metros, 40% for Non-Metros)',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 3. Special Allowance
-        $compSpl = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'SPL'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'SPL' => [
                 'name' => 'Special Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'balancing',
                 'default_value' => '0',
                 'description' => 'Balancing flexible component to match gross CTC',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 4. Conveyance Allowance
-        $compConv = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'CONV'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'CONV' => [
                 'name' => 'Conveyance Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '10',
-                'description' => 'Standard travel and commute support (10% of Basic)',
+                'description' => 'Standard travel and commute support',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 5. Medical Allowance
-        $compMed = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'MED'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'MED' => [
                 'name' => 'Medical Allowance',
                 'type' => 'earning',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '5',
-                'description' => 'Health and medical benefit (5% of Basic)',
+                'description' => 'Health and medical benefit',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 6. Performance Bonus (Adhoc Earning)
-        $compBonus = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'PERF_BONUS'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'PERF_BONUS' => [
                 'name' => 'Performance Incentive / Bonus',
                 'type' => 'earning',
                 'calculation_type' => 'fixed',
                 'default_value' => '0',
                 'description' => 'Discretionary adhoc bonus payout',
                 'is_adhoc' => true,
-                'status' => true,
-            ]
-        );
-
-        // 7. Provident Fund Deduction
-        $compPf = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'PF'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'PF' => [
                 'name' => 'Provident Fund (EPF)',
                 'type' => 'deduction',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '12',
-                'description' => 'Employee Provident Fund statutory deduction (12% of Basic)',
+                'description' => 'Employee Provident Fund statutory deduction',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 8. ESI Deduction
-        $compEsi = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'ESI'],
-            [
-                'pay_group_id' => $payGroupStaff->id,
+            ],
+            'ESI' => [
                 'name' => 'Employee State Insurance (ESIC)',
                 'type' => 'deduction',
                 'calculation_type' => 'percentage_of_basic',
                 'default_value' => '0.75',
-                'description' => 'ESIC statutory deduction (0.75% of Basic/Gross)',
+                'description' => 'ESIC statutory deduction',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 9. Professional Tax
-        $compPt = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'PT'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'PT' => [
                 'name' => 'Professional Tax',
                 'type' => 'deduction',
                 'calculation_type' => 'fixed',
                 'default_value' => '2400',
-                'description' => 'State Professional Tax (₹200/month)',
+                'description' => 'State Professional Tax',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
-
-        // 10. TDS / Tax Deduction
-        $compTds = SalaryComponent::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'company_id' => $company->id, 'code' => 'TDS'],
-            [
-                'pay_group_id' => $payGroupTech->id,
+            ],
+            'TDS' => [
                 'name' => 'Tax Deducted at Source (TDS)',
                 'type' => 'deduction',
                 'calculation_type' => 'fixed',
                 'default_value' => '0',
                 'description' => 'Income Tax TDS Deduction',
                 'is_adhoc' => false,
-                'status' => true,
-            ]
-        );
+            ],
+        ];
+
+        $seededComponents = [];
+        $payGroupsList = [$payGroupExec, $payGroupTech, $payGroupStaff];
+
+        foreach ($payGroupsList as $pg) {
+            foreach ($componentDefs as $code => $def) {
+                $seededComponents[$pg->id][$code] = SalaryComponent::firstOrCreate(
+                    [
+                        'tenant_id' => $tenant->id,
+                        'company_id' => $company->id,
+                        'pay_group_id' => $pg->id,
+                        'code' => $code,
+                    ],
+                    array_merge($def, ['status' => true])
+                );
+            }
+        }
 
         // Salary Structures
         // Structure A: Executive Leadership Package (CTC 15L - 36L)
@@ -665,13 +615,13 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compBasic->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compHra->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compConv->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compMed->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compSpl->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compPf->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $compPt->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['BASIC']->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['HRA']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['CONV']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['MED']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['SPL']->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['PF']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structExec->id, 'salary_component_id' => $seededComponents[$payGroupExec->id]['PT']->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
 
         // Structure B: Senior Tech & Management Package (CTC 8L - 15L)
         $structTech = SalaryStructure::firstOrCreate(
@@ -684,13 +634,13 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compBasic->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compHra->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compConv->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compMed->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compSpl->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compPf->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $compPt->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['BASIC']->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 50.00, 'sort_order' => 1]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['HRA']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 50.00, 'sort_order' => 2]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['CONV']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 10.00, 'sort_order' => 3]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['MED']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 5.00, 'sort_order' => 4]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['SPL']->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 5]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['PF']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 6]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structTech->id, 'salary_component_id' => $seededComponents[$payGroupTech->id]['PT']->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
 
         // Structure C: Standard Staff & Operations Package (CTC 3.6L - 8L)
         $structStaff = SalaryStructure::firstOrCreate(
@@ -703,13 +653,13 @@ class HrmsDemoSeeder extends Seeder
             ]
         );
 
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compBasic->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 40.00, 'sort_order' => 1]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compHra->id], ['calculation_type' => 'percentage_of_basic', 'value' => 40.00, 'sort_order' => 2]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compConv->id], ['calculation_type' => 'fixed', 'value' => 19200.00, 'sort_order' => 3]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compSpl->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 4]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compPf->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 5]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compEsi->id], ['calculation_type' => 'percentage_of_basic', 'value' => 0.75, 'sort_order' => 6]);
-        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $compPt->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['BASIC']->id], ['calculation_type' => 'percentage_of_ctc', 'value' => 40.00, 'sort_order' => 1]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['HRA']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 40.00, 'sort_order' => 2]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['CONV']->id], ['calculation_type' => 'fixed', 'value' => 19200.00, 'sort_order' => 3]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['SPL']->id], ['calculation_type' => 'balancing', 'value' => 0.00, 'sort_order' => 4]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['PF']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 12.00, 'sort_order' => 5]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['ESI']->id], ['calculation_type' => 'percentage_of_basic', 'value' => 0.75, 'sort_order' => 6]);
+        SalaryStructureItem::firstOrCreate(['tenant_id' => $tenant->id, 'salary_structure_id' => $structStaff->id, 'salary_component_id' => $seededComponents[$payGroupStaff->id]['PT']->id], ['calculation_type' => 'fixed', 'value' => 2400.00, 'sort_order' => 7]);
 
         // 5. Leave Structure & Leave Plans
         $leavePlanExec = LeavePlan::firstOrCreate(

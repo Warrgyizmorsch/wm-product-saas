@@ -2075,6 +2075,8 @@ return [
         'structure_created_success' => 'वेतन संरचना सफलतापूर्वक बनाई गई।',
         'structure_updated_success' => 'वेतन संरचना सफलतापूर्वक अपडेट की गई।',
         'structure_deleted_success' => 'वेतन संरचना सफलतापूर्वक हटाई गई।',
+        'structure_overlap_error' => 'वेतन संरचना दायरा (₹:min - ₹:max) मौजूदा संरचना ":name" (₹:existing_min - ₹:existing_max) के साथ ओवरलैप करता है। एक ही पे-ग्रुप के अंतर्गत स्लैब में ओवरलैपिंग सीटीसी रेंज नहीं हो सकती।',
+        'max_ctc_must_be_greater' => 'अधिकतम वार्षिक सीटीसी न्यूनतम वार्षिक सीटीसी से अधिक होना चाहिए।',
         'component_created_success' => 'वेतन घटक सफलतापूर्वक बनाया गया।',
         'component_updated_success' => 'वेतन घटक सफलतापूर्वक अपडेट किया गया।',
         'component_deleted_success' => 'वेतन घटक सफलतापूर्वक हटाया गया।',

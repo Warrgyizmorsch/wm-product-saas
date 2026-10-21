@@ -1997,6 +1997,8 @@ return [
         'structure_created_success' => 'Salary structure has been created successfully.',
         'structure_updated_success' => 'Salary structure has been updated successfully.',
         'structure_deleted_success' => 'Salary structure has been deleted successfully.',
+        'structure_overlap_error' => 'Salary structure range (₹:min - ₹:max) overlaps with existing structure ":name" (₹:existing_min - ₹:existing_max). Slabs within the same pay group cannot have overlapping CTC ranges.',
+        'max_ctc_must_be_greater' => 'Maximum Yearly CTC must be greater than Minimum Yearly CTC.',
         'component_created_success' => 'Salary component has been created successfully.',
         'component_updated_success' => 'Salary component has been updated successfully.',
         'component_deleted_success' => 'Salary component has been deleted successfully.',

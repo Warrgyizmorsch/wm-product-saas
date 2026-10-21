@@ -295,6 +295,10 @@ class ApprovalWorkflowService
      */
     public function canManageTicket(User|Employee $actor, HelpdeskTicket $ticket): bool
     {
+        if ($actor instanceof User && $this->isSuperAdmin($actor)) {
+            return true;
+        }
+
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
 
         if ($actorEmployeeId && (int) $actorEmployeeId === (int) $ticket->employee_id) {
@@ -305,18 +309,42 @@ class ApprovalWorkflowService
     }
 
     /**
-     * Authorize ticket status update / management.
+     * Authorize user or employee actor to manage or update status of a helpdesk ticket.
+     * Allowed: Super Admin, HR Admins, Support Managers, and designated Assigned Agent.
+     * Enforces conflict-of-interest prevention against self-resolving tickets.
      *
      * @throws ValidationException
      */
     public function authorizeTicketManagement(User|Employee $actor, HelpdeskTicket $ticket): void
     {
+        if ($actor instanceof User && $this->isSuperAdmin($actor)) {
+            return;
+        }
+
         if (! $this->canManageTicket($actor, $ticket)) {
             throw ValidationException::withMessages([
                 'ticket' => 'Conflict of Interest: You cannot manage or resolve helpdesk tickets raised by yourself.',
             ]);
         }
+
+        $tenantId = $ticket->tenant_id ?: tenant_id() ?: auth()->user()?->tenant_id ?: app(\App\Core\Tenant\TenantContext::class)->id();
+        $access = app(\App\Services\Access\AccessService::class);
+        $user = $actor instanceof User ? $actor : $this->getUserFromEmployee($actor);
+
+        if ($user) {
+            if ($user->is_admin || $access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId]) || $access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])) {
+                return;
+            }
+        }
+
+        $actorEmployeeId = $this->getEmployeeIdForActor($actor);
+        if ($actorEmployeeId && $ticket->assigned_to && (int) $actorEmployeeId === (int) $ticket->assigned_to) {
+            return;
+        }
+
+        abort(403, 'Unauthorized to manage or update status on this support ticket.');
     }
+
 
     /**
      * Document Module: Prevent HR staff from acting as the approving authority for their own issued documents.
@@ -391,6 +419,7 @@ class ApprovalWorkflowService
 
         return true;
     }
+
 
     /**
      * Helper to get the Employee ID associated with a User or Employee actor.

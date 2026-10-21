@@ -40,9 +40,10 @@ class BroadcastRepository implements BroadcastRepositoryInterface
         }
 
         match ($sort) {
-            'oldest'   => $query->oldest('published_at')->oldest('created_at'),
-            'priority' => $query->orderByRaw("FIELD(priority, 'urgent', 'important', 'general')"),
-            default    => $query->latest('published_at')->latest('created_at'),
+            'oldest'    => $query->oldest('published_at')->oldest('created_at'),
+            'priority'  => $query->orderByRaw("FIELD(priority, 'urgent', 'important', 'normal')"),
+            'title_asc' => $query->orderBy('title', 'asc'),
+            default     => $query->latest('published_at')->latest('created_at'),
         };
     }
 
@@ -70,7 +71,11 @@ class BroadcastRepository implements BroadcastRepositoryInterface
             }
         }
 
-        $totalActive = (clone $statsBaseQuery)->where('status', 'published')->count();
+        $totalActive = (clone $statsBaseQuery)->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            })->count();
         $publishedThisMonth = (clone $statsBaseQuery)->where('status', 'published')
             ->whereMonth('published_at', now()->month)
             ->whereYear('published_at', now()->year)
@@ -90,7 +95,11 @@ class BroadcastRepository implements BroadcastRepositoryInterface
 
         $scheduledCount = $isHrAdmin ? (clone $baseQuery)->where('status', 'scheduled')->count() : 0;
 
-        $publishedQuery = (clone $baseQuery)->where('status', 'published');
+        $publishedQuery = (clone $baseQuery)->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
         if (!$isHrAdmin) {
             if ($employee) {
                 $publishedQuery->where(function ($q) use ($employee) {
@@ -164,12 +173,19 @@ class BroadcastRepository implements BroadcastRepositoryInterface
     public function getShowData(int $id, bool $isHrAdmin, ?Employee $employee, int $tenantId): array
     {
         $broadcast = Broadcast::with([
-            'sender',
+            'creator',
             'receipts.employee.department',
-            'comments.user',
             'comments.employee',
-            'attachments'
+            'comments.replies.employee'
         ])->where('tenant_id', $tenantId)->findOrFail($id);
+
+        if (!$isHrAdmin) {
+            $hasAccess = $broadcast->target_type === 'all'
+                || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
+            if (!$hasAccess) {
+                abort(403, 'You are not authorized to view this targeted announcement.');
+            }
+        }
 
         if ($employee) {
             $this->broadcastService->markAsViewed($broadcast, $employee);
@@ -181,10 +197,17 @@ class BroadcastRepository implements BroadcastRepositoryInterface
         }
 
         $totalRecipients = $broadcast->receipts()->count();
-        $viewedCount = $broadcast->receipts()->whereNotNull('viewed_at')->count();
+        $viewedCount = $broadcast->receipts()->whereNotNull('read_at')->count();
         $ackCount = $broadcast->receipts()->whereNotNull('acknowledged_at')->count();
         $viewPercentage = $totalRecipients > 0 ? round(($viewedCount / $totalRecipients) * 100) : 0;
         $ackPercentage = $totalRecipients > 0 ? round(($ackCount / $totalRecipients) * 100) : 0;
+
+        $analytics = $this->broadcastService->getAnalytics($broadcast);
+
+        $departments = Department::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $branches = Branch::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $designations = Designation::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $employees = Employee::where('tenant_id', $tenantId)->where('status', true)->orderBy('full_name')->get();
 
         return compact(
             'broadcast',
@@ -195,20 +218,26 @@ class BroadcastRepository implements BroadcastRepositoryInterface
             'viewedCount',
             'ackCount',
             'viewPercentage',
-            'ackPercentage'
+            'ackPercentage',
+            'analytics',
+            'departments',
+            'branches',
+            'designations',
+            'employees'
         );
     }
 
     public function storeBroadcast(array $validated, Request $request, int $tenantId): Broadcast
     {
         $validated['tenant_id'] = $tenantId;
-        $validated['created_by_id'] = auth()->id();
+        $validated['created_by_user_id'] = auth()->id() ?? 1;
 
-        $attachmentFiles = $request->file('attachments', []);
+        $attachment = $request->file('attachment');
+        $bannerImage = $request->file('banner_image');
 
-        $broadcast = $this->broadcastService->createBroadcast($validated, $attachmentFiles);
+        $broadcast = $this->broadcastService->createBroadcast($validated, $attachment, $bannerImage);
 
-        if ($broadcast->status === 'published') {
+        if ($broadcast->status === 'published' && !$broadcast->published_at) {
             $this->broadcastService->publishBroadcast($broadcast);
         }
 
@@ -219,15 +248,10 @@ class BroadcastRepository implements BroadcastRepositoryInterface
     {
         $broadcast = Broadcast::where('tenant_id', $tenantId)->findOrFail($id);
 
-        $attachmentFiles = $request->file('attachments', []);
+        $attachment = $request->file('attachment');
+        $bannerImage = $request->file('banner_image');
 
-        $broadcast = $this->broadcastService->updateBroadcast($broadcast, $validated, $attachmentFiles);
-
-        if ($broadcast->status === 'published' && !$broadcast->published_at) {
-            $this->broadcastService->publishBroadcast($broadcast);
-        }
-
-        return $broadcast;
+        return $this->broadcastService->updateBroadcast($broadcast, $validated, $attachment, $bannerImage);
     }
 
     public function deleteBroadcast(int $id, int $tenantId): bool
@@ -252,12 +276,33 @@ class BroadcastRepository implements BroadcastRepositoryInterface
     {
         $broadcast = Broadcast::where('tenant_id', $tenantId)->findOrFail($id);
 
+        if (!$employee && $user) {
+            $employee = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                    if ($user->employee_id) {
+                        $q->orWhere('id', $user->employee_id);
+                    }
+                    if ($user->email) {
+                        $q->orWhere('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+
+        if (!$employee) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'comment' => ['An associated employee profile is required to post comments.'],
+            ]);
+        }
+
         return BroadcastComment::create([
             'tenant_id'    => $tenantId,
             'broadcast_id' => $broadcast->id,
-            'user_id'      => $user?->id,
-            'employee_id'  => $employee?->id,
-            'comment'      => $validated['comment'],
+            'employee_id'  => $employee->id,
+            'parent_id'    => $validated['parent_id'] ?? null,
+            'comment_text' => $validated['comment_text'] ?? $validated['comment'] ?? '',
+            'status'       => 'published',
         ]);
     }
 
@@ -265,7 +310,25 @@ class BroadcastRepository implements BroadcastRepositoryInterface
     {
         $comment = BroadcastComment::where('tenant_id', $tenantId)->findOrFail($commentId);
 
-        if (!$isHrAdmin && $comment->user_id !== $user?->id) {
+        if ($isHrAdmin) {
+            return (bool) $comment->delete();
+        }
+
+        $employee = null;
+        if ($user) {
+            $employee = Employee::where('tenant_id', $tenantId)
+                ->where(function ($q) use ($user) {
+                    if ($user->employee_id) {
+                        $q->where('id', $user->employee_id);
+                    }
+                    if ($user->email) {
+                        $q->orWhere('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+
+        if (!$employee || $comment->employee_id !== $employee->id) {
             return false;
         }
 

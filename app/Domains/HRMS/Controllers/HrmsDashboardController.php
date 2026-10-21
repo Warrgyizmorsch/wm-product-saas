@@ -435,13 +435,35 @@ class HrmsDashboardController extends Controller
         // 13. Active Company Broadcasts & Announcements
         app(\App\Domains\HRMS\Services\BroadcastService::class)->processScheduledBroadcasts($tenantId);
 
-        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)
-            ->where('status', 'published')
-            ->count();
+        $user = auth()->user();
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
 
-        $allPublishedBroadcasts = Broadcast::with(['creator', 'receipts', 'comments.employee'])
-            ->where('tenant_id', $tenantId)
+        $broadcastsBaseQuery = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
+
+        if (!$isHrOrAdmin) {
+            if ($currentEmployee) {
+                $broadcastsBaseQuery->where(function ($q) use ($currentEmployee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $currentEmployee->id));
+                });
+            } else {
+                $broadcastsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $totalBroadcastsCount = (clone $broadcastsBaseQuery)->count();
+
+        $allPublishedBroadcasts = (clone $broadcastsBaseQuery)
+            ->with(['creator', 'receipts', 'comments.employee'])
             ->get();
 
         $latestBroadcasts = $allPublishedBroadcasts->sort(function ($a, $b) use ($currentEmployee) {
@@ -470,13 +492,6 @@ class HrmsDashboardController extends Controller
             // 3. Newest published date
             return strtotime($b->published_at ?? $b->created_at) <=> strtotime($a->published_at ?? $a->created_at);
         })->take(3)->values();
-
-        $user = auth()->user();
-        $isHrOrAdmin = $user && (
-            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
-            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
-            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
-        );
         $activeView = $request->input('view', 'overview');
 
         $widgetQuery = array_filter([
@@ -723,14 +738,37 @@ class HrmsDashboardController extends Controller
     {
         $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
-        $latestBroadcasts = Broadcast::with(['receipts', 'comments.employee'])
-            ->where('tenant_id', $tenantId)
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
+
+        $broadcastsBaseQuery = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
+
+        if (!$isHrOrAdmin) {
+            if ($currentEmployee) {
+                $broadcastsBaseQuery->where(function ($q) use ($currentEmployee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $currentEmployee->id));
+                });
+            } else {
+                $broadcastsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $latestBroadcasts = (clone $broadcastsBaseQuery)
+            ->with(['receipts', 'comments.employee'])
             ->latest()
             ->take(5)
             ->get();
 
-        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)->where('status', 'published')->count();
+        $totalBroadcastsCount = (clone $broadcastsBaseQuery)->count();
 
         return compact('latestBroadcasts', 'totalBroadcastsCount', 'currentEmployee');
     }
