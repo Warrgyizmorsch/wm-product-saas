@@ -179,6 +179,11 @@
                                         </a>
                                     </li>
                                     <li>
+                                        <a href="{{ route('platform.transporters.edit', $transporter) }}" class="dropdown-item fs-12 py-1.5">
+                                            <i class="feather-edit me-2 text-warning"></i>{{ __('crm.edit_transporter_master') }}
+                                        </a>
+                                    </li>
+                                    <li>
                                         <button type="button" class="dropdown-item fs-12 py-1.5" data-bs-toggle="modal" data-bs-target="#editTransporterModal{{ $transporter->id }}">
                                             <i class="feather-edit-2 me-2 text-info"></i>{{ __('crm.edit_quick_master') }}
                                         </button>
@@ -210,7 +215,7 @@
                                         <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_number_field')" name="gstin" :value="$transporter->gstin" placeholder="Optional 15-digit GSTIN" />
                                     </div>
                                     <div class="mb-3">
-                                        <x-ui.odoo-form-ui type="input" :label="__('crm.phone_mobile_col')" name="phone" :value="$transporter->phone" placeholder="Mobile / Landline" />
+                                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('crm.phone_mobile_col')" name="phone" :value="$transporter->phone" placeholder="Mobile / Landline" oninput="this.value = this.value.replace(/[^0-9]/g, '')" maxlength="20" />
                                     </div>
                                     <div class="mb-3">
                                         <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.official_email_address')" name="email" :value="$transporter->email" placeholder="email@domain.com" />

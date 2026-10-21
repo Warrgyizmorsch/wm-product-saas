@@ -123,8 +123,8 @@ class PurchaseRfqRepository
 
             $percent = $poHighestTotal > 0 ? ($poSavings / $poHighestTotal) * 100 : 0;
             return [
-                'savings' => $poSavings,
-                'spend' => $poTotal,
+                'savings' => function_exists('convert_from_base') ? convert_from_base($poSavings) : $poSavings,
+                'spend' => function_exists('convert_from_base') ? convert_from_base($poTotal) : $poTotal,
                 'percent' => round($percent, 2),
                 'po_number' => $po->purchase_order_number ?? $po->po_number,
             ];

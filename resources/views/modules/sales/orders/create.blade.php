@@ -81,22 +81,60 @@
 
                 <!-- Column 2: Commercial, Tax & Delivery Options -->
                 <div class="col-md-6">
+                    @php
+                        $defaultDiscountType = 'item_wise';
+                        if ($prefillQuotation) {
+                            if ($prefillQuotation->effective_discount_type === 'item_wise') {
+                                $defaultDiscountType = 'item_wise';
+                            } elseif ($prefillQuotation->effective_discount_type === 'none') {
+                                $defaultDiscountType = 'without_discount';
+                            } elseif ($prefillQuotation->effective_discount_type === 'order_wise') {
+                                $defaultDiscountType = 'order_wise';
+                            } elseif ($prefillQuotation->items->sum('discount') > 0) {
+                                $defaultDiscountType = 'item_wise';
+                            } elseif ((float)$prefillQuotation->discount > 0) {
+                                $defaultDiscountType = 'order_wise';
+                            } else {
+                                $defaultDiscountType = 'without_discount';
+                            }
+                        }
+
+                        $defaultTaxType = 'item_wise_tax';
+                        if ($prefillQuotation && $prefillQuotation->tax_type === 'exempt') {
+                            $defaultTaxType = 'without_tax';
+                        }
+
+                        $defaultGstType = 'cgst_sgst';
+                        if ($prefillQuotation && $prefillQuotation->tax_type === 'inter_state') {
+                            $defaultGstType = 'igst';
+                        }
+
+                        $defaultTaxMode = $prefillQuotation?->effective_tax_mode ?? 'exclusive';
+                    @endphp
+
                     <x-ui.odoo-form-ui type="select" :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect" :required="true">
-                        <option value="without_discount" @selected(old('discount_type') === 'without_discount')>{{ __('crm.without_discount') }}</option>
-                        <option value="item_wise" @selected(old('discount_type', 'item_wise') === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
-                        <option value="order_wise" @selected(old('discount_type') === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
+                        <option value="without_discount" @selected(old('discount_type', $defaultDiscountType) === 'without_discount')>{{ __('crm.without_discount') }}</option>
+                        <option value="item_wise" @selected(old('discount_type', $defaultDiscountType) === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
+                        <option value="order_wise" @selected(old('discount_type', $defaultDiscountType) === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
                     </x-ui.odoo-form-ui>
 
+                    <div id="taxModeContainer">
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect" :required="true">
+                            <option value="exclusive" @selected(old('tax_mode', $defaultTaxMode) === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                            <option value="inclusive" @selected(old('tax_mode', $defaultTaxMode) === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+
                     <x-ui.odoo-form-ui type="select" :label="__('crm.tax_option')" name="tax_type" id="taxTypeSelect" :required="true">
-                        <option value="without_tax" @selected(old('tax_type') === 'without_tax')>{{ __('crm.without_tax') }}</option>
-                        <option value="item_wise_tax" @selected(old('tax_type', 'item_wise_tax') === 'item_wise_tax')>{{ __('crm.item_wise_tax') }}</option>
-                        <option value="order_wise_tax" @selected(old('tax_type') === 'order_wise_tax')>{{ __('crm.order_wise_tax') }}</option>
+                        <option value="without_tax" @selected(old('tax_type', $defaultTaxType) === 'without_tax')>{{ __('crm.without_tax') }}</option>
+                        <option value="item_wise_tax" @selected(old('tax_type', $defaultTaxType) === 'item_wise_tax')>{{ __('crm.item_wise_tax') }}</option>
+                        <option value="order_wise_tax" @selected(old('tax_type', $defaultTaxType) === 'order_wise_tax')>{{ __('crm.order_wise_tax') }}</option>
                     </x-ui.odoo-form-ui>
 
                     <div id="gstTypeContainer">
                         <x-ui.odoo-form-ui type="select" :label="__('crm.gst_type')" name="gst_type" id="gstTypeSelect" :required="true">
-                            <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>{{ __('crm.intra_state_gst') }}</option>
-                            <option value="igst" @selected(old('gst_type') === 'igst')>{{ __('crm.inter_state_gst') }}</option>
+                            <option value="cgst_sgst" @selected(old('gst_type', $defaultGstType) === 'cgst_sgst')>{{ __('crm.intra_state_gst') }}</option>
+                            <option value="igst" @selected(old('gst_type', $defaultGstType) === 'igst')>{{ __('crm.inter_state_gst') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
 
@@ -165,7 +203,7 @@
                         <div class="p-3 bg-white text-dark">
                             <!-- 1. Subtotal (Excl. Tax) -->
                             <div class="d-flex justify-content-between align-items-center mb-3" id="summarySubtotalRow">
-                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                <span class="text-muted fs-13 fw-semibold" id="summarySubtotalLabel">{{ __('crm.subtotal_excl_tax') }}</span>
                                 <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                             </div>
 
@@ -173,12 +211,12 @@
                             <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryDiscountRow">
                                 <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">{{ __('crm.less_item_discounts') }}</span>
                                 <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-0.00">
-                                <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('discount', $prefillQuotation?->discount ?: 0) }}" step="0.01">
+                                <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('discount', $prefillQuotation ? round(convert_from_base($prefillQuotation->discount), 2) : 0) }}" step="0.01">
                             </div>
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-3" id="calcTaxableRow">
-                                <span class="text-muted fs-13 fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                <span class="text-muted fs-13 fw-semibold" id="calcTaxableLabel">{{ __('crm.items_taxable_value') }}</span>
                                 <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                             </div>
 
@@ -191,11 +229,11 @@
                             <!-- 5. CGST (Central Tax) & SGST (State Tax) -->
                             <div id="cgstSgstRows" style="display: none;">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_cgst') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold cgst-label">{{ __('crm.add_cgst') }}</span>
                                     <input type="text" id="calcCgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_sgst') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold sgst-label">{{ __('crm.add_sgst') }}</span>
                                     <input type="text" id="calcSgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                 </div>
                             </div>
@@ -203,7 +241,7 @@
                             <!-- 6. IGST (Integrated Tax) -->
                             <div id="igstRow" style="display: none;">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_igst') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold igst-label">{{ __('crm.add_igst') }}</span>
                                     <input type="text" id="calcIgst" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                 </div>
                             </div>
@@ -457,10 +495,10 @@
                 }
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #freightTermsSelect').on('change', toggleTaxAndDiscountOptions);
+            $('#discountTypeSelect, #taxTypeSelect, #taxModeSelect, #gstTypeSelect, #freightTermsSelect').on('change', toggleTaxAndDiscountOptions);
 
             // Input listeners for calculations
-            $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #orderTaxInput, #freightTermsSelect, #freightAmountInput, #adjustmentInput', function() {
+            $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #orderTaxInput, #taxModeSelect, #freightTermsSelect, #freightAmountInput, #adjustmentInput', function() {
                 calculateTotals();
             });
 
@@ -509,30 +547,31 @@
             function calculateTotals() {
                 const discountType = $('#discountTypeSelect').val() || 'item_wise';
                 const taxType = $('#taxTypeSelect').val() || 'item_wise_tax';
+                const taxMode = $('#taxModeSelect').val() || 'exclusive';
 
                 let subtotal = 0;
                 let totalItemDiscount = 0;
                 let taxTotal = 0;
 
+                const lineItems = [];
                 $('.item-row').each(function() {
                     const qty = parseFloat($(this).find('.qty-input').val()) || 0;
                     const price = parseFloat($(this).find('.price-input').val()) || 0;
                     const lineDiscount = (discountType === 'item_wise') ? (parseFloat($(this).find('.line-discount-input').val()) || 0) : 0;
                     const taxRate = (taxType === 'item_wise_tax') ? (parseFloat($(this).find('.tax-input').val()) || 0) : 0;
 
-                    const untaxedAmount = qty * price;
-                    const lineTaxable = Math.max(0, untaxedAmount - lineDiscount);
-                    const lineTax = lineTaxable * (taxRate / 100);
-                    const lineTotalInclTax = lineTaxable + lineTax;
-
-                    subtotal += untaxedAmount;
+                    const lineGross = qty * price;
+                    subtotal += lineGross;
                     totalItemDiscount += lineDiscount;
 
-                    if (taxType === 'item_wise_tax') {
-                        taxTotal += lineTax;
-                    }
-
-                    $(this).find('.amount-display').text(currencySymbol + lineTotalInclTax.toFixed(2));
+                    lineItems.push({
+                        row: $(this),
+                        qty: qty,
+                        price: price,
+                        lineDiscount: lineDiscount,
+                        taxRate: taxRate,
+                        lineGross: lineGross
+                    });
                 });
 
                 let discountVal = 0;
@@ -545,10 +584,39 @@
                     $('#calcDiscountDisplay').val('-' + currencySymbol + discountVal.toFixed(2));
                 }
 
+                lineItems.forEach(function(item) {
+                    const lineDisc = (discountType === 'item_wise')
+                        ? item.lineDiscount
+                        : ((subtotal > 0 && discountVal > 0) ? (item.lineGross / subtotal) * discountVal : 0);
+
+                    if (taxMode === 'inclusive') {
+                        const lineNet = Math.max(0, item.lineGross - lineDisc);
+                        const lineBase = (item.taxRate > 0 && taxType === 'item_wise_tax') ? (lineNet / (1 + (item.taxRate / 100))) : lineNet;
+                        const lineTax = (taxType === 'item_wise_tax') ? (lineNet - lineBase) : 0;
+                        if (taxType === 'item_wise_tax') {
+                            taxTotal += lineTax;
+                        }
+                        const lineTotal = item.lineGross - (discountType === 'item_wise' ? lineDisc : 0);
+                        item.row.find('.amount-display').text(currencySymbol + lineTotal.toFixed(2));
+                    } else {
+                        const lineTaxable = Math.max(0, item.lineGross - lineDisc);
+                        const lineTax = (taxType === 'item_wise_tax') ? (lineTaxable * (item.taxRate / 100)) : 0;
+                        if (taxType === 'item_wise_tax') {
+                            taxTotal += lineTax;
+                        }
+                        const lineTotal = lineTaxable + lineTax;
+                        item.row.find('.amount-display').text(currencySymbol + lineTotal.toFixed(2));
+                    }
+                });
+
                 if (taxType === 'order_wise_tax') {
                     const orderTaxRate = parseFloat($('#orderTaxInput').val()) || 0;
-                    const taxableAmount = Math.max(0, subtotal - discountVal);
-                    taxTotal = taxableAmount * (orderTaxRate / 100);
+                    const netAmount = Math.max(0, subtotal - discountVal);
+                    if (taxMode === 'inclusive') {
+                        taxTotal = orderTaxRate > 0 ? (netAmount - (netAmount / (1 + (orderTaxRate / 100)))) : 0;
+                    } else {
+                        taxTotal = netAmount * (orderTaxRate / 100);
+                    }
                 } else if (taxType === 'without_tax') {
                     taxTotal = 0;
                 }
@@ -561,13 +629,36 @@
                 $('#freightAmountDisplay').val(effectiveFreight.toFixed(2));
 
                 const itemsTaxTotal = taxTotal;
-                const taxableAmount = Math.max(0, subtotal - discountVal);
-                const itemsTotalInclGst = taxableAmount + itemsTaxTotal;
+                let taxableAmount = 0;
+                let itemsTotalInclGst = 0;
+
+                if (taxMode === 'inclusive') {
+                    itemsTotalInclGst = Math.max(0, subtotal - discountVal);
+                    taxableAmount = Math.max(0, itemsTotalInclGst - itemsTaxTotal);
+                } else {
+                    taxableAmount = Math.max(0, subtotal - discountVal);
+                    itemsTotalInclGst = taxableAmount + itemsTaxTotal;
+                }
+
                 const grandTotal = itemsTotalInclGst + effectiveFreight + adjustment;
+
+                if (taxMode === 'inclusive') {
+                    $('#summarySubtotalLabel').text("{{ __('crm.subtotal') }} (Price incl. GST)");
+                    $('#calcTaxableLabel').text("Taxable Value (Excl. Tax)");
+                    $('.cgst-label').text("CGST (Included)");
+                    $('.sgst-label').text("SGST (Included)");
+                    $('.igst-label').text("IGST (Included)");
+                } else {
+                    $('#summarySubtotalLabel').text("{{ __('crm.subtotal_excl_tax') }}");
+                    $('#calcTaxableLabel').text("{{ __('crm.items_taxable_value') }}");
+                    $('.cgst-label').text("{{ __('crm.add_cgst') }}");
+                    $('.sgst-label').text("{{ __('crm.add_sgst') }}");
+                    $('.igst-label').text("{{ __('crm.add_igst') }}");
+                }
 
                 $('#calcSubtotal').val(currencySymbol + subtotal.toFixed(2));
                 $('#calcTaxableAmount').val(currencySymbol + taxableAmount.toFixed(2));
-                $('#calcTaxAmount').val('+' + currencySymbol + itemsTaxTotal.toFixed(2));
+                $('#calcTaxAmount').val((taxMode === 'inclusive' ? '' : '+') + currencySymbol + itemsTaxTotal.toFixed(2));
                 $('#calcItemsTotalInclGst').val(currencySymbol + itemsTotalInclGst.toFixed(2));
 
                 const gstType = $('#gstTypeSelect').val() || 'cgst_sgst';
@@ -576,12 +667,12 @@
                         $('#cgstSgstRows').removeClass('d-none').show();
                         $('#igstRow').addClass('d-none').hide();
                         const halfTax = itemsTaxTotal / 2;
-                        $('#calcCgst').val(currencySymbol + halfTax.toFixed(2));
-                        $('#calcSgst').val(currencySymbol + halfTax.toFixed(2));
+                        $('#calcCgst').val((taxMode === 'inclusive' ? '' : '+') + currencySymbol + halfTax.toFixed(2));
+                        $('#calcSgst').val((taxMode === 'inclusive' ? '' : '+') + currencySymbol + halfTax.toFixed(2));
                     } else { // igst
                         $('#cgstSgstRows').addClass('d-none').hide();
                         $('#igstRow').removeClass('d-none').show();
-                        $('#calcIgst').val(currencySymbol + itemsTaxTotal.toFixed(2));
+                        $('#calcIgst').val((taxMode === 'inclusive' ? '' : '+') + currencySymbol + itemsTaxTotal.toFixed(2));
                     }
                 } else {
                     $('#cgstSgstRows').addClass('d-none').hide();
@@ -616,7 +707,7 @@
                         'quantity' => $item->quantity,
                         'unit_price' => convert_from_base($item->unit_price),
                         'tax_rate' => $item->tax_rate,
-                        'discount' => convert_from_base($item->discount),
+                        'discount' => convert_from_base($item->discount ?? 0),
                     ];
                 }) : [];
             @endphp

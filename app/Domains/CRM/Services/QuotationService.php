@@ -61,21 +61,78 @@ class QuotationService
                 $data['quotation_number'] = $this->getNextQuotationNumber();
             }
 
-            $subtotal = 0;
-            $tax = 0;
-            $itemsData = [];
+            $taxMode = $data['tax_mode'] ?? 'exclusive';
+            $taxType = $data['tax_type'] ?? 'intra_state';
+            $discountType = $data['discount_type'] ?? 'order_wise';
 
+            $subtotal = 0;
+            $rawLines = [];
             foreach ($items as $item) {
                 $qty = floatval($item['quantity'] ?? 0);
                 $price = convert_to_base((float) ($item['unit_price'] ?? 0));
                 $taxRate = floatval($item['tax_rate'] ?? 0);
+                if ($taxType === 'exempt') {
+                    $taxRate = 0;
+                }
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
+                $lineGross = $qty * $price;
+                $subtotal += $lineGross;
 
-                $amount = $qty * $price;
-                $itemTax = $amount * ($taxRate / 100);
+                $rawLines[] = [
+                    'product_id' => $productId,
+                    'item' => $item,
+                    'qty' => $qty,
+                    'price' => $price,
+                    'tax_rate' => $taxRate,
+                    'line_gross' => $lineGross,
+                ];
+            }
 
-                $subtotal += $amount;
-                $tax += $itemTax;
+            if ($discountType === 'item_wise') {
+                $discount = 0;
+                foreach ($rawLines as &$lineRef) {
+                    $lDisc = convert_to_base((float) ($lineRef['item']['discount'] ?? 0));
+                    $lineRef['line_discount'] = $lDisc;
+                    $discount += $lDisc;
+                }
+                unset($lineRef);
+            } elseif ($discountType === 'none') {
+                $discount = 0;
+            } else {
+                $discount = convert_to_base((float) ($data['discount'] ?? 0));
+            }
+
+            $tax = 0;
+            $itemsData = [];
+
+            foreach ($rawLines as $line) {
+                $lineGross = $line['line_gross'];
+                $taxRate = $line['tax_rate'];
+                $qty = $line['qty'];
+                $price = $line['price'];
+                $productId = $line['product_id'];
+                $item = $line['item'];
+
+                if ($discountType === 'item_wise') {
+                    $lineDiscount = $line['line_discount'] ?? 0;
+                } elseif ($discountType === 'none') {
+                    $lineDiscount = 0;
+                } else {
+                    $lineDiscount = ($subtotal > 0 && $discount > 0) ? ($lineGross / $subtotal) * $discount : 0;
+                }
+
+                if ($taxMode === 'inclusive') {
+                    $lineNet = max(0, $lineGross - $lineDiscount);
+                    $lineBase = ($taxRate > 0 && $taxType !== 'exempt') ? round($lineNet / (1 + ($taxRate / 100)), 4) : $lineNet;
+                    $itemTax = $lineNet - $lineBase;
+                    $amount = $lineGross;
+                    $tax += $itemTax;
+                } else {
+                    $lineTaxable = max(0, $lineGross - $lineDiscount);
+                    $itemTax = ($taxType === 'exempt') ? 0 : ($lineTaxable * ($taxRate / 100));
+                    $amount = $lineGross;
+                    $tax += $itemTax;
+                }
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
@@ -92,17 +149,44 @@ class QuotationService
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate' => $taxRate,
+                    'discount' => round($lineDiscount, 2),
                     'amount' => $amount,
                 ];
             }
 
-            $discount = convert_to_base((float) ($data['discount'] ?? 0));
-            $totalAmount = max(0, $subtotal + $tax - $discount);
+            if ($taxType === 'exempt') {
+                $tax = 0;
+            }
 
-            $data['subtotal'] = $subtotal;
-            $data['tax'] = $tax;
+            $tax = round($tax, 2);
+            if ($taxMode === 'inclusive') {
+                $totalAmount = max(0, $subtotal - $discount);
+            } else {
+                $taxableAmount = max(0, $subtotal - $discount);
+                $totalAmount = max(0, $taxableAmount + $tax);
+            }
+
+            $cgst = 0;
+            $sgst = 0;
+            $igst = 0;
+
+            if ($taxType === 'intra_state') {
+                $cgst = round($tax / 2, 2);
+                $sgst = round($tax / 2, 2);
+            } elseif ($taxType === 'inter_state') {
+                $igst = round($tax, 2);
+            }
+
+            $data['tax_mode'] = $taxMode;
+            $data['tax_type'] = $taxType;
+            $data['discount_type'] = $discountType;
+            $data['subtotal'] = round($subtotal, 2);
+            $data['tax'] = round($tax, 2);
+            $data['cgst'] = $cgst;
+            $data['sgst'] = $sgst;
+            $data['igst'] = $igst;
             $data['discount'] = $discount;
-            $data['total_amount'] = $totalAmount;
+            $data['total_amount'] = round($totalAmount, 2);
             $data['is_current'] = true;
             $data['revision_number'] = 0;
 
@@ -130,21 +214,78 @@ class QuotationService
             $baseNum = explode('-R', $rawNum)[0];
             $newQuotationNumber = $baseNum . '-R' . $newRevisionNumber;
 
-            $subtotal = 0;
-            $tax = 0;
-            $itemsData = [];
+            $taxMode = $data['tax_mode'] ?? $quotation->tax_mode ?? 'exclusive';
+            $taxType = $data['tax_type'] ?? $quotation->tax_type ?? 'intra_state';
+            $discountType = $data['discount_type'] ?? $quotation->discount_type ?? 'order_wise';
 
+            $subtotal = 0;
+            $rawLines = [];
             foreach ($items as $item) {
                 $qty = floatval($item['quantity'] ?? 0);
                 $price = convert_to_base((float) ($item['unit_price'] ?? 0));
                 $taxRate = floatval($item['tax_rate'] ?? 0);
+                if ($taxType === 'exempt') {
+                    $taxRate = 0;
+                }
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
+                $lineGross = $qty * $price;
+                $subtotal += $lineGross;
 
-                $amount = $qty * $price;
-                $itemTax = $amount * ($taxRate / 100);
+                $rawLines[] = [
+                    'product_id' => $productId,
+                    'item' => $item,
+                    'qty' => $qty,
+                    'price' => $price,
+                    'tax_rate' => $taxRate,
+                    'line_gross' => $lineGross,
+                ];
+            }
 
-                $subtotal += $amount;
-                $tax += $itemTax;
+            if ($discountType === 'item_wise') {
+                $discount = 0;
+                foreach ($rawLines as &$lineRef) {
+                    $lDisc = convert_to_base((float) ($lineRef['item']['discount'] ?? 0));
+                    $lineRef['line_discount'] = $lDisc;
+                    $discount += $lDisc;
+                }
+                unset($lineRef);
+            } elseif ($discountType === 'none') {
+                $discount = 0;
+            } else {
+                $discount = convert_to_base((float) ($data['discount'] ?? 0));
+            }
+
+            $tax = 0;
+            $itemsData = [];
+
+            foreach ($rawLines as $line) {
+                $lineGross = $line['line_gross'];
+                $taxRate = $line['tax_rate'];
+                $qty = $line['qty'];
+                $price = $line['price'];
+                $productId = $line['product_id'];
+                $item = $line['item'];
+
+                if ($discountType === 'item_wise') {
+                    $lineDiscount = $line['line_discount'] ?? 0;
+                } elseif ($discountType === 'none') {
+                    $lineDiscount = 0;
+                } else {
+                    $lineDiscount = ($subtotal > 0 && $discount > 0) ? ($lineGross / $subtotal) * $discount : 0;
+                }
+
+                if ($taxMode === 'inclusive') {
+                    $lineNet = max(0, $lineGross - $lineDiscount);
+                    $lineBase = ($taxRate > 0 && $taxType !== 'exempt') ? round($lineNet / (1 + ($taxRate / 100)), 4) : $lineNet;
+                    $itemTax = $lineNet - $lineBase;
+                    $amount = $lineGross;
+                    $tax += $itemTax;
+                } else {
+                    $lineTaxable = max(0, $lineGross - $lineDiscount);
+                    $itemTax = ($taxType === 'exempt') ? 0 : ($lineTaxable * ($taxRate / 100));
+                    $amount = $lineGross;
+                    $tax += $itemTax;
+                }
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
@@ -161,12 +302,33 @@ class QuotationService
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate' => $taxRate,
+                    'discount' => round($lineDiscount, 2),
                     'amount' => $amount,
                 ];
             }
 
-            $discount = convert_to_base((float) ($data['discount'] ?? 0));
-            $totalAmount = max(0, $subtotal + $tax - $discount);
+            if ($taxType === 'exempt') {
+                $tax = 0;
+            }
+
+            $tax = round($tax, 2);
+            if ($taxMode === 'inclusive') {
+                $totalAmount = max(0, $subtotal - $discount);
+            } else {
+                $taxableAmount = max(0, $subtotal - $discount);
+                $totalAmount = max(0, $taxableAmount + $tax);
+            }
+
+            $cgst = 0;
+            $sgst = 0;
+            $igst = 0;
+
+            if ($taxType === 'intra_state') {
+                $cgst = round($tax / 2, 2);
+                $sgst = round($tax / 2, 2);
+            } elseif ($taxType === 'inter_state') {
+                $igst = round($tax, 2);
+            }
 
             $revData = [
                 'tenant_id' => $quotation->tenant_id,
@@ -178,10 +340,16 @@ class QuotationService
                 'quotation_date' => $data['quotation_date'],
                 'expiry_date' => $data['expiry_date'] ?? null,
                 'status' => $data['status'],
-                'subtotal' => $subtotal,
-                'tax' => $tax,
+                'tax_mode' => $taxMode,
+                'tax_type' => $taxType,
+                'discount_type' => $discountType,
+                'subtotal' => round($subtotal, 2),
+                'tax' => round($tax, 2),
+                'cgst' => $cgst,
+                'sgst' => $sgst,
+                'igst' => $igst,
                 'discount' => $discount,
-                'total_amount' => $totalAmount,
+                'total_amount' => round($totalAmount, 2),
                 'terms_conditions' => $data['terms_conditions'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'parent_id' => $rootParentId,

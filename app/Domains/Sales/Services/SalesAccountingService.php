@@ -4,6 +4,7 @@ namespace App\Domains\Sales\Services;
 
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Services\AccountResolverService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\PostingFailureRecorder;
@@ -91,21 +92,43 @@ class SalesAccountingService
         $lines = [];
 
         // Debit Customer (Accounts Receivable) -> Total Invoice Amount
-        $lines[] = [
-            'chart_of_account_id' => $accountsReceivable->id,
-            'debit'               => round((float) $invoice->total_amount, 2),
-            'credit'              => 0,
-            'description'         => "Debtors - Invoice {$invoice->invoice_number}",
-        ];
+        $totalAmount = round((float) $invoice->total_amount, 2);
+        if ($totalAmount > 0) {
+            $lines[] = [
+                'chart_of_account_id' => $accountsReceivable->id,
+                'debit'               => $totalAmount,
+                'credit'              => 0,
+                'description'         => "Debtors - Invoice {$invoice->invoice_number}",
+                'party_type'          => JournalEntry::PARTY_CUSTOMER,
+                'party_id'            => $invoice->customer_id,
+            ];
+        }
 
         // Credit Sales Revenue -> Net Taxable Amount partitioned by each product's sales account
-        $netTaxableSales = round((float) ($invoice->subtotal - $invoice->discount_amount), 2);
+        $taxMode = $invoice->effective_tax_mode ?? ($invoice->tax_mode ?? 'exclusive');
+        $netTaxableSales = ($taxMode === 'inclusive')
+            ? round((float) $invoice->taxable_amount, 2)
+            : round((float) ($invoice->subtotal - $invoice->discount_amount), 2);
+
         if ($netTaxableSales > 0) {
             $salesBuckets = []; // account_id => ['account' => ChartOfAccount, 'amount' => float]
             $itemsSubtotalSum = 0.0;
 
             foreach ($invoice->items as $item) {
-                $lineTaxable = max(0, ((float)$item->quantity * (float)$item->unit_price) - (float)($item->discount ?? 0));
+                $lineGross = max(0, ((float)$item->quantity * (float)$item->unit_price) - (float)($item->discount ?? 0));
+                if ($taxMode === 'inclusive') {
+                    $itemTax = (float)($item->tax_amount ?? 0);
+                    if ($itemTax > 0) {
+                        $lineTaxable = max(0, $lineGross - $itemTax);
+                    } elseif ((float)$item->tax_rate > 0) {
+                        $lineTaxable = max(0, $lineGross / (1 + ((float)$item->tax_rate / 100)));
+                    } else {
+                        $lineTaxable = $lineGross;
+                    }
+                } else {
+                    $lineTaxable = $lineGross;
+                }
+
                 $itemsSubtotalSum += $lineTaxable;
                 $resolvedSalesAcc = $this->accountResolver->resolveSalesAccount($item->product, $tenantId) ?: $defaultSalesRevenue;
                 $accId = $resolvedSalesAcc->id;
@@ -113,7 +136,7 @@ class SalesAccountingService
                 if (!isset($salesBuckets[$accId])) {
                     $salesBuckets[$accId] = [
                         'account' => $resolvedSalesAcc,
-                        'amount' => 0.0,
+                        'amount'  => 0.0,
                     ];
                 }
                 $salesBuckets[$accId]['amount'] += $lineTaxable;
@@ -132,12 +155,21 @@ class SalesAccountingService
                 ];
             }
 
+            // Ensure bucket sum matches netTaxableSales exactly
+            $bucketSum = round(array_sum(array_column($salesBuckets, 'amount')), 2);
+            $bucketDiff = round($netTaxableSales - $bucketSum, 2);
+            if ($bucketDiff != 0 && !empty($salesBuckets)) {
+                $firstKey = array_key_first($salesBuckets);
+                $salesBuckets[$firstKey]['amount'] = round($salesBuckets[$firstKey]['amount'] + $bucketDiff, 2);
+            }
+
             foreach ($salesBuckets as $accId => $bucket) {
-                if ($bucket['amount'] > 0) {
+                $bucketAmount = round($bucket['amount'], 2);
+                if ($bucketAmount > 0) {
                     $lines[] = [
                         'chart_of_account_id' => $accId,
                         'debit'               => 0,
-                        'credit'              => round($bucket['amount'], 2),
+                        'credit'              => $bucketAmount,
                         'description'         => "Sales Revenue ({$bucket['account']->name}) - Invoice {$invoice->invoice_number}",
                     ];
                 }
@@ -199,6 +231,37 @@ class SalesAccountingService
                 'credit'              => $adjustment > 0 ? $adjustment : 0,
                 'description'         => "Round Off - Invoice {$invoice->invoice_number}",
             ];
+        }
+
+        // Filter out any zero-value lines
+        $lines = array_values(array_filter($lines, function ($l) {
+            return round((float)($l['debit'] ?? 0), 2) > 0 || round((float)($l['credit'] ?? 0), 2) > 0;
+        }));
+
+        // Penny rounding balancing: ensure total Debit == total Credit exactly
+        $totalDebit = round(array_sum(array_column($lines, 'debit')), 2);
+        $totalCredit = round(array_sum(array_column($lines, 'credit')), 2);
+        $discrepancy = round($totalDebit - $totalCredit, 2);
+
+        if (abs($discrepancy) > 0 && abs($discrepancy) <= 0.05) {
+            $adjusted = false;
+            foreach ($lines as &$line) {
+                if (($line['credit'] ?? 0) > 0 && !in_array($line['chart_of_account_id'], array_filter([$outputCgst?->id, $outputSgst?->id, $outputIgst?->id]))) {
+                    $line['credit'] = round($line['credit'] + $discrepancy, 2);
+                    $adjusted = true;
+                    break;
+                }
+            }
+            unset($line);
+
+            if (!$adjusted && $roundOff) {
+                $lines[] = [
+                    'chart_of_account_id' => $roundOff->id,
+                    'debit'               => $discrepancy < 0 ? abs($discrepancy) : 0,
+                    'credit'              => $discrepancy > 0 ? $discrepancy : 0,
+                    'description'         => "Rounding Balancing - Invoice {$invoice->invoice_number}",
+                ];
+            }
         }
 
         $companyId = $invoice->company_id ?? (company_id() ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->value('id'));

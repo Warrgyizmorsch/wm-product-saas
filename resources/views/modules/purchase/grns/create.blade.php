@@ -298,7 +298,7 @@
                         <x-ui.odoo-form-ui type="input" :label="__('purchase.pan_number')" name="pan_number" placeholder="e.g. ABCDE1234F" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('purchase.phone_mobile')" name="phone" :placeholder="__('purchase.phone_mobile')" />
+                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('purchase.phone_mobile')" name="phone" :placeholder="__('purchase.phone_mobile')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                     </div>
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" inputType="email" :label="__('purchase.email_address')" name="email" placeholder="dispatch@transporter.com" />
@@ -343,13 +343,31 @@
     // Quick Transporter AJAX Store
     $(document).on('submit', '#quickTransporterForm', function(e) {
         e.preventDefault();
+        const form = $(this);
         const $btn = $('#saveQuickTransporterBtn');
+
+        // Clear previous errors
+        form.find('.is-invalid').removeClass('is-invalid');
+        form.find('.invalid-feedback.ajax-feedback').remove();
+        form.find('.transporter-alert-error').remove();
+
+        // Client-side email validation check
+        const emailInput = form.find('input[name="email"]');
+        const emailVal = emailInput.val().trim();
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            emailInput.addClass('is-invalid');
+            emailInput.parent().find('.invalid-feedback.ajax-feedback').remove();
+            emailInput.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+            emailInput.focus();
+            return false;
+        }
+
         $btn.prop('disabled', true).text('Saving...');
 
         $.ajax({
             url: "{{ route('platform.transporters.quick-create') }}",
             type: "POST",
-            data: $(this).serialize(),
+            data: form.serialize(),
             success: function(response) {
                 $btn.prop('disabled', false).text('Save Transporter');
                 if (response.success && response.transporter) {
@@ -361,14 +379,53 @@
                     const modalEl = document.getElementById('quickTransporterModal');
                     const modalInstance = bootstrap.Modal.getInstance(modalEl);
                     if (modalInstance) modalInstance.hide();
-                    $('#quickTransporterForm')[0].reset();
+                    form[0].reset();
+                    form.find('.is-invalid').removeClass('is-invalid');
+                    form.find('.invalid-feedback.ajax-feedback').remove();
                 }
             },
             error: function(err) {
                 $btn.prop('disabled', false).text('Save Transporter');
-                alert('Error saving transporter: ' + (err.responseJSON?.message || 'Invalid data'));
+                if (err.status === 422 && err.responseJSON && err.responseJSON.errors) {
+                    const errors = err.responseJSON.errors;
+                    let firstField = null;
+                    $.each(errors, function(field, messages) {
+                        const $input = form.find('[name="' + field + '"]');
+                        if ($input.length) {
+                            $input.addClass('is-invalid');
+                            $input.parent().find('.invalid-feedback.ajax-feedback').remove();
+                            $input.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">' + messages[0] + '</div>');
+                            if (!firstField) firstField = $input;
+                        } else {
+                            form.find('.p-1').prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + messages[0] + '</div>');
+                        }
+                    });
+                    if (firstField) {
+                        firstField.focus();
+                    }
+                } else {
+                    const msg = err.responseJSON?.message || 'Error saving transporter. Please check the details and try again.';
+                    form.find('.p-1').prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + msg + '</div>');
+                }
             }
         });
+    });
+
+    // Realtime clear invalid feedback on input/change
+    $(document).on('input change', '#quickTransporterForm input, #quickTransporterForm select', function() {
+        $(this).removeClass('is-invalid');
+        $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+        $('#quickTransporterForm').find('.transporter-alert-error').remove();
+    });
+
+    // Email blur validation for quick transporter form
+    $(document).on('blur', '#quickTransporterForm input[name="email"]', function() {
+        const val = $(this).val().trim();
+        if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            $(this).addClass('is-invalid');
+            $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+            $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+        }
     });
 
     function showWarningModal(title, message, callback) {

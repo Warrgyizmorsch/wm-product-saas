@@ -461,6 +461,37 @@
                 @endif
 
                 <div class="ref-row">
+                    <span class="ref-label">Pricing Mode:</span>
+                    <span class="ref-val">{{ $quotation->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">Discount Option:</span>
+                    <span class="ref-val">
+                        @if($quotation->effective_discount_type === 'item_wise')
+                            Line / Item Level
+                        @elseif($quotation->effective_discount_type === 'none')
+                            Without Discount
+                        @else
+                            Order Level
+                        @endif
+                    </span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">GST Tax Type:</span>
+                    <span class="ref-val" style="color: #0f766e;">
+                        @if($quotation->effective_tax_type === 'intra_state')
+                            Intra-State (CGST + SGST)
+                        @elseif($quotation->effective_tax_type === 'inter_state')
+                            Inter-State (IGST)
+                        @else
+                            Exempt (0%)
+                        @endif
+                    </span>
+                </div>
+
+                <div class="ref-row">
                     <span class="ref-label">Revision Count:</span>
                     <span class="ref-val">Revision {{ $quotation->revision_number }}</span>
                 </div>
@@ -482,11 +513,14 @@
         <thead>
             <tr>
                 <th style="width: 5%; text-align: center;">#</th>
-                <th style="width: 45%;">Item & Description</th>
+                <th style="{{ $quotation->effective_discount_type === 'item_wise' ? 'width: 38%;' : 'width: 45%;' }}">Item & Description</th>
                 <th style="width: 10%; text-align: right;">Qty</th>
-                <th style="width: 14%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
+                <th style="width: 13%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
+                @if($quotation->effective_discount_type === 'item_wise')
+                    <th style="width: 12%; text-align: right;">Discount ({!! $currencySymbol !!})</th>
+                @endif
                 <th style="width: 10%; text-align: right;">Tax %</th>
-                <th style="width: 16%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
+                <th style="width: 12%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
             </tr>
         </thead>
         <tbody>
@@ -501,6 +535,9 @@
                     </td>
                     <td style="text-align: right;">{{ $item->quantity }}</td>
                     <td style="text-align: right;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->unit_price), 2) }}</td>
+                    @if($quotation->effective_discount_type === 'item_wise')
+                        <td style="text-align: right; color: #dc2626;">{{ ($item->discount ?? 0) > 0 ? '-' . number_format((float) convert_from_base($item->discount), 2) : '—' }}</td>
+                    @endif
                     <td style="text-align: right;">{{ number_format($item->tax_rate, 2) }}%</td>
                     <td style="text-align: right; font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price))), 2) }}</td>
                 </tr>
@@ -511,8 +548,30 @@
     <!-- 4. CALCULATIONS SECTION -->
     <table class="calc-wrapper">
         <tr>
-            <!-- Left: Notes or empty space -->
+            <!-- Left: Tax Treatment Summary & Notes -->
             <td class="calc-notes-col">
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
+                    <div style="font-size: 8.5px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 4px;">Tax Treatment & Commercials Summary</div>
+                    <table style="width: 100%; font-size: 9.5px; border-collapse: collapse;">
+                        <tr>
+                            <td style="color: #64748b; padding: 2px 0; width: 45%;">Tax Scheme:</td>
+                            <td style="font-weight: bold; color: #1e293b; padding: 2px 0;">{{ $quotation->effective_tax_mode === 'inclusive' ? 'Inclusive of GST' : 'Exclusive of GST (Base Rate)' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #64748b; padding: 2px 0;">Applicable GST:</td>
+                            <td style="font-weight: bold; color: #0f766e; padding: 2px 0;">
+                                @if($quotation->effective_tax_type === 'intra_state')
+                                    CGST + SGST (Intra-State Supply)
+                                @elseif($quotation->effective_tax_type === 'inter_state')
+                                    IGST (Inter-State Supply)
+                                @else
+                                    GST Exempt / Nil-Rated
+                                @endif
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
                 @if(!empty($quotation->notes))
                     <div class="section-label">Internal Notes / Remarks:</div>
                     <div class="terms-content" style="font-style: italic; color: #64748b;">{{ $quotation->notes }}</div>
@@ -526,16 +585,44 @@
                         <span class="summary-lbl">Subtotal:</span>
                         <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->subtotal), 2) }}</span>
                     </div>
-                    <div class="summary-line">
-                        <span class="summary-lbl">Tax Amount (GST):</span>
-                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->tax), 2) }}</span>
-                    </div>
+
                     @if($quotation->discount > 0)
                         <div class="summary-line" style="color: #dc2626;">
                             <span class="summary-lbl" style="color: #dc2626;">Discount:</span>
                             <span class="summary-num" style="color: #dc2626;">-{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->discount), 2) }}</span>
                         </div>
                     @endif
+
+                    <div class="summary-line" style="color: #475569;">
+                        <span class="summary-lbl">{{ $quotation->effective_tax_mode === 'inclusive' ? 'Taxable Value (Excl. Tax):' : 'Taxable Amount:' }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->taxable_amount), 2) }}</span>
+                    </div>
+
+                    @if($quotation->effective_tax_type === 'intra_state')
+                        <div class="summary-line">
+                            <span class="summary-lbl">CGST {{ $quotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                            <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->computed_cgst), 2) }}</span>
+                        </div>
+                        <div class="summary-line">
+                            <span class="summary-lbl">SGST {{ $quotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                            <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->computed_sgst), 2) }}</span>
+                        </div>
+                    @elseif($quotation->effective_tax_type === 'inter_state')
+                        <div class="summary-line">
+                            <span class="summary-lbl">IGST {{ $quotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                            <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->computed_igst), 2) }}</span>
+                        </div>
+                    @else
+                        <div class="summary-line">
+                            <span class="summary-lbl">Tax (GST):</span>
+                            <span class="summary-num">Exempt (0%)</span>
+                        </div>
+                    @endif
+
+                    <div class="summary-line">
+                        <span class="summary-lbl">Total Tax {{ $quotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->tax), 2) }}</span>
+                    </div>
                     <div class="total-payable-box">
                         <span class="total-payable-lbl">Total Payable:</span>
                         <span class="total-payable-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($quotation->total_amount), 2) }}</span>

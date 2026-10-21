@@ -257,6 +257,7 @@
                 @if($order->quotation)
                     <div class="client-info"><strong>Quotation Ref:</strong> {{ $order->quotation->quotation_number }}</div>
                 @endif
+                <div class="client-info"><strong>Tax Mode:</strong> {{ $order->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</div>
                 @if($order->salesPerson)
                     <div class="client-info"><strong>Sales Rep:</strong> {{ $order->salesPerson->name }}</div>
                 @endif
@@ -333,12 +334,8 @@
                 <div class="calc-box">
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                         <tr>
-                            <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Subtotal:</td>
+                            <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">{{ $order->effective_tax_mode === 'inclusive' ? 'Subtotal (Incl. GST):' : 'Subtotal (Base Rate):' }}</td>
                             <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->subtotal, 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Tax total (GST):</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->tax, 2) }}</td>
                         </tr>
                         @if($order->discount > 0)
                             <tr style="color: #b91c1c;">
@@ -346,21 +343,46 @@
                                 <td style="text-align: right; font-weight: bold; padding: 4px 0; border: 0;">-{{ $currencySymbol }}{{ number_format($order->discount, 2) }}</td>
                             </tr>
                         @endif
+                        <tr style="border-top: 1px dashed #e2e8f0;">
+                            <td style="color: #475569; font-weight: 600; padding: 4px 0; text-align: left; border: 0;">{{ $order->effective_tax_mode === 'inclusive' ? 'Taxable Value (Excl. Tax):' : 'Taxable Amount:' }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->taxable_amount, 2) }}</td>
+                        </tr>
+                        @if($order->tax_type !== 'without_tax' && $order->tax > 0)
+                            @if(($order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')
+                                <tr>
+                                    <td style="color: #64748b; padding: 3px 0; text-align: left; border: 0;">CGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
+                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax / 2, 2) }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #64748b; padding: 3px 0; text-align: left; border: 0;">SGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
+                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax / 2, 2) }}</td>
+                                </tr>
+                            @else
+                                <tr>
+                                    <td style="color: #64748b; padding: 3px 0; text-align: left; border: 0;">IGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
+                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax, 2) }}</td>
+                                </tr>
+                            @endif
+                            <tr style="border-top: 1px dashed #e2e8f0;">
+                                <td style="color: #64748b; font-weight: 600; padding: 3px 0; text-align: left; border: 0;">Total Tax {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
+                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax, 2) }}</td>
+                            </tr>
+                        @endif
                         @if($order->shipping_charges > 0)
                             <tr>
-                                <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Shipping Charges:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->shipping_charges, 2) }}</td>
+                                <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Shipping / Freight:</td>
+                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ $currencySymbol }}{{ number_format($order->shipping_charges, 2) }}</td>
                             </tr>
                         @endif
                         @if($order->adjustment != 0)
                             <tr>
                                 <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Adjustment:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->adjustment, 2) }}</td>
+                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ ($order->adjustment > 0 ? '+' : '') . $currencySymbol }}{{ number_format($order->adjustment, 2) }}</td>
                             </tr>
                         @endif
-                        <tr style="border-top: 1px solid #cbd5e1;">
+                        <tr style="border-top: 1.5px solid #cbd5e1;">
                             <td style="font-weight: bold; color: #0f172a; padding: 6px 0 0 0; font-size: 11px; text-align: left; border: 0;">Total Payable:</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 11px; border: 0;">{{ $currencySymbol }}{{ number_format($order->total_amount, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 12px; border: 0;">{{ $currencySymbol }}{{ number_format($order->total_amount, 2) }}</td>
                         </tr>
                     </table>
                 </div>
