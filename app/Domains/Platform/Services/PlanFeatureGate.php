@@ -31,7 +31,7 @@ class PlanFeatureGate
      */
     public function allows(string $permissionName, ?int $tenantId): bool
     {
-        if ($tenantId === null) {
+        if ($tenantId === null || single_client()) {
             return true;
         }
 

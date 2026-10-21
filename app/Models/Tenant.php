@@ -121,7 +121,7 @@ class Tenant extends Model
     /** Subscription lapsed: everything but billing is locked until it's renewed (EnsureBillingActive). */
     public function isBillingLocked(): bool
     {
-        return $this->subscription_status === self::SUBSCRIPTION_SUSPENDED;
+        return ! single_client() && $this->subscription_status === self::SUBSCRIPTION_SUSPENDED;
     }
 
     public function owner(): BelongsTo
@@ -143,6 +143,14 @@ class Tenant extends Model
      */
     public function planModules(): ?array
     {
+        // A single-client install has every module except the ones it hides.
+        if (single_client()) {
+            return array_values(array_diff(
+                \App\Http\Middleware\EnsureTenantModuleAccess::GATED_MODULES,
+                config('tenancy.single_client.hidden_modules', []),
+            ));
+        }
+
         $features = $this->planCatalog?->features;
 
         if ($features === null) {

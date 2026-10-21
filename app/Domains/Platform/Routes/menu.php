@@ -10,7 +10,7 @@ return [
     ],
     [
         'section' => 'workspace', 'order' => 20, 'app' => 'admin',
-        'label' => 'Tenant Console', 'icon' => 'feather-grid',
+        'label' => single_client() ? 'Settings' : 'Tenant Console', 'icon' => 'feather-grid',
         'children' => [
             ['label' => 'Tenants', 'route' => 'platform.tenants.index', 'permission' => 'platform.tenants.manage'],
             ['label' => 'Plans', 'route' => 'platform.plans.index', 'permission' => 'platform.plans.manage'],

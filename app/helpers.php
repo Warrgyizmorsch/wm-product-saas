@@ -68,6 +68,17 @@ if (! function_exists('tenant_storage')) {
     }
 }
 
+if (! function_exists('single_client')) {
+    /**
+     * True when this install serves one client only (SINGLE_CLIENT_SLUG set):
+     * the tenant is pinned and plans, billing and tenant switching are off.
+     */
+    function single_client(): bool
+    {
+        return filled(config('tenancy.single_client.slug'));
+    }
+}
+
 if (! function_exists('tenant_allowed_modules')) {
     /**
      * @return list<string>|null null means unrestricted (no plan gating; tenant

@@ -9,6 +9,18 @@ return [
 
     'local_fallback_slug' => env('TENANT_LOCAL_FALLBACK_SLUG', 'warrgyizmorsch'),
 
+    /*
+    | Single-client install: every request belongs to this one tenant, whatever
+    | the host or header. Plans, usage limits, billing, tenant switching and the
+    | tenant console are switched off. hidden_modules (comma-separated, e.g.
+    | production,projects,visitor) are left out of the sidebar and blocked.
+    | Create the tenant with: php artisan client:install
+    */
+    'single_client' => [
+        'slug' => env('SINGLE_CLIENT_SLUG'),
+        'hidden_modules' => array_values(array_filter(array_map('trim', explode(',', (string) env('SINGLE_CLIENT_HIDDEN_MODULES', ''))))),
+    ],
+
     'central_domains' => array_filter(
         array_map('trim', explode(',', env('CENTRAL_DOMAINS', 'localhost,127.0.0.1')))
     ),

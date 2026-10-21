@@ -18,9 +18,12 @@ Route::get('/locale/{locale}', LocaleController::class)
 // Public — Razorpay's servers call this directly, no tenant/session context.
 // Authenticity is verified inside the controller via the webhook signature,
 // not by tenant resolution. Excluded from CSRF in bootstrap/app.php.
-Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
-    ->middleware('throttle:60,1')
-    ->name('webhooks.razorpay');
+// SaaS subscription billing only — a single-client install has no subscription.
+if (! single_client()) {
+    Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
+        ->middleware('throttle:60,1')
+        ->name('webhooks.razorpay');
+}
 
 // Public Meta (Facebook & Instagram) Lead Ads Webhook Route (GET for handshake verification, POST for lead ingestion)
 Route::match(['get', 'post'], '/webhooks/meta-leadgen', [\App\Domains\Platform\Controllers\MetaWebhookController::class, 'handle'])
@@ -71,8 +74,10 @@ Route::middleware(['tenant'])->group(function (): void {
     Route::middleware(['auth', 'company', 'branch', 'billing.active'])->group(function (): void {
         Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
-        Route::get('/tenant-switch/{tenant:slug}', TenantSwitchController::class)
-            ->name('tenant.switch');
+        if (! single_client()) {
+            Route::get('/tenant-switch/{tenant:slug}', TenantSwitchController::class)
+                ->name('tenant.switch');
+        }
 
         Route::get('/company-switch/{company}', CompanySwitchController::class)
             ->name('company.switch');

@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('platform')
     ->as('platform.')
     ->group(function (): void {
+        // Tenant console, plans and billing exist only on the multi-tenant SaaS;
+        // a single-client install never registers them (their menu entries drop out too).
+        if (! single_client()) {
         Route::get('tenants', [TenantController::class, 'index'])
             ->name('tenants.index');
         Route::get('tenants/create', [TenantController::class, 'create'])
@@ -83,6 +86,7 @@ Route::prefix('platform')
             ->name('subscription.verify');
         Route::post('subscription/cancel', [SubscriptionController::class, 'cancel'])
             ->name('subscription.cancel');
+        }
 
         Route::get('currencies', [CurrencyController::class, 'index'])
             ->name('currencies.index');

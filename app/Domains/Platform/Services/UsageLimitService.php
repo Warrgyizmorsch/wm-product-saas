@@ -17,6 +17,10 @@ class UsageLimitService
      */
     public function maxUsers(Tenant $tenant): ?int
     {
+        if (single_client()) {
+            return null;
+        }
+
         return $tenant->max_users ?? $tenant->planCatalog?->max_users;
     }
 
@@ -55,6 +59,10 @@ class UsageLimitService
     /** The plan's cap on a config/plan_limits.php resource, or null when unlimited. */
     public function limit(Tenant $tenant, string $resource): ?int
     {
+        if (single_client()) {
+            return null;
+        }
+
         $limit = $tenant->planCatalog?->limits[$resource] ?? null;
 
         return $limit === null ? null : (int) $limit;

@@ -9,6 +9,13 @@ class TenantResolver
 {
     public function resolve(Request $request): ?Tenant
     {
+        if (single_client()) {
+            return Tenant::query()
+                ->where('slug', config('tenancy.single_client.slug'))
+                ->whereIn('status', Tenant::accessibleStatuses())
+                ->first();
+        }
+
         $tenantKey = $request->header(config('tenancy.header'));
 
         if ($tenantKey) {

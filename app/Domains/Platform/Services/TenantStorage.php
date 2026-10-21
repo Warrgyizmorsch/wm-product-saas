@@ -90,6 +90,10 @@ class TenantStorage
     /** Allowance in bytes, or null when unlimited. The tenant's own column wins over its plan's. */
     public function limitBytes(Tenant $tenant): ?int
     {
+        if (single_client()) {
+            return null;
+        }
+
         $mb = $tenant->max_storage_mb ?? $tenant->planCatalog?->max_storage_mb;
 
         return $mb === null ? null : (int) $mb * 1024 * 1024;

@@ -19,6 +19,7 @@ Schedule::command('accounting:sync-exchange-rates')
 // Missed Razorpay webhooks, grace-period expiry and ended cancellations.
 Schedule::command('billing:reconcile-subscriptions')
     ->hourly()
+    ->skip(fn () => single_client())
     ->withoutOverlapping();
 
 // Tenant storage usage: drop deleted files, record untracked ones.
