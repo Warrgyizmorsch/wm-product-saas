@@ -16,6 +16,8 @@ interface SalaryStructureRepositoryInterface
 
     public function destroyStructure(SalaryStructure $salaryStructure): bool;
 
+    public function findOverlappingStructure(?int $payGroupId, float $minCtc, float $maxCtc, ?int $ignoreId = null): ?SalaryStructure;
+
     public function storeComponent(array $validated): SalaryComponent;
 
     public function updateComponent(SalaryComponent $salaryComponent, array $validated): bool;

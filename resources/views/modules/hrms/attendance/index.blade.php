@@ -9,9 +9,9 @@
         
         <x-ui.import-export-dropdown 
             type="attendance" 
-            export-route="{{ route('hrms.attendance.export', request()->query()) }}" 
-            download-template-route="{{ route('hrms.attendance.import.template') }}" 
-            import-modal-target="#attendanceImportModal" 
+            :exportRoute="route('hrms.attendance.export', array_merge(['view' => $view ?? 'date', 'month' => $filters['month'] ?? request('month', now()->format('Y-m'))], request()->except(['_token'])))" 
+            :downloadTemplateRoute="route('hrms.attendance.import.template')" 
+            importModalTarget="#attendanceImportModal" 
         />
 
         @if(($view ?? 'date') === 'date')
@@ -553,6 +553,25 @@
     // Global references for drawer logs and map
     window.currentDrawerLogs = [];
     window.activeRowMap = null;
+
+    // Dynamically synchronize current filter form inputs with export dropdown link
+    $(document).on('click', '.erp-import-export-dropdown a[href*="attendance/export"]', function(e) {
+        const form = document.getElementById('attendanceFilterForm');
+        if (form) {
+            try {
+                const url = new URL(this.href, window.location.origin);
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    if (val && val !== '') {
+                        url.searchParams.set(key, val);
+                    }
+                }
+                this.href = url.toString();
+            } catch (err) {
+                console.error('Error synchronizing export URL:', err);
+            }
+        }
+    });
 
     // 1. Open Employee Historical Logs (triggered in Employee view)
     function openAttendanceLogs(employeeId, employeeName, employeeCode, filterStatus = 'all') {

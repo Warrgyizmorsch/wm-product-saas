@@ -5,6 +5,8 @@ namespace App\Domains\HRMS\Repositories;
 use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\AttendanceBreak;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\HolidayCalendar;
+use App\Domains\HRMS\Models\LeaveRequest;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -844,86 +846,407 @@ class AttendanceRepository implements AttendanceRepositoryInterface
     }
 
     /**
-     * Export attendance records as CSV stream.
+     * Export attendance records or corrections as Excel (.xlsx) or CSV.
      */
     public function export(array $filters = []): mixed
     {
         $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
         $user = auth()->user();
 
-        $query = Attendance::with(['employee.department']);
+        // Check if exporting from the corrections view
+        if (($filters['view'] ?? '') === 'corrections') {
+            return $this->exportCorrections($filters, $tenantId, $user);
+        }
+
+        // Determine date range with proper precedence
+        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+            $startDate = Carbon::parse($filters['start_date'])->startOfDay();
+            $endDate = Carbon::parse($filters['end_date'])->endOfDay();
+        } elseif (!empty($filters['date'])) {
+            $startDate = Carbon::parse($filters['date'])->startOfDay();
+            $endDate = Carbon::parse($filters['date'])->endOfDay();
+        } elseif (!empty($filters['month']) && $filters['month'] !== 'all') {
+            $parts = explode('-', $filters['month']);
+            if (count($parts) === 2) {
+                $startDate = Carbon::createFromDate((int)$parts[0], (int)$parts[1], 1)->startOfDay();
+                $endDate = Carbon::createFromDate((int)$parts[0], (int)$parts[1], 1)->endOfMonth()->endOfDay();
+            } else {
+                $startDate = Carbon::today()->startOfMonth();
+                $endDate = Carbon::today()->endOfMonth();
+            }
+        } elseif (isset($filters['month']) && $filters['month'] === 'all') {
+            $startDate = Carbon::now()->startOfYear();
+            $endDate = Carbon::now()->endOfDay();
+        } else {
+            // Default when neither date nor month specified: current month
+            $startDate = Carbon::today()->startOfMonth();
+            $endDate = Carbon::today()->endOfMonth();
+        }
+
+        $startDateStr = $startDate->format('Y-m-d');
+        $endDateStr = $endDate->format('Y-m-d');
+
+        // Fetch scoped employees
+        $empQuery = Employee::with(['department', 'designation'])->where('status', true);
+        if ($tenantId) {
+            $empQuery->where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            });
+        }
+        if ($user) {
+            $empQuery->forUserScope($user);
+        }
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $empQuery->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('employee_id', 'like', "%{$search}%");
+            });
+        }
+        if (!empty($filters['department_id'])) {
+            $empQuery->where('department_id', $filters['department_id']);
+        }
+        if (!empty($filters['employee_id'])) {
+            $empQuery->where('id', $filters['employee_id']);
+        }
+        $employees = $empQuery->orderBy('full_name')->get();
+
+        // Fetch attendances within date range
+        $attQuery = Attendance::whereBetween('date', [$startDateStr, $endDateStr])
+            ->with(['employee.department']);
+        if ($tenantId) {
+            $attQuery->where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            });
+        }
+        if ($user) {
+            $attQuery->forUserScope($user);
+        }
+        $attendances = $attQuery->get();
+        $attendancesByKey = $attendances->groupBy(function ($a) {
+            $d = $a->date instanceof Carbon ? $a->date->format('Y-m-d') : substr((string)$a->date, 0, 10);
+            return $d . '_' . $a->employee_id;
+        });
+
+        // Fetch holidays overlapping the period
+        $holidaysQuery = HolidayCalendar::where('status', true)
+            ->whereBetween('holiday_date', [$startDateStr, $endDateStr]);
+        if ($tenantId) {
+            $holidaysQuery->where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            });
+        }
+        $holidays = $holidaysQuery->get();
+
+        // Fetch approved leaves overlapping the period
+        $leaves = LeaveRequest::where('status', 'approved')
+            ->where('start_date', '<=', $endDateStr)
+            ->where('end_date', '>=', $startDateStr)
+            ->with('leaveType')
+            ->get();
+
+        $statusFilter = !empty($filters['status']) && $filters['status'] !== 'all' ? $filters['status'] : null;
+
+        $rows = [];
+        $currentDate = $endDate->copy()->startOfDay();
+        $startDay = $startDate->copy()->startOfDay();
+
+        while ($currentDate->gte($startDay)) {
+            $dateStr = $currentDate->format('Y-m-d');
+            $dayOfWeek = $currentDate->dayOfWeek; // 0 = Sunday
+
+            foreach ($employees as $employee) {
+                // Check if date is before employee joining date
+                if ($employee->date_of_joining) {
+                    $joiningDate = $employee->date_of_joining instanceof Carbon
+                        ? $employee->date_of_joining->copy()->startOfDay()
+                        : Carbon::parse($employee->date_of_joining)->startOfDay();
+                    if ($currentDate->lt($joiningDate)) {
+                        continue;
+                    }
+                }
+
+                $key = $dateStr . '_' . $employee->id;
+                $att = $attendancesByKey->get($key)?->first();
+
+                $statusKey = 'absent';
+                $statusLabel = 'Absent';
+                $checkIn = '-';
+                $checkOut = '-';
+                $locationType = '-';
+                $workHours = '0.00';
+                $breakHours = '0.00';
+
+                if ($att) {
+                    $statusKey = $att->status ?: 'present';
+                    $statusLabel = ucwords(str_replace('_', ' ', $statusKey));
+                    $checkIn = $att->check_in ? $att->check_in->format('H:i:s') : '-';
+                    $checkOut = $att->check_out ? $att->check_out->format('H:i:s') : '-';
+                    $locationType = ucfirst($att->location_type ?: 'office');
+                    $workHours = (string) ($att->total_work_hours ?? '0.00');
+                    $breakHours = (string) ($att->total_break_hours ?? '0.00');
+                } else {
+                    // Check Holiday
+                    $holiday = $holidays->first(function ($h) use ($employee, $dateStr) {
+                        $hDate = $h->holiday_date instanceof Carbon ? $h->holiday_date->format('Y-m-d') : substr((string)$h->holiday_date, 0, 10);
+                        if ($hDate !== $dateStr) return false;
+                        if (is_null($h->company_id) && is_null($h->business_unit_id) && is_null($h->branch_id)) return true;
+                        if ($h->company_id == $employee->company_id) {
+                            if (is_null($h->business_unit_id) && is_null($h->branch_id)) return true;
+                            if ($h->business_unit_id == $employee->business_unit_id) {
+                                if (is_null($h->branch_id) || $h->branch_id == $employee->branch_id) return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                    if ($holiday) {
+                        $statusKey = 'holiday';
+                        $statusLabel = 'Holiday: ' . $holiday->name;
+                    } else {
+                        // Check Week Off
+                        $isWeekOff = false;
+                        if (isset($employee->weekly_pattern) && is_array($employee->weekly_pattern)) {
+                            if (isset($employee->weekly_pattern[$dayOfWeek]) && $employee->weekly_pattern[$dayOfWeek] === 'off') {
+                                $isWeekOff = true;
+                            } elseif ($dayOfWeek === 0 && (!isset($employee->weekly_pattern[$dayOfWeek]) || $employee->weekly_pattern[$dayOfWeek] === 'off')) {
+                                $isWeekOff = true;
+                            }
+                        } else {
+                            if ($dayOfWeek === 0) {
+                                $isWeekOff = true;
+                            }
+                        }
+
+                        if ($isWeekOff) {
+                            $statusKey = 'week_off';
+                            $statusLabel = 'Week Off';
+                        } else {
+                            // Check Leave
+                            $leave = $leaves->first(function ($l) use ($employee, $dateStr) {
+                                if ($l->employee_id != $employee->id) return false;
+                                $lStart = $l->start_date instanceof Carbon ? $l->start_date->format('Y-m-d') : substr((string)$l->start_date, 0, 10);
+                                $lEnd = $l->end_date instanceof Carbon ? $l->end_date->format('Y-m-d') : substr((string)$l->end_date, 0, 10);
+                                return $dateStr >= $lStart && $dateStr <= $lEnd;
+                            });
+
+                            if ($leave) {
+                                $typeName = $leave->leaveType ? $leave->leaveType->name : 'Leave';
+                                $statusKey = 'on_leave';
+                                $statusLabel = 'Leave (' . $typeName . ')';
+                            } else {
+                                if ($currentDate->isFuture() && !$currentDate->isToday()) {
+                                    $statusKey = 'scheduled';
+                                    $statusLabel = 'Scheduled';
+                                } else {
+                                    $statusKey = 'absent';
+                                    $statusLabel = 'Absent';
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Filter by status if requested
+                if ($statusFilter && $statusKey !== $statusFilter) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'employee_code'     => $employee->employee_id ?? '',
+                    'employee_name'     => $employee->full_name ?? '',
+                    'department'        => $employee->department?->name ?? '',
+                    'date'              => $dateStr,
+                    'check_in'          => $checkIn,
+                    'check_out'         => $checkOut,
+                    'status'            => $statusLabel,
+                    'location_type'     => $locationType,
+                    'total_work_hours'  => $workHours,
+                    'total_break_hours' => $breakHours,
+                    'check_in_raw'      => $att?->check_in?->timestamp ?? 0,
+                ];
+            }
+
+            $currentDate->subDay();
+        }
+
+        // Apply sorting
+        $sort = $filters['sort'] ?? 'name_asc';
+        $rowsCollection = collect($rows);
+
+        if ($sort === 'checkin_asc') {
+            $sortedRows = $rowsCollection->sortBy([
+                ['date', 'desc'],
+                ['check_in_raw', 'asc'],
+                ['employee_name', 'asc'],
+            ]);
+        } elseif ($sort === 'checkin_desc') {
+            $sortedRows = $rowsCollection->sortBy([
+                ['date', 'desc'],
+                ['check_in_raw', 'desc'],
+                ['employee_name', 'asc'],
+            ]);
+        } elseif ($sort === 'name_desc') {
+            $sortedRows = $rowsCollection->sortBy([
+                ['date', 'desc'],
+                ['employee_name', 'desc'],
+            ]);
+        } else {
+            // default: name_asc
+            $sortedRows = $rowsCollection->sortBy([
+                ['date', 'desc'],
+                ['employee_name', 'asc'],
+            ]);
+        }
+
+        $headers = [
+            'Employee Code',
+            'Employee Name',
+            'Department',
+            'Date',
+            'Check In',
+            'Check Out',
+            'Status',
+            'Location Type',
+            'Total Work Hours',
+            'Total Break Hours',
+        ];
+
+        $data = [];
+        foreach ($sortedRows as $row) {
+            $data[] = [
+                $row['employee_code'],
+                $row['employee_name'],
+                $row['department'],
+                $row['date'],
+                $row['check_in'],
+                $row['check_out'],
+                $row['status'],
+                $row['location_type'],
+                $row['total_work_hours'],
+                $row['total_break_hours'],
+            ];
+        }
+
+        $format = strtolower($filters['format'] ?? 'xlsx');
+        $filenameBase = 'attendance_export_' . date('Ymd_His');
+
+        if ($format === 'csv') {
+            $csvHeaders = [
+                "Content-type"        => "text/csv; charset=UTF-8",
+                "Content-Disposition" => "attachment; filename={$filenameBase}.csv",
+                "Pragma"              => "no-cache",
+                "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                "Expires"             => "0"
+            ];
+
+            $callback = function() use ($data, $headers) {
+                $file = fopen('php://output', 'w');
+                // UTF-8 BOM so Excel opens CSV without encoding issues
+                fputs($file, "\xEF\xBB\xBF");
+                fputcsv($file, $headers);
+
+                foreach ($data as $row) {
+                    fputcsv($file, $row);
+                }
+
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $csvHeaders);
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, "{$filenameBase}.xlsx");
+    }
+
+    /**
+     * Export attendance corrections.
+     */
+    protected function exportCorrections(array $filters, ?int $tenantId, mixed $user): mixed
+    {
+        $query = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee.department', 'employee.designation']);
         if ($tenantId) {
             $query->where('tenant_id', $tenantId);
         }
         if ($user) {
-            $query->forUserScope($user);
+            $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+            $scopeService->applyRelatedScope($query, $user);
         }
 
-        // Date range / Month / Single Date filtering
-        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
-            $query->whereBetween('date', [$filters['start_date'], $filters['end_date']]);
-        } elseif (!empty($filters['month']) && $filters['month'] !== 'all') {
-            $parts = explode('-', $filters['month']);
-            if (count($parts) === 2) {
-                $start = Carbon::createFromDate((int)$parts[0], (int)$parts[1], 1)->startOfMonth()->format('Y-m-d');
-                $end = Carbon::createFromDate((int)$parts[0], (int)$parts[1], 1)->endOfMonth()->format('Y-m-d');
-                $query->whereBetween('date', [$start, $end]);
-            }
-        } elseif (!empty($filters['date'])) {
-            $query->whereDate('date', $filters['date']);
-        } elseif (empty($filters['month']) || $filters['month'] !== 'all') {
-            $query->whereDate('date', Carbon::today()->format('Y-m-d'));
+        if (!empty($filters['corrections_status'])) {
+            $query->where('status', $filters['corrections_status']);
         }
 
-        if (!empty($filters['department_id'])) {
-            $departmentId = $filters['department_id'];
-            $query->whereHas('employee', function ($q) use ($departmentId) {
-                $q->where('department_id', $departmentId);
+        if (!empty($filters['payroll_month'])) {
+            $carbonMonth = Carbon::parse($filters['payroll_month'] . '-01');
+            $query->whereBetween('date', [$carbonMonth->copy()->startOfMonth(), $carbonMonth->copy()->endOfMonth()]);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $query->whereHas('employee', function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('employee_id', 'like', "%{$search}%");
             });
         }
 
-        if (!empty($filters['employee_id'])) {
-            $query->where('employee_id', $filters['employee_id']);
-        }
-
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        $logs = $query->orderBy('date', 'desc')->get();
+        $records = $query->orderBy('created_at', 'desc')->get();
 
         $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=attendance_export_" . date('Ymd_His') . ".csv",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            'Employee Code',
+            'Employee Name',
+            'Department',
+            'Date',
+            'Requested Check In',
+            'Requested Check Out',
+            'Reason',
+            'Status',
+            'Rejection Reason',
         ];
 
-        $columns = ['Employee Code', 'Employee Name', 'Department', 'Date', 'Check In', 'Check Out', 'Status', 'Location Type', 'Total Work Hours'];
+        $data = [];
+        foreach ($records as $item) {
+            $data[] = [
+                $item->employee?->employee_id ?? '',
+                $item->employee?->full_name ?? '',
+                $item->employee?->department?->name ?? '',
+                $item->date ? $item->date->format('Y-m-d') : '',
+                $item->requested_check_in ? $item->requested_check_in->format('H:i:s') : '-',
+                $item->requested_check_out ? $item->requested_check_out->format('H:i:s') : '-',
+                $item->reason ?? '',
+                ucfirst($item->status ?? 'pending'),
+                $item->rejected_reason ?? '',
+            ];
+        }
 
-        $callback = function() use ($logs, $columns) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
+        $format = strtolower($filters['format'] ?? 'xlsx');
+        $filenameBase = 'attendance_corrections_export_' . date('Ymd_His');
 
-            foreach ($logs as $log) {
-                fputcsv($file, [
-                    $log->employee?->employee_id ?? '',
-                    $log->employee?->full_name ?? '',
-                    $log->employee?->department?->name ?? '',
-                    $log->date ? $log->date->format('Y-m-d') : '',
-                    $log->check_in ? $log->check_in->format('H:i:s') : '',
-                    $log->check_out ? $log->check_out->format('H:i:s') : '',
-                    $log->status ?: 'present',
-                    $log->location_type ?: 'office',
-                    $log->total_work_hours ?: 0.00
-                ]);
-            }
+        if ($format === 'csv') {
+            $csvHeaders = [
+                "Content-type"        => "text/csv; charset=UTF-8",
+                "Content-Disposition" => "attachment; filename={$filenameBase}.csv",
+                "Pragma"              => "no-cache",
+                "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                "Expires"             => "0"
+            ];
 
-            fclose($file);
-        };
+            $callback = function() use ($data, $headers) {
+                $file = fopen('php://output', 'w');
+                fputs($file, "\xEF\xBB\xBF");
+                fputcsv($file, $headers);
 
-        return response()->stream($callback, 200, $headers);
+                foreach ($data as $row) {
+                    fputcsv($file, $row);
+                }
+
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $csvHeaders);
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, "{$filenameBase}.xlsx");
     }
 
     /**

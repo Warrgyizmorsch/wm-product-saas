@@ -748,6 +748,31 @@ class NotificationEventCatalog
                     ],
                 ],
             ],
+            'hrms' => [
+                'label' => 'HRMS & Employee Support',
+                'events' => [
+                    'hrms.ticket.created' => [
+                        'label' => 'Helpdesk Ticket Submitted',
+                        'description' => 'Triggered when an employee submits a new helpdesk support ticket.',
+                        'icon' => 'feather-help-circle',
+                        'default_roles' => ['HR Manager', 'HR Executive', 'Support Agent'],
+                        'default_title' => 'New Ticket {{ticket_no}}: {{subject}}',
+                        'default_body' => 'Ticket {{ticket_no}} (Category: {{category}}, Priority: {{priority}}) submitted by {{employee_name}}.',
+                        'action_route' => 'hrms.helpdesk.tickets.show',
+                        'variables' => ['ticket_no', 'subject', 'category', 'priority', 'employee_name', 'action_url'],
+                    ],
+                    'hrms.ticket.resolved' => [
+                        'label' => 'Helpdesk Ticket Resolved',
+                        'description' => 'Triggered when a support agent marks a helpdesk ticket as resolved.',
+                        'icon' => 'feather-check-circle',
+                        'default_roles' => ['Employee', 'HR Manager'],
+                        'default_title' => 'Ticket Resolved: {{ticket_no}}',
+                        'default_body' => 'Ticket {{ticket_no}} ("{{subject}}") has been marked as resolved by {{resolved_by}}.',
+                        'action_route' => 'hrms.helpdesk.tickets.show',
+                        'variables' => ['ticket_no', 'subject', 'resolved_by', 'action_url'],
+                    ],
+                ],
+            ],
         ];
     }
 

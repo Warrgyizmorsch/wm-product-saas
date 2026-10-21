@@ -18,14 +18,28 @@ class PipService
     public function generatePipNumber(int $tenantId): string
     {
         $year = date('Y');
+        $prefix = 'PIP-' . $year . '-';
+
+        // Lock latest record for update to prevent concurrent race condition
         $lastPip = PerformanceImprovementPlan::where('tenant_id', $tenantId)
             ->whereYear('created_at', $year)
+            ->lockForUpdate()
             ->latest('id')
             ->first();
 
-        $sequence = $lastPip ? intval(substr($lastPip->pip_number, -4)) + 1 : 1;
+        $baseSequence = 1;
+        if ($lastPip && preg_match('/-(\d+)$/', $lastPip->pip_number, $matches)) {
+            $baseSequence = intval($matches[1]) + 1;
+        }
 
-        return 'PIP-' . $year . '-' . str_pad((string)$sequence, 4, '0', STR_PAD_LEFT);
+        // Check global collision and increment until unused
+        $candidate = $prefix . str_pad((string)$baseSequence, 4, '0', STR_PAD_LEFT);
+        while (PerformanceImprovementPlan::where('pip_number', $candidate)->exists()) {
+            $baseSequence++;
+            $candidate = $prefix . str_pad((string)$baseSequence, 4, '0', STR_PAD_LEFT);
+        }
+
+        return $candidate;
     }
 
     /**
@@ -44,7 +58,6 @@ class PipService
         return DB::transaction(function () use ($data) {
             $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
             $data['tenant_id'] = $tenantId;
-            $data['pip_number'] = $this->generatePipNumber($tenantId);
             $data['status'] = $data['status'] ?? 'active';
 
             // Calculate duration in days
@@ -57,7 +70,28 @@ class PipService
             $data['start_date'] = $start->toDateString();
             $data['end_date'] = $end->toDateString();
 
-            $pip = PerformanceImprovementPlan::create($data);
+            // Attempt creation with atomic collision retry
+            $maxRetries = 5;
+            $attempt = 0;
+            $pip = null;
+            while ($attempt < $maxRetries) {
+                try {
+                    $data['pip_number'] = $this->generatePipNumber($tenantId);
+                    $pip = PerformanceImprovementPlan::create($data);
+                    break;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Check if duplicate key on pip_number
+                    if ($e->errorInfo[1] == 1062 || str_contains($e->getMessage(), 'Duplicate entry')) {
+                        $attempt++;
+                        if ($attempt >= $maxRetries) {
+                            throw $e;
+                        }
+                        usleep(100000); // Wait 100ms
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
 
             // Create Objectives if passed
             if (!empty($data['objectives']) && is_array($data['objectives'])) {
@@ -175,38 +209,43 @@ class PipService
     public function evaluateFinalOutcome(PerformanceImprovementPlan $pip, array $data): PerformanceImprovementPlan
     {
         return DB::transaction(function () use ($pip, $data) {
-            $outcome = $data['evaluation_outcome'] ?? $data['final_outcome'];
+            $rawOutcome = $data['evaluation_outcome'] ?? $data['final_outcome'] ?? 'successful_completion';
             $remarks = $data['final_remarks'] ?? $data['final_comments'] ?? null;
 
+            // Map aliases to the 4 strict database enum values
+            $canonicalOutcome = match ($rawOutcome) {
+                'successful_completion', 'completed_success' => 'successful_completion',
+                'pip_extension', 'extended' => 'pip_extension',
+                'role_reassignment', 'failed_role_change', 'failed_demoted' => 'role_reassignment',
+                'termination', 'failed_terminated' => 'termination',
+                default => 'successful_completion',
+            };
+
             $updateData = [
-                'final_outcome'  => $outcome,
+                'final_outcome'  => $canonicalOutcome,
                 'final_comments' => $remarks,
             ];
 
-            switch ($outcome) {
+            switch ($canonicalOutcome) {
                 case 'successful_completion':
-                case 'completed_success':
                     $updateData['status']       = 'completed_success';
                     $updateData['completed_at'] = now();
                     break;
 
                 case 'pip_extension':
-                case 'extended':
                     $extensionDays = (int) ($data['extension_days'] ?? 30);
                     $updateData['status']       = 'extended';
                     $updateData['end_date']     = Carbon::parse($pip->end_date)->addDays($extensionDays)->format('Y-m-d');
                     $updateData['duration_days'] = $pip->duration_days + $extensionDays;
+                    $updateData['completed_at'] = null;
                     break;
 
                 case 'role_reassignment':
-                case 'failed_role_change':
-                case 'failed_demoted':
                     $updateData['status']       = 'role_reassigned';
                     $updateData['completed_at'] = now();
                     break;
 
                 case 'termination':
-                case 'failed_terminated':
                     $updateData['status']       = 'failed_terminated';
                     $updateData['completed_at'] = now();
                     break;

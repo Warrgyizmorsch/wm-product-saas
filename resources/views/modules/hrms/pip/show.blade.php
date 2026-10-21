@@ -108,7 +108,37 @@
                     </small>
                 </div>
             </div>
-        </div>
+        <!-- ACKNOWLEDGEMENT STATUS BANNER -->
+        @if($pip->employee_acknowledged_at)
+            <div class="alert alert-success border-0 d-flex flex-wrap align-items-center justify-content-between p-3 rounded mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-check-circle fs-18 text-success"></i>
+                    <div>
+                        <strong class="text-success fs-13">Employee Digitally Acknowledged</strong>
+                        <div class="text-muted fs-11">
+                            Acknowledged by <strong>{{ $pip->employee->full_name }}</strong> on {{ $pip->employee_acknowledged_at->format('M d, Y h:i A') }}
+                            @if($pip->employee_signature)
+                                &bull; Signature: <code>{{ $pip->employee_signature }}</code>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <x-ui.badge soft variant="success" class="fs-11">Acknowledged</x-ui.badge>
+            </div>
+        @elseif(isset($canAcknowledge) && $canAcknowledge)
+            <div class="alert alert-warning border-0 d-flex flex-wrap align-items-center justify-content-between gap-3 p-3 rounded mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-alert-triangle fs-18 text-warning"></i>
+                    <div>
+                        <strong class="text-dark fs-13">Action Required: Digital Acknowledgement Pending</strong>
+                        <div class="text-muted fs-11">Please review the PIP plan guidelines, SMART objectives, and company support details below and submit your digital acknowledgement.</div>
+                    </div>
+                </div>
+                <x-ui.button variant="warning" size="sm" class="fw-bold text-dark px-3" data-bs-toggle="modal" data-bs-target="#acknowledgePipModal">
+                    <i class="feather-check-square me-1"></i> Acknowledge Plan
+                </x-ui.button>
+            </div>
+        @endif
 
         <!-- REASON FOR PIP & CORE DEFICIENCIES (FULL-WIDTH CARD) -->
         <div class="p-3 bg-light rounded border mb-4">
@@ -124,6 +154,14 @@
                             <i class="feather-tag me-1"></i> {{ $pip->category?->name ?? 'General Performance' }}
                         </x-ui.badge>
                     </div>
+                    @if($pip->template)
+                    <div>
+                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Policy Template</span>
+                        <x-ui.badge soft variant="info" class="mt-1">
+                            <i class="feather-file-text me-1"></i> {{ $pip->template->name }}
+                        </x-ui.badge>
+                    </div>
+                    @endif
                     <div>
                         <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Check-in Frequency</span>
                         <span class="fw-semibold text-dark text-capitalize mt-1 d-inline-block fs-12">
@@ -146,6 +184,29 @@
                     </div>
                 </div>
             </div>
+
+            @if($pip->support_provided || $pip->consequences || $pip->initial_notes)
+                <div class="mt-3 pt-3 border-top row g-3">
+                    @if($pip->support_provided)
+                        <div class="col-md-4">
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-help-circle me-1 text-primary"></i> Company Support & Resources</span>
+                            <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->support_provided }}</p>
+                        </div>
+                    @endif
+                    @if($pip->consequences)
+                        <div class="col-md-4">
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-alert-octagon me-1 text-danger"></i> Consequences of Failure</span>
+                            <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->consequences }}</p>
+                        </div>
+                    @endif
+                    @if($pip->initial_notes)
+                        <div class="col-md-4">
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-file-text me-1 text-muted"></i> Initial Discussion Notes</span>
+                            <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->initial_notes }}</p>
+                        </div>
+                    @endif
+                </div>
+            @endif
 
             @if($pip->final_outcome)
                 <div class="mt-3 pt-3 border-top">
@@ -378,19 +439,35 @@
                                                     @csrf
                                                     @method('PUT')
                                                     <div class="modal-body p-4 text-start">
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ $checkin->review_date?->format('Y-m-d') }}" :required="true" />
+                                                        <div class="row g-3 mb-3">
+                                                            <div class="col-md-6">
+                                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ $checkin->review_date?->format('Y-m-d') }}" :required="true" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
+                                                                    <option value="on_track" @selected($checkin->rating_status === 'on_track')>On Track</option>
+                                                                    <option value="off_track" @selected($checkin->rating_status === 'off_track')>Off Track</option>
+                                                                    <option value="at_risk" @selected($checkin->rating_status === 'at_risk')>At Risk</option>
+                                                                    <option value="exceeding" @selected($checkin->rating_status === 'exceeding')>Exceeding Expectations</option>
+                                                                </x-ui.odoo-form-ui>
+                                                            </div>
+                                                        </div>
+                                                        <div class="row g-3 mb-3">
+                                                            <div class="col-md-6">
+                                                                <x-ui.odoo-form-ui type="input" inputType="number" step="0.5" min="1" max="5" label="Numeric Score (1-5)" name="rating" value="{{ $checkin->rating }}" placeholder="e.g. 3.5" />
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Next Check-in Date" name="next_checkin_date" value="{{ $checkin->next_checkin_date?->format('Y-m-d') }}" />
+                                                            </div>
                                                         </div>
                                                         <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
-                                                                <option value="on_track" @selected($checkin->rating_status === 'on_track')>On Track</option>
-                                                                <option value="off_track" @selected($checkin->rating_status === 'off_track')>Off Track</option>
-                                                                <option value="at_risk" @selected($checkin->rating_status === 'at_risk')>At Risk</option>
-                                                                <option value="exceeding" @selected($checkin->rating_status === 'exceeding')>Exceeding Expectations</option>
-                                                            </x-ui.odoo-form-ui>
+                                                            <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="3" value="{{ $checkin->manager_comments }}" :required="true" />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <x-ui.odoo-form-ui type="textarea" label="Concerns Noted / Blockers" name="concerns_noted" rows="2" value="{{ $checkin->concerns_noted }}" placeholder="Specific hurdles or deficiencies noted..." />
                                                         </div>
                                                         <div class="mb-0">
-                                                            <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="4" value="{{ $checkin->manager_comments }}" :required="true" />
+                                                            <x-ui.odoo-form-ui type="textarea" label="Support Action Items" name="support_action_items" rows="2" value="{{ $checkin->support_action_items }}" placeholder="Agreed actions and support before next meeting..." />
                                                         </div>
                                                     </div>
                                                     <div class="modal-footer border-top bg-light py-2.5">
@@ -430,19 +507,35 @@
             <form action="{{ route('hrms.pip.checkin.store', $pip->id) }}" method="POST">
                 @csrf
                 <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ date('Y-m-d') }}" :required="true" />
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ date('Y-m-d') }}" :required="true" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
+                                <option value="on_track">On Track</option>
+                                <option value="off_track">Off Track</option>
+                                <option value="at_risk">At Risk</option>
+                                <option value="exceeding">Exceeding Expectations</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="number" step="0.5" min="1" max="5" label="Numeric Score (1-5)" name="rating" placeholder="e.g. 3.5" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="Next Check-in Date" name="next_checkin_date" />
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
-                            <option value="on_track">On Track</option>
-                            <option value="off_track">Off Track</option>
-                            <option value="at_risk">At Risk</option>
-                            <option value="exceeding">Exceeding Expectations</option>
-                        </x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="3" placeholder="Summarize performance discussions, blockers, and agreed next steps..." :required="true" />
+                    </div>
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="textarea" label="Concerns Noted / Blockers" name="concerns_noted" rows="2" placeholder="Specific hurdles or deficiencies noted..." />
                     </div>
                     <div class="mb-0">
-                        <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="4" placeholder="Summarize performance discussions, blockers, and agreed next steps..." :required="true" />
+                        <x-ui.odoo-form-ui type="textarea" label="Support Action Items" name="support_action_items" rows="2" placeholder="Agreed actions and support before next meeting..." />
                     </div>
                 </div>
                 <div class="modal-footer border-top bg-light py-2.5">
@@ -524,12 +617,39 @@
 </div>
 @endif
 
+<!-- ACKNOWLEDGE PIP MODAL -->
+<div class="modal fade" id="acknowledgePipModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-check-square me-1.5 text-warning"></i> Employee Digital Acknowledgement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.pip.acknowledge', $pip->id) }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <p class="fs-13 text-secondary mb-3">
+                        I, <strong>{{ $pip->employee?->full_name }}</strong>, acknowledge that I have received and reviewed this Performance Improvement Plan (#{{ $pip->pip_number }}), understand the performance expectations, support provided, and consequences of failing to meet the required objectives.
+                    </p>
+                    <div class="mb-0">
+                        <x-ui.odoo-form-ui type="input" label="Full Legal Name / Digital Signature" name="signature_data" placeholder="Type your full name as digital signature" value="{{ $pip->employee?->full_name }}" :required="true" />
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light py-2.5">
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="warning" size="sm" class="fw-bold text-dark px-4">Submit Acknowledgement</x-ui.button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <x-ui.confirmation-modal />
 
 @push('scripts')
 <script>
     $(document).ready(function() {
-        $('#addCheckinModal, #evaluateModal, #addObjectiveModal').each(function() {
+        $('#addCheckinModal, #evaluateModal, #addObjectiveModal, #acknowledgePipModal').each(function() {
             if ($(this).parent().get(0) !== document.body) {
                 $(this).appendTo(document.body);
             }

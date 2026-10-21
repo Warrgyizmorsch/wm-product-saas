@@ -279,9 +279,56 @@
                                 <x-ui.status-badge :status="$req->status" :label="in_array($req->status, ['approved', 'published', 'open']) ? 'Open' : null" />
                             </td>
                             <td class="text-end pe-3">
-                                <x-ui.button :href="route('hrms.recruitment.pipeline', $req->id)" variant="primary" size="sm" icon="feather-columns" class="text-nowrap">
-                                    View Pipeline
-                                </x-ui.button>
+                                <div class="d-flex align-items-center justify-content-end gap-1">
+                                    <x-ui.button :href="route('hrms.recruitment.pipeline', $req->id)" variant="primary" size="sm" icon="feather-columns" class="text-nowrap">
+                                        Pipeline
+                                    </x-ui.button>
+                                    @if($canUpdateRecruitment)
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-light border dropdown-toggle text-secondary py-1 px-2" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
+                                                <i class="feather-more-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 fs-12">
+                                                <li>
+                                                    <form action="{{ route('hrms.recruitment.requisitions.status', $req->id) }}" method="POST">
+                                                        @csrf
+                                                        <input type="hidden" name="status" value="approved">
+                                                        <button type="submit" class="dropdown-item py-1.5 {{ $req->status === 'approved' ? 'active fw-bold' : '' }}">
+                                                            <i class="feather-check-circle text-success me-2"></i> Mark as Open (Approved)
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('hrms.recruitment.requisitions.status', $req->id) }}" method="POST">
+                                                        @csrf
+                                                        <input type="hidden" name="status" value="published">
+                                                        <button type="submit" class="dropdown-item py-1.5 {{ $req->status === 'published' ? 'active fw-bold' : '' }}">
+                                                            <i class="feather-globe text-primary me-2"></i> Mark as Published
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('hrms.recruitment.requisitions.status', $req->id) }}" method="POST">
+                                                        @csrf
+                                                        <input type="hidden" name="status" value="closed">
+                                                        <button type="submit" class="dropdown-item py-1.5 {{ $req->status === 'closed' ? 'active fw-bold' : '' }}">
+                                                            <i class="feather-lock text-danger me-2"></i> Mark as Closed
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('hrms.recruitment.requisitions.status', $req->id) }}" method="POST">
+                                                        @csrf
+                                                        <input type="hidden" name="status" value="cancelled">
+                                                        <button type="submit" class="dropdown-item py-1.5 {{ $req->status === 'cancelled' ? 'active fw-bold' : '' }}">
+                                                            <i class="feather-slash text-muted me-2"></i> Mark as Cancelled
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty

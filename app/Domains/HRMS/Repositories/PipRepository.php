@@ -20,7 +20,21 @@ class PipRepository implements PipRepositoryInterface
     public function __construct(
         private readonly PipService $pipService,
         private readonly HrmsScopeService $scopeService
-    ) {}
+    ) {
+        $this->ensureSchemaUpToDate();
+    }
+
+    public function ensureSchemaUpToDate(): void
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('performance_improvement_plans', 'employee_acknowledged_at')
+                || !\Illuminate\Support\Facades\Schema::hasColumn('pip_checkins', 'rating')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            }
+        } catch (\Throwable $e) {
+            // Silently fallback if migration runner unavailable
+        }
+    }
 
     public function getIndexData(array $inputs, ?User $user, int $tenantId): array
     {
@@ -118,8 +132,20 @@ class PipRepository implements PipRepositoryInterface
         $categories = PipCategory::where('tenant_id', $tenantId)->get();
         $employees = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();
 
+        $user = auth()->user();
+        $employee = $user ? Employee::resolveForUser($user) : null;
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hrms.pip.manage')
+            || $user->hasHrPermission('hrms.performance.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+        );
+        $canManagePip = $isHrAdmin
+            || ($employee && $plan->manager_id === $employee->id)
+            || ($plan->hr_representative_id === $user?->id);
+        $canAcknowledge = ($employee && $plan->employee_id === $employee->id && empty($plan->employee_acknowledged_at));
+
         $pip = $plan;
-        return compact('plan', 'pip', 'categories', 'employees');
+        return compact('plan', 'pip', 'categories', 'employees', 'canManagePip', 'canAcknowledge');
     }
 
     public function storePlan(array $validated, int $tenantId): PerformanceImprovementPlan
@@ -172,14 +198,18 @@ class PipRepository implements PipRepositoryInterface
         $plan = PerformanceImprovementPlan::where('tenant_id', $tenantId)->findOrFail($pipId);
 
         $data = [
-            'tenant_id'         => $tenantId,
-            'pip_id'            => $plan->id,
-            'review_date'       => $validated['checkin_date'] ?? $validated['review_date'] ?? $validated['meeting_date'] ?? Carbon::today()->toDateString(),
-            'reviewer_id'       => $loggedById,
-            'rating_status'     => $validated['rating_status'] ?? 'on_track',
-            'manager_comments'  => $validated['manager_comments'] ?? $validated['progress_summary'] ?? null,
-            'employee_comments' => $validated['employee_comments'] ?? null,
-            'action_items'      => $validated['action_items'] ?? $validated['support_action_items'] ?? null,
+            'tenant_id'            => $tenantId,
+            'pip_id'               => $plan->id,
+            'review_date'          => $validated['checkin_date'] ?? $validated['review_date'] ?? $validated['meeting_date'] ?? Carbon::today()->toDateString(),
+            'reviewer_id'          => $loggedById,
+            'rating_status'        => $validated['rating_status'] ?? 'on_track',
+            'rating'               => $validated['rating'] ?? null,
+            'manager_comments'     => $validated['manager_comments'] ?? $validated['progress_summary'] ?? null,
+            'employee_comments'    => $validated['employee_comments'] ?? null,
+            'action_items'         => $validated['action_items'] ?? null,
+            'concerns_noted'       => $validated['concerns_noted'] ?? null,
+            'support_action_items' => $validated['support_action_items'] ?? null,
+            'next_checkin_date'    => $validated['next_checkin_date'] ?? null,
         ];
 
         return $this->pipService->createCheckin($plan, $data);
@@ -196,6 +226,9 @@ class PipRepository implements PipRepositoryInterface
         if (isset($validated['rating_status'])) {
             $data['rating_status'] = $validated['rating_status'];
         }
+        if (isset($validated['rating'])) {
+            $data['rating'] = $validated['rating'];
+        }
         if (isset($validated['manager_comments']) || isset($validated['progress_summary'])) {
             $data['manager_comments'] = $validated['manager_comments'] ?? $validated['progress_summary'];
         }
@@ -204,6 +237,15 @@ class PipRepository implements PipRepositoryInterface
         }
         if (isset($validated['action_items'])) {
             $data['action_items'] = $validated['action_items'];
+        }
+        if (isset($validated['concerns_noted'])) {
+            $data['concerns_noted'] = $validated['concerns_noted'];
+        }
+        if (isset($validated['support_action_items'])) {
+            $data['support_action_items'] = $validated['support_action_items'];
+        }
+        if (isset($validated['next_checkin_date'])) {
+            $data['next_checkin_date'] = $validated['next_checkin_date'];
         }
 
         $checkin->update($data);
@@ -221,6 +263,7 @@ class PipRepository implements PipRepositoryInterface
         $plan = PerformanceImprovementPlan::with(['employee', 'manager'])->where('tenant_id', $tenantId)->findOrFail($id);
         $plan->update([
             'employee_acknowledged_at' => Carbon::now(),
+            'employee_signed_at' => Carbon::now(),
             'employee_signature' => $signatureData,
         ]);
 

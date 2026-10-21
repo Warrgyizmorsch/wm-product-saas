@@ -49,6 +49,14 @@ class PipApiController extends Controller
     }
 
     /**
+     * Helper to get tenant ID.
+     */
+    private function getTenantId(): int
+    {
+        return (int) (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+    }
+
+    /**
      * Helper to check if current user has HR Admin permissions for PIP.
      */
     private function isHrAdmin(): bool
@@ -74,8 +82,44 @@ class PipApiController extends Controller
         }
 
         return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
+            ->where('tenant_id', $this->getTenantId())
             ->first();
+    }
+
+    /**
+     * Check if user can manage this specific PIP (HR admin, assigned manager, or HR rep).
+     */
+    private function canManagePip(PerformanceImprovementPlan $pip): bool
+    {
+        if ($this->isHrAdmin()) {
+            return true;
+        }
+        $employee = $this->getAuthenticatedEmployee();
+        if ($employee && (int)$pip->manager_id === (int)$employee->id) {
+            return true;
+        }
+        if ((int)$pip->hr_representative_id === (int)auth()->id()) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if user is associated with this PIP (Employee, Manager, HR Rep, or HR Admin).
+     * Fails closed: non-admins without employee profile are denied.
+     */
+    private function canAccessPip(PerformanceImprovementPlan $pip): bool
+    {
+        if ($this->isHrAdmin()) {
+            return true;
+        }
+        $employee = $this->getAuthenticatedEmployee();
+        if (!$employee) {
+            return false;
+        }
+        return ((int)$pip->employee_id === (int)$employee->id)
+            || ((int)$pip->manager_id === (int)$employee->id)
+            || ((int)$pip->hr_representative_id === (int)auth()->id());
     }
 
     /**
@@ -308,12 +352,18 @@ class PipApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to initiate PIP.', 403);
         }
 
+        $tenantId = $this->getTenantId();
+
         $validated = $request->validate([
-            'employee_id'               => 'required|exists:employees,id',
-            'manager_id'                => 'nullable|exists:employees,id',
-            'pip_category_id'           => 'nullable|exists:pip_categories,id',
-            'reason_category'          => 'nullable|string|max:100',
-            'reason_details'           => 'required|string',
+            'employee_id'               => ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'manager_id'                => ['nullable', \Illuminate\Validation\Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'pip_category_id'           => ['nullable', \Illuminate\Validation\Rule::exists('pip_categories', 'id')->where('tenant_id', $tenantId)],
+            'pip_policy_template_id'    => ['nullable', \Illuminate\Validation\Rule::exists('pip_policy_templates', 'id')->where('tenant_id', $tenantId)],
+            'reason_category'           => 'nullable|string|max:100',
+            'reason_details'            => 'required|string',
+            'support_provided'          => 'nullable|string',
+            'consequences'              => 'nullable|string',
+            'initial_notes'             => 'nullable|string',
             'start_date'                => 'required|date',
             'end_date'                  => 'required|date|after_or_equal:start_date',
             'checkin_frequency'         => 'required|in:weekly,biweekly,monthly',
@@ -336,18 +386,15 @@ class PipApiController extends Controller
      */
     public function show(mixed $id): JsonResponse
     {
-        $pip = PerformanceImprovementPlan::find($id);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($id);
 
         if (!$pip) {
             return $this->sendError("Performance Improvement Plan with ID '{$id}' not found.", 404);
         }
 
-        $isHrAdmin = $this->isHrAdmin();
-        $employee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $employee) {
-            if ($pip->employee_id !== $employee->id && $pip->manager_id !== $employee->id && $pip->hr_representative_id !== auth()->id()) {
-                return $this->sendError('Unauthorized action. You can only view your own PIP record.', 403);
-            }
+        if (!$this->canAccessPip($pip)) {
+            return $this->sendError('Unauthorized action. You can only view your own PIP record.', 403);
         }
 
         return $this->sendSuccess($this->formatPipDetailResponse($pip), 'PIP plan workspace details retrieved successfully.');
@@ -359,22 +406,28 @@ class PipApiController extends Controller
      */
     public function update(Request $request, mixed $id): JsonResponse
     {
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized action. Admin permissions required to update PIP plan.', 403);
-        }
-
-        $pip = PerformanceImprovementPlan::find($id);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($id);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
         }
 
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Manager or Admin permissions required to update PIP plan.', 403);
+        }
+
         $validated = $request->validate([
-            'pip_category_id'   => 'nullable|exists:pip_categories,id',
-            'reason_details'    => 'required|string',
-            'start_date'        => 'required|date',
-            'end_date'          => 'required|date|after_or_equal:start_date',
-            'checkin_frequency' => 'required|in:weekly,biweekly,monthly',
-            'status'            => 'required|string',
+            'pip_category_id'        => ['nullable', \Illuminate\Validation\Rule::exists('pip_categories', 'id')->where('tenant_id', $tenantId)],
+            'pip_policy_template_id' => ['nullable', \Illuminate\Validation\Rule::exists('pip_policy_templates', 'id')->where('tenant_id', $tenantId)],
+            'reason_category'        => 'nullable|string|max:100',
+            'reason_details'         => 'required|string',
+            'support_provided'       => 'nullable|string',
+            'consequences'           => 'nullable|string',
+            'initial_notes'          => 'nullable|string',
+            'start_date'             => 'required|date',
+            'end_date'               => 'required|date|after_or_equal:start_date',
+            'checkin_frequency'      => 'required|in:weekly,biweekly,monthly',
+            'status'                 => 'required|string',
         ]);
 
         $pip->update($validated);
@@ -392,7 +445,8 @@ class PipApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required to delete PIP plan.', 403);
         }
 
-        $pip = PerformanceImprovementPlan::find($id);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($id);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
         }
@@ -410,9 +464,14 @@ class PipApiController extends Controller
      */
     public function storeObjective(Request $request, mixed $pipId): JsonResponse
     {
-        $pip = PerformanceImprovementPlan::find($pipId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
+        }
+
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Manager or Admin permissions required to add objectives.', 403);
         }
 
         $validated = $request->validate([
@@ -420,9 +479,9 @@ class PipApiController extends Controller
             'description'      => 'nullable|string',
             'target_criteria'  => 'nullable|string',
             'support_provided' => 'nullable|string',
+            'weightage'        => 'nullable|numeric|min:0|max:100',
         ]);
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $validated['tenant_id'] = $tenantId;
         $validated['pip_id'] = $pip->id;
         $validated['status'] = 'pending';
@@ -438,7 +497,17 @@ class PipApiController extends Controller
      */
     public function updateObjectiveStatus(Request $request, mixed $pipId, mixed $objectiveId): JsonResponse
     {
-        $objective = PipObjective::where('pip_id', $pipId)->find($objectiveId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
+        if (!$pip) {
+            return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
+        }
+
+        if (!$this->canAccessPip($pip)) {
+            return $this->sendError('Unauthorized action. You are not associated with this PIP.', 403);
+        }
+
+        $objective = PipObjective::where('tenant_id', $tenantId)->where('pip_id', $pip->id)->find($objectiveId);
         if (!$objective) {
             return $this->sendError("SMART Objective with ID '{$objectiveId}' not found on PIP '{$pipId}'.", 404);
         }
@@ -459,7 +528,17 @@ class PipApiController extends Controller
      */
     public function updateObjective(Request $request, mixed $pipId, mixed $objectiveId): JsonResponse
     {
-        $objective = PipObjective::where('pip_id', $pipId)->find($objectiveId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
+        if (!$pip) {
+            return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
+        }
+
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Manager or Admin permissions required.', 403);
+        }
+
+        $objective = PipObjective::where('tenant_id', $tenantId)->where('pip_id', $pip->id)->find($objectiveId);
         if (!$objective) {
             return $this->sendError("SMART Objective with ID '{$objectiveId}' not found on PIP '{$pipId}'.", 404);
         }
@@ -470,6 +549,7 @@ class PipApiController extends Controller
             'target_criteria'  => 'nullable|string',
             'support_provided' => 'nullable|string',
             'status'           => 'required|in:pending,in_progress,achieved,partially_achieved,not_achieved',
+            'manager_remarks'  => 'nullable|string',
         ]);
 
         $objective->update($validated);
@@ -483,7 +563,17 @@ class PipApiController extends Controller
      */
     public function destroyObjective(mixed $pipId, mixed $objectiveId): JsonResponse
     {
-        $objective = PipObjective::where('pip_id', $pipId)->find($objectiveId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
+        if (!$pip) {
+            return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
+        }
+
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Manager or Admin permissions required.', 403);
+        }
+
+        $objective = PipObjective::where('tenant_id', $tenantId)->where('pip_id', $pip->id)->find($objectiveId);
         if (!$objective) {
             return $this->sendError("SMART Objective with ID '{$objectiveId}' not found on PIP '{$pipId}'.", 404);
         }
@@ -499,26 +589,41 @@ class PipApiController extends Controller
      */
     public function storeCheckin(Request $request, mixed $pipId): JsonResponse
     {
-        $pip = PerformanceImprovementPlan::find($pipId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
         }
 
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Only assigned managers or HR admins can log check-ins.', 403);
+        }
+
         $validated = $request->validate([
-            'checkin_date'     => 'required|date',
-            'rating_status'    => 'required|in:on_track,off_track,at_risk,exceeding',
-            'manager_comments' => 'required|string',
+            'checkin_date'         => 'required|date',
+            'rating_status'        => 'required|in:on_track,off_track,at_risk,exceeding',
+            'rating'               => 'nullable|numeric|min:1|max:5',
+            'manager_comments'     => 'required|string',
+            'employee_comments'    => 'nullable|string',
+            'action_items'         => 'nullable|string',
+            'concerns_noted'       => 'nullable|string',
+            'support_action_items' => 'nullable|string',
+            'next_checkin_date'    => 'nullable|date',
         ]);
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
-
         $checkin = PipCheckin::create([
-            'tenant_id'        => $tenantId,
-            'pip_id'           => $pip->id,
-            'review_date'      => $validated['checkin_date'],
-            'rating_status'    => $validated['rating_status'],
-            'manager_comments' => $validated['manager_comments'],
-            'reviewer_id'      => auth()->id(),
+            'tenant_id'            => $tenantId,
+            'pip_id'               => $pip->id,
+            'review_date'          => $validated['checkin_date'],
+            'rating_status'        => $validated['rating_status'],
+            'rating'               => $validated['rating'] ?? null,
+            'manager_comments'     => $validated['manager_comments'],
+            'employee_comments'    => $validated['employee_comments'] ?? null,
+            'action_items'         => $validated['action_items'] ?? null,
+            'concerns_noted'       => $validated['concerns_noted'] ?? null,
+            'support_action_items' => $validated['support_action_items'] ?? null,
+            'next_checkin_date'    => $validated['next_checkin_date'] ?? null,
+            'reviewer_id'          => auth()->id(),
         ]);
 
         return $this->sendSuccess($checkin->load('reviewer'), 'Milestone check-in recorded successfully.', 201);
@@ -530,21 +635,43 @@ class PipApiController extends Controller
      */
     public function updateCheckin(Request $request, mixed $pipId, mixed $checkinId): JsonResponse
     {
-        $checkin = PipCheckin::where('pip_id', $pipId)->find($checkinId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
+        if (!$pip) {
+            return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
+        }
+
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Only assigned managers or HR admins can update check-ins.', 403);
+        }
+
+        $checkin = PipCheckin::where('tenant_id', $tenantId)->where('pip_id', $pip->id)->find($checkinId);
         if (!$checkin) {
             return $this->sendError("Milestone check-in with ID '{$checkinId}' not found on PIP '{$pipId}'.", 404);
         }
 
         $validated = $request->validate([
-            'checkin_date'     => 'required|date',
-            'rating_status'    => 'required|in:on_track,off_track,at_risk,exceeding',
-            'manager_comments' => 'required|string',
+            'checkin_date'         => 'required|date',
+            'rating_status'        => 'required|in:on_track,off_track,at_risk,exceeding',
+            'rating'               => 'nullable|numeric|min:1|max:5',
+            'manager_comments'     => 'required|string',
+            'employee_comments'    => 'nullable|string',
+            'action_items'         => 'nullable|string',
+            'concerns_noted'       => 'nullable|string',
+            'support_action_items' => 'nullable|string',
+            'next_checkin_date'    => 'nullable|date',
         ]);
 
         $checkin->update([
-            'review_date'      => $validated['checkin_date'],
-            'rating_status'    => $validated['rating_status'],
-            'manager_comments' => $validated['manager_comments'],
+            'review_date'          => $validated['checkin_date'],
+            'rating_status'        => $validated['rating_status'],
+            'rating'               => $validated['rating'] ?? $checkin->rating,
+            'manager_comments'     => $validated['manager_comments'],
+            'employee_comments'    => $validated['employee_comments'] ?? $checkin->employee_comments,
+            'action_items'         => $validated['action_items'] ?? $checkin->action_items,
+            'concerns_noted'       => $validated['concerns_noted'] ?? $checkin->concerns_noted,
+            'support_action_items' => $validated['support_action_items'] ?? $checkin->support_action_items,
+            'next_checkin_date'    => $validated['next_checkin_date'] ?? $checkin->next_checkin_date,
         ]);
 
         return $this->sendSuccess($checkin->fresh('reviewer'), 'Milestone check-in updated successfully.');
@@ -556,7 +683,17 @@ class PipApiController extends Controller
      */
     public function destroyCheckin(mixed $pipId, mixed $checkinId): JsonResponse
     {
-        $checkin = PipCheckin::where('pip_id', $pipId)->find($checkinId);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($pipId);
+        if (!$pip) {
+            return $this->sendError("PIP plan with ID '{$pipId}' not found.", 404);
+        }
+
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Only assigned managers or HR admins can delete check-ins.', 403);
+        }
+
+        $checkin = PipCheckin::where('tenant_id', $tenantId)->where('pip_id', $pip->id)->find($checkinId);
         if (!$checkin) {
             return $this->sendError("Milestone check-in with ID '{$checkinId}' not found on PIP '{$pipId}'.", 404);
         }
@@ -572,19 +709,20 @@ class PipApiController extends Controller
      */
     public function evaluate(Request $request, mixed $id): JsonResponse
     {
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized action. Admin permissions required to evaluate PIP.', 403);
-        }
-
-        $pip = PerformanceImprovementPlan::find($id);
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($id);
         if (!$pip) {
             return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
         }
 
+        if (!$this->canManagePip($pip)) {
+            return $this->sendError('Unauthorized action. Admin or Manager permissions required to evaluate PIP.', 403);
+        }
+
         $validated = $request->validate([
-            'evaluation_outcome' => 'required|in:successful_completion,pip_extension,role_reassignment,termination',
+            'evaluation_outcome' => 'required|in:successful_completion,completed_success,pip_extension,extended,role_reassignment,failed_role_change,failed_demoted,termination,failed_terminated',
             'final_remarks'      => 'required|string',
-            'extension_days'     => 'nullable|required_if:evaluation_outcome,pip_extension|integer|min:7|max:90',
+            'extension_days'     => 'nullable|required_if:evaluation_outcome,pip_extension,extended|integer|min:7|max:90',
         ]);
 
         $this->pipService->evaluateFinalOutcome($pip, $validated);
@@ -593,12 +731,52 @@ class PipApiController extends Controller
     }
 
     /**
+     * POST /api/hrms/pip/{id}/acknowledge
+     * Employee digitally acknowledges PIP.
+     */
+    public function acknowledge(Request $request, mixed $id): JsonResponse
+    {
+        $tenantId = $this->getTenantId();
+        $pip = PerformanceImprovementPlan::where('tenant_id', $tenantId)->find($id);
+        if (!$pip) {
+            return $this->sendError("PIP plan with ID '{$id}' not found.", 404);
+        }
+
+        $employee = $this->getAuthenticatedEmployee();
+        if (!$employee || (int)$pip->employee_id !== (int)$employee->id) {
+            return $this->sendError('Unauthorized action. Only the assigned employee can acknowledge this PIP.', 403);
+        }
+
+        $validated = $request->validate([
+            'signature_data' => 'required|string',
+        ]);
+
+        $pip->update([
+            'employee_acknowledged_at' => Carbon::now(),
+            'employee_signed_at' => Carbon::now(),
+            'employee_signature' => $validated['signature_data'],
+        ]);
+
+        try {
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                'PIP Acknowledged by Employee',
+                "Employee {$employee->full_name} has digitally acknowledged PIP #{$pip->pip_number}.",
+                route('hrms.pip.show', $pip->id),
+                'pip_acknowledged',
+                'feather-check-square'
+            );
+        } catch (\Throwable $e) {}
+
+        return $this->sendSuccess($this->formatPipDetailResponse($pip->fresh()), 'PIP digitally acknowledged successfully.');
+    }
+
+    /**
      * GET /api/hrms/pip/categories
      * PIP Categories Master listing.
      */
     public function indexCategories(Request $request): JsonResponse
     {
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->getTenantId();
         $categories = PipCategory::where('tenant_id', $tenantId)
             ->latest('id')
             ->paginate($request->integer('per_page', 10));
@@ -622,7 +800,7 @@ class PipApiController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->getTenantId();
         $validated['tenant_id'] = $tenantId;
 
         $category = PipCategory::create($validated);
@@ -640,7 +818,8 @@ class PipApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required.', 403);
         }
 
-        $category = PipCategory::find($id);
+        $tenantId = $this->getTenantId();
+        $category = PipCategory::where('tenant_id', $tenantId)->find($id);
         if (!$category) {
             return $this->sendError("PIP Category with ID '{$id}' not found.", 404);
         }
@@ -656,7 +835,7 @@ class PipApiController extends Controller
      */
     public function indexTemplates(Request $request): JsonResponse
     {
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->getTenantId();
         $templates = PipPolicyTemplate::where('tenant_id', $tenantId)
             ->latest('id')
             ->paginate($request->integer('per_page', 10));
@@ -692,7 +871,7 @@ class PipApiController extends Controller
             'description'       => 'nullable|string',
         ]);
 
-        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $this->getTenantId();
         $validated['tenant_id'] = $tenantId;
 
         $template = PipPolicyTemplate::create($validated);
@@ -710,7 +889,8 @@ class PipApiController extends Controller
             return $this->sendError('Unauthorized action. Admin permissions required.', 403);
         }
 
-        $template = PipPolicyTemplate::find($id);
+        $tenantId = $this->getTenantId();
+        $template = PipPolicyTemplate::where('tenant_id', $tenantId)->find($id);
         if (!$template) {
             return $this->sendError("PIP Policy Template with ID '{$id}' not found.", 404);
         }
