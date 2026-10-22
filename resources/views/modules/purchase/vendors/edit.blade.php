@@ -129,6 +129,7 @@
                                 </x-ui.odoo-form-ui>
 
                                 <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="{{ __('purchase.opening_balance') }} ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" :value="old('opening_balance', number_format(convert_from_base($vendor->opening_balance ?? 0), 2, '.', ''))" placeholder="0.00" :errorText="$errors->first('opening_balance')" />
+                                @include('modules.accounting.partials.opening-balance-side', ['party' => 'vendor', 'selected' => $vendor->opening_balance_type])
                             </div>
                         </div>
                     </div>

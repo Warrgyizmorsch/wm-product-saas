@@ -48,13 +48,11 @@ class PartyLedgerController extends Controller
         }
 
         if ($party) {
-            $hasOpeningJournal = \App\Domains\Accounting\Models\Journal::where('tenant_id', auth()->user()->tenant_id)
-                ->where('reference_type', $partyType . '_opening_balance')
-                ->where('reference_id', $partyId)
-                ->where('status', \App\Domains\Accounting\Models\Journal::STATUS_POSTED)
-                ->exists();
-
-            $seed = $hasOpeningJournal ? 0.0 : (float) ($party->opening_balance ?? 0);
+            // Opening balances are posted to the ledger (OpeningBalanceService),
+            // so the statement reads the books only and always matches the
+            // Trial Balance. Run accounting:post-opening-balances once to post
+            // openings that were saved on a master but never reached the books.
+            $seed = 0.0;
             $ledger = $this->journals->partyLedger($partyType, $partyId, $from, $to, $seed);
         }
 

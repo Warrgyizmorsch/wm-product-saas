@@ -65,7 +65,7 @@ class CrmAccount extends BaseModel
 
     public function getOpeningBalanceAttribute(): float
     {
-        return (float) ($this->customer?->opening_balance ?? 0.00);
+        return (float) ($this->customer?->signedOpeningBalance() ?? 0.00);
     }
 
     public function owner(): BelongsTo

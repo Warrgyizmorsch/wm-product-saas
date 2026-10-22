@@ -113,6 +113,7 @@ class VendorApiController extends Controller
             'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'payment_terms'    => ['nullable', 'string'],
         ], [
             'email.email'          => 'The email field must be a valid email address.',
@@ -150,14 +151,16 @@ class VendorApiController extends Controller
             'account_number'   => $validated['account_number'] ?? null,
             'ifsc_code'        => $validated['ifsc_code'] ?? null,
             'opening_balance'  => isset($validated['opening_balance']) ? convert_to_base((float)$validated['opening_balance']) : 0.00,
+            'opening_balance_type' => $validated['opening_balance_type'] ?? 'credit',
             'payment_terms'    => $validated['payment_terms'] ?? null,
         ]);
 
-        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor created successfully',
+            'warning' => $openingWarning,
             'data'    => $vendor,
         ], 201);
     }
@@ -236,6 +239,7 @@ class VendorApiController extends Controller
             'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'payment_terms'    => ['nullable', 'string'],
         ], [
             'email.email'          => 'The email field must be a valid email address.',
@@ -260,11 +264,12 @@ class VendorApiController extends Controller
         }
         $vendor->update($data);
 
-        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor updated successfully',
+            'warning' => $openingWarning,
             'data'    => $vendor->fresh(),
         ]);
     }

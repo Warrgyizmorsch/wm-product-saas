@@ -116,6 +116,7 @@ class CustomerApiController extends Controller
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
         ], [
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'phone.max'   => 'Phone number cannot exceed 20 digits.',
@@ -145,11 +146,16 @@ class CustomerApiController extends Controller
             'billing_address'  => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
             'opening_balance'  => $validated['opening_balance'] ?? 0.00,
+            'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
         ]);
+
+        // Previously saved on the customer only, never posted to the ledger.
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer);
 
         return response()->json([
             'success' => true,
             'message' => 'Customer created successfully',
+            'warning' => $openingWarning,
             'data'    => $customer,
         ], 201);
     }
@@ -220,6 +226,7 @@ class CustomerApiController extends Controller
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
         ], [
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'phone.max'   => 'Phone number cannot exceed 20 digits.',
@@ -235,9 +242,12 @@ class CustomerApiController extends Controller
 
         $customer->update($validator->validated());
 
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer->fresh());
+
         return response()->json([
             'success' => true,
             'message' => 'Customer updated successfully',
+            'warning' => $openingWarning,
             'data'    => $customer->fresh(),
         ]);
     }

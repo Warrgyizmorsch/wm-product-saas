@@ -200,9 +200,13 @@ class JournalRepository implements JournalRepositoryInterface
 
     public function ledgerEntries(int $chartOfAccountId, int $periodId): Collection
     {
+        $periodStart = \App\Domains\Accounting\Models\AccountingPeriod::query()->whereKey($periodId)->value('start_date');
+
         return JournalEntry::query()
             ->where('chart_of_account_id', $chartOfAccountId)
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId)
+                // Shown as the opening balance instead (see openingBalance()).
+                ->when($periodStart, fn ($q) => $q->whereNot(fn ($o) => $this->isOpeningOn($o, \Illuminate\Support\Carbon::parse($periodStart)))))
             ->with('journal')
             ->get()
             ->sortBy(fn ($entry) => $entry->journal->journal_date)
@@ -213,7 +217,8 @@ class JournalRepository implements JournalRepositoryInterface
     {
         $totals = JournalEntry::query()
             ->where('chart_of_account_id', $chartOfAccountId)
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('journal_date', '<', $before))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where(fn ($w) => $w->where('journal_date', '<', $before)->orWhere(fn ($o) => $this->isOpeningOn($o, $before))))
             ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
             ->first();
 
@@ -228,7 +233,8 @@ class JournalRepository implements JournalRepositoryInterface
         $totals = JournalEntry::query()
             ->where('party_type', $partyType)
             ->where('party_id', $partyId)
-            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('journal_date', '<', $before))
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->where(fn ($w) => $w->where('journal_date', '<', $before)->orWhere(fn ($o) => $this->isOpeningOn($o, $before))))
             ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
             ->first();
 
@@ -245,7 +251,8 @@ class JournalRepository implements JournalRepositoryInterface
             ->where('party_id', $partyId)
             ->whereHas('journal', fn ($q) => $q
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
-                ->whereBetween('journal_date', [$from, $to]))
+                ->whereBetween('journal_date', [$from, $to])
+                ->whereNot(fn ($o) => $this->isOpeningOn($o, $from)))
             ->with('journal', 'account')
             ->get()
             ->sortBy(fn ($entry) => $entry->journal->journal_date)
@@ -289,7 +296,8 @@ class JournalRepository implements JournalRepositoryInterface
             ->where('chart_of_account_id', $chartOfAccountId)
             ->whereHas('journal', fn ($q) => $q
                 ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
-                ->whereBetween('journal_date', [$from, $to]))
+                ->whereBetween('journal_date', [$from, $to])
+                ->whereNot(fn ($o) => $this->isOpeningOn($o, $from)))
             ->with(['journal.voucherDetail', 'account'])
             ->get()
             ->sortBy(fn ($entry) => $entry->journal->journal_date)
@@ -311,5 +319,15 @@ class JournalRepository implements JournalRepositoryInterface
             ->groupBy('journal_entries.chart_of_account_id', 'journals.journal_date')
             ->with('account')
             ->get();
+    }
+
+    /**
+     * Opening-balance journals are dated on the books' first day. Statements
+     * starting that day must show them as the opening, not as a movement.
+     */
+    private function isOpeningOn(\Illuminate\Database\Eloquent\Builder $journal, \DateTimeInterface $date): \Illuminate\Database\Eloquent\Builder
+    {
+        return $journal->whereDate('journal_date', \Illuminate\Support\Carbon::parse($date)->toDateString())
+            ->where('reference_type', 'like', '%_opening_balance');
     }
 }

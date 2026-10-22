@@ -69,6 +69,8 @@
                                     @enderror
                                 </div>
 
+                                @include('modules.accounting.partials.opening-balance-side', ['party' => 'customer'])
+
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold text-dark">{{ __('crm.status') }} <span class="text-danger">*</span></label>
                                     <select name="status" class="form-select @error('status') is-invalid @enderror" required>
