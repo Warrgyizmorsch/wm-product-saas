@@ -240,6 +240,7 @@ Route::prefix('accounting')
 
                 Route::get('/{asset}', [AssetRegisterController::class, 'show'])->name('show');
                 Route::post('/{asset}/capitalize', [AssetRegisterController::class, 'capitalize'])->name('capitalize');
+                Route::post('/{asset}/capitalization-entry', [AssetRegisterController::class, 'postCapitalizationEntry'])->name('capitalization-entry');
             });
 
         foreach (VoucherType::ALL as $voucherType) {

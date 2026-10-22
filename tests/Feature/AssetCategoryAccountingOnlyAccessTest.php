@@ -22,6 +22,7 @@ class AssetCategoryAccountingOnlyAccessTest extends TestCase
     private Tenant $tenant;
     private User $accountant;
     private Company $company;
+    private ChartOfAccount $capital;
 
     protected function setUp(): void
     {
@@ -64,6 +65,18 @@ class AssetCategoryAccountingOnlyAccessTest extends TestCase
         $this->company = Company::create([
             'tenant_id' => $this->tenant->id,
             'company_name' => 'Acme Co',
+        ]);
+
+        app(\App\Domains\Accounting\Services\FiscalPeriodService::class)->createFiscalYearWithMonthlyPeriods([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'FY 2026',
+            'start_date' => '2026-01-01',
+            'end_date' => '2027-12-31',
+        ]);
+
+        $this->capital = ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => '3030', 'name' => "Proprietor's Capital",
+            'type' => ChartOfAccount::TYPE_EQUITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'is_active' => true,
         ]);
 
         ChartOfAccount::create([
@@ -180,11 +193,61 @@ class AssetCategoryAccountingOnlyAccessTest extends TestCase
                 'acquisition_cost' => 500000,
                 'useful_life_months' => 60,
                 'depreciation_method' => 'straight_line',
+                'capitalization_date' => '2026-10-05',
+                'funding_source' => 'opening_balance',
+                'funding_account_id' => $this->capital->id,
             ]);
         $capitalize->assertRedirect(route('accounting.fixed-assets.show', $asset));
 
         $asset->refresh();
         $this->assertEquals('active', $asset->status);
         $this->assertEquals(500000, (float) $asset->book_value);
+    }
+
+    public function test_asset_page_shows_what_was_entered_at_capitalization(): void
+    {
+        $category = AssetCategory::create([
+            'tenant_id' => $this->tenant->id,
+            'company_id' => $this->company->id,
+            'name' => 'Office Furniture',
+        ]);
+
+        $this->actingAs($this->accountant)
+            ->withHeader('X-Tenant', 'accounting-only-tenant')
+            ->post(route('accounting.fixed-assets.register.store'), [
+                'asset_category_id' => $category->id,
+                'name' => 'Ergonomic Office Chair',
+                'asset_code' => 'CHR-001',
+                'condition' => 'new',
+                'purchase_cost' => 80000,
+            ])->assertRedirect();
+
+        $asset = \App\Domains\HRMS\Models\Asset::where('asset_code', 'CHR-001')->firstOrFail();
+
+        $this->actingAs($this->accountant)
+            ->withHeader('X-Tenant', 'accounting-only-tenant')
+            ->post(route('accounting.fixed-assets.capitalize', $asset), [
+                'acquisition_cost' => 80000,
+                'directly_attributable_cost' => 5000,
+                'non_recoverable_tax' => 7800,
+                'recoverable_tax' => 1200,
+                'residual_value' => 42500,
+                'useful_life_months' => 12,
+                'depreciation_method' => 'straight_line',
+                'capitalization_date' => '2026-10-05',
+                'depreciation_start_date' => '2026-11-01',
+                'funding_source' => 'opening_balance',
+                'funding_account_id' => $this->capital->id,
+            ])->assertRedirect(route('accounting.fixed-assets.show', $asset));
+
+        $this->actingAs($this->accountant)
+            ->withHeader('X-Tenant', 'accounting-only-tenant')
+            ->get(route('accounting.fixed-assets.show', $asset))
+            ->assertOk()
+            ->assertSeeInOrder(['Capitalization', 'Capitalization Date', '05 Oct 2026', 'Depreciation Start Date', '01 Nov 2026'])
+            ->assertSee('Added manually in the register')
+            ->assertSee('Ledger entry:')
+            ->assertDontSee('has not been posted to the ledger')
+            ->assertSeeInOrder(['Acquisition Cost', '80,000.00', 'Directly Attributable Cost', '5,000.00', 'Non-Recoverable Tax', '7,800.00', 'Capitalized Cost', '92,800.00', 'Recoverable Tax', '1,200.00']);
     }
 }

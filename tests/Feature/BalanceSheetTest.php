@@ -152,6 +152,11 @@ class BalanceSheetTest extends TestCase
         // 300 + 11,500 = 11,800 = Assets — balanced.
         $response->assertSee('Balanced');
         $response->assertSee('11,800.00');
+
+        // Profit is its own row; Capital Account shows only the capital (10,000),
+        // not 11,500 with the profit counted a second time.
+        $response->assertSeeInOrder(['Profit for the Period', '1,500.00', 'Capital Account', '10,000.00']);
+        $response->assertDontSee('11,500.00');
     }
 
     /** @test */
