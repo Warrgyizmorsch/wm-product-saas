@@ -80,19 +80,15 @@ class AssetDepreciationService
         return $openingBookValue * $monthlyRate;
     }
 
+    /**
+     * Carrying amount the next period depreciates from: gross carrying amount
+     * less accumulated depreciation. Both are kept in step with the ledger by
+     * capitalization, depreciation posting and revaluation, so this also picks
+     * up a revaluation posted after the last depreciation run.
+     */
     public function openingBookValueFor(Asset $asset): float
     {
-        $lastPosted = $asset->depreciationSchedules()
-            ->where('status', AssetDepreciationSchedule::STATUS_POSTED)
-            ->orderByDesc('period_year')
-            ->orderByDesc('period_month')
-            ->first();
-
-        if ($lastPosted !== null) {
-            return (float) $lastPosted->closing_book_value;
-        }
-
-        return (float) ($asset->book_value ?? $asset->capitalization_cost ?? 0);
+        return round((float) $asset->capitalization_cost - (float) $asset->accumulated_depreciation, 2);
     }
 
     public function generateSchedule(Asset $asset, int $year, int $month, int $userId): AssetDepreciationSchedule
@@ -121,8 +117,24 @@ class AssetDepreciationService
             throw new InvalidArgumentException("Asset #{$asset->id}'s depreciation has not started as of {$periodEnd->toDateString()}.");
         }
 
+        // Schedules must be posted in order: a later period generated while an
+        // earlier one is still unposted would start from a stale book value.
+        $earlierUnposted = AssetDepreciationSchedule::where('asset_id', $asset->id)
+            ->where('status', '!=', AssetDepreciationSchedule::STATUS_POSTED)
+            ->where('period_end_date', '<', $periodStart->toDateString())
+            ->exists();
+
+        if ($earlierUnposted) {
+            throw new InvalidArgumentException("Asset #{$asset->id} has an earlier depreciation schedule that is not posted yet; post it before generating {$year}-{$month}.");
+        }
+
         $openingBookValue = $this->openingBookValueFor($asset);
         $depreciationAmount = $this->calculateMonthlyDepreciation($asset, $openingBookValue);
+
+        if ($depreciationAmount <= 0) {
+            throw new InvalidArgumentException("Asset #{$asset->id} has nothing left to depreciate for {$year}-{$month}.");
+        }
+
         $closingBookValue = round($openingBookValue - $depreciationAmount, 2);
 
         return AssetDepreciationSchedule::create([
@@ -219,6 +231,13 @@ class AssetDepreciationService
             $asset = $schedule->asset()->lockForUpdate()->first();
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
+
+            // The schedule was calculated against the book value at generation
+            // time. If that has moved since (revaluation, another posting), the
+            // amount is stale and must be regenerated rather than posted.
+            if (abs($this->openingBookValueFor($asset) - (float) $schedule->opening_book_value) >= 0.01) {
+                throw new InvalidArgumentException("Schedule #{$schedule->id} was calculated on a book value of {$schedule->opening_book_value}, but asset #{$asset->id} is now carried at {$this->openingBookValueFor($asset)}. Regenerate the schedule before posting.");
+            }
 
             $depreciationExpenseAccount = $category?->depreciationExpenseAccount
                 ?? $this->systemAccounts->get(self::FALLBACK_DEPRECIATION_EXPENSE_KEY, $tenantId)
