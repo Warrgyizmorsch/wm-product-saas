@@ -659,6 +659,16 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ExternalWorkerPayGrade::class,
+            \App\Domains\Production\Policies\ExternalWorkerPayGradePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ExternalWorkerAllocation::class,
+            \App\Domains\Production\Policies\ExternalWorkerAllocationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\Machine::class,
             \App\Domains\Production\Policies\MachinePolicy::class
         );

@@ -169,8 +169,8 @@ class UpdateRoutingRequest extends FormRequest
                     }
 
                     if ($machineId && $workCenterId) {
-                        $machine = Machine::find($machineId);
-                        if ($machine && $machine->work_center_id !== $workCenterId) {
+                        $machine = Machine::with('section')->find($machineId);
+                        if ($machine && $machine->section?->work_center_id !== $workCenterId) {
                             $validator->errors()->add(
                                 "operations.{$index}.machine_id",
                                 "The selected machine does not belong to the chosen work center."

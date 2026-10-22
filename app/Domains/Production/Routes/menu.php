@@ -57,6 +57,7 @@ return [
             ['label' => 'production.routing', 'default' => 'Routing', 'route' => 'production.routing.index', 'active_routes' => ['production.routing.*']],
             ['label' => 'production.eco_engineering_changes', 'default' => 'ECO / Engineering Changes', 'route' => 'production.ecos.index', 'active_routes' => ['production.ecos.*']],
             ['label' => 'production.work_centers', 'default' => 'Work Centers', 'route' => 'production.work-centers.index', 'active_routes' => ['production.work-centers.*']],
+            ['label' => 'production.pay_grades', 'default' => 'Pay Grades', 'route' => 'production.pay-grades.index', 'permission' => 'production.work_center.manage', 'active_routes' => ['production.pay-grades.*']],
             ['label' => 'production.machines', 'default' => 'Machines', 'route' => 'production.machines.index', 'active_routes' => ['production.machines.*']],
             ['label' => 'production.operator_skills', 'default' => 'Operator Skills', 'route' => 'production.operator-skills.index', 'permission' => 'production.mes.execute', 'active_routes' => ['production.operator-skills.*']],
             ['label' => 'production.shifts_sidebar', 'default' => 'Shifts', 'route' => 'production.shifts.index', 'permission' => 'production.mes.execute', 'active_routes' => ['production.shifts.*']],

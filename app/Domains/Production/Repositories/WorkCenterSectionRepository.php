@@ -108,20 +108,20 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
         return $query->orderBy('name')->get();
     }
 
-    public function syncShifts(WorkCenterSection $section, array $shiftIds, ?int $tenantId = null, array $shiftWorkers = []): void
+    public function syncShifts(WorkCenterSection $section, array $shiftIds, ?int $tenantId = null, array $shiftActive = []): void
     {
         $tenantId = $tenantId ?? (int) $section->tenant_id;
-        $existingPivotWorkers = $section->shifts->pluck('pivot.workers_required', 'id')->toArray();
+        $existingPivotActive = $section->shifts->pluck('pivot.active', 'id')->toArray();
 
         $syncData = [];
         foreach ($shiftIds as $shiftId) {
-            $workers = isset($shiftWorkers[$shiftId]) && is_numeric($shiftWorkers[$shiftId])
-                ? (int) $shiftWorkers[$shiftId]
-                : ($existingPivotWorkers[$shiftId] ?? $section->workers_required ?? 1);
+            $active = isset($shiftActive[$shiftId])
+                ? (bool) $shiftActive[$shiftId]
+                : (bool) ($existingPivotActive[$shiftId] ?? true);
 
             $syncData[$shiftId] = [
-                'tenant_id'        => $tenantId,
-                'workers_required' => max(1, $workers),
+                'tenant_id' => $tenantId,
+                'active'    => $active,
             ];
         }
 
@@ -142,8 +142,7 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
             \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
                 ->whereIn('id', $toRemove)
                 ->update([
-                    'section_id'     => null,
-                    'work_center_id' => null,
+                    'section_id' => null,
                 ]);
         }
 
@@ -151,8 +150,7 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
             \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)
                 ->whereIn('id', $toAdd)
                 ->update([
-                    'section_id'     => $section->id,
-                    'work_center_id' => $section->work_center_id,
+                    'section_id' => $section->id,
                 ]);
         }
     }

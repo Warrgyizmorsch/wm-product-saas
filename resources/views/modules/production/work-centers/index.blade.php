@@ -70,13 +70,13 @@
                             <span>Name (Z&ndash;A)</span>
                         </a>
                         <div class="dropdown-divider"></div>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_per_hour', 'sort_order' => 'asc']) }}"
-                            class="dropdown-item {{ $sortBy === 'cost_per_hour' && $sortOrder === 'asc' ? 'active' : '' }}">
-                            <span>Cost/Hr (Low to High)</span>
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'labor_cost_per_hour', 'sort_order' => 'asc']) }}"
+                            class="dropdown-item {{ $sortBy === 'labor_cost_per_hour' && $sortOrder === 'asc' ? 'active' : '' }}">
+                            <span>Labor Cost/Hr (Low to High)</span>
                         </a>
-                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_per_hour', 'sort_order' => 'desc']) }}"
-                            class="dropdown-item {{ $sortBy === 'cost_per_hour' && $sortOrder === 'desc' ? 'active' : '' }}">
-                            <span>Cost/Hr (High to Low)</span>
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'labor_cost_per_hour', 'sort_order' => 'desc']) }}"
+                            class="dropdown-item {{ $sortBy === 'labor_cost_per_hour' && $sortOrder === 'desc' ? 'active' : '' }}">
+                            <span>Labor Cost/Hr (High to Low)</span>
                         </a>
                     </x-ui.sort-dropdown>
 
@@ -151,7 +151,7 @@
                         <th style="width: 12%">{{ __('production.physical_location') }}</th>
                         <th style="width: 10%" class="text-end">{{ __('production.capacity_hr') }}</th>
                         <th style="width: 8%" class="text-end">{{ __('production.efficiency') }}</th>
-                        <th style="width: 9%" class="text-end">{{ __('production.cost_per_hour') }}</th>
+                        <th style="width: 10%" class="text-end">{{ __('production.wc_labor_cost_per_hour') }}</th>
                         <th style="width: 5%" class="text-center">{{ __('production.machines') }}</th>
                         <th style="width: 4%">{{ __('production.status') }}</th>
                         <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
@@ -182,7 +182,7 @@
                                 {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : __('production.unlimited') }}
                             </td>
                             <td class="text-end text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                            <td class="text-end fw-semibold text-dark">{{ format_currency($wc->cost_per_hour) }}</td>
+                            <td class="text-end fw-semibold text-dark">{{ format_currency((float) ($wc->labor_cost_per_hour ?? 0)) }}</td>
                             <td class="text-center">
                                 @if($wc->machines_count > 0)
                                     <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"

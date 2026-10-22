@@ -98,21 +98,11 @@ class WorkCenterSectionTest extends TestCase
             'code'      => 'WC-CNC',
             'status'    => 'active',
         ]);
-        $this->workCenterA1->shifts()->sync([
-            $this->shift1->id => ['tenant_id' => $this->tenantA->id],
-            $this->shift2->id => ['tenant_id' => $this->tenantA->id],
-        ]);
-
         $this->workCenterA2 = WorkCenter::create([
             'tenant_id' => $this->tenantA->id,
             'name'      => 'Assembly Dept',
             'code'      => 'WC-ASSY',
             'status'    => 'active',
-        ]);
-        $this->workCenterA2->shifts()->sync([
-            $this->shift1->id => ['tenant_id' => $this->tenantA->id],
-            $this->shift2->id => ['tenant_id' => $this->tenantA->id],
-            $this->shift3->id => ['tenant_id' => $this->tenantA->id],
         ]);
 
         // Work Center for Tenant B
@@ -238,25 +228,26 @@ class WorkCenterSectionTest extends TestCase
         ]);
     }
 
-    public function test_section_shift_assignment_must_be_subset_of_parent_work_center(): void
+    public function test_section_shift_assignment_does_not_depend_on_work_center_shifts(): void
     {
-        // workCenterA1 only has shift1 and shift2 assigned. shift3 is NOT assigned to workCenterA1.
+        // Any tenant shift can be assigned to a section; work center derives it dynamically
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.work-center-sections.store'), [
                 'work_center_id'   => $this->workCenterA1->id,
-                'name'             => 'Invalid Shift Section',
-                'code'             => 'SEC-INV',
+                'name'             => 'Night Shift Section',
+                'code'             => 'SEC-NIGHT',
                 'workers_required' => 1,
                 'status'           => 'active',
-                'shifts'           => [$this->shift3->id], // not on parent WC
+                'shifts'           => [$this->shift3->id],
                 'shift_workers'    => [$this->shift3->id => 1],
             ]);
 
-        $response->assertSessionHas('error');
-        $this->assertDatabaseMissing('production_work_center_sections', [
-            'code' => 'SEC-INV',
+        $response->assertRedirect();
+        $this->assertDatabaseHas('production_work_center_sections', [
+            'code' => 'SEC-NIGHT',
         ]);
+        $this->assertTrue($this->workCenterA1->getEffectiveShifts()->contains('id', $this->shift3->id));
 
         // Creating section without any shifts must fail validation
         $responseNoShifts = $this->actingAs($this->adminA)
@@ -273,9 +264,8 @@ class WorkCenterSectionTest extends TestCase
         $responseNoShifts->assertSessionHasErrors(['shifts']);
     }
 
-    public function test_work_center_shift_removal_blocked_when_section_has_only_that_shift(): void
+    public function test_work_center_update_does_not_manage_shifts(): void
     {
-        // Create section with shift1 only
         $section = WorkCenterSection::create([
             'tenant_id'        => $this->tenantA->id,
             'work_center_id'   => $this->workCenterA1->id,
@@ -284,99 +274,86 @@ class WorkCenterSectionTest extends TestCase
             'workers_required' => 1,
             'status'           => 'active',
         ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id]]);
+        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'target_headcount' => 1, 'active' => true]]);
 
-        // Try to update workCenterA1 to remove shift1 (only keep shift2)
+        // Updating work center without shifts succeeds and preserves section shifts
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->put(route('production.work-centers.update', $this->workCenterA1->id), [
-                'name'   => $this->workCenterA1->name,
+                'name'   => 'Renamed CNC Dept',
                 'code'   => $this->workCenterA1->code,
                 'status' => 'active',
-                'shifts' => [$this->shift2->id], // removing shift1
-            ]);
-
-        $response->assertSessionHasErrors(['shifts']);
-        // Verify shift1 was NOT removed from work center
-        $this->workCenterA1->refresh();
-        $this->assertTrue($this->workCenterA1->shifts->contains($this->shift1));
-        // Verify section still has shift1
-        $section->refresh();
-        $this->assertTrue($section->shifts->contains($this->shift1));
-    }
-
-    public function test_work_center_shift_removal_warns_when_sections_retain_other_shifts(): void
-    {
-        // Create section with BOTH shift1 and shift2
-        $section = WorkCenterSection::create([
-            'tenant_id'        => $this->tenantA->id,
-            'work_center_id'   => $this->workCenterA1->id,
-            'name'             => 'Flexible Section',
-            'code'             => 'SEC-FLEX',
-            'workers_required' => 1,
-            'status'           => 'active',
-        ]);
-        $section->shifts()->sync([
-            $this->shift1->id => ['tenant_id' => $this->tenantA->id],
-            $this->shift2->id => ['tenant_id' => $this->tenantA->id],
-        ]);
-
-        // Try to remove shift1 from WC WITHOUT confirmation
-        $response = $this->actingAs($this->adminA)
-            ->withHeader('X-Tenant', 'tenant-a')
-            ->put(route('production.work-centers.update', $this->workCenterA1->id), [
-                'name'   => $this->workCenterA1->name,
-                'code'   => $this->workCenterA1->code,
-                'status' => 'active',
-                'shifts' => [$this->shift2->id], // removing shift1
-            ]);
-
-        // Should receive warning on confirm_section_shift_removal
-        $response->assertSessionHasErrors(['confirm_section_shift_removal']);
-        $this->workCenterA1->refresh();
-        $this->assertTrue($this->workCenterA1->shifts->contains($this->shift1));
-        $section->refresh();
-        $this->assertTrue($section->shifts->contains($this->shift1));
-    }
-
-    public function test_work_center_shift_removal_confirmed_cascades_atomically_to_sections(): void
-    {
-        // Create section with BOTH shift1 and shift2
-        $section = WorkCenterSection::create([
-            'tenant_id'        => $this->tenantA->id,
-            'work_center_id'   => $this->workCenterA1->id,
-            'name'             => 'Flexible Section',
-            'code'             => 'SEC-FLEX',
-            'workers_required' => 1,
-            'status'           => 'active',
-        ]);
-        $section->shifts()->sync([
-            $this->shift1->id => ['tenant_id' => $this->tenantA->id],
-            $this->shift2->id => ['tenant_id' => $this->tenantA->id],
-        ]);
-
-        // Update WC with confirm_section_shift_removal = true
-        $response = $this->actingAs($this->adminA)
-            ->withHeader('X-Tenant', 'tenant-a')
-            ->put(route('production.work-centers.update', $this->workCenterA1->id), [
-                'name'                          => $this->workCenterA1->name,
-                'code'                          => $this->workCenterA1->code,
-                'status'                        => 'active',
-                'shifts'                        => [$this->shift2->id], // removing shift1
-                'confirm_section_shift_removal' => true,
             ]);
 
         $response->assertRedirect(route('production.work-centers.show', $this->workCenterA1->id));
-
-        // Shift1 removed from Work Center
         $this->workCenterA1->refresh();
-        $this->assertFalse($this->workCenterA1->shifts->contains($this->shift1));
-        $this->assertTrue($this->workCenterA1->shifts->contains($this->shift2));
+        $this->assertEquals('Renamed CNC Dept', $this->workCenterA1->name);
+        $this->assertTrue($this->workCenterA1->getEffectiveShifts()->contains('id', $this->shift1->id));
+    }
 
-        // Shift1 atomically detached from Section
+    public function test_section_shift_removal_updates_work_center_effective_shifts(): void
+    {
+        $section = WorkCenterSection::create([
+            'tenant_id'        => $this->tenantA->id,
+            'work_center_id'   => $this->workCenterA1->id,
+            'name'             => 'Flexible Section',
+            'code'             => 'SEC-FLEX',
+            'workers_required' => 1,
+            'status'           => 'active',
+        ]);
+        $section->shifts()->sync([
+            $this->shift1->id => ['tenant_id' => $this->tenantA->id, 'target_headcount' => 1, 'active' => true],
+            $this->shift2->id => ['tenant_id' => $this->tenantA->id, 'target_headcount' => 1, 'active' => true],
+        ]);
+
+        $this->assertCount(2, $this->workCenterA1->getEffectiveShifts());
+
+        // Update section to remove shift1
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->put(route('production.work-center-sections.update', $section->id), [
+                'work_center_id'   => $this->workCenterA1->id,
+                'name'             => 'Flexible Section',
+                'code'             => 'SEC-FLEX',
+                'status'           => 'active',
+                'shifts'           => [$this->shift2->id],
+                'shift_workers'    => [$this->shift2->id => 1],
+            ]);
+
+        $response->assertRedirect();
         $section->refresh();
-        $this->assertFalse($section->shifts->contains($this->shift1));
-        $this->assertTrue($section->shifts->contains($this->shift2));
+        $this->assertFalse($section->shifts->contains('id', $this->shift1->id));
+        $this->assertTrue($section->shifts->contains('id', $this->shift2->id));
+
+        // Work center effective shifts now only contain shift2
+        $this->assertCount(1, $this->workCenterA1->getEffectiveShifts());
+        $this->assertFalse($this->workCenterA1->getEffectiveShifts()->contains('id', $this->shift1->id));
+        $this->assertTrue($this->workCenterA1->getEffectiveShifts()->contains('id', $this->shift2->id));
+    }
+
+    public function test_section_deletion_updates_work_center_effective_shifts(): void
+    {
+        $section = WorkCenterSection::create([
+            'tenant_id'        => $this->tenantA->id,
+            'work_center_id'   => $this->workCenterA1->id,
+            'name'             => 'Removable Section',
+            'code'             => 'SEC-REM',
+            'workers_required' => 1,
+            'status'           => 'active',
+        ]);
+        $section->shifts()->sync([
+            $this->shift3->id => ['tenant_id' => $this->tenantA->id, 'target_headcount' => 1, 'active' => true],
+        ]);
+
+        $this->assertTrue($this->workCenterA1->getEffectiveShifts()->contains('id', $this->shift3->id));
+
+        // Delete section
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->delete(route('production.work-center-sections.destroy', $section->id));
+
+        $response->assertRedirect(route('production.work-centers.show', $this->workCenterA1->id));
+        $this->assertFalse($this->workCenterA1->getEffectiveShifts()->contains('id', $this->shift3->id));
     }
 
     public function test_machine_assignment_to_section_synchronizes_work_center_id(): void
@@ -1291,18 +1268,18 @@ class WorkCenterSectionTest extends TestCase
         $section = WorkCenterSection::where('code', 'SEC-MULTI-1')->first();
         $this->assertNotNull($section);
 
-        // Verify persistence in production_work_center_section_shifts pivot
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        // Verify persistence in production_section_shifts pivot
+        $this->assertDatabaseHas('production_section_shifts', [
             'tenant_id'        => $this->tenantA->id,
             'section_id'       => $section->id,
             'shift_id'         => $this->shift1->id,
-            'workers_required' => 4,
+            'target_headcount' => 4,
         ]);
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'tenant_id'        => $this->tenantA->id,
             'section_id'       => $section->id,
             'shift_id'         => $this->shift2->id,
-            'workers_required' => 6,
+            'target_headcount' => 6,
         ]);
 
         // Verify relationship loading
@@ -1310,8 +1287,8 @@ class WorkCenterSectionTest extends TestCase
         $this->assertCount(2, $shifts);
         $s1 = $shifts->firstWhere('id', $this->shift1->id);
         $s2 = $shifts->firstWhere('id', $this->shift2->id);
-        $this->assertEquals(4, (int) $s1->pivot->workers_required);
-        $this->assertEquals(6, (int) $s2->pivot->workers_required);
+        $this->assertEquals(4, (int) $s1->pivot->target_headcount);
+        $this->assertEquals(6, (int) $s2->pivot->target_headcount);
     }
 
     public function test_edit_individual_worker_counts(): void
@@ -1324,8 +1301,8 @@ class WorkCenterSectionTest extends TestCase
             'workers_required' => 2,
             'status'           => 'active',
         ]);
-        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 2]);
-        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 3]);
+        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 2, 'active' => true]);
+        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 3, 'active' => true]);
 
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
@@ -1343,17 +1320,17 @@ class WorkCenterSectionTest extends TestCase
 
         $response->assertRedirect(route('production.work-centers.show', $this->workCenterA2->id));
 
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'tenant_id'        => $this->tenantA->id,
             'section_id'       => $section->id,
             'shift_id'         => $this->shift1->id,
-            'workers_required' => 5,
+            'target_headcount' => 5,
         ]);
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'tenant_id'        => $this->tenantA->id,
             'section_id'       => $section->id,
             'shift_id'         => $this->shift2->id,
-            'workers_required' => 8,
+            'target_headcount' => 8,
         ]);
     }
 
@@ -1367,8 +1344,8 @@ class WorkCenterSectionTest extends TestCase
             'workers_required' => 4,
             'status'           => 'active',
         ]);
-        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 4]);
-        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 7]);
+        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 4, 'active' => true]);
+        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 7, 'active' => true]);
 
         // Submit update with same shifts and worker counts
         $response = $this->actingAs($this->adminA)
@@ -1388,24 +1365,24 @@ class WorkCenterSectionTest extends TestCase
 
         $response->assertRedirect(route('production.work-centers.show', $this->workCenterA2->id));
 
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'section_id'       => $section->id,
             'shift_id'         => $this->shift1->id,
-            'workers_required' => 4,
+            'target_headcount' => 4,
         ]);
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'section_id'       => $section->id,
             'shift_id'         => $this->shift2->id,
-            'workers_required' => 7,
+            'target_headcount' => 7,
         ]);
 
         // Also test repository syncShifts directly without passing $shiftWorkers maintains existing pivot counts
         $repo = app(\App\Domains\Production\Repositories\WorkCenterSectionRepositoryInterface::class);
         $repo->syncShifts($section, [$this->shift1->id, $this->shift2->id]); // omitted shiftWorkers
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'section_id'       => $section->id,
             'shift_id'         => $this->shift1->id,
-            'workers_required' => 4,
+            'target_headcount' => 4,
         ]);
     }
 
@@ -1419,8 +1396,8 @@ class WorkCenterSectionTest extends TestCase
             'workers_required' => 2,
             'status'           => 'active',
         ]);
-        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 3]);
-        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 5]);
+        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 3, 'active' => true]);
+        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 5, 'active' => true]);
 
         // Now remove shift1 and add shift3 (with 9 workers), keeping shift2 (with 5 workers)
         $response = $this->actingAs($this->adminA)
@@ -1440,21 +1417,21 @@ class WorkCenterSectionTest extends TestCase
         $response->assertRedirect(route('production.work-centers.show', $this->workCenterA2->id));
 
         // shift1 was detached
-        $this->assertDatabaseMissing('production_work_center_section_shifts', [
+        $this->assertDatabaseMissing('production_section_shifts', [
             'section_id' => $section->id,
             'shift_id'   => $this->shift1->id,
         ]);
         // shift2 retained
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'section_id'       => $section->id,
             'shift_id'         => $this->shift2->id,
-            'workers_required' => 5,
+            'target_headcount' => 5,
         ]);
         // shift3 attached
-        $this->assertDatabaseHas('production_work_center_section_shifts', [
+        $this->assertDatabaseHas('production_section_shifts', [
             'section_id'       => $section->id,
             'shift_id'         => $this->shift3->id,
-            'workers_required' => 9,
+            'target_headcount' => 9,
         ]);
     }
 
@@ -1551,8 +1528,8 @@ class WorkCenterSectionTest extends TestCase
             'workers_required' => 2,
             'status'           => 'active',
         ]);
-        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 4]);
-        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 6]);
+        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 4, 'active' => true]);
+        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 6, 'active' => true]);
 
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
@@ -1584,8 +1561,8 @@ class WorkCenterSectionTest extends TestCase
             'workers_required' => 2,
             'status'           => 'active',
         ]);
-        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 4]);
-        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'workers_required' => 6]);
+        $section->shifts()->attach($this->shift1->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 4, 'active' => true]);
+        $section->shifts()->attach($this->shift2->id, ['tenant_id' => $this->tenantA->id, 'target_headcount' => 6, 'active' => true]);
 
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')

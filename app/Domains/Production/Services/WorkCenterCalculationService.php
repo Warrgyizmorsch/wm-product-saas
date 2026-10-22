@@ -33,8 +33,8 @@ class WorkCenterCalculationService
         $tenantId = (int) $workCenter->tenant_id;
 
         $sections = $workCenter->relationLoaded('sections')
-            ? $workCenter->sections->where('tenant_id', $tenantId)
-            : $workCenter->sections()->where('tenant_id', $tenantId)->with(['machines', 'shifts'])->get();
+            ? $workCenter->sections->where('tenant_id', $tenantId)->filter(fn($sec) => $sec->isActive())
+            : $workCenter->sections()->where('tenant_id', $tenantId)->active()->with(['machines', 'shifts'])->get();
 
         if ($sections->isEmpty()) {
             return [
@@ -59,8 +59,8 @@ class WorkCenterCalculationService
             $sectionCap = (float) ($capInfo['total_capacity'] ?? 0.0);
 
             $shifts = $section->relationLoaded('shifts')
-                ? $section->shifts->where('tenant_id', $tenantId)
-                : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->get();
+                ? $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => ($s->active ?? true) && ($s->pivot->active ?? true))
+                : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->where('production_shifts.active', true)->where('production_section_shifts.active', true)->get();
 
             $shiftIntervals = [];
             foreach ($shifts as $shift) {
@@ -282,8 +282,8 @@ class WorkCenterCalculationService
         $tenantId = (int) $workCenter->tenant_id;
 
         $sections = $workCenter->relationLoaded('sections')
-            ? $workCenter->sections->where('tenant_id', $tenantId)
-            : $workCenter->sections()->where('tenant_id', $tenantId)->with(['shifts'])->get();
+            ? $workCenter->sections->where('tenant_id', $tenantId)->filter(fn($sec) => $sec->isActive())
+            : $workCenter->sections()->where('tenant_id', $tenantId)->active()->with(['shifts'])->get();
 
         if ($sections->isEmpty()) {
             return [
@@ -305,11 +305,11 @@ class WorkCenterCalculationService
 
         foreach ($sections as $section) {
             $shifts = $section->relationLoaded('shifts')
-                ? $section->shifts->where('tenant_id', $tenantId)
-                : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->get();
+                ? $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => ($s->active ?? true) && ($s->pivot->active ?? true))
+                : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->where('production_shifts.active', true)->where('production_section_shifts.active', true)->get();
 
             foreach ($shifts as $shift) {
-                $workersRequired = (int) ($shift->pivot->workers_required ?? 1);
+                $workersRequired = (int) ($shift->pivot->target_headcount ?? $shift->pivot->workers_required ?? 1);
                 $isRateMissing   = ($shift->hourly_labor_rate === null);
                 if ($isRateMissing) {
                     $hasMissingRates = true;
@@ -345,6 +345,7 @@ class WorkCenterCalculationService
                     'is_overnight'                 => $isOvernight,
                     'duration_minutes'             => $durationMin,
                     'duration_hours'               => round($durationMin / 60, 4),
+                    'target_headcount'             => $workersRequired,
                     'workers_required'             => $workersRequired,
                     'hourly_labor_rate'            => $hourlyRate,
                     'is_rate_missing'              => $isRateMissing,
@@ -548,7 +549,7 @@ class WorkCenterCalculationService
             'calculation_details'        => $calc,
         ]);
 
-        return $workCenter->fresh(['sections.machines', 'sections.shifts', 'shifts']);
+        return $workCenter->fresh(['sections.machines', 'sections.shifts']);
     }
 
     private function parseTimeToMinutes(string $timeStr): int

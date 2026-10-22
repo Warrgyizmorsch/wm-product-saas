@@ -151,10 +151,13 @@ class TrendAnalysisService
         $periodRange = CarbonPeriod::create($start, '1 day', $end);
 
         $machinesCount = \Illuminate\Support\Facades\DB::table('production_machines')
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
-            ->when(!empty($filters['work_center_id']), fn($q) => $q->where('work_center_id', $filters['work_center_id']))
-            ->when(!empty($filters['machine_id']), fn($q) => $q->where('id', $filters['machine_id']))
+            ->where('production_machines.tenant_id', $tenantId)
+            ->whereNull('production_machines.deleted_at')
+            ->when(!empty($filters['work_center_id']), function ($q) use ($filters) {
+                $q->join('production_work_center_sections', 'production_work_center_sections.id', '=', 'production_machines.section_id')
+                    ->where('production_work_center_sections.work_center_id', $filters['work_center_id']);
+            })
+            ->when(!empty($filters['machine_id']), fn($q) => $q->where('production_machines.id', $filters['machine_id']))
             ->count();
 
         foreach ($periodRange as $date) {
@@ -168,7 +171,12 @@ class TrendAnalysisService
                 ->whereBetween('start_time', [$dayStart, $dayEnd])
                 ->when(!empty($filters['machine_id']), fn($q) => $q->where('machine_id', $filters['machine_id']))
                 ->when(!empty($filters['work_center_id']), function($q) use ($filters, $tenantId) {
-                    $q->whereIn('machine_id', \Illuminate\Support\Facades\DB::table('production_machines')->where('tenant_id', $tenantId)->where('work_center_id', $filters['work_center_id'])->pluck('id'));
+                    $mIds = \Illuminate\Support\Facades\DB::table('production_machines')
+                        ->join('production_work_center_sections', 'production_work_center_sections.id', '=', 'production_machines.section_id')
+                        ->where('production_machines.tenant_id', $tenantId)
+                        ->where('production_work_center_sections.work_center_id', $filters['work_center_id'])
+                        ->pluck('production_machines.id');
+                    $q->whereIn('machine_id', $mIds);
                 })
                 ->sum('duration_minutes');
 

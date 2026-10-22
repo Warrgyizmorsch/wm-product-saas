@@ -1148,7 +1148,7 @@ class ReportingService
             $wcId = (int) $filters['work_center_id'];
             $query->where(function ($q) use ($wcId) {
                 $q->whereHas('operation', fn($opQ) => $opQ->where('work_center_id', $wcId))
-                    ->orWhereHas('machine', fn($mQ) => $mQ->where('work_center_id', $wcId));
+                    ->orWhereHas('machine.section', fn($sQ) => $sQ->where('work_center_id', $wcId));
             });
         }
 

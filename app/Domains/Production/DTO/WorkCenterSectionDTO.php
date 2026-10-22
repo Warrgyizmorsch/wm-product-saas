@@ -33,16 +33,12 @@ class WorkCenterSectionDTO
             : null;
 
         $shiftIds = [];
-        $shiftWorkers = [];
 
         if (isset($data['shifts']) && is_array($data['shifts'])) {
             foreach ($data['shifts'] as $key => $val) {
                 if (is_array($val)) {
                     $sId = (int) ($val['id'] ?? $val['shift_id'] ?? $key);
                     $shiftIds[] = $sId;
-                    if (isset($val['workers_required']) && is_numeric($val['workers_required'])) {
-                        $shiftWorkers[$sId] = (int) $val['workers_required'];
-                    }
                 } else {
                     $sId = (int) $val;
                     $shiftIds[] = $sId;
@@ -51,18 +47,7 @@ class WorkCenterSectionDTO
         }
         $shiftIds = array_values(array_unique(array_filter($shiftIds)));
 
-        if (isset($data['shift_workers']) && is_array($data['shift_workers'])) {
-            foreach ($data['shift_workers'] as $sId => $cnt) {
-                if (is_numeric($cnt) && (int) $cnt > 0) {
-                    $shiftWorkers[(int) $sId] = (int) $cnt;
-                }
-            }
-        }
-
-        // Section-level fallback workers_required is max of shift workers, or provided, or default 1
-        $workersRequired = !empty($shiftWorkers)
-            ? max(array_values($shiftWorkers))
-            : max(1, (int) ($data['workers_required'] ?? 1));
+        $workersRequired = max(1, (int) ($data['workers_required'] ?? 1));
 
         return new self(
             work_center_id:             (int) ($data['work_center_id'] ?? 0),
@@ -72,7 +57,7 @@ class WorkCenterSectionDTO
             description:                $data['description'] ?? null,
             status:                     $data['status'] ?? 'active',
             shift_ids:                  $shiftIds,
-            shift_workers:              $shiftWorkers,
+            shift_workers:              [],
             machine_ids:                $machineIds,
             supports_manual_production: $supportsManual,
             manual_capacity_per_hour:   $manualCapacity,

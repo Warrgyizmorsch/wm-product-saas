@@ -143,7 +143,6 @@ class SectionCalculationTest extends TestCase
         $m1 = $this->createMachine($this->tenantA, 'CNC 1', 'M-01', 40.0);
         $m2 = $this->createMachine($this->tenantA, 'CNC 2', 'M-02', 30.0);
         $shift = $this->createShift($this->tenantA, 'Day', 'SH-DAY', '08:00', '16:00');
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $dto = new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -168,7 +167,6 @@ class SectionCalculationTest extends TestCase
     {
         $m1 = $this->createMachine($this->tenantA, 'Press 1', 'M-PR1', 40.0);
         $shift = $this->createShift($this->tenantA, 'Day', 'SH-DAY', '08:00', '16:00');
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $dto = new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -193,7 +191,6 @@ class SectionCalculationTest extends TestCase
     {
         $m1 = $this->createMachine($this->tenantA, 'Press 2', 'M-PR2', 40.0);
         $shift = $this->createShift($this->tenantA, 'Day', 'SH-DAY', '08:00', '16:00');
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $dto = new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -217,7 +214,6 @@ class SectionCalculationTest extends TestCase
     public function test_capacity_returns_zero_when_no_contributing_resources(): void
     {
         $shift = $this->createShift($this->tenantA, 'Day', 'SH-DAY', '08:00', '16:00');
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $dto = new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -241,7 +237,6 @@ class SectionCalculationTest extends TestCase
         $m1 = $this->createMachine($this->tenantA, 'Lathe 1', 'M-L1', 50.0);
         $s1 = $this->createShift($this->tenantA, 'Morning', 'SH-M1', '08:00', '16:00');
         $s2 = $this->createShift($this->tenantA, 'Overlap', 'SH-OV1', '12:00', '20:00');
-        $this->workCenterA->shifts()->attach([$s1->id, $s2->id], ['tenant_id' => $this->tenantA->id]);
 
         $dto = new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -266,7 +261,6 @@ class SectionCalculationTest extends TestCase
         $m1 = $this->createMachine($this->tenantA, 'M1', 'M-1', 40.0);
         $m2 = $this->createMachine($this->tenantA, 'M2', 'M-2', 60.0);
         $shift = $this->createShift($this->tenantA, 'Day', 'SH-D', '08:00', '16:00');
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $sec1 = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -300,10 +294,7 @@ class SectionCalculationTest extends TestCase
     {
         $mB = $this->createMachine($this->tenantB, 'Machine B', 'M-B', 100.0);
         $shiftB = $this->createShift($this->tenantB, 'Shift B', 'SH-B', '08:00', '16:00');
-        $this->workCenterB->shifts()->attach($shiftB->id, ['tenant_id' => $this->tenantB->id]);
-
         $shiftA = $this->createShift($this->tenantA, 'Shift A', 'SH-A', '08:00', '16:00');
-        $this->workCenterA->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenantA->id]);
 
         $secA = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -327,7 +318,6 @@ class SectionCalculationTest extends TestCase
     public function test_single_shift_labor_cost_calculation(): void
     {
         $shift = $this->createShift($this->tenantA, 'Single Shift', 'SH-SGL', '08:00', '16:00', 120.0);
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -355,7 +345,6 @@ class SectionCalculationTest extends TestCase
         // Gap: 12:00 - 14:00 (2h) excluded from denominator!
         $s1 = $this->createShift($this->tenantA, 'Morning', 'SH-1', '08:00', '12:00', 100.0);
         $s2 = $this->createShift($this->tenantA, 'Afternoon', 'SH-2', '14:00', '18:00', 150.0);
-        $this->workCenterA->shifts()->attach([$s1->id, $s2->id], ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -391,7 +380,6 @@ class SectionCalculationTest extends TestCase
         // Labor cost per hour: 3000 / 10 = 300/h
         $s1 = $this->createShift($this->tenantA, 'S1', 'S-1', '08:00', '14:00', 100.0);
         $s2 = $this->createShift($this->tenantA, 'S2', 'S-2', '12:00', '18:00', 100.0);
-        $this->workCenterA->shifts()->attach([$s1->id, $s2->id], ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -424,7 +412,6 @@ class SectionCalculationTest extends TestCase
         // Labor cost per hour: 2200 / 10 = 220/h
         $s1 = $this->createShift($this->tenantA, 'Parent Shift', 'SH-P', '08:00', '18:00', 100.0);
         $s2 = $this->createShift($this->tenantA, 'Inside Shift', 'SH-IN', '10:00', '14:00', 150.0);
-        $this->workCenterA->shifts()->attach([$s1->id, $s2->id], ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -448,7 +435,6 @@ class SectionCalculationTest extends TestCase
         // Shift: 22:00 - 06:00 (8h), 4 workers @ 200 = 800/h
         // Operating hours: 8h, cost: 6400, avg: 800/h
         $sNight = $this->createShift($this->tenantA, 'Night Shift', 'SH-N', '22:00', '06:00', 200.0);
-        $this->workCenterA->shifts()->attach($sNight->id, ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -472,7 +458,6 @@ class SectionCalculationTest extends TestCase
         // Shift: 08:00 - 16:00 (8h) with 60 min break. 2 workers @ 100 = 200/h.
         // Full 8 hours paid: cost = 8 * 200 = 1600.
         $shift = $this->createShift($this->tenantA, 'Break Shift', 'SH-BRK', '08:00', '16:00', 100.0, breakMinutes: 60);
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -500,7 +485,6 @@ class SectionCalculationTest extends TestCase
         // Average labor cost: 800 / 8 = 100/h
         $s1 = $this->createShift($this->tenantA, 'No Rate Shift', 'SH-NORATE', '08:00', '12:00', null);
         $s2 = $this->createShift($this->tenantA, 'Rated Shift', 'SH-RATED', '12:00', '16:00', 100.0);
-        $this->workCenterA->shifts()->attach([$s1->id, $s2->id], ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -544,9 +528,6 @@ class SectionCalculationTest extends TestCase
         $shift3 = $this->createShift($this->tenantA, 'Shift 3', 'SH-3', '18:00', '06:00', 200.0);
         $shift4 = $this->createShift($this->tenantA, 'Shift 4', 'SH-4', '16:00', '20:00', 200.0);
 
-        $this->workCenterA->shifts()->attach([$shift1->id, $shift2->id, $shift3->id, $shift4->id], [
-            'tenant_id' => $this->tenantA->id,
-        ]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -636,7 +617,6 @@ class SectionCalculationTest extends TestCase
         $shift2 = $this->createShift($this->tenantA, 'Shift 2', 'SH-2', '12:00', '18:00', 150.0);
         $machine = $this->createMachine($this->tenantA, 'Milling Machine', 'M-MILL', 60.0);
 
-        $this->workCenterA->shifts()->attach([$shift1->id, $shift2->id], ['tenant_id' => $this->tenantA->id]);
 
         $section = $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,

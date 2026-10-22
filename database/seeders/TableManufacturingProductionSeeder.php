@@ -359,7 +359,9 @@ class TableManufacturingProductionSeeder extends Seeder
         ];
 
         // Clear existing work center shift associations for this tenant
-        DB::table('production_work_center_shifts')->where('tenant_id', $tenantId)->delete();
+        if (Schema::hasTable('production_work_center_shifts')) {
+            DB::table('production_work_center_shifts')->where('tenant_id', $tenantId)->delete();
+        }
 
         foreach ($shifts as $data) {
             $shift = ProductionShift::updateOrCreate(
@@ -367,19 +369,21 @@ class TableManufacturingProductionSeeder extends Seeder
                 array_merge($data, ['company_id' => $companyId])
             );
 
-            // Link shifts to all manufacturing work centers
-            foreach ($workCenters as $wc) {
-                DB::table('production_work_center_shifts')->updateOrInsert(
-                    [
-                        'tenant_id' => $tenantId,
-                        'work_center_id' => $wc->id,
-                        'shift_id' => $shift->id,
-                    ],
-                    [
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                );
+            // Link shifts to all manufacturing work centers if legacy table exists
+            if (Schema::hasTable('production_work_center_shifts')) {
+                foreach ($workCenters as $wc) {
+                    DB::table('production_work_center_shifts')->updateOrInsert(
+                        [
+                            'tenant_id' => $tenantId,
+                            'work_center_id' => $wc->id,
+                            'shift_id' => $shift->id,
+                        ],
+                        [
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                }
             }
         }
     }

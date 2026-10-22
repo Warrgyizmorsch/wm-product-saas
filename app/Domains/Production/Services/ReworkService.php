@@ -28,7 +28,7 @@ class ReworkService
             $ncr = \App\Domains\Production\Models\ProductionNcr::with('operation')->find($ncrId);
             $defaultMachineId = $data['machine_id'] ?? $ncr?->machine_id ?? $ncr?->operation?->machine_id;
             if (!$defaultMachineId && $wcId) {
-                $defaultMachineId = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->where('work_center_id', $wcId)->value('id');
+                $defaultMachineId = \App\Domains\Production\Models\Machine::where('tenant_id', $tenantId)->whereHas('section', fn ($q) => $q->where('work_center_id', $wcId))->value('id');
             }
 
             // Default single direct rework operation
@@ -57,9 +57,10 @@ class ReworkService
                 $opWcId = $op['work_center_id'] ?? $wcId;
                 $opMachineId = $op['machine_id'] ?? $defaultMachineId;
                 if ($opMachineId && $opWcId) {
-                    $machWc = \App\Domains\Production\Models\Machine::where('id', $opMachineId)->value('work_center_id');
+                    $mach = \App\Domains\Production\Models\Machine::with('section')->find($opMachineId);
+                    $machWc = $mach?->section?->work_center_id;
                     if ($machWc && $machWc !== $opWcId) {
-                        $opMachineId = \App\Domains\Production\Models\Machine::where('work_center_id', $opWcId)->value('id');
+                        $opMachineId = \App\Domains\Production\Models\Machine::whereHas('section', fn ($q) => $q->where('work_center_id', $opWcId))->value('id');
                     }
                 }
 

@@ -156,8 +156,6 @@ class WorkCenterCalculationTest extends TestCase
         $shiftB = $this->createShift($this->tenantA, 'Shift 12-20', 'SH-1220', '12:00', '20:00');
         $shiftC = $this->createShift($this->tenantA, 'Shift 20-04', 'SH-2004', '20:00', '04:00');
 
-        $this->workCenterA->shifts()->attach([$shiftA->id, $shiftB->id, $shiftC->id], ['tenant_id' => $this->tenantA->id]);
-
         $m1 = $this->createMachine($this->tenantA, 'Machine A', 'M-A', 80.0);
         $m2 = $this->createMachine($this->tenantA, 'Machine B', 'M-B', 50.0);
         $m3 = $this->createMachine($this->tenantA, 'Machine C', 'M-C', 30.0);
@@ -198,7 +196,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m3->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         $this->assertEquals(20.0, (float) $calc['unique_operating_hours']);
@@ -259,8 +257,6 @@ class WorkCenterCalculationTest extends TestCase
         $shift1 = $this->createShift($this->tenantA, 'Shift 1', 'SH-1', '08:00', '14:00');
         $shift2 = $this->createShift($this->tenantA, 'Shift 2', 'SH-2', '10:00', '16:00');
 
-        $this->workCenterA->shifts()->attach([$shift1->id, $shift2->id], ['tenant_id' => $this->tenantA->id]);
-
         $m1 = $this->createMachine($this->tenantA, 'Machine 1', 'M-1', 60.0);
         $m2 = $this->createMachine($this->tenantA, 'Machine 2', 'M-2', 40.0);
 
@@ -288,7 +284,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m2->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         // Timeline: 08:00–16:00 = 8h total unique hours
@@ -306,8 +302,6 @@ class WorkCenterCalculationTest extends TestCase
     {
         $shift1 = $this->createShift($this->tenantA, 'Morning', 'SH-MORN', '08:00', '12:00');
         $shift2 = $this->createShift($this->tenantA, 'Evening', 'SH-EVE', '16:00', '20:00');
-
-        $this->workCenterA->shifts()->attach([$shift1->id, $shift2->id], ['tenant_id' => $this->tenantA->id]);
 
         $m1 = $this->createMachine($this->tenantA, 'Machine 1', 'M-1', 50.0);
         $m2 = $this->createMachine($this->tenantA, 'Machine 2', 'M-2', 50.0);
@@ -336,7 +330,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m2->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         // Operating hours: 4h (08-12) + 4h (16-20) = 8h. Gaps: 12-16 (4h) and 20-08 (12h) excluded.
@@ -356,8 +350,6 @@ class WorkCenterCalculationTest extends TestCase
         $s1 = $this->createShift($this->tenantA, 'All Day', 'SH-AD', '06:00', '18:00');
         $s2 = $this->createShift($this->tenantA, 'Midday', 'SH-MD', '09:00', '12:00');
         $s3 = $this->createShift($this->tenantA, 'Afternoon', 'SH-AF', '10:00', '15:00');
-
-        $this->workCenterA->shifts()->attach([$s1->id, $s2->id, $s3->id], ['tenant_id' => $this->tenantA->id]);
 
         $m1 = $this->createMachine($this->tenantA, 'M1', 'M1', 40.0);
         $m2 = $this->createMachine($this->tenantA, 'M2', 'M2', 30.0);
@@ -399,7 +391,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m3->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         // Windows:
@@ -432,9 +424,6 @@ class WorkCenterCalculationTest extends TestCase
         $shiftA = $this->createShift($this->tenantA, 'Shift A', 'SH-A', '08:00', '16:00');
         $shiftB = $this->createShift($this->tenantB, 'Shift B', 'SH-B', '08:00', '16:00');
 
-        $this->workCenterA->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenantA->id]);
-        $this->workCenterB->shifts()->attach($shiftB->id, ['tenant_id' => $this->tenantB->id]);
-
         $mA = $this->createMachine($this->tenantA, 'Machine A', 'MA', 100.0);
         $mB = $this->createMachine($this->tenantB, 'Machine B', 'MB', 500.0);
 
@@ -462,7 +451,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$mB->id]
         ), $this->tenantB->id);
 
-        $calcA = $this->wcCalcService->calculateCapacity($this->workCenterA->fresh(['sections.machines', 'sections.shifts', 'shifts']));
+        $calcA = $this->wcCalcService->calculateCapacity($this->workCenterA->fresh(['sections.machines', 'sections.shifts']));
         $this->assertEquals(100.0, (float) $calcA['capacity_per_hour']);
         $this->assertEquals(800.0, (float) $calcA['total_theoretical_capacity']);
     }
@@ -490,8 +479,6 @@ class WorkCenterCalculationTest extends TestCase
         $shiftB = $this->createShift($this->tenantA, 'Shift B', 'SH-B', '08:00', '12:00', 125.0);
         $shiftC = $this->createShift($this->tenantA, 'Shift C', 'SH-C', '10:00', '14:00', 200.0);
 
-        $this->workCenterA->shifts()->attach([$shiftA->id, $shiftB->id, $shiftC->id], ['tenant_id' => $this->tenantA->id]);
-
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
             name: 'Section 1',
@@ -514,7 +501,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftC->id => 4]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         $this->assertEquals(6.0, (float) $calc['unique_operating_hours']);
@@ -559,8 +546,6 @@ class WorkCenterCalculationTest extends TestCase
     public function test_labor_single_shift_assignment_calculates_correctly(): void
     {
         $shift = $this->createShift($this->tenantA, 'Shift 1', 'SH-1', '08:00', '16:00', 120.0);
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
-
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
             name: 'Section 1',
@@ -572,7 +557,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift->id => 3]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // 3 workers @ ₹120 = ₹360/hr. 8h duration = ₹2,880 total cost. Avg: ₹360/hr.
@@ -585,8 +570,6 @@ class WorkCenterCalculationTest extends TestCase
     public function test_labor_same_shift_assigned_to_two_sections_uses_distinct_worker_counts(): void
     {
         $shift = $this->createShift($this->tenantA, 'Shared Shift', 'SH-SHR', '08:00', '16:00', 150.0);
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
-
         // Section 1 uses 2 workers => ₹300/hr
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -611,7 +594,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift->id => 5]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Combined: 7 workers @ ₹150/hr = ₹1,050/hr. 8h = ₹8,400 total.
@@ -627,8 +610,6 @@ class WorkCenterCalculationTest extends TestCase
         $shift1 = $this->createShift($this->tenantA, 'Shift 1', 'SH-1', '08:00', '16:00', 100.0);
         $shift2 = $this->createShift($this->tenantA, 'Shift 2', 'SH-2', '08:00', '16:00', 150.0);
         $shift3 = $this->createShift($this->tenantA, 'Shift 3', 'SH-3', '08:00', '16:00', 200.0);
-
-        $this->workCenterA->shifts()->attach([$shift1->id, $shift2->id, $shift3->id], ['tenant_id' => $this->tenantA->id]);
 
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -652,7 +633,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift3->id => 4] // 4*200=800
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Combined: 200 + 450 + 800 = 1,450/hr. 8h = 11,600.
@@ -667,8 +648,6 @@ class WorkCenterCalculationTest extends TestCase
     {
         $shiftLong = $this->createShift($this->tenantA, 'Long Shift', 'SH-LNG', '06:00', '18:00', 100.0);
         $shiftShort = $this->createShift($this->tenantA, 'Short Shift', 'SH-SHT', '10:00', '14:00', 200.0);
-
-        $this->workCenterA->shifts()->attach([$shiftLong->id, $shiftShort->id], ['tenant_id' => $this->tenantA->id]);
 
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -692,7 +671,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftShort->id => 3] // 3*200=600/hr
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Windows:
@@ -710,8 +689,6 @@ class WorkCenterCalculationTest extends TestCase
     {
         $shiftOvernight = $this->createShift($this->tenantA, 'Night Shift', 'SH-NGT', '22:00', '06:00', 150.0);
         $shiftMorning   = $this->createShift($this->tenantA, 'Morning Shift', 'SH-MRN', '08:00', '16:00', 100.0);
-
-        $this->workCenterA->shifts()->attach([$shiftOvernight->id, $shiftMorning->id], ['tenant_id' => $this->tenantA->id]);
 
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -735,7 +712,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftMorning->id => 4] // 4*100=400/hr, 8h = 3200
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Hours: 8h (morning) + 8h (night) = 16h. Gaps: 06-08 (2h) and 16-22 (6h) excluded.
@@ -750,8 +727,6 @@ class WorkCenterCalculationTest extends TestCase
     {
         // 60 minutes paid break
         $shift = $this->createShift($this->tenantA, 'Shift with Break', 'SH-BRK', '08:00', '16:00', 100.0, 60);
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
-
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
             name: 'Section 1',
@@ -763,7 +738,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift->id => 2]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Break minutes must NOT be subtracted from duration: full 8 hours counted
@@ -777,8 +752,6 @@ class WorkCenterCalculationTest extends TestCase
         // Shift with NULL rate
         $shiftMissing = $this->createShift($this->tenantA, 'Volunteer Shift', 'SH-VOL', '08:00', '16:00', null);
         $shiftPaid    = $this->createShift($this->tenantA, 'Paid Shift', 'SH-PD', '12:00', '20:00', 100.0);
-
-        $this->workCenterA->shifts()->attach([$shiftMissing->id, $shiftPaid->id], ['tenant_id' => $this->tenantA->id]);
 
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -802,7 +775,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftPaid->id => 2] // 2*100=200/hr, 8h = 1600
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Timeline: 08:00 to 20:00 = 12 unique hours.
@@ -823,8 +796,6 @@ class WorkCenterCalculationTest extends TestCase
     public function test_labor_explicit_zero_rate_distinguishable_from_missing_rate(): void
     {
         $shiftExplicitZero = $this->createShift($this->tenantA, 'Zero Rate Shift', 'SH-ZERO', '08:00', '16:00', 0.0);
-        $this->workCenterA->shifts()->attach($shiftExplicitZero->id, ['tenant_id' => $this->tenantA->id]);
-
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
             name: 'Section 1',
@@ -836,7 +807,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftExplicitZero->id => 4]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts', 'shifts']);
+        $wc = $this->workCenterA->fresh(['sections.shifts']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         $this->assertFalse($calc['has_missing_rates']);
@@ -858,9 +829,6 @@ class WorkCenterCalculationTest extends TestCase
     {
         $shiftA = $this->createShift($this->tenantA, 'Shift A', 'SH-A', '08:00', '16:00', 100.0);
         $shiftB = $this->createShift($this->tenantB, 'Shift B', 'SH-B', '08:00', '16:00', 500.0);
-
-        $this->workCenterA->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenantA->id]);
-        $this->workCenterB->shifts()->attach($shiftB->id, ['tenant_id' => $this->tenantB->id]);
 
         $this->sectionService->create(new WorkCenterSectionDTO(
             work_center_id: $this->workCenterA->id,
@@ -884,7 +852,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftB->id => 2]
         ), $this->tenantB->id);
 
-        $calcA = $this->wcCalcService->calculateLaborCost($this->workCenterA->fresh(['sections.shifts', 'shifts']));
+        $calcA = $this->wcCalcService->calculateLaborCost($this->workCenterA->fresh(['sections.shifts']));
         $this->assertEquals(200.0, (float) $calcA['labor_cost_per_hour']);
         $this->assertEquals(1600.0, (float) $calcA['total_scheduled_labor_cost']);
     }
@@ -892,8 +860,6 @@ class WorkCenterCalculationTest extends TestCase
     public function test_summary_and_detailed_breakdown_values_agree(): void
     {
         $shift = $this->createShift($this->tenantA, 'Shift', 'SH', '08:00', '16:00', 120.0);
-        $this->workCenterA->shifts()->attach($shift->id, ['tenant_id' => $this->tenantA->id]);
-
         $m = $this->createMachine($this->tenantA, 'Machine', 'M', 75.0);
 
         $this->sectionService->create(new WorkCenterSectionDTO(
@@ -921,8 +887,6 @@ class WorkCenterCalculationTest extends TestCase
     {
         $shift1 = $this->createShift($this->tenantA, 'Morning Shift', 'SH-MORN', '08:00', '12:00', 100.0);
         $shift2 = $this->createShift($this->tenantA, 'Afternoon Shift', 'SH-AFT', '12:00', '16:00', 150.0);
-
-        $this->workCenterA->shifts()->attach([$shift1->id, $shift2->id], ['tenant_id' => $this->tenantA->id]);
 
         $m1 = $this->createMachine($this->tenantA, 'CNC Mill', 'M-CNC', 50.0);
 

@@ -28,21 +28,12 @@ class UpdateWorkCenterRequest extends FormRequest
             'work_center_type'      => 'nullable|string|max:100',
             'description'           => 'nullable|string',
             'location'              => 'nullable|string|max:255',
-            'capacity_per_hour'     => 'nullable|numeric|min:0',
-            'efficiency_percentage' => 'nullable|numeric|min:0|max:100',
-            'cost_per_hour'         => 'nullable|numeric|min:0',
             'overhead_rate'         => 'nullable|numeric|min:0',
             'status'                => 'required|in:active,inactive',
             'production_calendar_id' => [
                 'nullable', 'integer',
                 Rule::exists('production_calendars', 'id')->where('tenant_id', $tenantId)
             ],
-            'shifts'                => 'nullable|array',
-            'shifts.*'              => [
-                'integer',
-                Rule::exists('production_shifts', 'id')->where('tenant_id', $tenantId)
-            ],
-            'confirm_section_shift_removal' => 'nullable|boolean',
         ];
     }
 }

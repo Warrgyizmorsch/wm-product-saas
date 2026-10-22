@@ -158,18 +158,34 @@ class WorkCenterTest extends TestCase
                 'status' => 'active',
                 'efficiency_percentage' => 100.0,
                 'cost_per_hour' => 50.00,
-                'shifts' => [$shift->id],
             ]);
 
         $response->assertRedirect();
         
         $wc = WorkCenter::where('code', 'WC-CNC')->firstOrFail();
-        $this->assertCount(1, $wc->shifts);
-        $this->assertEquals('Morning Shift', $wc->shifts->first()->name);
-        $this->assertDatabaseHas('production_work_center_shifts', [
+        $this->assertCount(0, $wc->getEffectiveShifts());
+
+        // Create section and assign shift
+        $section = \App\Domains\Production\Models\WorkCenterSection::create([
+            'tenant_id' => $this->tenantA->id,
             'work_center_id' => $wc->id,
+            'name' => 'CNC Milling Section',
+            'code' => 'SEC-CNC-1',
+            'status' => 'active',
+        ]);
+        $section->shifts()->attach($shift->id, [
+            'tenant_id' => $this->tenantA->id,
+            'active' => true,
+        ]);
+
+        $effectiveShifts = $wc->getEffectiveShifts();
+        $this->assertCount(1, $effectiveShifts);
+        $this->assertEquals('Morning Shift', $effectiveShifts->first()->name);
+        $this->assertDatabaseHas('production_section_shifts', [
+            'section_id' => $section->id,
             'shift_id' => $shift->id,
             'tenant_id' => $this->tenantA->id,
+            'active' => true,
         ]);
     }
 
@@ -202,19 +218,30 @@ class WorkCenterTest extends TestCase
                 'status' => 'active',
                 'efficiency_percentage' => 95.0,
                 'cost_per_hour' => 25.00,
-                'shifts' => [$shift->id],
             ]);
 
         $response->assertRedirect();
         
         $wc->refresh();
-        $this->assertCount(1, $wc->shifts);
-        $this->assertEquals('Night Shift', $wc->shifts->first()->name);
-        $this->assertDatabaseHas('production_work_center_shifts', [
-            'work_center_id' => $wc->id,
-            'shift_id' => $shift->id,
+        $this->assertEquals('Assembly Area Updated', $wc->name);
+        $this->assertCount(0, $wc->getEffectiveShifts());
+
+        // Assign shift to section
+        $section = \App\Domains\Production\Models\WorkCenterSection::create([
             'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $wc->id,
+            'name' => 'Assembly Section',
+            'code' => 'SEC-ASSY-1',
+            'status' => 'active',
         ]);
+        $section->shifts()->attach($shift->id, [
+            'tenant_id' => $this->tenantA->id,
+            'active' => true,
+        ]);
+
+        $effectiveShifts = $wc->getEffectiveShifts();
+        $this->assertCount(1, $effectiveShifts);
+        $this->assertEquals('Night Shift', $effectiveShifts->first()->name);
     }
 
     public function test_bulk_activate_work_centers(): void
@@ -296,6 +323,125 @@ class WorkCenterTest extends TestCase
         $response->assertRedirect();
         $this->assertSoftDeleted('production_work_centers', ['id' => $wc1->id]);
         $this->assertSoftDeleted('production_work_centers', ['id' => $wc2->id]);
+    }
+
+    public function test_create_and_edit_forms_do_not_contain_capacity_efficiency_and_cost_fields(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Test Station',
+            'code' => 'WC-TEST-FORM',
+            'status' => 'active',
+        ]);
+
+        // Check Create form
+        $createResponse = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.work-centers.create'));
+
+        $createResponse->assertStatus(200);
+        $createResponse->assertDontSee('name="capacity_per_hour"', false);
+        $createResponse->assertDontSee('name="efficiency_percentage"', false);
+        $createResponse->assertDontSee('name="cost_per_hour"', false);
+        $createResponse->assertSee('name="overhead_rate"', false);
+
+        // Check Edit form
+        $editResponse = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.work-centers.edit', $wc->id));
+
+        $editResponse->assertStatus(200);
+        $editResponse->assertDontSee('name="capacity_per_hour"', false);
+        $editResponse->assertDontSee('name="efficiency_percentage"', false);
+        $editResponse->assertDontSee('name="cost_per_hour"', false);
+        $editResponse->assertSee('name="overhead_rate"', false);
+    }
+
+    public function test_manual_values_cannot_override_work_center_fields(): void
+    {
+        // 1. On store, submitting manual values does not save manual capacity or cost
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.work-centers.store'), [
+                'name' => 'Manual Override Attempt WC',
+                'code' => 'WC-OVERRIDE',
+                'status' => 'active',
+                'capacity_per_hour' => 999.00,
+                'efficiency_percentage' => 45.00,
+                'cost_per_hour' => 888.00,
+                'overhead_rate' => 12.50,
+            ]);
+
+        $response->assertRedirect();
+
+        $wc = WorkCenter::where('code', 'WC-OVERRIDE')->firstOrFail();
+        // capacity_per_hour should be null (not 999)
+        $this->assertNull($wc->capacity_per_hour);
+        // cost_per_hour should be 0.0000 (not 888)
+        $this->assertEquals(0.0, (float) $wc->cost_per_hour);
+        // overhead_rate should be saved correctly
+        $this->assertEquals(12.50, (float) $wc->overhead_rate);
+
+        // 2. Set derived values on the work center
+        $wc->update([
+            'capacity_per_hour' => 75.0,
+            'cost_per_hour' => 40.0,
+        ]);
+
+        // 3. On update, submitting manual values does not overwrite existing derived values
+        $updateResponse = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->put(route('production.work-centers.update', $wc->id), [
+                'name' => 'Manual Override Attempt WC Updated',
+                'code' => 'WC-OVERRIDE',
+                'status' => 'active',
+                'capacity_per_hour' => 123.00,
+                'cost_per_hour' => 999.00,
+            ]);
+
+        $updateResponse->assertRedirect();
+
+        $wc->refresh();
+        $this->assertEquals('Manual Override Attempt WC Updated', $wc->name);
+        $this->assertEquals(75.0, (float) $wc->capacity_per_hour);
+        $this->assertEquals(40.0, (float) $wc->cost_per_hour);
+    }
+
+    public function test_work_center_detail_page_initial_display_for_newly_created_work_center(): void
+    {
+        // Newly created work center with no section or assignment data
+        $wc = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Brand New WC',
+            'code' => 'WC-NEW-EMPTY',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.work-centers.show', $wc->id));
+
+        $response->assertStatus(200);
+
+        // Efficiency should display "Cannot be determined"
+        $response->assertSee('Cannot be determined');
+
+        // It must display Cannot be determined instead of presenting 0% or misleading percentage
+        $response->assertSee('Cannot be determined');
+        $response->assertDontSee('>0%<', false);
+        $response->assertDontSee('>100%<', false);
+
+        // Operating Cost Structure: single Labor Cost / Hr field is displayed, redundant Cost Per Hour is removed
+        $response->assertSee(__('production.wc_labor_cost_per_hour'));
+        $response->assertSee(__('production.overhead_cost_rate'));
+        $response->assertDontSee('Direct Labor / Machine rate');
+
+        // Index page: displays Work Center Labor Cost / Hr as single labor cost column
+        $indexResponse = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.work-centers.index'));
+        $indexResponse->assertStatus(200);
+        $indexResponse->assertSee(__('production.wc_labor_cost_per_hour'));
     }
 }
 

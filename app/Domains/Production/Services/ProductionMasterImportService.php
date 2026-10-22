@@ -486,7 +486,7 @@ class ProductionMasterImportService
                             $opErrors[] = "Machine '{$op['machine_code']}' does not exist.";
                         } else {
                             $mchId = $mach->id;
-                            if ($wcId && $mach->work_center_id !== $wcId) {
+                            if ($wcId && $mach->workCenter?->id !== $wcId) {
                                 $opErrors[] = "Machine/Work Center mismatch: Machine '{$op['machine_code']}' belongs to Work Center '{$mach->workCenter?->code}', not '{$op['work_center_code']}'.";
                             }
                         }

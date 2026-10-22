@@ -20,9 +20,6 @@ class UpdateWorkCenterApiRequest extends ApiFormRequest
             'work_center_type'      => 'nullable|string|max:100',
             'description'           => 'nullable|string',
             'location'              => 'nullable|string|max:255',
-            'capacity_per_hour'     => 'nullable|numeric|min:0',
-            'efficiency_percentage' => 'nullable|numeric|min:0|max:100',
-            'cost_per_hour'         => 'nullable|numeric|min:0',
             'overhead_rate'         => 'nullable|numeric|min:0',
             'status'                => 'sometimes|required|in:active,inactive',
         ];

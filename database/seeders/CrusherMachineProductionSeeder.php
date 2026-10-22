@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Models\ProductionCalendar;
@@ -81,7 +82,9 @@ class CrusherMachineProductionSeeder extends Seeder
         DB::table('production_boms')->truncate();
         DB::table('production_machines')->truncate();
         DB::table('production_work_centers')->truncate();
-        DB::table('production_work_center_shifts')->truncate();
+        if (Schema::hasTable('production_work_center_shifts')) {
+            DB::table('production_work_center_shifts')->truncate();
+        }
 
         Schema::enableForeignKeyConstraints();
 
@@ -447,21 +450,51 @@ class CrusherMachineProductionSeeder extends Seeder
             'active' => true,
         ]);
 
-        foreach ([$wcCncCut, $wcHeavyWeld, $wcHorizBoring, $wcPitmanBay, $wcCrusherLine, $wcBlastSpray, $wcQaTesting] as $wcItem) {
-            DB::table('production_work_center_shifts')->insertOrIgnore([
-                'tenant_id' => $tenant->id,
-                'work_center_id' => $wcItem->id,
-                'shift_id' => $shiftDay->id,
-            ]);
+        if (Schema::hasTable('production_work_center_shifts')) {
+            foreach ([$wcCncCut, $wcHeavyWeld, $wcHorizBoring, $wcPitmanBay, $wcCrusherLine, $wcBlastSpray, $wcQaTesting] as $wcItem) {
+                DB::table('production_work_center_shifts')->insertOrIgnore([
+                    'tenant_id' => $tenant->id,
+                    'work_center_id' => $wcItem->id,
+                    'shift_id' => $shiftDay->id,
+                ]);
+            }
         }
 
         // ═════════════════════════════════════════════════════════════════════════
         //  MODULE 2: MACHINES
         // ═════════════════════════════════════════════════════════════════════════
+        $secCncCut = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcCncCut->id, 'code' => 'SEC-CNC-CUT'],
+            ['name' => 'CNC Cutting Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secHeavyWeld = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcHeavyWeld->id, 'code' => 'SEC-HEAVY-WELD'],
+            ['name' => 'Heavy Fabrication Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secHorizBoring = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcHorizBoring->id, 'code' => 'SEC-HORIZ-BORING'],
+            ['name' => 'Boring Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secPitmanBay = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcPitmanBay->id, 'code' => 'SEC-PITMAN-BAY'],
+            ['name' => 'Pitman Sub-Assembly Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secCrusherLine = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcCrusherLine->id, 'code' => 'SEC-CRUSHER-LINE'],
+            ['name' => 'Crusher Assembly Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secBlastSpray = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcBlastSpray->id, 'code' => 'SEC-BLAST-SPRAY'],
+            ['name' => 'Blasting & Painting Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secQaTesting = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcQaTesting->id, 'code' => 'SEC-QA-TESTING'],
+            ['name' => 'QA Testing Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
 
         $machCncOxy = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcCncCut->id,
+            'section_id' => $secCncCut->id,
             'name' => 'Messer Heavy CNC Oxy-Fuel & Plasma Cutter',
             'code' => 'MCH-CNC-OXY1',
             'machine_type' => 'CNC Plasma/Oxy Cutter',
@@ -474,7 +507,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machCncAlt = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcCncCut->id,
+            'section_id' => $secCncCut->id,
             'name' => 'ESAB Heavy CNC Gantry Cutting Machine',
             'code' => 'MCH-CNC-ALT1',
             'machine_type' => 'CNC Plasma Cutter',
@@ -487,7 +520,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machWeldArc = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcHeavyWeld->id,
+            'section_id' => $secHeavyWeld->id,
             'name' => 'Lincoln Electric Submerged Arc Welding Gantry',
             'code' => 'MCH-WELD-ARC1',
             'machine_type' => 'Submerged Arc Welder',
@@ -500,7 +533,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machBoring = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcHorizBoring->id,
+            'section_id' => $secHorizBoring->id,
             'name' => 'Toshiba Heavy Horizontal Boring Machine',
             'code' => 'MCH-BORING-H160',
             'machine_type' => 'Horizontal Boring Lathe',
@@ -513,7 +546,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machPress = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcPitmanBay->id,
+            'section_id' => $secPitmanBay->id,
             'name' => '500-Ton Hydraulic Bearing Press Rig',
             'code' => 'MCH-PRESS-HYD500',
             'machine_type' => 'Hydraulic Assembly Press',
@@ -526,7 +559,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machCrane = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcCrusherLine->id,
+            'section_id' => $secCrusherLine->id,
             'name' => '30-Ton Heavy Double Girder Overhead Crane',
             'code' => 'MCH-CRANE-OVERHEAD',
             'machine_type' => 'Erection Overhead Crane',
@@ -539,7 +572,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machBlastSpray = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcBlastSpray->id,
+            'section_id' => $secBlastSpray->id,
             'name' => 'Industrial Shot Blasting & Airless Spray Unit',
             'code' => 'MCH-BLAST-SPRAY1',
             'machine_type' => 'Shot Blast & Paint Rig',
@@ -552,7 +585,7 @@ class CrusherMachineProductionSeeder extends Seeder
 
         $machQaRig = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcQaTesting->id,
+            'section_id' => $secQaTesting->id,
             'name' => 'Dynamic Vibration & Power Performance Testing Rig',
             'code' => 'MCH-QA-DYN1',
             'machine_type' => 'QA Dynamic Test Station',

@@ -89,10 +89,39 @@ class WorkCenterSection extends BaseModel
     {
         return $this->belongsToMany(
             ProductionShift::class,
-            'production_work_center_section_shifts',
+            'production_section_shifts',
             'section_id',
             'shift_id'
-        )->distinct()->withPivot('workers_required', 'tenant_id')->withTimestamps();
+        )->distinct()->withPivot('id', 'active', 'tenant_id')->withTimestamps();
+    }
+
+    public function externalWorkerAllocations(): HasMany
+    {
+        return $this->hasMany(ExternalWorkerAllocation::class, 'section_id');
+    }
+
+    public function activeExternalWorkerAllocations(): HasMany
+    {
+        return $this->externalWorkerAllocations()->where('production_external_worker_allocations.active', true);
+    }
+
+    public function internalWorkerAllocations(): HasMany
+    {
+        return $this->hasMany(InternalWorkerAllocation::class, 'section_id');
+    }
+
+    public function activeInternalWorkerAllocations(): HasMany
+    {
+        return $this->internalWorkerAllocations()->where('production_internal_worker_allocations.active', true);
+    }
+
+    public function getTotalExternalWorkerHeadcount(?int $shiftId = null): int
+    {
+        $query = $this->activeExternalWorkerAllocations();
+        if ($shiftId !== null) {
+            $query->where('shift_id', $shiftId);
+        }
+        return (int) $query->sum('headcount');
     }
 
     // ─── Scopes & Helpers ─────────────────────────────────────────────────────

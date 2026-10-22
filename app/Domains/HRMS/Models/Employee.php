@@ -323,6 +323,16 @@ class Employee extends BaseModel
         return $this->full_name ?: trim($this->first_name . ' ' . $this->last_name);
     }
 
+    public function getNameAttribute(): string
+    {
+        return (string) ($this->full_name ?: $this->getDisplayNameAttribute());
+    }
+
+    public function getEmployeeCodeAttribute(): ?string
+    {
+        return $this->employee_id;
+    }
+
     /**
      * Migrate the employee to a new leave plan and reconcile balances.
      */

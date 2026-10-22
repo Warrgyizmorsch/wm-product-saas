@@ -5,7 +5,6 @@ namespace App\Domains\Production\Services;
 use App\Domains\HRMS\Models\Asset;
 use App\Domains\Production\DTO\MachineDTO;
 use App\Domains\Production\Models\Machine;
-use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Repositories\MachineRepositoryInterface;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +40,8 @@ class MachineService
 
         return DB::transaction(function () use ($dto, $section, $tenantId, $assetId) {
             $data = array_merge($dto->toArray(), [
-                'tenant_id'      => $tenantId,
-                'section_id'     => $section?->id,
-                'work_center_id' => $section?->work_center_id,
+                'tenant_id'  => $tenantId,
+                'section_id' => $section?->id,
             ]);
 
             if ($assetId !== null) {
@@ -115,7 +113,6 @@ class MachineService
         }
 
         $sectionId = $machine->section_id;
-        $workCenterId = $machine->work_center_id;
 
         if ($dto->has_section_id) {
             if ($dto->section_id !== null) {
@@ -130,10 +127,8 @@ class MachineService
                 }
 
                 $sectionId = $section->id;
-                $workCenterId = $section->work_center_id;
             } else {
                 $sectionId = null;
-                $workCenterId = null;
             }
         }
 
@@ -145,10 +140,9 @@ class MachineService
             );
         }
 
-        return DB::transaction(function () use ($id, $dto, $sectionId, $workCenterId) {
+        return DB::transaction(function () use ($id, $dto, $sectionId) {
             $data = array_merge($dto->toArray(), [
-                'section_id'     => $sectionId,
-                'work_center_id' => $workCenterId,
+                'section_id' => $sectionId,
             ]);
 
             return $this->repository->update($id, $data);

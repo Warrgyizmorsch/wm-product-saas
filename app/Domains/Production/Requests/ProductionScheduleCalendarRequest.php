@@ -32,8 +32,8 @@ class ProductionScheduleCalendarRequest extends FormRequest
                 function ($attribute, $value, $fail) {
                     if ($this->filled('work_center_id')) {
                         $wcId = $this->input('work_center_id');
-                        $machine = \App\Domains\Production\Models\Machine::withoutGlobalScopes()->find($value);
-                        if ($machine && $machine->work_center_id != $wcId) {
+                        $machine = \App\Domains\Production\Models\Machine::withoutGlobalScopes()->with('section')->find($value);
+                        if ($machine && $machine->section?->work_center_id != $wcId) {
                             $fail('The selected machine does not belong to the selected work center.');
                         }
                     }

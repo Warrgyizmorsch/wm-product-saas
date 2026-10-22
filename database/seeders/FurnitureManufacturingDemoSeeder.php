@@ -46,6 +46,7 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Models\ProductionWip;
 use App\Domains\Production\Models\ProductionWipTransaction;
 use App\Domains\Production\Models\ProductionCostAdjustment;
@@ -149,7 +150,9 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         DB::table('production_boms')->truncate();
         DB::table('production_machines')->truncate();
         DB::table('production_work_centers')->truncate();
-        DB::table('production_work_center_shifts')->truncate();
+        if (Schema::hasTable('production_work_center_shifts')) {
+            DB::table('production_work_center_shifts')->truncate();
+        }
 
         // Inventory tables (no orphan FKs)
         DB::table('product_warehouse_stocks')->truncate();
@@ -240,10 +243,15 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         //  SECTION 3 — MACHINES
         // ═══════════════════════════════════════════════════════════════════════
 
-        $machCnc = Machine::create(['tenant_id' => $tenant->id, 'work_center_id' => $wcCnc->id,      'name' => 'Biesse Rover CNC Router C600',     'code' => 'MCH-CNC-C600',   'machine_type' => 'CNC Router',       'manufacturer' => 'Biesse',       'model_number' => 'Rover C 6.40',  'capacity' => 4.0, 'status' => 'active', 'current_state' => 'Idle']);
-        $machSander = Machine::create(['tenant_id' => $tenant->id, 'work_center_id' => $wcSanding->id,  'name' => 'Holytek Belt Sander BS-1300',      'code' => 'MCH-SAND-BS13',  'machine_type' => 'Belt Sander',      'manufacturer' => 'Holytek',      'model_number' => 'BS-1300',       'capacity' => 6.0, 'status' => 'active', 'current_state' => 'Idle']);
-        $machSpray = Machine::create(['tenant_id' => $tenant->id, 'work_center_id' => $wcSprayBooth->id, 'name' => 'Anest Iwata Spray System W-400',  'code' => 'MCH-SPRAY-W400', 'machine_type' => 'Spray Gun System', 'manufacturer' => 'Anest Iwata',  'model_number' => 'W-400-134G',   'capacity' => 5.0, 'status' => 'active', 'current_state' => 'Idle']);
-        $machPress = Machine::create(['tenant_id' => $tenant->id, 'work_center_id' => $wcAssembly->id, 'name' => 'Pneumatic Assembly Clamp Press',   'code' => 'MCH-PRESS-AC1',  'machine_type' => 'Assembly Press',   'manufacturer' => 'Bessey',       'model_number' => 'STC-AP50',     'capacity' => 6.0, 'status' => 'active', 'current_state' => 'Idle']);
+        $secCnc = WorkCenterSection::firstOrCreate(['tenant_id' => $tenant->id, 'work_center_id' => $wcCnc->id, 'code' => 'SEC-CNC'], ['name' => 'CNC Routing Section', 'status' => 'active']);
+        $secSanding = WorkCenterSection::firstOrCreate(['tenant_id' => $tenant->id, 'work_center_id' => $wcSanding->id, 'code' => 'SEC-SAND'], ['name' => 'Sanding Section', 'status' => 'active']);
+        $secSpray = WorkCenterSection::firstOrCreate(['tenant_id' => $tenant->id, 'work_center_id' => $wcSprayBooth->id, 'code' => 'SEC-SPRAY'], ['name' => 'Spray Booth Section', 'status' => 'active']);
+        $secAssembly = WorkCenterSection::firstOrCreate(['tenant_id' => $tenant->id, 'work_center_id' => $wcAssembly->id, 'code' => 'SEC-ASSY'], ['name' => 'Assembly Section', 'status' => 'active']);
+
+        $machCnc = Machine::create(['tenant_id' => $tenant->id, 'section_id' => $secCnc->id,      'name' => 'Biesse Rover CNC Router C600',     'code' => 'MCH-CNC-C600',   'machine_type' => 'CNC Router',       'manufacturer' => 'Biesse',       'model_number' => 'Rover C 6.40',  'capacity' => 4.0, 'status' => 'active', 'current_state' => 'Idle']);
+        $machSander = Machine::create(['tenant_id' => $tenant->id, 'section_id' => $secSanding->id,  'name' => 'Holytek Belt Sander BS-1300',      'code' => 'MCH-SAND-BS13',  'machine_type' => 'Belt Sander',      'manufacturer' => 'Holytek',      'model_number' => 'BS-1300',       'capacity' => 6.0, 'status' => 'active', 'current_state' => 'Idle']);
+        $machSpray = Machine::create(['tenant_id' => $tenant->id, 'section_id' => $secSpray->id, 'name' => 'Anest Iwata Spray System W-400',  'code' => 'MCH-SPRAY-W400', 'machine_type' => 'Spray Gun System', 'manufacturer' => 'Anest Iwata',  'model_number' => 'W-400-134G',   'capacity' => 5.0, 'status' => 'active', 'current_state' => 'Idle']);
+        $machPress = Machine::create(['tenant_id' => $tenant->id, 'section_id' => $secAssembly->id, 'name' => 'Pneumatic Assembly Clamp Press',   'code' => 'MCH-PRESS-AC1',  'machine_type' => 'Assembly Press',   'manufacturer' => 'Bessey',       'model_number' => 'STC-AP50',     'capacity' => 6.0, 'status' => 'active', 'current_state' => 'Idle']);
 
         // ═══════════════════════════════════════════════════════════════════════
         //  SECTION 4 — SHIFTS & CALENDAR
@@ -254,11 +262,13 @@ class FurnitureManufacturingDemoSeeder extends Seeder
 
         foreach ([$wcCnc, $wcSanding, $wcSprayBooth, $wcAssembly, $wcQcFinal] as $wc) {
             foreach ([$shiftDay->id, $shiftEve->id] as $shiftId) {
-                DB::table('production_work_center_shifts')->insertOrIgnore([
-                    'tenant_id' => $tenant->id,
-                    'work_center_id' => $wc->id,
-                    'shift_id' => $shiftId,
-                ]);
+                if (Schema::hasTable('production_work_center_shifts')) {
+                    DB::table('production_work_center_shifts')->insertOrIgnore([
+                        'tenant_id' => $tenant->id,
+                        'work_center_id' => $wc->id,
+                        'shift_id' => $shiftId,
+                    ]);
+                }
             }
         }
 

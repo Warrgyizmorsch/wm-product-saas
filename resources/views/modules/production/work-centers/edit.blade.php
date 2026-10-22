@@ -32,31 +32,7 @@
                     <x-ui.button :href="route('production.work-centers.show', $workCenter->id)" variant="light" class="border">{{ __('production.cancel') }}</x-ui.button>
                 </div>
 
-                @if ($errors->has('confirm_section_shift_removal'))
-                    <div class="alert alert-warning border border-warning d-flex align-items-start gap-3 mb-4 shadow-sm">
-                        <i class="feather-alert-triangle fs-20 text-warning mt-1 flex-shrink-0"></i>
-                        <div class="flex-grow-1">
-                            <h6 class="fw-bold text-dark mb-1">{{ __('production.shift_removal_affects_sections') }}</h6>
-                            <p class="text-dark fs-13 mb-3">{{ $errors->first('confirm_section_shift_removal') }}</p>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="confirm_section_shift_removal" value="1" id="confirm_section_shift_removal" required>
-                                <label class="form-check-label fw-bold text-dark fs-13" for="confirm_section_shift_removal">
-                                    {{ __('production.confirm_cascade_shift_removal') }}
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                @endif
 
-                @if ($errors->has('shifts'))
-                    <div class="alert alert-danger border border-danger d-flex align-items-start gap-3 mb-4 shadow-sm">
-                        <i class="feather-alert-circle fs-20 text-danger mt-1 flex-shrink-0"></i>
-                        <div class="flex-grow-1">
-                            <h6 class="fw-bold text-danger mb-1">{{ __('production.shift_removal_blocked') }}</h6>
-                            <p class="text-dark fs-13 mb-0">{{ $errors->first('shifts') }}</p>
-                        </div>
-                    </div>
-                @endif
 
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
@@ -82,21 +58,7 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.capacity_per_hour')" name="capacity_per_hour" inputType="number" :value="old('capacity_per_hour', $workCenter->capacity_per_hour)" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.efficiency')" name="efficiency_percentage" inputType="number" :value="old('efficiency_percentage', $workCenter->efficiency_percentage)" :required="true" />
-                        
-                        <x-ui.odoo-form-ui type="input" :label="__('production.cost_per_hour') . ' (' . active_currency_symbol() . ')'" name="cost_per_hour" inputType="number" step="0.01" :value="old('cost_per_hour', number_format(convert_from_base($workCenter->cost_per_hour), 2, '.', ''))" :required="true" />
-                        
                         <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost_rate') . ' (' . active_currency_symbol() . ')'" name="overhead_rate" inputType="number" step="0.01" :value="old('overhead_rate', number_format(convert_from_base($workCenter->overhead_rate ?? 0), 2, '.', ''))" />
-                        
-                        <x-ui.odoo-form-ui type="select" :label="__('production.active_shifts')" name="shifts[]" :multiple="true" :searchable="true" :errorText="$errors->first('shifts')">
-                            @foreach($shifts as $shift)
-                                <option value="{{ $shift->id }}" @selected(in_array($shift->id, old('shifts', $workCenter->shifts->pluck('id')->toArray())))>
-                                    {{ $shift->name }} ({{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }})
-                                </option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
                         
                         <x-ui.odoo-form-ui type="select" label="Production Calendar" name="production_calendar_id">
                             <option value="">-- Default Factory Calendar --</option>

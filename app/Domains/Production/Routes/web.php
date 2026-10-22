@@ -39,6 +39,10 @@ use App\Domains\Production\Controllers\ShiftController;
 use App\Domains\Production\Controllers\WipController;
 use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\WorkCenterSectionController;
+use App\Domains\Production\Controllers\ExternalWorkerPayGradeController;
+use App\Domains\Production\Controllers\ExternalWorkerAllocationController;
+use App\Domains\Production\Controllers\InternalWorkerAllocationController;
+use App\Domains\Production\Controllers\WorkCenterEmployeeController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
@@ -112,6 +116,27 @@ Route::prefix('production')
         // ── Work Center Sections ──────────────────────────────────────────────
         Route::get('sections/by-work-center/{workCenter}', [WorkCenterSectionController::class, 'byWorkCenter'])->name('work-center-sections.by-work-center');
         Route::resource('work-center-sections', WorkCenterSectionController::class);
+
+        // ── External Worker Pay Grades ────────────────────────────────────────
+        Route::patch('pay-grades/{payGrade}/toggle-status', [ExternalWorkerPayGradeController::class, 'toggleStatus'])->name('pay-grades.toggle-status');
+        Route::resource('pay-grades', ExternalWorkerPayGradeController::class);
+
+        // ── External Worker Allocations ───────────────────────────────────────
+        Route::post('external-worker-allocations', [ExternalWorkerAllocationController::class, 'store'])->name('external-worker-allocations.store');
+        Route::patch('external-worker-allocations/{allocation}/headcount', [ExternalWorkerAllocationController::class, 'updateHeadcount'])->name('external-worker-allocations.headcount');
+        Route::patch('external-worker-allocations/{allocation}/toggle-status', [ExternalWorkerAllocationController::class, 'toggleStatus'])->name('external-worker-allocations.toggle-status');
+        Route::delete('external-worker-allocations/{allocation}', [ExternalWorkerAllocationController::class, 'destroy'])->name('external-worker-allocations.destroy');
+
+        // ── Internal Worker Allocations ───────────────────────────────────────
+        Route::post('internal-worker-allocations', [InternalWorkerAllocationController::class, 'store'])->name('internal-worker-allocations.store');
+        Route::patch('internal-worker-allocations/{allocation}/headcount', [InternalWorkerAllocationController::class, 'updateHeadcount'])->name('internal-worker-allocations.headcount');
+        Route::patch('internal-worker-allocations/{allocation}/toggle-status', [InternalWorkerAllocationController::class, 'toggleStatus'])->name('internal-worker-allocations.toggle-status');
+        Route::delete('internal-worker-allocations/{allocation}', [InternalWorkerAllocationController::class, 'destroy'])->name('internal-worker-allocations.destroy');
+
+        // ── Work Center Internal Employee Assignments ────────────────────────
+        Route::post('work-center-employees', [WorkCenterEmployeeController::class, 'store'])->name('work-center-employees.store');
+        Route::patch('work-center-employees/{assignment}/toggle-status', [WorkCenterEmployeeController::class, 'toggleStatus'])->name('work-center-employees.toggle-status');
+        Route::delete('work-center-employees/{assignment}', [WorkCenterEmployeeController::class, 'destroy'])->name('work-center-employees.destroy');
 
         // ── Machines (AJAX endpoint must be before resource to avoid routing conflict) ──
         Route::get('machines/by-work-center/{workCenter}', [MachineController::class, 'byWorkCenter'])

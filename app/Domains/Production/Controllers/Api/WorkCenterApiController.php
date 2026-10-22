@@ -92,7 +92,9 @@ class WorkCenterApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
 
         try {
-            $dto = WorkCenterDTO::fromArray($request->validated());
+            $data = $request->validated();
+            unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
+            $dto = WorkCenterDTO::fromArray($data);
             $workCenter = $this->service->create($dto, $tenantId);
 
             return $this->createdResponse(
@@ -116,7 +118,9 @@ class WorkCenterApiController extends ApiBaseController
         Gate::authorize('update', $workCenter);
 
         try {
-            $dto = WorkCenterDTO::fromArray($request->validated());
+            $data = $request->validated();
+            unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
+            $dto = WorkCenterDTO::fromArray($data);
             $this->service->update($id, $dto);
 
             return $this->successResponse(

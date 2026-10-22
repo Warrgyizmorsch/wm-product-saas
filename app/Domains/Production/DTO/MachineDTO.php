@@ -9,7 +9,6 @@ class MachineDTO
         public readonly string  $name = '',
         public readonly string  $code = '',
         public readonly string  $status = 'active',
-        public readonly ?int    $work_center_id = null,
         public readonly ?string $machine_type = null,
         public readonly ?string $manufacturer = null,
         public readonly ?string $model_number = null,
@@ -31,7 +30,6 @@ class MachineDTO
             name:               $data['name'] ?? '',
             code:               strtoupper(trim($data['code'] ?? '')),
             status:             $data['status'] ?? 'active',
-            work_center_id:     isset($data['work_center_id']) && $data['work_center_id'] !== '' && $data['work_center_id'] !== null ? (int) $data['work_center_id'] : null,
             machine_type:       $data['machine_type'] ?? null,
             manufacturer:       $data['manufacturer'] ?? null,
             model_number:       $data['model_number'] ?? null,
@@ -46,7 +44,6 @@ class MachineDTO
     {
         return [
             'section_id'         => $this->section_id,
-            'work_center_id'     => $this->work_center_id,
             'name'               => $this->name,
             'code'               => $this->code,
             'status'             => $this->status,

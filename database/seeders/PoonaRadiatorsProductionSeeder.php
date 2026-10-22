@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Models\ProductionCalendar;
@@ -101,8 +102,9 @@ class PoonaRadiatorsProductionSeeder extends Seeder
         DB::table('production_bom_items')->truncate();
         DB::table('production_boms')->truncate();
         DB::table('production_machines')->truncate();
-        DB::table('production_work_centers')->truncate();
-        DB::table('production_work_center_shifts')->truncate();
+        if (Schema::hasTable('production_work_center_shifts')) {
+            DB::table('production_work_center_shifts')->truncate();
+        }
 
         Schema::enableForeignKeyConstraints();
 
@@ -356,23 +358,42 @@ class PoonaRadiatorsProductionSeeder extends Seeder
             'parent_id' => $secTestCoat->id,
         ]);
 
-        // Attach shifts to work centers
-        foreach ([$wcFinTube, $wcCoreCab, $wcTankCrimp, $wcTestCoat] as $wcItem) {
-            foreach ([$shiftDay, $shiftEve] as $sfItem) {
-                DB::table('production_work_center_shifts')->insertOrIgnore([
-                    'tenant_id' => $tenant->id,
-                    'work_center_id' => $wcItem->id,
-                    'shift_id' => $sfItem->id,
-                ]);
+        // Attach shifts to work centers (legacy pivot)
+        if (Schema::hasTable('production_work_center_shifts')) {
+            foreach ([$wcFinTube, $wcCoreCab, $wcTankCrimp, $wcTestCoat] as $wcItem) {
+                foreach ([$shiftDay, $shiftEve] as $sfItem) {
+                    DB::table('production_work_center_shifts')->insertOrIgnore([
+                        'tenant_id' => $tenant->id,
+                        'work_center_id' => $wcItem->id,
+                        'shift_id' => $sfItem->id,
+                    ]);
+                }
             }
         }
 
         // ═════════════════════════════════════════════════════════════════════════
         //  MODULE 3: MACHINES
         // ═════════════════════════════════════════════════════════════════════════
+        $secFinTube = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcFinTube->id, 'code' => 'SEC-FIN-TUBE'],
+            ['name' => 'Fin & Tube Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secCoreCab = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcCoreCab->id, 'code' => 'SEC-CORE-CAB'],
+            ['name' => 'Core & CAB Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secTankCrimp = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcTankCrimp->id, 'code' => 'SEC-TANK-CRIMP'],
+            ['name' => 'Tank & Crimp Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+        $secTestCoat = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcTestCoat->id, 'code' => 'SEC-TEST-COAT'],
+            ['name' => 'Testing & Coating Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+
         $mcFinRoll = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcFinTube->id,
+            'section_id' => $secFinTube->id,
             'name' => 'High-Speed CNC Fin Roller Machine',
             'code' => 'MC-FIN-ROLL-01',
             'machine_type' => 'Fin Corrugation Roller',
@@ -385,7 +406,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcTubeMill = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcFinTube->id,
+            'section_id' => $secFinTube->id,
             'name' => 'Automated Aluminum Tube Mill & Seam Welder',
             'code' => 'MC-TUBE-MILL-01',
             'machine_type' => 'Tube Mill',
@@ -398,7 +419,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcCoreStack = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcCoreCab->id,
+            'section_id' => $secCoreCab->id,
             'name' => 'Servo-Driven Core Matrix Stacking Machine',
             'code' => 'MC-CORE-STACK-01',
             'machine_type' => 'Core Builder Stacker',
@@ -411,7 +432,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcCabFurnace = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcCoreCab->id,
+            'section_id' => $secCoreCab->id,
             'name' => 'Continuous Nocolok Controlled Atmosphere Brazing Furnace',
             'code' => 'MC-CAB-FURNACE-01',
             'machine_type' => 'CAB Furnace',
@@ -424,7 +445,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcCrimpPress = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcTankCrimp->id,
+            'section_id' => $secTankCrimp->id,
             'name' => 'Pneumatic Radiator Header Crimping Press',
             'code' => 'MC-CRIMP-PRESS-01',
             'machine_type' => 'Crimping Press',
@@ -437,7 +458,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcTigWeld = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcTankCrimp->id,
+            'section_id' => $secTankCrimp->id,
             'name' => 'Multi-Axis TIG Welding Station for Brass Nozzles',
             'code' => 'MC-TIG-WELD-01',
             'machine_type' => 'TIG Welder',
@@ -450,7 +471,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcLeakTest = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcTestCoat->id,
+            'section_id' => $secTestCoat->id,
             'name' => 'Automated Water Submersion Pressure Testing Rig',
             'code' => 'MC-LEAK-TEST-01',
             'machine_type' => 'Hydrostatic Leak Tester',
@@ -463,7 +484,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
 
         $mcPowderCoat = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcTestCoat->id,
+            'section_id' => $secTestCoat->id,
             'name' => 'Electrostatic Powder Coating Oven',
             'code' => 'MC-POWDER-COAT-01',
             'machine_type' => 'Powder Coating Line',
@@ -496,7 +517,7 @@ class PoonaRadiatorsProductionSeeder extends Seeder
                 'tenant_id' => $tenant->id,
                 'user_id' => $userId,
                 'skill_code' => 'SKILL-MC-' . $mc->code,
-                'work_center_id' => $mc->work_center_id,
+                'work_center_id' => $mc->section?->work_center_id,
                 'machine_id' => $mc->id,
                 'active' => true,
             ]);

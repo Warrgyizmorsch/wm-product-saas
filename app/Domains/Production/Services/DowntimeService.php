@@ -42,7 +42,7 @@ class DowntimeService
             $downtime = ProductionMachineDowntime::create([
                 'tenant_id'                      => $tenantId,
                 'machine_id'                     => $machineId,
-                'work_center_id'                 => $machine->work_center_id,
+                'work_center_id'                 => $machine->section?->work_center_id,
                 'production_order_id'            => $params['production_order_id'] ?? null,
                 'production_order_operation_id'  => $params['production_order_operation_id'] ?? null,
                 'reason'                         => $reason,

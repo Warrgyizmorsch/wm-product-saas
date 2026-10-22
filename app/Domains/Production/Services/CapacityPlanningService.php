@@ -59,7 +59,7 @@ class CapacityPlanningService
                     'code'           => $m->code,
                     'name'           => $m->name,
                     'type'           => 'machine',
-                    'work_center_id' => $m->work_center_id,
+                    'work_center_id' => $wc->id,
                     'status'         => $m->status,
                 ])->values()->all(),
             ];
@@ -490,7 +490,7 @@ class CapacityPlanningService
             throw new InvalidArgumentException("Selected machine [{$machine->name}] is inactive.");
         }
 
-        if ($machine->work_center_id !== $schedOp->work_center_id) {
+        if ($machine->section?->work_center_id !== $schedOp->work_center_id) {
             throw new InvalidArgumentException("Selected machine [{$machine->name}] does not belong to Work Center [#{$schedOp->work_center_id}].");
         }
 
@@ -921,7 +921,7 @@ class CapacityPlanningService
         $tenantId = require_tenant_id();
 
         // Get alternate machines in the same work center
-        $machines = Machine::where('work_center_id', $schedOp->work_center_id)
+        $machines = Machine::whereHas('section', fn ($q) => $q->where('work_center_id', $schedOp->work_center_id))
             ->where('status', 'active')
             ->where('id', '!=', $schedOp->machine_id)
             ->get();

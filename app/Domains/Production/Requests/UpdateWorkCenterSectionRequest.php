@@ -28,39 +28,18 @@ class UpdateWorkCenterSectionRequest extends FormRequest
         }
 
         $shifts = $this->input('shifts');
-        $shiftWorkers = $this->input('shift_workers', []);
-
-        // Support array-of-objects or map format: shifts => [['id' => 1, 'workers_required' => 4]]
         if (is_array($shifts)) {
             $normalizedShifts = [];
-            $normalizedWorkers = is_array($shiftWorkers) ? $shiftWorkers : [];
-
             foreach ($shifts as $key => $val) {
                 if (is_array($val)) {
                     $sId = (int) ($val['id'] ?? $val['shift_id'] ?? $key);
                     $normalizedShifts[] = $sId;
-                    if (isset($val['workers_required']) && !isset($normalizedWorkers[$sId])) {
-                        $normalizedWorkers[$sId] = $val['workers_required'];
-                    }
                 } else {
-                    $normalizedShifts[] = $val;
+                    $normalizedShifts[] = (int) $val;
                 }
             }
-
-            if (!empty($normalizedWorkers)) {
-                $this->merge([
-                    'shifts'        => $normalizedShifts,
-                    'shift_workers' => $normalizedWorkers,
-                ]);
-                $shiftWorkers = $normalizedWorkers;
-            }
-        }
-
-        // Auto-populate workers_required from shift_workers if not explicitly passed
-        if (!$this->has('workers_required') && is_array($shiftWorkers) && !empty($shiftWorkers)) {
-            $validCounts = array_filter(array_map('intval', $shiftWorkers), fn ($c) => $c > 0);
             $this->merge([
-                'workers_required' => !empty($validCounts) ? max($validCounts) : 1,
+                'shifts' => array_values(array_unique(array_filter($normalizedShifts))),
             ]);
         }
     }
@@ -103,8 +82,6 @@ class UpdateWorkCenterSectionRequest extends FormRequest
                 'integer',
                 Rule::exists('production_shifts', 'id')->where('tenant_id', $tenantId),
             ],
-            'shift_workers'              => 'required|array',
-            'shift_workers.*'            => 'required|integer|min:1',
             'machine_ids'                => 'nullable|array',
             'machine_ids.*'              => [
                 'integer',
@@ -117,19 +94,6 @@ class UpdateWorkCenterSectionRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            $shifts = $this->input('shifts', []);
-            $shiftWorkers = $this->input('shift_workers', []);
-
-            if (is_array($shifts)) {
-                foreach ($shifts as $shiftId) {
-                    if (!is_array($shiftWorkers) || !array_key_exists($shiftId, $shiftWorkers) || $shiftWorkers[$shiftId] === null || $shiftWorkers[$shiftId] === '') {
-                        $validator->errors()->add("shift_workers.{$shiftId}", "Worker count is required for this shift.");
-                    } elseif (!is_numeric($shiftWorkers[$shiftId]) || (int) $shiftWorkers[$shiftId] <= 0 || (string)(int)$shiftWorkers[$shiftId] !== (string)$shiftWorkers[$shiftId]) {
-                        $validator->errors()->add("shift_workers.{$shiftId}", "Worker count must be an integer greater than zero.");
-                    }
-                }
-            }
-
             $machineIds = $this->input('machine_ids');
             $sectionId = (int) ($this->route('work_center_section') ?? $this->route('section'));
             if (!empty($machineIds) && is_array($machineIds)) {
@@ -157,10 +121,6 @@ class UpdateWorkCenterSectionRequest extends FormRequest
             'shifts.required'                    => 'Every section must have at least one assigned shift.',
             'shifts.min'                         => 'Every section must have at least one assigned shift.',
             'shifts.*.exists'                    => 'One or more selected shifts do not exist.',
-            'shift_workers.required'             => 'Worker counts must be specified for assigned shifts.',
-            'shift_workers.*.required'           => 'Worker count is required for each assigned shift.',
-            'shift_workers.*.integer'            => 'Worker count must be an integer greater than zero.',
-            'shift_workers.*.min'                => 'Worker count must be at least 1.',
             'machine_ids.*.exists'               => 'One or more selected machines do not exist or belong to another organization.',
             'manual_capacity_per_hour.required'  => 'Manual capacity per hour is required when manual production is enabled.',
             'manual_capacity_per_hour.numeric'   => 'Manual capacity per hour must be a valid number.',

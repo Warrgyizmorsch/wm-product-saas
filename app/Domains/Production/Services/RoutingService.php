@@ -473,7 +473,7 @@ class RoutingService
      */
     public function validateMachineBelongsToWorkCenter(int $machineId, int $workCenterId): bool
     {
-        $machine = Machine::find($machineId);
-        return $machine && $machine->work_center_id === $workCenterId;
+        $machine = Machine::with('section')->find($machineId);
+        return (bool) ($machine && $machine->section?->work_center_id === $workCenterId);
     }
 }

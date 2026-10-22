@@ -363,18 +363,20 @@ class ProductionVariationDemoSeeder extends Seeder
             ]
         );
 
-        foreach ($workCenters as $wc) {
-            DB::table('production_work_center_shifts')->updateOrInsert(
-                [
-                    'tenant_id' => $tenantId,
-                    'work_center_id' => $wc->id,
-                    'shift_id' => $shift->id,
-                ],
-                [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
+        if (Schema::hasTable('production_work_center_shifts')) {
+            foreach ($workCenters as $wc) {
+                DB::table('production_work_center_shifts')->updateOrInsert(
+                    [
+                        'tenant_id' => $tenantId,
+                        'work_center_id' => $wc->id,
+                        'shift_id' => $shift->id,
+                    ],
+                    [
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            }
         }
     }
 

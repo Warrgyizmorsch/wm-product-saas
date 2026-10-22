@@ -41,10 +41,9 @@ class WorkCenterController extends Controller
         Gate::authorize('create', WorkCenter::class);
 
         $tenantId = require_tenant_id();
-        $shifts = $this->repository->getActiveShifts($tenantId);
         $workCenterTypes = config('production.work_center_types', []);
         $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return view('modules.production.work-centers.create', compact('workCenterTypes', 'shifts', 'calendars'));
+        return view('modules.production.work-centers.create', compact('workCenterTypes', 'calendars'));
     }
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
@@ -54,18 +53,12 @@ class WorkCenterController extends Controller
         try {
             $tenantId = require_tenant_id();
             $data = $request->validated();
-            if (isset($data['cost_per_hour'])) {
-                $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
-            }
+            unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
             if (isset($data['overhead_rate'])) {
                 $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->create($dto, $tenantId);
-
-            // Sync shifts
-            $shifts = $request->input('shifts', []);
-            $this->service->syncShifts($wc, $shifts, $tenantId, true);
 
             return redirect()
                 ->route('production.work-centers.show', $wc->id)
@@ -91,7 +84,38 @@ class WorkCenterController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('modules.production.work-centers.show', compact('workCenter', 'eligibleMachines'));
+        $availableShifts = ProductionShift::where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get();
+
+        $activePayGrades = \App\Domains\Production\Models\ExternalWorkerPayGrade::where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get();
+
+        $availableEmployees = class_exists(\App\Domains\HRMS\Models\Employee::class)
+            ? \App\Domains\HRMS\Models\Employee::with(['designation', 'department'])
+                ->where('tenant_id', $tenantId)
+                ->orderBy('full_name')
+                ->get()
+            : collect();
+
+        $employeesWithActiveSection = \App\Domains\Production\Models\WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+            ->whereNotNull('section_id')
+            ->where('active', true)
+            ->with('section')
+            ->get()
+            ->keyBy('employee_id');
+
+        return view('modules.production.work-centers.show', compact(
+            'workCenter',
+            'eligibleMachines',
+            'availableShifts',
+            'activePayGrades',
+            'availableEmployees',
+            'employeesWithActiveSection'
+        ));
     }
 
     public function edit(int $id): View
@@ -102,10 +126,9 @@ class WorkCenterController extends Controller
         Gate::authorize('update', $workCenter);
 
         $tenantId = require_tenant_id();
-        $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
         $workCenterTypes = config('production.work_center_types', []);
         $calendars = ProductionCalendar::where('tenant_id', $tenantId)->orderBy('name')->get();
-        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'shifts', 'calendars'));
+        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'calendars'));
     }
 
     public function update(UpdateWorkCenterRequest $request, int $id): RedirectResponse
@@ -118,20 +141,12 @@ class WorkCenterController extends Controller
         try {
             $tenantId = require_tenant_id();
             $data = $request->validated();
-            if (isset($data['cost_per_hour'])) {
-                $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
-            }
+            unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
             if (isset($data['overhead_rate'])) {
                 $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->update($id, $dto);
-
-
-            // Sync shifts with section cascading rules
-            $shifts = $request->input('shifts', []);
-            $confirmed = $request->boolean('confirm_section_shift_removal');
-            $this->service->syncShifts($wc, $shifts, $tenantId, $confirmed);
 
             return redirect()
                 ->route('production.work-centers.show', $wc->id)

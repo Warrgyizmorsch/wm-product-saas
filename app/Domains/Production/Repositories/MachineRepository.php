@@ -12,7 +12,7 @@ class MachineRepository implements MachineRepositoryInterface
         $query = Machine::query()->with(['workCenter', 'section']);
 
         if (!empty($filters['work_center_id'])) {
-            $query->where('work_center_id', $filters['work_center_id']);
+            $query->whereHas('section', fn ($q) => $q->where('work_center_id', $filters['work_center_id']));
         }
 
         if (!empty($filters['section_id'])) {
@@ -40,7 +40,7 @@ class MachineRepository implements MachineRepositoryInterface
         $query = Machine::query()->with(['workCenter', 'section']);
 
         if (!empty($filters['work_center_id'])) {
-            $query->where('work_center_id', $filters['work_center_id']);
+            $query->whereHas('section', fn ($q) => $q->where('work_center_id', $filters['work_center_id']));
         }
 
         if (!empty($filters['section_id'])) {
@@ -88,7 +88,7 @@ class MachineRepository implements MachineRepositoryInterface
 
     public function getByWorkCenter(int $workCenterId, bool $activeOnly = false): Collection
     {
-        $query = Machine::where('work_center_id', $workCenterId);
+        $query = Machine::whereHas('section', fn ($q) => $q->where('work_center_id', $workCenterId));
 
         if ($activeOnly) {
             $query->active();

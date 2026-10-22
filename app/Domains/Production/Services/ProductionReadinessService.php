@@ -732,14 +732,14 @@ class ProductionReadinessService
         if (!$machine && $op->work_center_id) {
             $totalMachines = Machine::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
-                ->where('work_center_id', $op->work_center_id)
+                ->whereHas('section', fn ($q) => $q->where('work_center_id', $op->work_center_id))
                 ->count();
 
             if ($totalMachines > 0) {
                 // Check if active machines exist at Work Center
                 $activeMachines = Machine::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
-                    ->where('work_center_id', $op->work_center_id)
+                    ->whereHas('section', fn ($q) => $q->where('work_center_id', $op->work_center_id))
                     ->where('status', 'active')
                     ->get();
 
@@ -819,7 +819,7 @@ class ProductionReadinessService
             if (!$alternateAvailable && $op->work_center_id) {
                 $otherWorkCenterMachines = Machine::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
-                    ->where('work_center_id', $op->work_center_id)
+                    ->whereHas('section', fn ($q) => $q->where('work_center_id', $op->work_center_id))
                     ->where('id', '!=', $machine->id)
                     ->where('status', 'active')
                     ->exists();

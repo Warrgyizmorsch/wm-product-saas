@@ -212,7 +212,7 @@
                             <td>
                                 @if ($machine->workCenter)
                                     <div class="d-flex flex-column">
-                                        <a href="{{ route('production.work-centers.show', $machine->work_center_id) }}" class="fw-semibold text-primary hover-primary">
+                                        <a href="{{ route('production.work-centers.show', $machine->workCenter->id) }}" class="fw-semibold text-primary hover-primary">
                                             {{ $machine->workCenter->name }}
                                         </a>
                                         @if ($machine->section)
@@ -221,7 +221,7 @@
                                         <small class="text-muted font-monospace fs-10">{{ $machine->workCenter->code }}</small>
                                     </div>
                                 @else
-                                    <span class="text-muted">Orphaned</span>
+                                    <span class="text-muted">Unassigned</span>
                                 @endif
                             </td>
                             <td class="text-muted">{{ $machine->machine_type ?? '—' }}</td>

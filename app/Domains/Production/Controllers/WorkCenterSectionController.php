@@ -64,7 +64,7 @@ class WorkCenterSectionController extends Controller
                 'id'               => $sh->id,
                 'name'             => $sh->name,
                 'code'             => $sh->code,
-                'workers_required' => (int) ($sh->pivot->workers_required ?? $s->workers_required ?? 1),
+                'active'           => (bool) ($sh->pivot->active ?? true),
             ]),
         ])->values());
     }

@@ -54,22 +54,10 @@ class SchedulingService
         return $this->calendarsCache[$wc->id];
     }
 
-    private function getCachedShifts(WorkCenter $wc): \Illuminate\Support\Collection
+    public function getCachedShifts(WorkCenter $wc): \Illuminate\Support\Collection
     {
         if (!isset($this->shiftsCache[$wc->id])) {
-            $shifts = $wc->shifts()->where('active', true)->get();
-            if ($shifts->isEmpty()) {
-                $shifts = collect([
-                    new ProductionShift([
-                        'name' => 'Standard Shift',
-                        'code' => 'STD',
-                        'start_time' => '08:00:00',
-                        'end_time' => '16:00:00',
-                        'break_minutes' => 0,
-                    ])
-                ]);
-            }
-            $this->shiftsCache[$wc->id] = $shifts;
+            $this->shiftsCache[$wc->id] = $wc->getEffectiveShifts(true);
         }
         return $this->shiftsCache[$wc->id];
     }
@@ -759,19 +747,18 @@ class SchedulingService
         // 1. Resolve Calendar Fallback Hierarchy
         $calendar = $this->getCachedCalendar($wc, $tenantId);
 
-        // Fetch shifts assigned to work center
+        // Fetch effective shifts assigned to work center (derived from sections)
         $shifts = $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
-            // Standard 8-hour shift fallback (480 minutes) if no shifts configured
-            $shifts = collect([
-                new ProductionShift([
-                    'name' => 'Standard Shift',
-                    'code' => 'STD',
-                    'start_time' => '08:00:00',
-                    'end_time' => '16:00:00',
-                    'break_minutes' => 0,
-                ])
-            ]);
+            return [
+                'start' => null,
+                'finish' => null,
+                'warnings' => array_merge($warnings, [[
+                    'code' => 'NO_SHIFTS_CONFIGURED',
+                    'message' => "Work Center '{$wc->name}' has no active shifts configured across its sections.",
+                    'severity' => 'error',
+                ]]),
+            ];
         }
 
         // Fetch other active operations on this resource to avoid overlap
@@ -1132,6 +1119,15 @@ class SchedulingService
         usort($evaluated, function ($a, $b) use ($forward) {
             $startA = $a['slot']['start'];
             $startB = $b['slot']['start'];
+            if ($startA === null && $startB === null) {
+                return $a['priority'] <=> $b['priority'];
+            }
+            if ($startA === null) {
+                return 1;
+            }
+            if ($startB === null) {
+                return -1;
+            }
             if ($startA->eq($startB)) {
                 return $a['priority'] <=> $b['priority'];
             }
@@ -1183,10 +1179,10 @@ class SchedulingService
 
         $shifts = $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
-            // Standard shift default (480 minutes)
-            $totalMinutes = 480.0;
-        } else {
-            $totalMinutes = 0.0;
+            return 0.0;
+        }
+
+        $totalMinutes = 0.0;
             foreach ($shifts as $shift) {
                 $start = Carbon::parse($shift->start_time);
                 $end = Carbon::parse($shift->end_time);
@@ -1202,7 +1198,6 @@ class SchedulingService
 
                 $totalMinutes += max(0.0, $diff);
             }
-        }
 
         $machineCount = $wc->machines()->where('status', Machine::STATUS_ACTIVE)->count();
         if ($machineCount <= 0) {
@@ -1527,15 +1522,7 @@ class SchedulingService
         $calendar = $this->getCachedCalendar($wc, $tenantId);
         $shifts = $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
-            $shifts = collect([
-                new ProductionShift([
-                    'name' => 'Standard Shift',
-                    'code' => 'STD',
-                    'start_time' => '08:00:00',
-                    'end_time' => '16:00:00',
-                    'break_minutes' => 0,
-                ])
-            ]);
+            return $from->copy()->addMinutes((int) ceil($minutes));
         }
 
         $searchDate = $from->copy();
@@ -1601,15 +1588,7 @@ class SchedulingService
         $calendar = $this->getCachedCalendar($wc, $tenantId);
         $shifts = $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
-            $shifts = collect([
-                new ProductionShift([
-                    'name' => 'Standard Shift',
-                    'code' => 'STD',
-                    'start_time' => '08:00:00',
-                    'end_time' => '16:00:00',
-                    'break_minutes' => 0,
-                ])
-            ]);
+            return $from->copy()->subMinutes((int) ceil($minutes));
         }
 
         $searchDate = $from->copy();
@@ -2018,8 +1997,9 @@ class SchedulingService
         return true;
     }
 
-    private function validateMachineForScheduling(Machine $machine, int $workCenterId, int $tenantId): array
+    public function validateMachineForScheduling(Machine $machine, int $workCenterId, ?int $tenantId = null): array
     {
+        $tenantId = $tenantId ?? $machine->tenant_id;
         if ($machine->tenant_id !== $tenantId) {
             return [
                 'valid' => false,
@@ -2031,7 +2011,7 @@ class SchedulingService
             ];
         }
 
-        if ($machine->work_center_id !== $workCenterId) {
+        if ($machine->section?->work_center_id !== $workCenterId) {
             return [
                 'valid' => false,
                 'warning' => [
@@ -2138,7 +2118,7 @@ class SchedulingService
                         "Machine [{$op->machine->name}] does not belong to this tenant."
                     );
                 }
-                if ($op->machine->work_center_id !== $op->work_center_id) {
+                if ($op->machine->section?->work_center_id !== $op->work_center_id) {
                     throw new \LogicException(
                         "Machine [{$op->machine->name}] does not belong to Work Center [{$op->workCenter->name}]."
                     );
@@ -2191,7 +2171,7 @@ class SchedulingService
 
             $utilization = $totalCapacity > 0 ? ($totalScheduled / $totalCapacity) * 100 : 100;
 
-            $shiftsList = $wc->shifts()->where('active', true)->pluck('name')->toArray();
+            $shiftsList = $wc->getEffectiveShifts(true)->pluck('name')->toArray();
             $calendarName = $wc->calendar ? $wc->calendar->name : 'Mon-Fri Fallback';
             $workingDays = $wc->calendar ? $wc->calendar->working_days : [1, 2, 3, 4, 5];
 
@@ -2286,7 +2266,7 @@ class SchedulingService
                 'work_center' => $wc,
                 'calendar_name' => $calendarName,
                 'working_days' => $workingDaysStr,
-                'shifts' => empty($shiftsList) ? 'Standard Shift (Fallback)' : implode(', ', $shiftsList),
+                'shifts' => empty($shiftsList) ? 'No Active Shifts' : implode(', ', $shiftsList),
                 'active_machines' => $activeMachinesCount,
                 'scheduled_minutes' => $totalScheduled,
                 'capacity_minutes' => $totalCapacity,
@@ -2316,15 +2296,7 @@ class SchedulingService
         // Retrieve shift windows
         $shifts = $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
-            $shifts = collect([
-                new ProductionShift([
-                    'name' => 'Standard Shift',
-                    'code' => 'STD',
-                    'start_time' => '08:00:00',
-                    'end_time' => '16:00:00',
-                    'break_minutes' => 0,
-                ])
-            ]);
+            return 0.0;
         }
 
         $windows = [];

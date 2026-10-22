@@ -35,23 +35,24 @@ class ProductionShift extends BaseModel
         return $this->belongsTo(\App\Domains\HRMS\Models\Company::class, 'company_id');
     }
 
-    public function workCenters(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            WorkCenter::class,
-            'production_work_center_shifts',
-            'shift_id',
-            'work_center_id'
-        );
-    }
-
     public function sections(): BelongsToMany
     {
         return $this->belongsToMany(
             WorkCenterSection::class,
-            'production_work_center_section_shifts',
+            'production_section_shifts',
             'shift_id',
             'section_id'
-        )->distinct()->withPivot('workers_required', 'tenant_id')->withTimestamps();
+        )->distinct()->withPivot('id', 'active', 'tenant_id')->withTimestamps();
+    }
+
+    public function externalWorkerAllocations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ExternalWorkerAllocation::class, 'shift_id');
+    }
+
+    public function isActive(): bool
+    {
+        return (bool) $this->active;
     }
 }
+

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
@@ -328,10 +329,24 @@ class ProductionBomSeeder extends Seeder
                 'parent_id' => $secIntegration->id,
             ]);
 
+            // Seed Sections
+            $secTig = WorkCenterSection::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'work_center_id' => $wcTig->id, 'code' => 'SEC-TIG-WELD'],
+                ['name' => 'TIG Welding Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+            );
+            $secCellWeld = WorkCenterSection::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'work_center_id' => $wcCellWeld->id, 'code' => 'SEC-CELL-WELD'],
+                ['name' => 'Cell Welding Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+            );
+            $secMainLine = WorkCenterSection::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'work_center_id' => $wcMainLine->id, 'code' => 'SEC-MAIN-LINE'],
+                ['name' => 'Main Line Assembly Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+            );
+
             // Seed Machines
             $machTig = Machine::create([
                 'tenant_id' => $tenant->id,
-                'work_center_id' => $wcTig->id,
+                'section_id' => $secTig->id,
                 'name' => 'Miller TIG Welder T-200',
                 'code' => 'MCH-TIG-200',
                 'status' => 'active',
@@ -339,7 +354,7 @@ class ProductionBomSeeder extends Seeder
 
             $machSpot = Machine::create([
                 'tenant_id' => $tenant->id,
-                'work_center_id' => $wcCellWeld->id,
+                'section_id' => $secCellWeld->id,
                 'name' => 'Precision Spot Welder S-500',
                 'code' => 'MCH-SPOT-500',
                 'status' => 'active',
@@ -347,7 +362,7 @@ class ProductionBomSeeder extends Seeder
 
             $machLift = Machine::create([
                 'tenant_id' => $tenant->id,
-                'work_center_id' => $wcMainLine->id,
+                'section_id' => $secMainLine->id,
                 'name' => 'Assembly Lift & Pneumatic Rig',
                 'code' => 'MCH-LIFT-100',
                 'status' => 'active',

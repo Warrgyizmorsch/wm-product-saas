@@ -33,6 +33,7 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -110,7 +111,9 @@ class FurnitureProductionSeeder extends Seeder
         DB::table('production_boms')->truncate();
         DB::table('production_machines')->truncate();
         DB::table('production_work_centers')->truncate();
-        DB::table('production_work_center_shifts')->truncate();
+        if (Schema::hasTable('production_work_center_shifts')) {
+            DB::table('production_work_center_shifts')->truncate();
+        }
 
         Schema::enableForeignKeyConstraints();
 
@@ -228,9 +231,14 @@ class FurnitureProductionSeeder extends Seeder
             'parent_id' => $deptPlant->id,
         ]);
 
+        $secCutting = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcCutting->id, 'code' => 'SEC-CUT-SIZE'],
+            ['name' => 'Cutting & Sizing Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+
         $mcCutting = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcCutting->id,
+            'section_id' => $secCutting->id,
             'name' => '5-Axis CNC Wood Router & Sizing Saw',
             'code' => 'MC-CNC-ROUTER-01',
             'machine_type' => 'CNC Wood Router',
@@ -257,9 +265,14 @@ class FurnitureProductionSeeder extends Seeder
             'parent_id' => $deptPlant->id,
         ]);
 
+        $secSanding = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcSanding->id, 'code' => 'SEC-SHAPE-SAND'],
+            ['name' => 'Shaping & Sanding Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+
         $mcSanding = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcSanding->id,
+            'section_id' => $secSanding->id,
             'name' => 'Automated Triple-Head Belt Sander Machine',
             'code' => 'MC-BELT-SANDER-01',
             'machine_type' => 'Belt Sander',
@@ -286,9 +299,14 @@ class FurnitureProductionSeeder extends Seeder
             'parent_id' => $deptPlant->id,
         ]);
 
+        $secFinishing = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcFinishing->id, 'code' => 'SEC-COAT-FINISH'],
+            ['name' => 'Coating & Finishing Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+
         $mcFinishing = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcFinishing->id,
+            'section_id' => $secFinishing->id,
             'name' => 'Cleanroom Spray Painting Booth & IR Oven',
             'code' => 'MC-SPRAY-BOOTH-01',
             'machine_type' => 'Spray Booth',
@@ -315,9 +333,14 @@ class FurnitureProductionSeeder extends Seeder
             'parent_id' => $deptPlant->id,
         ]);
 
+        $secAssembly = WorkCenterSection::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'work_center_id' => $wcAssembly->id, 'code' => 'SEC-FURN-ASSY'],
+            ['name' => 'Assembly & Upholstery Section', 'status' => WorkCenterSection::STATUS_ACTIVE]
+        );
+
         $mcAssembly = Machine::create([
             'tenant_id' => $tenant->id,
-            'work_center_id' => $wcAssembly->id,
+            'section_id' => $secAssembly->id,
             'name' => 'Hydraulic Furniture Assembly Clamp Press',
             'code' => 'MC-ASSY-PRESS-01',
             'machine_type' => 'Assembly Press',
@@ -334,11 +357,13 @@ class FurnitureProductionSeeder extends Seeder
 
         foreach ($allWorkCenters as $wcItem) {
             foreach ([$shiftDay, $shiftEve] as $sfItem) {
-                DB::table('production_work_center_shifts')->insertOrIgnore([
-                    'tenant_id' => $tenant->id,
-                    'work_center_id' => $wcItem->id,
-                    'shift_id' => $sfItem->id,
-                ]);
+                if (Schema::hasTable('production_work_center_shifts')) {
+                    DB::table('production_work_center_shifts')->insertOrIgnore([
+                        'tenant_id' => $tenant->id,
+                        'work_center_id' => $wcItem->id,
+                        'shift_id' => $sfItem->id,
+                    ]);
+                }
             }
             ProductionOperatorSkill::create([
                 'tenant_id' => $tenant->id,

@@ -32,7 +32,6 @@ class Machine extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'work_center_id',
         'section_id',
         'asset_id',
         'name',
@@ -57,22 +56,6 @@ class Machine extends BaseModel
         'next_maintenance_due_date' => 'date',
     ];
 
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        static::saving(function (Machine $machine) {
-            if ($machine->section_id) {
-                $section = WorkCenterSection::find($machine->section_id);
-                if ($section) {
-                    $machine->work_center_id = $section->work_center_id;
-                }
-            } elseif ($machine->isDirty('section_id') && is_null($machine->section_id)) {
-                $machine->work_center_id = null;
-            }
-        });
-    }
-
     // ─── Relationships ────────────────────────────────────────────────────────
 
     public function section(): BelongsTo
@@ -80,9 +63,20 @@ class Machine extends BaseModel
         return $this->belongsTo(WorkCenterSection::class, 'section_id');
     }
 
-    public function workCenter(): BelongsTo
+    /**
+     * Operational Work Center derived through the assigned Section.
+     * Returns null when the machine has no Section assignment.
+     */
+    public function workCenter(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
     {
-        return $this->belongsTo(WorkCenter::class, 'work_center_id');
+        return $this->hasOneThrough(
+            WorkCenter::class,
+            WorkCenterSection::class,
+            'id',             // Foreign key on WorkCenterSection table
+            'id',             // Foreign key on WorkCenter table
+            'section_id',     // Local key on Machine table
+            'work_center_id'  // Local key on WorkCenterSection table
+        );
     }
 
     /**
@@ -156,7 +150,7 @@ class Machine extends BaseModel
 
     public function scopeForWorkCenter(Builder $query, int $workCenterId): void
     {
-        $query->where('work_center_id', $workCenterId);
+        $query->whereHas('section', fn (Builder $q) => $q->where('work_center_id', $workCenterId));
     }
 
     public function scopeForSection(Builder $query, int $sectionId): void

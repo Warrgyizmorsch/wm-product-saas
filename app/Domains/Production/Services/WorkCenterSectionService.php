@@ -36,13 +36,10 @@ class WorkCenterSectionService
             throw new InvalidArgumentException('Every section must have at least one assigned shift.');
         }
 
-        // Validate shifts are a subset of parent work center's assigned shifts
-        $this->validateShiftsBelongToWorkCenter($workCenter, $dto->shift_ids);
-
-        return DB::transaction(function () use ($dto, $tenantId) {
+        return DB::transaction(function () use ($dto, $tenantId, $workCenter) {
             $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
             $section = $this->repository->create($data);
-            $this->repository->syncShifts($section, $dto->shift_ids, $tenantId, $dto->shift_workers);
+            $this->repository->syncShifts($section, $dto->shift_ids, $tenantId);
 
             if ($dto->machine_ids !== null) {
                 $this->validateMachinesForAssignment($dto->machine_ids, $tenantId);
@@ -50,7 +47,13 @@ class WorkCenterSectionService
             }
 
             $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
-            return $this->calculationService->calculateAndSave($fresh);
+            $calculated = $this->calculationService->calculateAndSave($fresh);
+
+            if ($workCenter) {
+                app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
+            }
+
+            return $calculated;
         });
     }
 
@@ -80,12 +83,9 @@ class WorkCenterSectionService
             throw new InvalidArgumentException('Every section must have at least one assigned shift.');
         }
 
-        // Validate shifts are a subset of parent work center's assigned shifts
-        $this->validateShiftsBelongToWorkCenter($workCenter, $dto->shift_ids);
-
-        return DB::transaction(function () use ($id, $dto, $section) {
+        return DB::transaction(function () use ($id, $dto, $section, $workCenter) {
             $updated = $this->repository->update($id, $dto->toArray());
-            $this->repository->syncShifts($updated, $dto->shift_ids, $section->tenant_id, $dto->shift_workers);
+            $this->repository->syncShifts($updated, $dto->shift_ids, $section->tenant_id);
 
             if ($dto->machine_ids !== null) {
                 $this->validateMachinesForAssignment($dto->machine_ids, $section->tenant_id, $section->id);
@@ -93,14 +93,24 @@ class WorkCenterSectionService
             }
 
             $fresh = $updated->fresh(['workCenter', 'machines', 'shifts']);
-            return $this->calculationService->calculateAndSave($fresh);
+            $calculated = $this->calculationService->calculateAndSave($fresh);
+
+            if ($workCenter) {
+                app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
+            }
+
+            return $calculated;
         });
     }
 
     public function recalculate(WorkCenterSection $section): WorkCenterSection
     {
         $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
-        return $this->calculationService->calculateAndSave($fresh);
+        $calculated = $this->calculationService->calculateAndSave($fresh);
+        if ($fresh->workCenter) {
+            app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
+        }
+        return $calculated;
     }
 
     public function delete(int $id): bool
@@ -126,18 +136,6 @@ class WorkCenterSectionService
             }
             return $deleted;
         });
-    }
-
-    private function validateShiftsBelongToWorkCenter(WorkCenter $workCenter, array $shiftIds): void
-    {
-        $wcShiftIds = $workCenter->shifts()->pluck('production_shifts.id')->map(fn($v) => (int)$v)->toArray();
-        $diff = array_diff($shiftIds, $wcShiftIds);
-
-        if (!empty($diff)) {
-            throw new InvalidArgumentException(
-                'Section shifts must be selected from the shifts assigned to its parent work center.'
-            );
-        }
     }
 
     private function validateMachinesForAssignment(array $machineIds, int $tenantId, ?int $currentSectionId = null): void
