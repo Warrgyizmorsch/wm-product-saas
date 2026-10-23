@@ -241,6 +241,12 @@
                     <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Claimed as input credit — not part of the capitalized cost.</small>
                 </div>
                 <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="select" label="GST Type (recoverable tax)" name="recoverable_tax_gst_type" id="capRecoverableTaxGstType">
+                        <option value="cgst_sgst" @selected(old('recoverable_tax_gst_type', 'cgst_sgst') === 'cgst_sgst')>Intra-state (CGST + SGST)</option>
+                        <option value="igst" @selected(old('recoverable_tax_gst_type') === 'igst')>Inter-state (IGST)</option>
+                    </x-ui.odoo-form-ui>
+                </div>
+                <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Non-recoverable Tax" name="non_recoverable_tax" id="capNonRecoverableTax" :value="old('non_recoverable_tax')" placeholder="0.00" />
                     <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Blocked ITC — added to the capitalized cost.</small>
                 </div>

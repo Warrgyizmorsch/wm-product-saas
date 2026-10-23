@@ -593,7 +593,8 @@
                 @endif
                 <div class="ref-row">
                     <span style="color: #64748b;">Place of Supply:</span>
-                    <span style="float: right; font-weight: 600; color: #0f172a;">Rajasthan (08)</span>
+                    @php $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer); @endphp
+                    <span style="float: right; font-weight: 600; color: #0f172a;">{{ $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : '—' }}</span>
                 </div>
                 <div class="ref-row">
                     <span style="color: #64748b;">GST Option:</span>

@@ -206,21 +206,6 @@ class CrmAccountController extends Controller
                 ->with(['salesOrder.quotation.deal', 'items'])
                 ->latest()->get();
 
-            $invoiceCount = $invoices->count();
-            $totalBilled = $invoices->where('status', '!=', 'cancelled')->sum('total_amount');
-            $totalPaid = $invoices->where('status', '!=', 'cancelled')->sum('amount_paid');
-            if ($totalPaid == 0 && $payments->isNotEmpty()) {
-                $totalPaid = $payments->where('status', 'completed')->sum('amount');
-            }
-            $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function($r) {
-                return floatval($r->total_amount ?: $r->total_refund_amount);
-            });
-            $openingBalance = $customer->signedOpeningBalance();
-            $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
-            $outstandingBalance = max(0, $netOutstanding);
-            $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
-            $overdueAmount = $invoices->where('status', 'unpaid')
-                ->filter(fn($inv) => $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast())
             $tenantId = $customer->tenant_id ?? (tenant_id() ?? 1);
             $creditNotes = \App\Domains\Accounting\Models\Journal::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
@@ -260,7 +245,8 @@ class CrmAccountController extends Controller
             $paymentsWithoutAlloc = (float) $postedPayments->filter(fn($p) => $p->allocations->isEmpty())->sum('amount');
             $totalAdvanceHold = $unallocatedAdvance + $paymentsWithoutAlloc;
 
-            $openingBalance = floatval($customer->opening_balance ?? 0);
+            // Signed: a credit opening (advance received) reduces what's owed.
+            $openingBalance = $customer->signedOpeningBalance();
 
             $netOutstanding = ($openingBalance + $invoiceOutstanding) - $totalAdvanceHold;
 

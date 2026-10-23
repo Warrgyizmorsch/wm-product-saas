@@ -17,7 +17,7 @@ interface PayrollRunRepositoryInterface
 
     public function resolvePending(PayrollRun $run, string $resolution, Request $request): array;
 
-    public function releasePayouts(PayrollRun $run): void;
+    public function releasePayouts(PayrollRun $run, ?int $bankAccountId = null, ?string $payoutDate = null): void;
 
     public function toggleHold(Employee $employee, string $month, ?string $targetMonth): string;
 

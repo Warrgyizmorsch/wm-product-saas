@@ -81,6 +81,29 @@ class AssetDepreciationService
     }
 
     /**
+     * Schedule II: depreciation runs pro rata from the date the asset is put
+     * to use, so the month it starts in is charged only for the days from
+     * that date (15 June -> 16/30 of a month). Every other month is 1.
+     */
+    public function firstMonthFraction(Asset $asset, \Illuminate\Support\Carbon $periodStart, \Illuminate\Support\Carbon $periodEnd): float
+    {
+        if (! $asset->depreciation_start_date) {
+            return 1.0;
+        }
+
+        $start = \Illuminate\Support\Carbon::parse($asset->depreciation_start_date)->startOfDay();
+
+        if ($start->lte($periodStart->copy()->startOfDay()) || $start->gt($periodEnd)) {
+            return 1.0;
+        }
+
+        $daysInMonth = $periodStart->daysInMonth;
+        $daysUsed = (int) round(abs($start->diffInDays($periodEnd->copy()->startOfDay()))) + 1;
+
+        return round(min(1.0, $daysUsed / $daysInMonth), 6);
+    }
+
+    /**
      * Carrying amount the next period depreciates from: gross carrying amount
      * less accumulated depreciation. Both are kept in step with the ledger by
      * capitalization, depreciation posting and revaluation, so this also picks
@@ -129,7 +152,7 @@ class AssetDepreciationService
         }
 
         $openingBookValue = $this->openingBookValueFor($asset);
-        $depreciationAmount = $this->calculateMonthlyDepreciation($asset, $openingBookValue);
+        $depreciationAmount = round($this->calculateMonthlyDepreciation($asset, $openingBookValue) * $this->firstMonthFraction($asset, $periodStart, $periodEnd), 2);
 
         if ($depreciationAmount <= 0) {
             throw new InvalidArgumentException("Asset #{$asset->id} has nothing left to depreciate for {$year}-{$month}.");

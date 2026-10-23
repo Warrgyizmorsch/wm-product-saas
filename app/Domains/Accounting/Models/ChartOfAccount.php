@@ -153,6 +153,17 @@ class ChartOfAccount extends BaseModel
         'opening_balance' => 'decimal:2',
     ];
 
+    protected static function booted(): void
+    {
+        // A ledger with no opening balance carries its normal side, so the
+        // edit form never offers Debit for a loan, capital or income ledger.
+        static::saving(function (self $account) {
+            if ((float) $account->opening_balance == 0.0 && $account->normal_balance) {
+                $account->opening_balance_type = $account->normal_balance;
+            }
+        });
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');

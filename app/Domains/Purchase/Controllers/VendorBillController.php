@@ -482,11 +482,12 @@ class VendorBillController extends Controller
             : null;
 
         $serviceHead = $validated['service_head'];
-        $notesParts = [];
+        // The head always leads the notes: PostPurchaseBillJournal picks the
+        // expense ledger (Insurance, Customs, Loading ...) from it, so user notes
+        // must not replace it.
+        $notesParts = ["{$serviceHead} Service Charge"];
         if (!empty($validated['notes'])) {
             $notesParts[] = $validated['notes'];
-        } else {
-            $notesParts[] = "{$serviceHead} Service Charge";
         }
         if ($dispatchOrder) {
             $notesParts[] = "Dispatch #{$dispatchOrder->dispatch_number}";

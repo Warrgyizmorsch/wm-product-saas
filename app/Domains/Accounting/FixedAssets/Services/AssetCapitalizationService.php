@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\FixedAssets\Services;
 
 use App\Domains\Accounting\FixedAssets\Events\AssetCapitalized;
+use App\Domains\Accounting\FixedAssets\Support\AssetLedgers;
 use App\Domains\Accounting\Models\ChartOfAccount;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\JournalEntry;
@@ -39,6 +40,7 @@ class AssetCapitalizationService
     public function __construct(
         private readonly JournalService $journals,
         private readonly SystemAccountService $systemAccounts,
+        private readonly AssetLedgers $ledgers,
     ) {
     }
 
@@ -47,6 +49,7 @@ class AssetCapitalizationService
      *     acquisition_cost?: float,
      *     directly_attributable_cost?: float,
      *     recoverable_tax?: float,
+     *     recoverable_tax_gst_type?: string,
      *     non_recoverable_tax?: float,
      *     residual_value?: float,
      *     useful_life_months?: int,
@@ -114,6 +117,7 @@ class AssetCapitalizationService
                 'acquisition_cost' => $acquisitionCost,
                 'directly_attributable_cost' => $directCost,
                 'recoverable_tax' => $recoverableTax,
+                'recoverable_tax_gst_type' => in_array($data['recoverable_tax_gst_type'] ?? null, AssetLedgers::GST_TYPES, true) ? $data['recoverable_tax_gst_type'] : AssetLedgers::GST_INTRA,
                 'non_recoverable_tax' => $nonRecoverableTax,
                 'capitalization_cost' => $capitalizationCost,
                 'residual_value' => $residualValue,
@@ -239,10 +243,9 @@ class AssetCapitalizationService
             $cost = round((float) $asset->capitalization_cost, 2);
         }
 
-        $fixedAssetAccount = $asset->category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
-        if ($fixedAssetAccount === null) {
-            throw new InvalidArgumentException("Cannot post capitalization for asset #{$asset->id}: no fixed asset account configured on its category and default account " . SystemAccount::templateCode(SystemAccount::FIXED_ASSETS) . ' not found.');
-        }
+        // The category's ledger, else the sub-ledger matching its name (1502
+        // Plant & Machinery ...), and only then the 1500 group header.
+        $fixedAssetAccount = $this->ledgers->forCategory($asset->category, $tenantId);
 
         $code = $asset->asset_code;
         $lines = [[
@@ -254,8 +257,8 @@ class AssetCapitalizationService
 
         $recoverableTax = round((float) $asset->recoverable_tax, 2);
         if ($recoverableTax > 0 && $source !== self::FUNDING_OPENING_BALANCE) {
-            $inputTax = $this->systemAccounts->require(SystemAccount::INPUT_TAX, $tenantId);
-            $lines[] = ['chart_of_account_id' => $inputTax->id, 'debit' => $recoverableTax, 'description' => "Input tax credit - {$code}"];
+            // Input CGST + SGST, or Input IGST, so the credit shows in the GST ledgers.
+            array_push($lines, ...$this->ledgers->gstLines($recoverableTax, $asset->recoverable_tax_gst_type, false, $tenantId, "Input tax credit - {$code}"));
             $credit = round($credit + $recoverableTax, 2);
         }
 

@@ -90,6 +90,7 @@ class Asset extends BaseModel
         'directly_attributable_cost',
         'capitalization_cost',
         'recoverable_tax',
+        'recoverable_tax_gst_type',
         'non_recoverable_tax',
         'residual_value',
         'useful_life_months',

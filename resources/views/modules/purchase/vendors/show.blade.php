@@ -423,14 +423,16 @@
                             </thead>
                             <tbody>
                                 @if($vendor->opening_balance > 0)
+                                    @php $openingSigned = $vendor->signedOpeningBalance(); @endphp
                                     <tr class="table-warning">
                                         <td class="fw-bold">—</td>
                                         <td class="font-monospace fw-bold">OPENING-BAL</td>
                                         <td><span class="badge bg-warning text-dark">{{ __('purchase.opening_balance') }}</span></td>
-                                        <td>{{ __('purchase.initial_supplier_opening_dues') }}</td>
-                                        <td class="text-end font-monospace">0.00</td>
-                                        <td class="text-end font-monospace fw-bold text-dark">{!! format_currency($vendor->opening_balance) !!}</td>
-                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($vendor->opening_balance) !!}</td>
+                                        {{-- A debit opening is an advance paid to the supplier, not a due. --}}
+                                        <td>{{ $openingSigned < 0 ? __('purchase.opening_advance_paid') : __('purchase.initial_supplier_opening_dues') }}</td>
+                                        <td class="text-end font-monospace fw-bold text-success">{!! $openingSigned < 0 ? format_currency(abs($openingSigned)) : '0.00' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-dark">{!! $openingSigned > 0 ? format_currency($openingSigned) : '0.00' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($openingSigned) !!}</td>
                                     </tr>
                                 @endif
 

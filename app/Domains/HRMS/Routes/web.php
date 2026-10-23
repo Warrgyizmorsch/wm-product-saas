@@ -455,6 +455,7 @@ Route::prefix('hrms')
             Route::post('/run/{run}/lock', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'lockRun'])->name('payroll.run.lock');
             Route::post('/run/{run}/resolve-pending', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'resolvePending'])->name('payroll.run.resolve-pending');
             Route::post('/run/{run}/release', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'releasePayouts'])->name('payroll.run.release');
+            Route::post('/statutory-dues/pay', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'payStatutoryDue'])->name('payroll.statutory.pay');
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
             Route::get('/run/{run}/export-bank-file', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'exportBankFile'])->name('payroll.run.export-bank-file');
             Route::get('/payslip/{run}/{employee}/download', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadPayslip'])->name('payroll.payslip.download');
