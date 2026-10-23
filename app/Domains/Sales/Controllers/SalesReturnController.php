@@ -76,6 +76,80 @@ class SalesReturnController extends Controller
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
         $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get();
 
+        // Query Dispatched Aggregates for Tenant (where dispatch order is not Cancelled)
+        $dispatchedSoAggregates = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
+        })
+        ->select(
+            'dispatch_orders.sales_order_id',
+            'dispatch_order_items.product_id',
+            DB::raw('SUM(COALESCE(NULLIF(dispatch_order_items.quantity_dispatched, 0), dispatch_order_items.quantity_ordered)) as total_dispatched')
+        )
+        ->join('dispatch_orders', 'dispatch_orders.id', '=', 'dispatch_order_items.dispatch_order_id')
+        ->whereNotNull('dispatch_orders.sales_order_id')
+        ->groupBy('dispatch_orders.sales_order_id', 'dispatch_order_items.product_id')
+        ->get();
+
+        $dispatchedInvAggregates = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
+        })
+        ->select(
+            'dispatch_orders.invoice_id',
+            'dispatch_order_items.product_id',
+            DB::raw('SUM(COALESCE(NULLIF(dispatch_order_items.quantity_dispatched, 0), dispatch_order_items.quantity_ordered)) as total_dispatched')
+        )
+        ->join('dispatch_orders', 'dispatch_orders.id', '=', 'dispatch_order_items.dispatch_order_id')
+        ->whereNotNull('dispatch_orders.invoice_id')
+        ->groupBy('dispatch_orders.invoice_id', 'dispatch_order_items.product_id')
+        ->get();
+
+        // Query Already Returned Aggregates for Tenant (where sales return is not Cancelled or Rejected)
+        $returnedSoAggregates = \App\Domains\Sales\Models\SalesReturnItem::whereHas('salesReturn', function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->whereNotIn('status', ['Cancelled', 'Rejected']);
+        })
+        ->select(
+            'sales_returns.sales_order_id',
+            'sales_return_items.product_id',
+            DB::raw('SUM(sales_return_items.quantity) as total_returned')
+        )
+        ->join('sales_returns', 'sales_returns.id', '=', 'sales_return_items.sales_return_id')
+        ->whereNotNull('sales_returns.sales_order_id')
+        ->groupBy('sales_returns.sales_order_id', 'sales_return_items.product_id')
+        ->get();
+
+        $returnedInvAggregates = \App\Domains\Sales\Models\SalesReturnItem::whereHas('salesReturn', function ($q) use ($tenantId) {
+            $q->where('tenant_id', $tenantId)->whereNotIn('status', ['Cancelled', 'Rejected']);
+        })
+        ->select(
+            'sales_returns.invoice_id',
+            'sales_return_items.product_id',
+            DB::raw('SUM(sales_return_items.quantity) as total_returned')
+        )
+        ->join('sales_returns', 'sales_returns.id', '=', 'sales_return_items.sales_return_id')
+        ->whereNotNull('sales_returns.invoice_id')
+        ->groupBy('sales_returns.invoice_id', 'sales_return_items.product_id')
+        ->get();
+
+        $soDispatchedMap = [];
+        foreach ($dispatchedSoAggregates as $row) {
+            $soDispatchedMap[$row->sales_order_id . '_' . $row->product_id] = (float) $row->total_dispatched;
+        }
+
+        $invDispatchedMap = [];
+        foreach ($dispatchedInvAggregates as $row) {
+            $invDispatchedMap[$row->invoice_id . '_' . $row->product_id] = (float) $row->total_dispatched;
+        }
+
+        $soReturnedMap = [];
+        foreach ($returnedSoAggregates as $row) {
+            $soReturnedMap[$row->sales_order_id . '_' . $row->product_id] = (float) $row->total_returned;
+        }
+
+        $invReturnedMap = [];
+        foreach ($returnedInvAggregates as $row) {
+            $invReturnedMap[$row->invoice_id . '_' . $row->product_id] = (float) $row->total_returned;
+        }
+
         $latest = SalesReturn::latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('RET-', '', $latest->return_number)) + 1 : 1;
         $nextReturnNumber = 'RET-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
@@ -95,7 +169,8 @@ class SalesReturnController extends Controller
 
         return view('modules.sales.returns.create', compact(
             'customers', 'salesOrders', 'salesOrder', 'invoices', 'warehouses', 'nextReturnNumber',
-            'prefillSalesOrderId', 'prefillCustomerId', 'prefillInvoiceId', 'products', 'formattedProducts', 'formattedWarehouses'
+            'prefillSalesOrderId', 'prefillCustomerId', 'prefillInvoiceId', 'products', 'formattedProducts', 'formattedWarehouses',
+            'soDispatchedMap', 'invDispatchedMap', 'soReturnedMap', 'invReturnedMap'
         ));
     }
 
@@ -159,6 +234,88 @@ class SalesReturnController extends Controller
             'items.*.unit_price'   => ['required', 'numeric', 'min:0'],
             'items.*.serial_numbers' => ['nullable', 'string'],
         ]);
+
+        // Option 1: Dispatched Quantity Check (Safe & Recommended)
+        // Max Returnable Quantity = Dispatched Quantity - Already Returned Quantity
+        if ($request->input('return_mode', 'so') !== 'direct') {
+            $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+            $soId = $validated['sales_order_id'] ?? null;
+            $invId = $validated['invoice_id'] ?? null;
+
+            if ($soId || $invId) {
+                foreach ($validated['items'] as $item) {
+                    $prodId = (int)$item['product_id'];
+                    $product = \App\Domains\Inventory\Models\Product::find($prodId);
+                    $prodName = $product?->name ?? "Product #{$prodId}";
+
+                    // Calculate total dispatched quantity for this order/invoice and product
+                    $dispQuery = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
+                        $q->where('tenant_id', $tenantId)->where('status', '!=', 'Cancelled');
+                    })->where('dispatch_order_items.product_id', $prodId);
+
+                    if ($soId && $invId) {
+                        $dispQuery->where(function ($q) use ($soId, $invId) {
+                            $q->whereHas('dispatchOrder', function ($dq) use ($soId) {
+                                $dq->where('sales_order_id', $soId);
+                            })->orWhereHas('dispatchOrder', function ($dq) use ($invId) {
+                                $dq->where('invoice_id', $invId);
+                            });
+                        });
+                    } elseif ($soId) {
+                        $dispQuery->whereHas('dispatchOrder', function ($dq) use ($soId) {
+                            $dq->where('sales_order_id', $soId);
+                        });
+                    } else {
+                        $dispQuery->whereHas('dispatchOrder', function ($dq) use ($invId) {
+                            $dq->where('invoice_id', $invId);
+                        });
+                    }
+
+                    $dispatchedQty = (float) $dispQuery->sum(DB::raw('COALESCE(NULLIF(dispatch_order_items.quantity_dispatched, 0), dispatch_order_items.quantity_ordered)'));
+
+                    // Calculate already returned quantity for this order/invoice and product
+                    $retQuery = \App\Domains\Sales\Models\SalesReturnItem::whereHas('salesReturn', function ($q) use ($tenantId) {
+                        $q->where('tenant_id', $tenantId)->whereNotIn('status', ['Cancelled', 'Rejected']);
+                    })->where('sales_return_items.product_id', $prodId);
+
+                    if ($soId && $invId) {
+                        $retQuery->where(function ($q) use ($soId, $invId) {
+                            $q->whereHas('salesReturn', function ($rq) use ($soId) {
+                                $rq->where('sales_order_id', $soId);
+                            })->orWhereHas('salesReturn', function ($rq) use ($invId) {
+                                $rq->where('invoice_id', $invId);
+                            });
+                        });
+                    } elseif ($soId) {
+                        $retQuery->whereHas('salesReturn', function ($rq) use ($soId) {
+                            $rq->where('sales_order_id', $soId);
+                        });
+                    } else {
+                        $retQuery->whereHas('salesReturn', function ($rq) use ($invId) {
+                            $rq->where('invoice_id', $invId);
+                        });
+                    }
+
+                    $alreadyReturnedQty = (float) $retQuery->sum('sales_return_items.quantity');
+                    $maxReturnable = max(0.0, round($dispatchedQty - $alreadyReturnedQty, 4));
+
+                    if ($dispatchedQty <= 0) {
+                        return redirect()->back()->withInput()->with('error', __('crm.order_not_dispatched_error', ['product' => $prodName]));
+                    }
+
+                    $requestedQty = (float)$item['quantity'];
+                    if ($requestedQty > $maxReturnable) {
+                        return redirect()->back()->withInput()->with('error', __('crm.return_qty_exceeds_max_error', [
+                            'qty' => $requestedQty,
+                            'max' => $maxReturnable,
+                            'product' => $prodName,
+                            'dispatched' => $dispatchedQty,
+                            'returned' => $alreadyReturnedQty
+                        ]));
+                    }
+                }
+            }
+        }
 
         $returnOrder = DB::transaction(function () use ($validated) {
             $totalAmount = 0;

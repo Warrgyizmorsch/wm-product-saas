@@ -61,7 +61,7 @@
                             <x-ui.odoo-form-ui type="select" :label="__('crm.link_to_sales_order')" name="sales_order_id" id="salesOrderSelect">
                                 <option value="">{{ __('crm.select_sales_order') }}</option>
                                 @foreach ($salesOrders as $so)
-                                    <option value="{{ $so->id }}" data-customer="{{ $so->customer_id }}" @selected(old('sales_order_id', $prefillSalesOrderId) == $so->id)>
+                                    <option value="{{ $so->id }}" data-customer="{{ $so->customer_id }}" data-total="{{ round(convert_from_base((float)$so->total_amount), 2) }}" @selected(old('sales_order_id', $prefillSalesOrderId) == $so->id)>
                                         {{ $so->sales_order_number }} ({{ __('crm.total') }}: {{ format_currency($so->total_amount) }})
                                     </option>
                                 @endforeach
@@ -119,7 +119,7 @@
                 // Filter Sales Order options
                 $('#salesOrderSelect option').each(function() {
                     const optionCust = $(this).attr('data-customer');
-                    if (!optionCust || optionCust == customerId) {
+                    if (!customerId || !optionCust || optionCust == customerId) {
                         $(this).show();
                     } else {
                         $(this).hide();
@@ -132,7 +132,7 @@
                 // Filter Invoice options
                 $('#invoiceSelect option').each(function() {
                     const optionCust = $(this).attr('data-customer');
-                    if (!optionCust || optionCust == customerId) {
+                    if (!customerId || !optionCust || optionCust == customerId) {
                         $(this).show();
                     } else {
                         $(this).hide();
@@ -143,19 +143,21 @@
                 });
             }
 
-            $('#allocateToSelect').on('change', toggleAllocationGroups);
-            $('#customerSelect').on('change', filterAllocationsByCustomer);
-
-            // Initial Triggers — run toggle first so invoice/SO group is visible
-            toggleAllocationGroups();
-            filterAllocationsByCustomer();
-
             // Auto-fill amount from selected invoice's balance_due
             function syncAmountFromInvoice() {
                 const selected = $('#invoiceSelect option:selected');
                 const balance  = selected.data('balance');
-                if (balance !== undefined && balance > 0) {
+                if (balance !== undefined && balance > 0 && !$('#amountInput').val()) {
                     $('#amountInput').val(parseFloat(balance).toFixed(2));
+                }
+            }
+
+            // Auto-fill amount from selected sales order's total
+            function syncAmountFromSalesOrder() {
+                const selected = $('#salesOrderSelect option:selected');
+                const total    = selected.data('total');
+                if (total !== undefined && total > 0 && !$('#amountInput').val()) {
+                    $('#amountInput').val(parseFloat(total).toFixed(2));
                 }
             }
 
@@ -163,8 +165,8 @@
             function syncCustomerFromInvoice() {
                 const selected    = $('#invoiceSelect option:selected');
                 const customerId  = selected.data('customer');
-                if (customerId) {
-                    $('#customerSelect').val(customerId).trigger('change');
+                if (customerId && !$('#customerSelect').val()) {
+                    $('#customerSelect').val(customerId);
                 }
             }
 
@@ -172,26 +174,39 @@
             function syncCustomerFromSalesOrder() {
                 const selected   = $('#salesOrderSelect option:selected');
                 const customerId = selected.data('customer');
-                if (customerId) {
-                    $('#customerSelect').val(customerId).trigger('change');
+                if (customerId && !$('#customerSelect').val()) {
+                    $('#customerSelect').val(customerId);
                 }
             }
 
+            $('#allocateToSelect').on('change', toggleAllocationGroups);
+            $('#customerSelect').on('change', filterAllocationsByCustomer);
+
             $('#invoiceSelect').on('change', function () {
-                syncAmountFromInvoice();
                 syncCustomerFromInvoice();
+                syncAmountFromInvoice();
+                filterAllocationsByCustomer();
             });
 
-            $('#salesOrderSelect').on('change', syncCustomerFromSalesOrder);
+            $('#salesOrderSelect').on('change', function () {
+                syncCustomerFromSalesOrder();
+                syncAmountFromSalesOrder();
+                filterAllocationsByCustomer();
+            });
 
-            // On page load if invoice/SO is pre-selected, sync customer & amount
+            // On initial page load:
+            // 1. If invoice or SO is pre-selected, sync customer & amount first
             if ($('#invoiceSelect').val()) {
                 syncCustomerFromInvoice();
                 syncAmountFromInvoice();
-            }
-            if ($('#salesOrderSelect').val()) {
+            } else if ($('#salesOrderSelect').val()) {
                 syncCustomerFromSalesOrder();
+                syncAmountFromSalesOrder();
             }
+
+            // 2. Trigger allocation display & filtering
+            toggleAllocationGroups();
+            filterAllocationsByCustomer();
         });
     </script>
 @endpush

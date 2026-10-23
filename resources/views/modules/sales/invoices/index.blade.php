@@ -267,7 +267,7 @@
                                                 </form>
                                             </li>
                                         @endif
-                                        @if ($inv->einvoice_status !== 'Generated')
+                                        @if ($inv->einvoice_status !== 'Generated' && !in_array(strtolower($inv->status), ['draft', 'cancelled', 'void']))
                                             <li>
                                                 <form action="{{ route('sales.invoices.einvoice.generate', $inv->id) }}" method="POST" class="d-inline">
                                                     @csrf

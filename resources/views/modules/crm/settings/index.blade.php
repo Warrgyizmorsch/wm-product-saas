@@ -46,6 +46,12 @@
                 'icon' => 'feather-check-square',
                 'active' => in_array($activeTab, ['quotation-approval', 'approvals', 'tab-quotation-approval']),
             ],
+            [
+                'id' => 'tab-field-visit',
+                'label' => 'Field Visits & Geo-Verification',
+                'icon' => 'feather-map-pin',
+                'active' => in_array($activeTab, ['field-visit', 'field_visit', 'tab-field-visit']),
+            ],
         ];
     @endphp
 
@@ -333,6 +339,94 @@
                             <ul class="text-muted fs-12 ps-3 mb-0">
                                 <li class="mb-2"><strong>{{ __('crm.standard_approval_colon') }}</strong> {{ __('crm.standard_approval_summary_desc') }}</li>
                                 <li><strong>{{ __('crm.auto_approve_colon') }}</strong> {{ __('crm.auto_approve_summary_desc') }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: FIELD VISITS & GEO-VERIFICATION    -->
+        <!-- ========================================== -->
+        <div class="tab-pane fade @if(in_array($activeTab, ['field-visit', 'field_visit', 'tab-field-visit'])) show active @endif" id="tab-field-visit" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">
+                                    <i class="feather-map-pin me-2 text-primary"></i>Meeting & Field Visit Geo-Location Verification
+                                </h6>
+                                <span class="text-muted fs-12">Control whether sales executives must verify physical location and take a selfie when completing meetings.</span>
+                            </div>
+                            <span class="badge @if($fieldVisitVerification) bg-soft-success text-success @else bg-soft-secondary text-secondary @endif fs-11 font-monospace">
+                                {{ $fieldVisitVerification ? 'Active' : 'Disabled' }}
+                            </span>
+                        </div>
+                        <div class="card-body p-4">
+                            <form action="{{ route('crm.settings.update-field-visit-verification') }}" method="POST">
+                                @csrf
+                                <div class="p-3 border rounded-3 mb-4 @if($fieldVisitVerification) bg-soft-success-light border-success @else bg-light border-secondary-subtle @endif">
+                                    <div class="form-check form-switch d-flex align-items-center gap-3 ps-0 mb-0">
+                                        <input class="form-check-input ms-0 fs-4" type="checkbox" role="switch" id="fieldVisitVerificationSwitch" name="field_visit_verification" value="1" @checked($fieldVisitVerification) style="cursor: pointer;">
+                                        <label class="form-check-label mb-0" for="fieldVisitVerificationSwitch" style="cursor: pointer;">
+                                            <span class="fw-bold fs-14 text-dark d-block">Require Geo-Location & Live Photo for Meeting Outcome</span>
+                                            <span class="text-muted fs-12">
+                                                When enabled, sales executives will be prompted for real-time GPS location and must capture a live photo before marking meetings as <strong>Connected</strong> or <strong>Not Connected</strong>.
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <div class="p-3 border rounded-3 h-100 bg-white">
+                                            <div class="d-flex align-items-center gap-2 mb-2">
+                                                <div class="rounded-circle p-1.5 bg-soft-secondary text-secondary d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                                    <i class="feather-x fs-13"></i>
+                                                </div>
+                                                <span class="fw-bold fs-13 text-dark">Disabled (Default Policy)</span>
+                                            </div>
+                                            <p class="text-muted fs-12 mb-0">
+                                                Meetings can be marked as Connected or Not Connected instantly. No mandatory GPS coordinate or photo validation is enforced.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="p-3 border rounded-3 h-100 bg-white">
+                                            <div class="d-flex align-items-center gap-2 mb-2">
+                                                <div class="rounded-circle p-1.5 bg-soft-success text-success d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;">
+                                                    <i class="feather-shield fs-13"></i>
+                                                </div>
+                                                <span class="fw-bold fs-13 text-dark">Enabled (Field Verification)</span>
+                                            </div>
+                                            <p class="text-muted fs-12 mb-0">
+                                                Enforces live GPS location coordinates and front-camera selfie capture. Guarantees physical presence and eliminates fake reporting.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary px-4 fw-semibold shadow-sm">
+                                        <i class="feather-save me-1"></i>Save Verification Policy
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold text-dark mb-3"><i class="feather-info me-2 text-info"></i>How It Works</h6>
+                            <ul class="text-muted fs-12 ps-3 mb-0">
+                                <li class="mb-2"><strong>Database Non-Breaking:</strong> Location and photo fields in database are nullable, ensuring zero disruption to existing activities.</li>
+                                <li class="mb-2"><strong>Controller Enforcement:</strong> When enabled, server rejects meeting submissions missing GPS coordinates or selfie.</li>
+                                <li class="mb-2"><strong>Live Camera Capture:</strong> Mobile browser triggers the front-camera directly, blocking gallery photo uploads.</li>
+                                <li><strong>Manager Verification:</strong> Check location coordinates with direct Google Maps link and photo evidence in Activity History.</li>
                             </ul>
                         </div>
                     </div>
