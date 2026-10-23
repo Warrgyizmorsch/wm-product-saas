@@ -121,6 +121,7 @@ Route::prefix('api/crm')
             });
 
         // Standalone followups & documents delete/patch
+        Route::match(['put', 'patch', 'post'], 'followups/{followup}', [LeadFollowupApiController::class, 'update'])->whereNumber('followup')->name('followups.update');
         Route::patch('followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('followup')->name('followups.status');
         Route::delete('followups/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('followup')->name('followups.destroy');
         Route::delete('documents/{document}', [LeadApiController::class, 'deleteDocument'])->whereNumber('document')->name('documents.destroy');

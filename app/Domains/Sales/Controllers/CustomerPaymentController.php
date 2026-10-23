@@ -57,18 +57,34 @@ class CustomerPaymentController extends Controller
         $nextSeq = $latest ? intval(str_replace('PAY-', '', $latest->payment_number)) + 1 : 1;
         $nextPaymentNumber = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
 
-        $prefillCustomerId    = $request->input('customer_id');
-        $prefillInvoiceId     = $request->input('invoice_id');
-        $prefillSalesOrderId  = $request->input('sales_order_id');
+        $prefillCustomerId    = $request->input('customer_id') ?? $request->input('amp;customer_id');
+        $prefillInvoiceId     = $request->input('invoice_id') ?? $request->input('amp;invoice_id');
+        $prefillSalesOrderId  = $request->input('sales_order_id') ?? $request->input('amp;sales_order_id');
         $prefillAmount        = null;
 
         if ($prefillInvoiceId) {
             $prefillInvoice = Invoice::find($prefillInvoiceId);
             if ($prefillInvoice && in_array($prefillInvoice->status, ['Posted', 'Partially Paid', 'Overdue'])) {
                 $prefillAmount      = $prefillInvoice->balance_due;
-                $prefillCustomerId  = $prefillCustomerId ?: $prefillInvoice->customer_id;
+                $prefillCustomerId  = $prefillCustomerId ?: ($prefillInvoice->customer_id ?? $prefillInvoice->salesOrder?->customer_id);
             } else {
                 $prefillInvoiceId = null;
+            }
+        }
+
+        if ($prefillSalesOrderId) {
+            $prefillOrder = SalesOrder::with('allocations')->find($prefillSalesOrderId);
+            if ($prefillOrder) {
+                $prefillCustomerId = $prefillCustomerId ?: $prefillOrder->customer_id;
+                if ($prefillAmount === null) {
+                    $paid = (float) $prefillOrder->allocations->sum('allocated_amount');
+                    $unpaid = max(0, (float) $prefillOrder->total_amount - $paid);
+                    if ($unpaid > 0) {
+                        $prefillAmount = $unpaid;
+                    }
+                }
+            } else {
+                $prefillSalesOrderId = null;
             }
         }
 

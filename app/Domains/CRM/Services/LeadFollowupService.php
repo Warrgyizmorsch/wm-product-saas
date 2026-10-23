@@ -6,7 +6,10 @@ use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\LeadFollowup;
 use App\Domains\CRM\Models\LeadHistory;
 use App\Domains\CRM\Repositories\LeadFollowupRepository;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class LeadFollowupService
 {
@@ -33,19 +36,24 @@ class LeadFollowupService
         $titleInput = !empty($validated['title']) ? trim($validated['title']) : (($validated['type'] ?? 'Scheduled Call') . " with " . ($lead->company_name ?: $lead->contact_person));
 
         $followup = $this->followupRepo->create([
-            'tenant_id'        => $lead->tenant_id ?? (tenant_id() ?? (auth()->user()?->tenant_id ?? 1)),
-            'company_id'       => $lead->company_id ?? (company_id() ?? (auth()->user()?->company_id ?? 1)),
-            'branch_id'        => $lead->branch_id ?? (branch_id() ?? (auth()->user()?->branch_id ?? null)),
-            'lead_id'          => $lead->id,
-            'followup_date'    => $followupDateTime,
-            'type'             => $validated['type'],
-            'title'            => $titleInput,
-            'duration_minutes' => $durationMinutes,
-            'guest_emails'     => $guestEmailsInput,
-            'status'           => $validated['status'],
-            'notes'            => $validated['notes'] ?? null,
-            'tagged_user_id'   => $primaryTaggedId,
-            'tagged_user_ids'  => $taggedUserIds,
+            'tenant_id'            => $lead->tenant_id ?? (tenant_id() ?? (auth()->user()?->tenant_id ?? 1)),
+            'company_id'           => $lead->company_id ?? (company_id() ?? (auth()->user()?->company_id ?? 1)),
+            'branch_id'            => $lead->branch_id ?? (branch_id() ?? (auth()->user()?->branch_id ?? null)),
+            'lead_id'              => $lead->id,
+            'followup_date'        => $followupDateTime,
+            'type'                 => $validated['type'],
+            'title'                => $titleInput,
+            'duration_minutes'     => $durationMinutes,
+            'guest_emails'         => $guestEmailsInput,
+            'status'               => $validated['status'],
+            'notes'                => $validated['notes'] ?? null,
+            'tagged_user_id'       => $primaryTaggedId,
+            'tagged_user_ids'      => $taggedUserIds,
+            'latitude'             => isset($validated['latitude']) ? (float)$validated['latitude'] : null,
+            'longitude'            => isset($validated['longitude']) ? (float)$validated['longitude'] : null,
+            'location_address'     => $validated['location_address'] ?? null,
+            'selfie_path'          => $validated['selfie_path'] ?? null,
+            'location_verified_at' => $validated['location_verified_at'] ?? (!empty($validated['latitude']) || !empty($validated['selfie_path']) ? now() : null),
         ]);
 
         $eventType = $followup->status === 'Pending' ? 'activity_scheduled' : 'activity_completed';
@@ -139,6 +147,7 @@ class LeadFollowupService
      */
     public function updateOrReschedule(LeadFollowup $followup, array $validated, bool $isRescheduleRequested): string
     {
+        $lead = $followup->lead ?? ($followup->crm_deal_id ? Lead::where('crm_deal_id', $followup->crm_deal_id)->first() : null);
         $isReschedule = !empty($validated['followup_date']) && ($isRescheduleRequested || $followup->status === 'Pending');
 
         $taggedUserIds = isset($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
@@ -164,15 +173,16 @@ class LeadFollowupService
                     'original_followup_date' => $followup->original_followup_date ?: $followup->followup_date,
                 ]);
 
-                LeadHistory::logEvent(
-                    $followup->lead,
-                    'activity_rescheduled',
-                    $oldStatus,
-                    'Rescheduled',
-                    "Rescheduled {$followup->type} activity from " . $followup->followup_date->format('d/m/Y h:i A') . " to " . $newFollowupDateTime->format('d/m/Y h:i A')
-                );
-
-                $this->followupRepo->syncLeadNextFollowupDate($followup->lead);
+                if ($lead) {
+                    LeadHistory::logEvent(
+                        $lead,
+                        'activity_rescheduled',
+                        $oldStatus,
+                        'Rescheduled',
+                        "Rescheduled {$followup->type} activity from " . $followup->followup_date->format('d/m/Y h:i A') . " to " . $newFollowupDateTime->format('d/m/Y h:i A')
+                    );
+                    $this->followupRepo->syncLeadNextFollowupDate($lead);
+                }
                 return 'Activity successfully rescheduled!';
             } catch (\Exception $e) {
                 // Fall through to standard update on parse exception
@@ -192,21 +202,32 @@ class LeadFollowupService
         if (isset($validated['followup_date'])) {
             try { $updateData['followup_date'] = Carbon::parse($validated['followup_date']); } catch (\Exception $e) {}
         }
+        if (array_key_exists('latitude', $validated)) $updateData['latitude'] = $validated['latitude'];
+        if (array_key_exists('longitude', $validated)) $updateData['longitude'] = $validated['longitude'];
+        if (array_key_exists('location_address', $validated)) $updateData['location_address'] = $validated['location_address'];
+        if (array_key_exists('selfie_path', $validated)) $updateData['selfie_path'] = $validated['selfie_path'];
+        if (array_key_exists('location_verified_at', $validated)) $updateData['location_verified_at'] = $validated['location_verified_at'];
 
         $oldStatus = $followup->status;
         $this->followupRepo->update($followup, $updateData);
 
-        if ($oldStatus !== $followup->status && $followup->status === 'Completed') {
-            LeadHistory::logEvent(
-                $followup->lead,
-                'activity_completed',
-                $oldStatus,
-                'Completed',
-                "Marked scheduled {$followup->type} activity (scheduled for " . $followup->followup_date->format('d/m/Y h:i A') . ") as Completed"
-            );
+        if ($oldStatus !== $followup->status && in_array($followup->status, ['Completed', 'Not Connected'])) {
+            $locSnippet = !empty($followup->location_address) ? " at {$followup->location_address}" : (!empty($followup->latitude) ? " [GPS Verified]" : "");
+            $photoSnippet = !empty($followup->selfie_path) ? " [Photo Attached]" : "";
+            if ($lead) {
+                LeadHistory::logEvent(
+                    $lead,
+                    $followup->status === 'Completed' ? 'activity_completed' : 'activity_not_connected',
+                    $oldStatus,
+                    $followup->status,
+                    "Marked scheduled {$followup->type} activity (scheduled for " . $followup->followup_date->format('d/m/Y h:i A') . ") as {$followup->status}{$locSnippet}{$photoSnippet}"
+                );
+            }
         }
 
-        $this->followupRepo->syncLeadNextFollowupDate($followup->lead);
+        if ($lead) {
+            $this->followupRepo->syncLeadNextFollowupDate($lead);
+        }
         return 'Follow-up successfully updated!';
     }
 
@@ -215,17 +236,119 @@ class LeadFollowupService
      */
     public function deleteFollowup(LeadFollowup $followup): void
     {
-        $lead = $followup->lead;
+        $lead = $followup->lead ?? ($followup->crm_deal_id ? Lead::where('crm_deal_id', $followup->crm_deal_id)->first() : null);
 
-        LeadHistory::logEvent(
-            $lead,
-            'activity_deleted',
-            $followup->type,
-            null,
-            "Deleted {$followup->type} activity (scheduled/logged for " . $followup->followup_date->format('d/m/Y h:i A') . ")"
-        );
+        if ($lead) {
+            LeadHistory::logEvent(
+                $lead,
+                'activity_deleted',
+                $followup->type,
+                null,
+                "Deleted {$followup->type} activity (scheduled/logged for " . $followup->followup_date->format('d/m/Y h:i A') . ")"
+            );
+        }
 
         $this->followupRepo->delete($followup);
-        $this->followupRepo->syncLeadNextFollowupDate($lead);
+        if ($lead) {
+            $this->followupRepo->syncLeadNextFollowupDate($lead);
+        }
+    }
+
+    /**
+     * Check if Geo-Verification & Selfie are strictly required by tenant policy.
+     */
+    public function isGeoVerificationRequired(?string $targetStatus, ?string $activityType, ?LeadFollowup $existingFollowup = null): bool
+    {
+        $tenant = tenant();
+        $settings = is_array($tenant?->settings) ? $tenant->settings : [];
+        if (empty($settings['field_visit_verification'])) {
+            return false;
+        }
+
+        $effectiveType = $activityType ?: ($existingFollowup?->type ?? 'Meeting');
+        $effectiveStatus = $targetStatus ?: ($existingFollowup?->status ?? 'Completed');
+
+        $isMeeting = strcasecmp((string)$effectiveType, 'Meeting') === 0;
+        $isCompleting = in_array((string)$effectiveStatus, ['Completed', 'Not Connected']);
+
+        return $isMeeting && $isCompleting;
+    }
+
+    /**
+     * Process selfie upload from either raw file or base64 data string.
+     */
+    public function processSelfieUpload(Request $request): ?string
+    {
+        if ($request->filled('selfie_base64')) {
+            $base64Data = trim((string)$request->input('selfie_base64'));
+            $imageType = 'jpg';
+            $data = $base64Data;
+
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+                $rawExt = strtolower($type[1]);
+                $imageType = ($rawExt === 'jpeg') ? 'jpg' : $rawExt;
+                $data = substr($base64Data, strpos($base64Data, ',') + 1);
+            }
+
+            if (in_array($imageType, ['jpeg', 'jpg', 'png', 'webp'])) {
+                $decoded = base64_decode($data, true);
+                if ($decoded !== false && strlen($decoded) <= 5242880) { // Max 5MB
+                    $filename = Str::uuid() . '.' . ($imageType === 'jpeg' ? 'jpg' : $imageType);
+                    Storage::disk('public')->put('crm/selfies/' . $filename, $decoded);
+                    return 'storage/crm/selfies/' . $filename;
+                }
+            }
+        } elseif ($request->hasFile('selfie')) {
+            $file = $request->file('selfie');
+            $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+            if ($ext === 'jpeg') {
+                $ext = 'jpg';
+            }
+            $filename = Str::uuid() . '.' . $ext;
+            $path = $file->storeAs('crm/selfies', $filename, 'public');
+            return 'storage/' . $path;
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract verification payload from request (coordinates, address, selfie).
+     */
+    public function extractVerificationPayload(Request $request, ?LeadFollowup $existingFollowup = null): array
+    {
+        $payload = [];
+        $selfiePath = $this->processSelfieUpload($request);
+
+        if ($selfiePath) {
+            $payload['selfie_path'] = $selfiePath;
+            $payload['location_verified_at'] = now();
+        } elseif ($existingFollowup?->selfie_path) {
+            $payload['selfie_path'] = $existingFollowup->selfie_path;
+        }
+
+        if ($request->filled('latitude')) {
+            $payload['latitude'] = (float)$request->input('latitude');
+        } elseif ($existingFollowup?->latitude !== null) {
+            $payload['latitude'] = $existingFollowup->latitude;
+        }
+
+        if ($request->filled('longitude')) {
+            $payload['longitude'] = (float)$request->input('longitude');
+        } elseif ($existingFollowup?->longitude !== null) {
+            $payload['longitude'] = $existingFollowup->longitude;
+        }
+
+        if ($request->filled('location_address')) {
+            $payload['location_address'] = (string)$request->input('location_address');
+        } elseif ($existingFollowup?->location_address !== null) {
+            $payload['location_address'] = $existingFollowup->location_address;
+        }
+
+        if ((!empty($payload['latitude']) || !empty($payload['selfie_path'])) && empty($payload['location_verified_at'])) {
+            $payload['location_verified_at'] = now();
+        }
+
+        return $payload;
     }
 }

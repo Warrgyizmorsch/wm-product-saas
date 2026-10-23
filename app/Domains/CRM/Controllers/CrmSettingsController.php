@@ -22,6 +22,7 @@ class CrmSettingsController extends Controller
 
         $quotationApprovalPolicy = $settings['quotation_approval_policy'] ?? 'approval_required';
         $leadAssignmentConfig = LeadAssignmentService::getConfig($tenant);
+        $fieldVisitVerification = (bool)($settings['field_visit_verification'] ?? false);
 
         $users = User::where('tenant_id', $tenantId)
             ->orderBy('name')
@@ -32,6 +33,7 @@ class CrmSettingsController extends Controller
             'settings' => $settings,
             'quotationApprovalPolicy' => $quotationApprovalPolicy,
             'leadAssignmentConfig' => $leadAssignmentConfig,
+            'fieldVisitVerification' => $fieldVisitVerification,
             'users' => $users,
         ]);
     }
@@ -95,5 +97,27 @@ class CrmSettingsController extends Controller
 
         return redirect()->route('crm.settings.index', ['tab' => 'quotation-approval'])
             ->with('success', 'Quotation Approval Policy updated successfully.');
+    }
+
+    public function updateFieldVisitVerification(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Lead::class);
+
+        $tenant = tenant();
+        if (!$tenant) {
+            return redirect()->back()->with('error', 'Tenant context not found.');
+        }
+
+        $request->validate([
+            'field_visit_verification' => ['nullable'],
+        ]);
+
+        $currentSettings = is_array($tenant->settings) ? $tenant->settings : [];
+        $currentSettings['field_visit_verification'] = $request->boolean('field_visit_verification');
+
+        $tenant->update(['settings' => $currentSettings]);
+
+        return redirect()->route('crm.settings.index', ['tab' => 'field-visit'])
+            ->with('success', 'Field Visit & Meeting Geo-Verification settings updated successfully.');
     }
 }
