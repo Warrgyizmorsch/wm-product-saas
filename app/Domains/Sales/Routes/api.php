@@ -64,6 +64,8 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
         Route::patch('/{id}/status', [InvoiceApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/post', [InvoiceApiController::class, 'post'])->name('post');
         Route::post('/{id}/pay', [InvoiceApiController::class, 'pay'])->name('pay');
+        Route::get('/{id}/cancellation-check', [InvoiceApiController::class, 'checkCancellationEligibility'])->name('cancellation-check');
+        Route::post('/{id}/credit-note', [InvoiceApiController::class, 'storeCreditNote'])->name('credit-note');
         Route::post('/{id}/send-email', [InvoiceApiController::class, 'sendEmail'])->name('send-email');
         Route::post('/{id}/send-whatsapp', [InvoiceApiController::class, 'sendWhatsApp'])->name('send-whatsapp');
         Route::delete('/{id}', [InvoiceApiController::class, 'destroy'])->name('destroy');

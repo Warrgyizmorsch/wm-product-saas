@@ -78,6 +78,7 @@ Route::prefix('sales')
         Route::post('invoices/{invoice}/send-email', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendEmail'])->name('invoices.sendEmail');
         Route::post('invoices/{invoice}/send-whatsapp', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendWhatsApp'])->name('invoices.sendWhatsApp');
         Route::post('invoices/{invoice}/post', [\App\Domains\Sales\Controllers\InvoiceController::class, 'post'])->name('invoices.post');
+        Route::post('invoices/{invoice}/credit-note', [\App\Domains\Sales\Controllers\InvoiceController::class, 'storeCreditNote'])->name('invoices.credit-note');
         Route::post('invoices/{invoice}/send', [\App\Domains\Sales\Controllers\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/pay', [\App\Domains\Sales\Controllers\InvoiceController::class, 'pay'])->name('invoices.pay');
 

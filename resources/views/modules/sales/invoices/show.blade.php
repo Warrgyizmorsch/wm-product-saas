@@ -27,7 +27,11 @@
             </a>
         @endif
 
-        @if ($invoice->status !== 'Draft')
+        @php
+            $isCancelled = in_array(strtolower((string)$invoice->status), ['cancelled', 'void']);
+        @endphp
+
+        @if (!$isCancelled && $invoice->status !== 'Draft')
             <!-- E-Invoice Action Buttons -->
             @if ($invoice->einvoice_status === 'Generated')
                 <div class="dropdown d-inline-flex align-items-center">
@@ -98,6 +102,39 @@
             <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="btn btn-sm btn-outline-success fw-bold px-3 d-inline-flex align-items-center" title="Download Official Government GEPP JSON">
                 <i class="feather-code me-1.5"></i>Export JSON
             </a>
+        @elseif ($isCancelled)
+            {{-- When invoice is cancelled, only allow viewing existing E-Invoice/E-Way Bill if they were generated before cancellation --}}
+            @if ($invoice->einvoice_status === 'Generated')
+                <div class="dropdown d-inline-flex align-items-center">
+                    <button class="btn btn-sm btn-soft-secondary text-secondary border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-check-circle me-1.5"></i>E-Invoice (IRN)
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+                        <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 font-monospace text-truncate d-block">IRN: {{ substr($invoice->irn, 0, 18) }}...</span></li>
+                        <li>
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#viewEInvoiceQrModal">
+                                <i class="feather-maximize me-2.5 text-primary fs-14"></i>View / Scan Signed QR
+                            </button>
+                        </li>
+                        <li>
+                            <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-success text-nowrap">
+                                <i class="feather-code me-2.5 text-success fs-14"></i>Export NIC JSON (Govt Schema)
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endif
+
+            @if ($invoice->eway_bill_status === 'Generated')
+                <div class="dropdown d-inline-flex align-items-center">
+                    <button class="btn btn-sm btn-soft-secondary text-secondary border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-truck me-1.5"></i>EWB: {{ $invoice->eway_bill_no }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+                        <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 text-nowrap d-block">Valid Till: {{ $invoice->eway_bill_valid_till ? date('d-M-Y H:i', strtotime($invoice->eway_bill_valid_till)) : '—' }}</span></li>
+                    </ul>
+                </div>
+            @endif
         @endif
 
         <a href="{{ route('sales.invoices.download', $invoice->id) }}" class="btn btn-sm btn-outline-danger fw-bold px-3 d-inline-flex align-items-center" title="Download PDF Document">
@@ -158,6 +195,40 @@
                         Print Invoice
                     </a>
                 </li>
+
+                @if ($invoice->status !== 'Cancelled')
+                    <li><hr class="dropdown-divider my-1"></li>
+                    @if (!empty($hasDispatched))
+                        {{-- Goods WERE Dispatched -> Show Sales Return --}}
+                        <li>
+                            <a href="{{ route('sales.returns.create', ['invoice_id' => $invoice->id, 'sales_order_id' => $invoice->sales_order_id]) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-warning d-flex align-items-center text-nowrap">
+                                <i class="feather-rotate-ccw me-2.5 text-warning fs-14"></i>
+                                <span>{{ __('crm.create_sales_return') }} ({{ __('crm.dispatched_items') }})</span>
+                            </a>
+                        </li>
+                    @else
+                        {{-- Goods NOT Dispatched -> Show Direct Financial Credit Note --}}
+                        <li>
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#createCreditNoteModal">
+                                <i class="feather-file-minus me-2.5 text-danger fs-14"></i>
+                                <span>{{ __('crm.create_credit_note') }} ({{ __('crm.financial_only') }})</span>
+                            </button>
+                        </li>
+                    @endif
+                @endif
+
+                @if (!empty($linkedCreditNotes) && $linkedCreditNotes->isNotEmpty())
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 font-monospace">Linked Credit Notes</span></li>
+                    @foreach ($linkedCreditNotes as $cn)
+                        <li>
+                            <a href="{{ route('accounting.vouchers.credit_note.show', $cn->id) }}" class="dropdown-item py-1.5 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap">
+                                <i class="feather-file-text me-2 text-danger fs-13"></i>
+                                <span>{{ $cn->journal_number }} ({{ format_currency($cn->total_amount ?? $cn->entries->where('debit', '>', 0)->sum('debit')) }})</span>
+                            </a>
+                        </li>
+                    @endforeach
+                @endif
             </ul>
         </div>
     </div>
@@ -498,6 +569,36 @@
     <div class="row text-dark">
         <div class="col-12">
 
+            @if ($invoice->status === 'Cancelled')
+                <div class="alert alert-soft-danger border border-danger-subtle d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm d-print-none" style="max-width: 900px; margin: 0 auto 1.5rem auto;">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-danger text-white rounded-circle me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px;">
+                            <i class="feather-slash fs-18"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-danger mb-0.5 fs-14">{{ __('crm.invoice_cancelled_title') }}</h6>
+                            <p class="text-muted fs-12 mb-0">
+                                {{ __('crm.invoice_cancelled_desc') }}
+                                @if (!empty($linkedCreditNotes) && $linkedCreditNotes->isNotEmpty())
+                                    <span class="ms-1 fw-bold text-dark">
+                                        (Credit Note: 
+                                        @foreach ($linkedCreditNotes as $cn)
+                                            <a href="{{ route('accounting.vouchers.credit_note.show', $cn->id) }}" class="text-danger text-decoration-underline">{{ $cn->journal_number }}</a>{{ !$loop->last ? ', ' : '' }}
+                                        @endforeach
+                                        )
+                                    </span>
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    @if (!empty($linkedCreditNotes) && $linkedCreditNotes->first())
+                        <a href="{{ route('accounting.vouchers.credit_note.show', $linkedCreditNotes->first()->id) }}" class="btn btn-sm btn-danger fw-bold px-3 ms-2 flex-shrink-0">
+                            <i class="feather-file-text me-1.5"></i>{{ __('crm.view_credit_note') }}
+                        </a>
+                    @endif
+                </div>
+            @endif
+
             <!-- Standard ERP Customer Tax Invoice Sheet -->
             <div class="invoice-sheet print-area mb-5">
                 <!-- Status Corner Ribbon Tag Patti -->
@@ -682,7 +783,11 @@
 
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">{{ __('crm.payment_status') }}</span>
-                                <span class="fw-bold {{ ($balanceDue ?? 0) > 0 ? 'text-danger' : 'text-success' }}">{{ ($balanceDue ?? 0) > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
+                                @if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void']))
+                                    <span class="badge bg-danger-subtle text-danger fw-bold fs-11">{{ __('crm.cancelled') ?? 'Cancelled' }}</span>
+                                @else
+                                    <span class="fw-bold {{ ($balanceDue ?? 0) > 0 ? 'text-danger' : 'text-success' }}">{{ ($balanceDue ?? 0) > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1251,6 +1356,7 @@
     </form>
 </x-ui.modal>
 
+@if (!$isCancelled)
 <!-- GENERATE E-WAY BILL MODAL -->
 <x-ui.modal id="generateEWayBillModal" title="<i class='feather-truck text-info me-1.5'></i>Generate GST E-Way Bill (EWB)" size="lg" :centered="true" :showFooter="false">
     <form action="{{ route('sales.invoices.ewaybill.generate', $invoice->id) }}" method="POST">
@@ -1339,6 +1445,7 @@
         </div>
     </form>
 </x-ui.modal>
+@endif
 
 <!-- QUICK ADD TRANSPORTER MODAL -->
 <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Add New Transporter Master" size="lg" :centered="true" :showFooter="false">
@@ -1573,6 +1680,118 @@
             <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
         </div>
     </div>
+</x-ui.modal>
+
+<!-- CREATE FINANCIAL CREDIT NOTE MODAL (Enterprise ERP Style) -->
+<x-ui.modal id="createCreditNoteModal" title="<i class='feather-file-minus text-danger me-1.5'></i>{{ __('crm.issue_financial_credit_note') }}" size="lg" :centered="true" :showFooter="false">
+    <form action="{{ route('sales.invoices.credit-note', $invoice->id) }}" method="POST" id="createCreditNoteForm">
+        @csrf
+
+        <!-- Informational Banner: Stock Integrity Safe -->
+        <div class="alert alert-soft-success border border-success-subtle py-2.5 px-3 fs-12 mb-3 d-flex align-items-center rounded-3">
+            <i class="feather-shield text-success fs-20 me-2.5 flex-shrink-0"></i>
+            <div>
+                <strong class="text-success d-block mb-0.5">{{ __('crm.credit_note_safe_title') }}</strong>
+                <span class="text-muted">{{ __('crm.credit_note_safe_desc') }}</span>
+            </div>
+        </div>
+
+        <!-- Invoice Financial Breakdown Summary Card -->
+        <div class="card bg-light border mb-3 rounded-3">
+            <div class="card-body p-3">
+                <div class="row g-2 fs-12">
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">{{ __('crm.invoice_number') }}</span>
+                        <strong class="text-dark font-monospace fs-13">{{ $invoice->invoice_number }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">{{ __('crm.customer') }}</span>
+                        <strong class="text-dark text-truncate d-block fs-13">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">Total Invoice Value</span>
+                        <strong class="text-dark fs-13">{{ format_currency($invoice->total_amount) }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">Amount Paid</span>
+                        <strong class="{{ $invoice->amount_paid > 0 ? 'text-success' : 'text-muted' }} fs-13">{{ format_currency($invoice->amount_paid) }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.cancellation_reason') }} <span class="text-danger">*</span></label>
+                <select name="reason" class="form-select form-select-sm" required>
+                    <option value="Order Cancelled before Dispatch" selected>{{ __('crm.order_cancelled_before_dispatch') }}</option>
+                    <option value="Customer Requested Cancellation">{{ __('crm.customer_requested_cancellation') }}</option>
+                    <option value="Billing / Quantity Mistake">{{ __('crm.billing_mistake') }}</option>
+                    <option value="Duplicate Invoice">{{ __('crm.duplicate_invoice') }}</option>
+                    <option value="Other Reason">{{ __('crm.other_reason') }}</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.credit_note_date') }} <span class="text-danger">*</span></label>
+                <input type="date" name="credit_note_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" required>
+            </div>
+        </div>
+
+        <!-- Payment Handling Section (if invoice has any payment) -->
+        @if ($invoice->amount_paid > 0)
+            <div class="card border border-warning-subtle bg-soft-warning mb-3 rounded-3">
+                <div class="card-body p-3">
+                    <label class="form-label fs-12 fw-bold text-dark d-flex align-items-center mb-1">
+                        <i class="feather-dollar-sign text-warning me-1.5 fs-15"></i>
+                        {{ __('crm.settle_received_payment') }} ({{ format_currency($invoice->amount_paid) }})
+                    </label>
+                    <p class="fs-11 text-muted mb-2.5">
+                        {{ __('crm.payment_received_notice') }}
+                    </p>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="refund_action" id="refundActionCredit" value="credit_balance" checked onchange="$('#bankRefundSelectWrapper').slideUp(150);">
+                        <label class="form-check-label fs-12 fw-semibold text-dark" for="refundActionCredit">
+                            {{ __('crm.retain_as_customer_credit') }}
+                            <span class="d-block fs-11 text-muted fw-normal">{{ __('crm.retain_as_customer_credit_desc') }}</span>
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="refund_action" id="refundActionBank" value="bank_refund" onchange="$('#bankRefundSelectWrapper').slideDown(150);">
+                        <label class="form-check-label fs-12 fw-semibold text-dark" for="refundActionBank">
+                            {{ __('crm.refund_via_bank') }}
+                            <span class="d-block fs-11 text-muted fw-normal">{{ __('crm.refund_via_bank_desc') }}</span>
+                        </label>
+                    </div>
+
+                    <div id="bankRefundSelectWrapper" class="mt-2.5 pt-2 border-top border-warning-subtle" style="display: none;">
+                        <label class="form-label fs-11 fw-bold text-dark mb-1">{{ __('crm.select_refund_bank_account') }} <span class="text-danger">*</span></label>
+                        <select name="refund_bank_account_id" class="form-select form-select-sm">
+                            <option value="">-- {{ __('crm.choose_bank_or_cash_account') }} --</option>
+                            @foreach ($cashBankAccounts as $acc)
+                                <option value="{{ $acc->id }}">{{ $acc->name }} ({{ $acc->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+        @else
+            <input type="hidden" name="refund_action" value="credit_balance">
+        @endif
+
+        <div class="mb-3">
+            <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.notes_remarks') }} <span class="text-muted fw-normal">({{ __('crm.optional') }})</span></label>
+            <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="{{ __('crm.credit_note_remarks_placeholder') }}"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">{{ __('crm.close') }}</button>
+            <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 d-inline-flex align-items-center" onclick="return confirm('{{ __('crm.confirm_issue_credit_note') }}');">
+                <i class="feather-file-minus me-1.5"></i>{{ __('crm.issue_credit_note_btn') }}
+            </button>
+        </div>
+    </form>
 </x-ui.modal>
 
 @push('scripts')

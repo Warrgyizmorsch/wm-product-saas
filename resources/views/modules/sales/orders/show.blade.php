@@ -1116,7 +1116,7 @@
                                                 </x-ui.dropdown-item>
 
                                                 @if(in_array($inv->status, ['Sent', 'Partially Paid', 'Posted', 'Draft']))
-                                                    <x-ui.dropdown-item href="{{ route('sales.payments.create', ['invoice_id' => $inv->id, 'customer_id' => $order->customer_id]) }}" icon="feather-dollar-sign me-2" class="text-success fw-semibold">
+                                                    <x-ui.dropdown-item :href="route('sales.payments.create', ['invoice_id' => $inv->id, 'customer_id' => $order->customer_id])" icon="feather-dollar-sign me-2" class="text-success fw-semibold">
                                                         {{ __('crm.register_payment') ?? 'Register Payment' }}
                                                     </x-ui.dropdown-item>
                                                 @endif
@@ -1144,7 +1144,7 @@
                             <h6 class="mb-0 fw-bold text-dark fs-14">{{ __('crm.payments_allocations_header') ?? 'Payments & Receipts' }}</h6>
                         </div>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <x-ui.button href="{{ route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
+                            <x-ui.button :href="route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order'])" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
                                 {{ __('crm.record_receipt_advance') ?? 'Record Payment' }}
                             </x-ui.button>
                         @endif

@@ -14,6 +14,13 @@ class EInvoiceService
      */
     public function generate(Invoice $invoice): array
     {
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            return [
+                'success' => false,
+                'message' => 'Cannot generate E-Invoice for a cancelled invoice.',
+            ];
+        }
+
         if ($invoice->einvoice_status === 'Generated' && !empty($invoice->irn)) {
             return [
                 'success'  => true,

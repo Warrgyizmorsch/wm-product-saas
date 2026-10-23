@@ -188,6 +188,14 @@ class CrmAccountController extends Controller
         $payments = collect();
         $salesOrders = collect();
         $salesReturns = collect();
+        $creditNotes = collect();
+        $totalBilled = 0;
+        $outstandingBalance = 0;
+        $customerCreditBalance = 0;
+        $overdueAmount = 0;
+        $availableCredit = $creditLimit;
+        $invoiceCount = 0;
+        $openingBalance = 0;
 
         if ($account->customer) {
             $customer = $account->customer;
@@ -195,7 +203,7 @@ class CrmAccountController extends Controller
             $payments = $customer->payments()->with(['allocations.invoice', 'allocations.salesOrder'])->latest()->get();
             $salesOrders = $customer->salesOrders()->with(['quotation.deal', 'items'])->latest()->get();
             $salesReturns = \App\Domains\Sales\Models\SalesReturn::where('customer_id', $customer->id)
-                ->with(['salesOrder.quotation.deal'])
+                ->with(['salesOrder.quotation.deal', 'items'])
                 ->latest()->get();
 
             $invoiceCount = $invoices->count();
@@ -213,8 +221,61 @@ class CrmAccountController extends Controller
             $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
             $overdueAmount = $invoices->where('status', 'unpaid')
                 ->filter(fn($inv) => $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast())
+            $tenantId = $customer->tenant_id ?? (tenant_id() ?? 1);
+            $creditNotes = \App\Domains\Accounting\Models\Journal::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('voucher_type', 'credit_note')
+                ->where('status', 'posted')
+                ->where(function ($q) use ($customer, $invoices) {
+                    $q->whereHas('entries', function ($sq) use ($customer) {
+                        $sq->where('party_type', 'customer')->where('party_id', $customer->id);
+                    });
+                    if ($invoices->isNotEmpty()) {
+                        $q->orWhere(function ($sq) use ($invoices) {
+                            $sq->where('reference_type', 'invoice')
+                               ->whereIn('reference_id', $invoices->pluck('id'));
+                        });
+                    }
+                })
+                ->with(['entries.account'])
+                ->latest('journal_date')
+                ->get();
+
+            // Filter active non-cancelled invoices
+            $activeInvoices = $invoices->filter(fn($inv) => !in_array(strtolower((string)$inv->status), ['cancelled', 'void']));
+            $invoiceCount = $activeInvoices->count();
+            $totalBilled = (float) $activeInvoices->sum('total_amount');
+
+            // Outstanding balance from active invoices
+            $invoiceOutstanding = (float) $activeInvoices->sum('balance_due');
+
+            // Total posted/completed payments
+            $postedPayments = $payments->filter(fn($p) => in_array(strtolower((string)$p->status), ['posted', 'completed', 'paid']));
+
+            // Unallocated advances (e.g. from cancelled invoices or direct unallocated payments)
+            $unallocatedAdvance = (float) \App\Domains\Sales\Models\PaymentAllocation::whereHas('payment', function($q) use ($customer) {
+                $q->where('customer_id', $customer->id)->whereIn('status', ['Posted', 'posted', 'completed', 'paid']);
+            })->whereNull('invoice_id')->sum('allocated_amount');
+
+            $paymentsWithoutAlloc = (float) $postedPayments->filter(fn($p) => $p->allocations->isEmpty())->sum('amount');
+            $totalAdvanceHold = $unallocatedAdvance + $paymentsWithoutAlloc;
+
+            $openingBalance = floatval($customer->opening_balance ?? 0);
+
+            $netOutstanding = ($openingBalance + $invoiceOutstanding) - $totalAdvanceHold;
+
+            if ($netOutstanding < 0) {
+                $outstandingBalance = 0;
+                $customerCreditBalance = abs($netOutstanding);
+            } else {
+                $outstandingBalance = $netOutstanding;
+                $customerCreditBalance = ($totalAdvanceHold > 0 && $outstandingBalance == 0) ? $totalAdvanceHold : 0;
+            }
+
+            $overdueAmount = $activeInvoices->filter(fn($inv) => $inv->balance_due > 0 && $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast())
                 ->sum('balance_due');
-            $availableCredit = max(0, $creditLimit - $outstandingBalance);
+
+            $availableCredit = max(0, $creditLimit - $outstandingBalance + $customerCreditBalance);
         }
 
         return view('modules.crm.accounts.show', compact(
@@ -234,6 +295,7 @@ class CrmAccountController extends Controller
             'payments',
             'salesOrders',
             'salesReturns',
+            'creditNotes',
             'openingBalance'
         ));
     }

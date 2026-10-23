@@ -200,16 +200,45 @@
                 </div>
             @endif
 
+            <!-- Geo-Location & Selfie Proof (if verified) -->
+            @if(!empty($item->selfie_path) || !empty($item->latitude))
+                <div class="d-flex align-items-center gap-2.5 my-2 p-2 rounded-2 bg-light border" style="max-width: 480px;">
+                    @if(!empty($item->selfie_path))
+                        <a href="{{ asset($item->selfie_path) }}" target="_blank" title="View Verified Selfie">
+                            <img src="{{ asset($item->selfie_path) }}" class="rounded border shadow-xs" style="width: 42px; height: 42px; object-fit: cover;" alt="Selfie">
+                        </a>
+                    @endif
+                    <div class="fs-11 text-secondary">
+                        <div class="fw-semibold text-dark d-flex align-items-center gap-1">
+                            <i class="feather-shield text-success fs-12"></i> Verified Field Visit
+                            @if($item->location_verified_at)
+                                <span class="text-muted fw-normal">({{ $item->location_verified_at->format('d M, h:i A') }})</span>
+                            @endif
+                        </div>
+                        @if(!empty($item->latitude) && !empty($item->longitude))
+                            <div class="d-flex align-items-center gap-1 mt-0.5">
+                                <a href="https://www.google.com/maps?q={{ $item->latitude }},{{ $item->longitude }}" target="_blank" class="text-primary text-decoration-none fw-semibold d-inline-flex align-items-center gap-1">
+                                    <i class="feather-map-pin fs-11"></i> View on Google Maps
+                                </a>
+                                @if(!empty($item->location_address))
+                                    <span class="text-muted text-truncate" style="max-width: 200px;" title="{{ $item->location_address }}">&bull; {{ $item->location_address }}</span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <!-- Line 3: Direct Action Options (Connected, Not Connected, Reschedule, Cancel, Call) -->
             @if($isPending)
                 <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
                     <!-- Connected -->
-                    <a href="javascript:void(0)" class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">
+                    <a href="javascript:void(0)" class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed" onclick="crmInitVisitModal('{{ $item->id }}', 'Completed')">
                         <i class="feather-check fs-12"></i> <span>{{ __('crm.connected') }}</span>
                     </a>
 
                     <!-- Not Connected -->
-                    <a href="javascript:void(0)" class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">
+                    <a href="javascript:void(0)" class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected" onclick="crmInitVisitModal('{{ $item->id }}', 'NotConnected')">
                         <i class="feather-phone-off fs-12"></i> <span>{{ __('crm.not_connected') }}</span>
                     </a>
 
@@ -239,6 +268,8 @@
 
                 @php
                     $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
+                    $isGeoVerificationEnabled = !empty(tenant()?->settings['field_visit_verification']);
+                    $isMeeting = ($item->type === 'Meeting');
                 @endphp
 
                 <!-- Status Modal: Connected / Completed -->
@@ -249,6 +280,7 @@
                     :centered="true"
                     :formAction="route('crm.followups.update', $item->id)"
                     formMethod="PUT"
+                    formEnctype="multipart/form-data"
                     :submitText="__('crm.save_mark_connected')"
                     :closeText="__('crm.cancel')"
                 >
@@ -258,6 +290,109 @@
                             <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
+
+                    @if($isGeoVerificationEnabled && $isMeeting)
+                        <div class="border rounded-3 p-3 bg-light mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+                                <span class="fs-12 fw-bold text-dark d-flex align-items-center gap-1">
+                                    <i class="feather-shield text-primary fs-13"></i> Field Visit Verification
+                                </span>
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 font-monospace">Required</span>
+                            </div>
+                            
+                            <!-- GPS Coordinates hidden inputs -->
+                            <input type="hidden" name="latitude" id="lat_{{ $item->id }}_Completed" value="{{ $item->latitude }}">
+                            <input type="hidden" name="longitude" id="lng_{{ $item->id }}_Completed" value="{{ $item->longitude }}">
+                            <input type="hidden" name="location_address" id="addr_{{ $item->id }}_Completed" value="{{ $item->location_address }}">
+
+                            <!-- 1. GPS Location Section -->
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <label class="form-label fs-11 fw-semibold text-secondary mb-0">
+                                        <i class="feather-map-pin me-1 text-primary"></i>Live GPS Location <span class="text-danger">*</span>
+                                    </label>
+                                    <span id="loc_badge_{{ $item->id }}_Completed" class="badge {{ $item->latitude ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted' }} fs-10">
+                                        {{ $item->latitude ? 'Verified' : 'Required' }}
+                                    </span>
+                                </div>
+                                <div id="loc_box_{{ $item->id }}_Completed" class="d-flex align-items-center justify-content-between bg-white border rounded-2 p-2 fs-12">
+                                    <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                                        <span id="loc_status_dot_{{ $item->id }}_Completed" class="rounded-circle d-inline-block {{ $item->latitude ? 'bg-success' : 'bg-warning' }}" style="width: 8px; height: 8px; flex-shrink: 0;"></span>
+                                        <span id="loc_text_{{ $item->id }}_Completed" class="text-muted text-truncate fs-12">
+                                            {{ $item->latitude ? "GPS: {$item->latitude}, {$item->longitude}" : 'Click Fetch GPS to capture location' }}
+                                        </span>
+                                    </div>
+                                    <button type="button" class="btn btn-xs btn-outline-primary flex-shrink-0" onclick="crmCaptureLocation('{{ $item->id }}', 'Completed')">
+                                        <i class="feather-crosshair me-1"></i>Fetch GPS
+                                    </button>
+                                </div>
+                                <div id="loc_error_{{ $item->id }}_Completed" class="text-danger fs-11 mt-1 d-none">
+                                    <i class="feather-alert-circle me-1"></i>Location verification is required. Please click "Fetch GPS" to capture live coordinates.
+                                </div>
+                            </div>
+
+                            <!-- 2. Front Camera Live Selfie Section (NO file upload!) -->
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <label class="form-label fs-11 fw-semibold text-secondary mb-0">
+                                        <i class="feather-camera me-1 text-primary"></i>Live Front Camera Selfie <span class="text-danger">*</span>
+                                    </label>
+                                    <span id="selfie_badge_{{ $item->id }}_Completed" class="badge {{ $item->selfie_path ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted' }} fs-10">
+                                        {{ $item->selfie_path ? 'Captured' : 'Required' }}
+                                    </span>
+                                </div>
+                                
+                                <input type="hidden" name="selfie_base64" id="selfie_base64_{{ $item->id }}_Completed" value="">
+                                <input type="hidden" id="has_existing_selfie_{{ $item->id }}_Completed" value="{{ $item->selfie_path ? '1' : '0' }}">
+                                <canvas id="canvas_{{ $item->id }}_Completed" style="display:none;"></canvas>
+
+                                <!-- State A: Idle / Click to Open Front Camera -->
+                                <div id="camera_idle_{{ $item->id }}_Completed" 
+                                     class="{{ $item->selfie_path ? 'd-none' : '' }} bg-white border border-dashed rounded-2 p-3 text-center cursor-pointer hover-bg-light" 
+                                     onclick="crmStartCamera('{{ $item->id }}', 'Completed')">
+                                    <div class="d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-circle mb-1.5" style="width: 38px; height: 38px;">
+                                        <i class="feather-camera fs-18"></i>
+                                    </div>
+                                    <div class="fs-12 fw-semibold text-dark">Open Front Camera & Take Selfie</div>
+                                    <div class="fs-10 text-muted mt-0.5">Click here to launch selfie camera directly</div>
+                                </div>
+
+                                <!-- State B: Active Live Camera Stream -->
+                                <div id="camera_active_{{ $item->id }}_Completed" class="d-none bg-dark rounded-2 overflow-hidden position-relative shadow-sm text-center">
+                                    <video id="video_{{ $item->id }}_Completed" autoplay playsinline muted style="width: 100%; max-height: 220px; object-fit: cover; transform: scaleX(-1); border-radius: 6px;"></video>
+                                    <div class="p-2 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-success px-3 fw-semibold shadow-xs" onclick="crmSnapSelfie('{{ $item->id }}', 'Completed')">
+                                            <i class="feather-camera me-1"></i>Snap Selfie
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light" onclick="crmStopCamera('{{ $item->id }}', 'Completed')">
+                                            <i class="feather-x me-1"></i>Cancel
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- State C: Captured Preview -->
+                                <div id="camera_preview_{{ $item->id }}_Completed" class="{{ $item->selfie_path ? '' : 'd-none' }} bg-white border rounded-2 p-2 text-center">
+                                    <div class="position-relative d-inline-block">
+                                        <img id="selfie_img_{{ $item->id }}_Completed" src="{{ $item->selfie_path ? asset($item->selfie_path) : '' }}" class="rounded border shadow-xs" style="max-height: 160px; max-width: 100%; object-fit: cover;" alt="Selfie Preview">
+                                        <span class="position-absolute top-0 end-0 badge bg-success m-1 shadow-xs fs-10">
+                                            <i class="feather-check"></i> Captured
+                                        </span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="crmRetakeSelfie('{{ $item->id }}', 'Completed')">
+                                            <i class="feather-refresh-cw me-1"></i>Retake Selfie
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Validation error text for Selfie -->
+                                <div id="selfie_error_{{ $item->id }}_Completed" class="text-danger fs-11 mt-1 d-none">
+                                    <i class="feather-alert-circle me-1"></i>Front camera selfie is required. Please take a selfie before saving.
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <x-ui.odoo-form-ui type="textarea" :label="__('crm.discussion_summary')" name="notes" rows="3" :placeholder="__('crm.enter_notes_outcome')">{{ $item->notes }}</x-ui.odoo-form-ui>
                 </x-ui.modal>
 
@@ -269,6 +404,7 @@
                     :centered="true"
                     :formAction="route('crm.followups.update', $item->id)"
                     formMethod="PUT"
+                    formEnctype="multipart/form-data"
                     :submitText="__('crm.save_status')"
                     :closeText="__('crm.cancel')"
                 >
@@ -278,6 +414,109 @@
                             <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
+
+                    @if($isGeoVerificationEnabled && $isMeeting)
+                        <div class="border rounded-3 p-3 bg-light mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+                                <span class="fs-12 fw-bold text-dark d-flex align-items-center gap-1">
+                                    <i class="feather-shield text-primary fs-13"></i> Field Visit Verification
+                                </span>
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 font-monospace">Required</span>
+                            </div>
+                            
+                            <!-- GPS Coordinates hidden inputs -->
+                            <input type="hidden" name="latitude" id="lat_{{ $item->id }}_NotConnected" value="{{ $item->latitude }}">
+                            <input type="hidden" name="longitude" id="lng_{{ $item->id }}_NotConnected" value="{{ $item->longitude }}">
+                            <input type="hidden" name="location_address" id="addr_{{ $item->id }}_NotConnected" value="{{ $item->location_address }}">
+
+                            <!-- 1. GPS Location Section -->
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <label class="form-label fs-11 fw-semibold text-secondary mb-0">
+                                        <i class="feather-map-pin me-1 text-primary"></i>Live GPS Location <span class="text-danger">*</span>
+                                    </label>
+                                    <span id="loc_badge_{{ $item->id }}_NotConnected" class="badge {{ $item->latitude ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted' }} fs-10">
+                                        {{ $item->latitude ? 'Verified' : 'Required' }}
+                                    </span>
+                                </div>
+                                <div id="loc_box_{{ $item->id }}_NotConnected" class="d-flex align-items-center justify-content-between bg-white border rounded-2 p-2 fs-12">
+                                    <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                                        <span id="loc_status_dot_{{ $item->id }}_NotConnected" class="rounded-circle d-inline-block {{ $item->latitude ? 'bg-success' : 'bg-warning' }}" style="width: 8px; height: 8px; flex-shrink: 0;"></span>
+                                        <span id="loc_text_{{ $item->id }}_NotConnected" class="text-muted text-truncate fs-12">
+                                            {{ $item->latitude ? "GPS: {$item->latitude}, {$item->longitude}" : 'Click Fetch GPS to capture location' }}
+                                        </span>
+                                    </div>
+                                    <button type="button" class="btn btn-xs btn-outline-primary flex-shrink-0" onclick="crmCaptureLocation('{{ $item->id }}', 'NotConnected')">
+                                        <i class="feather-crosshair me-1"></i>Fetch GPS
+                                    </button>
+                                </div>
+                                <div id="loc_error_{{ $item->id }}_NotConnected" class="text-danger fs-11 mt-1 d-none">
+                                    <i class="feather-alert-circle me-1"></i>Location verification is required. Please click "Fetch GPS" to capture live coordinates.
+                                </div>
+                            </div>
+
+                            <!-- 2. Front Camera Live Selfie Section (NO file upload!) -->
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <label class="form-label fs-11 fw-semibold text-secondary mb-0">
+                                        <i class="feather-camera me-1 text-primary"></i>Live Front Camera Selfie <span class="text-danger">*</span>
+                                    </label>
+                                    <span id="selfie_badge_{{ $item->id }}_NotConnected" class="badge {{ $item->selfie_path ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted' }} fs-10">
+                                        {{ $item->selfie_path ? 'Captured' : 'Required' }}
+                                    </span>
+                                </div>
+                                
+                                <input type="hidden" name="selfie_base64" id="selfie_base64_{{ $item->id }}_NotConnected" value="">
+                                <input type="hidden" id="has_existing_selfie_{{ $item->id }}_NotConnected" value="{{ $item->selfie_path ? '1' : '0' }}">
+                                <canvas id="canvas_{{ $item->id }}_NotConnected" style="display:none;"></canvas>
+
+                                <!-- State A: Idle / Click to Open Front Camera -->
+                                <div id="camera_idle_{{ $item->id }}_NotConnected" 
+                                     class="{{ $item->selfie_path ? 'd-none' : '' }} bg-white border border-dashed rounded-2 p-3 text-center cursor-pointer hover-bg-light" 
+                                     onclick="crmStartCamera('{{ $item->id }}', 'NotConnected')">
+                                    <div class="d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-circle mb-1.5" style="width: 38px; height: 38px;">
+                                        <i class="feather-camera fs-18"></i>
+                                    </div>
+                                    <div class="fs-12 fw-semibold text-dark">Open Front Camera & Take Selfie</div>
+                                    <div class="fs-10 text-muted mt-0.5">Click here to launch selfie camera directly</div>
+                                </div>
+
+                                <!-- State B: Active Live Camera Stream -->
+                                <div id="camera_active_{{ $item->id }}_NotConnected" class="d-none bg-dark rounded-2 overflow-hidden position-relative shadow-sm text-center">
+                                    <video id="video_{{ $item->id }}_NotConnected" autoplay playsinline muted style="width: 100%; max-height: 220px; object-fit: cover; transform: scaleX(-1); border-radius: 6px;"></video>
+                                    <div class="p-2 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-success px-3 fw-semibold shadow-xs" onclick="crmSnapSelfie('{{ $item->id }}', 'NotConnected')">
+                                            <i class="feather-camera me-1"></i>Snap Selfie
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light" onclick="crmStopCamera('{{ $item->id }}', 'NotConnected')">
+                                            <i class="feather-x me-1"></i>Cancel
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- State C: Captured Preview -->
+                                <div id="camera_preview_{{ $item->id }}_NotConnected" class="{{ $item->selfie_path ? '' : 'd-none' }} bg-white border rounded-2 p-2 text-center">
+                                    <div class="position-relative d-inline-block">
+                                        <img id="selfie_img_{{ $item->id }}_NotConnected" src="{{ $item->selfie_path ? asset($item->selfie_path) : '' }}" class="rounded border shadow-xs" style="max-height: 160px; max-width: 100%; object-fit: cover;" alt="Selfie Preview">
+                                        <span class="position-absolute top-0 end-0 badge bg-success m-1 shadow-xs fs-10">
+                                            <i class="feather-check"></i> Captured
+                                        </span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="crmRetakeSelfie('{{ $item->id }}', 'NotConnected')">
+                                            <i class="feather-refresh-cw me-1"></i>Retake Selfie
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Validation error text for Selfie -->
+                                <div id="selfie_error_{{ $item->id }}_NotConnected" class="text-danger fs-11 mt-1 d-none">
+                                    <i class="feather-alert-circle me-1"></i>Front camera selfie is required. Please take a selfie before saving.
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <x-ui.odoo-form-ui type="textarea" :label="__('crm.discussion_summary')" name="notes" rows="3" :placeholder="__('crm.enter_notes_outcome')">{{ $item->notes }}</x-ui.odoo-form-ui>
                 </x-ui.modal>
 
@@ -331,3 +570,345 @@
         </div>
     </div>
 </div>
+
+@once
+<script>
+window.crmActiveStreams = window.crmActiveStreams || {};
+
+window.crmCaptureLocation = function(itemId, suffix, isRetry) {
+    const key = itemId + '_' + suffix;
+    const statusDot = document.getElementById('loc_status_dot_' + key);
+    const locText = document.getElementById('loc_text_' + key);
+    const locBox = document.getElementById('loc_box_' + key);
+    const locError = document.getElementById('loc_error_' + key);
+    const locBadge = document.getElementById('loc_badge_' + key);
+    const latInput = document.getElementById('lat_' + key);
+    const lngInput = document.getElementById('lng_' + key);
+    const addrInput = document.getElementById('addr_' + key);
+
+    if (!navigator.geolocation) {
+        if (locText) {
+            locText.textContent = 'Geolocation not supported by this device.';
+            locText.className = 'text-danger text-truncate fs-12';
+        }
+        if (locError) {
+            locError.textContent = 'Geolocation is not supported by your browser or device.';
+            locError.classList.remove('d-none');
+        }
+        if (locBox) locBox.classList.add('border-danger');
+        return;
+    }
+
+    if (locText) {
+        locText.textContent = isRetry ? 'Detecting network location...' : 'Fetching live location...';
+        locText.className = 'text-primary text-truncate fs-12';
+    }
+    if (statusDot) {
+        statusDot.className = 'rounded-circle d-inline-block bg-info';
+    }
+
+    const options = isRetry 
+        ? { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        : { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 };
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            const lat = pos.coords.latitude.toFixed(7);
+            const lng = pos.coords.longitude.toFixed(7);
+            if (latInput) latInput.value = lat;
+            if (lngInput) lngInput.value = lng;
+            if (statusDot) {
+                statusDot.className = 'rounded-circle d-inline-block bg-success';
+            }
+            if (locText) {
+                locText.textContent = 'GPS: ' + lat + ', ' + lng;
+                locText.className = 'text-success fw-semibold text-truncate fs-12';
+            }
+            if (locBadge) {
+                locBadge.textContent = 'Verified';
+                locBadge.className = 'badge bg-success-subtle text-success border border-success-subtle fs-10';
+            }
+            if (locError) locError.classList.add('d-none');
+            if (locBox) locBox.classList.remove('border-danger');
+
+            // Silent Reverse Geocoding via Nominatim
+            fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.display_name) {
+                        if (addrInput) addrInput.value = data.display_name;
+                        const parts = data.display_name.split(',').map(s => s.trim());
+                        const shortAddr = parts.slice(0, 3).join(', ');
+                        if (locText) locText.textContent = shortAddr || ('GPS: ' + lat + ', ' + lng);
+                    }
+                })
+                .catch(() => {});
+        },
+        function(err) {
+            if (!isRetry && (err.code === err.POSITION_UNAVAILABLE || err.code === err.TIMEOUT)) {
+                return window.crmCaptureLocation(itemId, suffix, true);
+            }
+
+            let msg = 'Location unavailable. Click Fetch GPS to retry.';
+            if (err.code === err.PERMISSION_DENIED) {
+                msg = 'GPS Permission Blocked. Please allow location access in browser.';
+            } else if (err.code === err.TIMEOUT) {
+                msg = 'Location timed out. Click Fetch GPS to retry.';
+            }
+
+            if (statusDot) {
+                statusDot.className = 'rounded-circle d-inline-block bg-danger';
+            }
+            if (locText) {
+                locText.textContent = msg;
+                locText.className = 'text-danger text-truncate fs-12';
+            }
+            if (locError) {
+                locError.textContent = msg;
+                locError.classList.remove('d-none');
+            }
+            if (locBox) locBox.classList.add('border-danger');
+        },
+        options
+    );
+};
+
+window.crmInitVisitModal = function(itemId, suffix) {
+    setTimeout(function() {
+        const latInput = document.getElementById('lat_' + itemId + '_' + suffix);
+        if (latInput && !latInput.value) {
+            window.crmCaptureLocation(itemId, suffix, false);
+        }
+    }, 200);
+};
+
+window.crmStartCamera = function(itemId, suffix) {
+    const key = itemId + '_' + suffix;
+    const idleEl = document.getElementById('camera_idle_' + key);
+    const activeEl = document.getElementById('camera_active_' + key);
+    const previewEl = document.getElementById('camera_preview_' + key);
+    const videoEl = document.getElementById('video_' + key);
+    const selfieErr = document.getElementById('selfie_error_' + key);
+
+    if (selfieErr) selfieErr.classList.add('d-none');
+    if (idleEl) idleEl.classList.remove('border-danger');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (selfieErr) {
+            selfieErr.textContent = 'Camera is not supported on this browser or insecure origin (requires HTTPS or localhost).';
+            selfieErr.classList.remove('d-none');
+        }
+        return;
+    }
+
+    navigator.mediaDevices.getUserMedia({
+        video: {
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+        },
+        audio: false
+    })
+    .then(function(stream) {
+        window.crmActiveStreams[key] = stream;
+        if (videoEl) {
+            videoEl.srcObject = stream;
+            videoEl.play();
+        }
+        if (idleEl) idleEl.classList.add('d-none');
+        if (previewEl) previewEl.classList.add('d-none');
+        if (activeEl) activeEl.classList.remove('d-none');
+    })
+    .catch(function(err) {
+        console.error('Camera error:', err);
+        let msg = 'Unable to access front camera. Please check camera permissions.';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            msg = 'Camera permission denied. Please allow camera access in browser.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            msg = 'No camera found on this device.';
+        }
+        if (selfieErr) {
+            selfieErr.textContent = msg;
+            selfieErr.classList.remove('d-none');
+        }
+    });
+};
+
+window.crmStopCamera = function(itemId, suffix) {
+    const key = itemId + '_' + suffix;
+    const stream = window.crmActiveStreams[key];
+    if (stream) {
+        stream.getTracks().forEach(function(track) {
+            track.stop();
+        });
+        delete window.crmActiveStreams[key];
+    }
+    const videoEl = document.getElementById('video_' + key);
+    if (videoEl) {
+        videoEl.srcObject = null;
+    }
+    const activeEl = document.getElementById('camera_active_' + key);
+    const previewEl = document.getElementById('camera_preview_' + key);
+    const idleEl = document.getElementById('camera_idle_' + key);
+    const selfieInput = document.getElementById('selfie_base64_' + key);
+    const existingSelfie = document.getElementById('has_existing_selfie_' + key);
+
+    if (activeEl) activeEl.classList.add('d-none');
+    if ((selfieInput && selfieInput.value) || (existingSelfie && existingSelfie.value === '1')) {
+        if (previewEl) previewEl.classList.remove('d-none');
+    } else {
+        if (idleEl) idleEl.classList.remove('d-none');
+    }
+};
+
+window.crmSnapSelfie = function(itemId, suffix) {
+    const key = itemId + '_' + suffix;
+    const videoEl = document.getElementById('video_' + key);
+    const canvasEl = document.getElementById('canvas_' + key);
+    const selfieInput = document.getElementById('selfie_base64_' + key);
+    const previewImg = document.getElementById('selfie_img_' + key);
+    const activeEl = document.getElementById('camera_active_' + key);
+    const previewEl = document.getElementById('camera_preview_' + key);
+    const idleEl = document.getElementById('camera_idle_' + key);
+    const selfieErr = document.getElementById('selfie_error_' + key);
+    const selfieBadge = document.getElementById('selfie_badge_' + key);
+
+    if (!videoEl || !canvasEl) return;
+
+    const width = videoEl.videoWidth || 640;
+    const height = videoEl.videoHeight || 480;
+    canvasEl.width = width;
+    canvasEl.height = height;
+
+    const ctx = canvasEl.getContext('2d');
+    // Mirror horizontally so the snapped image looks natural as seen in front camera
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(videoEl, 0, 0, width, height);
+
+    const dataUrl = canvasEl.toDataURL('image/jpeg', 0.85);
+    if (selfieInput) selfieInput.value = dataUrl;
+    if (previewImg) {
+        previewImg.src = dataUrl;
+    }
+
+    if (selfieBadge) {
+        selfieBadge.textContent = 'Captured';
+        selfieBadge.className = 'badge bg-success-subtle text-success border border-success-subtle fs-10';
+    }
+    if (selfieErr) selfieErr.classList.add('d-none');
+    if (idleEl) idleEl.classList.remove('border-danger');
+
+    // Stop video stream
+    const stream = window.crmActiveStreams[key];
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        delete window.crmActiveStreams[key];
+    }
+    videoEl.srcObject = null;
+
+    if (activeEl) activeEl.classList.add('d-none');
+    if (previewEl) previewEl.classList.remove('d-none');
+};
+
+window.crmRetakeSelfie = function(itemId, suffix) {
+    const key = itemId + '_' + suffix;
+    const selfieInput = document.getElementById('selfie_base64_' + key);
+    const existingSelfie = document.getElementById('has_existing_selfie_' + key);
+    const selfieBadge = document.getElementById('selfie_badge_' + key);
+
+    if (selfieInput) selfieInput.value = '';
+    if (existingSelfie) existingSelfie.value = '0';
+    if (selfieBadge) {
+        selfieBadge.textContent = 'Required';
+        selfieBadge.className = 'badge bg-secondary-subtle text-muted fs-10';
+    }
+    window.crmStartCamera(itemId, suffix);
+};
+
+window.crmValidateVisitForm = function(e, itemId, suffix) {
+    const key = itemId + '_' + suffix;
+    const latInput = document.getElementById('lat_' + key);
+    const selfieInput = document.getElementById('selfie_base64_' + key);
+    const locBox = document.getElementById('loc_box_' + key);
+    const locError = document.getElementById('loc_error_' + key);
+    const idleEl = document.getElementById('camera_idle_' + key);
+    const selfieErr = document.getElementById('selfie_error_' + key);
+    const existingSelfie = document.getElementById('has_existing_selfie_' + key);
+
+    let isValid = true;
+
+    // 1. Check GPS Location
+    if (!latInput || !latInput.value || latInput.value.trim() === '') {
+        isValid = false;
+        if (locError) {
+            locError.textContent = 'Location verification is required. Please click "Fetch GPS" to capture live coordinates.';
+            locError.classList.remove('d-none');
+        }
+        if (locBox) {
+            locBox.classList.add('border-danger');
+        }
+    } else {
+        if (locError) locError.classList.add('d-none');
+        if (locBox) locBox.classList.remove('border-danger');
+    }
+
+    // 2. Check Selfie
+    const hasSelfie = (selfieInput && selfieInput.value && selfieInput.value.trim() !== '') || (existingSelfie && existingSelfie.value === '1');
+    if (!hasSelfie) {
+        isValid = false;
+        if (selfieErr) {
+            selfieErr.textContent = 'Front camera selfie is required. Please take a selfie before saving.';
+            selfieErr.classList.remove('d-none');
+        }
+        if (idleEl) {
+            idleEl.classList.add('border-danger');
+        }
+    } else {
+        if (selfieErr) selfieErr.classList.add('d-none');
+        if (idleEl) idleEl.classList.remove('border-danger');
+    }
+
+    return isValid;
+};
+
+// Global capturing submit listener to block submission if GPS or Selfie is missing
+if (!window.crmVisitSubmitListenerRegistered) {
+    window.crmVisitSubmitListenerRegistered = true;
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        const modal = form.closest ? form.closest('.modal') : null;
+        if (!modal || !modal.id) return;
+
+        const match = modal.id.match(/^statusModal_(\d+)_(Completed|NotConnected)$/);
+        if (!match) return;
+
+        const itemId = match[1];
+        const suffix = match[2];
+
+        const latInput = document.getElementById('lat_' + itemId + '_' + suffix);
+        const selfieInput = document.getElementById('selfie_base64_' + itemId + '_' + suffix);
+
+        // Only validate if geo-verification inputs exist in this modal
+        if (!latInput || !selfieInput) return;
+
+        const isValid = window.crmValidateVisitForm(e, itemId, suffix);
+        if (!isValid) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }, true);
+
+    // Turn off camera when modal is closed
+    document.addEventListener('hidden.bs.modal', function(e) {
+        if (e.target && e.target.id && e.target.id.startsWith('statusModal_')) {
+            const parts = e.target.id.replace('statusModal_', '').split('_');
+            if (parts.length >= 2) {
+                window.crmStopCamera(parts[0], parts[1]);
+            }
+        }
+    });
+}
+</script>
+@endonce

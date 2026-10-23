@@ -8,6 +8,7 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\LeadHistory;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\DealStatus;
 use App\Domains\CRM\Services\DealHealthService;
@@ -816,12 +817,25 @@ class CrmDealController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $account->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $account->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} marked as Won and linked to Customer '{$customer->name}'."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             // Sync all quotations linked to this deal or lead
@@ -892,12 +906,25 @@ class CrmDealController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $newAccount->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $newAccount->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} converted to new Customer & Account. Lead marked as Won."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             // Sync lead contacts → account
