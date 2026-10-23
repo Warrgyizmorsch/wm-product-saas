@@ -12,8 +12,10 @@ return new class extends Migration
         Schema::create('tenant_files', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->string('disk', 50);
-            $table->string('path', 500);
+            // (20 + 225) × 4 bytes (utf8mb4) keeps the disk+path unique key under
+            // MyISAM's 1000-byte limit, which some shared hosts still default to.
+            $table->string('disk', 20);
+            $table->string('path', 225);
             $table->unsignedBigInteger('size')->default(0);
             $table->timestamps();
 
