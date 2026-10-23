@@ -329,13 +329,15 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             ];
         }
 
-        $run->update(['status' => 'locked']);
-
+        // The salary accrual must reach the books with the lock, or not lock at
+        // all: a locked run with nothing posted leaves the ledger silently short.
         try {
-            $payrollAccountingService = app(PayrollAccountingService::class);
-            $payrollAccountingService->postPayrollRunJournal($run);
-        } catch (\Throwable $e) {
-            Log::error("Failed to post payroll accrual journal on lock: " . $e->getMessage());
+            DB::transaction(function () use ($run) {
+                $run->update(['status' => 'locked']);
+                app(PayrollAccountingService::class)->postPayrollRunJournal($run);
+            });
+        } catch (\InvalidArgumentException $e) {
+            return ['success' => false, 'message' => 'Payroll not locked — the salary entry could not be posted: ' . $e->getMessage()];
         }
 
         return ['success' => true];
@@ -433,7 +435,24 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
         }
     }
 
-    public function releasePayouts(PayrollRun $run): void
+    /**
+     * Pays the run: posts the salary accrual (if not yet) and the payout from
+     * the chosen cash/bank ledger first, and only then marks everything paid.
+     * Throws InvalidArgumentException (nothing changed) when the books refuse,
+     * e.g. no open period or not enough cash on hand.
+     */
+    public function releasePayouts(PayrollRun $run, ?int $bankAccountId = null, ?string $payoutDate = null): void
+    {
+        DB::transaction(function () use ($run, $bankAccountId, $payoutDate) {
+            $accounting = app(PayrollAccountingService::class);
+            $accounting->postPayrollRunJournal($run);
+            $accounting->postPayrollPayoutJournal($run, $bankAccountId, $payoutDate);
+
+            $this->markRunPaid($run);
+        });
+    }
+
+    private function markRunPaid(PayrollRun $run): void
     {
         $run->update(['status' => 'paid']);
 
@@ -531,17 +550,6 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             DB::table('leave_encashments')
                 ->whereIn('id', $allEncashIds)
                 ->update(['status' => 'processed']);
-        }
-
-        try {
-            $payrollAccountingService = app(PayrollAccountingService::class);
-            $payrollAccountingService->postPayrollRunJournal($run);
-            $payrollAccountingService->postPayrollPayoutJournal($run);
-        } catch (\Throwable $e) {
-            Log::error("Failed to post payroll journal entry: " . $e->getMessage(), [
-                'run_id' => $run->id,
-                'trace' => $e->getTraceAsString()
-            ]);
         }
     }
 

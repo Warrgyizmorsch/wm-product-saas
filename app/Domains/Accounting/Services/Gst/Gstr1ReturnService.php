@@ -686,6 +686,26 @@ class Gstr1ReturnService
         return $issues;
     }
 
+    /**
+     * Where a sale to this customer is supplied, and whether that makes it
+     * inter-state (IGST) — from the customer's GSTIN, else the state named in
+     * their address. inter is null when the state can't be told.
+     *
+     * @return array{pos: ?string, seller_state: ?string, inter: ?bool}
+     */
+    public function supplyFor($customer, ?array $seller = null): array
+    {
+        $seller ??= $this->seller();
+        $gstin = $customer?->gstin ? strtoupper(trim((string) $customer->gstin)) : null;
+        $pos = $this->placeOfSupply($customer, $gstin !== null && GstStates::isValidGstin($gstin) ? $gstin : null, true, $seller);
+
+        return [
+            'pos' => $pos,
+            'seller_state' => $seller['state'],
+            'inter' => $pos !== null && $seller['state'] !== null ? $pos !== $seller['state'] : null,
+        ];
+    }
+
     private function placeOfSupply($customer, ?string $gstin, bool $inter, array $seller): ?string
     {
         if ($gstin !== null) {

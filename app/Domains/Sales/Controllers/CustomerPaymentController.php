@@ -88,8 +88,11 @@ class CustomerPaymentController extends Controller
             }
         }
 
+        $bankAccounts = \App\Domains\Accounting\Models\ChartOfAccount::query()
+            ->where('is_cash_or_bank', true)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
+
         return view('modules.sales.payments.create', compact(
-            'customers', 'invoices', 'salesOrders', 'nextPaymentNumber',
+            'customers', 'invoices', 'salesOrders', 'nextPaymentNumber', 'bankAccounts',
             'prefillCustomerId', 'prefillInvoiceId', 'prefillSalesOrderId', 'prefillAmount'
         ));
     }
@@ -106,10 +109,20 @@ class CustomerPaymentController extends Controller
             'amount'         => ['required', 'numeric', 'min:0.01'],
             'reference_no'   => ['nullable', 'string', 'max:255'],
             'notes'          => ['nullable', 'string'],
-            'allocate_to'    => ['nullable', 'string', 'in:invoice,sales_order,unallocated'],
+            'allocate_to'    => ['nullable', 'string', 'in:invoice,sales_order,unallocated,opening_balance'],
             'invoice_id'     => ['nullable', 'exists:invoices,id'],
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
+            'bank_account_id' => ['nullable', 'integer'],
         ]);
+
+        // Only this tenant's own cash/bank ledgers can receive the money.
+        if (!empty($validated['bank_account_id'])) {
+            $isBankLedger = \App\Domains\Accounting\Models\ChartOfAccount::query()
+                ->whereKey($validated['bank_account_id'])->where('is_cash_or_bank', true)->exists();
+            if (!$isBankLedger) {
+                return back()->withInput()->withErrors(['bank_account_id' => 'Choose a cash or bank ledger.']);
+            }
+        }
 
         $baseAmount = convert_to_base((float) $validated['amount']);
 
@@ -122,7 +135,10 @@ class CustomerPaymentController extends Controller
                 'payment_method' => $validated['payment_method'],
                 'amount'         => $baseAmount,
                 'reference_no'   => $validated['reference_no'] ?? null,
-                'notes'          => $validated['notes'] ?? null,
+                'notes'          => ($validated['allocate_to'] ?? null) === 'opening_balance'
+                    ? trim('Against opening balance. ' . ($validated['notes'] ?? ''))
+                    : ($validated['notes'] ?? null),
+                'bank_account_id' => $validated['bank_account_id'] ?? null,
                 'status'         => 'Posted',   // Direct post — Odoo/Tally style
             ]);
 
@@ -158,7 +174,9 @@ class CustomerPaymentController extends Controller
                     'allocated_amount'    => $allocatedAmt,
                 ]);
             }
-            // else: unallocated — no PaymentAllocation row, kept as advance credit
+            // else: unallocated / against opening balance — no PaymentAllocation
+            // row; posted Dr Bank / Cr the customer's receivable, which settles
+            // opening dues or stays as a credit for later invoices.
 
             event(new CustomerPaymentReceived($payment));
 

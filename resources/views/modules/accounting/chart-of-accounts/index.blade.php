@@ -232,6 +232,16 @@
                 filterSubtypes(this.value, '');
             });
 
+            // The opening side follows the ledger's normal balance (Cr for a loan,
+            // capital or income) until the user picks a side themselves.
+            let openingSideChosen = false;
+            $('#coaOpeningBalanceType').on('change', function () { openingSideChosen = true; });
+            $('#coaNormalBalance').on('change', function () {
+                if (!openingSideChosen) {
+                    $('#coaOpeningBalanceType').val(this.value);
+                }
+            });
+
             coaModal.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
                 if (!button || !button.classList.contains('edit-coa-btn')) {
@@ -257,7 +267,10 @@
                 $('#coaLedgerGroupId').val(data.ledgerGroupId || '');
                 $('#coaDescription').val(data.description);
                 $('#coaOpeningBalance').val(data.openingBalance || 0);
-                $('#coaOpeningBalanceType').val(data.openingBalanceType || 'debit');
+                // No opening yet: offer the normal side rather than a stored default.
+                const hasOpening = parseFloat(data.openingBalance || 0) !== 0;
+                $('#coaOpeningBalanceType').val(hasOpening && data.openingBalanceType ? data.openingBalanceType : data.normalBalance);
+                openingSideChosen = hasOpening;
                 $('#coaIsActive').prop('checked', data.isActive === '1');
                 $('#coaIsCashOrBank').prop('checked', data.isCashOrBank === '1');
                 $('#coaSystemNotice').toggle(data.isSystem === '1');
@@ -275,6 +288,8 @@
                 $('#coaSystemNotice').hide();
                 $('#coaCode').prop('readonly', false);
                 filterSubtypes($('#coaType').val(), '');
+                openingSideChosen = false;
+                $('#coaOpeningBalanceType').val($('#coaNormalBalance').val());
             });
 
             filterSubtypes($('#coaType').val(), $('#coaSubtype').val());

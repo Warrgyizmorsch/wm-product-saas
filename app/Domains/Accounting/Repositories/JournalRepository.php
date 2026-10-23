@@ -140,17 +140,23 @@ class JournalRepository implements JournalRepositoryInterface
      * so the count-based sequence and the unique (tenant_id, journal_number)
      * constraint stay consistent under concurrent posting.
      */
-    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string
+    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL', ?\DateTimeInterface $journalDate = null): string
     {
-        $yearMonth = now()->format('Ym');
+        // Numbered by the month the entry belongs to, so a 1 April opening
+        // balance reads JNL-202604-… whenever it is typed in.
+        $yearMonth = ($journalDate ?? now())->format('Ym');
 
-        $count = Journal::withoutGlobalScopes()
+        // Highest sequence rather than a count, so a gap (e.g. a deleted
+        // draft) can never hand out a number that is already taken.
+        $last = Journal::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('journal_number', 'like', "{$prefix}-{$yearMonth}-%")
             ->lockForUpdate()
-            ->count();
+            ->pluck('journal_number')
+            ->map(fn ($number) => (int) substr((string) $number, strrpos((string) $number, '-') + 1))
+            ->max() ?? 0;
 
-        $sequence = str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
+        $sequence = str_pad((string) ($last + 1), 5, '0', STR_PAD_LEFT);
 
         return "{$prefix}-{$yearMonth}-{$sequence}";
     }
@@ -191,6 +197,34 @@ class JournalRepository implements JournalRepositoryInterface
             ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
                 ->where('accounting_period_id', $periodId)
                 ->where('source', '!=', Journal::SOURCE_YEAR_END_CLOSE))
+            ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
+
+    public function partyBalancesUpTo(int $tenantId, int $chartOfAccountId, \DateTimeInterface $asOfDate): Collection
+    {
+        return JournalEntry::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('chart_of_account_id', $chartOfAccountId)
+            ->whereNotNull('party_id')
+            ->whereHas('journal', fn ($q) => $q->withoutGlobalScopes()
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereDate('journal_date', '<=', $asOfDate))
+            ->groupBy('party_type', 'party_id')
+            ->selectRaw('party_type, party_id, SUM(debit) - SUM(credit) as balance')
+            ->get();
+    }
+
+    public function trialBalanceUpTo(\DateTimeInterface $asOfDate, ?int $costCenterId = null, ?int $projectId = null): Collection
+    {
+        return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->whereDate('journal_date', '<=', $asOfDate))
             ->when($costCenterId, fn ($q) => $q->where('cost_center_id', $costCenterId))
             ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->groupBy('chart_of_account_id')

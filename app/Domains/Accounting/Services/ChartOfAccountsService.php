@@ -309,6 +309,7 @@ class ChartOfAccountsService
 
             // --- Indirect Expenses (sheet rows 71-99) ---
             ['code' => '5100', 'key' => 'salary_and_wages_staff', 'name' => 'Salary & Wages - Staff', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
+            ['code' => '5110', 'key' => 'employer_statutory_contribution', 'name' => 'Employer Contribution to PF & ESI', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5500', 'key' => 'staff_welfare_expenses', 'name' => 'Staff Welfare Expenses', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5200', 'key' => 'rent_expense', 'name' => 'Rent Expense', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],
             ['code' => '5300', 'key' => 'electricity_expense', 'name' => 'Electricity Expense', 'type' => ChartOfAccount::TYPE_EXPENSE, 'subtype' => 'indirect_expense', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '5000'],

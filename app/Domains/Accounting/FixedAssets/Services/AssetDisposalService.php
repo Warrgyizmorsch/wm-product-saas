@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\FixedAssets\Services;
 use App\Domains\Accounting\FixedAssets\Events\AssetDisposed;
 use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetDisposal;
+use App\Domains\Accounting\FixedAssets\Support\AssetLedgers;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
@@ -23,7 +24,6 @@ use InvalidArgumentException;
 class AssetDisposalService
 {
     private const FALLBACK_BANK_KEY = SystemAccount::BANK;
-    private const FALLBACK_OUTPUT_TAX_KEY = SystemAccount::OUTPUT_TAX;
 
     private const TERMINAL_STATUSES = [
         Asset::STATUS_DISPOSED,
@@ -37,11 +37,12 @@ class AssetDisposalService
         private readonly JournalService $journals,
         private readonly ChartOfAccountRepositoryInterface $accounts,
         private readonly SystemAccountService $systemAccounts,
+        private readonly AssetLedgers $ledgers,
     ) {
     }
 
     /**
-     * @param array{disposal_type: string, disposal_date: string, sale_proceeds?: float, tax_amount?: float, remarks?: string} $data
+     * @param array{disposal_type: string, disposal_date: string, sale_proceeds?: float, tax_amount?: float, gst_type?: string, remarks?: string} $data
      */
     public function dispose(Asset $asset, array $data, int $userId): AssetDisposal
     {
@@ -70,6 +71,7 @@ class AssetDisposalService
             'net_book_value' => $netBookValue,
             'sale_proceeds' => $saleProceeds,
             'tax_amount' => $taxAmount,
+            'gst_type' => in_array($data['gst_type'] ?? null, AssetLedgers::GST_TYPES, true) ? $data['gst_type'] : AssetLedgers::GST_INTRA,
             'gain_loss_amount' => $gainLoss,
             'status' => AssetDisposal::STATUS_PENDING_APPROVAL,
             'requested_by' => $userId,
@@ -135,94 +137,8 @@ class AssetDisposalService
             // leave a balance behind on the accumulated depreciation ledger.
             $this->refreshFigures($disposal, $asset);
 
-            $category = $asset->category;
+            $lines = $this->postingLines($disposal, $asset);
             $tenantId = $asset->tenant_id;
-
-            $fixedAssetAccount = $category?->chartOfAccount
-                ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
-
-            if ($fixedAssetAccount === null) {
-                throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: no fixed asset account configured.");
-            }
-
-            $lines = [];
-
-            // The buyer pays the sale price plus the GST charged on it.
-            $amountReceived = round((float) $disposal->sale_proceeds + (float) $disposal->tax_amount, 2);
-
-            if ($amountReceived > 0) {
-                $bankAccount = $this->systemAccounts->get(self::FALLBACK_BANK_KEY, $tenantId);
-                if ($bankAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: bank account (code " . SystemAccount::templateCode(self::FALLBACK_BANK_KEY) . ') not found.');
-                }
-                $lines[] = [
-                    'chart_of_account_id' => $bankAccount->id,
-                    'debit' => $amountReceived,
-                    'description' => "Sale proceeds - {$asset->asset_code}",
-                ];
-            }
-
-            if ((float) $disposal->accumulated_depreciation_at_disposal > 0) {
-                $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
-                    ?? $this->systemAccounts->get(SystemAccount::ACCUMULATED_DEPRECIATION, $tenantId);
-                if ($accumulatedDepreciationAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: accumulated depreciation account not found.");
-                }
-                $lines[] = [
-                    'chart_of_account_id' => $accumulatedDepreciationAccount->id,
-                    'debit' => (float) $disposal->accumulated_depreciation_at_disposal,
-                    'description' => "Accumulated depreciation write-back - {$asset->asset_code}",
-                ];
-            }
-
-            $gainLoss = (float) $disposal->gain_loss_amount;
-
-            if ($gainLoss < 0) {
-                $lossAccount = $category?->lossOnDisposalAccount
-                    ?? $this->systemAccounts->get(SystemAccount::LOSS_ON_ASSET_DISPOSAL, $tenantId)
-                    ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
-                if ($lossAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: loss-on-disposal account not found.");
-                }
-                $lines[] = [
-                    'chart_of_account_id' => $lossAccount->id,
-                    'debit' => round(abs($gainLoss), 2),
-                    'description' => "Loss on disposal - {$asset->asset_code}",
-                ];
-            }
-
-            $lines[] = [
-                'chart_of_account_id' => $fixedAssetAccount->id,
-                'credit' => (float) $disposal->original_cost,
-                'description' => "Disposal - {$asset->asset_code}",
-            ];
-
-            if ($gainLoss > 0) {
-                // Miscellaneous Income (4900) only for charts that predate 4940.
-                $gainAccount = $category?->gainOnDisposalAccount
-                    ?? $this->systemAccounts->get(SystemAccount::GAIN_ON_ASSET_DISPOSAL, $tenantId)
-                    ?? $this->systemAccounts->get(SystemAccount::MISC_INCOME, $tenantId);
-                if ($gainAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: gain-on-disposal account not found.");
-                }
-                $lines[] = [
-                    'chart_of_account_id' => $gainAccount->id,
-                    'credit' => round($gainLoss, 2),
-                    'description' => "Gain on disposal - {$asset->asset_code}",
-                ];
-            }
-
-            if ((float) $disposal->tax_amount > 0) {
-                $outputTaxAccount = $this->systemAccounts->get(self::FALLBACK_OUTPUT_TAX_KEY, $tenantId);
-                if ($outputTaxAccount === null) {
-                    throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: output tax account (code " . SystemAccount::templateCode(self::FALLBACK_OUTPUT_TAX_KEY) . ') not found.');
-                }
-                $lines[] = [
-                    'chart_of_account_id' => $outputTaxAccount->id,
-                    'credit' => (float) $disposal->tax_amount,
-                    'description' => "Output tax on disposal - {$asset->asset_code}",
-                ];
-            }
 
             $journal = $this->journals->post($lines, [
                 'tenant_id' => $tenantId,
@@ -255,6 +171,96 @@ class AssetDisposalService
 
             return $disposal->fresh();
         });
+    }
+
+    /**
+     * Dr Bank (price + GST), Dr Accumulated Depreciation, Dr Loss / Cr Gain,
+     * Cr the ledger the asset sits in, Cr output GST (CGST+SGST or IGST), and
+     * the asset's remaining revaluation reserve moved to Reserves & Surplus.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function postingLines(AssetDisposal $disposal, Asset $asset): array
+    {
+        $category = $asset->category;
+        $tenantId = $asset->tenant_id;
+
+        // Credit the ledger the asset's cost actually sits in.
+        $fixedAssetAccount = $this->ledgers->holding($asset);
+
+        $lines = [];
+
+        // The buyer pays the sale price plus the GST charged on it.
+        $amountReceived = round((float) $disposal->sale_proceeds + (float) $disposal->tax_amount, 2);
+
+        if ($amountReceived > 0) {
+            $bankAccount = $this->systemAccounts->get(self::FALLBACK_BANK_KEY, $tenantId);
+            if ($bankAccount === null) {
+                throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: bank account (code " . SystemAccount::templateCode(self::FALLBACK_BANK_KEY) . ') not found.');
+            }
+            $lines[] = [
+                'chart_of_account_id' => $bankAccount->id,
+                'debit' => $amountReceived,
+                'description' => "Sale proceeds - {$asset->asset_code}",
+            ];
+        }
+
+        if ((float) $disposal->accumulated_depreciation_at_disposal > 0) {
+            $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
+                ?? $this->systemAccounts->get(SystemAccount::ACCUMULATED_DEPRECIATION, $tenantId);
+            if ($accumulatedDepreciationAccount === null) {
+                throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: accumulated depreciation account not found.");
+            }
+            $lines[] = [
+                'chart_of_account_id' => $accumulatedDepreciationAccount->id,
+                'debit' => (float) $disposal->accumulated_depreciation_at_disposal,
+                'description' => "Accumulated depreciation write-back - {$asset->asset_code}",
+            ];
+        }
+
+        $gainLoss = (float) $disposal->gain_loss_amount;
+
+        if ($gainLoss < 0) {
+            $lossAccount = $category?->lossOnDisposalAccount
+                ?? $this->systemAccounts->get(SystemAccount::LOSS_ON_ASSET_DISPOSAL, $tenantId)
+                ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
+            if ($lossAccount === null) {
+                throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: loss-on-disposal account not found.");
+            }
+            $lines[] = [
+                'chart_of_account_id' => $lossAccount->id,
+                'debit' => round(abs($gainLoss), 2),
+                'description' => "Loss on disposal - {$asset->asset_code}",
+            ];
+        }
+
+        $lines[] = [
+            'chart_of_account_id' => $fixedAssetAccount->id,
+            'credit' => (float) $disposal->original_cost,
+            'description' => "Disposal - {$asset->asset_code}",
+        ];
+
+        if ($gainLoss > 0) {
+            // Miscellaneous Income (4900) only for charts that predate 4940.
+            $gainAccount = $category?->gainOnDisposalAccount
+                ?? $this->systemAccounts->get(SystemAccount::GAIN_ON_ASSET_DISPOSAL, $tenantId)
+                ?? $this->systemAccounts->get(SystemAccount::MISC_INCOME, $tenantId);
+            if ($gainAccount === null) {
+                throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: gain-on-disposal account not found.");
+            }
+            $lines[] = [
+                'chart_of_account_id' => $gainAccount->id,
+                'credit' => round($gainLoss, 2),
+                'description' => "Gain on disposal - {$asset->asset_code}",
+            ];
+        }
+
+        // Output CGST + SGST, or Output IGST.
+        array_push($lines, ...$this->ledgers->gstLines((float) $disposal->tax_amount, $disposal->gst_type, true, (int) $tenantId, "Output tax on disposal - {$asset->asset_code}"));
+
+        array_push($lines, ...$this->ledgers->reserveTransferLines($asset));
+
+        return $lines;
     }
 
     private function refreshFigures(AssetDisposal $disposal, Asset $asset): void

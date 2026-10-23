@@ -11,14 +11,20 @@
 @section('content')
     <x-ui.card class="mb-4">
         <x-ui.filter-toolbar :resetUrl="route('accounting.reports.trial-balance')" searchLabel="View">
-            <x-ui.filter-field label="Accounting Period" col="col-md-4">
+            <x-ui.filter-field label="Show" col="col-md-3">
+                <select name="basis" class="form-select form-select-sm">
+                    <option value="closing" @selected($basis === 'closing')>Closing balances (as at period end)</option>
+                    <option value="movement" @selected($basis === 'movement')>Period movement (debits &amp; credits)</option>
+                </select>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="Accounting Period" col="col-md-3">
                 <select name="period_id" class="form-select form-select-sm">
                     @foreach ($allPeriods as $p)
                         <option value="{{ $p->id }}" @selected($period?->id == $p->id)>{{ $p->fiscalYear?->name }} — {{ $p->name }} ({{ $p->status }})</option>
                     @endforeach
                 </select>
             </x-ui.filter-field>
-            <x-ui.filter-field label="Cost Center" col="col-md-4">
+            <x-ui.filter-field label="Cost Center" col="col-md-3">
                 <select name="cost_center_id" class="form-select form-select-sm">
                     <option value="" @selected(!$costCenterId)>All Cost Centers</option>
                     @foreach ($costCenters as $c)
@@ -26,7 +32,7 @@
                     @endforeach
                 </select>
             </x-ui.filter-field>
-            <x-ui.filter-field label="Project" col="col-md-4">
+            <x-ui.filter-field label="Project" col="col-md-3">
                 <select name="project_id" class="form-select form-select-sm">
                     <option value="" @selected(!$projectId)>All Projects</option>
                     @foreach ($projects as $p)
@@ -37,7 +43,9 @@
         </x-ui.filter-toolbar>
     </x-ui.card>
 
-    <x-ui.card title="Trial Balance{{ $period ? ' — ' . $period->name : '' }}" bodyClass="p-0">
+    @include('modules.accounting.reports.partials.opening-difference-alert')
+
+    <x-ui.card title="Trial Balance{{ $period ? ($basis === 'closing' ? ' — as at end of ' : ' — movement in ') . $period->name : '' }}" bodyClass="p-0">
         <x-ui.table hoverable>
             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                 <tr>
@@ -73,7 +81,7 @@
                             @if (!$period)
                                 No accounting periods exist yet.
                             @else
-                                No posted activity in this period.
+                                {{ $basis === 'closing' ? 'No balances as at the end of this period.' : 'No posted activity in this period.' }}
                             @endif
                         </td>
                     </tr>

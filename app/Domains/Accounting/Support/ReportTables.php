@@ -99,6 +99,7 @@ final class ReportTables
     private function trialBalance(array $d): array
     {
         $meta = $this->periodMeta($d['period']);
+        $meta[] = ['Showing', ($d['basis'] ?? 'closing') === 'movement' ? 'Period movement' : 'Closing balances as at period end'];
 
         if ($d['costCenterId']) {
             $costCenter = $d['costCenters']->firstWhere('id', $d['costCenterId']);

@@ -9,6 +9,8 @@
 @endsection
 
 @section('content')
+    @include('modules.accounting.reports.partials.opening-difference-alert')
+
     <x-ui.card class="mb-4">
         <x-ui.filter-toolbar :resetUrl="route('accounting.reports.balance-sheet')" searchLabel="View">
             <x-ui.filter-field label="As of Accounting Period" col="col-md-6">

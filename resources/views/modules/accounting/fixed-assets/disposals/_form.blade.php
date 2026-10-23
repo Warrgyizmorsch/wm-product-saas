@@ -46,6 +46,10 @@
                     <x-ui.icon-input label="GST Charged" icon="feather-percent" helperText="Added to the amount received and credited to output tax." type="number" name="tax_amount" :value="old('tax_amount', 0)" placeholder="0.00" />
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label fw-semibold fs-13 text-dark mb-2">GST Type</label>
+                    <x-ui.select name="gst_type" :selected="old('gst_type', 'cgst_sgst')" :options="['cgst_sgst' => 'Intra-state (CGST + SGST)', 'igst' => 'Inter-state (IGST)']" />
+                </div>
+                <div class="col-md-6">
                     <x-ui.icon-input label="Remarks" icon="feather-file-text" name="remarks" :value="old('remarks')" placeholder="Optional notes about this disposal" />
                 </div>
             </div>
@@ -70,7 +74,12 @@
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Disposal Date" name="disposal_date" :value="old('disposal_date', now()->toDateString())" :required="true" />
                 </div>
-                <div class="col-md-6"></div>
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="select" label="GST Type" name="gst_type">
+                        <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>Intra-state (CGST + SGST)</option>
+                        <option value="igst" @selected(old('gst_type') === 'igst')>Inter-state (IGST)</option>
+                    </x-ui.odoo-form-ui>
+                </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Sale Proceeds (excl. GST)" name="sale_proceeds" :value="old('sale_proceeds', 0)" placeholder="0.00" helperText="Sale price before GST. Leave 0 for scrap/lost with no recovery." />
                 </div>

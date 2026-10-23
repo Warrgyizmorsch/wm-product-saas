@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\FixedAssets\Services;
 use App\Domains\Accounting\FixedAssets\Events\AssetWrittenOff;
 use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetWriteOff;
+use App\Domains\Accounting\FixedAssets\Support\AssetLedgers;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
@@ -108,7 +109,9 @@ class AssetWriteOffService
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
-            $fixedAssetAccount = $category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
+            $ledgers = app(AssetLedgers::class);
+            // The ledger the asset's cost actually sits in.
+            $fixedAssetAccount = $ledgers->holding($asset);
             $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount ?? $this->systemAccounts->get(SystemAccount::ACCUMULATED_DEPRECIATION, $tenantId);
             $lossAccount = $category?->lossOnDisposalAccount
                 ?? $this->systemAccounts->get(SystemAccount::LOSS_ON_ASSET_DISPOSAL, $tenantId)
@@ -146,6 +149,8 @@ class AssetWriteOffService
                 'credit' => (float) $asset->capitalization_cost,
                 'description' => "Write-off - {$asset->asset_code}",
             ];
+
+            array_push($lines, ...$ledgers->reserveTransferLines($asset));
 
             $journal = $this->journals->post($lines, [
                 'tenant_id' => $tenantId,

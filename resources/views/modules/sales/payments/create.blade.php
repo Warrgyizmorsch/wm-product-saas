@@ -41,6 +41,13 @@
                             <option value="Card" @selected(old('payment_method') == 'Card')>{{ __('crm.method_card') }}</option>
                         </x-ui.odoo-form-ui>
 
+                        <x-ui.odoo-form-ui type="select" label="Deposited To" name="bank_account_id">
+                            <option value="">Default bank account</option>
+                            @foreach($bankAccounts as $bankAccount)
+                                <option value="{{ $bankAccount->id }}" @selected((string) old('bank_account_id') === (string) $bankAccount->id)>{{ $bankAccount->code }} — {{ $bankAccount->name }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+
                         <x-ui.odoo-form-ui type="input" :label="__('crm.bank_reference_txn_no')" name="reference_no" :value="old('reference_no')" :placeholder="__('crm.bank_reference_placeholder')" />
                     </div>
 
@@ -52,6 +59,7 @@
 
                         <x-ui.odoo-form-ui type="select" :label="__('crm.allocate_to')" name="allocate_to" id="allocateToSelect">
                             <option value="unallocated" @selected(old('allocate_to') == 'unallocated')>{{ __('crm.unallocated_advance') }}</option>
+                            <option value="opening_balance" @selected(old('allocate_to') == 'opening_balance')>Against Opening Balance (old dues)</option>
                             <option value="sales_order" @selected(old('allocate_to', $prefillSalesOrderId ? 'sales_order' : '') == 'sales_order')>{{ __('crm.sales_order_advance') }}</option>
                             <option value="invoice" @selected(old('allocate_to', $prefillInvoiceId ? 'invoice' : '') == 'invoice')>{{ __('crm.invoice_adjust') }}</option>
                         </x-ui.odoo-form-ui>
