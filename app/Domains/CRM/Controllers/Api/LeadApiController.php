@@ -10,6 +10,8 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\DealStatus;
+use App\Domains\CRM\Models\LeadDocument;
+use App\Domains\CRM\Services\LeadService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -479,13 +481,13 @@ class LeadApiController extends Controller
             'company_name'       => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'gstin'              => 'nullable|string|max:100',
             'company_email'      => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
-            'company_phone'      => 'nullable|string|max:50',
+            'company_phone'      => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Contact Person Details
             'contact_person'     => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
             'designation'        => 'nullable|string|max:255',
             'email'              => $isB2B ? 'nullable|email|max:255' : 'required|email|max:255',
-            'phone'              => 'nullable|string|max:50',
+            'phone'              => 'nullable|string|regex:/^[0-9]+$/|max:20',
 
             // Sales Rep / Owner
             'lead_owner_id'      => 'nullable|integer',
@@ -518,7 +520,7 @@ class LeadApiController extends Controller
             'additional_contacts'               => 'nullable|array',
             'additional_contacts.*.name'        => 'nullable|string|max:255',
             'additional_contacts.*.designation' => 'nullable|string|max:255',
-            'additional_contacts.*.phone'       => 'nullable|string|max:50',
+            'additional_contacts.*.phone'       => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'additional_contacts.*.email'       => 'nullable|email|max:255',
             'is_customer'                       => 'nullable|boolean',
         ];
@@ -530,10 +532,13 @@ class LeadApiController extends Controller
     private function leadValidationMessages(): array
     {
         return [
-            'company_name.required'   => 'company_name is required when company_email is provided.',
-            'company_email.required'  => 'company_email is required when company_name is provided.',
-            'contact_person.required' => 'contact_person is required for B2C leads (when company details are not provided).',
-            'email.required'          => 'email (contact email) is required for B2C leads (when company details are not provided).',
+            'company_name.required'             => 'company_name is required when company_email is provided.',
+            'company_email.required'            => 'company_email is required when company_name is provided.',
+            'contact_person.required'           => 'contact_person is required for B2C leads (when company details are not provided).',
+            'email.required'                    => 'email (contact email) is required for B2C leads (when company details are not provided).',
+            'phone.regex'                       => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'company_phone.regex'               => 'Company phone must contain digits/numbers only (no special characters or letters).',
+            'additional_contacts.*.phone.regex' => 'Additional contact phone must contain digits/numbers only (no special characters or letters).',
         ];
     }
 
@@ -858,6 +863,21 @@ class LeadApiController extends Controller
             }
         }
 
+        if (isset($validated['status'])) {
+            if (strcasecmp($validated['status'], 'Won') === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.',
+                ], 422);
+            }
+            if (strcasecmp($lead->status, 'Won') === 0 && strcasecmp($validated['status'], 'Won') !== 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead status is Won and permanently locked. Status cannot be changed.',
+                ], 422);
+            }
+        }
+
         $lead->update($validated);
 
         return response()->json([
@@ -905,6 +925,20 @@ class LeadApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Please provide status or status_id.',
+            ], 422);
+        }
+
+        if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead status in '{$lead->status}' stage is locked.",
+            ], 422);
+        }
+
+        if (strcasecmp($newStatus, 'Won') === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.',
             ], 422);
         }
 
@@ -1300,6 +1334,128 @@ class LeadApiController extends Controller
             'success' => true,
             'message' => 'Lead restored successfully',
             'data'    => $lead,
+        ]);
+    }
+
+    /**
+     * GET /api/crm/leads/{lead}/documents
+     * List all documents for a lead.
+     */
+    public function documents(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead with ID {$id} not found.",
+            ], 404);
+        }
+
+        $this->authorize('view', $lead);
+
+        $documents = $lead->leadDocuments->map(function (LeadDocument $doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ]);
+    }
+
+    /**
+     * POST /api/crm/leads/{lead}/documents
+     * Upload one or multiple documents for a lead.
+     */
+    public function uploadDocuments(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $lead = Lead::where('tenant_id', $tenantId)->find($id);
+
+        if (!$lead) {
+            return response()->json([
+                'success' => false,
+                'message' => "Lead with ID {$id} not found.",
+            ], 404);
+        }
+
+        $this->authorize('update', $lead);
+
+        $validator = Validator::make($request->all(), [
+            'documents'   => 'required',
+            'documents.*' => 'file|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $files = $request->file('documents');
+        if (!is_array($files)) {
+            $files = [$files];
+        }
+
+        app(LeadService::class)->uploadDocuments($lead, $files);
+
+        $lead->refresh();
+        $documents = $lead->leadDocuments->map(function (LeadDocument $doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document(s) uploaded successfully.',
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ], 201);
+    }
+
+    /**
+     * DELETE /api/crm/documents/{document}
+     * Delete a single document.
+     */
+    public function deleteDocument(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $document = LeadDocument::where('tenant_id', $tenantId)->find($id);
+
+        if (!$document) {
+            return response()->json([
+                'success' => false,
+                'message' => "Document with ID {$id} not found.",
+            ], 404);
+        }
+
+        if ($document->lead) {
+            $this->authorize('update', $document->lead);
+        }
+
+        app(LeadService::class)->deleteDocument($document);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document deleted successfully.',
         ]);
     }
 }

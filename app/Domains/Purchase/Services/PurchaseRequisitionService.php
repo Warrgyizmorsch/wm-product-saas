@@ -31,6 +31,8 @@ class PurchaseRequisitionService
             $sourceId = $validated['production_requisition_slip_id'] ?? null;
         } elseif ($validated['source_type'] === 'material_requirement') {
             $sourceId = $validated['material_requirement_id'] ?? null;
+        } elseif ($validated['source_type'] === 'project') {
+            $sourceId = $validated['project_id'] ?? null;
         }
 
         return DB::transaction(function () use ($validated, $sourceId, $tenantId) {
@@ -46,9 +48,15 @@ class PurchaseRequisitionService
                 $nextNum = ((int) $lastNumStr) + 1;
             }
             $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            while (PurchaseRequisition::where('requisition_number', $requisitionNumber)->exists()) {
+                $nextNum++;
+                $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+            }
 
             $pr = PurchaseRequisition::create([
                 'tenant_id' => $tenantId,
+                'company_id' => company_id() ?? auth()->user()?->company_id,
+                'branch_id' => branch_id() ?? auth()->user()?->branch_id,
                 'requisition_number' => $requisitionNumber,
                 'requisition_date' => $validated['requisition_date'],
                 'expected_date' => $validated['expected_date'] ?? null,
@@ -63,10 +71,12 @@ class PurchaseRequisitionService
             foreach ($validated['items'] as $item) {
                 PurchaseRequisitionItem::create([
                     'purchase_requisition_id' => $pr->id,
+                    'sales_order_item_id' => $item['sales_order_item_id'] ?? null,
+                    'project_task_id' => $item['project_task_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
-                    'estimated_cost' => $item['estimated_cost'],
+                    'estimated_cost' => convert_to_base((float)($item['estimated_cost'] ?? 0)),
                 ]);
             }
 
@@ -85,6 +95,8 @@ class PurchaseRequisitionService
             $sourceId = $validated['production_requisition_slip_id'] ?? null;
         } elseif ($validated['source_type'] === 'material_requirement') {
             $sourceId = $validated['material_requirement_id'] ?? null;
+        } elseif ($validated['source_type'] === 'project') {
+            $sourceId = $validated['project_id'] ?? null;
         }
 
         return DB::transaction(function () use ($validated, $sourceId, $requisition) {
@@ -102,10 +114,12 @@ class PurchaseRequisitionService
             foreach ($validated['items'] as $item) {
                 PurchaseRequisitionItem::create([
                     'purchase_requisition_id' => $requisition->id,
+                    'sales_order_item_id' => $item['sales_order_item_id'] ?? null,
+                    'project_task_id' => $item['project_task_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
-                    'estimated_cost' => $item['estimated_cost'],
+                    'estimated_cost' => convert_to_base((float)($item['estimated_cost'] ?? 0)),
                 ]);
             }
 

@@ -39,10 +39,11 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
             app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($summaryQuery, $user);
         }
 
-        $shiftSearch = $inputs['shift_search'] ?? $inputs['search'] ?? '';
-        $shiftEmployeeId = $inputs['shift_employee_id'] ?? $inputs['employee_id'] ?? '';
-        $shiftStatus = $inputs['shift_status'] ?? $inputs['status'] ?? '';
-        $shiftSort = $inputs['shift_sort'] ?? $inputs['sort'] ?? 'newest';
+        $isShiftTab = !isset($inputs['tab']) || in_array($inputs['tab'], ['shift', 'shift-change', 'shift_change']);
+        $shiftSearch = $inputs['shift_search'] ?? ($isShiftTab ? ($inputs['search'] ?? '') : '');
+        $shiftEmployeeId = $inputs['shift_employee_id'] ?? ($isShiftTab ? ($inputs['employee_id'] ?? '') : '');
+        $shiftStatus = $inputs['shift_status'] ?? ($isShiftTab ? ($inputs['status'] ?? '') : '');
+        $shiftSort = $inputs['shift_sort'] ?? ($isShiftTab ? ($inputs['sort'] ?? 'newest') : 'newest');
 
         if (!empty($shiftEmployeeId)) {
             $query->where('employee_id', $shiftEmployeeId);
@@ -53,9 +54,18 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
         }
 
         if (!empty($shiftSearch)) {
-            $query->whereHas('employee', function ($eq) use ($shiftSearch) {
-                $eq->where('full_name', 'like', "%{$shiftSearch}%")
-                    ->orWhere('employee_id', 'like', "%{$shiftSearch}%");
+            $query->where(function ($q) use ($shiftSearch) {
+                $q->whereHas('employee', function ($eq) use ($shiftSearch) {
+                    $eq->where('full_name', 'like', "%{$shiftSearch}%")
+                        ->orWhere('employee_id', 'like', "%{$shiftSearch}%");
+                })
+                ->orWhereHas('requestedShift', function ($sq) use ($shiftSearch) {
+                    $sq->where('name', 'like', "%{$shiftSearch}%");
+                })
+                ->orWhereHas('currentShift', function ($sq) use ($shiftSearch) {
+                    $sq->where('name', 'like', "%{$shiftSearch}%");
+                })
+                ->orWhere('reason', 'like', "%{$shiftSearch}%");
             });
         }
 
@@ -97,15 +107,17 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
     {
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('shift_change_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('shift_change_attachments', 'public');
         }
 
         $user = auth()->user();
-        $tenantId = $user ? $user->tenant_id : null;
+        $employee = Employee::find($validated['employee_id']);
+        $tenantId = $user?->tenant_id ?? $employee?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1);
+        $companyId = $validated['company_id'] ?? $employee?->company_id ?? $user?->company_id ?? 1;
 
         return ShiftChangeRequest::create([
             'tenant_id'          => $tenantId,
-            'company_id'         => $validated['company_id'],
+            'company_id'         => $companyId,
             'employee_id'        => $validated['employee_id'],
             'type'               => $validated['type'],
             'start_date'         => $validated['start_date'],
@@ -132,6 +144,8 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
             $approvalService->authorizeApproval($user, $requestModel->employee, $requestModel);
         }
 
+        $oldStatus = $requestModel->status;
+
         if ($action === 'approved') {
             $requestModel->update([
                 'status'           => 'approved',
@@ -143,11 +157,19 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
             $this->applyShiftChange($requestModel);
 
         } elseif ($action === 'rejected') {
+            if ($oldStatus === 'approved') {
+                $this->revertShiftChange($requestModel);
+            }
+
             $requestModel->update([
                 'status'           => 'rejected',
                 'rejection_reason' => $comment,
             ]);
         } elseif ($action === 'pending') {
+            if ($oldStatus === 'approved') {
+                $this->revertShiftChange($requestModel);
+            }
+
             $requestModel->update([
                 'status'           => 'pending',
                 'approved_by'      => null,
@@ -164,6 +186,11 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
         $type = $requestModel->type;
         $startDate = Carbon::parse($requestModel->start_date);
         $requestedShiftId = $requestModel->requested_shift_id;
+        $tenantId = $requestModel->tenant_id ?? $employee->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1);
+
+        if (!$requestModel->tenant_id && $tenantId) {
+            $requestModel->update(['tenant_id' => $tenantId]);
+        }
 
         if ($type === 'temporary') {
             $endDate = $requestModel->end_date ? Carbon::parse($requestModel->end_date) : $startDate;
@@ -172,7 +199,7 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
             foreach ($period as $date) {
                 ShiftRoster::updateOrCreate(
                     [
-                        'tenant_id'   => $requestModel->tenant_id,
+                        'tenant_id'   => $tenantId,
                         'employee_id' => $employee->id,
                         'date'        => $date->format('Y-m-d'),
                     ],
@@ -192,7 +219,7 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
                 $date = $startDate->copy()->addDays($i);
                 ShiftRoster::updateOrCreate(
                     [
-                        'tenant_id'   => $requestModel->tenant_id,
+                        'tenant_id'   => $tenantId,
                         'employee_id' => $employee->id,
                         'date'        => $date->format('Y-m-d'),
                     ],
@@ -222,7 +249,7 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
                 if (in_array($dayOfWeek, $recurringDays)) {
                     ShiftRoster::updateOrCreate(
                         [
-                            'tenant_id'   => $requestModel->tenant_id,
+                            'tenant_id'   => $tenantId,
                             'employee_id' => $employee->id,
                             'date'        => $date->format('Y-m-d'),
                         ],
@@ -234,6 +261,32 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
                     );
                 }
             }
+        }
+    }
+
+    public function revertShiftChange(ShiftChangeRequest $requestModel): void
+    {
+        $employee = Employee::find($requestModel->employee_id);
+        if (!$employee) {
+            return;
+        }
+
+        // Delete roster records generated for this specific shift change request
+        ShiftRoster::where('employee_id', $employee->id)
+            ->where('notes', 'like', "%Req #{$requestModel->id}%")
+            ->delete();
+
+        if ($requestModel->type === 'permanent') {
+            if ($requestModel->requested_shift_id && (int) $employee->shift_id === (int) $requestModel->requested_shift_id) {
+                $employee->update(['shift_id' => $requestModel->current_shift_id]);
+            }
+        } elseif ($requestModel->type === 'recurring') {
+            $weeklyPattern = $employee->weekly_pattern ?: [];
+            $recurringDays = $requestModel->recurring_days ?: [];
+            foreach ($recurringDays as $day) {
+                $weeklyPattern[(int) $day] = $requestModel->current_shift_id ?: 'off';
+            }
+            $employee->update(['weekly_pattern' => $weeklyPattern]);
         }
     }
 }

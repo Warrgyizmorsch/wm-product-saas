@@ -80,7 +80,16 @@
 @php
     $authUser = auth()->user();
     $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
-    $canManageDocStatus = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+    $accessService = app(\App\Services\Access\AccessService::class);
+    $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+    $currentEmployee = $authUser ? $scopeService->resolveEmployee($authUser) : null;
+
+    $canManageDocStatus = $authUser && (
+        $scopeService->isCompanyAdmin($authUser) ||
+        $accessService->allows($authUser, 'hrms.documents.manage', ['tenant_id' => $authUser->tenant_id]) ||
+        $accessService->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]) ||
+        $accessService->allows($authUser, 'hr.settings.manage', ['tenant_id' => $authUser->tenant_id])
+    );
     
     $canDeleteAnyDoc = false;
     if (isset($documents)) {
@@ -139,14 +148,17 @@
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status">
                                         <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                        <option value="uploaded">{{ __('hrms.employees.lbl_uploaded') }}</option>
+                                        <option value="approved">{{ __('hrms.employees.status_approved') }}</option>
+                                        <option value="uploaded">{{ __('hrms.employees.lbl_pending_verification') }}</option>
                                         <option value="requested">{{ __('hrms.employees.lbl_pending_upload') }}</option>
+                                        <option value="pending_signature">{{ __('hrms.employees.lbl_pending_signature') }}</option>
+                                        <option value="rejected">{{ __('hrms.employees.status_rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.lbl_expiry_req') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="has_expiry">
-                                        <option value="">{{ __('hrms.employees.tbl_actions') }} - {{ __('hrms.common.filter') }}</option>
+                                        <option value="">{{ __('hrms.common.all') ?? 'All' }}</option>
                                         <option value="1">{{ __('hrms.employees.lbl_has_expiry') }}</option>
                                         <option value="0">{{ __('hrms.employees.lbl_no_expiry') }}</option>
                                     </x-ui.odoo-form-ui>
@@ -160,8 +172,8 @@
                             </div>
                         </x-ui.filter>
 
-                        <x-ui.button type="button" variant="primary" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">
-                            <i class="feather-upload-cloud"></i> {{ __('hrms.employees.btn_upload') }}
+                        <x-ui.button type="button" variant="primary" icon="feather-upload-cloud" class="fw-bold text-uppercase" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal">
+                            {{ __('hrms.employees.btn_upload') }}
                         </x-ui.button>
                     </div>
                 </div>
@@ -182,79 +194,91 @@
                             <tbody>
                                 @forelse($documents as $doc)
                                     @php
+                                        // Option A: If document master is not visible to employee, hide it completely from non-HR employee portal
+                                        $isRestrictedFromEmployee = (!$canManageDocStatus) && ($doc->documentMaster && !$doc->documentMaster->employee_can_view);
+                                    @endphp
+                                    @if($isRestrictedFromEmployee)
+                                        @continue
+                                    @endif
+                                    @php
                                          $isExpired = $doc->expiry_date && $doc->expiry_date->isPast();
                                          $reminderDays = $doc->documentMaster?->reminder_days_before ?? 30;
                                          $isExpiringSoon = $doc->expiry_date && !$isExpired && now()->greaterThanOrEqualTo($doc->expiry_date->copy()->subDays($reminderDays));
                                         
-                                        $rowStatus = $isExpired ? 'requested' : $doc->status;
-                                        $rowHasExpiry = $doc->expiry_date ? '1' : '0';
+                                         $rowStatus = $isExpired ? 'requested' : $doc->status;
+                                         $rowHasExpiry = $doc->expiry_date ? '1' : '0';
 
-                                        $requiresApproval = true;
-                                        if ($doc->documentMaster) {
-                                            $requiresApproval = (bool) $doc->documentMaster->approval_required;
-                                        }
-                                        
-                                        $displayStatus = $doc->status;
-                                        if ($doc->file_path && $displayStatus === 'requested') {
-                                            $displayStatus = 'uploaded';
-                                        }
-                                        if (!$requiresApproval && ($displayStatus === 'uploaded' || $displayStatus === 'requested')) {
-                                            $displayStatus = 'approved';
-                                        }
+                                         $requiresApproval = true;
+                                         if ($doc->documentMaster) {
+                                             $requiresApproval = (bool) $doc->documentMaster->approval_required;
+                                         }
+                                         
+                                         $displayStatus = $doc->status;
+                                         if ($doc->file_path && $displayStatus === 'requested') {
+                                             $displayStatus = 'uploaded';
+                                         }
+                                         if (!$requiresApproval && ($displayStatus === 'uploaded' || $displayStatus === 'requested')) {
+                                             $displayStatus = 'approved';
+                                         }
                                     @endphp
                                     <tr class="document-row" 
                                         data-title="{{ strtolower($doc->name) }}" 
-                                        data-search="{{ strtolower($doc->name) }}" 
+                                        data-search="{{ strtolower($doc->name) }} {{ strtolower($doc->description ?? '') }} {{ strtolower($doc->requestedBy?->name ?? '') }} {{ strtolower($doc->file_name ?? '') }}" 
                                         data-status="{{ $rowStatus }}" 
                                         data-has-expiry="{{ $rowHasExpiry }}"
                                         data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : 9999999999 }}"
                                         data-title-raw="{{ $doc->name }}">
                                         <td class="ps-3">
-                                            <div class="fw-bold text-dark fs-14 mb-1" style="word-break: break-word; white-space: normal; line-height: 1.4;" title="{{ $doc->name }}">{{ $doc->name }}</div>
+                                            <div class="d-flex align-items-center gap-1.5 flex-wrap mb-1">
+                                                <span class="fw-bold text-dark fs-14" style="word-break: break-word; white-space: normal; line-height: 1.4;" title="{{ $doc->name }}">{{ $doc->name }}</span>
+                                                @if($doc->documentMaster && !$doc->documentMaster->employee_can_view)
+                                                    <x-ui.badge soft variant="secondary" class="border px-1.5 py-0.5 fs-10" title="Internal / Hidden from Employee Portal"><i class="feather-lock me-0.5"></i> {{ __('hrms.employees.lbl_hr_only') }}</x-ui.badge>
+                                                @endif
+                                            </div>
                                             @if($doc->description)
                                                 <div class="doc-desc-wrapper" style="max-width: 100%;">
                                                     <div class="text-muted fs-12 mb-0 doc-desc-text" 
                                                          style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; white-space: normal; line-height: 1.3;"
                                                          title="{{ $doc->description }}">{{ $doc->description }}</div>
-                                                    <a href="#" class="doc-toggle-text-btn fs-11 text-primary fw-semibold d-none mt-0.5" onclick="toggleDocText(this); return false;">See more</a>
+                                                    <a href="#" class="doc-toggle-text-btn fs-11 text-primary fw-semibold d-none mt-0.5" onclick="toggleDocText(this); return false;">{{ __('hrms.employees.lbl_see_more') }}</a>
                                                 </div>
                                             @endif
                                         </td>
                                         <td>
                                             <div>
-                                                <span class="badge bg-light text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
+                                                <x-ui.badge soft variant="light" class="text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
                                                     <i class="feather-user fs-11"></i>
                                                     {{ $doc->requestedBy?->name ?? 'System' }}
-                                                </span>
+                                                </x-ui.badge>
                                             </div>
                                             <div class="mt-1.5">
                                                 @if($doc->expiry_date)
                                                     @if($isExpired)
-                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
+                                                        <x-ui.badge soft variant="danger" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                             <i class="feather-alert-triangle fs-11"></i>
                                                             {{ __('hrms.employees.lbl_expired') }} ({{ $doc->expiry_date->format('d M Y') }})
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @elseif($isExpiringSoon)
-                                                        <span class="badge px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #ff9800 !important; border: 1px solid rgba(255, 152, 0, 0.2);">
+                                                        <x-ui.badge soft variant="warning" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                             <i class="feather-clock fs-11"></i>
                                                             {{ __('hrms.employees.lbl_near_expiry') ?? 'Near Expiry' }} ({{ $doc->expiry_date->format('d M Y') }})
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @else
-                                                        <span class="badge bg-soft-secondary text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
+                                                        <x-ui.badge soft variant="secondary" class="text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
                                                             <i class="feather-clock fs-11"></i>
                                                             {{ __('hrms.employees.lbl_expiry') ?? 'Expiry' }} ({{ $doc->expiry_date->format('d M Y') }})
-                                                        </span>
+                                                        </x-ui.badge>
                                                     @endif
                                                 @elseif($doc->has_expiry)
-                                                    <span class="badge px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #ff9800 !important; border: 1px solid rgba(255, 152, 0, 0.2);">
+                                                    <x-ui.badge soft variant="warning" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                         <i class="feather-alert-circle fs-11"></i>
                                                         {{ __('hrms.employees.lbl_expiry_required') }}
-                                                    </span>
+                                                    </x-ui.badge>
                                                 @else
-                                                    <span class="badge bg-soft-success text-success px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(40, 167, 69, 0.08) !important; color: #28a745 !important; border: 1px solid rgba(40, 167, 69, 0.15);">
+                                                    <x-ui.badge soft variant="success" class="px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
                                                         <i class="feather-check-circle fs-11"></i>
                                                         {{ __('hrms.employees.lbl_no_expiry') }}
-                                                    </span>
+                                                    </x-ui.badge>
                                                 @endif
                                             </div>
                                         </td>
@@ -279,7 +303,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
-                                                         @if(($doc->documentMaster?->employee_can_view ?? true) || $doc->file_path)
+                                                         @if($canManageDocStatus || ($doc->documentMaster?->employee_can_view ?? true))
                                                              <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
                                                                  <i class="feather-eye fs-11"></i>
                                                              </a>
@@ -289,17 +313,17 @@
                                                                  <i class="feather-refresh-cw fs-10"></i>
                                                              </a>
                                                          @endif
-                                                         @if(($doc->documentMaster?->employee_can_download ?? true) || $doc->file_path)
+                                                         @if($canManageDocStatus || ($doc->documentMaster?->employee_can_view ?? true))
                                                              <a href="{{ asset('storage/' . ($doc->signed_file_path ?: $doc->file_path)) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
                                                                  <i class="feather-download fs-11"></i>
                                                              </a>
                                                          @endif
                                                          @if($doc->status === 'pending_signature')
-                                                             <button type="button" class="btn btn-xs btn-warning text-dark fw-bold px-2 py-0.5 d-inline-flex align-items-center gap-1 border-0 rounded-pill ms-1" 
-                                                                     onclick="openSignModal('{{ $doc->id }}', '{{ route('hrms.employees.documents.sign', $doc->id) }}', '{{ e($doc->name) }}', '{{ asset('storage/' . $doc->file_path) }}', '{{ strtolower(pathinfo($doc->file_path, PATHINFO_EXTENSION)) }}')" 
-                                                                     title="Sign Document Now">
-                                                                 <i class="feather-edit-3 fs-10"></i> Sign
-                                                             </button>
+                                                             <x-ui.button type="button" variant="warning" size="xs" icon="feather-edit-3" class="text-dark fw-bold px-2 py-0.5 border-0 rounded-pill ms-1" 
+                                                                     onclick="openSignModal('{{ $doc->id }}', '{{ route('hrms.employees.documents.sign', $doc->id) }}', '{{ addslashes($doc->name) }}', '{{ asset('storage/' . $doc->file_path) }}', '{{ strtolower(pathinfo($doc->file_path, PATHINFO_EXTENSION)) }}')" 
+                                                                     title="{{ __('hrms.employees.mdl_sign_doc_title') }}">
+                                                                 {{ __('hrms.employees.lbl_sign') }}
+                                                             </x-ui.button>
                                                          @endif
                                                     </div>
                                                 </div>
@@ -323,11 +347,11 @@
                                                                         </div>
                                                                     </div>
                                                                     
-                                                                    <button type="submit" class="btn btn-sm text-white fw-bold d-inline-flex align-items-center gap-1 px-2.5 flex-shrink-0" style="background-color: var(--bs-primary) !important; font-size: 10.5px; height: 32px; border-radius: 8px; border: none; white-space: nowrap;">
-                                                                        <i class="feather-upload-cloud fs-11"></i> {{ __('hrms.employees.btn_upload') }}
-                                                                    </button>
+                                                                    <x-ui.button type="submit" variant="primary" size="sm" icon="feather-upload-cloud" class="fw-bold px-2.5 flex-shrink-0" style="font-size: 10.5px; height: 32px; border-radius: 8px; white-space: nowrap;">
+                                                                        {{ __('hrms.employees.btn_upload') }}
+                                                                    </x-ui.button>
                                                                 </div>
-                                                                <div class="file-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Please select a file.</div>
+                                                                <div class="file-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">{{ __('hrms.employees.msg_select_file') }}</div>
                                                             </div>
 
                                                             @if($doc->has_expiry)
@@ -336,7 +360,7 @@
                                                                         <span class="text-muted fw-bold fs-9 text-uppercase" style="white-space: nowrap;">{{ __('hrms.employees.lbl_expiry') ?? 'EXPIRY' }}:</span>
                                                                         <input type="date" name="expiry_date" class="form-control py-0 px-2 fs-11 text-muted border inline-expiry-input" style="height: 26px; border-radius: 6px; width: 120px;" required>
                                                                     </div>
-                                                                    <div class="expiry-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Expiry date is required.</div>
+                                                                    <div class="expiry-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">{{ __('hrms.employees.msg_expiry_required') }}</div>
                                                                 </div>
                                                             @endif
                                                         </form>
@@ -358,11 +382,11 @@
                                                                 </div>
                                                             </div>
                                                             
-                                                            <button type="submit" class="btn btn-sm text-white fw-bold d-inline-flex align-items-center gap-1 px-2.5 flex-shrink-0" style="background-color: var(--bs-primary) !important; font-size: 10.5px; height: 32px; border-radius: 8px; border: none; white-space: nowrap;">
-                                                                <i class="feather-upload-cloud fs-11"></i> {{ __('hrms.employees.btn_upload') }}
-                                                            </button>
+                                                            <x-ui.button type="submit" variant="primary" size="sm" icon="feather-upload-cloud" class="fw-bold px-2.5 flex-shrink-0" style="font-size: 10.5px; height: 32px; border-radius: 8px; white-space: nowrap;">
+                                                                {{ __('hrms.employees.btn_upload') }}
+                                                            </x-ui.button>
                                                         </div>
-                                                        <div class="file-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Please select a file.</div>
+                                                        <div class="file-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">{{ __('hrms.employees.msg_select_file') }}</div>
                                                     </div>
 
                                                     @if($doc->has_expiry)
@@ -371,7 +395,7 @@
                                                                 <span class="text-muted fw-bold fs-9 text-uppercase" style="white-space: nowrap;">{{ __('hrms.employees.lbl_expiry') ?? 'EXPIRY' }}:</span>
                                                                 <input type="date" name="expiry_date" class="form-control py-0 px-2 fs-11 text-muted border inline-expiry-input" style="height: 26px; border-radius: 6px; width: 120px;" required>
                                                             </div>
-                                                            <div class="expiry-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">Expiry date is required.</div>
+                                                            <div class="expiry-error-msg text-danger fs-10 mt-1 d-none" style="font-weight: 600;">{{ __('hrms.employees.msg_expiry_required') }}</div>
                                                         </div>
                                                     @endif
                                                 </form>
@@ -379,21 +403,23 @@
                                         </td>
                                         <td>
                                             @if(!$doc->file_path || $isExpired)
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
+                                                <x-ui.badge soft variant="warning" class="px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1">
                                                     <i class="feather-clock fs-11"></i>
                                                     {{ __('hrms.employees.lbl_pending_upload') }}
-                                                </span>
+                                                </x-ui.badge>
                                             @elseif($doc->status === 'pending_signature')
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.2); font-weight: 600;">
-                                                    <i class="feather-edit-3 fs-11"></i> Pending Signature
-                                                </span>
+                                                <x-ui.badge soft variant="warning" class="px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1">
+                                                    <i class="feather-edit-3 fs-11"></i> {{ __('hrms.employees.lbl_pending_signature') }}
+                                                </x-ui.badge>
                                             @else
                                                 @php
-                                                    $authUser = auth()->user();
-                                                    $canManageDocStatus = $authUser && app(\App\Services\Access\AccessService::class)->allows($authUser, 'hrms.employees.update', ['tenant_id' => $authUser->tenant_id]);
+                                                    $canEditThisDocStatus = $canManageDocStatus && (
+                                                        (int) ($doc->documentable_id ?? 0) !== (int) ($currentEmployee->id ?? 0) ||
+                                                        $workflowService->allowsSelfApproval($authUser, $doc, 'hrms.documents.manage')
+                                                    );
                                                 @endphp
                                                 @if($requiresApproval)
-                                                    @if($canManageDocStatus)
+                                                    @if($canEditThisDocStatus)
                                                         <div class="dropdown d-inline-block">
                                                             <span class="dropdown-toggle doc-status-toggle fw-bold" 
                                                                   id="docStatusDropdown_{{ $doc->id }}" 
@@ -401,11 +427,11 @@
                                                                   aria-expanded="false" 
                                                                   style="color: {{ $displayStatus === 'approved' ? '#10b981' : ($displayStatus === 'rejected' ? '#ef4444' : '#00bcd4') }};">
                                                                 @if($displayStatus === 'approved')
-                                                                    Approved
+                                                                    {{ __('hrms.employees.status_approved') }}
                                                                 @elseif($displayStatus === 'rejected')
-                                                                    Rejected
+                                                                    {{ __('hrms.employees.status_rejected') }}
                                                                 @else
-                                                                    Pending Verification
+                                                                    {{ __('hrms.employees.lbl_pending_verification') }}
                                                                 @endif
                                                             </span>
                                                             <ul class="dropdown-menu dropdown-menu-start shadow-sm status-dropdown-menu mt-1" aria-labelledby="docStatusDropdown_{{ $doc->id }}" style="z-index: 1050;">
@@ -413,7 +439,7 @@
                                                                     <button type="button" class="dropdown-item fw-bold text-success d-flex align-items-center justify-content-between gap-2" 
                                                                             onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'approved'); return false;"
                                                                             style="background: transparent; border: none; width: 100%;">
-                                                                        Approved
+                                                                        {{ __('hrms.employees.status_approved') }}
                                                                         @if($displayStatus === 'approved')
                                                                             <i class="feather-check text-success fs-14"></i>
                                                                         @endif
@@ -423,7 +449,7 @@
                                                                     <button type="button" class="dropdown-item fw-bold text-danger d-flex align-items-center justify-content-between gap-2" 
                                                                             onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'rejected'); return false;"
                                                                             style="background: transparent; border: none; width: 100%;">
-                                                                        Rejected
+                                                                        {{ __('hrms.employees.status_rejected') }}
                                                                         @if($displayStatus === 'rejected')
                                                                             <i class="feather-check text-danger fs-14"></i>
                                                                         @endif
@@ -432,27 +458,23 @@
                                                             </ul>
                                                         </div>
                                                     @else
-                                                        <span class="fw-bold fs-13" style="color: {{ $displayStatus === 'approved' ? '#10b981' : ($displayStatus === 'rejected' ? '#ef4444' : '#00bcd4') }}; text-transform: uppercase;">
-                                                            @if($displayStatus === 'approved')
-                                                                Approved
-                                                            @elseif($displayStatus === 'rejected')
-                                                                Rejected
-                                                            @else
-                                                                Pending Verification
-                                                            @endif
-                                                        </span>
+                                                        @if($displayStatus === 'approved')
+                                                            <x-ui.status-badge status="approved" :label="__('hrms.employees.status_approved')" size="sm" dot />
+                                                        @elseif($displayStatus === 'rejected')
+                                                            <x-ui.status-badge status="rejected" :label="__('hrms.employees.status_rejected')" size="sm" dot />
+                                                        @else
+                                                            <x-ui.status-badge status="in_progress" :label="__('hrms.employees.lbl_pending_verification')" size="sm" dot />
+                                                        @endif
                                                     @endif
                                                 @else
-                                                    <span class="fw-bold fs-13" style="color: #10b981; font-weight: 700; text-transform: uppercase;">
-                                                        Approved
-                                                    </span>
+                                                    <x-ui.status-badge status="approved" :label="__('hrms.employees.status_approved')" size="sm" dot />
                                                 @endif
                                                 @endif
                                                 @if($doc->is_signed)
                                                     <div class="mt-0.5">
-                                                        <span class="badge bg-soft-success text-success px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
-                                                            <i class="feather-check-circle fs-9 me-0.5"></i> Digitally Signed
-                                                        </span>
+                                                        <x-ui.badge soft variant="success" class="px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
+                                                            <i class="feather-check-circle fs-9 me-0.5"></i> {{ __('hrms.employees.lbl_digitally_signed') }}
+                                                        </x-ui.badge>
                                                     </div>
                                                 @endif
                                             </td>
@@ -463,9 +485,7 @@
                                                          <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
                                                              @csrf
                                                              @method('DELETE')
-                                                             <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
-                                                                 <i class="feather-trash-2 fs-13"></i>
-                                                             </button>
+                                                             <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="{{ __('hrms.common.delete') }}" />
                                                          </form>
                                                      @endif
                                                  </div>
@@ -476,7 +496,7 @@
                                     <tr id="documentEmptyStateRow">
                                         <td colspan="{{ $canDeleteAnyDoc ? 5 : 4 }}" class="text-center py-5 text-muted fs-13">
                                             <i class="feather-file-text d-block fs-32 text-light-muted mb-2" style="font-size: 28px;"></i>
-                                            No documents found.
+                                            {{ __('hrms.employees.lbl_no_docs_uploaded') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -509,57 +529,57 @@
 </div>
 
     <!-- DIRECT UPLOAD DOCUMENT MODAL -->
-    <div class="modal fade" id="uploadDocumentModal" tabindex="-1" aria-labelledby="uploadDocumentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-dark" id="uploadDocumentModalLabel">
-                        <i class="feather-upload-cloud me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.employees.mdl_upload_doc_title') }}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <x-ui.modal 
+        id="uploadDocumentModal" 
+        title="<i class='feather-upload-cloud me-2 text-primary' style='font-size: 16px;'></i>{{ __('hrms.employees.mdl_upload_doc_title') }}" 
+        :centered="true" 
+        :showFooter="false"
+    >
+        <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <input type="hidden" name="document_id" id="upload_doc_modal_document_id" value="">
+            <div class="row g-3">
+                <!-- Selected Document Template (For new uploads) -->
+                <div class="col-12" id="upload_template_select_group">
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_document_template') }}" name="document_master_id" id="upload_document_master_id" :required="true" select2-selector="default">
+                        <option value="">{{ __('hrms.employees.lbl_select_template') }}</option>
+                        @foreach($documentMasters as $master)
+                            @if(!$canManageDocStatus && $master->upload_responsibility === 'hr')
+                                @continue
+                            @endif
+                            <option value="{{ $master->id }}" data-expiry-applicable="{{ $master->expiry_applicable ? 1 : 0 }}">
+                                {{ $master->name }} ({{ $master->code }})
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
                 </div>
-                <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <input type="hidden" name="document_id" id="upload_doc_modal_document_id" value="">
-                    <div class="modal-body">
-                        <div class="row g-3">
-                            <!-- Selected Document Template (For new uploads) -->
-                            <div class="col-12" id="upload_template_select_group">
-                                <x-ui.odoo-form-ui type="select" label="Document Template" name="document_master_id" id="upload_document_master_id" :required="true" select2-selector="default">
-                                    <option value="">-- Select Document Template --</option>
-                                    @foreach($documentMasters as $master)
-                                        <option value="{{ $master->id }}" data-expiry-applicable="{{ $master->expiry_applicable ? 1 : 0 }}">
-                                            {{ $master->name }} ({{ $master->code }})
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            
-                            <!-- Static Label for Document Name (For requested/existing uploads) -->
-                            <div class="col-12" id="upload_document_name_label_group" style="display: none;">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Document Name</label>
-                                <div id="upload_document_name_label" class="fw-bold text-dark fs-14 py-1"></div>
-                            </div>
-                            
-                            <!-- File Upload Input -->
-                            <div class="col-12">
-                                <x-ui.odoo-form-ui type="file" label="{{ __('hrms.employees.mdl_select_file') }}" name="file" :required="true" placeholder="{{ __('hrms.employees.mdl_select_file_placeholder') }}" />
-                            </div>
-                            
-                            <!-- Expiry Date Input (Dynamically shown/hidden) -->
-                            <div class="col-12" id="upload_expiry_date_group" style="display: none;">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_expiry_date') }}" name="expiry_date" id="upload_expiry_date" inputType="date" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_upload_file') }}</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
-                    </div>
-                </form>
+                
+                <!-- Static Label for Document Name (For requested/existing uploads) -->
+                <div class="col-12" id="upload_document_name_label_group" style="display: none;">
+                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.lbl_doc_name') }}</label>
+                    <div id="upload_document_name_label" class="fw-bold text-dark fs-14 py-1"></div>
+                </div>
+                
+                <!-- File Upload Input -->
+                <div class="col-12">
+                    <x-ui.odoo-form-ui type="file" label="{{ __('hrms.employees.mdl_select_file') }}" name="file" :required="true" placeholder="{{ __('hrms.employees.mdl_select_file_placeholder') }}" />
+                </div>
+                
+                <!-- Expiry Date Input (Dynamically shown/hidden) -->
+                <div class="col-12" id="upload_expiry_date_group" style="display: none;">
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_expiry_date') }}" name="expiry_date" id="upload_expiry_date" inputType="date" />
+                </div>
             </div>
-        </div>
-    </div>
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
+                <x-ui.button type="button" variant="light" class="border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">
+                    {{ __('hrms.employees.mdl_btn_discard') }}
+                </x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-upload-cloud" class="px-4 text-uppercase fw-bold" style="font-size: 11px;">
+                    {{ __('hrms.employees.mdl_btn_upload_file') }}
+                </x-ui.button>
+            </div>
+        </form>
+    </x-ui.modal>
 
 <script>
     function validateInlineUploadForm(event, form) {
@@ -575,7 +595,11 @@
         // Validate File Input
         var fileInput = $form.find('.inline-file-input');
         if (fileInput.length && (!fileInput[0].files || !fileInput[0].files.length)) {
-            $form.find('.file-error-msg').removeClass('d-none');
+            $form.find('.file-error-msg').text('{{ __('hrms.employees.msg_select_file') }}').removeClass('d-none');
+            $form.find('.file-upload-box').css('border-color', '#dc3545');
+            isValid = false;
+        } else if (fileInput.length && fileInput[0].files[0] && fileInput[0].files[0].size > 10 * 1024 * 1024) {
+            $form.find('.file-error-msg').text('File size exceeds the maximum limit of 10 MB.').removeClass('d-none');
             $form.find('.file-upload-box').css('border-color', '#dc3545');
             isValid = false;
         }
@@ -610,93 +634,93 @@
 </script>
 
 <!-- SIGN DOCUMENT CANVAS MODAL (STANDARD FORMAT) -->
-<div class="modal fade" id="signDocumentCanvasModal" tabindex="-1" aria-labelledby="signDocumentCanvasModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header py-2.5">
-                <h5 class="modal-title fw-bold text-dark" id="signDocumentCanvasModalLabel" style="font-size: 15px;">
-                    <i class="feather-edit-3 me-2 text-warning"></i>Sign Document
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<x-ui.modal 
+    id="signDocumentCanvasModal" 
+    title="<i class='feather-edit-3 me-2 text-warning'></i>{{ __('hrms.employees.mdl_sign_doc_title') }}" 
+    size="lg" 
+    :centered="true" 
+    :showFooter="false"
+>
+    <form id="signDocumentForm" method="POST" action="">
+        @csrf
+        <input type="hidden" name="signature_image" id="modal_signature_image_input">
+        <div>
+            <div class="mb-2">
+                <span class="text-muted fs-12">{{ __('hrms.employees.lbl_doc_name') }}:</span>
+                <span id="sign_modal_doc_title" class="fw-bold text-primary fs-14 ms-1"></span>
             </div>
-            <form id="signDocumentForm" method="POST" action="">
-                @csrf
-                <input type="hidden" name="signature_image" id="modal_signature_image_input">
-                <div class="modal-body p-3">
-                    <div class="mb-2">
-                        <span class="text-muted fs-12">Document Name:</span>
-                        <span id="sign_modal_doc_title" class="fw-bold text-primary fs-14 ms-1"></span>
-                    </div>
 
-                    <!-- DOCUMENT PREVIEW (FULL SCROLLABLE PDF/IMAGE) -->
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-12 text-dark mb-1"><i class="feather-eye text-primary me-1"></i> Document Preview:</label>
-                        <div id="modal_doc_preview_wrapper" class="position-relative border rounded bg-light" style="height: 380px; border-color: #cbd5e1 !important;">
-                            <div id="modal_doc_preview_container" class="h-100 w-100 overflow-auto">
-                                <div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13">
-                                    <i class="feather-file me-1"></i> Loading preview...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <input type="hidden" name="signature_position" value="bottom_right">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-12">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-bold fs-12 text-dark mb-0">Signature Input <span class="text-danger">*</span></label>
-                                <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1" id="signatureInputTabs" role="tablist">
-                                    <li class="nav-item">
-                                        <button type="button" id="btn_sig_type_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchSigMode('draw')">
-                                            <i class="feather-edit-2 me-1"></i> Draw Signature
-                                        </button>
-                                    </li>
-                                    <li class="nav-item">
-                                        <button type="button" id="btn_sig_type_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0" onclick="switchSigMode('upload')">
-                                            <i class="feather-upload-cloud me-1"></i> Upload Image
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            <!-- DRAW SIGNATURE TAB -->
-                            <div id="sig_draw_container">
-                                <div class="d-flex justify-content-end mb-1">
-                                    <button type="button" class="btn btn-xs btn-outline-secondary" onclick="clearSignatureCanvas()">
-                                        <i class="feather-rotate-ccw me-1"></i>Clear
-                                    </button>
-                                </div>
-                                <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
-                                    <canvas id="signatureCanvas" width="400" height="110" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 110px;"></canvas>
-                                </div>
-                                <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw signature using mouse or touch.</small>
-                            </div>
-
-                            <!-- UPLOAD SIGNATURE IMAGE TAB (CUSTOM UI) -->
-                            <div id="sig_upload_container" class="d-none">
-                                <div class="position-relative w-100">
-                                    <input type="file" id="sig_file_input" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleSignatureFileUpload(this)">
-                                    <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 140px;">
-                                        <div id="sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
-                                            <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
-                                            <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop signature image here</span>
-                                            <small class="text-muted fs-10 mt-0.5">Supports PNG, JPG, JPEG, WEBP image formats</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Upload pre-saved PNG/JPG image file of your signature.</small>
-                            </div>
+            <!-- DOCUMENT PREVIEW (FULL SCROLLABLE PDF/IMAGE) -->
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-12 text-dark mb-1"><i class="feather-eye text-primary me-1"></i> {{ __('hrms.employees.lbl_doc_preview') }}:</label>
+                <div id="modal_doc_preview_wrapper" class="position-relative border rounded bg-light" style="height: 380px; border-color: #cbd5e1 !important;">
+                    <div id="modal_doc_preview_container" class="h-100 w-100 overflow-auto">
+                        <div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13">
+                            <i class="feather-file me-1"></i> {{ __('hrms.employees.lbl_loading_preview') }}
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
-                    <button type="button" class="btn btn-primary px-4 text-uppercase fw-bold" onclick="submitDigitalSignature()" style="font-size: 11px; background-color: var(--bs-primary) !important; border-color: var(--bs-primary) !important; border-radius: 6px;">Confirm & Sign Document</button>
+            </div>
+            
+            <input type="hidden" name="signature_position" value="bottom_right">
+            <div class="row g-3 align-items-end">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold fs-12 text-dark mb-0">{{ __('hrms.employees.lbl_signature_input') }} <span class="text-danger">*</span></label>
+                        <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1 flex-nowrap" id="signatureInputTabs" role="tablist" style="flex-wrap: nowrap !important; white-space: nowrap !important;">
+                            <li class="nav-item">
+                                <button type="button" id="btn_sig_type_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchSigMode('draw')">
+                                    <i class="feather-edit-2 me-1"></i> {{ __('hrms.employees.lbl_draw_signature') }}
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" id="btn_sig_type_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0" onclick="switchSigMode('upload')">
+                                    <i class="feather-upload-cloud me-1"></i> {{ __('hrms.employees.lbl_upload_image') }}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- DRAW SIGNATURE TAB -->
+                    <div id="sig_draw_container">
+                        <div class="d-flex justify-content-end mb-1">
+                            <x-ui.button type="button" variant="outline-secondary" size="sm" icon="feather-rotate-ccw" onclick="clearSignatureCanvas()">
+                                {{ __('hrms.employees.lbl_clear') }}
+                            </x-ui.button>
+                        </div>
+                        <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
+                            <canvas id="signatureCanvas" width="400" height="110" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 110px;"></canvas>
+                        </div>
+                        <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> {{ __('hrms.employees.lbl_draw_signature_help') }}</small>
+                    </div>
+
+                    <!-- UPLOAD SIGNATURE IMAGE TAB (CUSTOM UI) -->
+                    <div id="sig_upload_container" class="d-none">
+                        <div class="position-relative w-100">
+                            <input type="file" id="sig_file_input" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleSignatureFileUpload(this)">
+                            <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 140px;">
+                                <div id="sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
+                                    <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
+                                    <span class="fw-bold text-dark fs-12 file-name-label">{{ __('hrms.employees.lbl_click_to_browse_signature') }}</span>
+                                    <small class="text-muted fs-10 mt-0.5">{{ __('hrms.employees.lbl_supports_formats') }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> {{ __('hrms.employees.lbl_upload_signature_help') }}</small>
+                    </div>
                 </div>
-            </form>
+            </div>
         </div>
-    </div>
-</div>
+        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
+            <x-ui.button type="button" variant="light" class="border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">
+                {{ __('hrms.common.cancel') }}
+            </x-ui.button>
+            <x-ui.button type="button" variant="primary" icon="feather-check-circle" class="px-4 text-uppercase fw-bold" onclick="submitDigitalSignature()" style="font-size: 11px;">
+                {{ __('hrms.employees.btn_confirm_sign') }}
+            </x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
 
 <script>
     var canvas = document.getElementById('signatureCanvas');
@@ -805,8 +829,8 @@
         $('#sig_file_input').val('');
         $('#sig_upload_preview_box').html(
             '<i class="feather-upload-cloud text-primary mb-1" style="font-size: 24px;"></i>' +
-            '<span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop signature image here</span>' +
-            '<small class="text-muted fs-10 mt-0.5">Supports PNG, JPG, JPEG, WEBP image formats</small>'
+            '<span class="fw-bold text-dark fs-12 file-name-label">{{ __('hrms.employees.lbl_click_to_browse_signature') }}</span>' +
+            '<small class="text-muted fs-10 mt-0.5">{{ __('hrms.employees.lbl_supports_formats') }}</small>'
         );
         switchSigMode('draw');
 
@@ -828,11 +852,11 @@
             }
         } else {
             previewContainer.html(
-                '<div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13"><i class="feather-file me-1"></i> Preview not available</div>'
+                '<div class="d-flex align-items-center justify-content-center h-100 text-muted fs-13"><i class="feather-file me-1"></i> {{ __('hrms.employees.lbl_preview_not_available') }}</div>'
             );
         }
 
-        var modal = new bootstrap.Modal(document.getElementById('signDocumentCanvasModal'));
+        var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('signDocumentCanvasModal'));
         modal.show();
     }
 
@@ -840,13 +864,13 @@
         var dataUrl = null;
         if (currentSigMode === 'upload') {
             if (!uploadedSigDataUrl) {
-                alert('Please select a signature image file to upload.');
+                alert('{{ __('hrms.employees.msg_select_sig_file') }}');
                 return;
             }
             dataUrl = uploadedSigDataUrl;
         } else {
             if (!hasSigned) {
-                alert('Please draw your signature inside the box before confirming.');
+                alert('{{ __('hrms.employees.msg_draw_sig_required') }}');
                 return;
             }
             dataUrl = canvas.toDataURL('image/png');

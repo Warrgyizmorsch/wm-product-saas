@@ -130,7 +130,7 @@ class ThreeWayMatchService
     {
         $grnItem = $this->grnItemFor($bill, $item);
         $poItem = $grnItem?->purchaseOrderItem ?? $this->poItemFor($bill, $item);
-        $basis = $grnItem ? '3-way' : ($poItem ? '2-way' : 'none');
+        $basis = ($grnItem && $poItem) ? '3-way' : ($grnItem ? 'grn-only' : ($poItem ? '2-way' : 'none'));
 
         $billQty = (float) $item->quantity;
         $billRate = (float) $item->unit_rate;
@@ -140,9 +140,9 @@ class ThreeWayMatchService
             'product' => $item->product?->name ?? ('Item #' . $item->product_id),
             'basis' => $basis,
             'bill_qty' => round($billQty, 3),
-            'bill_rate' => round($billRate, 2),
+            'bill_rate' => round($billRate, 4),
             'po_qty' => $poItem ? round((float) $poItem->quantity, 3) : null,
-            'po_rate' => $poItem ? round((float) $poItem->rate, 2) : null,
+            'po_rate' => $poItem ? round((float) $poItem->rate, 4) : null,
             'received_qty' => $grnItem ? round($this->acceptedQty($grnItem), 3) : null,
             'billed_before_qty' => 0.0,
             'allowed_qty' => null,
@@ -185,7 +185,7 @@ class ThreeWayMatchService
 
             if ($variance > $settings['price_tolerance_percent'] + 0.0001) {
                 $line['price_ok'] = false;
-                $line['messages'][] = sprintf('Rate %s is %s%% above the PO rate %s.', number_format($billRate, 2), $variance, number_format($poRate, 2));
+                $line['messages'][] = sprintf('Rate %s is %s%% above the PO rate %s.', format_currency($billRate), $variance, format_currency($poRate));
             }
         }
 

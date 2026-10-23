@@ -290,6 +290,11 @@ class Employee extends BaseModel
         return $this->hasMany(EmployeeExitDocument::class, 'employee_id')->orderBy('issue_date', 'desc');
     }
 
+    public function pipPlans(): HasMany
+    {
+        return $this->hasMany(PerformanceImprovementPlan::class, 'employee_id')->latest('created_at');
+    }
+
     public function getFirstNameAttribute(): string
     {
         return (string) str($this->full_name)->before(' ');
@@ -516,6 +521,11 @@ class Employee extends BaseModel
         }
     }
 
+    public function rosters(): HasMany
+    {
+        return $this->hasMany(\App\Domains\HRMS\Models\ShiftRoster::class, 'employee_id');
+    }
+
     public function defaultShift(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Production\Models\ProductionShift::class, 'shift_id');
@@ -528,44 +538,81 @@ class Employee extends BaseModel
      * 2. Weekly pattern default (from employee's weekly_pattern JSON field)
      * 3. General default shift (from employee's default shift_id)
      *
-     * @param string|\Carbon\Carbon $date
+     * @param string|\Carbon\Carbon|null $date
      * @return \App\Domains\Production\Models\ProductionShift|null
      */
     public function resolveShiftForDate($date)
     {
-        $carbonDate = \Carbon\Carbon::parse($date);
-        $dateStr = $carbonDate->format('Y-m-d');
-        $dayOfWeek = $carbonDate->dayOfWeek;
-
-        // 1. Check for specific date override in shift_rosters
-        $roster = \App\Domains\HRMS\Models\ShiftRoster::where([
-            'employee_id' => $this->id,
-            'date' => $dateStr
-        ])->first();
-
-        if ($roster) {
-            if (is_null($roster->shift_id)) {
-                return null; // Day Off override
-            }
-            return \App\Domains\Production\Models\ProductionShift::find($roster->shift_id);
+        if (empty($date)) {
+            return $this->defaultShift ?? $this->shift;
         }
 
-        // 2. Check for weekly pattern default (fallback to 'off' for Sunday if not set)
+        try {
+            $carbonDate = $date instanceof \Carbon\Carbon ? $date->copy() : \Carbon\Carbon::parse($date);
+        } catch (\Throwable $e) {
+            return $this->defaultShift ?? $this->shift;
+        }
+
+        $dateStr = $carbonDate->format('Y-m-d');
+        $dayOfWeek = (int) $carbonDate->dayOfWeek;
+
+        // 1. Check for specific date override in shift_rosters
+        if ($this->relationLoaded('rosters')) {
+            $roster = $this->rosters->first(function ($r) use ($dateStr) {
+                $rDate = $r->date instanceof \Carbon\Carbon ? $r->date->format('Y-m-d') : (string) $r->date;
+                return $rDate === $dateStr;
+            });
+        } else {
+            $roster = \App\Domains\HRMS\Models\ShiftRoster::where([
+                'employee_id' => $this->id,
+                'date' => $dateStr
+            ])->first();
+        }
+
+        if ($roster) {
+            if (is_null($roster->shift_id) || $roster->shift_id === 0 || $roster->shift_id === 'off') {
+                return null; // Day Off override
+            }
+            $shiftModel = ($roster->relationLoaded('shift') && $roster->shift) 
+                ? $roster->shift 
+                : \App\Domains\Production\Models\ProductionShift::find($roster->shift_id);
+            if ($shiftModel) {
+                return $shiftModel;
+            }
+        }
+
+        // 2. Check for weekly pattern default (fallback to 'off' for Sunday if not explicitly set)
+        $pattern = is_array($this->weekly_pattern) 
+            ? $this->weekly_pattern 
+            : (is_string($this->weekly_pattern) ? json_decode($this->weekly_pattern, true) : null);
+
         $weeklyShiftId = null;
-        if (isset($this->weekly_pattern) && isset($this->weekly_pattern[$dayOfWeek])) {
-            $weeklyShiftId = $this->weekly_pattern[$dayOfWeek];
-        } elseif ($dayOfWeek === 0) {
+        if (is_array($pattern)) {
+            if (array_key_exists($dayOfWeek, $pattern)) {
+                $weeklyShiftId = $pattern[$dayOfWeek];
+            } elseif (array_key_exists((string) $dayOfWeek, $pattern)) {
+                $weeklyShiftId = $pattern[(string) $dayOfWeek];
+            }
+        }
+
+        // Sunday defaults to off if not explicitly set in weekly pattern
+        if (is_null($weeklyShiftId) && $dayOfWeek === 0) {
             $weeklyShiftId = 'off';
         }
 
         if ($weeklyShiftId === 'off') {
             return null; // Weekly Off
-        } elseif ($weeklyShiftId) {
-            return \App\Domains\Production\Models\ProductionShift::find($weeklyShiftId);
+        }
+
+        if (!empty($weeklyShiftId) && $weeklyShiftId !== 'default') {
+            $patternShift = \App\Domains\Production\Models\ProductionShift::find((int) $weeklyShiftId);
+            if ($patternShift) {
+                return $patternShift;
+            }
         }
 
         // 3. Fall back to general default shift
-        return $this->defaultShift;
+        return $this->defaultShift ?? $this->shift;
     }
 
     public function revisions(): HasMany
@@ -576,21 +623,34 @@ class Employee extends BaseModel
     /**
      * Multi-tier resolution of Employee profile for a given User model.
      */
-    public static function resolveForUser(?\App\Models\User $user): ?self
+    public static function resolveForUser(?\App\Models\User $user, ?int $tenantId = null): ?self
     {
         if (!$user) {
             return null;
         }
 
+        $tenantId = $tenantId
+            ?? (function_exists('tenant_id') ? tenant_id() : null)
+            ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+            ?? $user->tenant_id;
+
+        $scoped = function () use ($tenantId) {
+            $q = static::query();
+            if ($tenantId) {
+                $q->where('tenant_id', $tenantId);
+            }
+            return $q;
+        };
+
         // 1. Primary check: by user_id link
-        $employee = static::where('user_id', $user->id)->first();
+        $employee = $scoped()->where('user_id', $user->id)->first();
         if ($employee) {
             return $employee;
         }
 
         // 2. Secondary check: case-insensitive email match (office_email or personal_email)
         if (!empty($user->email)) {
-            $employee = static::where(function ($q) use ($user) {
+            $employee = $scoped()->where(function ($q) use ($user) {
                 $q->whereRaw('LOWER(office_email) = ?', [strtolower($user->email)])
                   ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($user->email)]);
             })->first();
@@ -606,7 +666,7 @@ class Employee extends BaseModel
 
         // 3. Tertiary check: match full_name with user name if available
         if (!empty($user->name)) {
-            $employee = static::whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
+            $employee = $scoped()->whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
             if ($employee) {
                 if (!$employee->user_id) {
                     $employee->updateQuietly(['user_id' => $user->id]);

@@ -44,7 +44,7 @@ class AttendanceController extends Controller
         $scopeService->applyRelatedScope($todayAttQuery, $user);
 
         $stats = [
-            'total_present' => (clone $todayAttQuery)->count(),
+            'total_present' => (clone $todayAttQuery)->whereIn('status', ['present', 'late', 'half_day', 'wfh'])->count(),
             'total_on_break' => (clone $todayAttQuery)
                 ->whereHas('breaks', function($q) {
                     $q->whereNull('break_out');
@@ -55,7 +55,7 @@ class AttendanceController extends Controller
         $departments = Department::where('status', true)->orderBy('name')->get();
 
         if ($view === 'corrections') {
-            $query = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee', 'attendance']);
+            $query = \App\Domains\HRMS\Models\AttendanceCorrection::with(['employee.designation', 'attendance']);
             $scopeService->applyRelatedScope($query, $user);
 
             $correctionsStatus = $request->get('corrections_status');
@@ -175,8 +175,18 @@ class AttendanceController extends Controller
             if ($dates->isNotEmpty()) {
                 $dateStrings = $dates->pluck('date')->map(fn($d) => $d->format('Y-m-d'))->toArray();
                 
-                // Fetch active employees scoped to user's organizational boundary
-                $allEmployees = \App\Domains\HRMS\Models\Employee::where('status', true)->forUserScope($user)->get();
+                // Fetch active employees scoped to user's organizational boundary and applied filters
+                $allEmployeesQuery = \App\Domains\HRMS\Models\Employee::where('status', true)->forUserScope($user);
+                if ($departmentId) {
+                    $allEmployeesQuery->where('department_id', $departmentId);
+                }
+                if ($search) {
+                    $allEmployeesQuery->where(function($q) use ($search) {
+                        $q->where('full_name', 'like', "%{$search}%")
+                          ->orWhere('employee_id', 'like', "%{$search}%");
+                    });
+                }
+                $allEmployees = $allEmployeesQuery->get();
                 
                 // Fetch attendances for these dates
                 $allAttendances = Attendance::whereIn('date', $dateStrings)
@@ -203,20 +213,23 @@ class AttendanceController extends Controller
                     })
                     ->get();
 
+                // Fetch approved overtimes overlapping these dates for scoped employees
+                $allOvertimes = \App\Domains\HRMS\Models\OvertimeRequest::where('status', 'approved')
+                    ->whereBetween('date', [$minDate, $maxDate])
+                    ->whereIn('employee_id', $allEmployees->pluck('id'))
+                    ->get()
+                    ->groupBy(fn($o) => $o->date instanceof \Carbon\Carbon ? $o->date->format('Y-m-d') : \Carbon\Carbon::parse($o->date)->format('Y-m-d'));
+
                 // Compute stats for each date
                 $computedStats = [];
                 foreach ($dateStrings as $dStr) {
                     $carbonDate = \Carbon\Carbon::parse($dStr);
                     $dateAttendances = $allAttendances->get($dStr, collect())->keyBy('employee_id');
                     
-                    $present = 0;
-                    $late = 0;
-                    $half_day = 0;
-                    $wfh = 0;
-                    $absent = 0;
                     $counts = [
                         'present' => 0, 'wfh' => 0, 'late' => 0, 'half_day' => 0,
-                        'absent' => 0, 'on_leave' => 0, 'week_off' => 0, 'holiday' => 0
+                        'absent' => 0, 'on_leave' => 0, 'week_off' => 0, 'holiday' => 0,
+                        'overtime' => $allOvertimes->get($dStr, collect())->count(),
                     ];
 
                     foreach ($allEmployees as $emp) {
@@ -343,11 +356,19 @@ class AttendanceController extends Controller
                 ->get()
                 ->groupBy('employee_id');
 
+            // Fetch approved overtime requests for these employees in this month
+            $monthOvertimes = \App\Domains\HRMS\Models\OvertimeRequest::whereIn('employee_id', $employeeIds)
+                ->where('status', 'approved')
+                ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->get()
+                ->groupBy('employee_id');
+
             foreach ($employees as $employee) {
                 $empAttendances = $monthAttendances->get($employee->id, collect())->keyBy(function($att) {
                     return $att->date->format('Y-m-d');
                 });
                 $empLeaves = $monthLeaves->get($employee->id, collect());
+                $empOvertimes = $monthOvertimes->get($employee->id, collect());
 
                 $counts = [
                     'present' => 0, 'wfh' => 0, 'late' => 0, 'half_day' => 0,
@@ -370,6 +391,7 @@ class AttendanceController extends Controller
                     $employee->computed_on_leave = 0;
                     $employee->computed_week_off = 0;
                     $employee->computed_holiday = 0;
+                    $employee->computed_overtime = 0;
                     continue;
                 }
 
@@ -394,6 +416,7 @@ class AttendanceController extends Controller
                 $employee->computed_on_leave = $counts['on_leave'];
                 $employee->computed_week_off = $counts['week_off'];
                 $employee->computed_holiday = $counts['holiday'];
+                $employee->computed_overtime = $empOvertimes->count();
             }
         }
 
@@ -416,51 +439,69 @@ class AttendanceController extends Controller
     {
         $user = auth()->user();
 
-        $employee = \App\Domains\HRMS\Models\Employee::where('user_id', $user->id)
-            ->with(['department', 'designation'])
-            ->firstOrFail();
+        $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
+        if (!$employee) {
+            $employee = \App\Domains\HRMS\Models\Employee::where('user_id', $user->id)
+                ->orWhere('personal_email', $user->email)
+                ->orWhere('office_email', $user->email)
+                ->with(['department', 'designation'])
+                ->first();
+        } else {
+            $employee->loadMissing(['department', 'designation']);
+        }
+
+        if (!$employee) {
+            abort(404, 'No employee record linked to the authenticated user.');
+        }
 
         $date = $request->input('date');
+        $monthFilter = $request->input('month');
         $status = $request->input('status');
         $sort = $request->input('sort', 'date_desc');
         $search = $request->input('search');
 
-        $monthFilter = $request->input('month');
-        if (!$request->has('month') && !$request->has('date')) {
-            $monthFilter = now()->format('Y-m');
-        }
+        $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
 
-        $year = now()->year;
-        $month = now()->month;
-        if ($monthFilter) {
+        if ($date) {
+            try {
+                $parsedDate = \Carbon\Carbon::parse($date)->startOfDay();
+                if ($joiningDate && $joiningDate->gt($parsedDate)) {
+                    $startDate = $joiningDate->copy();
+                } else {
+                    $startDate = $parsedDate;
+                }
+                $endDate = $parsedDate->copy()->endOfDay();
+            } catch (\Exception $e) {
+                $startDate = now()->startOfMonth();
+                $endDate = now()->startOfDay();
+            }
+        } elseif ($monthFilter === 'all' || ($request->has('month') && empty($monthFilter))) {
+            $startDate = $joiningDate ? max($joiningDate, now()->startOfYear()) : now()->startOfYear();
+            $endDate = now()->startOfDay();
+        } elseif ($monthFilter) {
             $parts = explode('-', $monthFilter);
+            $year = now()->year;
+            $month = now()->month;
             if (count($parts) === 2) {
                 $year = (int)$parts[0];
                 $month = (int)$parts[1];
             }
-        }
-        
-        $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
-        $joiningDate = $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay() : null;
-        if ($joiningDate && $joiningDate->gt($startDate)) {
-            $startDate = $joiningDate->copy();
-        }
-
-        $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
-        $today = now()->startOfDay();
-        if ($endDate->gt($today)) {
-            $endDate = $today->copy();
-        }
-
-        if ($date) {
-            $parsedDate = \Carbon\Carbon::parse($date)->startOfDay();
-            if ($joiningDate && $joiningDate->gt($parsedDate)) {
+            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            if ($joiningDate && $joiningDate->gt($startDate)) {
                 $startDate = $joiningDate->copy();
-                $endDate = $parsedDate->copy()->endOfDay();
-            } else {
-                $startDate = $parsedDate;
-                $endDate = $parsedDate->copy()->endOfDay();
             }
+            $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+            $today = now()->startOfDay();
+            if ($endDate->gt($today)) {
+                $endDate = $today->copy();
+            }
+        } else {
+            $monthFilter = now()->format('Y-m');
+            $startDate = \Carbon\Carbon::now()->startOfMonth();
+            if ($joiningDate && $joiningDate->gt($startDate)) {
+                $startDate = $joiningDate->copy();
+            }
+            $endDate = now()->startOfDay();
         }
 
         $attendances = Attendance::where('employee_id', $employee->id)
@@ -538,16 +579,28 @@ class AttendanceController extends Controller
 
         if ($status) {
             $calendarDays = $calendarDays->filter(function($day) use ($status) {
+                if ($status === 'week_off' || $status === 'weekly_off') {
+                    return in_array($day->status, ['week_off', 'weekly_off']);
+                }
+                if ($status === 'on_leave' || $status === 'leave') {
+                    return in_array($day->status, ['on_leave', 'leave']);
+                }
                 return $day->status === $status;
             });
         }
 
         if ($search) {
-            $searchLower = strtolower($search);
+            $searchLower = strtolower(trim($search));
             $calendarDays = $calendarDays->filter(function($day) use ($searchLower) {
                 return str_contains(strtolower($day->date->format('M d, Y')), $searchLower) ||
+                       str_contains(strtolower($day->date->format('l')), $searchLower) ||
+                       str_contains(strtolower($day->date->format('Y-m-d')), $searchLower) ||
+                       str_contains(strtolower($day->date->format('F')), $searchLower) ||
                        str_contains(strtolower($day->status_label), $searchLower) ||
+                       str_contains(strtolower($day->status), $searchLower) ||
+                       str_contains(strtolower(str_replace('_', ' ', $day->status)), $searchLower) ||
                        str_contains(strtolower($day->location_type), $searchLower) ||
+                       str_contains(strtolower($day->formatted_location_type), $searchLower) ||
                        ($day->holiday_name && str_contains(strtolower($day->holiday_name), $searchLower)) ||
                        ($day->leave_type_name && str_contains(strtolower($day->leave_type_name), $searchLower));
             });
@@ -557,17 +610,19 @@ class AttendanceController extends Controller
             $calendarDays = $calendarDays->sortBy(fn($d) => $d->date->timestamp);
         } elseif ($sort === 'checkin_asc') {
             $calendarDays = $calendarDays->sortBy(function($d) {
-                return $d->check_in ? $d->check_in->timestamp : PHP_INT_MAX;
+                if (!$d->check_in) return PHP_INT_MAX;
+                return $d->check_in instanceof \Carbon\Carbon ? $d->check_in->timestamp : \Carbon\Carbon::parse($d->check_in)->timestamp;
             });
         } elseif ($sort === 'checkin_desc') {
             $calendarDays = $calendarDays->sortByDesc(function($d) {
-                return $d->check_in ? $d->check_in->timestamp : 0;
+                if (!$d->check_in) return 0;
+                return $d->check_in instanceof \Carbon\Carbon ? $d->check_in->timestamp : \Carbon\Carbon::parse($d->check_in)->timestamp;
             });
         } else {
             $calendarDays = $calendarDays->sortByDesc(fn($d) => $d->date->timestamp);
         }
 
-        $attendances = $calendarDays;
+        $attendances = $calendarDays->values();
 
         $correctionRequests = \App\Domains\HRMS\Models\AttendanceCorrection::where('employee_id', $employee->id)
             ->get()
@@ -753,7 +808,7 @@ class AttendanceController extends Controller
             ->where('status', 'approved')
             ->pluck('date')
             ->map(function ($d) {
-                return $d->format('Y-m-d');
+                return $d instanceof \Carbon\Carbon ? $d->format('Y-m-d') : substr((string)$d, 0, 10);
             })
             ->toArray();
 
@@ -834,7 +889,7 @@ class AttendanceController extends Controller
                 }
 
                 $status = $log->status;
-                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave', 'week_off', 'holiday']);
+                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave', 'week_off', 'holiday', 'not_joined', 'scheduled']);
 
                 if ($status === 'present') {
                     $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
@@ -860,6 +915,10 @@ class AttendanceController extends Controller
                         $holidayLabel = 'Holiday: ' . $log->holiday_name;
                     }
                     $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">' . e($holidayLabel) . '</span>';
+                } elseif ($status === 'not_joined') {
+                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Not Joined</span>';
+                } elseif ($status === 'scheduled') {
+                    $statusBadge = '<span class="badge bg-soft-dark text-dark">Scheduled</span>';
                 } else {
                     $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
                 }
@@ -919,10 +978,17 @@ class AttendanceController extends Controller
 
     public function getDateLogs($date)
     {
+        abort_unless(
+            auth()->user() && (auth()->user()->hasHrPermission('hrms.attendance.view') || auth()->user()->hasHrPermission('hr.settings.manage')),
+            403
+        );
+        $user = auth()->user();
+
         $carbonDate = \Carbon\Carbon::parse($date);
         $dateStr = $carbonDate->format('Y-m-d');
 
         $employees = \App\Domains\HRMS\Models\Employee::where('status', true)
+            ->forUserScope($user)
             ->with(['department'])
             ->get();
 
@@ -937,6 +1003,7 @@ class AttendanceController extends Controller
             ->get();
 
         $attendances = Attendance::where('date', $dateStr)
+            ->forUserScope($user)
             ->with(['breaks', 'locationLogs'])
             ->get()
             ->keyBy('employee_id');
@@ -997,7 +1064,7 @@ class AttendanceController extends Controller
                 }
 
                 $status = $log->status;
-                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave', 'week_off', 'holiday']);
+                $isAbsentOrLeave = in_array($status, ['absent', 'on_leave', 'week_off', 'holiday', 'not_joined', 'scheduled']);
 
                 if ($status === 'present') {
                     $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
@@ -1023,6 +1090,10 @@ class AttendanceController extends Controller
                         $holidayLabel = 'Holiday: ' . $log->holiday_name;
                     }
                     $statusBadge = '<span class="badge bg-soft-indigo text-indigo" style="background-color: rgba(79, 70, 229, 0.1); color: #4f46e5 !important;">' . e($holidayLabel) . '</span>';
+                } elseif ($status === 'not_joined') {
+                    $statusBadge = '<span class="badge bg-soft-secondary text-secondary">Not Joined</span>';
+                } elseif ($status === 'scheduled') {
+                    $statusBadge = '<span class="badge bg-soft-dark text-dark">Scheduled</span>';
                 } else {
                     $statusBadge = '<span class="badge bg-soft-dark text-dark">' . ucfirst(str_replace('_', ' ', $status)) . '</span>';
                 }
@@ -1469,9 +1540,16 @@ class AttendanceController extends Controller
 
     public function destroyDate($date)
     {
-        $attendances = Attendance::where('date', $date)->get();
+        abort_unless(
+            auth()->user() && (auth()->user()->hasHrPermission('hrms.attendance.manage') || auth()->user()->hasHrPermission('hr.settings.manage')),
+            403
+        );
+        $user = auth()->user();
+
+        $attendances = Attendance::where('date', $date)->forUserScope($user)->get();
         foreach ($attendances as $attendance) {
             $attendance->breaks()->delete();
+            $attendance->locationLogs()->delete();
             $attendance->delete();
         }
 
@@ -1480,7 +1558,27 @@ class AttendanceController extends Controller
 
     public function export(Request $request)
     {
-        return $this->attendanceRepository->export($request->all());
+        abort_unless(
+            auth()->user() && (auth()->user()->hasHrPermission('hrms.attendance.view') || auth()->user()->hasHrPermission('hr.settings.manage')),
+            403
+        );
+
+        $params = $request->all();
+
+        // If month or view is missing, fall back to referer query parameters
+        if (empty($params['month']) && empty($params['date']) && $request->headers->get('referer')) {
+            $refererQuery = parse_url($request->headers->get('referer'), PHP_URL_QUERY);
+            if ($refererQuery) {
+                parse_str($refererQuery, $refererParams);
+                foreach (['month', 'view', 'date', 'department_id', 'status', 'search', 'sort'] as $k) {
+                    if (empty($params[$k]) && !empty($refererParams[$k])) {
+                        $params[$k] = $refererParams[$k];
+                    }
+                }
+            }
+        }
+
+        return $this->attendanceRepository->export($params);
     }
 
     public function downloadTemplate()
@@ -1491,7 +1589,7 @@ class AttendanceController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|max:10240',
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);
 
         try {
@@ -1549,6 +1647,22 @@ class AttendanceController extends Controller
         }
 
         $dateStr = $date->format('Y-m-d');
+
+        // Check if date is before employee joining date
+        if ($employee->date_of_joining) {
+            $joiningDate = $employee->date_of_joining instanceof \Carbon\Carbon 
+                ? $employee->date_of_joining->copy()->startOfDay() 
+                : \Carbon\Carbon::parse($employee->date_of_joining)->startOfDay();
+            if ($date->copy()->startOfDay()->lt($joiningDate)) {
+                return [
+                    'status' => 'not_joined',
+                    'label' => 'Not Joined',
+                    'record' => null,
+                    'holiday_name' => null,
+                    'leave_type_name' => null
+                ];
+            }
+        }
 
         // 2. Check if it is a holiday
         $holiday = $holidays->first(function($h) use ($employee, $dateStr) {

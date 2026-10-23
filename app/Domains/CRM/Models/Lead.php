@@ -35,12 +35,61 @@ class Lead extends Model
             }
         });
 
-        static::updating(function ($lead) {
-            if ($lead->isDirty('status') && strtolower($lead->status) === 'won' && !$lead->crm_account_id) {
-                throw new \InvalidArgumentException('Cannot mark as Won. Account & Deal conversion required first!');
+        static::saving(function ($lead) {
+            // Auto-detect and normalize lead_type (b2b vs b2c) across all ingestion sources
+            if (!empty($lead->lead_type)) {
+                $normalized = strtolower(trim((string)$lead->lead_type));
+                $lead->lead_type = ($normalized === 'b2c' || str_contains($normalized, 'individual') || str_contains($normalized, 'consumer')) ? 'b2c' : 'b2b';
+            } else {
+                $hasGstin = !empty(trim((string)$lead->gstin));
+                $companyName = trim((string)$lead->company_name);
+                $contactPerson = trim((string)$lead->contact_person);
+
+                $hasDistinctCompany = !empty($companyName) && 
+                    strcasecmp($companyName, 'Individual Customer') !== 0 && 
+                    strcasecmp($companyName, 'Walk-in Visitor') !== 0 &&
+                    ($companyName !== $contactPerson || $hasGstin);
+
+                $lead->lead_type = ($hasGstin || $hasDistinctCompany) ? 'b2b' : 'b2c';
             }
         });
+
+        static::updating(function ($lead) {
+            if ($lead->isDirty('status')) {
+                $oldStatus = strtolower((string) $lead->getOriginal('status'));
+                $newStatus = strtolower((string) $lead->status);
+
+                // Permanent lock: Once Won, it cannot be changed to another status manually
+                if ($oldStatus === 'won' && $newStatus !== 'won' && !static::$allowWonTransition) {
+                    throw new \InvalidArgumentException('Lead status is Won and permanently locked. Status cannot be changed.');
+                }
+
+                // Permanent lock: Once Dealing, it cannot be changed to another status manually (except to Won when authorized)
+                if ($oldStatus === 'dealing' && !in_array($newStatus, ['dealing', 'won']) && !static::$allowWonTransition) {
+                    throw new \InvalidArgumentException('Lead status in Dealing stage is locked. Status cannot be changed.');
+                }
+
+                // Direct Won transition guard: Cannot manually change status to Won
+                if ($newStatus === 'won' && !static::$allowWonTransition) {
+                    throw new \InvalidArgumentException('Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal or converted to Customer.');
+                }
+            }
+        });
+
+        static::saved(function ($lead) {
+            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
+        });
+
+        static::deleted(function ($lead) {
+            $tid = $lead->tenant_id ?? (tenant_id() ?? 1);
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_dup_graph");
+            \Illuminate\Support\Facades\Cache::forget("tenant_{$tid}_lead_status_counts");
+        });
     }
+
+    public static bool $allowWonTransition = false;
 
     protected $fillable = [
         'tenant_id',
@@ -85,6 +134,7 @@ class Lead extends Model
         'is_customer',
         'documents',
         'additional_contacts',
+        'custom_fields',
     ];
 
     protected $casts = [
@@ -97,7 +147,24 @@ class Lead extends Model
         'product_items' => 'array',
         'documents' => 'array',
         'additional_contacts' => 'array',
+        'custom_fields' => 'array',
     ];
+
+    /**
+     * Get formatted key-value pairs for dynamic custom fields.
+     */
+    public function getCustomFieldsFormattedAttribute(): array
+    {
+        if (empty($this->custom_fields) || !is_array($this->custom_fields)) {
+            return [];
+        }
+        $result = [];
+        foreach ($this->custom_fields as $key => $value) {
+            $label = ucwords(str_replace('_', ' ', $key));
+            $result[$label] = is_array($value) ? implode(', ', $value) : $value;
+        }
+        return $result;
+    }
 
     /**
      * Get all interested products models.

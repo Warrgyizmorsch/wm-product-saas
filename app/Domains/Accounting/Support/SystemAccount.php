@@ -25,6 +25,12 @@ final class SystemAccount
     public const INVENTORY = 'inventory';
     public const WORK_IN_PROGRESS = 'work_in_progress';
     public const SUSPENSE = 'suspense_account';
+    // Where the year-end close moves each year's profit or loss.
+    public const RESERVES_AND_SURPLUS = 'reserves_and_surplus';
+    // Offset for every opening balance entered on ledgers and party masters;
+    // nets to zero once all opening balances are in (Tally's "Difference in
+    // opening balances").
+    public const OPENING_BALANCE_DIFFERENCE = 'opening_balance_difference';
 
     // Advances
     public const LOANS_AND_ADVANCES = 'loans_and_advances';
@@ -75,6 +81,7 @@ final class SystemAccount
         'reserves_and_surplus' => '3020',
         'partners_proprietors_capital' => '3030',
         'drawings' => '3040',
+        'opening_balance_difference' => '3050',
         'revaluation_reserve' => '3200',
         'secured_loans' => '2400',
         'term_loan_bank' => '2401',

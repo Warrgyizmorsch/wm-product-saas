@@ -437,6 +437,7 @@ class SchedulingService
             $scheduledData = [];
             // Track created schedule-op IDs per parallel_group for sibling exclusion
             $parallelGroupOpIds = []; // ['GROUP-A' => [scheduleOpId1, ...]]
+            $inMemoryBookings = [];
 
             foreach ($reversedOps as $op) {
                 if ($op->is_external) {
@@ -480,11 +481,11 @@ class SchedulingService
                         $excludeScheduleOpIds = $parallelGroupOpIds[$op->parallel_group] ?? [];
                     }
 
-                    // Find slot searching backwards
+                    // Find slot searching backwards respecting DB bookings and in-memory reservations
                     if ($op->routing_operation_id) {
-                        $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $latestFinish, $duration, $tenantId, false, $excludeScheduleOpIds);
+                        $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $latestFinish, $duration, $tenantId, false, $excludeScheduleOpIds, $inMemoryBookings);
                     } else {
-                        $slot = $this->calculateAvailableSlot($op->work_center_id, $op->machine_id, $latestFinish, $duration, false, $excludeScheduleOpIds);
+                        $slot = $this->calculateAvailableSlot($op->work_center_id, $op->machine_id, $latestFinish, $duration, false, $excludeScheduleOpIds, $inMemoryBookings);
                         $warnings = $slot['warnings'];
                         if ($op->machine_id) {
                             $m = Machine::withoutGlobalScopes()->find($op->machine_id);
@@ -509,6 +510,20 @@ class SchedulingService
                     $warnings = $alloc['warnings'] ?? [];
                     $machineId = $alloc['machine_id'] ?? null;
                     $priority = $alloc['priority'] ?? 1;
+
+                    // Immediately register in-memory reservation for this operation so subsequent operations see it
+                    $tempOpId = -(count($inMemoryBookings) + 1);
+                    $inMemoryBookings[] = [
+                        'id' => $tempOpId,
+                        'machine_id' => $machineId,
+                        'work_center_id' => $op->work_center_id,
+                        'planned_start' => $plannedStart->copy(),
+                        'planned_finish' => $plannedFinish->copy(),
+                        'parallel_group' => $op->parallel_group,
+                    ];
+                    if ($op->is_parallel && $op->parallel_group !== null) {
+                        $parallelGroupOpIds[$op->parallel_group][] = $tempOpId;
+                    }
                 }
 
                 $lane = $op->work_center_id ? 'WorkCenter_' . $op->work_center_id : 'Vendor_' . ($op->vendor_id ?? 'External');
@@ -722,7 +737,8 @@ class SchedulingService
         Carbon $from,
         float $durationMinutes,
         bool $forward = true,
-        array $excludeScheduleOpIds = []
+        array $excludeScheduleOpIds = [],
+        array $inMemoryBookings = []
     ): array {
         if (!$workCenterId) {
             return [
@@ -782,8 +798,29 @@ class SchedulingService
 
             foreach ($downtimes as $dt) {
                 $bookings->push((object) [
+                    'id' => null,
                     'planned_start' => Carbon::parse($dt->start_time),
                     'planned_finish' => Carbon::parse($dt->end_time),
+                ]);
+            }
+        }
+
+        // Merge in-memory reservations for the current scheduling run
+        foreach ($inMemoryBookings as $mem) {
+            $matchesResource = false;
+            if ($machineId) {
+                $matchesResource = isset($mem['machine_id']) && (int) $mem['machine_id'] === (int) $machineId;
+            } else {
+                $matchesResource = isset($mem['work_center_id'])
+                    && (int) $mem['work_center_id'] === (int) $workCenterId
+                    && empty($mem['machine_id']);
+            }
+
+            if ($matchesResource && !empty($mem['planned_start']) && !empty($mem['planned_finish'])) {
+                $bookings->push((object) [
+                    'id' => $mem['id'] ?? null,
+                    'planned_start' => $mem['planned_start'] instanceof Carbon ? $mem['planned_start']->copy() : Carbon::parse($mem['planned_start']),
+                    'planned_finish' => $mem['planned_finish'] instanceof Carbon ? $mem['planned_finish']->copy() : Carbon::parse($mem['planned_finish']),
                 ]);
             }
         }
@@ -1005,7 +1042,8 @@ class SchedulingService
         float $durationMinutes,
         int $tenantId,
         bool $forward = true,
-        array $excludeScheduleOpIds = []
+        array $excludeScheduleOpIds = [],
+        array $inMemoryBookings = []
     ): array {
         $warnings = [];
         $routingOp = RoutingOperation::withoutGlobalScopes()->find($routingOpId);
@@ -1074,7 +1112,15 @@ class SchedulingService
         // Calculate slot for each valid candidate
         $evaluated = [];
         foreach ($candidates as $cand) {
-            $slot = $this->calculateAvailableSlot($routingOp->work_center_id, $cand['machine']->id, $from, $durationMinutes, $forward, $excludeScheduleOpIds);
+            $slot = $this->calculateAvailableSlot(
+                $routingOp->work_center_id,
+                $cand['machine']->id,
+                $from,
+                $durationMinutes,
+                $forward,
+                $excludeScheduleOpIds,
+                $inMemoryBookings
+            );
             $evaluated[] = [
                 'machine' => $cand['machine'],
                 'priority' => $cand['priority'],
@@ -1176,7 +1222,17 @@ class SchedulingService
      * @param  int   $tenantId
      * @return string[]  Human-readable conflict descriptions.
      */
-    public function detectConflicts(int $tenantId): array
+    /**
+     * Detect scheduling conflicts for a tenant (detailed array of conflict data).
+     *
+     * Identifies machine-level time overlaps: two operations assigned to the same
+     * machine where the earlier operation's planned_finish exceeds the next
+     * operation's planned_start.
+     *
+     * @param  int   $tenantId
+     * @return array<int, array{machine_id: int, curr_op_id: int, next_op_id: int, curr_schedule_id: int, next_schedule_id: int, curr_order_id: int|null, next_order_id: int|null, message: string}>
+     */
+    public function detectConflictsDetailed(int $tenantId): array
     {
         $conflicts = [];
         $ops = ProductionScheduleOperation::withoutGlobalScopes()
@@ -1202,28 +1258,88 @@ class SchedulingService
                     $nextOpName = $next->orderOperation ? $next->orderOperation->name : "Op #{$next->sequence}";
                     $nextOrder = $next->order ? "Order #{$next->order->order_number}" : "Schedule Op #{$next->id}";
 
-                    $conflicts[] = "Overlap on machine {$mName}: {$currOrder} (Op #{$curr->sequence} - {$currOpName}) overlaps with {$nextOrder} (Op #{$next->sequence} - {$nextOpName}).";
+                    $msg = "Overlap on machine {$mName}: {$currOrder} (Op #{$curr->sequence} - {$currOpName}) overlaps with {$nextOrder} (Op #{$next->sequence} - {$nextOpName}).";
+
+                    $conflicts[] = [
+                        'machine_id' => (int) $machineId,
+                        'curr_op_id' => (int) $curr->id,
+                        'next_op_id' => (int) $next->id,
+                        'curr_schedule_id' => (int) $curr->production_schedule_id,
+                        'next_schedule_id' => (int) $next->production_schedule_id,
+                        'curr_order_id' => $curr->production_order_id ? (int) $curr->production_order_id : null,
+                        'next_order_id' => $next->production_order_id ? (int) $next->production_order_id : null,
+                        'message' => $msg,
+                    ];
                 }
             }
         }
 
-        return array_values(array_unique($conflicts));
+        return $conflicts;
     }
 
     /**
-     * Detect capacity overloads for a tenant.
-     *
-     * Groups active scheduled operations by (work_center_id, date) and compares
-     * the total planned minutes against the work center's calculated capacity.
-     * Returns a list of human-readable overload messages for affected work centers.
-     *
-     * NOTE: This method performs in-memory grouping after loading all active ops.
-     * For large tenants, consider refactoring to a DB-level aggregation query.
+     * Detect scheduling conflicts for a tenant (string messages).
      *
      * @param  int   $tenantId
-     * @return string[]  Human-readable overload descriptions.
+     * @return string[]  Human-readable conflict descriptions.
      */
-    public function detectOverloads(int $tenantId): array
+    public function detectConflicts(int $tenantId): array
+    {
+        $detailed = $this->detectConflictsDetailed($tenantId);
+        return array_values(array_unique(array_column($detailed, 'message')));
+    }
+
+    /**
+     * Detect conflicts directly relevant to a specific schedule.
+     *
+     * Returns conflict messages where either operation belongs to this schedule.
+     *
+     * @param  ProductionSchedule|int  $schedule
+     * @return string[]
+     */
+    public function detectConflictsForSchedule(ProductionSchedule|int $schedule): array
+    {
+        $scheduleId = $schedule instanceof ProductionSchedule ? $schedule->id : (int) $schedule;
+        $tenantId = $schedule instanceof ProductionSchedule ? (int) $schedule->tenant_id : (int) ProductionSchedule::withoutGlobalScopes()->where('id', $scheduleId)->value('tenant_id');
+
+        if (!$tenantId) {
+            return [];
+        }
+
+        $detailed = $this->detectConflictsDetailed($tenantId);
+        $filtered = array_filter($detailed, fn($item) => (int) $item['curr_schedule_id'] === $scheduleId || (int) $item['next_schedule_id'] === $scheduleId);
+
+        return array_values(array_unique(array_column($filtered, 'message')));
+    }
+
+    /**
+     * Detect conflicts across other factory schedules that do NOT involve this schedule.
+     *
+     * @param  ProductionSchedule|int  $schedule
+     * @return string[]
+     */
+    public function detectUnrelatedConflictsForSchedule(ProductionSchedule|int $schedule): array
+    {
+        $scheduleId = $schedule instanceof ProductionSchedule ? $schedule->id : (int) $schedule;
+        $tenantId = $schedule instanceof ProductionSchedule ? (int) $schedule->tenant_id : (int) ProductionSchedule::withoutGlobalScopes()->where('id', $scheduleId)->value('tenant_id');
+
+        if (!$tenantId) {
+            return [];
+        }
+
+        $detailed = $this->detectConflictsDetailed($tenantId);
+        $unrelated = array_filter($detailed, fn($item) => (int) $item['curr_schedule_id'] !== $scheduleId && (int) $item['next_schedule_id'] !== $scheduleId);
+
+        return array_values(array_unique(array_column($unrelated, 'message')));
+    }
+
+    /**
+     * Detect capacity overloads for a tenant (detailed records).
+     *
+     * @param  int   $tenantId
+     * @return array<int, array{work_center_id: int, work_center_name: string, date: string, scheduled_minutes: float, capacity_minutes: float, message: string}>
+     */
+    public function detectOverloadsDetailed(int $tenantId): array
     {
         $overloads = [];
         $ops = ProductionScheduleOperation::withoutGlobalScopes()
@@ -1268,14 +1384,86 @@ class SchedulingService
                 }
 
                 if ($scheduledMinutes > $capacity) {
-                    $overloads[] = "Work Center [{$wc->name}] overloaded on {$dateStr}: Scheduled " . round($scheduledMinutes, 1) . " minutes, Capacity is " . round($capacity, 1) . " minutes.";
+                    $overloads[] = [
+                        'work_center_id' => (int) $wcId,
+                        'work_center_name' => $wc->name,
+                        'date' => $dateStr,
+                        'scheduled_minutes' => round($scheduledMinutes, 1),
+                        'capacity_minutes' => round($capacity, 1),
+                        'message' => "Work Center [{$wc->name}] overloaded on {$dateStr}: Scheduled " . round($scheduledMinutes, 1) . " minutes, Capacity is " . round($capacity, 1) . " minutes.",
+                    ];
                 }
 
                 $date->addDay();
             }
         }
 
-        return array_values(array_unique($overloads));
+        return $overloads;
+    }
+
+    /**
+     * Detect capacity overloads for a tenant (string messages).
+     *
+     * Groups active scheduled operations by (work_center_id, date) and compares
+     * the total planned minutes against the work center's calculated capacity.
+     * Returns a list of human-readable overload messages for affected work centers.
+     *
+     * @param  int   $tenantId
+     * @return string[]  Human-readable overload descriptions.
+     */
+    public function detectOverloads(int $tenantId): array
+    {
+        $detailed = $this->detectOverloadsDetailed($tenantId);
+        return array_values(array_unique(array_column($detailed, 'message')));
+    }
+
+    /**
+     * Detect capacity overloads specifically affecting work centers and dates of a given schedule.
+     *
+     * @param  ProductionSchedule|int  $schedule
+     * @return string[]
+     */
+    public function detectOverloadsForSchedule(ProductionSchedule|int $schedule): array
+    {
+        if (is_numeric($schedule)) {
+            $schedule = ProductionSchedule::withoutGlobalScopes()->with('operations')->find($schedule);
+        }
+        if (!$schedule) {
+            return [];
+        }
+        $tenantId = (int) $schedule->tenant_id;
+        $detailed = $this->detectOverloadsDetailed($tenantId);
+        if (empty($detailed)) {
+            return [];
+        }
+
+        $scheduleOps = $schedule->operations ?? ProductionScheduleOperation::withoutGlobalScopes()
+            ->where('production_schedule_id', $schedule->id)
+            ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
+            ->get();
+
+        $scheduleWcDates = [];
+        foreach ($scheduleOps as $op) {
+            if (!$op->work_center_id || !$op->planned_start || !$op->planned_finish) {
+                continue;
+            }
+            $curr = Carbon::parse($op->planned_start)->startOfDay();
+            $end = Carbon::parse($op->planned_finish)->startOfDay();
+            while ($curr->lte($end)) {
+                $scheduleWcDates[$op->work_center_id . '_' . $curr->toDateString()] = true;
+                $curr->addDay();
+            }
+        }
+
+        $relevant = [];
+        foreach ($detailed as $item) {
+            $key = $item['work_center_id'] . '_' . $item['date'];
+            if (isset($scheduleWcDates[$key])) {
+                $relevant[] = $item['message'];
+            }
+        }
+
+        return array_values(array_unique($relevant));
     }
 
     // ─── Private Helpers ─────────────────────────────────────────────────────

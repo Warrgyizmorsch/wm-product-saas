@@ -72,44 +72,32 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'email' => [
-                'required', 
-                'email', 
-                'max:255', 
-                Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId);
-                })
-            ],
-            'phone' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'phone')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('phone');
-                })
-            ],
-            'gstin' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'gstin')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('gstin');
-                })
-            ],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+            'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive'],
         ], [
-            'email.unique' => 'Customer with this email address already exists.',
-            'phone.unique' => 'Customer with this phone number already exists.',
-            'gstin.unique' => 'Customer with this GSTIN already exists.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
-        $this->customers->create($validated);
+        $validated['opening_balance'] = isset($validated['opening_balance'])
+            ? convert_to_base((float) $validated['opening_balance'])
+            : 0.00;
+        $validated['tenant_id'] = $tenantId;
+
+        $customer = $this->customers->create($validated);
+
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer);
 
         return redirect()
             ->route('crm.customers.index')
-            ->with('success', 'Customer created successfully.');
+            ->with('success', 'Customer created successfully.')
+            ->with('warning', $openingWarning);
     }
 
     public function quickCreate(Request $request): JsonResponse
@@ -120,38 +108,17 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'email' => [
-                'required', 
-                'email', 
-                'max:255', 
-                Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId);
-                })
-            ],
-            'phone' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'phone')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('phone');
-                })
-            ],
-            'gstin' => [
-                'nullable', 
-                'string', 
-                'max:50',
-                Rule::unique('customers', 'gstin')->where(function ($query) use ($tenantId) {
-                    return $query->where('tenant_id', $tenantId)->whereNotNull('gstin');
-                })
-            ],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin' => ['nullable', 'string', 'max:50'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
         ], [
-            'email.unique' => 'Customer with this email address already exists.',
-            'phone.unique' => 'Customer with this phone number already exists.',
-            'gstin.unique' => 'Customer with this GSTIN already exists.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
+        $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'active';
         $customer = $this->customers->create($validated);
 
@@ -188,7 +155,8 @@ class CustomerController extends Controller
             return floatval($r->total_amount ?: $r->total_refund_amount);
         });
 
-        $netOutstanding = $totalBilled - $totalPaid - $totalReturns;
+        $openingBalance = $customer->signedOpeningBalance();
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
         $outstandingBalance = max(0, $netOutstanding);
         $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
         

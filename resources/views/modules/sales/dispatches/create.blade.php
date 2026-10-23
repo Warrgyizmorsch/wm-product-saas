@@ -236,7 +236,7 @@
                         <x-ui.odoo-form-ui type="input" :label="__('crm.pan_number_field')" name="pan_number" placeholder="e.g. ABCDE1234F" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.primary_office_phone')" name="phone" placeholder="Contact number" />
+                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('crm.primary_office_phone')" name="phone" placeholder="Contact number" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                     </div>
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" inputType="email" :label="__('crm.official_email_address')" name="email" placeholder="dispatch@transporter.com" />
@@ -291,13 +291,31 @@
         // Quick Transporter AJAX Store
         $('#quickTransporterForm').on('submit', function(e) {
             e.preventDefault();
+            const form = $(this);
             const $btn = $('#saveQuickTransporterBtn');
+
+            // Clear previous errors
+            form.find('.is-invalid').removeClass('is-invalid');
+            form.find('.invalid-feedback.ajax-feedback').remove();
+            form.find('.transporter-alert-error').remove();
+
+            // Client-side email validation check
+            const emailInput = form.find('input[name="email"]');
+            const emailVal = emailInput.val().trim();
+            if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+                emailInput.addClass('is-invalid');
+                emailInput.parent().find('.invalid-feedback.ajax-feedback').remove();
+                emailInput.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+                emailInput.focus();
+                return false;
+            }
+
             $btn.prop('disabled', true).text('Saving...');
 
             $.ajax({
                 url: "{{ route('platform.transporters.quick-create') }}",
                 type: "POST",
-                data: $(this).serialize(),
+                data: form.serialize(),
                 success: function(response) {
                     $btn.prop('disabled', false).text('Save Transporter');
                     if (response.success && response.transporter) {
@@ -314,14 +332,53 @@
                         const modalEl = document.getElementById('quickTransporterModal');
                         const modalInstance = bootstrap.Modal.getInstance(modalEl);
                         if (modalInstance) modalInstance.hide();
-                        $('#quickTransporterForm')[0].reset();
+                        form[0].reset();
+                        form.find('.is-invalid').removeClass('is-invalid');
+                        form.find('.invalid-feedback.ajax-feedback').remove();
                     }
                 },
                 error: function(err) {
                     $btn.prop('disabled', false).text('Save Transporter');
-                    alert('Error saving transporter: ' + (err.responseJSON?.message || 'Invalid data'));
+                    if (err.status === 422 && err.responseJSON && err.responseJSON.errors) {
+                        const errors = err.responseJSON.errors;
+                        let firstField = null;
+                        $.each(errors, function(field, messages) {
+                            const $input = form.find('[name="' + field + '"]');
+                            if ($input.length) {
+                                $input.addClass('is-invalid');
+                                $input.parent().find('.invalid-feedback.ajax-feedback').remove();
+                                $input.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">' + messages[0] + '</div>');
+                                if (!firstField) firstField = $input;
+                            } else {
+                                form.find('.p-1').prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + messages[0] + '</div>');
+                            }
+                        });
+                        if (firstField) {
+                            firstField.focus();
+                        }
+                    } else {
+                        const msg = err.responseJSON?.message || 'Error saving transporter. Please check the details and try again.';
+                        form.find('.p-1').prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + msg + '</div>');
+                    }
                 }
             });
+        });
+
+        // Realtime clear invalid feedback on input/change
+        $(document).on('input change', '#quickTransporterForm input, #quickTransporterForm select', function() {
+            $(this).removeClass('is-invalid');
+            $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+            $('#quickTransporterForm').find('.transporter-alert-error').remove();
+        });
+
+        // Email blur validation for quick transporter form
+        $(document).on('blur', '#quickTransporterForm input[name="email"]', function() {
+            const val = $(this).val().trim();
+            if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                $(this).addClass('is-invalid');
+                $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+                $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+            }
         });
 
         const warehouses = @json($formattedWarehouses);
@@ -587,8 +644,8 @@
                             </td>
                             <td class="align-top"><span class="text-muted fs-12">—</span></td>
                             <td class="text-end align-top">${item.quantity_ordered}</td>
-                            <td class="text-end fw-semibold text-success align-top">${item.available_qty ?? 0}</td>
-                            <td class="text-end align-top">${item.quantity_reserved ?? 0}</td>
+                            <td class="text-end fw-semibold text-success align-top">${(Number(item.available_qty) || 0) % 1 === 0 ? (Number(item.available_qty) || 0) : parseFloat(Number(item.available_qty).toFixed(2))}</td>
+                            <td class="text-end align-top">${(Number(item.quantity_reserved) || 0) % 1 === 0 ? (Number(item.quantity_reserved) || 0) : parseFloat(Number(item.quantity_reserved).toFixed(2))}</td>
                             <td class="text-end fw-bold text-success align-top">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-muted align-top">0</td>
                             <td class="text-end align-top">
@@ -607,8 +664,8 @@
                             </td>
                             <td class="align-top"><select name="items[${index}][warehouse_id]" class="form-select odoo-table-select odoo-select2 item-warehouse-select">${options}</select></td>
                             <td class="text-end fw-semibold mr-col align-top">${item.quantity_ordered}</td>
-                            <td class="text-end fw-semibold text-success mr-col align-top avail-qty-cell">${item.available_qty ?? 0}</td>
-                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${item.quantity_reserved ?? 0}</td>
+                            <td class="text-end fw-semibold text-success mr-col align-top avail-qty-cell">${(Number(item.available_qty) || 0) % 1 === 0 ? (Number(item.available_qty) || 0) : parseFloat(Number(item.available_qty).toFixed(2))}</td>
+                            <td class="text-end fw-semibold text-info mr-col align-top reserved-qty-cell">${(Number(item.quantity_reserved) || 0) % 1 === 0 ? (Number(item.quantity_reserved) || 0) : parseFloat(Number(item.quantity_reserved).toFixed(2))}</td>
                             <td class="text-end fw-bold mr-col align-top ${item.already_dispatched > 0 ? 'text-warning' : 'text-muted'}">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-primary mr-col align-top">${item.remaining_qty}</td>
                             <td class="text-end pe-2 align-top qty-cell">
@@ -971,21 +1028,26 @@
                     if (response && response.success) {
                         const avail = parseFloat(response.available_qty) || 0;
                         const itemReserved = parseFloat(response.item_reserved_qty) || 0;
+                        const whReserved = parseFloat(response.reserved_qty) || 0;
 
                         $tr.attr('data-available-qty', avail);
 
+                        const formattedAvail = (avail % 1 === 0) ? avail : parseFloat(avail.toFixed(2));
+                        const displayReserved = itemReserved > 0 ? itemReserved : whReserved;
+                        const formattedReserved = (displayReserved % 1 === 0) ? displayReserved : parseFloat(displayReserved.toFixed(2));
+
                         if ($availCell.length) {
-                            $availCell.text(avail);
+                            $availCell.text(formattedAvail);
                             $availCell.removeClass('text-success text-danger');
                             $availCell.addClass(avail > 0 ? 'text-success' : 'text-danger');
                         }
 
                         if ($reservedCell.length) {
-                            $reservedCell.text(itemReserved);
+                            $reservedCell.text(formattedReserved);
                         }
 
                         if ($availBadgeSpan.length) {
-                            $availBadgeSpan.text(avail);
+                            $availBadgeSpan.text(formattedAvail);
                             if (avail <= 0) {
                                 $badgeBox.removeClass('bg-soft-info text-info bg-soft-success text-success').addClass('bg-soft-danger text-danger border-danger');
                             } else {

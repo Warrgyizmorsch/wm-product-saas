@@ -32,6 +32,13 @@ class LeadFollowup extends Model
         'tagged_user_ids',
         'rescheduled_from_id',
         'original_followup_date',
+        'recording_url',
+        'audio_duration',
+        'latitude',
+        'longitude',
+        'location_address',
+        'selfie_path',
+        'location_verified_at',
     ];
 
     protected $casts = [
@@ -39,7 +46,27 @@ class LeadFollowup extends Model
         'original_followup_date' => 'datetime',
         'tagged_user_ids' => 'array',
         'is_google_meet' => 'boolean',
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'location_verified_at' => 'datetime',
     ];
+
+    protected $appends = [
+        'selfie_url',
+    ];
+
+    public function getSelfieUrlAttribute(): ?string
+    {
+        if (empty($this->selfie_path)) {
+            return null;
+        }
+
+        if (str_starts_with($this->selfie_path, 'http://') || str_starts_with($this->selfie_path, 'https://')) {
+            return $this->selfie_path;
+        }
+
+        return asset($this->selfie_path);
+    }
 
     /**
      * Get all users tagged on this followup/activity (multi-select & single select compatible).

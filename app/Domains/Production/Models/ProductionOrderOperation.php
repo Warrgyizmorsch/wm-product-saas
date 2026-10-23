@@ -60,6 +60,7 @@ class ProductionOrderOperation extends BaseModel
         'quantity_scrapped',
         'machine_used_id',
         'operator_id',
+        'executed_by',
         'is_external',
         'vendor_id',
         'subcontract_lead_time_days',
@@ -245,6 +246,11 @@ class ProductionOrderOperation extends BaseModel
     public function operator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'operator_id');
+    }
+
+    public function executedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'executed_by');
     }
 
     public function vendor(): BelongsTo

@@ -13,8 +13,10 @@ use Illuminate\Support\Carbon;
 $summary = function (WidgetContext $c): array {
     $service = app(AccountingDashboardService::class);
     $today = Carbon::today();
-    $period = $c->period->preset === 'fiscal_year'
-        ? DashboardPeriod::resolve(['preset' => 'fiscal_year'], $today, $service->fiscalYearStart($today))
+    // Keep the preset (not just its dates) so the comparison lines up the same
+    // way as on the page header: MTD vs same days last month, and so on.
+    $period = array_key_exists($c->period->preset, DashboardPeriod::PRESETS) && $c->period->preset !== 'custom'
+        ? DashboardPeriod::resolve(['preset' => $c->period->preset], $today, $service->fiscalYearStart($today))
         : DashboardPeriod::resolve(['preset' => 'custom', 'from' => $c->period->from->toDateString(), 'to' => $c->period->to->toDateString()], $today);
 
     return $service->cachedSummary($c->tenantId, $period, $c->consolidated, $c->costCenterId, $today);

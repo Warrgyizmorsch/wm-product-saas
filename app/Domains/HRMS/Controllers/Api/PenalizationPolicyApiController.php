@@ -166,7 +166,7 @@ class PenalizationPolicyApiController extends Controller
         $validationRules = [
             'rule_type'  => 'required|in:late_arrival,under_hours,missing_logs',
             'company_id' => 'nullable|integer',
-            'status'     => 'required',
+            'status'     => 'required|in:0,1',
         ];
 
         if ($request->rule_type === 'late_arrival') {
@@ -214,7 +214,7 @@ class PenalizationPolicyApiController extends Controller
                         'max_occurrence' => isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value'  => (float) $tier['penalty_value'],
-                        'leave_type_id'  => null,
+                        'leave_type_id'  => !empty($tier['leave_type_id']) ? (int)$tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -234,7 +234,7 @@ class PenalizationPolicyApiController extends Controller
                         'max_occurrence' => isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value'  => (float) $tier['penalty_value'],
-                        'leave_type_id'  => null,
+                        'leave_type_id'  => !empty($tier['leave_type_id']) ? (int)$tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -252,7 +252,7 @@ class PenalizationPolicyApiController extends Controller
                         'hours_threshold' => (float) $tier['hours_threshold'],
                         'penalty_action'  => $tier['penalty_action'],
                         'penalty_value'   => (float) $tier['penalty_value'],
-                        'leave_type_id'   => null,
+                        'leave_type_id'   => !empty($tier['leave_type_id']) ? (int)$tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -343,7 +343,7 @@ class PenalizationPolicyApiController extends Controller
             'wfh_tracking_minutes'   => 'nullable|integer|min:1|max:120',
             'site_tracking_meters'   => 'required|integer|min:1',
             'site_tracking_minutes'  => 'nullable|integer|min:1|max:120',
-            'status'                 => 'required',
+            'status'                 => 'required|in:0,1',
         ]);
 
         $validated['office_biometric']       = $request->boolean('office_biometric');

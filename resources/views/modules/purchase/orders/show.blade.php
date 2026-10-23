@@ -195,7 +195,7 @@
                 <!-- Grand Total Banner -->
                 <div class="text-end bg-light p-3 rounded-3 border min-w-180">
                     <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Grand Total</span>
-                    <h3 class="fw-bold text-primary mb-0 font-monospace">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</h3>
+                    <h3 class="fw-bold text-primary mb-0 font-monospace">{{ format_currency($order->grand_total) }}</h3>
                 </div>
             </div>
 
@@ -380,15 +380,14 @@
                                 <th style="width: 28%;">{{ __('purchase.product_name') }} & SKU</th>
                                 <th class="text-end" style="width: 8%;">{{ __('purchase.qty') }}</th>
                                 <th class="text-end" style="width: 12%;">{{ __('purchase.rate') }} ({{ active_currency_symbol() }})</th>
-                                <th class="text-end" style="width: 12%;">{{ __('purchase.gross_amount') }} ({{ active_currency_symbol() }})</th>
 
                                 @if($order->discount_type === 'item_wise')
+                                    <th class="text-end" style="width: 12%;">{{ __('purchase.gross_amount') }} ({{ active_currency_symbol() }})</th>
                                     <th class="text-end text-danger" style="width: 10%;">{{ __('purchase.disc_percent') }}</th>
                                 @endif
 
-                                <th class="text-end text-dark" style="width: 13%;">{{ __('purchase.taxable_amt') }} ({{ active_currency_symbol() }})</th>
-
                                 @if($order->tax_type === 'item_wise_tax')
+                                    <th class="text-end text-dark" style="width: 13%;">{{ __('purchase.taxable_amt') }} ({{ active_currency_symbol() }})</th>
                                     <th class="text-end text-muted" style="width: 10%;">{{ __('purchase.tax_rate') }}</th>
                                 @endif
 
@@ -408,7 +407,7 @@
                                     $discAmt = $items->sum('discount_amount');
                                     $taxableAmt = max(0, $grossAmt - $discAmt);
                                     $taxAmt = $items->sum('tax_amount');
-                                    $totalAmt = $items->sum('total_amount');
+                                    $totalAmt = $taxableAmt + $taxAmt;
                                     return (object) [
                                         'id' => $first->id,
                                         'product' => $first->product,
@@ -463,30 +462,29 @@
                                         {{ (float)$item->quantity }}
                                     </td>
                                     <td class="text-end font-monospace text-muted">
-                                        {{ $currencySymbol }}{{ number_format($item->rate, 2) }}
-                                    </td>
-                                    <td class="text-end font-monospace fw-semibold text-dark">
-                                        {{ $currencySymbol }}{{ number_format($item->gross_amount, 2) }}
+                                        {{ format_currency($item->rate) }}
                                     </td>
 
                                     @if($order->discount_type === 'item_wise')
+                                        <td class="text-end font-monospace fw-semibold text-dark">
+                                            {{ format_currency($item->gross_amount) }}
+                                        </td>
                                         <td class="text-end font-monospace text-danger">
                                             {{ (float)$item->discount_percent }}%
                                         </td>
                                     @endif
 
-                                    <td class="text-end font-monospace fw-semibold text-dark">
-                                        {{ $currencySymbol }}{{ number_format($item->taxable_amount, 2) }}
-                                    </td>
-
                                     @if($order->tax_type === 'item_wise_tax')
+                                        <td class="text-end font-monospace fw-semibold text-dark">
+                                            {{ format_currency($item->taxable_amount) }}
+                                        </td>
                                         <td class="text-end font-monospace text-muted">
                                             {{ (float)$item->tax_percent }}%
                                         </td>
                                     @endif
 
                                     <td class="text-end font-monospace fw-bold text-dark fs-14">
-                                        {{ $currencySymbol }}{{ number_format($item->total_amount, 2) }}
+                                        {{ format_currency($item->total_amount) }}
                                     </td>
                                 </tr>
                             @endforeach
@@ -701,7 +699,13 @@
 
     <!-- Register Advance Payment Modal -->
     @if($order->status === 'Approved')
-        <x-ui.modal id="advancePaymentModal" :title="__('purchase.register_vendor_advance_payment')" size="lg">
+        @php
+            $activeBalanceDue = round(convert_from_base((float)$order->balance_due), 2);
+            $activeGrandTotal = round(convert_from_base((float)$order->grand_total), 2);
+            $defaultAdvanceAmount = min($activeBalanceDue, $activeGrandTotal);
+            $currSymbol = active_currency_symbol();
+        @endphp
+        <x-ui.modal id="advancePaymentModal" :title="__('purchase.register_vendor_advance_payment')" size="lg" :showFooter="false">
             <form action="{{ route('purchase.orders.advance-payments.store') }}" method="POST" class="odoo-sheet">
                 @csrf
                 <input type="hidden" name="purchase_order_id" value="{{ $order->id }}">
@@ -724,7 +728,7 @@
 
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('purchase.advance_amount')" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" :placeholder="__('purchase.enter_amount_placeholder')" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('purchase.advance_amount') . ' (' . $currSymbol . ')'" name="amount" id="advance_amount" value="{{ number_format($defaultAdvanceAmount, 2, '.', '') }}" step="0.01" min="0.01" max="{{ number_format($activeBalanceDue, 2, '.', '') }}" required="true" :placeholder="__('purchase.enter_amount_placeholder')" />
                         </div>
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" :label="__('purchase.payment_method')" name="payment_method" id="payment_method" required="true">
@@ -749,7 +753,7 @@
                 </div>
 
                 <div class="modal-footer border-top px-3 py-2 bg-light d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('ui.cancel') ?? 'Cancel' }}</button>
+                    <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                     <button type="submit" class="btn btn-sm btn-primary fw-semibold">
                         <i class="feather-check me-1"></i>{{ __('purchase.post_advance_payment') }}
                     </button>

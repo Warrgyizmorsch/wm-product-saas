@@ -7,6 +7,7 @@ use App\Core\Database\BaseModel;
 class EmployeePenalty extends BaseModel
 {
     protected $fillable = [
+        'tenant_id',
         'employee_id',
         'date',
         'rule_type',

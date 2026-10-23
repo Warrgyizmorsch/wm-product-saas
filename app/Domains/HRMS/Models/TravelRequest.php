@@ -30,6 +30,7 @@ class TravelRequest extends BaseModel
         'start_date'             => 'date',
         'end_date'               => 'date',
         'estimated_budget'       => 'decimal:2',
+        'approved_budget'        => 'decimal:2',
         'approval_levels'        => 'integer',
         'current_approval_level' => 'integer',
         'l1_approved_at'         => 'datetime',

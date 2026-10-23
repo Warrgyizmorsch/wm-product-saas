@@ -37,15 +37,15 @@ class ProductService
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
                 'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
-                'selling_price' => (float)($validated['selling_price'] ?? 0),
-                'cost_price' => (float)($validated['cost_price'] ?? 0),
-                'unit_cost' => (float)($validated['cost_price'] ?? 0),
+                'selling_price' => convert_to_base((float)($validated['selling_price'] ?? 0)),
+                'cost_price' => convert_to_base((float)($validated['cost_price'] ?? 0)),
+                'unit_cost' => convert_to_base((float)($validated['cost_price'] ?? 0)),
                 'sales_account' => $validated['sales_account'] ?? null,
                 'purchase_account' => $validated['purchase_account'] ?? null,
                 'inventory_account' => $isService ? null : ($validated['inventory_account'] ?? null),
                 'reorder_point' => $isService ? 0 : ($validated['reorder_point'] ?? 0),
                 'opening_stock' => ($validated['variation_type'] === 'Single' && !$isService) ? ($validated['opening_stock'] ?? 0) : 0,
-                'opening_stock_rate' => ($validated['variation_type'] === 'Single' && !$isService) ? ($validated['opening_stock_rate'] ?? 0) : 0,
+                'opening_stock_rate' => ($validated['variation_type'] === 'Single' && !$isService) ? convert_to_base((float)($validated['opening_stock_rate'] ?? 0)) : 0,
                 'description' => $validated['description'] ?? null,
                 'brand' => $isService ? null : ($validated['brand'] ?? null),
                 'manufacturer' => $isService ? null : ($validated['manufacturer'] ?? null),
@@ -79,7 +79,7 @@ class ProductService
                 if (!empty($validated['warehouse_stocks'])) {
                     foreach ($validated['warehouse_stocks'] as $whId => $stockData) {
                         $qty = (float)($stockData['quantity'] ?? 0);
-                        $cost = (float)($stockData['unit_cost'] ?? 0);
+                        $cost = convert_to_base((float)($stockData['unit_cost'] ?? 0));
                         if ($qty > 0) {
                             StockService::recordInflow(
                                 $tenantId,
@@ -98,7 +98,7 @@ class ProductService
                         $parentProduct->id,
                         $defaultWarehouse->id,
                         $openingStock,
-                        $parentProduct->cost_price > 0 ? $parentProduct->cost_price : (float)($validated['opening_stock_rate'] ?? 0),
+                        $parentProduct->cost_price > 0 ? $parentProduct->cost_price : convert_to_base((float)($validated['opening_stock_rate'] ?? 0)),
                         'Opening Stock'
                     );
                 }
@@ -123,12 +123,12 @@ class ProductService
                             'variation_type' => 'Single',
                             'uom_id' => $parentProduct->uom_id,
                             'status' => $vData['status'] ?? 'active',
-                            'selling_price' => !empty($vData['selling_price']) ? (float)$vData['selling_price'] : $parentProduct->selling_price,
-                            'cost_price' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
-                            'unit_cost' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'selling_price' => !empty($vData['selling_price']) ? convert_to_base((float)$vData['selling_price']) : $parentProduct->selling_price,
+                            'cost_price' => !empty($vData['cost_price']) ? convert_to_base((float)$vData['cost_price']) : $parentProduct->cost_price,
+                            'unit_cost' => !empty($vData['cost_price']) ? convert_to_base((float)$vData['cost_price']) : $parentProduct->cost_price,
                             'reorder_point' => !empty($vData['reorder_point']) ? (float)$vData['reorder_point'] : 0,
                             'opening_stock' => !empty($vData['opening_stock']) ? (float)$vData['opening_stock'] : 0,
-                            'opening_stock_rate' => !empty($vData['cost_price']) ? (float)$vData['cost_price'] : $parentProduct->cost_price,
+                            'opening_stock_rate' => !empty($vData['cost_price']) ? convert_to_base((float)$vData['cost_price']) : $parentProduct->cost_price,
                             'variant_values' => ['label' => $attrLabel],
                             'track_serial_number' => $parentProduct->track_serial_number,
                             'track_batch' => $parentProduct->track_batch,
@@ -189,10 +189,9 @@ class ProductService
                 'status' => $validated['status'] ?? $product->status ?? 'active',
                 'hsn_sac' => $validated['hsn_sac'] ?? null,
                 'gst_rate' => $validated['gst_rate'] ?? 18.00,
-                'preferred_vendor_id' => $isService ? null : ($validated['preferred_vendor_id'] ?? null),
-                'selling_price' => (float)($validated['selling_price'] ?? $product->selling_price ?? 0),
-                'cost_price' => (float)($validated['cost_price'] ?? $product->cost_price ?? 0),
-                'unit_cost' => (float)($validated['cost_price'] ?? $product->unit_cost ?? $product->cost_price ?? 0),
+                'selling_price' => isset($validated['selling_price']) ? convert_to_base((float)$validated['selling_price']) : ($product->selling_price ?? 0),
+                'cost_price' => isset($validated['cost_price']) ? convert_to_base((float)$validated['cost_price']) : ($product->cost_price ?? 0),
+                'unit_cost' => isset($validated['cost_price']) ? convert_to_base((float)$validated['cost_price']) : ($product->unit_cost ?? $product->cost_price ?? 0),
                 'sales_account' => $validated['sales_account'] ?? null,
                 'default_production_model' => $validated['default_production_model'] ?? $product->default_production_model ?? 'pure_manufacturing',
                 'purchase_account' => $validated['purchase_account'] ?? null,
@@ -251,8 +250,8 @@ class ProductService
                     $variantSku = trim($vData['sku'] ?? '');
                     $attrLabel = trim($vData['attributes'] ?? '');
                     $name = $product->name . ($attrLabel ? " ({$attrLabel})" : '');
-                    $vSelling = isset($vData['selling_price']) && is_numeric($vData['selling_price']) ? (float)$vData['selling_price'] : $product->selling_price;
-                    $vCost = isset($vData['cost_price']) && is_numeric($vData['cost_price']) ? (float)$vData['cost_price'] : $product->cost_price;
+                    $vSelling = isset($vData['selling_price']) && is_numeric($vData['selling_price']) ? convert_to_base((float)$vData['selling_price']) : $product->selling_price;
+                    $vCost = isset($vData['cost_price']) && is_numeric($vData['cost_price']) ? convert_to_base((float)$vData['cost_price']) : $product->cost_price;
                     $vReorder = isset($vData['reorder_point']) && is_numeric($vData['reorder_point']) ? (float)$vData['reorder_point'] : 0;
                     $vOpening = isset($vData['opening_stock']) && is_numeric($vData['opening_stock']) ? (float)$vData['opening_stock'] : 0;
 
@@ -381,7 +380,7 @@ class ProductService
                 if (!empty($stocksInput) && is_array($stocksInput)) {
                     foreach ($stocksInput as $whId => $stockData) {
                         $qty = (float)($stockData['quantity'] ?? 0);
-                        $cost = (float)($stockData['unit_cost'] ?? 0);
+                        $cost = convert_to_base((float)($stockData['unit_cost'] ?? 0));
 
                         $oldStock = ProductWarehouseStock::query()
                             ->where('tenant_id', $tenantId)
@@ -483,7 +482,7 @@ class ProductService
 
                     foreach ($whData as $warehouseId => $data) {
                         $qty  = (float)($data['quantity']  ?? 0);
-                        $cost = (float)($data['unit_cost'] ?? 0);
+                        $cost = convert_to_base((float)($data['unit_cost'] ?? 0));
                         $batchNumber = $data['batch_number'] ?? null;
                         $snRaw = $data['serial_numbers'] ?? '';
                         $serialNumbers = array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$snRaw))));
@@ -557,7 +556,7 @@ class ProductService
                 $stocks = $requestInput['warehouse_stocks'] ?? [];
                 foreach ($stocks as $warehouseId => $data) {
                     $qty  = (float)($data['quantity']  ?? 0);
-                    $cost = (float)($data['unit_cost'] ?? 0);
+                    $cost = convert_to_base((float)($data['unit_cost'] ?? 0));
                     $batchNumber = $data['batch_number'] ?? null;
                     $snRaw = $data['serial_numbers'] ?? '';
                     $serialNumbers = array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$snRaw))));
@@ -643,15 +642,14 @@ class ProductService
             'supplier_method' => $validated['supplier_method'],
             'uom_id' => $validated['uom_id'],
             'inventory_valuation_method' => $validated['inventory_valuation_method'],
-            'unit_cost' => $validated['unit_cost'] ?? 0.0,
-            'selling_price' => $validated['selling_price'] ?? 0.0,
-            'cost_price' => $validated['unit_cost'] ?? 0.0,
+            'unit_cost' => convert_to_base((float)($validated['unit_cost'] ?? 0.0)),
+            'selling_price' => convert_to_base((float)($validated['selling_price'] ?? 0.0)),
+            'cost_price' => convert_to_base((float)($validated['unit_cost'] ?? 0.0)),
             'sales_account' => $validated['sales_account'] ?? null,
             'purchase_account' => $validated['purchase_account'] ?? null,
             'inventory_account' => $validated['inventory_account'] ?? null,
             'preferred_vendor_id' => $validated['preferred_vendor_id'] ?? null,
             'status' => 'active',
-            'planning_type' => $validated['supplier_method'] === 'manufacture' ? 'manufacture' : 'purchase',
             'variation_type' => 'Single',
         ]);
     }

@@ -11,12 +11,19 @@ use App\Domains\Sales\Models\PaymentAllocation;
 use App\Domains\Sales\Events\InvoicePosted;
 use App\Domains\Sales\Repositories\InvoiceRepository;
 use App\Domains\Platform\Models\PaymentTerm;
+use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
+use App\Domains\Accounting\Services\VoucherService;
+use App\Domains\Accounting\Support\VoucherType;
+use App\Domains\Sales\Models\DispatchOrderItem;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Exports\InvoiceExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 
@@ -149,7 +156,8 @@ class InvoiceController extends Controller
 
         if (!$dispatchOrderId && $mode !== 'dispatch_order') {
             if ($salesOrderId) {
-                $matchingSO = $salesOrders->firstWhere('id', (int)$salesOrderId);
+                $matchingSO = $salesOrders->firstWhere('id', (int)$salesOrderId)
+                    ?: SalesOrder::with(['customer', 'items.product', 'items.warehouse'])->find((int)$salesOrderId);
                 if ($matchingSO) {
                     $salesOrder = $matchingSO;
                 } else {
@@ -165,6 +173,10 @@ class InvoiceController extends Controller
         $latest = Invoice::latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('INV-', '', $latest->invoice_number)) + 1 : 1;
         $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        while (Invoice::where('invoice_number', $nextInvoiceNumber)->exists()) {
+            $nextSeq++;
+            $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        }
 
         $advanceAllocations = 0;
         if ($salesOrder) {
@@ -172,6 +184,8 @@ class InvoiceController extends Controller
                 ->whereNull('invoice_id')
                 ->sum('allocated_amount');
         }
+
+        $taxMode = $salesOrder?->effective_tax_mode ?? 'exclusive';
 
         $invoiceItems = [];
         if ($mode === 'dispatch_order') {
@@ -207,14 +221,25 @@ class InvoiceController extends Controller
                         continue; // Skip items already fully invoiced
                     }
 
-                    $unitPrice = $soItem ? floatval($soItem->unit_price) : floatval($doItem->product?->selling_price ?? 0);
+                    $unitPriceInBase = $soItem ? floatval($soItem->unit_price) : floatval($doItem->product?->selling_price ?? 0);
+                    $unitPrice = round(convert_from_base($unitPriceInBase), 2);
                     $taxRate = $soItem ? floatval($soItem->tax_rate) : 0.0;
-                    $discount = $soItem ? floatval($soItem->discount) : 0.0;
+                    $discountInBase = $soItem ? floatval($soItem->discount) : 0.0;
+                    $discount = round(convert_from_base($discountInBase), 2);
 
                     $subtotal = $unbilledQty * $unitPrice;
                     $discountAmt = $discount;
-                    $taxable = max(0, $subtotal - $discountAmt);
-                    $taxAmt = $taxable * ($taxRate / 100);
+                    $net = max(0, $subtotal - $discountAmt);
+
+                    if ($taxMode === 'inclusive') {
+                        $taxable = ($taxRate > 0) ? round($net / (1 + ($taxRate / 100)), 4) : $net;
+                        $taxAmt = round($net - $taxable, 4);
+                        $totalAmt = $net;
+                    } else {
+                        $taxable = $net;
+                        $taxAmt = $taxable * ($taxRate / 100);
+                        $totalAmt = $taxable + $taxAmt;
+                    }
 
                     $invoiceItems[] = [
                         'sales_order_item_id'          => $soItem?->id,
@@ -231,7 +256,7 @@ class InvoiceController extends Controller
                         'tax_rate'                     => $taxRate,
                         'tax_amount'                   => $taxAmt,
                         'subtotal'                     => $subtotal,
-                        'total_amount'                 => $taxable + $taxAmt,
+                        'total_amount'                 => $totalAmt,
                         'warehouse_id'                 => $doItem->warehouse_id ?? null,
                         'warehouse_name'               => $doItem->warehouse?->name ?? null,
                     ];
@@ -250,14 +275,23 @@ class InvoiceController extends Controller
                     continue; // Skip items already fully invoiced
                 }
 
-                $unitPrice = floatval($soItem->unit_price);
+                $unitPrice = round(convert_from_base(floatval($soItem->unit_price)), 2);
                 $taxRate = floatval($soItem->tax_rate);
-                $discount = floatval($soItem->discount);
+                $discount = round(convert_from_base(floatval($soItem->discount)), 2);
 
                 $subtotal = $unbilledQty * $unitPrice;
                 $discountAmt = $discount;
-                $taxable = max(0, $subtotal - $discountAmt);
-                $taxAmt = $taxable * ($taxRate / 100);
+                $net = max(0, $subtotal - $discountAmt);
+
+                if ($taxMode === 'inclusive') {
+                    $taxable = ($taxRate > 0) ? round($net / (1 + ($taxRate / 100)), 4) : $net;
+                    $taxAmt = round($net - $taxable, 4);
+                    $totalAmt = $net;
+                } else {
+                    $taxable = $net;
+                    $taxAmt = $taxable * ($taxRate / 100);
+                    $totalAmt = $taxable + $taxAmt;
+                }
 
                 $invoiceItems[] = [
                     'sales_order_item_id'          => $soItem->id,
@@ -274,7 +308,7 @@ class InvoiceController extends Controller
                     'tax_rate'                     => $taxRate,
                     'tax_amount'                   => $taxAmt,
                     'subtotal'                     => $subtotal,
-                    'total_amount'                 => $taxable + $taxAmt,
+                    'total_amount'                 => $totalAmt,
                     'warehouse_id'                 => $soItem->warehouse_id ?? null,
                     'warehouse_name'               => $soItem->warehouse?->name ?? null,
                 ];
@@ -285,7 +319,7 @@ class InvoiceController extends Controller
 
         return view('modules.sales.invoices.create', compact(
             'mode', 'salesOrders', 'dispatchOrders', 'customers', 'products', 'warehouses', 'paymentTerms',
-            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId', 'invoicingPolicy'
+            'salesOrder', 'dispatchOrder', 'nextInvoiceNumber', 'advanceAllocations', 'invoiceItems', 'customerId', 'invoicingPolicy', 'taxMode'
         ));
     }
 
@@ -293,14 +327,37 @@ class InvoiceController extends Controller
     {
         $this->authorize('create', Invoice::class);
 
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id;
+        $branchId = branch_id() ?? auth()->user()?->branch_id;
+        if ($request->filled('sales_order_id')) {
+            $so = SalesOrder::find($request->input('sales_order_id'));
+            if ($so) {
+                $tenantId = $so->tenant_id ?? $tenantId;
+                $companyId = $so->company_id ?? $companyId;
+                $branchId = $so->branch_id ?? $branchId;
+            }
+        }
+
+        $invoiceNumberRule = Rule::unique('invoices', 'invoice_number')->where(function ($query) use ($tenantId, $companyId, $branchId) {
+            $query->where('tenant_id', $tenantId);
+            if ($companyId !== null) {
+                $query->where('company_id', $companyId);
+            }
+            if ($branchId !== null) {
+                $query->where('branch_id', $branchId);
+            }
+        });
+
         $validated = $request->validate([
             'sales_order_id'          => ['nullable', 'exists:sales_orders,id'],
             'customer_id'             => ['nullable', 'exists:customers,id'],
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
-            'invoice_number'          => ['required', 'string', 'max:255', 'unique:invoices,invoice_number'],
+            'invoice_number'          => ['required', 'string', 'max:255', $invoiceNumberRule],
             'invoice_date'            => ['required', 'date'],
             'due_date'                => ['required', 'date', 'after_or_equal:invoice_date'],
             'payment_terms'           => ['nullable', 'string', 'max:255'],
+            'tax_mode'                => ['nullable', 'string', 'in:exclusive,inclusive'],
             'gst_type'                => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'freight_terms'           => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
             'freight_amount'          => ['nullable', 'numeric', 'min:0'],
@@ -353,29 +410,39 @@ class InvoiceController extends Controller
             return redirect()->back()->withInput()->with('error', 'Customer selection is required.');
         }
 
-        $tenantId = $salesOrder?->tenant_id ?? (tenant_id() ?? 1);
+        $tenantId = $salesOrder?->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+        $branchId = branch_id() ?? $salesOrder?->branch_id ?? auth()->user()?->branch_id;
+        $companyId = company_id() ?? $salesOrder?->company_id ?? auth()->user()?->company_id;
 
+        $taxMode      = $request->input('tax_mode') ?: ($salesOrder?->effective_tax_mode ?? 'exclusive');
         $taxType      = $request->input('tax_type', 'item_wise_tax');
         $discountType = $request->input('discount_type', 'without_discount');
         $gstType      = $request->input('gst_type', 'cgst_sgst');
 
         $freightTerms  = $validated['freight_terms'] ?? $salesOrder?->freight_terms ?? 'To Pay';
-        $freightAmount = floatval($validated['freight_amount'] ?? 0);
+        $freightAmount = convert_to_base(floatval($validated['freight_amount'] ?? 0));
 
-        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
+        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $branchId, $companyId, $taxMode, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
             $subtotal = 0;
             $taxAmount = 0;
             $discountAmount = 0;
 
             foreach ($validated['items'] as $item) {
                 $qty   = floatval($item['quantity']);
-                $price = floatval($item['unit_price']);
-                $disc  = ($discountType === 'item_wise') ? floatval($item['discount'] ?? 0) : 0;
+                $price = convert_to_base(floatval($item['unit_price']));
+                $disc  = ($discountType === 'item_wise') ? convert_to_base(floatval($item['discount'] ?? 0)) : 0;
                 $taxR  = ($taxType === 'item_wise_tax') ? floatval($item['tax_rate'] ?? 0) : 0;
 
                 $lineSubtotal = $qty * $price;
-                $lineTaxable  = max(0, $lineSubtotal - $disc);
-                $lineTax      = $lineTaxable * ($taxR / 100);
+                $lineNet      = max(0, $lineSubtotal - $disc);
+
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($taxR > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxR / 100)), 4) : $lineNet;
+                    $lineTax  = ($taxType === 'item_wise_tax') ? ($lineNet - $lineBase) : 0;
+                } else {
+                    $lineBase = $lineNet;
+                    $lineTax  = ($taxType === 'item_wise_tax') ? ($lineBase * ($taxR / 100)) : 0;
+                }
 
                 $subtotal       += $lineSubtotal;
                 $discountAmount += $disc;
@@ -383,7 +450,7 @@ class InvoiceController extends Controller
             }
 
             if ($discountType === 'order_wise') {
-                $discountAmount = floatval($request->input('discount_amount', 0));
+                $discountAmount = convert_to_base(floatval($request->input('discount_amount', 0)));
             } elseif ($discountType === 'without_discount') {
                 $discountAmount = 0;
             }
@@ -391,10 +458,16 @@ class InvoiceController extends Controller
             if ($taxType === 'order_wise_tax') {
                 $orderTaxPercent = floatval($request->input('order_tax_percent', 0));
                 $taxableBase     = max(0, $subtotal - $discountAmount);
-                $taxAmount       = $taxableBase * ($orderTaxPercent / 100);
+                if ($taxMode === 'inclusive') {
+                    $taxAmount = ($orderTaxPercent > 0) ? ($taxableBase - ($taxableBase / (1 + ($orderTaxPercent / 100)))) : 0;
+                } else {
+                    $taxAmount = $taxableBase * ($orderTaxPercent / 100);
+                }
             } elseif ($taxType === 'without_tax') {
                 $taxAmount = 0;
             }
+
+            $taxAmount = round($taxAmount, 4);
 
             $freightTaxRateOpt = $request->input('freight_tax_rate', 'highest');
             $freightTaxRatePercent = 18;
@@ -414,7 +487,7 @@ class InvoiceController extends Controller
             }
 
             $effectiveFreight = ($freightTerms === 'To Be Billed') ? $freightAmount : 0;
-            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 2) : 0;
+            $freightTax = ($effectiveFreight > 0 && $taxType !== 'without_tax') ? round($effectiveFreight * ($freightTaxRatePercent / 100), 4) : 0;
             $totalTaxAmount = $taxAmount + $freightTax;
 
             $cgstAmount = 0;
@@ -425,16 +498,22 @@ class InvoiceController extends Controller
                 if ($gstType === 'igst') {
                     $igstAmount = $totalTaxAmount;
                 } else {
-                    $cgstAmount = round($totalTaxAmount / 2, 2);
-                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($totalTaxAmount / 2, 4);
+                    $sgstAmount = round($totalTaxAmount - $cgstAmount, 4);
                 }
             }
 
-            $adjustment = floatval($request->input('adjustment', 0));
-            $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
+            $adjustment = convert_to_base(floatval($request->input('adjustment', 0)));
+            if ($taxMode === 'inclusive') {
+                $totalAmount = max(0, $subtotal - $discountAmount) + $effectiveFreight + $adjustment;
+            } else {
+                $totalAmount = max(0, $subtotal - $discountAmount + $totalTaxAmount + $effectiveFreight + $adjustment);
+            }
 
             $invoice = Invoice::create([
                 'tenant_id'               => $tenantId,
+                'company_id'              => $companyId,
+                'branch_id'               => $branchId,
                 'sales_order_id'          => $salesOrder?->id,
                 'customer_id'             => $customerId,
                 'material_requirement_id' => $validated['material_requirement_id'] ?? null,
@@ -445,6 +524,7 @@ class InvoiceController extends Controller
                 'status'                  => 'Draft',
                 'discount_type'           => $discountType,
                 'tax_type'                => $taxType,
+                'tax_mode'                => $taxMode,
                 'order_tax_rate'          => floatval($request->input('order_tax_percent', $request->input('order_tax_rate', 0))),
                 'adjustment'              => $adjustment,
                 'subtotal'                => $subtotal,
@@ -465,13 +545,22 @@ class InvoiceController extends Controller
 
             foreach ($validated['items'] as $item) {
                 $qty = floatval($item['quantity']);
-                $price = floatval($item['unit_price']);
-                $disc = floatval($item['discount'] ?? 0);
+                $price = convert_to_base(floatval($item['unit_price']));
+                $disc = convert_to_base(floatval($item['discount'] ?? 0));
                 $taxR = floatval($item['tax_rate'] ?? 0);
 
                 $lineSubtotal = $qty * $price;
-                $lineTaxable = max(0, $lineSubtotal - $disc);
-                $lineTax = $lineTaxable * ($taxR / 100);
+                $lineNet = max(0, $lineSubtotal - $disc);
+
+                if ($taxMode === 'inclusive') {
+                    $lineBase = ($taxR > 0 && $taxType === 'item_wise_tax') ? round($lineNet / (1 + ($taxR / 100)), 4) : $lineNet;
+                    $lineTax = ($taxType === 'item_wise_tax') ? ($lineNet - $lineBase) : 0;
+                    $lineTotal = $lineNet;
+                } else {
+                    $lineBase = $lineNet;
+                    $lineTax = ($taxType === 'item_wise_tax') ? ($lineBase * ($taxR / 100)) : 0;
+                    $lineTotal = $lineBase + $lineTax;
+                }
 
                 $lineCgstPercent = 0;
                 $lineSgstPercent = 0;
@@ -487,8 +576,8 @@ class InvoiceController extends Controller
                     } else {
                         $lineCgstPercent = round($taxR / 2, 2);
                         $lineSgstPercent = round($taxR / 2, 2);
-                        $lineCgstAmt = round($lineTax / 2, 2);
-                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 2);
+                        $lineCgstAmt = round($lineTax / 2, 4);
+                        $lineSgstAmt = round($lineTax - $lineCgstAmt, 4);
                     }
                 }
 
@@ -512,7 +601,7 @@ class InvoiceController extends Controller
                     'sgst_amount'                  => $lineSgstAmt,
                     'igst_amount'                  => $lineIgstAmt,
                     'subtotal'                     => $lineSubtotal,
-                    'total_amount'                 => $lineTaxable + $lineTax,
+                    'total_amount'                 => $lineTotal,
                 ]);
             }
 
@@ -562,15 +651,269 @@ class InvoiceController extends Controller
         $adjustedAmount = $invoice->allocations->sum('allocated_amount');
         $balanceDue     = $invoice->balance_due;
 
-        $transporters = \App\Domains\Platform\Models\Transporter::where('tenant_id', require_tenant_id())
+        $tenantId = require_tenant_id();
+
+        $transporters = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
             ->where('status', 'active')
             ->orderBy('name')
             ->get();
 
-        $count = \App\Domains\Platform\Models\Transporter::where('tenant_id', require_tenant_id())->count() + 1;
+        $count = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)->count() + 1;
         $autoTransporterCode = 'TRP-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
-        return view('modules.sales.invoices.show', compact('invoice', 'adjustedAmount', 'balanceDue', 'transporters', 'autoTransporterCode'));
+        // Check if any goods have been dispatched for this invoice or its sales order
+        $hasDispatched = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId, $invoice) {
+            $q->where('tenant_id', $tenantId)
+              ->where('status', '!=', 'Cancelled')
+              ->where(function ($sub) use ($invoice) {
+                  $sub->where('invoice_id', $invoice->id);
+                  if ($invoice->sales_order_id) {
+                      $sub->orWhere('sales_order_id', $invoice->sales_order_id);
+                  }
+                  if ($invoice->material_requirement_id) {
+                      $sub->orWhere('material_requirement_id', $invoice->material_requirement_id);
+                  }
+              });
+        })
+        ->where(function ($q) {
+            $q->where('quantity_dispatched', '>', 0)
+              ->orWhere('quantity_ordered', '>', 0);
+        })
+        ->exists();
+
+        // Linked Financial Credit Notes
+        $linkedCreditNotes = Journal::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('reference_type', 'invoice')
+            ->where('reference_id', $invoice->id)
+            ->where('voucher_type', VoucherType::CREDIT_NOTE)
+            ->get();
+
+        // Active Cash and Bank accounts for potential refunds
+        $cashBankAccounts = ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('is_cash_or_bank', true)
+                  ->orWhere('name', 'like', '%Bank%')
+                  ->orWhere('name', 'like', '%Cash%');
+            })
+            ->orderBy('name')
+            ->get();
+
+        return view('modules.sales.invoices.show', compact(
+            'invoice', 'adjustedAmount', 'balanceDue', 'transporters', 'autoTransporterCode',
+            'hasDispatched', 'linkedCreditNotes', 'cashBankAccounts'
+        ));
+    }
+
+    /**
+     * Issue a Financial Credit Note directly from the Invoice (for un-dispatched orders or financial adjustments)
+     */
+    public function storeCreditNote(Request $request, int $invoice): RedirectResponse
+    {
+        $inv = $this->invoiceRepo->find($invoice);
+        if (!$inv) abort(404);
+        $this->authorize('update', $inv);
+
+        if ($inv->status === 'Cancelled') {
+            return back()->withErrors(['error' => 'This invoice is already cancelled.']);
+        }
+
+        $tenantId = $inv->tenant_id ?? require_tenant_id();
+
+        // Enforce dispatch guard
+        $hasDispatched = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId, $inv) {
+            $q->where('tenant_id', $tenantId)
+              ->where('status', '!=', 'Cancelled')
+              ->where(function ($sub) use ($inv) {
+                  $sub->where('invoice_id', $inv->id);
+                  if ($inv->sales_order_id) {
+                      $sub->orWhere('sales_order_id', $inv->sales_order_id);
+                  }
+                  if ($inv->material_requirement_id) {
+                      $sub->orWhere('material_requirement_id', $inv->material_requirement_id);
+                  }
+              });
+        })
+        ->where(function ($q) {
+            $q->where('quantity_dispatched', '>', 0)
+              ->orWhere('quantity_ordered', '>', 0);
+        })
+        ->exists();
+
+        if ($hasDispatched) {
+            return back()->withErrors(['error' => 'Goods for this invoice have already been dispatched. Please create a Sales Return instead of a direct financial credit note.']);
+        }
+
+        $validated = $request->validate([
+            'reason'                 => ['required', 'string', 'max:255'],
+            'credit_note_date'       => ['required', 'date'],
+            'refund_action'          => ['required', 'string', 'in:credit_balance,bank_refund'],
+            'refund_bank_account_id' => ['nullable', 'required_if:refund_action,bank_refund', 'integer'],
+            'notes'                  => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $journal = DB::transaction(function () use ($inv, $tenantId, $validated) {
+            $accountsReceivable = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '1100')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Accounts Receivable%')->first();
+            $salesReturnAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '4030')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Sales Return%')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '4010')->first();
+            $cgstAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '2110')->first();
+            $sgstAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '2120')->first();
+            $igstAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '2130')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Output IGST%')->first();
+            $freightAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '4900')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Freight%')->first();
+            $roundOffAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '5730')->first();
+
+            $taxableNet = max(0, (float)$inv->subtotal - (float)$inv->discount_amount);
+            $cgst = (float)$inv->cgst_amount;
+            $sgst = (float)$inv->sgst_amount;
+            $igst = (float)$inv->igst_amount;
+            $freight = ($inv->freight_terms === 'To Be Billed') ? (float)$inv->freight_amount : 0;
+            $totalAmount = (float)$inv->total_amount;
+
+            $lines = [];
+            if ($taxableNet > 0 && $salesReturnAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $salesReturnAccount->id,
+                    'debit'               => round($taxableNet, 2),
+                    'credit'              => 0,
+                    'description'         => "Sales Return / Credit Note - {$inv->invoice_number}",
+                ];
+            }
+            if ($cgst > 0 && $cgstAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $cgstAccount->id,
+                    'debit'               => round($cgst, 2),
+                    'credit'              => 0,
+                    'description'         => "CGST Output Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($sgst > 0 && $sgstAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $sgstAccount->id,
+                    'debit'               => round($sgst, 2),
+                    'credit'              => 0,
+                    'description'         => "SGST Output Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($igst > 0 && $igstAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $igstAccount->id,
+                    'debit'               => round($igst, 2),
+                    'credit'              => 0,
+                    'description'         => "IGST Output Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($freight > 0 && $freightAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $freightAccount->id,
+                    'debit'               => round($freight, 2),
+                    'credit'              => 0,
+                    'description'         => "Freight Charges Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($accountsReceivable) {
+                $lines[] = [
+                    'chart_of_account_id' => $accountsReceivable->id,
+                    'debit'               => 0,
+                    'credit'              => round($totalAmount, 2),
+                    'description'         => "Credit Note Total Value - {$inv->invoice_number}",
+                    'party_type'          => JournalEntry::PARTY_CUSTOMER,
+                    'party_id'            => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                ];
+            }
+
+            // Penny balance check
+            $totalDebit = round(array_sum(array_column($lines, 'debit')), 2);
+            $totalCredit = round(array_sum(array_column($lines, 'credit')), 2);
+            $diff = round($totalDebit - $totalCredit, 2);
+            if (abs($diff) > 0 && abs($diff) <= 0.05 && $roundOffAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $roundOffAccount->id,
+                    'debit'               => $diff < 0 ? abs($diff) : 0,
+                    'credit'              => $diff > 0 ? $diff : 0,
+                    'description'         => "Round Off - Credit Note {$inv->invoice_number}",
+                ];
+            }
+
+            $voucherService = app(VoucherService::class);
+            $journal = $voucherService->post(VoucherType::CREDIT_NOTE, $lines, [
+                'tenant_id'      => $tenantId,
+                'company_id'     => $inv->company_id,
+                'branch_id'      => $inv->branch_id,
+                'journal_date'   => $validated['credit_note_date'],
+                'reference_type' => 'invoice',
+                'reference_id'   => $inv->id,
+                'memo'           => "Credit Note for Invoice {$inv->invoice_number}: {$validated['reason']}",
+                'party_type'     => 'customer',
+                'party_id'       => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                'party_name'     => $inv->customer?->name ?: $inv->salesOrder?->customer?->name,
+                'reference_no'   => $inv->invoice_number,
+                'posted_by'      => auth()->id(),
+            ]);
+
+            // Handle payments if any
+            if ((float)$inv->amount_paid > 0) {
+                if ($validated['refund_action'] === 'bank_refund' && !empty($validated['refund_bank_account_id'])) {
+                    $bankAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($validated['refund_bank_account_id']);
+                    if ($bankAccount && $accountsReceivable) {
+                        $refundLines = [
+                            [
+                                'chart_of_account_id' => $accountsReceivable->id,
+                                'debit'               => round((float)$inv->amount_paid, 2),
+                                'credit'              => 0,
+                                'description'         => "Customer Refund for Invoice {$inv->invoice_number}",
+                                'party_type'          => JournalEntry::PARTY_CUSTOMER,
+                                'party_id'            => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                            ],
+                            [
+                                'chart_of_account_id' => $bankAccount->id,
+                                'debit'               => 0,
+                                'credit'              => round((float)$inv->amount_paid, 2),
+                                'description'         => "Bank Payout - Customer Refund {$inv->invoice_number}",
+                            ],
+                        ];
+                        $voucherService->post(VoucherType::PAYMENT, $refundLines, [
+                            'tenant_id'      => $tenantId,
+                            'company_id'     => $inv->company_id,
+                            'branch_id'      => $inv->branch_id,
+                            'journal_date'   => $validated['credit_note_date'],
+                            'reference_type' => 'invoice_refund',
+                            'reference_id'   => $inv->id,
+                            'memo'           => "Customer Refund for {$inv->invoice_number} via {$bankAccount->name}",
+                            'party_type'     => 'customer',
+                            'party_id'       => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                            'party_name'     => $inv->customer?->name ?: $inv->salesOrder?->customer?->name,
+                            'reference_no'   => $inv->invoice_number,
+                            'posted_by'      => auth()->id(),
+                        ]);
+                    }
+                } else {
+                    // Retain as Customer Advance Credit: unallocate payment allocation from this invoice
+                    PaymentAllocation::where('invoice_id', $inv->id)
+                        ->update(['invoice_id' => null]);
+                }
+            }
+
+            // Update Invoice
+            $inv->status = 'Cancelled';
+            $inv->balance_due = 0;
+            $cancellationNote = "Cancelled via Financial Credit Note #{$journal->journal_number} on " . date('Y-m-d') . ". Reason: " . $validated['reason'];
+            if (!empty($validated['notes'])) {
+                $cancellationNote .= " | Notes: " . $validated['notes'];
+            }
+            $inv->notes = $inv->notes ? ($inv->notes . "\n" . $cancellationNote) : $cancellationNote;
+            $inv->save();
+
+            return $journal;
+        });
+
+        return redirect()->route('sales.invoices.show', $inv->id)
+            ->with('success', "Financial Credit Note {$journal->journal_number} created successfully. Invoice {$inv->invoice_number} has been cancelled without altering warehouse inventory.");
     }
 
 
@@ -727,3 +1070,4 @@ class InvoiceController extends Controller
         }
     }
 }
+

@@ -70,9 +70,39 @@ class ProjectDashboardService
         }
 
         $totalTrackedHours = (float) (clone $timeLogQuery)->sum('hours');
-        $totalIncurredCost = (float) ((clone $timeLogQuery)
+        $timesheetCost = (float) ((clone $timeLogQuery)
             ->selectRaw('SUM(hours * COALESCE(hourly_rate, 0)) as cost')
             ->value('cost') ?? 0.0);
+
+        $productionOrders = \App\Domains\Production\Models\ProductionOrder::query()
+            ->where('tenant_id', $filters->tenant_id)
+            ->where(function ($q) use ($projectIds) {
+                $q->whereIn('project_id', $projectIds)
+                  ->orWhereHas('projectTask', function ($tq) use ($projectIds) {
+                      $tq->whereIn('project_id', $projectIds);
+                  });
+            })
+            ->with([
+                'reservations.product',
+                'issues.product',
+                'operations.routingOperation',
+                'operations.workCenter',
+            ])
+            ->get();
+
+        $productionCost = 0.0;
+        if ($productionOrders->isNotEmpty()) {
+            $varianceService = app(\App\Domains\Production\Services\ProductionCostVarianceService::class);
+            $adjustmentService = app(\App\Domains\Production\Services\ProductionCostAdjustmentService::class);
+
+            foreach ($productionOrders as $order) {
+                $analysis = $varianceService->getCostAnalysis($order);
+                $finalSummary = $adjustmentService->getFinalCostingSummary($order, $analysis);
+                $productionCost += (float) ($finalSummary['totals']['final'] ?? 0.0);
+            }
+        }
+
+        $totalIncurredCost = $timesheetCost + $productionCost;
 
         $costConsumptionPercent = $totalBudgetAmount > 0
             ? round(($totalIncurredCost / $totalBudgetAmount) * 100, 1)

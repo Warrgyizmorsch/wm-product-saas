@@ -492,10 +492,14 @@
                             </thead>
                             <tbody>
                                 @forelse($assignments as $a)
+                                    @php
+                                        $empName = $a->employee?->full_name ?? ($a->employee?->first_name ?? 'Employee');
+                                        $deptName = $a->employee?->department?->name ?? 'Organization-Wide';
+                                    @endphp
                                     <tr>
                                         <td class="ps-2 py-2">
-                                            <span class="fw-bold text-dark d-block text-truncate fs-12" title="{{ $a->employee->full_name }}">{{ $a->employee->full_name }}</span>
-                                            <small class="text-muted d-block text-truncate fs-11" title="{{ $a->employee->department->name ?? 'Dept' }}">{{ $a->employee->department->name ?? 'Dept' }}</small>
+                                            <span class="fw-bold text-dark d-block text-truncate fs-12" title="{{ $empName }}">{{ $empName }}</span>
+                                            <small class="text-muted d-block text-truncate fs-11" title="{{ $deptName }}">{{ $deptName }}</small>
                                         </td>
                                         <td class="py-2">
                                             @if($a->status === 'acknowledged')
@@ -557,12 +561,17 @@
                     <i class="feather-git-branch text-warning fs-14"></i>
                     <h6 class="fw-bold fs-13 text-dark mb-0">Version Control & Revision Action</h6>
                 </div>
+                @php
+                    $vParts = explode('.', $sop->version ?? '1.0');
+                    $nextMinor = ($vParts[0] ?? '1') . '.' . (((int)($vParts[1] ?? 0)) + 1);
+                    $nextMajor = (((int)($vParts[0] ?? 1)) + 1) . '.0';
+                @endphp
                 <div class="row g-3">
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="select" label="Version Bump" name="version_bump">
                             <option value="none">No Version Change (Keep Current v{{ $sop->version }})</option>
-                            <option value="minor">Minor Revision (Bump to v{{ (float)$sop->version + 0.1 }}) - Minor wording/clarification</option>
-                            <option value="major">Major Revision (Bump to v{{ (int)$sop->version + 1 }}.0) - Mandatory Re-acknowledgment for Staff</option>
+                            <option value="minor">Minor Revision (Bump to v{{ $nextMinor }}) - Minor wording/clarification</option>
+                            <option value="major">Major Revision (Bump to v{{ $nextMajor }}) - Mandatory Re-acknowledgment for Staff</option>
                         </x-ui.odoo-form-ui>
                     </div>
                     <div class="col-md-6">

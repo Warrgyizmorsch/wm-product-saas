@@ -120,7 +120,7 @@ class RecruitmentController extends Controller
             'first_name'            => 'required|string|max:100',
             'last_name'             => 'nullable|string|max:100',
             'email'                 => 'required|email|max:255',
-            'phone'                 => 'nullable|string|max:20',
+            'phone'                 => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'current_location'      => 'nullable|string|max:100',
             'current_company'       => 'nullable|string|max:150',
             'current_designation'   => 'nullable|string|max:150',
@@ -229,7 +229,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $offer = $this->recruitmentRepository->createOffer($application, $validated, $request, $tenantId);
 
-        return redirect()->back()->with('success', "Job Offer #{$offer->offer_code} generated and sent successfully!");
+        return redirect()->back()->with('success', "Job Offer #{$offer->offer_code} generated successfully. Send it to the candidate when ready.");
     }
 
     // Send Job Offer Email to Candidate
@@ -253,13 +253,37 @@ class RecruitmentController extends Controller
         return redirect()->back()->with('success', $result['message']);
     }
 
+    // Update Offer Status (Accepted / Declined)
+    public function updateOfferStatus(Request $request, JobOffer $offer): RedirectResponse
+    {
+        $this->authorizeHrms('hrms.recruitment.update');
+
+        $validated = $request->validate([
+            'status' => 'required|in:accepted,declined',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $tenantId = function_exists('tenant_id') ? tenant_id() : null;
+        $result = $this->recruitmentRepository->updateOfferStatus($offer, $validated['status'], $validated['reason'] ?? null, $tenantId);
+
+        if (!$result['success']) {
+            return redirect()->back()->with('error', $result['message']);
+        }
+
+        return redirect()->back()->with('success', $result['message']);
+    }
+
     // Convert Candidate to HRMS Employee: Create User & Redirect to Pre-filled Employee Form
     public function convertToEmployee(Request $request, JobOffer $offer): RedirectResponse
     {
         $this->authorizeHrms('hrms.recruitment.manage');
 
+        $request->validate([
+            'initial_password' => 'nullable|string|min:8|max:64',
+        ]);
+
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
-        $result = $this->recruitmentRepository->convertToEmployee($offer, $tenantId);
+        $result = $this->recruitmentRepository->convertToEmployee($offer, $tenantId, $request->input('initial_password'));
 
         if (!$result['success']) {
             return redirect()->back()->with('error', $result['message']);
@@ -267,12 +291,26 @@ class RecruitmentController extends Controller
 
         $user = $result['user'];
         $candidate = $result['candidate'];
+        $initialPassword = $result['initial_password'] ?? null;
+
+        $msg = "🎉 User account created for {$candidate->full_name}!";
+        if ($initialPassword && !$request->filled('initial_password')) {
+            $msg .= " Initial password: {$initialPassword} (Please share securely with employee).";
+        }
+        $msg .= " Candidate moved to Hired stage. Please complete the Employee Profile below.";
 
         return redirect()->route('hrms.employees.index', array_filter([
             'convert_offer_id' => $offer->id,
             'user_id'          => $user->id,
             'account_id'       => $request->account_id,
-        ]))->with('success', "🎉 User account created for {$candidate->full_name}! Candidate moved to Hired stage. Please complete the Employee Profile below.");
+        ]))->with('success', $msg);
+    }
+
+    public function downloadOfferPdf(JobOffer $offer)
+    {
+        $this->authorizeHrms('hrms.recruitment.view');
+
+        return $this->recruitmentRepository->downloadOfferPdf($offer);
     }
 
     public function downloadResume(Candidate $candidate)

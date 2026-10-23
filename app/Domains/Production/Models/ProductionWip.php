@@ -63,6 +63,28 @@ class ProductionWip extends BaseModel
         'completed_at' => 'datetime',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($wip) {
+            if ((empty($wip->company_id) || empty($wip->branch_id) || empty($wip->product_id)) && !empty($wip->production_order_id)) {
+                $order = $wip->order ?: ProductionOrder::withoutGlobalScopes()->find($wip->production_order_id);
+                if ($order) {
+                    if (empty($wip->company_id)) {
+                        $wip->company_id = $order->company_id;
+                    }
+                    if (empty($wip->branch_id)) {
+                        $wip->branch_id = $order->branch_id;
+                    }
+                    if (empty($wip->product_id)) {
+                        $wip->product_id = $order->product_id;
+                    }
+                }
+            }
+        });
+    }
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(ProductionOrder::class, 'production_order_id')->withTrashed();

@@ -37,7 +37,18 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                     $inner->where('full_name', 'like', "%{$search}%")
                         ->orWhere('employee_id', 'like', "%{$search}%")
                         ->orWhere('personal_email', 'like', "%{$search}%")
-                        ->orWhere('personal_mobile_number', 'like', "%{$search}%");
+                        ->orWhere('office_email', 'like', "%{$search}%")
+                        ->orWhere('personal_mobile_number', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($uq) use ($search) {
+                            $uq->where('email', 'like', "%{$search}%")
+                               ->orWhere('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('designation', function ($dq) use ($search) {
+                            $dq->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('department', function ($dpq) use ($search) {
+                            $dpq->where('name', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($filters['company_id'], fn ($query, int $companyId) => $query->where('company_id', $companyId))
@@ -95,6 +106,10 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'assetRequests.requestedAsset',
             'assetRequests.allocatedAsset',
             'assetRequests.allocatedAssets',
+            'probationEvaluations.reviewer',
+            'activeExit.clearances',
+            'activeExit.documents',
+            'activeExit.fnfSettlement',
         ]);
 
         $availableAssets = \App\Domains\HRMS\Models\Asset::query()
@@ -204,8 +219,39 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
 
-        $documents = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+        $tenantId = tenant_id() ?? $employee->tenant_id ?? 1;
+        $requiredMasters = \App\Domains\HRMS\Models\DocumentMaster::where('status', 'active')
+            ->where('is_required', true)
+            ->get();
+
+        foreach ($requiredMasters as $rm) {
+            $exists = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+                ->where('documentable_id', $employee->id)
+                ->where(function ($q) use ($rm) {
+                    $q->where('document_master_id', $rm->id)
+                      ->orWhere('name', $rm->name);
+                })
+                ->exists();
+
+            if (!$exists) {
+                \App\Domains\HRMS\Models\Document::create([
+                    'tenant_id'          => $tenantId,
+                    'documentable_type'  => Employee::class,
+                    'documentable_id'    => $employee->id,
+                    'document_master_id' => $rm->id,
+                    'name'               => $rm->name,
+                    'description'        => $rm->description,
+                    'status'             => 'requested',
+                    'has_expiry'         => (bool) $rm->expiry_applicable,
+                    'requires_signature' => (bool) $rm->requires_signature,
+                ]);
+            }
+        }
+
+        $documents = \App\Domains\HRMS\Models\Document::with(['documentMaster.category', 'requestedBy', 'signedBy'])
+            ->where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
+            ->orderBy('id', 'desc')
             ->paginate(10, ['*'], 'doc_page')
             ->withQueryString();
 
@@ -262,32 +308,37 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $validated['status'] = $request->input('status', '1') === '1';
 
         if ($request->hasFile('photo')) {
-            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+            $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
         }
 
         if ($request->hasFile('resume')) {
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
+            $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
         }
 
         $userIdInput = $validated['user_id'] ?? $request->input('user_id');
         if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-            if (!empty($validated['office_email'])) {
-                $existingUser = \App\Models\User::where('email', $validated['office_email'])->first();
+            $userEmail = !empty($validated['office_email']) ? $validated['office_email'] : (!empty($validated['personal_email']) ? $validated['personal_email'] : null);
+            if (!empty($userEmail)) {
+                $existingUser = \App\Models\User::where('email', $userEmail)->first();
                 if ($existingUser) {
                     $validated['user_id'] = $existingUser->id;
+                    $validated['office_email'] = $validated['office_email'] ?: $existingUser->email;
                 } else {
                     $newUser = \App\Models\User::create([
-                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
                         'company_id'    => $validated['company_id'] ?? null,
                         'branch_id'     => $validated['branch_id'] ?? null,
                         'department_id' => $validated['department_id'] ?? null,
                         'role_id'       => $request->input('role_id') ?: null,
                         'name'          => $validated['full_name'],
-                        'email'         => $validated['office_email'],
+                        'email'         => $userEmail,
                         'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
                     ]);
                     $validated['user_id'] = $newUser->id;
+                    $validated['office_email'] = $validated['office_email'] ?: $userEmail;
                 }
+            } else {
+                $validated['user_id'] = null;
             }
         } elseif (!empty($validated['user_id'])) {
             $user = \App\Models\User::find($validated['user_id']);
@@ -313,7 +364,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             if ($employee->photo) {
                 Storage::disk('public')->delete($employee->photo);
             }
-            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+            $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
         }
 
         if ($request->hasFile('resume')) {
@@ -325,7 +376,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
                     Storage::disk('public')->delete($employee->resume_path);
                 }
             }
-            $validated['resume_path'] = $request->file('resume')->store('employees/resumes', 'local');
+            $validated['resume_path'] = $request->file('resume')->storeTenantFile('employees/resumes', 'local');
         }
 
         $updated = $employee->update($validated);

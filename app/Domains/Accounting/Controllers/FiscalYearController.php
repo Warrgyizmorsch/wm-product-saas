@@ -4,15 +4,18 @@ namespace App\Domains\Accounting\Controllers;
 
 use App\Domains\Accounting\Models\FiscalYear;
 use App\Domains\Accounting\Services\FiscalPeriodService;
+use App\Domains\Accounting\Services\YearEndClosingService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class FiscalYearController extends Controller
 {
     public function __construct(
         private readonly FiscalPeriodService $periods,
+        private readonly YearEndClosingService $yearEnd,
     ) {
     }
 
@@ -37,7 +40,11 @@ class FiscalYearController extends Controller
             'end_date' => ['required', 'date', 'after:start_date'],
         ]);
 
-        $this->periods->createFiscalYearWithMonthlyPeriods($validated + ['created_by' => auth()->id()]);
+        try {
+            $this->periods->createFiscalYearWithMonthlyPeriods($validated + ['created_by' => auth()->id()]);
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['start_date' => $e->getMessage()])->withInput();
+        }
 
         return redirect()->route('accounting.fiscal-years.index')
             ->with('success', 'Fiscal year created with monthly periods.');
@@ -47,9 +54,27 @@ class FiscalYearController extends Controller
     {
         $this->authorize('close', $fiscalYear);
 
-        $this->periods->closeFiscalYear($fiscalYear->id);
+        try {
+            $this->yearEnd->close($fiscalYear, auth()->id());
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['fiscal_year' => $e->getMessage()]);
+        }
 
         return redirect()->route('accounting.fiscal-years.index')
-            ->with('success', 'Fiscal year closed.');
+            ->with('success', "Fiscal year {$fiscalYear->name} closed. Its profit or loss has been moved to Reserves & Surplus.");
+    }
+
+    public function reopen(FiscalYear $fiscalYear): RedirectResponse
+    {
+        $this->authorize('reopen', $fiscalYear);
+
+        try {
+            $this->yearEnd->reopen($fiscalYear, auth()->id());
+        } catch (InvalidArgumentException $e) {
+            return back()->withErrors(['fiscal_year' => $e->getMessage()]);
+        }
+
+        return redirect()->route('accounting.fiscal-years.index')
+            ->with('success', "Fiscal year {$fiscalYear->name} reopened. Reopen the period you need to post into.");
     }
 }

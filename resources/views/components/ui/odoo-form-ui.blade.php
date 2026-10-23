@@ -256,6 +256,15 @@
                 font-size: 13px;
                 transition: border-bottom-color 0.2s ease-in-out;
             }
+            .odoo-table-input[type="number"]::-webkit-outer-spin-button,
+            .odoo-table-input[type="number"]::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+            .odoo-table-input[type="number"] {
+                -moz-appearance: textfield !important;
+                appearance: textfield !important;
+            }
             .odoo-table-input:focus {
                 border-bottom-color: var(--bs-primary) !important;
                 outline: none;
@@ -592,9 +601,11 @@
                     $('.odoo-select2').each(function() {
                         var select = $(this);
                         if (!select.hasClass('select2-hidden-accessible')) {
+                            var parentContainer = select.closest('.modal-content, .modal, .offcanvas-body, .offcanvas');
                             select.select2({
                                 theme: "bootstrap-5",
-                                width: "100%"
+                                width: "100%",
+                                dropdownParent: parentContainer.length ? parentContainer : $(document.body)
                             });
                         }
                     });
@@ -912,8 +923,8 @@
             });
 
             // Re-initialize for modals/drawers when shown
-            $(document).on('show.bs.modal show.bs.offcanvas', function () {
-                setTimeout(initOdooComponents, 150);
+            $(document).on('show.bs.modal show.bs.offcanvas shown.bs.modal shown.bs.offcanvas', function () {
+                setTimeout(initOdooComponents, 100);
             });
         </script>
     @endpush

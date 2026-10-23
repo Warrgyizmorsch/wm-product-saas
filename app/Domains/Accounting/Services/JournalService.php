@@ -10,6 +10,7 @@ use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
 use App\Models\User;
 use App\Services\Access\AccessService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -196,8 +197,90 @@ class JournalService
      */
     public function post(array $lines, array $meta = []): Journal
     {
-        return DB::transaction(function () use ($lines, $meta) {
-            $journal = $this->createJournal($lines, $meta, Journal::STATUS_POSTED);
+        return $this->postJournal($lines, $meta);
+    }
+
+    /**
+     * Post the journal for a source document (invoice, bill, payment, payroll
+     * run...) exactly once. If the document already has a standing journal, that
+     * one is returned and nothing is posted. Once that journal is reversed, the
+     * document can be posted again.
+     *
+     * The check alone can't stop two queue workers posting the same document
+     * at the same moment, so the journal also carries an idempotency key with a
+     * unique index; whoever loses that race gets the winner's journal back.
+     *
+     * @param array<int, array<string, mixed>> $lines
+     * @param array<string, mixed> $meta  same keys as post(); reference_type and reference_id are required
+     */
+    public function postOnce(array $lines, array $meta): Journal
+    {
+        $referenceType = $meta['reference_type'] ?? null;
+        $referenceId = $meta['reference_id'] ?? null;
+
+        if (empty($referenceType) || empty($referenceId)) {
+            throw new InvalidArgumentException('postOnce() needs a reference_type and reference_id to know what was posted.');
+        }
+
+        $tenantId = (int) ($meta['tenant_id'] ?? require_tenant_id());
+        $meta['tenant_id'] = $tenantId;
+
+        $existing = $this->activePosting($tenantId, $referenceType, (int) $referenceId);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $meta['idempotency_key'] = self::idempotencyKey($referenceType, (int) $referenceId);
+
+        try {
+            return $this->postJournal($lines, $meta);
+        } catch (UniqueConstraintViolationException $e) {
+            // Lost the race: the other worker's journal is the posting. (A
+            // clash on journal_number instead finds nothing and rethrows.)
+            return $this->activePosting($tenantId, $referenceType, (int) $referenceId) ?? throw $e;
+        }
+    }
+
+    /**
+     * The journal currently standing as the posting of a source document, or
+     * null if it was never posted or its posting was reversed.
+     */
+    public function activePosting(int $tenantId, string $referenceType, int $referenceId): ?Journal
+    {
+        return $this->journals->activeForReference($tenantId, $referenceType, $referenceId);
+    }
+
+    public static function idempotencyKey(string $referenceType, int $referenceId): string
+    {
+        return "{$referenceType}:{$referenceId}";
+    }
+
+    /**
+     * Post the year-end closing journal into the fiscal year's last period,
+     * even if that period is already closed: closing entries belong to the
+     * year being closed. Only YearEndClosingService calls this.
+     */
+    public function postClosingEntry(array $lines, array $meta, AccountingPeriod $period): Journal
+    {
+        $meta['source'] = Journal::SOURCE_YEAR_END_CLOSE;
+        $meta['idempotency_key'] = self::idempotencyKey($meta['reference_type'], (int) $meta['reference_id']);
+
+        return $this->postJournal($lines, $meta, $period);
+    }
+
+    /**
+     * Reverse a year-end closing journal on its own date and period (not today),
+     * so reopening a year puts its profit back into that year.
+     */
+    public function reverseClosingEntry(int $journalId, AccountingPeriod $period, ?int $postedBy, string $reason): Journal
+    {
+        return $this->reverseJournal($journalId, $reason, $postedBy, $period);
+    }
+
+    private function postJournal(array $lines, array $meta, ?AccountingPeriod $period = null): Journal
+    {
+        return DB::transaction(function () use ($lines, $meta, $period) {
+            $journal = $this->createJournal($lines, $meta, Journal::STATUS_POSTED, $period);
 
             $this->auditLog->record(
                 $journal,
@@ -220,17 +303,32 @@ class JournalService
      * and open-period checks run for pending journals too, so a maker learns
      * about a closed period immediately rather than at approval time.
      */
-    private function createJournal(array $lines, array $meta, string $status): Journal
+    private function createJournal(array $lines, array $meta, string $status, ?AccountingPeriod $period = null): Journal
     {
         $tenantId = $meta['tenant_id'] ?? tenant_id();
         $companyId = $meta['company_id'] ?? company_id();
         $branchId = $meta['branch_id'] ?? branch_id();
         $journalDate = Carbon::parse($meta['journal_date'] ?? now());
 
-        $this->assertLinesAreBalanced($lines);
+        $lineTenantId = $tenantId !== null ? (int) $tenantId : null;
+        $this->assertLinesAreBalanced($lines, $lineTenantId);
+        $this->assertAccountsUsable(
+            $lines,
+            $lineTenantId,
+            // Manual entries can't use a deactivated account; automatic postings and
+            // reversals of older entries still can, so they never fail mid-flow.
+            enforceActive: ($meta['source'] ?? Journal::SOURCE_MANUAL) === Journal::SOURCE_MANUAL && empty($meta['is_reversal']),
+        );
 
-        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate, $status) {
-            $period = $this->periods->assertOpenPeriodForDate($journalDate);
+        if ($period !== null && !$journalDate->betweenIncluded(
+            Carbon::parse($period->start_date)->startOfDay(),
+            Carbon::parse($period->end_date)->endOfDay(),
+        )) {
+            throw new InvalidArgumentException("Journal date {$journalDate->toDateString()} is outside period '{$period->name}'.");
+        }
+
+        return DB::transaction(function () use ($lines, $meta, $tenantId, $companyId, $branchId, $journalDate, $status, $period) {
+            $period ??= $this->periods->assertOpenPeriodForDate($journalDate);
 
             $totalDebit = array_sum(array_column($lines, 'debit'));
             $totalCredit = array_sum(array_column($lines, 'credit'));
@@ -248,6 +346,7 @@ class JournalService
                 'voucher_type' => $meta['voucher_type'] ?? null,
                 'reference_type' => $meta['reference_type'] ?? null,
                 'reference_id' => $meta['reference_id'] ?? null,
+                'idempotency_key' => $meta['idempotency_key'] ?? null,
                 'memo' => $meta['memo'] ?? null,
                 'status' => $status,
                 'total_debit' => round($totalDebit, 2),
@@ -261,12 +360,36 @@ class JournalService
     }
 
     /**
+     * Reverse a journal on its own date rather than today — for entries that
+     * belong to a fixed date, like opening balances. The original's period must
+     * still be open.
+     */
+    public function reverseOnOriginalDate(int $journalId, ?string $reason = null, ?int $postedBy = null): Journal
+    {
+        $original = $this->journals->findWithEntries($journalId)
+            ?? throw new InvalidArgumentException('Journal not found.');
+
+        $period = $this->periods->assertOpenPeriodForDate(Carbon::parse($original->journal_date));
+
+        return $this->reverseJournal($journalId, $reason, $postedBy, $period);
+    }
+
+    /**
      * Create the mirror-image journal that cancels out an already-posted one,
      * rather than mutating or deleting it — journals are an immutable audit trail.
      */
     public function reverse(int $journalId, ?string $reason = null, ?int $postedBy = null): Journal
     {
-        return DB::transaction(function () use ($journalId, $reason, $postedBy) {
+        return $this->reverseJournal($journalId, $reason, $postedBy);
+    }
+
+    /**
+     * With $period, the reversal is dated on the original's date inside that
+     * period (year-end reopen); otherwise it's dated today in today's open period.
+     */
+    private function reverseJournal(int $journalId, ?string $reason, ?int $postedBy, ?AccountingPeriod $period = null): Journal
+    {
+        return DB::transaction(function () use ($journalId, $reason, $postedBy, $period) {
             $original = $this->journals->findWithEntries($journalId);
 
             if ($original === null) {
@@ -275,6 +398,12 @@ class JournalService
 
             if ($original->status !== Journal::STATUS_POSTED) {
                 throw new InvalidArgumentException("Only posted journals can be reversed; journal is {$original->status}.");
+            }
+
+            // Reversing it by hand would date the reversal today and leave the
+            // year marked closed; reopening the year reverses it properly.
+            if ($period === null && $original->source === Journal::SOURCE_YEAR_END_CLOSE) {
+                throw new InvalidArgumentException("Journal {$original->journal_number} is a year-end closing entry. Reopen the fiscal year instead of reversing it.");
             }
 
             // A journal the bank has already cleared is part of a bank
@@ -290,6 +419,7 @@ class JournalService
             $reversalLines = $original->entries->map(fn ($entry) => [
                 'chart_of_account_id' => $entry->chart_of_account_id,
                 'cost_center_id' => $entry->cost_center_id,
+                'project_id' => $entry->project_id,
                 'party_type' => $entry->party_type,
                 'party_id' => $entry->party_id,
                 'debit' => $entry->credit,
@@ -297,12 +427,13 @@ class JournalService
                 'description' => $reason ?? "Reversal of {$original->journal_number}",
             ])->all();
 
-            $reversal = $this->post($reversalLines, [
+            $reversal = $this->postJournal($reversalLines, [
                 'tenant_id' => $original->tenant_id,
                 'company_id' => $original->company_id,
                 'branch_id' => $original->branch_id,
-                'journal_date' => now(),
+                'journal_date' => $period !== null ? $original->journal_date : now(),
                 'source' => $original->source,
+                'is_reversal' => true,
                 'voucher_type' => $original->voucher_type,
                 'journal_number_prefix' => $original->voucher_type
                     ? \App\Domains\Accounting\Support\VoucherType::prefix($original->voucher_type)
@@ -311,11 +442,14 @@ class JournalService
                 'reference_id' => $original->reference_id,
                 'memo' => $reason ?? "Reversal of {$original->journal_number}",
                 'posted_by' => $postedBy,
-            ]);
+            ], $period);
 
+            // Releasing the idempotency key lets the source document be
+            // posted again now that this posting is cancelled out.
             $original->update([
                 'status' => Journal::STATUS_REVERSED,
                 'reversed_journal_id' => $reversal->id,
+                'idempotency_key' => null,
             ]);
 
             $this->auditLog->record(
@@ -355,9 +489,9 @@ class JournalService
         return $this->journals->posters();
     }
 
-    public function trialBalance(AccountingPeriod $period, ?int $costCenterId = null): Collection
+    public function trialBalance(AccountingPeriod $period, ?int $costCenterId = null, ?int $projectId = null): Collection
     {
-        return $this->journals->trialBalance($period->id, $costCenterId);
+        return $this->journals->trialBalance($period->id, $costCenterId, $projectId);
     }
 
     /**
@@ -365,9 +499,9 @@ class JournalService
      * $asOfDate — the basis for a Balance Sheet (point-in-time), unlike
      * trialBalance() which is scoped to one period's movements.
      */
-    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate, bool $excludeYearEndClose = false): Collection
     {
-        return $this->journals->balancesAsOf($tenantId, $asOfDate);
+        return $this->journals->balancesAsOf($tenantId, $asOfDate, $excludeYearEndClose);
     }
 
     public function forDate(\DateTimeInterface $date): Collection
@@ -468,7 +602,7 @@ class JournalService
      * @param int $decimals minor-unit scale of the transaction currency (2 for INR/USD,
      *                      0 for JPY, 3 for KWD)
      */
-    private function assertLinesAreBalanced(array $lines, int $decimals = 2): void
+    private function assertLinesAreBalanced(array $lines, ?int $tenantId = null, int $decimals = 2): void
     {
         if (count($lines) < 2) {
             throw new InvalidArgumentException('A journal requires at least two lines.');
@@ -510,7 +644,10 @@ class JournalService
         }
 
         $accountIds = array_values(array_unique(array_column($lines, 'chart_of_account_id')));
+        // Only this tenant's sub-accounts make an account a group: another tenant
+        // must never be able to freeze these accounts by parenting under them.
         $groupAccountIds = ChartOfAccount::withoutGlobalScopes()
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereIn('parent_id', $accountIds)
             ->pluck('parent_id')
             ->unique();
@@ -529,6 +666,32 @@ class JournalService
         if ($totalDebitMinor !== $totalCreditMinor) {
             throw new InvalidArgumentException(
                 "Journal is not balanced: total debit {$totalDebit} does not equal total credit {$totalCredit}."
+            );
+        }
+    }
+
+    /**
+     * Every line's account must belong to the journal's tenant (defence in depth
+     * behind the tenant-scoped request validation, and the only check for
+     * postings that don't come from a form) and, when $enforceActive, be active.
+     */
+    private function assertAccountsUsable(array $lines, ?int $tenantId, bool $enforceActive): void
+    {
+        $accountIds = array_values(array_unique(array_map('intval', array_column($lines, 'chart_of_account_id'))));
+        $accounts = ChartOfAccount::withoutGlobalScopes()->whereIn('id', $accountIds)->get(['id', 'tenant_id', 'code', 'is_active']);
+
+        if ($accounts->count() !== count($accountIds)) {
+            throw new InvalidArgumentException('One or more journal lines use an account that does not exist.');
+        }
+
+        if ($tenantId !== null && $accounts->contains(fn (ChartOfAccount $a) => (int) $a->tenant_id !== $tenantId)) {
+            throw new InvalidArgumentException('One or more journal lines use an account from another workspace.');
+        }
+
+        $inactive = $accounts->where('is_active', false);
+        if ($enforceActive && $inactive->isNotEmpty()) {
+            throw new InvalidArgumentException(
+                "Account {$inactive->pluck('code')->implode(', ')} is inactive. Reactivate it or choose another account."
             );
         }
     }

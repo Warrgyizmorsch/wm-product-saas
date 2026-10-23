@@ -35,6 +35,7 @@ class Customer extends BaseModel
         'billing_address',
         'shipping_address',
         'opening_balance',
+        'opening_balance_type',
     ];
 
     protected $casts = [
@@ -52,12 +53,8 @@ class Customer extends BaseModel
             }
 
             $alreadyExists = CrmAccount::where('tenant_id', $customer->tenant_id)
-                ->where(function ($q) use ($customer) {
-                    $q->where('customer_id', $customer->id);
-                    if (!empty($customer->email)) {
-                        $q->orWhere('email', $customer->email);
-                    }
-                })->exists();
+                ->where('customer_id', $customer->id)
+                ->exists();
 
             if (!$alreadyExists) {
                 CrmAccount::create([
@@ -96,5 +93,15 @@ class Customer extends BaseModel
     public function payments()
     {
         return $this->hasMany(CustomerPayment::class, 'customer_id');
+    }
+
+    /**
+     * Opening balance as this party's statements show it: an amount owed by the customer (debit) is positive; an advance received (credit) is negative.
+     */
+    public function signedOpeningBalance(): float
+    {
+        $amount = (float) ($this->opening_balance ?? 0);
+
+        return ($this->opening_balance_type ?: 'debit') === 'debit' ? $amount : -$amount;
     }
 }

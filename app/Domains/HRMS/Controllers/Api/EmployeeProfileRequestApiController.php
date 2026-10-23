@@ -261,8 +261,8 @@ class EmployeeProfileRequestApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'personal_email'                => 'nullable|email|max:255',
-            'personal_mobile_number'        => 'nullable|string|max:20',
-            'home_phone'                    => 'nullable|string|max:20',
+            'personal_mobile_number'        => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
+            'home_phone'                    => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'present_address'               => 'nullable|string|max:500',
             'permanent_address'             => 'nullable|string|max:500',
             'city'                          => 'nullable|string|max:100',
@@ -272,7 +272,7 @@ class EmployeeProfileRequestApiController extends Controller
             'diet_preference'               => 'nullable|string|max:50',
             'emergency_contact_name'        => 'nullable|string|max:100',
             'emergency_contact_relationship'=> 'nullable|string|max:50',
-            'emergency_contact_number'      => 'nullable|string|max:20',
+            'emergency_contact_number'      => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'bank_name'                     => 'nullable|string|max:150',
             'bank_account_number'           => 'nullable|string|max:50',
             'ifsc_code'                     => 'nullable|string|max:30',
@@ -325,7 +325,7 @@ class EmployeeProfileRequestApiController extends Controller
         // Handle Photo Upload
         if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
             $tempFileName = 'temp_' . $currentEmployee->id . '_' . time() . '_' . Str::random(6) . '.' . $request->file('photo')->getClientOriginalExtension();
-            $tempPath = $request->file('photo')->storeAs('temp/profile_requests', $tempFileName, 'public');
+            $tempPath = $request->file('photo')->storeTenantFileAs('temp/profile_requests', $tempFileName, 'public');
 
             $changes['photo'] = [
                 'old' => $currentEmployee->photo ?? '—',

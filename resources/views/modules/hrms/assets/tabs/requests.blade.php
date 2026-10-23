@@ -60,7 +60,7 @@
                                 <x-ui.odoo-form-ui type="select" name="request_status">
                                     <option value="">{{ __('hrms.common.all_statuses') }}</option>
                                     <option value="pending" {{ request('request_status') === 'pending' ? 'selected' : '' }}>{{ __('hrms.assets.status_pending') }}</option>
-                                    <option value="partially_allocated" {{ request('request_status') === 'partially_allocated' ? 'selected' : '' }}>Partially Allocated</option>
+                                    <option value="partially_allocated" {{ request('request_status') === 'partially_allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_partially_allocated') }}</option>
                                     <option value="allocated" {{ request('request_status') === 'allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_allocated') }}</option>
                                     <option value="rejected" {{ request('request_status') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.assets.status_rejected') }}</option>
                                 </x-ui.odoo-form-ui>
@@ -73,7 +73,7 @@
                         </x-ui.filter>
 
                     @if(request()->anyFilled(['request_search', 'request_category_id', 'request_company_id', 'request_status']))
-                        <a href="{{ route('hrms.assets.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
+                        <a href="{{ route('hrms.assets.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="{{ __('hrms.common.reset') }}">
                             <i class="feather-x"></i>
                         </a>
                     @endif
@@ -99,7 +99,7 @@
                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                         <tr>
                             <th style="width: 45px; padding-left: 20px;"><input type="checkbox" id="selectAllRequests" class="form-check-input"></th>
-                            <th class="text-start" style="width: 35%;">{{ __('hrms.employees.title') }} & {{ __('hrms.assets.org_entity') }}</th>
+                            <th class="text-start" style="width: 35%;">{{ __('hrms.assets.employee') }} & {{ __('hrms.assets.org_entity') }}</th>
                             <th class="text-start" style="width: 35%;">{{ __('hrms.assets.req_asset') }} & {{ __('hrms.assets.status') }}</th>
                             <th class="text-end px-4" style="width: 180px; white-space: nowrap;">{{ __('hrms.assets.actions') }}</th>
                         </tr>
@@ -169,7 +169,7 @@
                                                     foreach ($unitsList as $aUnit) {
                                                         $allocatedUnitsData[] = [
                                                             'code' => $aUnit->asset_code,
-                                                            'serial' => $aUnit->serial_number ?: 'N/A',
+                                                            'serial' => $aUnit->serial_number ?: __('hrms.common.na'),
                                                             'name' => $aUnit->name ?: ($req->item->name ?? $req->category->name),
                                                             'date' => $aUnit->allocated_at ? $aUnit->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                         ];
@@ -177,7 +177,7 @@
                                                 } elseif ($req->allocatedAsset) {
                                                     $allocatedUnitsData[] = [
                                                         'code' => $req->allocatedAsset->asset_code,
-                                                        'serial' => $req->allocatedAsset->serial_number ?: 'N/A',
+                                                        'serial' => $req->allocatedAsset->serial_number ?: __('hrms.common.na'),
                                                         'name' => $req->allocatedAsset->name ?: ($req->item->name ?? $req->category->name),
                                                         'date' => $req->allocatedAsset->allocated_at ? $req->allocatedAsset->allocated_at->format('d M, Y') : ($req->updated_at ? $req->updated_at->format('d M, Y') : '-')
                                                     ];
@@ -186,7 +186,7 @@
                                         @endphp
                                         <button type="button" class="btn btn-sm btn-icon btn-light view-req-details-btn" 
                                             style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;"
-                                            title="View Request Details & Reason"
+                                            title="{{ __('hrms.assets.details_modal_title') }}"
                                             data-emp-name="{{ $req->employee->display_name }}"
                                             data-emp-id="{{ $req->employee->employee_id }}"
                                             data-company="{{ $req->company->company_name ?? '' }}"
@@ -196,10 +196,10 @@
                                             data-alloc-qty="{{ $allocatedCount }}"
                                             data-rem-qty="{{ $remainingQty }}"
                                             data-status-raw="{{ $req->status }}"
-                                            data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                            data-status="{{ $req->status === 'partially_allocated' ? __('hrms.assets.status_partially_allocated') : ($req->status === 'allocated' ? __('hrms.assets.status_allocated') : ($req->status === 'rejected' ? __('hrms.assets.status_rejected') : ($req->status === 'approved' ? __('hrms.assets.status_approved') : ($req->status === 'withdrawn' ? __('hrms.assets.status_withdrawn') : __('hrms.assets.status_pending'))))) }}"
                                             data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
                                             data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
-                                            data-reason="{{ $req->reason ?: 'No reason provided.' }}"
+                                            data-reason="{{ $req->reason ?: __('hrms.assets.no_description_provided') }}"
                                             data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
                                             data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
                                             <i class="feather-eye"></i>
@@ -214,7 +214,7 @@
                                                 data-employee-id="{{ $req->employee_id }}"
                                                 data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
                                                 data-asset-item-id="{{ $req->asset_item_id }}"
-                                                data-item-name="{{ $req->item->name ?? 'N/A' }}"
+                                                data-item-name="{{ $req->item->name ?? __('hrms.common.na') }}"
                                                 data-quantity="{{ $req->quantity }}"
                                                 data-allocated-count="{{ $allocatedCount }}"
                                                 data-remaining-qty="{{ $remainingQty }}">
@@ -271,7 +271,7 @@
 </div>
 
 <!-- MODAL: REJECT REQUEST -->
-<div class="modal fade" id="rejectRequestModal" tabindex="-1" aria-labelledby="rejectRequestModalLabel" aria-hidden="true">
+<div class="modal fade" id="rejectRequestModal" tabindex="-1" aria-labelledby="rejectRequestModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -299,7 +299,7 @@
 </div>
 
 <!-- MODAL: BULK ALLOCATE ASSETS -->
-<div class="modal fade" id="bulkAllocateModal" tabindex="-1" aria-labelledby="bulkAllocateModalLabel" aria-hidden="true">
+<div class="modal fade" id="bulkAllocateModal" tabindex="-1" aria-labelledby="bulkAllocateModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -338,7 +338,7 @@
 </div>
 
 <!-- MODAL: BULK REJECT -->
-<div class="modal fade" id="bulkRejectModal" tabindex="-1" aria-labelledby="bulkRejectModalLabel" aria-hidden="true">
+<div class="modal fade" id="bulkRejectModal" tabindex="-1" aria-labelledby="bulkRejectModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -367,12 +367,12 @@
 </div>
 
 <!-- MODAL: VIEW FULL DESCRIPTION -->
-<div class="modal fade" id="viewDescriptionModal" tabindex="-1" aria-labelledby="viewDescriptionModalLabel" aria-hidden="true">
+<div class="modal fade" id="viewDescriptionModal" tabindex="-1" aria-labelledby="viewDescriptionModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-dark" id="viewDescriptionModalLabel">
-                    <i class="feather-info me-2 text-primary"></i><span id="desc_modal_title">Full Description</span>
+                    <i class="feather-info me-2 text-primary"></i><span id="desc_modal_title">{{ __('hrms.assets.full_description') }}</span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -380,14 +380,14 @@
                 <div class="bg-light p-3 rounded border text-dark fs-13" id="desc_modal_content" style="white-space: pre-wrap; line-height: 1.6; max-height: 350px; overflow-y: auto;"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- MODAL: VIEW ASSET REQUEST DETAILS -->
-<div class="modal fade" id="viewRequestDetailsModal" tabindex="-1" aria-labelledby="viewRequestDetailsModalLabel" aria-hidden="true">
+<div class="modal fade" id="viewRequestDetailsModal" tabindex="-1" aria-labelledby="viewRequestDetailsModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-bottom py-2.5 px-4">
@@ -403,11 +403,11 @@
                         <div class="d-flex align-items-start justify-content-between">
                             <div>
                                 <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-0.5">{{ __('hrms.assets.lbl_requested_by') }}</span>
-                                <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">Employee Name</h6>
-                                <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">EMP0000</div>
+                                <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">{{ __('hrms.assets.employee') }}</h6>
+                                <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">-</div>
                             </div>
                             <div class="text-end">
-                                <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">Company</span>
+                                <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold mb-1 d-inline-block" id="req_detail_company">{{ __('hrms.assets.company') }}</span>
                                 <div class="fs-11 text-muted fw-medium mt-0.5">
                                     <i class="feather-calendar me-1 text-primary"></i><span id="req_detail_date">-</span>
                                 </div>
@@ -415,7 +415,7 @@
                         </div>
                         <div class="mt-2.5 pt-2 border-top">
                             <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-message-square me-1 text-primary"></i>{{ __('hrms.assets.lbl_reason_for_request') }}</span>
-                            <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.4;">No reason provided.</div>
+                            <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.4;">{{ __('hrms.assets.no_description_provided') }}</div>
                         </div>
                     </div>
                 </div>
@@ -425,13 +425,13 @@
                     <div class="d-flex align-items-center justify-content-between mb-1">
                         <div>
                             <span class="fs-10 text-uppercase fw-bold text-muted me-2">{{ __('hrms.assets.req_asset') }}</span>
-                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-10" id="req_detail_category">Category</span>
+                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-10" id="req_detail_category">{{ __('hrms.assets.category') }}</span>
                         </div>
                         <div id="req_detail_status_container">
-                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11" id="req_detail_status">Pending</span>
+                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11" id="req_detail_status">{{ __('hrms.assets.status_pending') }}</span>
                         </div>
                     </div>
-                    <h6 class="fw-bold text-dark mb-2 fs-14" id="req_detail_asset_name">Asset Name</h6>
+                    <h6 class="fw-bold text-dark mb-2 fs-14" id="req_detail_asset_name">{{ __('hrms.assets.asset_name_label') }}</h6>
 
                     <div class="d-flex align-items-center gap-2 mt-1">
                         <div class="flex-fill border rounded py-1 px-2 text-center bg-light">
@@ -454,11 +454,11 @@
                     <!-- Allocation Details Box -->
                     <div id="req_detail_allocation_box" class="border rounded-3 p-3 bg-soft-success border-success-subtle d-none">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fs-10 text-uppercase fw-bold text-success"><i class="feather-check-circle me-1"></i>Allocation Details</span>
+                            <span class="fs-10 text-uppercase fw-bold text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.assets.allocation_details') }}</span>
                             <span class="fs-11 fw-semibold text-dark" id="req_detail_alloc_date">-</span>
                         </div>
                         <div>
-                            <span class="fs-10 text-uppercase text-muted d-block mb-1">Allocated Asset Units</span>
+                            <span class="fs-10 text-uppercase text-muted d-block mb-1">{{ __('hrms.assets.allocated_asset_units') }}</span>
                             <div id="req_detail_allocated_units_list" class="d-flex flex-wrap gap-1.5">
                             </div>
                         </div>
@@ -467,18 +467,18 @@
                     <!-- Rejection Details Box -->
                     <div id="req_detail_rejection_box" class="border rounded-3 p-3 bg-soft-danger border-danger-subtle d-none">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fs-10 text-uppercase fw-bold text-danger"><i class="feather-x-circle me-1"></i>Rejection Details</span>
+                            <span class="fs-10 text-uppercase fw-bold text-danger"><i class="feather-x-circle me-1"></i>{{ __('hrms.assets.rejection_details') }}</span>
                             <span class="fs-11 fw-semibold text-dark" id="req_detail_reject_date">-</span>
                         </div>
                         <div>
-                            <span class="fs-10 text-uppercase text-muted d-block mb-1">Reason / Admin Notes</span>
-                            <div class="fs-12 text-dark fw-medium" id="req_detail_reject_notes">No specific reason provided.</div>
+                            <span class="fs-10 text-uppercase text-muted d-block mb-1">{{ __('hrms.assets.reason_admin_notes') }}</span>
+                            <div class="fs-12 text-dark fw-medium" id="req_detail_reject_notes">{{ __('hrms.assets.no_description_provided') }}</div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-light-brand px-4" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-light-brand px-4" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
             </div>
         </div>
     </div>

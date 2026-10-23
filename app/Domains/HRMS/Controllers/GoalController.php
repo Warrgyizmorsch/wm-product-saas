@@ -3,14 +3,29 @@
 namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Repositories\GoalRepositoryInterface;
+use App\Domains\HRMS\Models\GoalCategory;
+use App\Domains\HRMS\Models\GoalCycle;
 use App\Http\Controllers\Controller;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class GoalController extends Controller
 {
+    private function goalReferenceRule(string $model, int $tenantId): array
+    {
+        return ['nullable', function ($attribute, $value, $fail) use ($model, $tenantId) {
+            if ($value === '__custom__') {
+                return;
+            }
+            if (!ctype_digit((string) $value) || !$model::where('tenant_id', $tenantId)->whereKey((int) $value)->exists()) {
+                $fail('The selected goal reference is invalid.');
+            }
+        }];
+    }
+
     public function __construct(
         private readonly GoalRepositoryInterface $goalRepository
     ) {}
@@ -59,21 +74,29 @@ class GoalController extends Controller
 
         $request->validate([
             'title'                => 'required|string|max:255',
-            'goal_cycle_id'        => 'nullable',
+            'goal_cycle_id'        => $this->goalReferenceRule(GoalCycle::class, $tenantId),
             'custom_goal_cycle'    => 'nullable|string|max:255',
-            'goal_category_id'     => 'nullable',
+            'goal_category_id'     => $this->goalReferenceRule(GoalCategory::class, $tenantId),
             'custom_goal_category' => 'nullable|string|max:255',
             'owner_type'           => 'required|in:company,department,employee',
-            'department_id'        => 'nullable|exists:departments,id',
-            'employee_id'          => 'nullable|exists:employees,id',
+            'department_id'        => ['nullable', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
+            'employee_id'          => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'employee_ids'         => 'nullable|array',
-            'employee_ids.*'       => 'exists:employees,id',
-            'parent_goal_id'       => 'nullable|exists:goals,id',
+            'employee_ids.*'       => ['integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id'       => ['nullable', Rule::exists('goals', 'id')->where('tenant_id', $tenantId)],
             'priority'             => 'nullable|in:low,medium,high,critical',
             'due_date'             => 'nullable|date',
         ]);
 
         try {
+            if ($request->owner_type === 'company' && !$this->goalRepository->canManageGoals($user)) {
+                return redirect()->back()->with('error', 'You are not authorized to create organization-wide goals.')->withInput();
+            }
+
+            if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {
+                return redirect()->back()->with('error', 'You are not authorized to create custom cycles or strategic pillars.')->withInput();
+            }
+
             $data = $request->all();
 
             // Structure key results from form repeater if submitted
@@ -112,22 +135,35 @@ class GoalController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        if (!$this->goalRepository->canUpdateGoal($user, $goal)) {
+            return redirect()->back()->with('error', 'You are not authorized to modify this goal.');
+        }
+
         $request->validate([
             'title'                => 'required|string|max:255',
-            'goal_cycle_id'        => 'nullable',
+            'goal_cycle_id'        => $this->goalReferenceRule(GoalCycle::class, $tenantId),
             'custom_goal_cycle'    => 'nullable|string|max:255',
-            'goal_category_id'     => 'nullable',
+            'goal_category_id'     => $this->goalReferenceRule(GoalCategory::class, $tenantId),
             'custom_goal_category' => 'nullable|string|max:255',
             'owner_type'           => 'required|in:company,department,employee',
-            'department_id'        => 'nullable|exists:departments,id',
-            'employee_id'          => 'nullable|exists:employees,id',
+            'department_id'        => ['nullable', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
+            'employee_id'          => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
             'employee_ids'         => 'nullable|array',
-            'employee_ids.*'       => 'exists:employees,id',
-            'parent_goal_id'       => 'nullable|exists:goals,id',
+            'employee_ids.*'       => ['integer', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'parent_goal_id'       => ['nullable', Rule::exists('goals', 'id')->where('tenant_id', $tenantId)->whereNot('id', $id)],
             'health_status'        => 'nullable|in:on_track,at_risk,behind,completed,cancelled',
             'priority'             => 'nullable|in:low,medium,high,critical',
             'due_date'             => 'nullable|date',
         ]);
+
+        if ($request->owner_type === 'company' && $goal->owner_type !== 'company' && !$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to change this goal to an organization-wide objective.')->withInput();
+        }
+
+        if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to create custom cycles or strategic pillars.')->withInput();
+        }
 
         try {
             $data = $request->all();
@@ -165,11 +201,18 @@ class GoalController extends Controller
      */
     public function destroy(int $id): RedirectResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
 
         try {
+            $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
+            if (!$this->goalRepository->canDeleteGoal($user, $goal)) {
+                return redirect()->back()->with('error', 'You are not authorized to delete this goal.');
+            }
+
             $this->goalRepository->deleteGoal($id, $tenantId);
-            return redirect()->route('hrms.goals.index')->with('success', 'Goal deleted successfully.');
+            $activeTab = request('active_tab');
+            return redirect()->route('hrms.goals.index', $activeTab ? ['active_tab' => $activeTab] : [])
+                ->with('success', 'Goal deleted successfully.');
         } catch (Exception $e) {
             return redirect()->back()->with('error', 'Failed to delete goal: ' . $e->getMessage());
         }
@@ -182,10 +225,15 @@ class GoalController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        if (!$this->goalRepository->canCheckInGoal($user, $goal)) {
+            return redirect()->back()->with('error', 'You are not authorized to log check-ins for this goal.');
+        }
+
         $request->validate([
-            'goal_key_result_id' => 'nullable|exists:goal_key_results,id',
+            'goal_key_result_id' => ['nullable', Rule::exists('goal_key_results', 'id')->where('tenant_id', $tenantId)->where('goal_id', $id)],
             'new_value'          => 'nullable|numeric',
-            'health_status'      => 'required|in:on_track,at_risk,behind',
+            'health_status'      => 'required|in:on_track,at_risk,behind,completed',
             'comment'            => 'required|string|max:1000',
             'blockers'           => 'nullable|string|max:1000',
         ]);
@@ -199,6 +247,45 @@ class GoalController extends Controller
         }
     }
 
+    /**
+     * Approve a Goal / Objective.
+     */
+    public function approve(int $id): RedirectResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        try {
+            $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
+            if (!$this->goalRepository->canUpdateGoal($user, $goal)) {
+                return redirect()->back()->with('error', 'You are not authorized to approve this goal.');
+            }
+
+            $this->goalRepository->approveGoal($id, $tenantId, $user);
+
+            return redirect()->back()->with('success', "Goal '{$goal->title}' approved and activated.");
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', 'Failed to approve goal: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Display Cascading Alignment Tree Tab.
+     */
+    public function alignmentTree(Request $request): View
+    {
+        $request->merge(['active_tab' => 'alignment_tree']);
+        return $this->index($request);
+    }
+
+    /**
+     * Display My & Team Goals Tab.
+     */
+    public function myGoals(Request $request): View
+    {
+        $request->merge(['active_tab' => 'my_team_goals']);
+        return $this->index($request);
+    }
+
     // =========================================================================
     // CYCLES & CATEGORIES MASTER ACTIONS
     // =========================================================================
@@ -207,12 +294,16 @@ class GoalController extends Controller
     {
         [$tenantId, $user] = $this->resolveContext();
 
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to manage goal cycles.');
+        }
+
         $request->validate([
             'name'       => 'required|string|max:100',
             'code'       => 'nullable|string|max:50',
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after_or_equal:start_date',
-            'status'     => 'nullable|in:planning,active,review,closed',
+            'status'     => 'nullable|in:planning,active,review,closed,upcoming,review_period',
         ]);
 
         try {
@@ -225,9 +316,39 @@ class GoalController extends Controller
         }
     }
 
+    public function updateCycle(Request $request, int $id): RedirectResponse
+    {
+        [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to manage goal cycles.');
+        }
+
+        $request->validate([
+            'name'       => 'required|string|max:100',
+            'code'       => 'nullable|string|max:50',
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'status'     => 'nullable|in:planning,active,review,closed,upcoming,review_period',
+        ]);
+
+        try {
+            $this->goalRepository->updateCycle($id, $request->all(), $tenantId, $user);
+
+            return redirect()->route('hrms.goals.index', ['active_tab' => 'cycles_pillars'])
+                ->with('success', 'Goal Cycle updated successfully.');
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', 'Failed to update cycle: ' . $e->getMessage());
+        }
+    }
+
     public function destroyCycle(int $id): RedirectResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to manage goal cycles.');
+        }
 
         try {
             $this->goalRepository->deleteCycle($id, $tenantId);
@@ -241,6 +362,10 @@ class GoalController extends Controller
     public function storeCategory(Request $request): RedirectResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to manage strategic categories.');
+        }
 
         $request->validate([
             'name'  => 'required|string|max:100',
@@ -261,7 +386,11 @@ class GoalController extends Controller
 
     public function destroyCategory(int $id): RedirectResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+
+        if (!$this->goalRepository->canManageGoals($user)) {
+            return redirect()->back()->with('error', 'You are not authorized to manage strategic categories.');
+        }
 
         try {
             $this->goalRepository->deleteCategory($id, $tenantId);

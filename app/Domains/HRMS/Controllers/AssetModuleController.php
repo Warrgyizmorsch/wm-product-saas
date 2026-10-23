@@ -48,7 +48,11 @@ class AssetModuleController extends Controller
         $categories = AssetCategory::orderBy('name')->get();
 
         // 1. Asset Requests Query (with search, sort, and filters)
-        $requestsQuery = AssetRequest::with(['employee', 'category', 'item', 'allocatedAsset']);
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+        $requestsQuery = AssetRequest::with(['employee', 'category', 'item', 'allocatedAsset', 'allocatedAssets']);
+        if ($hasRequestColumn) {
+            $requestsQuery->withCount('allocatedAssets');
+        }
         app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyEmployeeScope($requestsQuery, auth()->user(), 'employee_id');
 
         if ($requestSearch = $request->input('request_search')) {
@@ -146,6 +150,8 @@ class AssetModuleController extends Controller
      */
     public function allocateDirect(Request $request): RedirectResponse
     {
+        $this->authorize('approve', Asset::class);
+
         $validated = $request->validate([
             'employee_id'          => 'required|exists:employees,id',
             'allocated_at'         => 'required|date',
@@ -159,13 +165,13 @@ class AssetModuleController extends Controller
         $assetIds = collect($validated['items'])->pluck('asset_id')->all();
 
         if (count($assetIds) !== count(array_unique($assetIds))) {
-            return redirect()->back()->withInput()->with('error', 'Duplicate assets selected for allocation.');
+            return redirect()->back()->withInput()->with('error', __('hrms.assets.error_dup_assets_selected'));
         }
 
         $assets = Asset::whereIn('id', $assetIds)->get();
         foreach ($assets as $asset) {
             if ($asset->status !== 'available') {
-                return redirect()->back()->withInput()->with('error', "Asset '{$asset->name} ({$asset->asset_code})' is not currently available.");
+                return redirect()->back()->withInput()->with('error', __('hrms.assets.error_asset_not_avail', ['code' => $asset->asset_code, 'name' => $asset->name]));
             }
         }
 
@@ -183,7 +189,7 @@ class AssetModuleController extends Controller
                     'employee_id'          => $validated['employee_id'],
                     'allocated_at'         => $validated['allocated_at'],
                     'allocation_condition' => $asset->condition,
-                    'notes'                => $validated['notes'] ?? 'Allocated directly by Admin',
+                    'notes'                => $validated['notes'] ?? __('hrms.assets.allocated_directly_by_admin'),
                 ]);
             }
         });
@@ -198,7 +204,7 @@ class AssetModuleController extends Controller
             iconClass: 'feather-box'
         );
 
-        return redirect()->route('hrms.assets-module.index')->with('success', 'Asset(s) allocated directly successfully.');
+        return redirect()->route('hrms.assets-module.index')->with('success', __('hrms.assets.success_req_allocated_dir'));
     }
 
     /**
@@ -206,18 +212,34 @@ class AssetModuleController extends Controller
      */
     public function returnDirect(Request $request, Asset $asset): RedirectResponse
     {
+        $user = auth()->user();
+        $isOwner = $user && $asset->assigned_employee_id && (int) $asset->assignedEmployee?->user_id === (int) $user->id;
+
+        if (!$isOwner) {
+            $this->authorize('approve', $asset);
+        }
+
+        if (!$request->has('condition_on_return') && $request->has('return_condition')) {
+            $request->merge([
+                'condition_on_return' => $request->input('return_condition'),
+            ]);
+        }
+
         $validated = $request->validate([
             'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
             'notes'               => 'nullable|string|max:1000',
+            'returned_at'         => 'nullable|date',
         ]);
 
         if ($asset->status !== 'allocated') {
-            return redirect()->back()->with('error', 'Only allocated assets can be returned.');
+            return redirect()->back()->with('error', __('hrms.assets.error_only_allocated_returned'));
         }
 
         $allocation = AssetAllocation::where('asset_id', $asset->id)
             ->whereNull('returned_at')
             ->first();
+
+        $emp = $asset->assignedEmployee;
 
         DB::transaction(function () use ($asset, $allocation, $validated) {
             $newStatus = 'available';
@@ -229,22 +251,37 @@ class AssetModuleController extends Controller
 
             if ($allocation) {
                 $allocation->update([
-                    'returned_at'      => now(),
+                    'returned_at'      => $validated['returned_at'] ?? now(),
                     'return_condition' => $validated['condition_on_return'],
                     'notes'            => $validated['notes'] ?? $allocation->notes,
                 ]);
             }
 
-            $asset->update([
+            $upd = [
                 'status'               => $newStatus,
                 'condition'            => $validated['condition_on_return'],
                 'assigned_employee_id' => null,
                 'allocated_at'         => null,
                 'expected_return_date' => null,
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id')) {
+                $upd['asset_request_id'] = null;
+            }
+
+            $asset->update($upd);
         });
 
-        return redirect()->back()->with('success', 'Asset returned to inventory successfully.');
+        if ($isOwner && $emp) {
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Asset Returned',
+                message: "{$emp->full_name} returned asset {$asset->asset_code} ({$asset->name}) to inventory.",
+                actionUrl: 'hrms.assets-module.index',
+                type: 'asset_return',
+                iconClass: 'feather-corner-up-left'
+            );
+        }
+
+        return redirect()->back()->with('success', __('hrms.assets.success_returned'));
     }
 
     /**
@@ -252,16 +289,34 @@ class AssetModuleController extends Controller
      */
     public function returnDirectMulti(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+        $employee = Employee::where('user_id', $user?->id)->first();
+        $assetIds = (array) $request->input('allocated_asset_ids', []);
+
+        $allBelongToEmployee = $employee && !empty($assetIds) &&
+            Asset::whereIn('id', $assetIds)->where('assigned_employee_id', $employee->id)->count() === count($assetIds);
+
+        if (!$allBelongToEmployee) {
+            $this->authorize('approve', Asset::class);
+        }
+
+        if (!$request->has('condition_on_return') && $request->has('return_condition')) {
+            $request->merge([
+                'condition_on_return' => $request->input('return_condition'),
+            ]);
+        }
+
         $validated = $request->validate([
-            'allocated_asset_ids' => 'required|array',
+            'allocated_asset_ids'   => 'required|array',
             'allocated_asset_ids.*' => 'exists:assets,id',
-            'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
-            'notes'               => 'nullable|string|max:1000',
+            'condition_on_return'   => 'required|string|in:new,good,fair,damaged,scrapped',
+            'notes'                 => 'nullable|string|max:1000',
+            'returned_at'           => 'nullable|date',
         ]);
 
-        $assetIds = $request->input('allocated_asset_ids');
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
 
-        DB::transaction(function () use ($assetIds, $validated) {
+        DB::transaction(function () use ($assetIds, $validated, $hasRequestColumn) {
             foreach ($assetIds as $assetId) {
                 $asset = Asset::findOrFail($assetId);
                 $allocation = AssetAllocation::where('asset_id', $assetId)
@@ -277,23 +332,38 @@ class AssetModuleController extends Controller
 
                 if ($allocation) {
                     $allocation->update([
-                        'returned_at'      => now(),
+                        'returned_at'      => $validated['returned_at'] ?? now(),
                         'return_condition' => $validated['condition_on_return'],
                         'notes'            => $validated['notes'] ?? $allocation->notes,
                     ]);
                 }
 
-                $asset->update([
+                $upd = [
                     'status'               => $newStatus,
                     'condition'            => $validated['condition_on_return'],
                     'assigned_employee_id' => null,
                     'allocated_at'         => null,
                     'expected_return_date' => null,
-                ]);
+                ];
+                if ($hasRequestColumn) {
+                    $upd['asset_request_id'] = null;
+                }
+
+                $asset->update($upd);
             }
         });
 
-        return redirect()->back()->with('success', 'Selected asset(s) returned to inventory successfully.');
+        if ($allBelongToEmployee && $employee) {
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Asset(s) Returned',
+                message: "{$employee->full_name} returned asset unit(s) to inventory.",
+                actionUrl: 'hrms.assets-module.index',
+                type: 'asset_return',
+                iconClass: 'feather-corner-up-left'
+            );
+        }
+
+        return redirect()->back()->with('success', __('hrms.assets.success_returned'));
     }
 
     /**
@@ -305,7 +375,7 @@ class AssetModuleController extends Controller
         $employee = Employee::where('user_id', $user->id)->first();
 
         if (!$employee) {
-            abort(403, 'You do not have an active employee profile associated with your user account.');
+            return redirect()->route('hrms.dashboard')->with('warning', __('hrms.assets.error_no_employee_profile'));
         }
 
         $categories = AssetCategory::orderBy('name')->get();
@@ -340,9 +410,20 @@ class AssetModuleController extends Controller
         $requestAssetCategories = $employee->assetRequests->pluck('category.name')->filter()->unique()->sort()->values();
         $requestAssetStatuses = $employee->assetRequests->pluck('status')->filter()->unique()->sort()->values();
 
-        $availableAssetItems = \App\Domains\HRMS\Models\AssetItem::whereHas('category', function($q) use ($employee) {
-            $q->where('company_id', $employee->company_id);
-        })->get();
+        $availableAssetItems = \App\Domains\HRMS\Models\AssetItem::query()
+            ->when($employee->company_id, function($q) use ($employee) {
+                $q->where(function($sub) use ($employee) {
+                    $sub->whereNull('company_id')
+                        ->orWhere('company_id', $employee->company_id);
+                })
+                ->orWhereHas('category', function($cq) use ($employee) {
+                    $cq->whereNull('company_id')
+                       ->orWhere('company_id', $employee->company_id);
+                });
+            })
+            ->with('category')
+            ->orderBy('name')
+            ->get();
 
         return view('modules.hrms.assets-module.my-assets', compact(
             'employee',

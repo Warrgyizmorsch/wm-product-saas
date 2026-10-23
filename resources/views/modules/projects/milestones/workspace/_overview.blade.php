@@ -65,7 +65,11 @@
             @forelse ($upcomingTasks as $upcomingTask)
                 <div class="d-flex align-items-center justify-content-between gap-2 py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
                     <div class="flex-grow-1 text-truncate">
-                        <div class="fs-13 text-dark text-truncate">{{ $upcomingTask->title }}</div>
+                        <div class="fs-13 text-truncate">
+                            <a href="{{ route('projects.tasks.show', [$project, $upcomingTask]) }}" class="text-dark fw-semibold text-decoration-none hover-primary">
+                                {{ $upcomingTask->title }}
+                            </a>
+                        </div>
                         <div class="fs-11 text-muted">{{ $upcomingTask->assignee?->name ?? __('projects.unassigned') }}</div>
                     </div>
                     <span class="fs-11 text-muted flex-shrink-0">{{ $upcomingTask->due_date?->format('d/m/Y') }}</span>
@@ -86,7 +90,11 @@
                     <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 0;">
                         <i class="{{ $reasonMeta['icon'] }} text-{{ $reasonMeta['variant'] }}"></i>
                         <div class="text-truncate">
-                            <div class="fs-13 text-dark text-truncate">{{ $attentionTask->title }}</div>
+                            <div class="fs-13 text-truncate">
+                                <a href="{{ route('projects.tasks.show', [$project, $attentionTask]) }}" class="text-dark fw-semibold text-decoration-none hover-primary">
+                                    {{ $attentionTask->title }}
+                                </a>
+                            </div>
                             <div class="fs-11 text-muted">{{ $attentionTask->taskList?->name }}</div>
                         </div>
                     </div>

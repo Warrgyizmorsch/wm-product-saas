@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', __('My Profile') . ' | SaaS ERP')
-@section('page-title', __('My Profile'))
-@section('breadcrumb', 'Account / ' . __('My Profile'))
+@section('title', __('hrms.employees.my_profile') . ' | SaaS ERP')
+@section('page-title', __('hrms.employees.my_profile'))
+@section('breadcrumb', __('hrms.employees.account') . ' / ' . __('hrms.employees.my_profile'))
 
 @php
     $rawTab = request('tab', request('active_tab', session('active_tab')));
@@ -139,7 +139,7 @@
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button href="{{ route('account.settings') }}" variant="secondary" icon="feather-settings">
-            {{ __('Account Settings') }}
+            {{ __('hrms.employees.account_settings') }}
         </x-ui.button>
     </div>
 @endsection
@@ -156,14 +156,6 @@
             .card-custom { border: 1px solid #e2e8f0; border-radius: 16px; background-color: #fff; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.02); margin-bottom: 24px; }
             .card-custom-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
             .card-custom-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 10px; }
-            .btn-doc-card { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #1e293b; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); text-decoration: none; transition: all 0.15s ease-in-out; }
-            .btn-doc-card:hover { color: var(--bs-primary); border-color: var(--bs-primary); background-color: rgba(var(--bs-primary-rgb), 0.04); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); transform: translateY(-1px); }
-            .tab-nav-custom { border-bottom: 2px solid #e2e8f0; gap: 8px; margin-bottom: 24px; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-            .tab-nav-custom::-webkit-scrollbar { display: none; }
-            .tab-nav-custom .nav-item { flex-shrink: 0; }
-            .tab-nav-custom .nav-link { border: none !important; border-bottom: 3px solid transparent !important; background: transparent !important; color: #64748b !important; font-size: 14px; font-weight: 600; padding: 12px 16px; transition: all 0.2s ease; display: flex; align-items: center; gap: 8px; }
-            .tab-nav-custom .nav-link:hover { color: var(--bs-primary) !important; border-bottom-color: #cbd5e1 !important; }
-            .tab-nav-custom .nav-link.active { color: var(--bs-primary) !important; border-bottom-color: var(--bs-primary) !important; font-weight: 700; }
             .file-card-container { border: 1px solid #e2e8f0 !important; background-color: #f8fafc; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; max-width: 280px; transition: all 0.2s ease-in-out; }
             .file-card-container:hover { border-color: #cbd5e1 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
             .file-action-btn { width: 28px; height: 28px; min-width: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; border: 1px solid #e2e8f0 !important; background-color: #ffffff !important; color: #64748b !important; transition: all 0.2s ease; }
@@ -203,14 +195,14 @@
                         <i class="feather-clock fs-18 text-white"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold text-dark mb-1 fs-14">Pending Profile Edit Request Under Review</h6>
+                        <h6 class="fw-bold text-dark mb-1 fs-14">{{ __('hrms.employees.pending_profile_request_title') }}</h6>
                         <p class="text-muted fs-12 mb-0">
-                            You submitted a profile edit request with <strong class="text-dark">{{ count($pChanges) }} edited field(s)</strong> on {{ $pendingReq->created_at ? $pendingReq->created_at->format('M d, Y h:i A') : 'recently' }}. Your live profile will update once reviewed and approved by HR.
+                            {{ __('hrms.employees.pending_profile_request_self_desc', ['date' => $pendingReq->created_at ? $pendingReq->created_at->format('M d, Y h:i A') : __('hrms.common.na')]) }}
                         </p>
                     </div>
                 </div>
                 <x-ui.button type="button" variant="primary" size="sm" icon="feather-eye" data-bs-toggle="modal" data-bs-target="#viewMyPendingRequestModal" class="fw-bold text-nowrap">
-                    View Edit Request
+                    {{ __('hrms.employees.view_requested_changes') }}
                 </x-ui.button>
             </div>
         @endif
@@ -228,12 +220,12 @@
                 <div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                         <h4 class="fw-bold text-dark mb-0">{{ $employee ? $employee->display_name : $user->name }}</h4>
-                        <span class="erp-badge-active">{{ __('Active') }}</span>
-                        <span class="badge bg-soft-primary text-primary">{{ $user->primaryRole?->name ?? ucfirst($user->role ?: 'User') }}</span>
+                        <x-ui.badge soft variant="success">{{ __('hrms.common.active') }}</x-ui.badge>
+                        <x-ui.badge soft variant="primary">{{ __($user->primaryRole?->name ?? ucfirst($user->role ?: 'User')) }}</x-ui.badge>
                         @if ($tenant)
-                            <span class="badge bg-soft-info text-info border border-info-subtle">
+                            <x-ui.badge soft variant="info">
                                 <i class="feather-briefcase me-1"></i>{{ $tenant->name }}
-                            </span>
+                            </x-ui.badge>
                         @endif
                     </div>
                     <p class="text-muted fs-13 mb-0">
@@ -258,18 +250,18 @@
                         @elseif ($user->department)
                             <span class="ms-2">&bull; <i class="feather-layers me-1"></i>{{ $user->department->name }}</span>
                         @endif
-                        <span class="ms-2">&bull; <i class="feather-hash me-1"></i>User ID: #{{ $user->id }}</span>
+                        <span class="ms-2">&bull; <i class="feather-hash me-1"></i>{{ __('hrms.employees.lbl_user_id') }}: #{{ $user->id }}</span>
                     </p>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2">
                 @if($employee)
                     <x-ui.button type="button" variant="light-brand" icon="feather-edit" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
-                        {{ __('Edit Profile') }}
+                        {{ __('hrms.employees.edit_profile') }}
                     </x-ui.button>
                 @else
                     <x-ui.button type="button" variant="light-brand" icon="feather-edit" data-bs-toggle="modal" data-bs-target="#editProfileModal">
-                        {{ __('Edit Profile') }}
+                        {{ __('hrms.employees.edit_profile') }}
                     </x-ui.button>
                 @endif
             </div>
@@ -277,48 +269,19 @@
 
         @if($employee)
             <!-- TAB NAVIGATION FOR EMPLOYEES -->
-            <ul class="nav nav-tabs tab-nav-custom mb-4" id="profileTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'overview' ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="{{ $activeTabName === 'overview' ? 'true' : 'false' }}">
-                        <i class="feather-user me-1.5"></i> {{ __('hrms.employees.tab_overview') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'compensation' ? 'active' : '' }}" id="compensation-tab" data-bs-toggle="tab" data-bs-target="#compensation-pane" type="button" role="tab" aria-controls="compensation-pane" aria-selected="{{ $activeTabName === 'compensation' ? 'true' : 'false' }}">
-                        <i class="feather-dollar-sign me-1.5"></i> {{ __('hrms.employees.tab_compensation') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'documents' ? 'active' : '' }}" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="{{ $activeTabName === 'documents' ? 'true' : 'false' }}">
-                        <i class="feather-file-text me-1.5"></i> {{ __('hrms.employees.tab_documents') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'probation' ? 'active' : '' }}" id="probation-tab" data-bs-toggle="tab" data-bs-target="#probation-pane" type="button" role="tab" aria-controls="probation-pane" aria-selected="{{ $activeTabName === 'probation' ? 'true' : 'false' }}">
-                        <i class="feather-award me-1.5"></i> Probation
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'exit-clearance' ? 'active' : '' }}" id="exit-clearance-tab" data-bs-toggle="tab" data-bs-target="#exit-clearance-pane" type="button" role="tab" aria-controls="exit-clearance-pane" aria-selected="{{ $activeTabName === 'exit-clearance' ? 'true' : 'false' }}">
-                        <i class="feather-log-out me-1.5"></i> Exit & NOC
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'pip' ? 'active' : '' }}" id="pip-tab" data-bs-toggle="tab" data-bs-target="#pip-pane" type="button" role="tab" aria-controls="pip-pane" aria-selected="{{ $activeTabName === 'pip' ? 'true' : 'false' }}">
-                        <i class="feather-trending-up me-1.5"></i> PIP Plans
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'security' ? 'active' : '' }}" id="security-tab" data-bs-toggle="tab" data-bs-target="#security-pane" type="button" role="tab" aria-controls="security-pane" aria-selected="{{ $activeTabName === 'security' ? 'true' : 'false' }}">
-                        <i class="feather-lock me-1.5"></i> {{ __('Security & Password') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {{ $activeTabName === 'activity' ? 'active' : '' }}" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity-pane" type="button" role="tab" aria-controls="activity-pane" aria-selected="{{ $activeTabName === 'activity' ? 'true' : 'false' }}">
-                        <i class="feather-activity me-1.5"></i> {{ __('Activity & Sessions') }}
-                    </button>
-                </li>
-            </ul>
+            @php
+                $employeeProfileTabs = [
+                    ['id' => 'overview-pane', 'label' => __('hrms.employees.tab_overview'), 'active' => ($activeTabName === 'overview'), 'icon' => 'feather-user'],
+                    ['id' => 'compensation-pane', 'label' => __('hrms.employees.tab_compensation'), 'active' => ($activeTabName === 'compensation'), 'icon' => 'feather-dollar-sign'],
+                    ['id' => 'documents-pane', 'label' => __('hrms.employees.tab_documents'), 'active' => ($activeTabName === 'documents'), 'icon' => 'feather-file-text'],
+                    ['id' => 'probation-pane', 'label' => __('hrms.employees.tab_probation'), 'active' => ($activeTabName === 'probation'), 'icon' => 'feather-award'],
+                    ['id' => 'exit-clearance-pane', 'label' => __('hrms.employees.tab_exit_noc'), 'active' => ($activeTabName === 'exit-clearance'), 'icon' => 'feather-log-out'],
+                    ['id' => 'pip-pane', 'label' => __('hrms.employees.tab_pip'), 'active' => ($activeTabName === 'pip'), 'icon' => 'feather-trending-up'],
+                    ['id' => 'security-pane', 'label' => __('hrms.employees.tab_security'), 'active' => ($activeTabName === 'security'), 'icon' => 'feather-lock'],
+                    ['id' => 'activity-pane', 'label' => __('hrms.employees.tab_activity'), 'active' => ($activeTabName === 'activity'), 'icon' => 'feather-activity'],
+                ];
+            @endphp
+            <x-ui.horizontal-tabs id="profileTabs" :tabs="$employeeProfileTabs" :syncUrl="true" />
 
             <!-- TAB CONTENT CONTAINER FOR EMPLOYEES -->
             <div class="tab-content" id="profileTabsContent">
@@ -336,22 +299,22 @@
                         <div class="col-lg-7">
                             <x-ui.odoo-form-ui type="sheet">
                                 <h5 class="fw-bold text-dark mb-4 pb-2 border-bottom">
-                                    <i class="feather-key text-primary me-2"></i>{{ __('Change Account Password') }}
+                                    <i class="feather-key text-primary me-2"></i>{{ __('hrms.security.change_password') }}
                                 </h5>
 
                                 <form action="{{ route('profile.password.update') }}" method="POST">
                                     @csrf
                                     @method('PUT')
 
-                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('Current Password')" name="current_password" id="current_password" placeholder="Enter current password" :required="true" :error-text="$errors->first('current_password')" />
+                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('hrms.security.current_password')" name="current_password" id="current_password" :placeholder="__('hrms.security.enter_current_password')" :required="true" :error-text="$errors->first('current_password')" />
 
-                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('New Password')" name="password" id="password" placeholder="Minimum 8 characters" :required="true" helperText="{{ __('Must be at least 8 characters long.') }}" :error-text="$errors->first('password')" />
+                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('hrms.security.new_password')" name="password" id="password" :placeholder="__('hrms.security.minimum_8_chars')" :required="true" :helperText="__('hrms.security.password_min_length')" :error-text="$errors->first('password')" />
 
-                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('Confirm Password')" name="password_confirmation" id="password_confirmation" placeholder="Repeat new password" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('hrms.security.confirm_password')" name="password_confirmation" id="password_confirmation" :placeholder="__('hrms.security.repeat_new_password')" :required="true" />
 
                                     <div class="d-flex justify-content-end mt-4">
                                         <x-ui.button type="submit" variant="primary" icon="feather-save">
-                                            {{ __('Update Password') }}
+                                            {{ __('hrms.security.update_password') }}
                                         </x-ui.button>
                                     </div>
                                 </form>
@@ -361,26 +324,26 @@
                         <div class="col-lg-5">
                             <div class="bg-light p-4 rounded border">
                                 <h6 class="fw-bold text-dark mb-3">
-                                    <i class="feather-shield text-primary me-2"></i>{{ __('Session & Security Info') }}
+                                    <i class="feather-shield text-primary me-2"></i>{{ __('hrms.security.session_security_info') }}
                                 </h6>
                                 <div class="d-flex align-items-start gap-3 mb-4">
                                     <div class="p-2 rounded-circle bg-soft-success text-success">
                                         <i class="feather-monitor fs-20"></i>
                                     </div>
                                     <div>
-                                        <div class="fw-bold text-dark fs-14">{{ __('Current Session') }}</div>
-                                        <div class="text-muted fs-12">IP: {{ request()->ip() }}</div>
+                                        <div class="fw-bold text-dark fs-14">{{ __('hrms.security.current_session') }}</div>
+                                        <div class="text-muted fs-12">{{ __('hrms.security.ip_label') }}: {{ request()->ip() }}</div>
                                         <div class="text-muted fs-11 mt-1 text-truncate" style="max-width: 260px;" title="{{ request()->userAgent() }}">
                                             {{ request()->userAgent() }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="alert alert-soft-primary border-0 fs-12 mb-0">
-                                    <div class="fw-bold mb-1"><i class="feather-info me-1"></i>{{ __('Password Guidelines') }}</div>
+                                    <div class="fw-bold mb-1"><i class="feather-info me-1"></i>{{ __('hrms.security.password_guidelines') }}</div>
                                     <ul class="mb-0 ps-3">
-                                        <li>Use at least 8 characters.</li>
-                                        <li>Mix uppercase, lowercase, numbers, and symbols.</li>
-                                        <li>Avoid reusing passwords from other systems.</li>
+                                        <li>{{ __('hrms.security.guideline_min_chars') }}</li>
+                                        <li>{{ __('hrms.security.guideline_mix_chars') }}</li>
+                                        <li>{{ __('hrms.security.guideline_reuse') }}</li>
                                     </ul>
                                 </div>
                             </div>
@@ -391,7 +354,7 @@
                 <!-- Activity & Sessions Tab Pane -->
                 <div class="tab-pane fade {{ $activeTabName === 'activity' ? 'show active' : '' }}" id="activity-pane" role="tabpanel" aria-labelledby="activity-tab">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="fw-bold text-dark mb-0">{{ __('Recent Account Activity') }}</h5>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.security.recent_activity') }}</h5>
                     </div>
 
                     @if ($recentActivity->isNotEmpty())
@@ -399,18 +362,18 @@
                             <x-ui.odoo-form-ui type="table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 30%">{{ __('Action') }}</th>
-                                        <th style="width: 40%">{{ __('Target / Scope') }}</th>
-                                        <th style="width: 30%">{{ __('Timestamp') }}</th>
+                                        <th style="width: 30%">{{ __('hrms.security.action') }}</th>
+                                        <th style="width: 40%">{{ __('hrms.security.target_scope') }}</th>
+                                        <th style="width: 30%">{{ __('hrms.security.timestamp') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($recentActivity as $log)
                                         <tr>
                                             <td>
-                                                <span class="badge bg-soft-primary text-primary fw-bold">
-                                                    {{ ucwords(str_replace(['.', '_'], ' ', $log->action)) }}
-                                                </span>
+                                                <x-ui.badge soft variant="primary" class="fw-bold">
+                                                    {{ __(ucwords(str_replace(['.', '_'], ' ', $log->action))) }}
+                                                </x-ui.badge>
                                             </td>
                                             <td class="fs-13 text-muted">
                                                 {{ class_basename($log->subject_type ?: 'System') }}
@@ -419,7 +382,7 @@
                                                 @endif
                                             </td>
                                             <td class="fs-12 text-muted">
-                                                {{ $log->created_at ? $log->created_at->format('d M, Y h:i A') : 'N/A' }}
+                                                {{ $log->created_at ? $log->created_at->format('d M, Y h:i A') : __('hrms.common.na') }}
                                             </td>
                                         </tr>
                                     @endforeach
@@ -428,7 +391,7 @@
                         </div>
                     @else
                         <div class="p-4 text-center border rounded bg-light text-muted fs-13">
-                            <i class="feather-info me-2 text-primary"></i>{{ __('No recent audit activity found for your account.') }}
+                            <i class="feather-info me-2 text-primary"></i>{{ __('hrms.security.no_recent_activity') }}
                         </div>
                     @endif
                 </div>
@@ -440,7 +403,7 @@
                     <div class="modal-content border-0 shadow-lg">
                         <div class="modal-header">
                             <h5 class="modal-title fw-bold" id="editEmployeeModalLabel">
-                                <i class="feather-edit-3 me-2 text-primary"></i>{{ __('Edit Profile') }}
+                                <i class="feather-edit-3 me-2 text-primary"></i>{{ __('hrms.employees.edit_profile') }}
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
@@ -458,8 +421,8 @@
                                 @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee, 'isHrOrAdmin' => $showOfficeSection])
                             </div>
                             <div class="modal-footer bg-light py-2">
-                                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                                <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>
+                                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                                <x-ui.button type="submit" variant="primary">{{ __('hrms.employees.mdl_btn_update_employee') }}</x-ui.button>
                             </div>
                         </form>
                     </div>
@@ -469,10 +432,10 @@
         @else
             <!-- TAB NAVIGATION FOR NON-EMPLOYEES -->
             <x-ui.horizontal-tabs id="profileTabs" :tabs="[
-                ['id' => 'tab-overview', 'label' => __('Overview'), 'active' => ($activeTabName === 'overview'), 'icon' => 'feather-user'],
-                ['id' => 'tab-security', 'label' => __('Security & Password'), 'active' => ($activeTabName === 'security'), 'icon' => 'feather-lock'],
-                ['id' => 'tab-activity', 'label' => __('Activity & Sessions'), 'active' => ($activeTabName === 'activity'), 'icon' => 'feather-activity']
-            ]" />
+                ['id' => 'tab-overview', 'label' => __('hrms.employees.tab_overview'), 'active' => ($activeTabName === 'overview'), 'icon' => 'feather-user'],
+                ['id' => 'tab-security', 'label' => __('hrms.employees.tab_security'), 'active' => ($activeTabName === 'security'), 'icon' => 'feather-lock'],
+                ['id' => 'tab-activity', 'label' => __('hrms.employees.tab_activity'), 'active' => ($activeTabName === 'activity'), 'icon' => 'feather-activity']
+            ]" :syncUrl="true" />
 
             <!-- TAB CONTENT CONTAINER FOR NON-EMPLOYEES -->
             <div class="tab-content mt-5">
@@ -484,43 +447,43 @@
                             <!-- Left Column: Personal & Account Details -->
                             <div class="col-md-6 border-end">
                                 <h6 class="fw-bold text-dark mb-3">
-                                    <i class="feather-user text-primary me-2"></i>{{ __('Personal & Account Details') }}
+                                    <i class="feather-user text-primary me-2"></i>{{ __('hrms.employees.personal_account_details') }}
                                 </h6>
-                                <x-ui.odoo-form-ui type="input" :label="__('Full Name')" name="view_name" :value="$user->name" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Email Address')" name="view_email" :value="$user->email" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Phone / Mobile')" name="view_phone" :value="$user->effective_phone ?: __('Not set')" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Assigned Role')" name="view_role" :value="$user->primaryRole?->name ?? ucfirst($user->role ?: 'User')" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('System User ID')" name="view_id" :value="'#' . $user->id" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Registered On')" name="view_registered" :value="$user->created_at ? $user->created_at->format('M d, Y h:i A') : 'N/A'" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.full_name')" name="view_name" :value="$user->name" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.email_address')" name="view_email" :value="$user->email" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.phone_mobile')" name="view_phone" :value="$user->effective_phone ?: __('hrms.common.not_set')" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.assigned_role')" name="view_role" :value="$user->primaryRole?->name ?? ucfirst($user->role ?: 'User')" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.system_user_id')" name="view_id" :value="'#' . $user->id" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.registered_on')" name="view_registered" :value="$user->created_at ? $user->created_at->format('M d, Y h:i A') : __('hrms.common.na')" :readonly="true" />
                             </div>
 
                             <!-- Right Column: Organization Context -->
                             <div class="col-md-6">
                                 <h6 class="fw-bold text-dark mb-3">
-                                    <i class="feather-briefcase text-primary me-2"></i>{{ __('Organization Context') }}
+                                    <i class="feather-briefcase text-primary me-2"></i>{{ __('hrms.employees.org_context') }}
                                 </h6>
-                                <x-ui.odoo-form-ui type="input" :label="__('Tenant / Workspace')" name="view_tenant" :value="$tenant?->name ?? 'Default Tenant'" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Tenant Identifier')" name="view_slug" :value="$tenant?->slug ?? 'default'" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Company')" name="view_company" :value="$user->company?->company_name ?? __('Default Company')" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Branch')" name="view_branch" :value="$user->branch?->branch_name ?? __('Default Branch')" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Department')" name="view_department" :value="$user->department?->name ?? __('Not Assigned')" :readonly="true" />
-                                <x-ui.odoo-form-ui type="input" :label="__('Subscription Plan')" name="view_plan" :value="ucfirst($tenant?->plan ?? 'Enterprise')" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.tenant_workspace')" name="view_tenant" :value="$tenant?->name ?? 'Default Tenant'" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.tenant_identifier')" name="view_slug" :value="$tenant?->slug ?? 'default'" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.company')" name="view_company" :value="$user->company?->company_name ?? __('hrms.employees.default_company')" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.branch')" name="view_branch" :value="$user->branch?->branch_name ?? __('hrms.employees.default_branch')" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.tbl_department')" name="view_department" :value="$user->department?->name ?? __('hrms.employees.not_assigned')" :readonly="true" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.subscription_plan')" name="view_plan" :value="ucfirst($tenant?->plan ?? 'Enterprise')" :readonly="true" />
                             </div>
                         </div>
 
                         <!-- Bottom Section: Regional & System Preferences -->
                         <div class="border-top pt-4 mt-3">
                             <h6 class="fw-bold text-dark mb-3">
-                                <i class="feather-globe text-primary me-2"></i>{{ __('Regional & System Preferences') }}
+                                <i class="feather-globe text-primary me-2"></i>{{ __('hrms.employees.regional_system_preferences') }}
                             </h6>
                             <div class="row g-4">
                                 <div class="col-md-6 border-end">
-                                    <x-ui.odoo-form-ui type="input" :label="__('System Timezone')" name="view_timezone" :value="$tenant?->timezone ?? config('app.timezone', 'UTC')" :readonly="true" />
-                                    <x-ui.odoo-form-ui type="input" :label="__('System Language')" name="view_locale" :value="strtoupper($tenant?->locale ?? config('app.locale', 'en'))" :readonly="true" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.system_timezone')" name="view_timezone" :value="$tenant?->timezone ?? config('app.timezone', 'UTC')" :readonly="true" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.system_language')" name="view_locale" :value="strtoupper($tenant?->locale ?? config('app.locale', 'en'))" :readonly="true" />
                                 </div>
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" :label="__('Default Currency')" name="view_currency" :value="$tenant?->settings['currency'] ?? 'INR (₹)'" :readonly="true" />
-                                    <x-ui.odoo-form-ui type="input" :label="__('Financial Year')" name="view_fy" :value="$tenant?->settings['financial_year'] ?? '2026-2027'" :readonly="true" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.default_currency')" name="view_currency" :value="$tenant?->settings['currency'] ?? 'INR (₹)'" :readonly="true" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.financial_year')" name="view_fy" :value="$tenant?->settings['financial_year'] ?? '2026-2027'" :readonly="true" />
                                 </div>
                             </div>
                         </div>
@@ -533,22 +496,22 @@
                         <div class="col-lg-7">
                             <x-ui.odoo-form-ui type="sheet">
                                 <h5 class="fw-bold text-dark mb-4 pb-2 border-bottom">
-                                    <i class="feather-key text-primary me-2"></i>{{ __('Change Account Password') }}
+                                    <i class="feather-key text-primary me-2"></i>{{ __('hrms.security.change_password') }}
                                 </h5>
 
                                 <form action="{{ route('profile.password.update') }}" method="POST">
                                     @csrf
                                     @method('PUT')
 
-                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('Current Password')" name="current_password" id="current_password_alt" placeholder="Enter current password" :required="true" :error-text="$errors->first('current_password')" />
+                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('hrms.security.current_password')" name="current_password" id="current_password_alt" :placeholder="__('hrms.security.enter_current_password')" :required="true" :error-text="$errors->first('current_password')" />
 
-                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('New Password')" name="password" id="password_alt" placeholder="Minimum 8 characters" :required="true" helperText="{{ __('Must be at least 8 characters long.') }}" :error-text="$errors->first('password')" />
+                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('hrms.security.new_password')" name="password" id="password_alt" :placeholder="__('hrms.security.minimum_8_chars')" :required="true" :helperText="__('hrms.security.password_min_length')" :error-text="$errors->first('password')" />
 
-                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('Confirm Password')" name="password_confirmation" id="password_confirmation_alt" placeholder="Repeat new password" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" inputType="password" :label="__('hrms.security.confirm_password')" name="password_confirmation" id="password_confirmation_alt" :placeholder="__('hrms.security.repeat_new_password')" :required="true" />
 
                                     <div class="d-flex justify-content-end mt-4">
                                         <x-ui.button type="submit" variant="primary" icon="feather-save">
-                                            {{ __('Update Password') }}
+                                            {{ __('hrms.security.update_password') }}
                                         </x-ui.button>
                                     </div>
                                 </form>
@@ -558,26 +521,26 @@
                         <div class="col-lg-5">
                             <div class="bg-light p-4 rounded border">
                                 <h6 class="fw-bold text-dark mb-3">
-                                    <i class="feather-shield text-primary me-2"></i>{{ __('Session & Security Info') }}
+                                    <i class="feather-shield text-primary me-2"></i>{{ __('hrms.security.session_security_info') }}
                                 </h6>
                                 <div class="d-flex align-items-start gap-3 mb-4">
                                     <div class="p-2 rounded-circle bg-soft-success text-success">
                                         <i class="feather-monitor fs-20"></i>
                                     </div>
                                     <div>
-                                        <div class="fw-bold text-dark fs-14">{{ __('Current Session') }}</div>
-                                        <div class="text-muted fs-12">IP: {{ request()->ip() }}</div>
+                                        <div class="fw-bold text-dark fs-14">{{ __('hrms.security.current_session') }}</div>
+                                        <div class="text-muted fs-12">{{ __('hrms.security.ip_label') }}: {{ request()->ip() }}</div>
                                         <div class="text-muted fs-11 mt-1 text-truncate" style="max-width: 260px;" title="{{ request()->userAgent() }}">
                                             {{ request()->userAgent() }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="alert alert-soft-primary border-0 fs-12 mb-0">
-                                    <div class="fw-bold mb-1"><i class="feather-info me-1"></i>{{ __('Password Guidelines') }}</div>
+                                    <div class="fw-bold mb-1"><i class="feather-info me-1"></i>{{ __('hrms.security.password_guidelines') }}</div>
                                     <ul class="mb-0 ps-3">
-                                        <li>Use at least 8 characters.</li>
-                                        <li>Mix uppercase, lowercase, numbers, and symbols.</li>
-                                        <li>Avoid reusing passwords from other systems.</li>
+                                        <li>{{ __('hrms.security.guideline_min_chars') }}</li>
+                                        <li>{{ __('hrms.security.guideline_mix_chars') }}</li>
+                                        <li>{{ __('hrms.security.guideline_reuse') }}</li>
                                     </ul>
                                 </div>
                             </div>
@@ -588,7 +551,7 @@
                 <!-- 3. ACTIVITY & SESSIONS TAB -->
                 <div class="tab-pane fade {{ $activeTabName === 'activity' ? 'show active' : '' }}" id="tab-activity" role="tabpanel" aria-labelledby="tab-activity-tab">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="fw-bold text-dark mb-0">{{ __('Recent Account Activity') }}</h5>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.security.recent_activity') }}</h5>
                     </div>
 
                     @if ($recentActivity->isNotEmpty())
@@ -596,18 +559,18 @@
                             <x-ui.odoo-form-ui type="table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 30%">{{ __('Action') }}</th>
-                                        <th style="width: 40%">{{ __('Target / Scope') }}</th>
-                                        <th style="width: 30%">{{ __('Timestamp') }}</th>
+                                        <th style="width: 30%">{{ __('hrms.security.action') }}</th>
+                                        <th style="width: 40%">{{ __('hrms.security.target_scope') }}</th>
+                                        <th style="width: 30%">{{ __('hrms.security.timestamp') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($recentActivity as $log)
                                         <tr>
                                             <td>
-                                                <span class="badge bg-soft-primary text-primary fw-bold">
-                                                    {{ ucwords(str_replace(['.', '_'], ' ', $log->action)) }}
-                                                </span>
+                                                <x-ui.badge soft variant="primary" class="fw-bold">
+                                                    {{ __(ucwords(str_replace(['.', '_'], ' ', $log->action))) }}
+                                                </x-ui.badge>
                                             </td>
                                             <td class="fs-13 text-muted">
                                                 {{ class_basename($log->subject_type ?: 'System') }}
@@ -616,7 +579,7 @@
                                                 @endif
                                             </td>
                                             <td class="fs-12 text-muted">
-                                                {{ $log->created_at ? $log->created_at->format('d M, Y h:i A') : 'N/A' }}
+                                                {{ $log->created_at ? $log->created_at->format('d M, Y h:i A') : __('hrms.common.na') }}
                                             </td>
                                         </tr>
                                     @endforeach
@@ -625,7 +588,7 @@
                         </div>
                     @else
                         <div class="p-4 text-center border rounded bg-light text-muted fs-13">
-                            <i class="feather-info me-2 text-primary"></i>{{ __('No recent audit activity found for your account.') }}
+                            <i class="feather-info me-2 text-primary"></i>{{ __('hrms.security.no_recent_activity') }}
                         </div>
                     @endif
                 </div>
@@ -633,28 +596,28 @@
             </div>
 
             <!-- Edit Profile Modal for Non-Employees -->
-            <x-ui.modal id="editProfileModal" :title="__('Edit Profile')" :centered="true">
+            <x-ui.modal id="editProfileModal" :title="__('hrms.employees.edit_profile')" :centered="true">
                 <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data" id="editProfileForm">
                     @csrf
                     @method('PUT')
 
                     <x-ui.odoo-form-ui type="sheet">
-                        <x-ui.odoo-form-ui type="input" :label="__('Full Name')" name="name" id="edit_name" :value="old('name', $user->name)" :required="true" :error-text="$errors->first('name')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('hrms.employees.full_name')" name="name" id="edit_name" :value="old('name', $user->name)" :required="true" :error-text="$errors->first('name')" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('Email Address')" name="email" id="edit_email" :value="old('email', $user->email)" :required="true" :error-text="$errors->first('email')" />
+                        <x-ui.odoo-form-ui type="input" inputType="email" :label="__('hrms.employees.email_address')" name="email" id="edit_email" :value="old('email', $user->email)" :required="true" :error-text="$errors->first('email')" />
 
-                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('Phone / Mobile')" name="phone" id="edit_phone" :value="old('phone', $user->effective_phone)" placeholder="+91 9876543210" :error-text="$errors->first('phone')" />
+                        <x-ui.odoo-form-ui type="input" inputType="tel" :label="__('hrms.employees.phone_mobile')" name="phone" id="edit_phone" :value="old('phone', $user->effective_phone)" placeholder="+91 9876543210" :error-text="$errors->first('phone')" />
 
-                        <x-ui.odoo-form-ui type="file" :label="__('Profile Photo')" name="avatar" id="edit_avatar" placeholder="Choose photo (JPG, PNG, WEBP, max 2MB)" :error-text="$errors->first('avatar')" />
+                        <x-ui.odoo-form-ui type="file" :label="__('hrms.employees.profile_photo')" name="avatar" id="edit_avatar" :placeholder="__('hrms.employees.photo_placeholder')" :error-text="$errors->first('avatar')" />
                     </x-ui.odoo-form-ui>
                 </form>
 
                 <x-slot name="footer">
                     <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal">
-                        {{ __('Cancel') }}
+                        {{ __('hrms.common.cancel') }}
                     </x-ui.button>
                     <x-ui.button type="button" variant="primary" icon="feather-save" onclick="document.getElementById('editProfileForm').submit();">
-                        {{ __('Save Changes') }}
+                        {{ __('hrms.common.save_changes') }}
                     </x-ui.button>
                 </x-slot>
             </x-ui.modal>
@@ -666,69 +629,58 @@
                 $pChanges = $pendingReq->changes ?? [];
             @endphp
             <!-- MODAL FOR EMPLOYEE TO VIEW THEIR PENDING CHANGES -->
-            <div class="modal fade" id="viewMyPendingRequestModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-centered">
-                    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-                        <div class="modal-header bg-light border-bottom px-4 py-3">
-                            <h5 class="modal-title fw-bold text-dark mb-0">
-                                <i class="feather-clock me-2 text-warning"></i>Profile Edit Request Details
-                            </h5>
-                            <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body p-4">
-                            <div class="border rounded-3 overflow-hidden mb-3">
-                                <table class="table table-bordered align-middle mb-0 fs-13" style="table-layout: fixed; width: 100%;">
-                                    <thead class="bg-light text-uppercase fs-11 text-muted">
-                                        <tr>
-                                            <th style="width: 28%;" class="ps-3">Field</th>
-                                            <th style="width: 36%;" class="text-danger bg-soft-danger">Current Value</th>
-                                            <th style="width: 36%;" class="text-success bg-soft-success">Requested New Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($pChanges as $fKey => $fData)
-                                            <tr>
-                                                <td class="fw-bold text-dark ps-3 text-break" style="white-space: normal; word-break: break-word;">{{ $fData['label'] ?? ucwords(str_replace('_', ' ', $fKey)) }}</td>
-                                                <td class="text-muted text-break" style="white-space: normal; word-break: break-word;">
-                                                    @if(!empty($fData['is_image']))
-                                                        @if(!empty($fData['old']) && $fData['old'] !== '—')
-                                                            <img src="{{ asset('storage/' . $fData['old']) }}" alt="Old Photo" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px;">
-                                                        @else
-                                                            <span class="text-muted">No photo</span>
-                                                        @endif
-                                                    @else
-                                                        @if(empty($fData['old']) || $fData['old'] === '—')
-                                                            <span class="text-muted">&mdash;</span>
-                                                        @else
-                                                            <span class="text-danger text-decoration-line-through d-inline-block" style="line-height: 1.45;">{{ $fData['old'] }}</span>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                                <td class="fw-bold text-success text-break" style="white-space: normal; word-break: break-word;">
-                                                    @if(!empty($fData['is_image']))
-                                                        <img src="{{ asset('storage/' . $fData['new']) }}" alt="New Photo" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 2px solid #22c55e;">
-                                                    @else
-                                                        @if(empty($fData['new']) || $fData['new'] === '—')
-                                                            <span class="text-muted">&mdash;</span>
-                                                        @else
-                                                            <div class="p-2 rounded-2 bg-success-subtle text-success border border-success-subtle fs-13 fw-semibold text-break d-block" style="white-space: normal; word-break: break-word; line-height: 1.45;">{{ $fData['new'] }}</div>
-                                                        @endif
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="modal-footer bg-light border-top px-4 py-3">
-                            <x-ui.button type="button" variant="light" class="border" data-bs-dismiss="modal">
-                                Close
-                            </x-ui.button>
-                        </div>
-                    </div>
+            <x-ui.modal id="viewMyPendingRequestModal" size="lg" :centered="true" :title="'<i class=\'feather-clock me-2 text-warning\'></i>' . __('hrms.employees.pending_profile_request_title')">
+                <div class="border rounded-3 overflow-hidden mb-3">
+                    <table class="table table-bordered align-middle mb-0 fs-13" style="table-layout: fixed; width: 100%;">
+                        <thead class="bg-light text-uppercase fs-11 text-muted">
+                            <tr>
+                                <th style="width: 28%;" class="ps-3">{{ __('hrms.employees.field_name') }}</th>
+                                <th style="width: 36%;" class="text-danger bg-soft-danger">{{ __('hrms.employees.current_value') }}</th>
+                                <th style="width: 36%;" class="text-success bg-soft-success">{{ __('hrms.employees.requested_new_value') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($pChanges as $fKey => $fData)
+                                <tr>
+                                    <td class="fw-bold text-dark ps-3 text-break" style="white-space: normal; word-break: break-word;">{{ $fData['label'] ?? ucwords(str_replace('_', ' ', $fKey)) }}</td>
+                                    <td class="text-muted text-break" style="white-space: normal; word-break: break-word;">
+                                        @if(!empty($fData['is_image']))
+                                            @if(!empty($fData['old']) && $fData['old'] !== '—')
+                                                <img src="{{ asset('storage/' . $fData['old']) }}" alt="Old Photo" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px;">
+                                            @else
+                                                <span class="text-muted">{{ __('hrms.employees.no_photo') }}</span>
+                                            @endif
+                                        @else
+                                            @if(empty($fData['old']) || $fData['old'] === '—')
+                                                <span class="text-muted">&mdash;</span>
+                                            @else
+                                                <span class="text-danger text-decoration-line-through d-inline-block" style="line-height: 1.45;">{{ $fData['old'] }}</span>
+                                            @endif
+                                        @endif
+                                    </td>
+                                    <td class="fw-bold text-success text-break" style="white-space: normal; word-break: break-word;">
+                                        @if(!empty($fData['is_image']))
+                                            <img src="{{ asset('storage/' . $fData['new']) }}" alt="New Photo" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 2px solid #22c55e;">
+                                        @else
+                                            @if(empty($fData['new']) || $fData['new'] === '—')
+                                                <span class="text-muted">&mdash;</span>
+                                            @else
+                                                <div class="p-2 rounded-2 bg-success-subtle text-success border border-success-subtle fs-13 fw-semibold text-break d-block" style="white-space: normal; word-break: break-word; line-height: 1.45;">{{ $fData['new'] }}</div>
+                                            @endif
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+
+                <x-slot name="footer">
+                    <x-ui.button type="button" variant="light" class="border" data-bs-dismiss="modal">
+                        {{ __('hrms.common.close') }}
+                    </x-ui.button>
+                </x-slot>
+            </x-ui.modal>
         @endif
 
     </div>
@@ -761,9 +713,10 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const activeTab = urlParams.get('tab');
                 if (activeTab) {
-                    const tabEl = document.querySelector(`#${activeTab}-tab`);
-                    if (tabEl) {
-                        const tab = new bootstrap.Tab(tabEl);
+                    const cleanTab = activeTab.replace(/(-pane|tab-)/g, '');
+                    const tabEl = document.querySelector(`#${cleanTab}-pane-tab`) || document.querySelector(`#${cleanTab}-tab`) || document.querySelector(`#tab-${cleanTab}-tab`);
+                    if (tabEl && window.bootstrap) {
+                        const tab = bootstrap.Tab.getOrCreateInstance(tabEl);
                         tab.show();
                     }
                 }

@@ -10,4 +10,6 @@ interface ShiftChangeRequestRepositoryInterface
     public function getIndexData(array $inputs): array;
     public function storeShiftChangeRequest(array $validated, Request $request): ShiftChangeRequest;
     public function updateStatus(ShiftChangeRequest $requestModel, array $validated, Request $request): bool;
+    public function revertShiftChange(ShiftChangeRequest $requestModel): void;
 }
+

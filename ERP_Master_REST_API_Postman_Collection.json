@@ -1128,6 +1128,46 @@
                             }
                         },
                         {
+                            "name": "15b. Log Lead Field Meeting with Geo-Verification & Live Selfie",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/leads/1/followups",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "leads",
+                                        "1",
+                                        "followups"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"action_mode\": \"log_note\",\n    \"type\": \"Meeting\",\n    \"status\": \"Completed\",\n    \"followup_date\": \"2026-10-22 14:00:00\",\n    \"notes\": \"Conducted in-person field meeting at client premises. Verified requirements.\",\n    \"latitude\": 28.613939,\n    \"longitude\": 77.209021,\n    \"location_address\": \"Connaught Place, New Delhi, India\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\",\n    \"next_activity_type\": \"Call\",\n    \"next_followup_date\": \"2026-10-25 11:30:00\",\n    \"next_title\": \"Follow up call on proposal delivery\",\n    \"lead_status\": \"In Progress\"\n}"
+                                }
+                            }
+                        },
+                        {
                             "name": "16. List Lead Documents",
                             "request": {
                                 "method": "GET",
@@ -1245,6 +1285,47 @@
                                         "leads",
                                         "1",
                                         "restore"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "17. Upload Lead Documents",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/leads/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "leads",
+                                        "1",
+                                        "documents"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "documents[]",
+                                            "type": "file",
+                                            "description": "Select files/documents to upload"
+                                        }
                                     ]
                                 }
                             }
@@ -1877,6 +1958,46 @@
                             }
                         },
                         {
+                            "name": "15b. Log Deal Field Meeting with Geo-Verification & Live Selfie",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/followups",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "followups"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"action_mode\": \"log_note\",\n    \"type\": \"Meeting\",\n    \"status\": \"Completed\",\n    \"title\": \"On-site Deal Closing Meeting\",\n    \"followup_date\": \"2026-10-22 15:30:00\",\n    \"notes\": \"On-site commercial negotiation concluded successfully at customer office.\",\n    \"latitude\": 28.613939,\n    \"longitude\": 77.209021,\n    \"location_address\": \"Sector 62, Noida, Uttar Pradesh\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
+                                }
+                            }
+                        },
+                        {
                             "name": "16. Export Deals to Excel",
                             "request": {
                                 "method": "GET",
@@ -1963,6 +2084,78 @@
                                         "deals",
                                         "1",
                                         "restore"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "16. List Deal Documents",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "documents"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "17. Upload Deal Documents",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/deals/1/documents",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "deals",
+                                        "1",
+                                        "documents"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "documents[]",
+                                            "type": "file",
+                                            "description": "Select files/documents to upload for this deal"
+                                        }
                                     ]
                                 }
                             }
@@ -2763,6 +2956,117 @@
                                     ]
                                 }
                             }
+                        },
+                        {
+                            "name": "7. Send Quotation via Email",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/send-email",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "send-email"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"to_email\": \"client@example.com\",\n    \"subject\": \"Official Commercial Proposal - Quotation #QT-2026-0001\",\n    \"body_html\": \"<p>Dear Valued Client,<br>Please find attached our quotation proposal.</p>\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "8. Send Quotation via WhatsApp",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/send-whatsapp",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "send-whatsapp"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"phone\": \"+919876543210\",\n    \"caption\": \"Hello, please review our official Quotation proposal.\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "9. Download Quotation PDF",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/quotations/1/download",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "quotations",
+                                        "1",
+                                        "download"
+                                    ]
+                                }
+                            }
                         }
                     ]
                 },
@@ -2874,7 +3178,37 @@
                     "name": "9. CRM - Standalone Followups & Documents",
                     "item": [
                         {
-                            "name": "1. Update Followup Status",
+                            "name": "0. Get Single Followup / Activity Details",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/followups/1",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "followups",
+                                        "1"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "1. Update Followup Status (Quick Status Change)",
                             "request": {
                                 "method": "PATCH",
                                 "header": [
@@ -2909,12 +3243,162 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"status\": \"completed\",\n    \"completion_notes\": \"Call completed successfully. Sent quotation via email.\"\n}"
+                                    "raw": "{\n    \"status\": \"Completed\",\n    \"notes\": \"Followup call completed successfully. Client requested quote update.\",\n    \"outcome\": \"Interested in quotation\"\n}"
                                 }
                             }
                         },
                         {
-                            "name": "2. Delete Followup",
+                            "name": "2. Complete Field Meeting with Geo-Verification & Live Selfie (Base64)",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/followups/1/status",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "followups",
+                                        "1",
+                                        "status"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"Completed\",\n    \"notes\": \"Client on-site field meeting concluded. Requirements verified.\",\n    \"outcome\": \"Meeting Successful\",\n    \"latitude\": 28.613939,\n    \"longitude\": 77.209021,\n    \"location_address\": \"Connaught Place, Barakhamba Road, New Delhi, 110001\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "3. Complete Field Meeting with Geo-Verification & Selfie (Multipart Form-Data)",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/followups/1/status",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "followups",
+                                        "1",
+                                        "status"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "status",
+                                            "value": "Completed",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "notes",
+                                            "value": "Field meeting completed with live GPS photo.",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "outcome",
+                                            "value": "Completed",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "latitude",
+                                            "value": "28.613939",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "longitude",
+                                            "value": "77.209021",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "location_address",
+                                            "value": "Connaught Place, New Delhi",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "selfie",
+                                            "type": "file",
+                                            "src": ""
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "4. Update / Reschedule Followup Record (Full Update)",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/crm/followups/1",
+                                    "host": [
+                                        "{{baseUrl}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "crm",
+                                        "followups",
+                                        "1"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"type\": \"Meeting\",\n    \"status\": \"Completed\",\n    \"followup_date\": \"2026-10-22 14:00:00\",\n    \"notes\": \"Field meeting concluded. Verified requirements with CEO.\",\n    \"latitude\": 28.613939,\n    \"longitude\": 77.209021,\n    \"location_address\": \"Connaught Place, New Delhi\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\",\n    \"is_reschedule\": false\n}"
+                                }
+                            }
+                        },
+                        {
+                            "name": "5. Delete Followup",
                             "request": {
                                 "method": "DELETE",
                                 "header": [
@@ -2944,7 +3428,7 @@
                             }
                         },
                         {
-                            "name": "3. Delete CRM Document",
+                            "name": "6. Delete CRM Document",
                             "request": {
                                 "method": "DELETE",
                                 "header": [
@@ -3071,7 +3555,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"quotation_approval_required\": true,\n    \"auto_convert_won_deal_to_customer\": true,\n    \"default_deal_probability\": 40\n}"
+                                    "raw": "{\n    \"quotation_approval_policy\": \"approval_required\",\n    \"invoicing_policy\": \"sales_order\",\n    \"field_visit_verification\": true\n}"
                                 }
                             }
                         }
@@ -3981,6 +4465,66 @@
                                         "export"
                                     ]
                                 }
+                            }
+                        },
+                        {
+                            "name": "4.15 Check Invoice Cancellation Eligibility (Dispatched Check)",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/sales/invoices/1/cancellation-check",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "sales",
+                                        "invoices",
+                                        "1",
+                                        "cancellation-check"
+                                    ]
+                                },
+                                "description": "Verifies whether the invoice is eligible for direct Financial Credit Note cancellation or requires a physical Sales Return (if goods have already been dispatched). Also returns payment status, advance handling options, active bank accounts for refunds, and linked credit note history."
+                            }
+                        },
+                        {
+                            "name": "4.16 Create Financial Credit Note & Cancel Invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"reason\": \"Customer order cancelled before dispatch\",\n    \"credit_note_date\": \"2026-10-22\",\n    \"refund_action\": \"credit_balance\",\n    \"refund_bank_account_id\": null,\n    \"notes\": \"Retain payment as advance credit for future orders\"\n}"
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/sales/invoices/1/credit-note",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "sales",
+                                        "invoices",
+                                        "1",
+                                        "credit-note"
+                                    ]
+                                },
+                                "description": "Cancels an un-dispatched invoice and generates a Financial Credit Note (VoucherType::CREDIT_NOTE) in the General Ledger reversing Sales Revenue, GST Output accounts, and Accounts Receivable. If payments were recorded, allows choosing either 'credit_balance' (retaining customer advance) or 'bank_refund' (issuing payout via bank account)."
                             }
                         }
                     ]
@@ -5468,6 +6012,66 @@
                                 "dispatches"
                             ]
                         }
+                    }
+                },
+                {
+                    "name": "8. Check Cancellation Eligibility",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/sales/invoices/1/cancellation-check",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "sales",
+                                "invoices",
+                                "1",
+                                "cancellation-check"
+                            ]
+                        },
+                        "description": "Check if invoice can be cancelled via Credit Note (un-dispatched) or requires Sales Return."
+                    }
+                },
+                {
+                    "name": "9. Create Credit Note & Cancel Invoice",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Customer order cancelled before dispatch\",\n    \"credit_note_date\": \"2026-10-22\",\n    \"refund_action\": \"credit_balance\",\n    \"refund_bank_account_id\": null,\n    \"notes\": \"Retain payment as advance credit for future orders\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/sales/invoices/1/credit-note",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "sales",
+                                "invoices",
+                                "1",
+                                "credit-note"
+                            ]
+                        },
+                        "description": "Cancel invoice via Financial Credit Note and retain advance or refund via bank."
                     }
                 }
             ]

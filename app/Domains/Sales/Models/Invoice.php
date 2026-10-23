@@ -29,6 +29,7 @@ class Invoice extends BaseModel
         'subtotal',
         'tax_amount',
         'tax_type',
+        'tax_mode',
         'discount_type',
         'order_tax_rate',
         'gst_type',
@@ -135,5 +136,32 @@ class Invoice extends BaseModel
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    public function getEffectiveTaxModeAttribute(): string
+    {
+        if (!empty($this->attributes['tax_mode'])) {
+            return $this->attributes['tax_mode'];
+        }
+
+        if ($this->salesOrder && !empty($this->salesOrder->effective_tax_mode)) {
+            return $this->salesOrder->effective_tax_mode;
+        }
+
+        return 'exclusive';
+    }
+
+    public function getTaxableAmountAttribute(): float
+    {
+        $subtotal = (float)($this->subtotal ?? 0);
+        $discount = (float)($this->discount_amount ?? 0);
+        $net = max(0, $subtotal - $discount);
+
+        if ($this->effective_tax_mode === 'inclusive') {
+            $tax = (float)($this->tax_amount ?? 0);
+            return round(max(0, $net - $tax), 2);
+        }
+
+        return round($net, 2);
     }
 }

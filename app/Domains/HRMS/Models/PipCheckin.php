@@ -16,13 +16,19 @@ class PipCheckin extends BaseModel
         'review_date',
         'reviewer_id',
         'rating_status',
+        'rating',
         'manager_comments',
         'employee_comments',
         'action_items',
+        'concerns_noted',
+        'support_action_items',
+        'next_checkin_date',
     ];
 
     protected $casts = [
         'review_date' => 'date',
+        'next_checkin_date' => 'date',
+        'rating' => 'float',
     ];
 
     public function plan(): BelongsTo

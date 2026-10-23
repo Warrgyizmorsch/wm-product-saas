@@ -21,7 +21,46 @@ class LeadRepository
      */
     public function getPaginatedLeads(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Lead::query()->with(['quotations', 'owner']);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $query = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->select([
+                'id',
+                'tenant_id',
+                'lead_number',
+                'company_name',
+                'company_email',
+                'company_phone',
+                'gstin',
+                'lead_type',
+                'contact_person',
+                'email',
+                'phone',
+                'expected_amount',
+                'expected_sale_date',
+                'source',
+                'priority',
+                'segment',
+                'status',
+                'is_customer',
+                'lead_owner_id',
+                'crm_deal_id',
+                'crm_account_id',
+                'next_followup_date',
+                'call_date',
+                'additional_contacts',
+                'created_at',
+                'updated_at',
+            ])
+            ->with([
+                'owner:id,name,email',
+                'followups' => function ($q) {
+                    $q->select(['id', 'lead_id', 'status', 'followup_date', 'title', 'notes'])
+                      ->whereNull('crm_deal_id')
+                      ->orderBy('followup_date', 'desc');
+                }
+            ]);
 
         // Search Keywords
         if (!empty($filters['search'])) {
@@ -37,16 +76,22 @@ class LeadRepository
 
         // Duplicates Only Filter (Tenant-wise & Non-deleted Only)
         if (!empty($filters['duplicates_only']) && $filters['duplicates_only'] === '1') {
-            $tenantId = tenant_id() ?? 1;
-            $query->where('tenant_id', $tenantId)
-                ->whereNull('deleted_at')
-                ->where(function ($q) {
+            if (isset($filters['duplicate_lead_ids'])) {
+                $dupIds = (array) $filters['duplicate_lead_ids'];
+                if (empty($dupIds)) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->whereIn('id', $dupIds);
+                }
+            } else {
+                $query->where(function ($q) {
                     $q->whereNotNull('email')->where('email', '!=', '')
                       ->orWhereNotNull('company_email')->where('company_email', '!=', '')
                       ->orWhereNotNull('phone')->where('phone', '!=', '')
                       ->orWhereNotNull('company_phone')->where('company_phone', '!=', '');
                 });
-            $query->orderByRaw("LOWER(email) ASC, phone ASC, id ASC");
+            }
+            $query->orderByRaw("LOWER(COALESCE(email, company_email, '')) ASC, phone ASC, id ASC");
         } else {
             if (!empty($filters['priority'])) {
                 $query->where('priority', $filters['priority']);
@@ -92,7 +137,7 @@ class LeadRepository
             $sortOrder = $filters['sort_order'] ?? 'desc';
             
             if ($sortBy === 'duplicates') {
-                $query->orderByRaw("LOWER(email) ASC, phone ASC, id ASC");
+                $query->orderByRaw("LOWER(COALESCE(email, company_email, '')) ASC, phone ASC, id ASC");
             } else {
                 $allowedSorts = ['call_date', 'company_name', 'expected_amount', 'priority', 'status'];
                 if (in_array($sortBy, $allowedSorts)) {
@@ -111,27 +156,64 @@ class LeadRepository
      */
     public function getLeadDetails(Lead $lead, ?int $activeQuotationId = null): array
     {
-        $lead->load(['followups.taggedUser', 'histories.user', 'leadDocuments']);
+        $todayStart = now()->startOfDay();
+
+        $lead->load([
+            'followups' => fn($q) => $q->where(function($fq) use ($todayStart) {
+                $fq->where('status', 'Pending')
+                   ->orWhere('updated_at', '>=', $todayStart);
+            })->with([
+                'taggedUser:id,name,email',
+                'rescheduledTo:id,rescheduled_from_id,followup_date,status'
+            ]),
+            'histories' => fn($q) => $q->with('user:id,name')->latest('id'),
+            'leadDocuments' => fn($q) => $q->latest('id')
+        ]);
+
+        $pastActivitiesQuery = $lead->followups()
+            ->where('status', '!=', 'Pending')
+            ->where('updated_at', '<', $todayStart)
+            ->whereDoesntHave('rescheduledTo');
+
+        $pastActivitiesCount = (clone $pastActivitiesQuery)->count();
+        $pastDoneActivities = $pastActivitiesQuery
+            ->with([
+                'taggedUser:id,name,email',
+                'rescheduledTo:id,rescheduled_from_id,followup_date,status'
+            ])
+            ->orderByDesc('updated_at')
+            ->take(5)
+            ->get();
 
         $customer = null;
         if ($lead->email) {
-            $customer = Customer::where('email', $lead->email)->first();
-        }
-        if (!$customer && $lead->phone) {
-            $customer = Customer::where('phone', $lead->phone)->first();
+            $customer = Customer::where('email', $lead->email)->select('id', 'name', 'email', 'phone', 'company_name', 'billing_address', 'shipping_address')->first();
+        } elseif ($lead->phone) {
+            $customer = Customer::where('phone', $lead->phone)->select('id', 'name', 'email', 'phone', 'company_name', 'billing_address', 'shipping_address')->first();
         }
 
         $quotations = Quotation::where('lead_id', $lead->id)->latest()->get();
         if ($activeQuotationId) {
-            $activeQuotation = Quotation::where('lead_id', $lead->id)->find($activeQuotationId);
+            $activeQuotation = Quotation::where('lead_id', $lead->id)->with('items')->find($activeQuotationId);
         } else {
             $activeQuotation = $quotations->where('is_current', true)->first() ?: $quotations->first();
+            $activeQuotation?->loadMissing('items');
         }
 
-        $prevLead = Lead::where('id', '>', $lead->id)->orderBy('id', 'asc')->first();
-        $nextLead = Lead::where('id', '<', $lead->id)->orderBy('id', 'desc')->first();
+        $tenantId = $lead->tenant_id;
+        $prevLead = Lead::where('id', '>', $lead->id)
+            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->orderBy('id', 'asc')
+            ->select('id')
+            ->first();
 
-        return compact('customer', 'quotations', 'activeQuotation', 'prevLead', 'nextLead');
+        $nextLead = Lead::where('id', '<', $lead->id)
+            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->orderBy('id', 'desc')
+            ->select('id')
+            ->first();
+
+        return compact('customer', 'quotations', 'activeQuotation', 'prevLead', 'nextLead', 'pastActivitiesCount', 'pastDoneActivities');
     }
 
     /**

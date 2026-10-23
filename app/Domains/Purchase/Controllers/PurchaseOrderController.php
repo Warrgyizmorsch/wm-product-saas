@@ -107,7 +107,7 @@ class PurchaseOrderController extends Controller
 
                 $productId = $prItem->product_id;
                 $product   = $prItem->product;
-                $costRate  = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+                $costRate  = convert_from_base((float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00))));
 
                 if (isset($mergedItems[$productId])) {
                     $mergedItems[$productId]['quantity'] += $pendingQty;
@@ -150,7 +150,7 @@ class PurchaseOrderController extends Controller
 
                 $productId = $prItem->product_id;
                 $product   = $prItem->product;
-                $costRate  = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+                $costRate  = convert_from_base((float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00))));
 
                 if (isset($mergedItems[$productId])) {
                     $mergedItems[$productId]['quantity'] += $pendingQty;
@@ -275,7 +275,7 @@ class PurchaseOrderController extends Controller
         \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.created', [
             'po_no' => $po->purchase_order_number ?? $po->po_number ?? 'PO-NEW',
             'vendor_name' => $po->vendor?->name ?? 'Vendor',
-            'amount' => number_format((float)($po->grand_total ?? $po->total_amount ?? 0), 2),
+            'amount' => format_currency((float)($po->grand_total ?? $po->total_amount ?? 0)),
             'created_by' => auth()->user()?->name ?? 'User',
         ], route('purchase.orders.show', $po->id), $po);
 
@@ -357,7 +357,7 @@ class PurchaseOrderController extends Controller
         \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.order.approved', [
             'po_no' => $order->purchase_order_number ?? $order->po_number ?? 'PO',
             'vendor_name' => $order->vendor?->name ?? 'Vendor',
-            'amount' => number_format((float)($order->grand_total ?? $order->total_amount ?? 0), 2),
+            'amount' => format_currency((float)($order->grand_total ?? $order->total_amount ?? 0)),
             'approved_by' => auth()->user()?->name ?? 'Approver',
         ], route('purchase.orders.show', $order->id), $order);
 

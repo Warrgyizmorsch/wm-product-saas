@@ -41,10 +41,13 @@ class HolidayCalendarController extends Controller
             'company_id' => 'nullable|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id' => 'nullable|exists:branches,id',
-            'status' => 'nullable|boolean',
+            'status' => 'nullable',
         ]);
 
-        $validated['status'] = $request->has('status') ? (bool) $request->status : true;
+        $validated['company_id'] = $request->filled('company_id') ? $request->company_id : null;
+        $validated['business_unit_id'] = $request->filled('business_unit_id') ? $request->business_unit_id : null;
+        $validated['branch_id'] = $request->filled('branch_id') ? $request->branch_id : null;
+        $validated['status'] = $request->has('status') ? $request->boolean('status') : true;
 
         $this->holidayCalendarRepository->storeHoliday($validated);
 
@@ -66,10 +69,13 @@ class HolidayCalendarController extends Controller
             'company_id' => 'nullable|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
             'branch_id' => 'nullable|exists:branches,id',
-            'status' => 'nullable|boolean',
+            'status' => 'nullable',
         ]);
 
-        $validated['status'] = $request->has('status') ? (bool) $request->status : false;
+        $validated['company_id'] = $request->filled('company_id') ? $request->company_id : null;
+        $validated['business_unit_id'] = $request->filled('business_unit_id') ? $request->business_unit_id : null;
+        $validated['branch_id'] = $request->filled('branch_id') ? $request->branch_id : null;
+        $validated['status'] = $request->has('status') ? $request->boolean('status') : false;
 
         $this->holidayCalendarRepository->updateHoliday($holiday, $validated);
 

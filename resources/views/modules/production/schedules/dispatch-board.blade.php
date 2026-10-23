@@ -284,15 +284,15 @@
             </div>
 
             {{-- Main Gantt Swimlanes Container --}}
-            <div class="gantt-board-wrapper border rounded bg-white overflow-hidden shadow-sm mb-4">
+            <div class="gantt-board-wrapper border rounded bg-white shadow-sm mb-4" style="overflow-x: auto; position: relative; max-width: 100%;">
                 <div class="d-flex gantt-header border-bottom bg-light fs-12 fw-bold text-dark sticky-top"
                     style="z-index: 10;">
-                    <div class="gantt-resource-col border-end p-2 px-3 bg-light d-flex align-items-center justify-content-between"
-                        style="width: 280px; min-width: 280px;">
+                    <div class="gantt-resource-col border-end p-2 px-3 bg-light d-flex align-items-center justify-content-between sticky-start"
+                        style="width: 280px; min-width: 280px; max-width: 280px; flex-shrink: 0; z-index: 15;">
                         <span>{{ __('production.work_center_resource') }}</span>
                         <span class="text-muted fs-11">{{ __('production.load_pct') }}</span>
                     </div>
-                    <div class="gantt-timeline-col flex-grow-1 overflow-hidden" id="ganttHeaderTimeline">
+                    <div class="gantt-timeline-col flex-grow-1" id="ganttHeaderTimeline">
                         <div class="d-flex align-items-center h-100 text-center" id="ganttHeaderTicks">
                             {{-- Dynamic date ticks rendered here --}}
                         </div>
@@ -800,6 +800,36 @@
                     });
             });
 
+            // Helper to synchronize Shift Propagation Mode select & its Select2 UI
+            function syncEditShiftModeSelect(mode) {
+                const select = document.getElementById('editShiftMode') || document.querySelector('#editShiftMode select');
+                if (!select) return;
+
+                // 1. Update native select value and option attributes
+                select.value = mode;
+                Array.from(select.options).forEach(opt => {
+                    opt.selected = (opt.value === mode);
+                });
+
+                // 2. Trigger jQuery Select2 change event
+                if (window.jQuery && $(select).data('select2')) {
+                    $(select).val(mode).trigger('change.select2').trigger('change');
+                } else {
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                // 3. Direct update of Select2 visible rendered text container as fail-safe
+                const selectedOpt = select.querySelector(`option[value="${mode}"]`);
+                if (selectedOpt) {
+                    const s2Container = document.getElementById('select2-editShiftMode-container') ||
+                                        select.parentElement?.querySelector('.select2-selection__rendered');
+                    if (s2Container) {
+                        s2Container.textContent = selectedOpt.textContent.trim();
+                        s2Container.title = selectedOpt.textContent.trim();
+                    }
+                }
+            }
+
             // Shift Mode Handler
             window.setShiftMode = function (mode) {
                 currentShiftMode = mode;
@@ -808,6 +838,9 @@
                 document.getElementById('iconIsolatedCheck').className = mode === 'isolated' ? 'feather-check me-1 text-success d-inline' : 'feather-check me-1 text-success d-none';
                 document.getElementById('optShiftRipple').classList.toggle('active', mode === 'ripple');
                 document.getElementById('optShiftIsolated').classList.toggle('active', mode === 'isolated');
+
+                // Synchronize modal Select2 dropdown
+                syncEditShiftModeSelect(mode);
             };
 
             // View Scale Handlers
@@ -914,6 +947,23 @@
                 btnRefreshBoardData.addEventListener('click', loadDispatchData);
             }
 
+            // Safely hide and purge all tooltips and orphaned tooltip DOM nodes
+            function hideAllTooltips() {
+                try {
+                    if (window.bootstrap && bootstrap.Tooltip) {
+                        document.querySelectorAll('#ganttSwimlanesBody .gantt-op-bar, [data-bs-toggle="tooltip"]').forEach(el => {
+                            const inst = bootstrap.Tooltip.getInstance(el);
+                            if (inst) {
+                                inst.hide();
+                            }
+                        });
+                    }
+                } catch (e) {}
+                document.querySelectorAll('.tooltip, .bs-tooltip-top, .bs-tooltip-bottom, .bs-tooltip-start, .bs-tooltip-end, .bs-tooltip-auto').forEach(el => {
+                    el.remove();
+                });
+            }
+
             // Dynamic Button Visibility & State Updater
             function updateDynamicButtons(data) {
                 const btnPreRelease = document.getElementById('btnPreReleaseCheck');
@@ -954,6 +1004,18 @@
 
             // Fetch Main Board Data API
             function loadDispatchData() {
+                hideAllTooltips();
+                document.querySelectorAll('#ganttSwimlanesBody .gantt-op-bar').forEach(el => {
+                    try {
+                        if (window.bootstrap && bootstrap.Tooltip) {
+                            const inst = bootstrap.Tooltip.getInstance(el);
+                            if (inst) {
+                                inst.dispose();
+                            }
+                        }
+                    } catch (e) {}
+                });
+
                 const startDate = filterStartDate.value;
                 const endDate = filterEndDate.value;
                 const workCenterId = filterWorkCenter.value;
@@ -1056,6 +1118,18 @@
 
             // Render Timeline Scale Header and Resource Swimlanes
             function renderTimelineAndOperations(data) {
+                hideAllTooltips();
+                document.querySelectorAll('#ganttSwimlanesBody .gantt-op-bar').forEach(el => {
+                    try {
+                        if (window.bootstrap && bootstrap.Tooltip) {
+                            const inst = bootstrap.Tooltip.getInstance(el);
+                            if (inst) {
+                                inst.dispose();
+                            }
+                        }
+                    } catch (e) {}
+                });
+
                 const bodyEl = document.getElementById('ganttSwimlanesBody');
                 const headerTicksEl = document.getElementById('ganttHeaderTicks');
 
@@ -1072,28 +1146,59 @@
                 const endDate = new Date(data.range.end + 'T23:59:59');
                 const startMs = startDate.getTime();
                 const endMs = endDate.getTime();
-                const totalMs = endMs - startMs;
+                const tickDays = Math.max(1, Math.ceil((endMs - startMs) / (86400 * 1000)));
+
+                const totalTicks = currentScale === 'week' ? Math.max(1, Math.ceil(tickDays / 7)) : tickDays;
+                const totalDurationMs = currentScale === 'week' ? (totalTicks * 7 * 86400 * 1000) : (totalTicks * 86400 * 1000);
+                const tickPct = (100 / totalTicks);
+                const minTickWidth = currentScale === 'week' ? 120 : 75;
+                const minTimelineWidth = totalTicks * minTickWidth;
+                const rowMinWidth = `calc(280px + ${minTimelineWidth}px)`;
+
+                const isDarkSkin = document.documentElement.classList.contains('app-skin-dark') || 
+                                   document.body.classList.contains('app-skin-dark') ||
+                                   document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                const gridBorderColor = isDarkSkin ? '#1e293b' : '#e2e8f0';
+
+                // Synchronize Header container widths
+                const headerRow = document.querySelector('.gantt-header');
+                if (headerRow) {
+                    headerRow.style.minWidth = rowMinWidth;
+                }
+                const headerTimelineEl = document.getElementById('ganttHeaderTimeline');
+                if (headerTimelineEl) {
+                    headerTimelineEl.style.minWidth = `${minTimelineWidth}px`;
+                    headerTimelineEl.style.width = '100%';
+                }
+                headerTicksEl.style.minWidth = `${minTimelineWidth}px`;
+                headerTicksEl.style.width = '100%';
 
                 // Render Header Ticks
-                const tickDays = Math.ceil(totalMs / (86400 * 1000));
                 if (currentScale === 'week') {
-                    const totalWeeks = Math.max(1, Math.ceil(tickDays / 7));
-                    for (let w = 0; w < totalWeeks; w++) {
+                    for (let w = 0; w < totalTicks; w++) {
                         const wStart = new Date(startMs + w * 7 * 86400 * 1000);
                         const wEnd = new Date(startMs + Math.min(tickDays - 1, (w + 1) * 7 - 1) * 86400 * 1000);
                         const wNum = getWeekNumber(wStart);
                         const label = `W${wNum} (${wStart.getDate()}/${wStart.getMonth() + 1} - ${wEnd.getDate()}/${wEnd.getMonth() + 1})`;
                         const tickDiv = document.createElement('div');
-                        tickDiv.className = 'gantt-header-tick border-end p-1 flex-grow-1 text-center text-truncate fs-11 fw-bold';
+                        tickDiv.className = 'gantt-header-tick border-end p-1 text-center text-truncate fs-11 fw-bold';
+                        tickDiv.style.flex = `0 0 ${tickPct}%`;
+                        tickDiv.style.width = `${tickPct}%`;
+                        tickDiv.style.minWidth = `${minTickWidth}px`;
+                        tickDiv.style.boxSizing = 'border-box';
                         tickDiv.textContent = label;
                         headerTicksEl.appendChild(tickDiv);
                     }
                 } else {
-                    for (let d = 0; d < tickDays; d++) {
+                    for (let d = 0; d < totalTicks; d++) {
                         const tickDate = new Date(startMs + d * 86400 * 1000);
                         const dayLabel = tickDate.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
                         const tickDiv = document.createElement('div');
-                        tickDiv.className = 'gantt-header-tick border-end p-1 flex-grow-1 text-center text-truncate fs-11';
+                        tickDiv.className = 'gantt-header-tick border-end p-1 text-center text-truncate fs-11';
+                        tickDiv.style.flex = `0 0 ${tickPct}%`;
+                        tickDiv.style.width = `${tickPct}%`;
+                        tickDiv.style.minWidth = `${minTickWidth}px`;
+                        tickDiv.style.boxSizing = 'border-box';
                         tickDiv.textContent = dayLabel;
                         headerTicksEl.appendChild(tickDiv);
                     }
@@ -1111,6 +1216,7 @@
                     // Work Center Header Row
                     const wcRow = document.createElement('div');
                     wcRow.className = 'gantt-row-wc d-flex align-items-center border-bottom fw-bold fs-12 py-1.5 px-2';
+                    wcRow.style.minWidth = rowMinWidth;
 
                     const wcUtil = res.capacity_utilization_percent || 0;
                     const wcUtilBadge = wcUtil > 100
@@ -1118,11 +1224,11 @@
                         : `<span class="badge bg-soft-info text-info ms-2 font-monospace fs-10">${wcUtil}%</span>`;
 
                     wcRow.innerHTML = `
-                                <div class="gantt-resource-col d-flex align-items-center justify-content-between pe-3" style="width: 280px; min-width: 280px;">
+                                <div class="gantt-resource-col border-end p-2 px-3 d-flex align-items-center justify-content-between sticky-start" style="width: 280px; min-width: 280px; max-width: 280px; flex-shrink: 0; z-index: 5;">
                                     <span><i class="feather-layers text-primary me-1"></i> ${res.name} (${res.code})</span>
                                     ${wcUtilBadge}
                                 </div>
-                                <div class="gantt-timeline-col flex-grow-1 text-muted fs-11 px-2">
+                                <div class="gantt-timeline-col flex-grow-1 text-muted fs-11 px-2" style="min-width: ${minTimelineWidth}px;">
                                     ${res.machines.length} machine lane(s)
                                 </div>
                             `;
@@ -1135,12 +1241,13 @@
                         const laneRow = document.createElement('div');
                         laneRow.className = 'gantt-row-machine d-flex border-bottom position-relative';
                         laneRow.style.minHeight = '52px';
+                        laneRow.style.minWidth = rowMinWidth;
                         laneRow.dataset.workCenterId = res.id;
                         laneRow.dataset.machineId = m.id ?? '';
 
                         const mIcon = m.id ? 'feather-cpu text-secondary' : 'feather-user text-info';
                         const laneResourceCol = `
-                                    <div class="gantt-resource-col border-end p-2 fs-12 d-flex align-items-center justify-content-between sticky-start" style="width: 280px; min-width: 280px; z-index: 5;">
+                                    <div class="gantt-resource-col border-end p-2 fs-12 d-flex align-items-center justify-content-between sticky-start" style="width: 280px; min-width: 280px; max-width: 280px; flex-shrink: 0; z-index: 5;">
                                         <div class="text-truncate" title="${m.name}">
                                             <i class="${mIcon} me-1"></i> <strong>${m.name}</strong>
                                             ${m.code ? `<span class="text-muted fs-11">(${m.code})</span>` : ''}
@@ -1152,15 +1259,34 @@
                         const laneTimelineCol = document.createElement('div');
                         laneTimelineCol.className = 'gantt-timeline-lane flex-grow-1 position-relative';
                         laneTimelineCol.style.minHeight = '52px';
+                        laneTimelineCol.style.minWidth = `${minTimelineWidth}px`;
+                        laneTimelineCol.style.width = '100%';
 
-                        // Swimlane Column Grid Lines Background
-                        const stepPct = currentScale === 'week' ? (100 / Math.max(1, Math.ceil(tickDays / 7))) : (100 / Math.max(1, tickDays));
-                        const isDarkSkin = document.documentElement.classList.contains('app-skin-dark') || 
-                                           document.body.classList.contains('app-skin-dark') ||
-                                           document.documentElement.getAttribute('data-bs-theme') === 'dark';
-                        const gridLineColor = isDarkSkin ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-                        laneTimelineCol.style.backgroundImage = `linear-gradient(to right, ${gridLineColor} 1px, transparent 1px)`;
-                        laneTimelineCol.style.backgroundSize = `${stepPct}% 100%`;
+                        // Swimlane Column Grid Lines Overlay - Exactly matching header ticks
+                        const gridOverlay = document.createElement('div');
+                        gridOverlay.className = 'gantt-lane-grid position-absolute top-0 bottom-0 start-0 end-0 d-flex pe-none';
+                        gridOverlay.style.pointerEvents = 'none';
+                        gridOverlay.style.zIndex = '1';
+
+                        for (let i = 0; i < totalTicks; i++) {
+                            const colCell = document.createElement('div');
+                            colCell.className = 'gantt-lane-cell h-100 border-end';
+                            colCell.style.flex = `0 0 ${tickPct}%`;
+                            colCell.style.width = `${tickPct}%`;
+                            colCell.style.minWidth = `${minTickWidth}px`;
+                            colCell.style.boxSizing = 'border-box';
+                            colCell.style.borderColor = gridBorderColor;
+
+                            if (currentScale !== 'week') {
+                                const cellDate = new Date(startMs + i * 86400 * 1000);
+                                const dayOfWeek = cellDate.getDay();
+                                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                                    colCell.style.backgroundColor = isDarkSkin ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)';
+                                }
+                            }
+                            gridOverlay.appendChild(colCell);
+                        }
+                        laneTimelineCol.appendChild(gridOverlay);
 
                         // Render Machine Downtime Blockers
                         if (m.id && data.downtimes) {
@@ -1168,14 +1294,15 @@
                             machineDowntimes.forEach(dt => {
                                 const dtStart = new Date(dt.start_time).getTime();
                                 const dtEnd = new Date(dt.end_time).getTime();
-                                if (dtEnd > startMs && dtStart < endMs) {
-                                    const leftPct = Math.max(0, ((dtStart - startMs) / totalMs) * 100);
-                                    const widthPct = Math.min(100 - leftPct, ((dtEnd - Math.max(startMs, dtStart)) / totalMs) * 100);
+                                if (dtEnd > startMs && dtStart < (startMs + totalDurationMs)) {
+                                    const leftPct = Math.max(0, ((dtStart - startMs) / totalDurationMs) * 100);
+                                    const widthPct = Math.min(100 - leftPct, ((dtEnd - Math.max(startMs, dtStart)) / totalDurationMs) * 100);
 
                                     const dtBlock = document.createElement('div');
                                     dtBlock.className = 'gantt-downtime-block position-absolute bg-danger opacity-25 rounded h-75 my-auto top-0 bottom-0';
                                     dtBlock.style.left = `${leftPct}%`;
                                     dtBlock.style.width = `${widthPct}%`;
+                                    dtBlock.style.zIndex = '2';
                                     dtBlock.title = `Downtime: ${dt.reason} (${dt.start_time} to ${dt.end_time})`;
                                     laneTimelineCol.appendChild(dtBlock);
                                 }
@@ -1192,16 +1319,18 @@
                             const opStartMs = new Date(op.planned_start).getTime();
                             const opFinishMs = new Date(op.planned_finish).getTime();
 
-                            const leftPct = Math.max(0, ((opStartMs - startMs) / totalMs) * 100);
+                            const leftPct = Math.max(0, ((opStartMs - startMs) / totalDurationMs) * 100);
                             const minWidthPct = currentScale === 'week' ? 3.5 : 1.8;
-                            const widthPct = Math.max(minWidthPct, Math.min(100 - leftPct, ((opFinishMs - Math.max(startMs, opStartMs)) / totalMs) * 100));
+                            const widthPct = Math.max(minWidthPct, Math.min(100 - leftPct, ((opFinishMs - Math.max(startMs, opStartMs)) / totalDurationMs) * 100));
 
                             const bar = document.createElement('div');
                             bar.className = `gantt-op-bar position-absolute rounded p-1.5 px-2 shadow-sm text-white fs-11 font-monospace d-flex align-items-center justify-content-between overflow-hidden ${getOpStatusClass(op.status)}`;
                             bar.style.left = `${leftPct}%`;
                             bar.style.width = `${widthPct}%`;
+                            bar.style.minWidth = '42px';
                             bar.style.top = '8px';
                             bar.style.height = '36px';
+                            bar.style.zIndex = '3';
                             bar.style.cursor = op.locked ? 'not-allowed' : 'grab';
                             bar.dataset.opId = op.schedule_operation_id;
                             bar.dataset.version = op.version;
@@ -1243,10 +1372,8 @@
                                         </div>
                                     `;
 
-                            bar.setAttribute('data-bs-toggle', 'tooltip');
                             bar.setAttribute('data-bs-html', 'true');
                             bar.setAttribute('data-bs-title', tooltipContent);
-                            bar.setAttribute('title', tooltipContent);
 
                             if (window.bootstrap && bootstrap.Tooltip) {
                                 new bootstrap.Tooltip(bar, {
@@ -1255,11 +1382,18 @@
                                     placement: 'top',
                                     container: 'body'
                                 });
+
+                                bar.addEventListener('show.bs.tooltip', function (e) {
+                                    if (dragContext) {
+                                        e.preventDefault();
+                                    }
+                                });
                             }
 
                             // Click to open Quick Edit Modal
                             bar.addEventListener('click', function (e) {
                                 e.stopPropagation();
+                                hideAllTooltips();
                                 openQuickEditModal(op);
                             });
 
@@ -1268,6 +1402,8 @@
                                 bar.draggable = true;
 
                                 bar.addEventListener('dragstart', function (e) {
+                                    hideAllTooltips();
+                                    const barRect = bar.getBoundingClientRect();
                                     dragContext = {
                                         op: op,
                                         element: bar,
@@ -1276,14 +1412,21 @@
                                         originalMachineId: m.id,
                                         originalWorkCenterId: res.id,
                                         startMs: startMs,
-                                        totalMs: totalMs,
+                                        totalDurationMs: totalDurationMs,
+                                        grabOffsetX: e.clientX - barRect.left,
                                     };
                                     bar.classList.add('opacity-50');
                                     e.dataTransfer.setData('text/plain', op.schedule_operation_id);
                                 });
 
+                                bar.addEventListener('drag', function () {
+                                    hideAllTooltips();
+                                });
+
                                 bar.addEventListener('dragend', function () {
+                                    hideAllTooltips();
                                     bar.classList.remove('opacity-50');
+                                    dragContext = null;
                                 });
                             }
 
@@ -1303,22 +1446,52 @@
                         laneTimelineCol.addEventListener('drop', function (e) {
                             e.preventDefault();
                             laneTimelineCol.classList.remove('bg-soft-primary');
+                            hideAllTooltips();
                             if (!dragContext) return;
 
-                            const rect = laneTimelineCol.getBoundingClientRect();
-                            const clickX = e.clientX - rect.left;
-                            const dropRatio = Math.max(0, Math.min(1, clickX / rect.width));
+                            const targetWorkCenterId = parseInt(res.id);
+                            const targetMachineId = m.id ? parseInt(m.id) : null;
+                            const targetMachineName = m.id ? `${m.name} (${m.code})` : 'Manual Operation';
 
-                            const newStartMs = startMs + dropRatio * totalMs;
+                            // Validation: Cannot move operation to a different Work Center
+                            if (targetWorkCenterId !== parseInt(dragContext.op.work_center_id)) {
+                                showPlannerAlert(
+                                    'Invalid Work Center',
+                                    `Operation #${dragContext.op.sequence} (${dragContext.op.operation_name}) belongs to Work Center #${dragContext.op.work_center_id} and cannot be moved to a different Work Center.`,
+                                    'danger'
+                                );
+                                loadDispatchData();
+                                dragContext = null;
+                                return;
+                            }
+
+                            // Validation: Target machine must be approved for this operation (Primary or Approved Alternate)
+                            if (targetMachineId && dragContext.op.qualified_machine_ids && dragContext.op.qualified_machine_ids.length > 0) {
+                                const isQualified = dragContext.op.qualified_machine_ids.map(Number).includes(targetMachineId);
+                                if (!isQualified) {
+                                    showPlannerAlert(
+                                        'Incompatible Machine',
+                                        `Machine [${targetMachineName}] is not an approved primary or alternate machine for operation [${dragContext.op.operation_name}]. It cannot perform this work.`,
+                                        'danger'
+                                    );
+                                    loadDispatchData();
+                                    dragContext = null;
+                                    return;
+                                }
+                            }
+
+                            const rect = laneTimelineCol.getBoundingClientRect();
+                            const grabOffset = (dragContext && typeof dragContext.grabOffsetX === 'number') ? dragContext.grabOffsetX : 0;
+                            const dropX = Math.max(0, e.clientX - rect.left - grabOffset);
+                            const dropRatio = Math.max(0, Math.min(1, dropX / rect.width));
+
+                            const newStartMs = startMs + dropRatio * totalDurationMs;
                             // Snap to 15 minute interval
                             const snapMs = 15 * 60 * 1000;
                             const snappedMs = Math.round(newStartMs / snapMs) * snapMs;
 
                             const proposedStartDate = new Date(snappedMs);
-                            const proposedStartIso = proposedStartDate.toISOString().slice(0, 19);
-
-                            const targetMachineId = m.id;
-                            const targetMachineName = m.id ? `${m.name} (${m.code})` : 'Manual Operation';
+                            const proposedStartIso = formatLocalIso(proposedStartDate);
 
                             // Prompt Drag Confirmation Modal
                             promptDragConfirm(dragContext.op, proposedStartIso, targetMachineId, targetMachineName);
@@ -1331,8 +1504,15 @@
                 });
             }
 
+            // Local ISO Formatter helper (avoids UTC offset shifts)
+            function formatLocalIso(d) {
+                const pad = n => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            }
+
             // Prompt Confirmation Modal for Drag & Drop Move
             function promptDragConfirm(op, proposedStartIso, targetMachineId, targetMachineName) {
+                hideAllTooltips();
                 document.getElementById('dragOpTitle').textContent = `#${op.sequence} ${op.operation_name} (${op.production_order_number})`;
                 document.getElementById('dragNewStartDisplay').textContent = proposedStartIso.replace('T', ' ');
                 document.getElementById('dragNewMachineDisplay').textContent = targetMachineName;
@@ -1462,6 +1642,7 @@
 
             // Quick Edit Operation Modal Handler
             function openQuickEditModal(op) {
+                hideAllTooltips();
                 quickEditOp = op;
                 document.getElementById('editOpId').value = op.schedule_operation_id;
                 document.getElementById('editOpVersion').value = op.version;
@@ -1476,7 +1657,7 @@
                 const editStartInput = document.querySelector('#editPlannedStart input') || document.getElementById('editPlannedStart');
                 editStartInput.value = localIso;
 
-                // Populate Machines Select
+                // Populate Machines Select with qualification indicators
                 const selectM = document.querySelector('#editMachineId select') || document.getElementById('editMachineId');
                 selectM.innerHTML = '<option value="">{{ __('production.no_machine_manual') }}</option>';
                 if (dispatchBoardData && dispatchBoardData.resources) {
@@ -1485,16 +1666,31 @@
                             res.machines.forEach(m => {
                                 const opt = document.createElement('option');
                                 opt.value = m.id;
-                                opt.textContent = `${m.name} (${m.code})`;
-                                if (m.id === op.machine_id) opt.selected = true;
+                                let suffix = '';
+                                const hasQualification = op.qualified_machine_ids && op.qualified_machine_ids.length > 0;
+                                if (hasQualification) {
+                                    if (op.primary_machine_id && (parseInt(op.primary_machine_id) === parseInt(m.id))) {
+                                        suffix = ' — Primary Machine ⭐';
+                                    } else if (op.qualified_machine_ids.map(Number).includes(parseInt(m.id))) {
+                                        suffix = ' — Approved Alternate ✓';
+                                    } else {
+                                        suffix = ' — Incompatible / Not Approved ⚠️';
+                                        opt.disabled = true;
+                                    }
+                                }
+                                opt.textContent = `${m.name} (${m.code})${suffix}`;
+                                if (parseInt(m.id) === parseInt(op.machine_id)) opt.selected = true;
                                 selectM.appendChild(opt);
                             });
                         }
                     });
                 }
 
-                const editShiftSelect = document.querySelector('#editShiftMode select') || document.getElementById('editShiftMode');
-                editShiftSelect.value = currentShiftMode;
+                if (window.jQuery && $(selectM).data('select2')) {
+                    $(selectM).trigger('change');
+                }
+
+                syncEditShiftModeSelect(currentShiftMode);
                 document.getElementById('editBaselineStart').textContent = op.baseline_start || 'N/A';
                 document.getElementById('editBaselineFinish').textContent = op.baseline_finish || 'N/A';
 
@@ -1530,14 +1726,23 @@
             document.getElementById('btnToggleLockInModal').addEventListener('click', function () {
                 if (!quickEditOp) return;
                 const opId = quickEditOp.schedule_operation_id;
+                const urlParams = new URLSearchParams(window.location.search);
+                const scenarioId = urlParams.get('scenario_id');
+
+                const payload = {};
+                if (scenarioId) {
+                    payload.scenario_id = scenarioId;
+                }
 
                 fetch(`{{ url('production/schedules/operations') }}/${opId}/toggle-lock`, {
                     method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         'X-Requested-With': 'XMLHttpRequest'
-                    }
+                    },
+                    body: JSON.stringify(payload)
                 })
                     .then(r => r.json())
                     .then(res => {
@@ -1849,6 +2054,41 @@
                 }
             }
 
+            // Modal lifecycle handlers to prevent stuck tooltips
+            ['modalConfirmDrag', 'modalQuickEditOp', 'modalPlanningScenario', 'modalLevelCapacity', 'modalPreReleaseValidation'].forEach(id => {
+                const modalEl = document.getElementById(id);
+                if (modalEl) {
+                    modalEl.addEventListener('show.bs.modal', hideAllTooltips);
+                    modalEl.addEventListener('hidden.bs.modal', hideAllTooltips);
+                }
+            });
+
+            // Ensure Quick Edit modal Select2 reflects currentShiftMode when fully shown
+            const quickEditModalEl = document.getElementById('modalQuickEditOp');
+            if (quickEditModalEl) {
+                quickEditModalEl.addEventListener('shown.bs.modal', function () {
+                    syncEditShiftModeSelect(currentShiftMode);
+                });
+            }
+
+            // Sync user changes inside the Quick Edit modal back to the board header
+            const editShiftSelectEl = document.getElementById('editShiftMode') || document.querySelector('#editShiftMode select');
+            if (editShiftSelectEl) {
+                if (window.jQuery) {
+                    window.jQuery(editShiftSelectEl).on('change', function () {
+                        if (this.value && this.value !== currentShiftMode) {
+                            window.setShiftMode(this.value);
+                        }
+                    });
+                } else {
+                    editShiftSelectEl.addEventListener('change', function () {
+                        if (this.value && this.value !== currentShiftMode) {
+                            window.setShiftMode(this.value);
+                        }
+                    });
+                }
+            }
+
             // Initial Board Load
             loadDispatchData();
         });
@@ -1885,10 +2125,21 @@
             border-color: #e2e8f0;
         }
 
+        .gantt-board-wrapper {
+            overflow-x: auto;
+            position: relative;
+            max-width: 100%;
+        }
+
         .gantt-row-wc {
             background-color: #f8fafc;
             border-color: #e2e8f0;
             color: #1e293b;
+        }
+
+        .gantt-row-wc .gantt-resource-col {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
         }
 
         .gantt-row-machine .gantt-resource-col {
@@ -1902,19 +2153,29 @@
         }
 
         .gantt-header-tick {
-            min-width: 90px;
+            box-sizing: border-box;
+            border-color: #e2e8f0;
+            user-select: none;
+        }
+
+        .gantt-lane-cell {
+            box-sizing: border-box;
             border-color: #e2e8f0;
         }
 
         .gantt-op-bar {
-            transition: left 0.2s ease, width 0.2s ease;
             border-left: 3px solid rgba(0, 0, 0, 0.3);
+            user-select: none;
         }
 
         .gantt-op-bar:hover {
             z-index: 20;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
             filter: brightness(1.05);
+        }
+
+        .tooltip {
+            pointer-events: none !important;
         }
 
         .gantt-downtime-block {
@@ -2006,7 +2267,11 @@
         html.app-skin-dark .gantt-header-tick,
         body.app-skin-dark .gantt-header-tick,
         [data-bs-theme="dark"] .gantt-header-tick,
-        [data-theme="dark"] .gantt-header-tick {
+        [data-theme="dark"] .gantt-header-tick,
+        html.app-skin-dark .gantt-lane-cell,
+        body.app-skin-dark .gantt-lane-cell,
+        [data-bs-theme="dark"] .gantt-lane-cell,
+        [data-theme="dark"] .gantt-lane-cell {
             border-color: #283c50 !important;
             color: #cbd5e1 !important;
         }
@@ -2015,7 +2280,11 @@
         html.app-skin-dark .gantt-row-wc,
         body.app-skin-dark .gantt-row-wc,
         [data-bs-theme="dark"] .gantt-row-wc,
-        [data-theme="dark"] .gantt-row-wc {
+        [data-theme="dark"] .gantt-row-wc,
+        html.app-skin-dark .gantt-row-wc .gantt-resource-col,
+        body.app-skin-dark .gantt-row-wc .gantt-resource-col,
+        [data-bs-theme="dark"] .gantt-row-wc .gantt-resource-col,
+        [data-theme="dark"] .gantt-row-wc .gantt-resource-col {
             background-color: #162038 !important;
             border-color: #283c50 !important;
             color: #f1f5f9 !important;

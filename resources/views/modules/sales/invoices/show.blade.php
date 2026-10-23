@@ -27,7 +27,11 @@
             </a>
         @endif
 
-        @if ($invoice->status !== 'Draft')
+        @php
+            $isCancelled = in_array(strtolower((string)$invoice->status), ['cancelled', 'void']);
+        @endphp
+
+        @if (!$isCancelled && $invoice->status !== 'Draft')
             <!-- E-Invoice Action Buttons -->
             @if ($invoice->einvoice_status === 'Generated')
                 <div class="dropdown d-inline-flex align-items-center">
@@ -98,6 +102,39 @@
             <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="btn btn-sm btn-outline-success fw-bold px-3 d-inline-flex align-items-center" title="Download Official Government GEPP JSON">
                 <i class="feather-code me-1.5"></i>Export JSON
             </a>
+        @elseif ($isCancelled)
+            {{-- When invoice is cancelled, only allow viewing existing E-Invoice/E-Way Bill if they were generated before cancellation --}}
+            @if ($invoice->einvoice_status === 'Generated')
+                <div class="dropdown d-inline-flex align-items-center">
+                    <button class="btn btn-sm btn-soft-secondary text-secondary border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-check-circle me-1.5"></i>E-Invoice (IRN)
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+                        <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 font-monospace text-truncate d-block">IRN: {{ substr($invoice->irn, 0, 18) }}...</span></li>
+                        <li>
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#viewEInvoiceQrModal">
+                                <i class="feather-maximize me-2.5 text-primary fs-14"></i>View / Scan Signed QR
+                            </button>
+                        </li>
+                        <li>
+                            <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-success text-nowrap">
+                                <i class="feather-code me-2.5 text-success fs-14"></i>Export NIC JSON (Govt Schema)
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endif
+
+            @if ($invoice->eway_bill_status === 'Generated')
+                <div class="dropdown d-inline-flex align-items-center">
+                    <button class="btn btn-sm btn-soft-secondary text-secondary border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="feather-truck me-1.5"></i>EWB: {{ $invoice->eway_bill_no }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+                        <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 text-nowrap d-block">Valid Till: {{ $invoice->eway_bill_valid_till ? date('d-M-Y H:i', strtotime($invoice->eway_bill_valid_till)) : '—' }}</span></li>
+                    </ul>
+                </div>
+            @endif
         @endif
 
         <a href="{{ route('sales.invoices.download', $invoice->id) }}" class="btn btn-sm btn-outline-danger fw-bold px-3 d-inline-flex align-items-center" title="Download PDF Document">
@@ -158,6 +195,40 @@
                         Print Invoice
                     </a>
                 </li>
+
+                @if ($invoice->status !== 'Cancelled')
+                    <li><hr class="dropdown-divider my-1"></li>
+                    @if (!empty($hasDispatched))
+                        {{-- Goods WERE Dispatched -> Show Sales Return --}}
+                        <li>
+                            <a href="{{ route('sales.returns.create', ['invoice_id' => $invoice->id, 'sales_order_id' => $invoice->sales_order_id]) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-warning d-flex align-items-center text-nowrap">
+                                <i class="feather-rotate-ccw me-2.5 text-warning fs-14"></i>
+                                <span>{{ __('crm.create_sales_return') }} ({{ __('crm.dispatched_items') }})</span>
+                            </a>
+                        </li>
+                    @else
+                        {{-- Goods NOT Dispatched -> Show Direct Financial Credit Note --}}
+                        <li>
+                            <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#createCreditNoteModal">
+                                <i class="feather-file-minus me-2.5 text-danger fs-14"></i>
+                                <span>{{ __('crm.create_credit_note') }} ({{ __('crm.financial_only') }})</span>
+                            </button>
+                        </li>
+                    @endif
+                @endif
+
+                @if (!empty($linkedCreditNotes) && $linkedCreditNotes->isNotEmpty())
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><span class="dropdown-header fs-10 text-uppercase fw-bold text-muted px-3 py-1 font-monospace">Linked Credit Notes</span></li>
+                    @foreach ($linkedCreditNotes as $cn)
+                        <li>
+                            <a href="{{ route('accounting.vouchers.credit_note.show', $cn->id) }}" class="dropdown-item py-1.5 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap">
+                                <i class="feather-file-text me-2 text-danger fs-13"></i>
+                                <span>{{ $cn->journal_number }} ({{ format_currency($cn->total_amount ?? $cn->entries->where('debit', '>', 0)->sum('debit')) }})</span>
+                            </a>
+                        </li>
+                    @endforeach
+                @endif
             </ul>
         </div>
     </div>
@@ -498,6 +569,36 @@
     <div class="row text-dark">
         <div class="col-12">
 
+            @if ($invoice->status === 'Cancelled')
+                <div class="alert alert-soft-danger border border-danger-subtle d-flex align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm d-print-none" style="max-width: 900px; margin: 0 auto 1.5rem auto;">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-danger text-white rounded-circle me-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 42px; height: 42px;">
+                            <i class="feather-slash fs-18"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-danger mb-0.5 fs-14">{{ __('crm.invoice_cancelled_title') }}</h6>
+                            <p class="text-muted fs-12 mb-0">
+                                {{ __('crm.invoice_cancelled_desc') }}
+                                @if (!empty($linkedCreditNotes) && $linkedCreditNotes->isNotEmpty())
+                                    <span class="ms-1 fw-bold text-dark">
+                                        (Credit Note: 
+                                        @foreach ($linkedCreditNotes as $cn)
+                                            <a href="{{ route('accounting.vouchers.credit_note.show', $cn->id) }}" class="text-danger text-decoration-underline">{{ $cn->journal_number }}</a>{{ !$loop->last ? ', ' : '' }}
+                                        @endforeach
+                                        )
+                                    </span>
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    @if (!empty($linkedCreditNotes) && $linkedCreditNotes->first())
+                        <a href="{{ route('accounting.vouchers.credit_note.show', $linkedCreditNotes->first()->id) }}" class="btn btn-sm btn-danger fw-bold px-3 ms-2 flex-shrink-0">
+                            <i class="feather-file-text me-1.5"></i>{{ __('crm.view_credit_note') }}
+                        </a>
+                    @endif
+                </div>
+            @endif
+
             <!-- Standard ERP Customer Tax Invoice Sheet -->
             <div class="invoice-sheet print-area mb-5">
                 <!-- Status Corner Ribbon Tag Patti -->
@@ -673,9 +774,20 @@
                                 <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? __('crm.inter_state_gst') : __('crm.intra_state_gst') }}</span>
                             </div>
 
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <span class="text-muted">{{ __('crm.tax_mode') }}</span>
+                                <span class="badge {{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary' }} fw-bold">
+                                    {{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? __('crm.tax_inclusive') : __('crm.tax_exclusive') }}
+                                </span>
+                            </div>
+
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">{{ __('crm.payment_status') }}</span>
-                                <span class="fw-bold {{ $balanceDue > 0 ? 'text-danger' : 'text-success' }}">{{ $balanceDue > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
+                                @if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void']))
+                                    <span class="badge bg-danger-subtle text-danger fw-bold fs-11">{{ __('crm.cancelled') ?? 'Cancelled' }}</span>
+                                @else
+                                    <span class="fw-bold {{ ($balanceDue ?? 0) > 0 ? 'text-danger' : 'text-success' }}">{{ ($balanceDue ?? 0) > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -727,96 +839,76 @@
                 </div>
 
                 <!-- 4. Summary & Calculations Row -->
-                <div class="row pt-2 fs-13 text-dark mb-4">
-                    <!-- Left: GST Tax Rate Summary, Bank Details & Terms -->
-                    <div class="col-7">
-                        @php
-                            $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
-                        @endphp
-                        @if ($taxGroups->count() > 0 && $invoice->tax_amount > 0)
-                            <div class="card border shadow-none mb-3 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
-                                <div class="py-1 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
-                                    <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }}</span>
-                                    <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $invoice->gst_type === 'igst' ? 'IGST' : 'CGST + SGST' }}</span>
-                                </div>
-                                <div class="table-responsive" style="overflow-x: visible;">
-                                    <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
-                                        <thead class="bg-light text-secondary fw-bold">
-                                            @if($invoice->gst_type === 'igst')
-                                                <tr>
-                                                    <th class="py-1" style="width: 30%;">{{ __('crm.tax_rate') }}</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">{{ __('crm.total_amount') }}</th>
-                                                    <th class="py-1 text-end" style="width: 35%;">IGST</th>
-                                                </tr>
-                                            @else
-                                                <tr>
-                                                    <th class="py-1" style="width: 25%;">{{ __('crm.tax_rate') }}</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">{{ __('crm.total_amount') }}</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">CGST</th>
-                                                    <th class="py-1 text-end" style="width: 25%;">SGST</th>
-                                                </tr>
-                                            @endif
-                                        </thead>
-                                        <tbody>
-                                            @php
-                                                $totCgst = 0;
-                                                $totSgst = 0;
-                                                $totIgst = 0;
-                                                $totTax = 0;
-                                            @endphp
-                                            @foreach($taxGroups as $rateStr => $gItems)
-                                                @php
-                                                    $rate = floatval($rateStr);
-                                                    $grpTax = $gItems->sum('tax_amount');
-                                                    $totTax += $grpTax;
-                                                @endphp
-                                                @if($invoice->gst_type === 'igst')
-                                                    @php
-                                                        $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
-                                                        $totIgst += $grpIgst;
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpIgst) }}</td>
-                                                    </tr>
-                                                @else
-                                                    @php
-                                                        $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
-                                                        $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
-                                                        $totCgst += $grpCgst;
-                                                        $totSgst += $grpSgst;
-                                                    @endphp
-                                                    <tr>
-                                                        <td class="py-1 fw-bold">GST {{ $rate }}%</td>
-                                                        <td class="py-1 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpCgst) }}</td>
-                                                        <td class="py-1 text-end">{{ format_currency($grpSgst) }}</td>
-                                                    </tr>
-                                                @endif
-                                            @endforeach
-                                        </tbody>
-                                        <tfoot class="bg-light fw-bold text-dark">
-                                            @if($invoice->gst_type === 'igst')
-                                                <tr>
-                                                    <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totIgst) }}</td>
-                                                </tr>
-                                            @else
-                                                <tr>
-                                                    <td class="py-1">Total</td>
-                                                    <td class="py-1 text-end text-primary">{{ format_currency($totTax) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totCgst) }}</td>
-                                                    <td class="py-1 text-end">{{ format_currency($totSgst) }}</td>
-                                                </tr>
-                                            @endif
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        @endif
+                @php
+                    $taxMode = $invoice->effective_tax_mode ?? 'exclusive';
+                    $grossSubtotal = 0;
+                    $totalItemDiscount = 0;
+                    $itemsTaxAmount = 0;
+                    $maxItemTaxRate = 0;
+                    foreach($invoice->items as $it) {
+                        $grossSubtotal += ($it->quantity * $it->unit_price);
+                        $totalItemDiscount += $it->discount;
+                        if ($invoice->tax_type === 'item_wise_tax') {
+                            $lineNet = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                            if ($taxMode === 'inclusive') {
+                                $lineBase = ($it->tax_rate > 0) ? round($lineNet / (1 + ($it->tax_rate / 100)), 4) : $lineNet;
+                                $lineTax = $lineNet - $lineBase;
+                            } else {
+                                $lineTax = ($lineNet * ($it->tax_rate / 100));
+                            }
+                            $itemsTaxAmount += $lineTax;
+                            if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
+                        }
+                    }
+                    $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
+                    $itemsNet = max(0, $grossSubtotal - $effectiveDiscount);
 
+                    if ($invoice->tax_type === 'order_wise_tax') {
+                        $orderTaxRate = (float)($invoice->order_tax_rate ?: 18);
+                        if ($taxMode === 'inclusive') {
+                            $itemsTaxAmount = ($orderTaxRate > 0) ? ($itemsNet - ($itemsNet / (1 + ($orderTaxRate / 100)))) : 0;
+                        } else {
+                            $itemsTaxAmount = $itemsNet * ($orderTaxRate / 100);
+                        }
+                    } elseif ($invoice->tax_type === 'without_tax') {
+                        $itemsTaxAmount = 0;
+                    }
+
+                    if ($taxMode === 'inclusive') {
+                        $taxableBase = max(0, $itemsNet - $itemsTaxAmount);
+                        $itemsTotalInclGst = $itemsNet;
+                    } else {
+                        $taxableBase = $itemsNet;
+                        $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
+                    }
+
+                    $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
+
+                    $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
+                    $freightTaxRatePercent = 18;
+                    if ($freightTaxRateOpt === 'highest') {
+                        if ($invoice->tax_type === 'order_wise_tax') {
+                            $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
+                        } else {
+                            $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
+                        }
+                    } else {
+                        $freightTaxRatePercent = floatval($freightTaxRateOpt);
+                    }
+
+                    $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
+                    $totalFreightInclGst = $freightAmount + $freightTax;
+                    $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
+                    $adjustment = (float)($invoice->adjustment ?? 0);
+                    $grandTotal = (float)($invoice->total_amount ?: ($taxMode === 'inclusive' ? ($itemsTotalInclGst + $freightAmount + $adjustment) : (($taxableBase + $freightAmount) + $totalInvoiceTaxAmount + $adjustment)));
+                    $gstType = $invoice->gst_type ?? 'cgst_sgst';
+                    $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
+                    $hasFreightTax = ($freightAmount > 0 && $freightTax > 0);
+                @endphp
+
+                <div class="row pt-2 fs-13 text-dark mb-4">
+                    <!-- Left: Bank Details & Terms -->
+                    <div class="col-7">
                         <div class="p-3 bg-light bg-opacity-30 rounded border mb-3 bank-details-box" style="border-color: #cbd5e1 !important;">
                             <h6 class="fw-bold text-dark fs-11 text-uppercase mb-2" style="letter-spacing: 0.5px;">{{ __('crm.bank_payment_details') }}</h6>
                             <div class="row fs-11 text-secondary g-2">
@@ -838,55 +930,10 @@
                     <!-- Right: Subtotal Calculations -->
                     <div class="col-5 summary-table-box ms-auto">
                         <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
-                            @php
-                                $grossSubtotal = 0;
-                                $totalItemDiscount = 0;
-                                $itemsTaxAmount = 0;
-                                $maxItemTaxRate = 0;
-                                foreach($invoice->items as $it) {
-                                    $grossSubtotal += ($it->quantity * $it->unit_price);
-                                    $totalItemDiscount += $it->discount;
-                                    if ($invoice->tax_type === 'item_wise_tax') {
-                                        $lineTaxable = max(0, ($it->quantity * $it->unit_price) - $it->discount);
-                                        $itemsTaxAmount += ($lineTaxable * ($it->tax_rate / 100));
-                                        if ($it->tax_rate > $maxItemTaxRate) $maxItemTaxRate = $it->tax_rate;
-                                    }
-                                }
-                                $effectiveDiscount = ($invoice->discount_type === 'order_wise') ? (float)$invoice->discount_amount : $totalItemDiscount;
-                                $taxableBase = max(0, $grossSubtotal - $effectiveDiscount);
 
-                                if ($invoice->tax_type === 'order_wise_tax') {
-                                    $itemsTaxAmount = $taxableBase * (($invoice->order_tax_rate ?: 18) / 100);
-                                } elseif ($invoice->tax_type === 'without_tax') {
-                                    $itemsTaxAmount = 0;
-                                }
-
-                                $itemsTotalInclGst = $taxableBase + $itemsTaxAmount;
-                                $freightAmount = ($invoice->freight_terms === 'To Be Billed') ? (float)($invoice->freight_amount ?: 0) : 0;
-
-                                $freightTaxRateOpt = $invoice->freight_tax_rate ?? 'highest';
-                                $freightTaxRatePercent = 18;
-                                if ($freightTaxRateOpt === 'highest') {
-                                    if ($invoice->tax_type === 'order_wise_tax') {
-                                        $freightTaxRatePercent = $invoice->order_tax_rate > 0 ? $invoice->order_tax_rate : 18;
-                                    } else {
-                                        $freightTaxRatePercent = ($maxItemTaxRate > 0) ? $maxItemTaxRate : 18;
-                                    }
-                                } else {
-                                    $freightTaxRatePercent = floatval($freightTaxRateOpt);
-                                }
-
-                                $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
-                                $totalFreightInclGst = $freightAmount + $freightTax;
-                                $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
-                                $adjustment = (float)($invoice->adjustment ?? 0);
-                                $grandTotal = $itemsTotalInclGst + $totalFreightInclGst + $adjustment;
-                                $gstType = $invoice->gst_type ?? 'cgst_sgst';
-                            @endphp
-
-                            <!-- 1. Subtotal (Excl. Tax) -->
+                            <!-- 1. Subtotal -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                <span class="text-muted fw-semibold">{{ $taxMode === 'inclusive' ? __('crm.subtotal_incl_tax') : __('crm.subtotal_excl_tax') }}</span>
                                 <span class="fw-bold text-dark">{{ format_currency($grossSubtotal) }}</span>
                             </div>
 
@@ -900,40 +947,19 @@
 
                             <!-- 3. Items Taxable Value -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                <span class="text-muted fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                <span class="text-muted fw-semibold">{{ $taxMode === 'inclusive' ? __('crm.taxable_value_excl_tax') : __('crm.items_taxable_value') }}</span>
                                 <span class="fw-bold text-dark">{{ format_currency($taxableBase) }}</span>
                             </div>
 
-                            <!-- 4. Add: Items GST Tax -->
-                            @if($invoice->tax_type !== 'without_tax' && $itemsTaxAmount > 0)
-                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                    <span class="text-muted fw-medium">{{ __('crm.add_items_gst_tax') }}</span>
-                                    <span class="text-muted font-monospace">+{{ format_currency($itemsTaxAmount) }}</span>
-                                </div>
-                            @endif
-
-                            <!-- 5. Billed Items Total (Incl. GST) -->
-                            <div class="d-flex justify-content-between align-items-center my-2 py-1.5 px-2.5 rounded bg-white border fs-12 fw-bold text-dark" style="border-color: #e2e8f0 !important;">
-                                <span>{{ __('crm.billed_items_total') }}</span>
-                                <span>{{ format_currency($itemsTotalInclGst) }}</span>
-                            </div>
-
-                            <!-- 6. Freight Charges -->
+                            <!-- 4. Freight Charges -->
                             @if($freightAmount > 0)
-                                <hr class="my-2 border-slate">
                                 <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
                                     <span class="text-muted fw-semibold">{{ __('crm.freight_charges') }}</span>
                                     <span class="fw-bold text-primary">{{ format_currency($freightAmount) }}</span>
                                 </div>
-                                @if($freightTax > 0)
-                                    <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-semibold">{{ __('crm.add_freight_gst_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($freightTax) }}</span>
-                                    </div>
-                                @endif
-                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-primary">
-                                    <span>{{ __('crm.total_freight_incl_gst') }}</span>
-                                    <span>{{ format_currency($totalFreightInclGst) }}</span>
+                                <div class="d-flex justify-content-between align-items-center mb-2 fs-12 fw-bold text-dark">
+                                    <span>Total Taxable Value</span>
+                                    <span>{{ format_currency($taxableBase + $freightAmount) }}</span>
                                 </div>
                             @endif
 
@@ -942,17 +968,17 @@
                                 <hr class="my-2 border-slate">
                                 @if($gstType === 'cgst_sgst')
                                     <div class="d-flex justify-content-between align-items-center mb-1.5 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.cgst_central_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount / 2) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.sgst_state_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</span>
                                     </div>
                                 @else
                                     <div class="d-flex justify-content-between align-items-center mb-2 fs-12">
-                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }}</span>
-                                        <span class="text-muted font-monospace">+{{ format_currency($totalInvoiceTaxAmount) }}</span>
+                                        <span class="text-muted fw-medium">{{ __('crm.igst_integrated_tax') }} {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}</span>
+                                        <span class="text-muted font-monospace">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount) }}</span>
                                     </div>
                                 @endif
                             @endif
@@ -989,6 +1015,166 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 5. Full-Width GST Tax Summary / Tax Analysis (A4 Optimized) -->
+                @if (($taxGroups->count() > 0 && $invoice->tax_amount > 0) || $hasFreightTax)
+                    <div class="card border shadow-none mb-4 gst-summary-box" style="border-radius: 6px; overflow: hidden; border-color: #cbd5e1 !important;">
+                        <div class="py-1.5 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
+                            <span><i class="feather-pie-chart me-1 text-primary"></i>{{ __('crm.gst_tax_summary') }} / TAX ANALYSIS</span>
+                            <span class="badge bg-soft-primary text-primary fs-10" style="font-size: 10px;">{{ $gstType === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                        </div>
+                        <div class="table-responsive" style="overflow-x: visible;">
+                            <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
+                                <thead class="bg-light text-secondary fw-bold">
+                                    @if($gstType === 'igst')
+                                        <tr>
+                                            <th class="py-1.5 text-start ps-3" style="width: 35%;">Tax Rate / Description</th>
+                                            <th class="py-1.5 text-end" style="width: 25%;">Taxable Value</th>
+                                            <th class="py-1.5 text-end" style="width: 20%;">Total Tax</th>
+                                            <th class="py-1.5 text-end pe-3" style="width: 20%;">IGST Amount</th>
+                                        </tr>
+                                    @else
+                                        <tr>
+                                            <th class="py-1.5 text-start ps-3" style="width: 32%;">Tax Rate / Description</th>
+                                            <th class="py-1.5 text-end" style="width: 20%;">Taxable Value</th>
+                                            <th class="py-1.5 text-end" style="width: 16%;">Total Tax</th>
+                                            <th class="py-1.5 text-end" style="width: 16%;">CGST Amount</th>
+                                            <th class="py-1.5 text-end pe-3" style="width: 16%;">SGST Amount</th>
+                                        </tr>
+                                    @endif
+                                </thead>
+                                <tbody>
+                                    @php
+                                        $totTaxable = 0;
+                                        $totCgst = 0;
+                                        $totSgst = 0;
+                                        $totIgst = 0;
+                                        $totTax = 0;
+                                    @endphp
+                                    @if($invoice->tax_type === 'order_wise_tax')
+                                        @php
+                                            $orderTaxRate = $invoice->order_tax_rate ?: 18;
+                                            $totTaxable += $taxableBase;
+                                            $totTax += $itemsTaxAmount;
+                                        @endphp
+                                        @if($gstType === 'igst')
+                                            @php $totIgst += $itemsTaxAmount; @endphp
+                                            <tr>
+                                                <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $orderTaxRate }}% (Order Level)</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($taxableBase) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($itemsTaxAmount) }}</td>
+                                                <td class="py-1.5 text-end pe-3">{{ format_currency($itemsTaxAmount) }}</td>
+                                            </tr>
+                                        @else
+                                            @php
+                                                $oCgst = round($itemsTaxAmount / 2, 2);
+                                                $oSgst = round($itemsTaxAmount - $oCgst, 2);
+                                                $totCgst += $oCgst;
+                                                $totSgst += $oSgst;
+                                            @endphp
+                                            <tr>
+                                                <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $orderTaxRate }}% (Order Level)</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($taxableBase) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($itemsTaxAmount) }}</td>
+                                                <td class="py-1.5 text-end">{{ format_currency($oCgst) }}</td>
+                                                <td class="py-1.5 text-end pe-3">{{ format_currency($oSgst) }}</td>
+                                            </tr>
+                                        @endif
+                                    @else
+                                        {{-- 1. Pure Items-wise Tax Rows (No freight mixed in) --}}
+                                        @foreach($taxGroups as $rateStr => $gItems)
+                                            @php
+                                                $rate = floatval($rateStr);
+                                                $grpTaxable = $gItems->sum(function($it) use ($taxMode) {
+                                                    $lineNet = max(0, ($it->quantity * $it->unit_price) - $it->discount);
+                                                    return $taxMode === 'inclusive' ? max(0, $lineNet - $it->tax_amount) : $lineNet;
+                                                });
+                                                $grpTax = $gItems->sum('tax_amount');
+                                                $totTaxable += $grpTaxable;
+                                                $totTax += $grpTax;
+                                            @endphp
+                                            @if($gstType === 'igst')
+                                                @php
+                                                    $grpIgst = $gItems->sum('igst_amount') > 0 ? $gItems->sum('igst_amount') : $grpTax;
+                                                    $totIgst += $grpIgst;
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $rate }}%</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpTaxable) }}</td>
+                                                    <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                    <td class="py-1.5 text-end pe-3">{{ format_currency($grpIgst) }}</td>
+                                                </tr>
+                                            @else
+                                                @php
+                                                    $grpCgst = $gItems->sum('cgst_amount') > 0 ? $gItems->sum('cgst_amount') : round($grpTax / 2, 2);
+                                                    $grpSgst = $gItems->sum('sgst_amount') > 0 ? $gItems->sum('sgst_amount') : round($grpTax - $grpCgst, 2);
+                                                    $totCgst += $grpCgst;
+                                                    $totSgst += $grpSgst;
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-1.5 text-start ps-3 fw-bold">GST {{ $rate }}%</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpTaxable) }}</td>
+                                                    <td class="py-1.5 text-end fw-bold text-dark">{{ format_currency($grpTax) }}</td>
+                                                    <td class="py-1.5 text-end">{{ format_currency($grpCgst) }}</td>
+                                                    <td class="py-1.5 text-end pe-3">{{ format_currency($grpSgst) }}</td>
+                                                </tr>
+                                            @endif
+                                        @endforeach
+                                    @endif
+
+                                    {{-- 2. Dedicated Freight Tax Row (Separate & Clean) --}}
+                                    @if($hasFreightTax)
+                                        @php
+                                            $totTaxable += $freightAmount;
+                                            $totTax += $freightTax;
+                                        @endphp
+                                        @if($gstType === 'igst')
+                                            @php $totIgst += $freightTax; @endphp
+                                            <tr class="table-light">
+                                                <td class="py-1.5 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($freightAmount) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-primary">{{ format_currency($freightTax) }}</td>
+                                                <td class="py-1.5 text-end pe-3 text-primary">{{ format_currency($freightTax) }}</td>
+                                            </tr>
+                                        @else
+                                            @php
+                                                $fCgst = round($freightTax / 2, 2);
+                                                $fSgst = round($freightTax - $fCgst, 2);
+                                                $totCgst += $fCgst;
+                                                $totSgst += $fSgst;
+                                            @endphp
+                                            <tr class="table-light">
+                                                <td class="py-1.5 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($freightAmount) }}</td>
+                                                <td class="py-1.5 text-end fw-bold text-primary">{{ format_currency($freightTax) }}</td>
+                                                <td class="py-1.5 text-end text-primary">{{ format_currency($fCgst) }}</td>
+                                                <td class="py-1.5 text-end pe-3 text-primary">{{ format_currency($fSgst) }}</td>
+                                            </tr>
+                                        @endif
+                                    @endif
+                                </tbody>
+                                <tfoot class="bg-light fw-bold text-dark">
+                                    @if($gstType === 'igst')
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3">Total</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totTaxable) }}</td>
+                                            <td class="py-1.5 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                            <td class="py-1.5 text-end pe-3">{{ format_currency($totIgst) }}</td>
+                                        </tr>
+                                    @else
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3">Total</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totTaxable) }}</td>
+                                            <td class="py-1.5 text-end text-primary">{{ format_currency($totTax) }}</td>
+                                            <td class="py-1.5 text-end">{{ format_currency($totCgst) }}</td>
+                                            <td class="py-1.5 text-end pe-3">{{ format_currency($totSgst) }}</td>
+                                        </tr>
+                                    @endif
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                @endif
 
                 <!-- 5. Signature Footer Block -->
                 <div class="row pt-4 border-top fs-11 text-muted align-items-end mt-4 signature-footer-block">
@@ -1170,6 +1356,7 @@
     </form>
 </x-ui.modal>
 
+@if (!$isCancelled)
 <!-- GENERATE E-WAY BILL MODAL -->
 <x-ui.modal id="generateEWayBillModal" title="<i class='feather-truck text-info me-1.5'></i>Generate GST E-Way Bill (EWB)" size="lg" :centered="true" :showFooter="false">
     <form action="{{ route('sales.invoices.ewaybill.generate', $invoice->id) }}" method="POST">
@@ -1258,6 +1445,7 @@
         </div>
     </form>
 </x-ui.modal>
+@endif
 
 <!-- QUICK ADD TRANSPORTER MODAL -->
 <x-ui.modal id="quickTransporterModal" title="<i class='feather-truck text-primary me-2'></i>Add New Transporter Master" size="lg" :centered="true" :showFooter="false">
@@ -1298,7 +1486,7 @@
                     <x-ui.modal-form-ui type="input" label="PAN Number" name="pan_number" placeholder="e.g. ABCDE1234F" class="text-uppercase font-monospace" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.modal-form-ui type="input" label="Primary Phone" name="phone" placeholder="Contact number" />
+                    <x-ui.modal-form-ui type="input" inputType="tel" label="Primary Phone" name="phone" placeholder="Contact number" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                 </div>
                 <div class="col-md-6">
                     <x-ui.modal-form-ui type="input" inputType="email" label="Official Email Address" name="email" placeholder="dispatch@transporter.com" />
@@ -1492,6 +1680,118 @@
             <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
         </div>
     </div>
+</x-ui.modal>
+
+<!-- CREATE FINANCIAL CREDIT NOTE MODAL (Enterprise ERP Style) -->
+<x-ui.modal id="createCreditNoteModal" title="<i class='feather-file-minus text-danger me-1.5'></i>{{ __('crm.issue_financial_credit_note') }}" size="lg" :centered="true" :showFooter="false">
+    <form action="{{ route('sales.invoices.credit-note', $invoice->id) }}" method="POST" id="createCreditNoteForm">
+        @csrf
+
+        <!-- Informational Banner: Stock Integrity Safe -->
+        <div class="alert alert-soft-success border border-success-subtle py-2.5 px-3 fs-12 mb-3 d-flex align-items-center rounded-3">
+            <i class="feather-shield text-success fs-20 me-2.5 flex-shrink-0"></i>
+            <div>
+                <strong class="text-success d-block mb-0.5">{{ __('crm.credit_note_safe_title') }}</strong>
+                <span class="text-muted">{{ __('crm.credit_note_safe_desc') }}</span>
+            </div>
+        </div>
+
+        <!-- Invoice Financial Breakdown Summary Card -->
+        <div class="card bg-light border mb-3 rounded-3">
+            <div class="card-body p-3">
+                <div class="row g-2 fs-12">
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">{{ __('crm.invoice_number') }}</span>
+                        <strong class="text-dark font-monospace fs-13">{{ $invoice->invoice_number }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">{{ __('crm.customer') }}</span>
+                        <strong class="text-dark text-truncate d-block fs-13">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">Total Invoice Value</span>
+                        <strong class="text-dark fs-13">{{ format_currency($invoice->total_amount) }}</strong>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <span class="text-muted d-block fs-11">Amount Paid</span>
+                        <strong class="{{ $invoice->amount_paid > 0 ? 'text-success' : 'text-muted' }} fs-13">{{ format_currency($invoice->amount_paid) }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.cancellation_reason') }} <span class="text-danger">*</span></label>
+                <select name="reason" class="form-select form-select-sm" required>
+                    <option value="Order Cancelled before Dispatch" selected>{{ __('crm.order_cancelled_before_dispatch') }}</option>
+                    <option value="Customer Requested Cancellation">{{ __('crm.customer_requested_cancellation') }}</option>
+                    <option value="Billing / Quantity Mistake">{{ __('crm.billing_mistake') }}</option>
+                    <option value="Duplicate Invoice">{{ __('crm.duplicate_invoice') }}</option>
+                    <option value="Other Reason">{{ __('crm.other_reason') }}</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.credit_note_date') }} <span class="text-danger">*</span></label>
+                <input type="date" name="credit_note_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}" required>
+            </div>
+        </div>
+
+        <!-- Payment Handling Section (if invoice has any payment) -->
+        @if ($invoice->amount_paid > 0)
+            <div class="card border border-warning-subtle bg-soft-warning mb-3 rounded-3">
+                <div class="card-body p-3">
+                    <label class="form-label fs-12 fw-bold text-dark d-flex align-items-center mb-1">
+                        <i class="feather-dollar-sign text-warning me-1.5 fs-15"></i>
+                        {{ __('crm.settle_received_payment') }} ({{ format_currency($invoice->amount_paid) }})
+                    </label>
+                    <p class="fs-11 text-muted mb-2.5">
+                        {{ __('crm.payment_received_notice') }}
+                    </p>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="refund_action" id="refundActionCredit" value="credit_balance" checked onchange="$('#bankRefundSelectWrapper').slideUp(150);">
+                        <label class="form-check-label fs-12 fw-semibold text-dark" for="refundActionCredit">
+                            {{ __('crm.retain_as_customer_credit') }}
+                            <span class="d-block fs-11 text-muted fw-normal">{{ __('crm.retain_as_customer_credit_desc') }}</span>
+                        </label>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="refund_action" id="refundActionBank" value="bank_refund" onchange="$('#bankRefundSelectWrapper').slideDown(150);">
+                        <label class="form-check-label fs-12 fw-semibold text-dark" for="refundActionBank">
+                            {{ __('crm.refund_via_bank') }}
+                            <span class="d-block fs-11 text-muted fw-normal">{{ __('crm.refund_via_bank_desc') }}</span>
+                        </label>
+                    </div>
+
+                    <div id="bankRefundSelectWrapper" class="mt-2.5 pt-2 border-top border-warning-subtle" style="display: none;">
+                        <label class="form-label fs-11 fw-bold text-dark mb-1">{{ __('crm.select_refund_bank_account') }} <span class="text-danger">*</span></label>
+                        <select name="refund_bank_account_id" class="form-select form-select-sm">
+                            <option value="">-- {{ __('crm.choose_bank_or_cash_account') }} --</option>
+                            @foreach ($cashBankAccounts as $acc)
+                                <option value="{{ $acc->id }}">{{ $acc->name }} ({{ $acc->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+        @else
+            <input type="hidden" name="refund_action" value="credit_balance">
+        @endif
+
+        <div class="mb-3">
+            <label class="form-label fs-12 fw-bold text-dark">{{ __('crm.notes_remarks') }} <span class="text-muted fw-normal">({{ __('crm.optional') }})</span></label>
+            <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="{{ __('crm.credit_note_remarks_placeholder') }}"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">{{ __('crm.close') }}</button>
+            <button type="submit" class="btn btn-sm btn-danger fw-bold px-3 d-inline-flex align-items-center" onclick="return confirm('{{ __('crm.confirm_issue_credit_note') }}');">
+                <i class="feather-file-minus me-1.5"></i>{{ __('crm.issue_credit_note_btn') }}
+            </button>
+        </div>
+    </form>
 </x-ui.modal>
 
 @push('scripts')
@@ -1825,6 +2125,22 @@
         const btn = $('#saveQuickTransporterBtn');
         const origHtml = btn.html();
 
+        // Clear previous errors
+        form.find('.is-invalid').removeClass('is-invalid');
+        form.find('.invalid-feedback.ajax-feedback').remove();
+        form.find('.transporter-alert-error').remove();
+
+        // Client-side email validation check
+        const emailInput = form.find('input[name="email"]');
+        const emailVal = emailInput.val().trim();
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            emailInput.addClass('is-invalid');
+            emailInput.parent().find('.invalid-feedback.ajax-feedback').remove();
+            emailInput.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+            emailInput.focus();
+            return false;
+        }
+
         btn.prop('disabled', true).html('<i class="feather-loader spin me-1"></i>Saving...');
 
         $.ajax({
@@ -1858,16 +2174,54 @@
                     const modalInstance = bootstrap.Modal.getInstance(modalEl);
                     if (modalInstance) modalInstance.hide();
                     form[0].reset();
+                    form.find('.is-invalid').removeClass('is-invalid');
+                    form.find('.invalid-feedback.ajax-feedback').remove();
                 } else {
-                    alert(res.message || 'Could not create transporter.');
+                    form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + (res.message || 'Could not create transporter.') + '</div>');
                 }
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
-                const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to save transporter.';
-                alert('Error: ' + errMsg);
+                if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                    const errors = xhr.responseJSON.errors;
+                    let firstField = null;
+                    $.each(errors, function(field, messages) {
+                        const $input = form.find('[name="' + field + '"]');
+                        if ($input.length) {
+                            $input.addClass('is-invalid');
+                            $input.parent().find('.invalid-feedback.ajax-feedback').remove();
+                            $input.after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">' + messages[0] + '</div>');
+                            if (!firstField) firstField = $input;
+                        } else {
+                            form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + messages[0] + '</div>');
+                        }
+                    });
+                    if (firstField) {
+                        firstField.focus();
+                    }
+                } else {
+                    const errMsg = xhr.responseJSON ? xhr.responseJSON.message : 'Failed to save transporter.';
+                    form.prepend('<div class="alert alert-danger py-2 px-3 fs-12 mb-3 transporter-alert-error">' + errMsg + '</div>');
+                }
             }
         });
+    });
+
+    // Realtime clear invalid feedback on input/change
+    $(document).on('input change', '#quickTransporterForm input, #quickTransporterForm select', function() {
+        $(this).removeClass('is-invalid');
+        $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+        $('#quickTransporterForm').find('.transporter-alert-error').remove();
+    });
+
+    // Email blur validation for quick transporter form
+    $(document).on('blur', '#quickTransporterForm input[name="email"]', function() {
+        const val = $(this).val().trim();
+        if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+            $(this).addClass('is-invalid');
+            $(this).parent().find('.invalid-feedback.ajax-feedback').remove();
+            $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
+        }
     });
 </script>
 @endpush

@@ -85,7 +85,6 @@ return array (
   'buy' => 'Trade',
   'trade' => 'Trade',
   'manufacture' => 'Manufacture',
-  'planning_type' => 'Planning Type',
   'stock' => 'Stock',
   'material_type' => 'Material Type',
   'raw_material' => 'Raw Material',

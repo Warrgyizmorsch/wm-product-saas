@@ -43,6 +43,7 @@ class Milestone extends BaseModel
         'company_id',
         'branch_id',
         'project_id',
+        'sales_order_item_id',
         'owner_id',
         'name',
         'description',
@@ -77,6 +78,16 @@ class Milestone extends BaseModel
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function salesOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Sales\Models\SalesOrderItem::class, 'sales_order_item_id');
+    }
+
+    public function productionOrders(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Production\Models\ProductionOrder::class, 'project_milestone_id');
     }
 
     public function owner(): BelongsTo

@@ -34,7 +34,7 @@ class NotificationService
         $employee = Employee::where('user_id', $userId)->first();
 
         try {
-            return Notification::create([
+            $notification = Notification::create([
                 'tenant_id' => $recipientUser->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1,
                 'company_id' => $employee?->company_id,
                 'business_unit_id' => $employee?->business_unit_id,
@@ -49,6 +49,27 @@ class NotificationService
                 'icon_class' => $iconClass,
                 'data' => $extraData,
             ]);
+
+            // Safely dispatch FCM Push Notification (non-blocking, never throws exception)
+            if (config('firebase.auto_push_notifications', true)) {
+                try {
+                    \App\Services\Firebase\FcmService::sendToUser(
+                        user: $recipientUser,
+                        title: $title,
+                        body: $message,
+                        actionUrl: self::resolveUrl($actionUrl),
+                        extraData: array_merge($extraData ?? [], [
+                            'notification_id' => (string) ($notification->id ?? ''),
+                            'module' => (string) $module,
+                            'type' => (string) $type,
+                        ])
+                    );
+                } catch (\Throwable $fcmEx) {
+                    \Illuminate\Support\Facades\Log::info("FCM push notification dispatch skipped: " . $fcmEx->getMessage());
+                }
+            }
+
+            return $notification;
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("Notification creation failed: " . $e->getMessage());
             return null;
@@ -100,12 +121,13 @@ class NotificationService
         }
 
         if (!$employeeModel->user_id) {
-            $user = User::where('email', $employeeModel->office_email)
-                ->orWhere('email', $employeeModel->personal_email)
-                ->first();
-            if ($user) {
-                $employeeModel->user_id = $user->id;
-                $employeeModel->saveQuietly();
+            $emails = array_filter([$employeeModel->office_email, $employeeModel->personal_email]);
+            if (!empty($emails)) {
+                $user = User::whereIn('email', $emails)->first();
+                if ($user) {
+                    $employeeModel->user_id = $user->id;
+                    $employeeModel->saveQuietly();
+                }
             }
         }
 

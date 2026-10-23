@@ -696,7 +696,7 @@
             </div>
         </div>
 
-        <div class="row g-3">
+        <div class="row g-3 mb-4">
             {{-- Card 1: Active Production Orders --}}
             <div class="col-xl-2 col-md-4 col-sm-6">
                 <x-ui.stat-widget title="{{ __('production.active_orders') }}" :value="number_format($totalActiveOrders)"
@@ -998,8 +998,6 @@
                     <h6 class="card-title fw-bold text-dark mb-0 fs-13">{{ __('production.production_flow') }}</h6>
                     <span class="fs-11 text-muted">{{ __('production.mfg_lifecycle_pipeline') }}</span>
                 </div>
-                <span class="fs-11 text-muted">{{ __('production.click_stage_drilldown') }}</span>
-            </div>
                 <span class="fs-11 text-muted">{{ __('production.click_stage_drilldown') }}</span>
             </div>
             <div class="card-body p-3">

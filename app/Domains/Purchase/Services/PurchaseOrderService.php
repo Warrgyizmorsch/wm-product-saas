@@ -24,8 +24,8 @@ class PurchaseOrderService
 
             foreach ($validated['items'] as $item) {
                 $qty = (float)$item['quantity'];
-                $price = (float)($item['unit_price'] ?? $item['rate'] ?? 0);
-                $disc = (float)($item['discount'] ?? $item['discount_amount'] ?? 0);
+                $price = convert_to_base((float)($item['unit_price'] ?? $item['rate'] ?? 0));
+                $disc = convert_to_base((float)($item['discount'] ?? $item['discount_amount'] ?? 0));
                 $taxRate = (float)($item['tax_rate'] ?? $item['tax_percent'] ?? 0);
 
                 $lineSubtotal = $qty * $price;
@@ -41,10 +41,10 @@ class PurchaseOrderService
             $taxType = $validated['tax_type'] ?? 'order_wise_tax';
             $gstType = $validated['gst_type'] ?? 'cgst_sgst';
 
-            $subtotal = isset($validated['subtotal']) && (float)$validated['subtotal'] > 0 ? (float)$validated['subtotal'] : $calculatedSubtotal;
+            $subtotal = $calculatedSubtotal;
 
             if ($discountType === 'order_wise') {
-                $discountAmount = (float)($validated['discount_amount'] ?? 0);
+                $discountAmount = convert_to_base((float)($validated['discount_amount'] ?? 0));
             } elseif ($discountType === 'item_wise') {
                 $discountAmount = $calculatedItemDiscount;
             } else {
@@ -69,12 +69,14 @@ class PurchaseOrderService
                 if ($gstType === 'igst') {
                     $igstAmount = $taxAmount;
                 } else {
-                    $cgstAmount = round($taxAmount / 2, 2);
-                    $sgstAmount = round($taxAmount - $cgstAmount, 2);
+                    $cgstAmount = round($taxAmount / 2, 4);
+                    $sgstAmount = round($taxAmount - $cgstAmount, 4);
                 }
             }
 
-            $grandTotal = isset($validated['grand_total']) && (float)$validated['grand_total'] > 0 ? (float)$validated['grand_total'] : ($grossTotal + $taxAmount);
+            $freightAmt = convert_to_base((float)($validated['freight_amount'] ?? 0));
+            $isFreightIncluded = in_array($validated['freight_terms'] ?? 'to_pay', ['to_be_billed', 'prepaid']);
+            $grandTotal = $grossTotal + $taxAmount + ($isFreightIncluded ? $freightAmt : 0);
 
             $po = $this->orderRepo->create([
                 'tenant_id' => $tenantId,
@@ -91,7 +93,7 @@ class PurchaseOrderService
                 'tax_type' => $taxType,
                 'gst_type' => $gstType,
                 'freight_terms' => $validated['freight_terms'] ?? 'to_pay',
-                'freight_amount' => (float)($validated['freight_amount'] ?? 0),
+                'freight_amount' => $freightAmt,
                 'subtotal' => $subtotal,
                 'discount_amount' => $discountAmount,
                 'cgst_amount' => $cgstAmount,
@@ -105,8 +107,8 @@ class PurchaseOrderService
 
             foreach ($validated['items'] as $item) {
                 $qty = (float)$item['quantity'];
-                $price = (float)($item['unit_price'] ?? $item['rate'] ?? 0);
-                $disc = (float)($item['discount'] ?? $item['discount_amount'] ?? 0);
+                $price = convert_to_base((float)($item['unit_price'] ?? $item['rate'] ?? 0));
+                $disc = convert_to_base((float)($item['discount'] ?? $item['discount_amount'] ?? 0));
                 $taxRate = (float)($item['tax_rate'] ?? $item['tax_percent'] ?? 0);
 
                 $lineSubtotal = ($qty * $price) - $disc;

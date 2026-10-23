@@ -63,6 +63,13 @@
         background-color: #f1f5f9 !important;
         border: 2px dashed #3b82f6 !important;
     }
+    .kanban-card-locked {
+        cursor: default !important;
+    }
+    .kanban-card-locked:hover {
+        transform: none !important;
+        cursor: default !important;
+    }
 
     /* Star Rating Widget — Kanban Cards */
     .star-rating-widget {
@@ -298,15 +305,27 @@
                             };
                             $kStarLabels = [1 => 'Low', 2 => 'Medium', 3 => 'High', 4 => 'Urgent'];
                         @endphp
-                        <div class="kanban-card" draggable="true" data-lead-id="{{ $lead->id }}" data-company-name="{{ addslashes($lead->company_name) }}" data-has-account-deal="{{ (($lead->crm_account_id && $lead->crm_deal_id) || $lead->is_customer || $lead->status === 'Won') ? '1' : '0' }}" data-is-qualified="{{ $lead->is_qualified ? '1' : '0' }}" data-amount="{{ $expAmt }}">
+                        @php
+                            $isDealing = strcasecmp($lead->status, 'Dealing') === 0;
+                            $isWon = strcasecmp($lead->status, 'Won') === 0 || $lead->is_customer;
+                            $isLocked = $isDealing || $isWon;
+                        @endphp
+                        <div class="kanban-card {{ $isLocked ? 'kanban-card-locked' : '' }}" draggable="{{ $isLocked ? 'false' : 'true' }}" data-lead-id="{{ $lead->id }}" data-company-name="{{ addslashes($lead->company_name) }}" data-status="{{ $lead->status ?: 'New' }}" data-has-account-deal="{{ (($lead->crm_account_id && $lead->crm_deal_id) || $lead->is_customer || $isWon) ? '1' : '0' }}" data-is-qualified="{{ $lead->is_qualified ? '1' : '0' }}" data-amount="{{ $expAmt }}" style="{{ $isLocked ? 'cursor: default;' : '' }}">
                             <!-- Lead Title & Value -->
                             <div class="d-flex align-items-start justify-content-between mb-1.5">
-                                <a href="{{ route('crm.leads.show', $lead->id) }}" class="fw-bold text-dark fs-13 hover-underline text-truncate me-2" style="max-width: 190px;" title="{{ $lead->company_name }}">
+                                <a href="{{ route('crm.leads.show', $lead->id) }}" class="fw-bold text-dark fs-13 hover-underline text-truncate me-2" style="max-width: 170px;" title="{{ $lead->company_name }}">
                                     {{ $lead->company_name }}
                                 </a>
-                                <span class="badge bg-soft-success text-success fs-10 font-monospace fw-bold">
-                                    {{ format_currency($expAmt) }}
-                                </span>
+                                <div class="d-flex align-items-center gap-1">
+                                    @if($isLocked)
+                                        <span class="badge bg-soft-secondary text-secondary fs-10 px-1.5 py-0.5 lock-badge" title="{{ $isWon ? 'Won Stage Locked' : 'Dealing Stage Locked' }}">
+                                            <i class="feather-lock me-1"></i>Locked
+                                        </span>
+                                    @endif
+                                    <span class="badge bg-soft-success text-success fs-10 font-monospace fw-bold">
+                                        {{ format_currency($expAmt) }}
+                                    </span>
+                                </div>
                             </div>
 
                             <!-- Contact Info -->
@@ -431,6 +450,17 @@
         // Drag Start & End
         document.querySelectorAll('.kanban-card').forEach(card => {
             card.addEventListener('dragstart', function (e) {
+                const cardStatus = this.getAttribute('data-status');
+                if (cardStatus === 'Dealing' || cardStatus === 'Won') {
+                    e.preventDefault();
+                    confirmAction({
+                        title: 'Action Blocked: ' + cardStatus + ' Stage Locked',
+                        message: 'Lead "' + (this.getAttribute('data-company-name') || 'This lead') + '" is in ' + cardStatus + ' stage and is locked. It cannot be moved to any other stage.',
+                        variant: 'warning',
+                        confirmText: 'Got It'
+                    });
+                    return false;
+                }
                 draggedCard = this;
                 originalParent = this.parentElement;
                 originalNextSibling = this.nextElementSibling;
@@ -467,19 +497,25 @@
                 const oldStatus = originalParent ? originalParent.closest('.kanban-column').getAttribute('data-status') : null;
                 const leadId = draggedCard.getAttribute('data-lead-id');
                 const companyName = draggedCard.getAttribute('data-company-name') || ('Lead #' + leadId);
-                const hasAccountDeal = draggedCard.getAttribute('data-has-account-deal') === '1';
 
-                // Guard 1: Won status lead is permanently locked! Status cannot be changed from Won to any other status
-                if (oldStatus === 'Won' && newStatus !== 'Won') {
-                    // Revert card immediately back to Won column box!
+                // Helper to revert card position immediately
+                const revertCard = () => {
                     if (originalNextSibling) {
                         originalParent.insertBefore(draggedCard, originalNextSibling);
                     } else {
                         originalParent.appendChild(draggedCard);
                     }
                     recalculateTotals();
+                };
 
-                    // Open Warning Modal Alert
+                // Dropped in the same column
+                if (oldStatus === newStatus) {
+                    return;
+                }
+
+                // Guard 1: Won status lead is permanently locked!
+                if (oldStatus === 'Won') {
+                    revertCard();
                     confirmAction({
                         title: 'Action Blocked: Won Status Locked',
                         message: 'Lead "' + companyName + '" status is Won and permanently locked. It cannot be changed to ' + newStatus + '.',
@@ -489,91 +525,164 @@
                     return false;
                 }
 
-                // Guard 2: Direct Won conversion blocked if Account & Deal not created yet
-                if (newStatus === 'Won' && !hasAccountDeal) {
-                    // Revert card immediately to original column box!
-                    if (originalNextSibling) {
-                        originalParent.insertBefore(draggedCard, originalNextSibling);
-                    } else {
-                        originalParent.appendChild(draggedCard);
-                    }
-                    recalculateTotals();
-
-                    // Open Warning Modal Alert
+                // Guard 2: Dealing status lead is permanently locked! Cannot move back to New, Qualified, Won, etc.
+                if (oldStatus === 'Dealing') {
+                    revertCard();
                     confirmAction({
-                        title: 'Action Blocked: Account & Deal Required',
-                        message: 'Lead "' + companyName + '" cannot be marked as Won directly because Account & Deal have not been created yet! Please click "CONVERT TO ACCOUNT & DEAL" first.',
+                        title: 'Action Blocked: Dealing Stage Locked',
+                        message: 'Lead "' + companyName + '" is in Dealing stage and permanently locked. It cannot be moved to ' + newStatus + ' or any other stage.',
                         variant: 'warning',
                         confirmText: 'Got It'
                     });
                     return false;
                 }
 
-                // Append card temporarily to new column
-                const emptyMsg = this.querySelector('.empty-col-msg');
-                if (emptyMsg) emptyMsg.remove();
-                this.appendChild(draggedCard);
-                recalculateTotals();
-
-                // AJAX Update Status in DB
-                fetch(`{{ url('crm/leads') }}/${leadId}/status`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ status: newStatus })
-                })
-                .then(async res => {
-                    let data = {};
-                    try {
-                        data = await res.json();
-                    } catch(e) {
-                        data = { success: false, message: 'Cannot mark as Won. Account & Deal conversion required first!' };
-                    }
-
-                    if (!res.ok || data.success === false) {
-                        // Revert card immediately back to its original column box!
-                        if (originalNextSibling) {
-                            originalParent.insertBefore(draggedCard, originalNextSibling);
-                        } else {
-                            originalParent.appendChild(draggedCard);
-                        }
-                        recalculateTotals();
-
-                        const errMsg = data.message || 'Cannot mark as Won. Account & Deal conversion required first!';
-                        confirmAction({
-                            title: 'Action Blocked',
-                            message: errMsg,
-                            variant: 'warning',
-                            confirmText: 'Got It'
-                        });
-                        showAppToast('error', errMsg);
-                    } else {
-                        // Display Common Component Toaster Success Message!
-                        showAppToast('success', data.message || 'Lead status updated successfully!');
-                    }
-                })
-                .catch(err => {
-                    // Revert card immediately back to its original column box on error!
-                    if (originalNextSibling) {
-                        originalParent.insertBefore(draggedCard, originalNextSibling);
-                    } else {
-                        originalParent.appendChild(draggedCard);
-                    }
-                    recalculateTotals();
-
+                // Guard 3: Direct Won conversion is strictly blocked!
+                if (newStatus === 'Won') {
+                    revertCard();
+                    const wonErrMsg = 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.';
                     confirmAction({
                         title: 'Action Blocked',
-                        message: 'Cannot mark as Won. Account & Deal conversion required first!',
+                        message: wonErrMsg,
                         variant: 'warning',
                         confirmText: 'Got It'
                     });
-                });
+                    if (typeof showAppToast === 'function') {
+                        showAppToast('error', wonErrMsg);
+                    }
+                    return false;
+                }
+
+                // Guard 4: Dealing Stage Confirmation Popup!
+                // Only for this Lead Kanban, before moving a lead to Dealing, prompt with common confirmation modal!
+                if (newStatus === 'Dealing') {
+                    const cardToMove = draggedCard;
+                    const targetDropZone = this;
+                    const origParent = originalParent;
+                    const origNextSib = originalNextSibling;
+
+                    confirmAction({
+                        title: 'Are you sure?',
+                        message: 'Are you sure you want to move lead "' + companyName + '" to Dealing? Once moved to Dealing, this lead will be locked and cannot be moved back to New, Qualified, or Won.',
+                        variant: 'warning',
+                        confirmText: 'Yes, Move to Dealing',
+                        cancelText: 'Cancel'
+                    }, function () {
+                        commitStatusChange(cardToMove, targetDropZone, leadId, companyName, newStatus, origParent, origNextSib);
+                    });
+                    return false;
+                }
+
+                // Any other regular column move (e.g. New -> Qualified)
+                commitStatusChange(draggedCard, this, leadId, companyName, newStatus, originalParent, originalNextSibling);
             });
         });
+
+        function commitStatusChange(card, dropZone, leadId, companyName, newStatus, origParent, origNextSib) {
+            // Append card to new column
+            const emptyMsg = dropZone.querySelector('.empty-col-msg');
+            if (emptyMsg) emptyMsg.remove();
+            dropZone.appendChild(card);
+            recalculateTotals();
+
+            // If moving to Dealing, immediately lock the card in UI
+            if (newStatus === 'Dealing') {
+                card.setAttribute('data-status', 'Dealing');
+                card.setAttribute('draggable', 'false');
+                card.style.cursor = 'default';
+                card.classList.add('kanban-card-locked');
+                if (!card.querySelector('.lock-badge')) {
+                    const headerBadges = card.querySelector('.d-flex.align-items-start.justify-content-between .d-flex.align-items-center');
+                    if (headerBadges) {
+                        const lockSpan = document.createElement('span');
+                        lockSpan.className = 'badge bg-soft-secondary text-secondary fs-10 px-1.5 py-0.5 lock-badge';
+                        lockSpan.title = 'Dealing Stage Locked';
+                        lockSpan.innerHTML = '<i class="feather-lock me-1"></i>Locked';
+                        headerBadges.insertBefore(lockSpan, headerBadges.firstChild);
+                    }
+                }
+            }
+
+            // AJAX Update Status in DB
+            fetch(`{{ url('crm/leads') }}/${leadId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(async res => {
+                let data = {};
+                try {
+                    data = await res.json();
+                } catch(e) {
+                    data = { success: false, message: 'Unable to update lead status.' };
+                }
+
+                if (!res.ok || data.success === false) {
+                    // Revert card immediately back to its original column box!
+                    if (origNextSib) {
+                        origParent.insertBefore(card, origNextSib);
+                    } else {
+                        origParent.appendChild(card);
+                    }
+                    if (newStatus === 'Dealing') {
+                        const prevStatus = origParent.closest('.kanban-column').getAttribute('data-status');
+                        card.setAttribute('data-status', prevStatus);
+                        card.setAttribute('draggable', 'true');
+                        card.style.cursor = 'grab';
+                        card.classList.remove('kanban-card-locked');
+                        const lockBadge = card.querySelector('.lock-badge');
+                        if (lockBadge) lockBadge.remove();
+                    }
+                    recalculateTotals();
+
+                    const errMsg = data.message || 'Unable to update lead status.';
+                    confirmAction({
+                        title: 'Action Blocked',
+                        message: errMsg,
+                        variant: 'warning',
+                        confirmText: 'Got It'
+                    });
+                    if (typeof showAppToast === 'function') {
+                        showAppToast('error', errMsg);
+                    }
+                } else {
+                    card.setAttribute('data-status', newStatus);
+                    if (typeof showAppToast === 'function') {
+                        showAppToast('success', data.message || ('Lead status updated to ' + newStatus + '!'));
+                    }
+                }
+            })
+            .catch(err => {
+                // Revert card immediately back to its original column box on error!
+                if (origNextSib) {
+                    origParent.insertBefore(card, origNextSib);
+                } else {
+                    origParent.appendChild(card);
+                }
+                if (newStatus === 'Dealing') {
+                    const prevStatus = origParent.closest('.kanban-column').getAttribute('data-status');
+                    card.setAttribute('data-status', prevStatus);
+                    card.setAttribute('draggable', 'true');
+                    card.style.cursor = 'grab';
+                    card.classList.remove('kanban-card-locked');
+                    const lockBadge = card.querySelector('.lock-badge');
+                    if (lockBadge) lockBadge.remove();
+                }
+                recalculateTotals();
+
+                confirmAction({
+                    title: 'Action Blocked',
+                    message: 'Unable to update lead status.',
+                    variant: 'warning',
+                    confirmText: 'Got It'
+                });
+            });
+        }
 
         function recalculateTotals() {
             document.querySelectorAll('.kanban-column').forEach(col => {

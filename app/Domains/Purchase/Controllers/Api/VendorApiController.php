@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class VendorApiController extends Controller
 {
@@ -94,18 +95,31 @@ class VendorApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+        $uniqueScope = $this->scopeUniqueVendor($tenantId, $companyId, $branchId);
+
         $validator = Validator::make($request->all(), [
-            'name'             => ['required', 'string', 'max:255'],
+            'name'             => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
             'company_name'     => ['nullable', 'string', 'max:255'],
-            'email'            => ['nullable', 'email', 'max:255'],
-            'phone'            => ['nullable', 'string', 'max:50'],
+            'email'            => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => ['nullable', 'string', 'max:50'],
             'pan'              => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
+            'address'          => ['nullable', 'string'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+            'bank_name'        => ['nullable', 'string', 'max:150'],
+            'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'payment_terms'    => ['nullable', 'string'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if ($validator->fails()) {
@@ -130,15 +144,23 @@ class VendorApiController extends Controller
             'gstin'            => $validated['gstin'] ?? null,
             'pan'              => $validated['pan'] ?? null,
             'status'           => $validated['status'] ?? 'active',
+            'address'          => $validated['address'] ?? null,
             'billing_address'  => $validated['billing_address'] ?? null,
             'shipping_address' => $validated['shipping_address'] ?? null,
-            'opening_balance'  => $validated['opening_balance'] ?? 0.00,
+            'bank_name'        => $validated['bank_name'] ?? null,
+            'account_number'   => $validated['account_number'] ?? null,
+            'ifsc_code'        => $validated['ifsc_code'] ?? null,
+            'opening_balance'  => isset($validated['opening_balance']) ? convert_to_base((float)$validated['opening_balance']) : 0.00,
+            'opening_balance_type' => $validated['opening_balance_type'] ?? 'credit',
             'payment_terms'    => $validated['payment_terms'] ?? null,
         ]);
+
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor created successfully',
+            'warning' => $openingWarning,
             'data'    => $vendor,
         ], 201);
     }
@@ -198,18 +220,32 @@ class VendorApiController extends Controller
             ], 404);
         }
 
+        $targetCompanyId = $vendor->company_id ?? $companyId;
+        $targetBranchId  = $vendor->branch_id ?? $branchId;
+        $uniqueScope     = $this->scopeUniqueVendor($tenantId, $targetCompanyId, $targetBranchId);
+
         $validator = Validator::make($request->all(), [
-            'name'             => ['sometimes', 'required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('vendors')->where('tenant_id', $tenantId)->ignore($vendor->id)],
+            'name'             => ['sometimes', 'required', 'string', 'max:255', Rule::unique('vendors', 'name')->ignore($vendor->id)->where($uniqueScope)],
             'company_name'     => ['nullable', 'string', 'max:255'],
-            'email'            => ['nullable', 'email', 'max:255'],
-            'phone'            => ['nullable', 'string', 'max:50'],
+            'email'            => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope)],
+            'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin'            => ['nullable', 'string', 'max:50'],
             'pan'              => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', 'in:active,inactive,blocked'],
+            'address'          => ['nullable', 'string'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
+            'bank_name'        => ['nullable', 'string', 'max:150'],
+            'account_number'   => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
+            'ifsc_code'        => ['nullable', 'string', 'max:30'],
             'opening_balance'  => ['nullable', 'numeric'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'payment_terms'    => ['nullable', 'string'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if ($validator->fails()) {
@@ -220,11 +256,20 @@ class VendorApiController extends Controller
             ], 422);
         }
 
-        $vendor->update($validator->validated());
+        $data = $validator->validated();
+        if (array_key_exists('opening_balance', $data)) {
+            $data['opening_balance'] = $data['opening_balance'] !== null
+                ? convert_to_base((float) $data['opening_balance'])
+                : 0.00;
+        }
+        $vendor->update($data);
+
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return response()->json([
             'success' => true,
             'message' => 'Vendor updated successfully',
+            'warning' => $openingWarning,
             'data'    => $vendor->fresh(),
         ]);
     }
@@ -267,13 +312,18 @@ class VendorApiController extends Controller
     public function quickCreate(Request $request): JsonResponse
     {
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+        $uniqueScope = $this->scopeUniqueVendor($tenantId, $companyId, $branchId);
 
         $validator = Validator::make($request->all(), [
-            'name'         => ['required', 'string', 'max:255'],
+            'name'         => ['required', 'string', 'max:255', Rule::unique('vendors', 'name')->where($uniqueScope)],
             'company_name' => ['nullable', 'string', 'max:255'],
-            'phone'        => ['nullable', 'string', 'max:50'],
-            'email'        => ['nullable', 'email', 'max:255'],
+            'phone'        => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'email'        => ['nullable', 'email', 'max:255', Rule::unique('vendors', 'email')->where($uniqueScope)],
             'gstin'        => ['nullable', 'string', 'max:50'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if ($validator->fails()) {
@@ -341,5 +391,23 @@ class VendorApiController extends Controller
             new \App\Exports\VendorExport($tenantId, $request->all()),
             'vendors_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    private function scopeUniqueVendor(int $tenantId, ?int $companyId, ?int $branchId): \Closure
+    {
+        return function ($query) use ($tenantId, $companyId, $branchId) {
+            $query->where('tenant_id', $tenantId);
+            if ($companyId !== null) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
+            if ($branchId !== null) {
+                $query->where('branch_id', $branchId);
+            } else {
+                $query->whereNull('branch_id');
+            }
+            return $query;
+        };
     }
 }

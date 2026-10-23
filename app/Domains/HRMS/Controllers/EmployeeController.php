@@ -196,23 +196,32 @@ class EmployeeController extends Controller
 
         $userIdInput = $request->input('user_id');
         if (empty($userIdInput) || $userIdInput === 'auto_create' || $userIdInput === 'new') {
-            if ($request->filled('office_email')) {
-                $existingUser = \App\Models\User::where('email', $request->office_email)->first();
+            $userEmail = $request->input('office_email') ?: $request->input('personal_email');
+            if (!empty($userEmail)) {
+                $existingUser = \App\Models\User::where('email', $userEmail)->first();
                 if ($existingUser) {
                     $request->merge(['user_id' => $existingUser->id]);
+                    if (!$request->filled('office_email')) {
+                        $request->merge(['office_email' => $existingUser->email]);
+                    }
                 } else {
                     $newUser = \App\Models\User::create([
-                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id'),
+                        'tenant_id'     => auth()->user()?->tenant_id ?? $request->input('tenant_id') ?? 1,
                         'company_id'    => $request->input('company_id'),
                         'branch_id'     => $request->input('branch_id'),
                         'department_id' => $request->input('department_id'),
                         'role_id'       => $request->input('role_id'),
                         'name'          => $request->input('full_name'),
-                        'email'         => $request->input('office_email'),
+                        'email'         => $userEmail,
                         'password'      => \Illuminate\Support\Facades\Hash::make('12345678'),
                     ]);
                     $request->merge(['user_id' => $newUser->id]);
+                    if (!$request->filled('office_email')) {
+                        $request->merge(['office_email' => $userEmail]);
+                    }
                 }
+            } else {
+                $request->merge(['user_id' => null]);
             }
         } elseif ($request->filled('user_id')) {
             $targetUser = \App\Models\User::find($request->user_id);
@@ -487,7 +496,7 @@ class EmployeeController extends Controller
             }
 
             if ($request->hasFile('photo')) {
-                $tempPath = $request->file('photo')->store('employees/temp_requests', 'public');
+                $tempPath = $request->file('photo')->storeTenantFile('employees/temp_requests', 'public');
                 $changes['photo'] = [
                     'label'    => 'Profile Photo',
                     'old'      => $employee->photo ?: '—',
@@ -552,7 +561,7 @@ class EmployeeController extends Controller
                     ->ignore($employeeId),
             ],
             'user_id' => [
-                'required',
+                'nullable',
                 Rule::unique('employees', 'user_id')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at')
@@ -599,16 +608,16 @@ class EmployeeController extends Controller
             'wfh_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'wfh_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'date_of_joining' => ['required', 'date'],
-            'date_of_birth' => ['nullable', 'date'],
+            'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
             'gender' => ['required', 'string', 'max:50'],
             'marital_status' => ['nullable', 'string', 'max:50'],
             'blood_group' => ['nullable', 'string', 'max:20'],
-            'personal_mobile_number' => ['nullable', 'string', 'max:50'],
-            'home_phone' => ['nullable', 'string', 'max:50'],
+            'personal_mobile_number' => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
+            'home_phone' => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'nick_name' => ['nullable', 'string', 'max:255'],
             'diet_preference' => ['nullable', 'string', 'max:100'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
-            'emergency_contact_number' => ['nullable', 'string', 'max:50'],
+            'emergency_contact_number' => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'emergency_contact_relation' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:100'],
             'postal_code' => ['nullable', 'string', 'max:20'],
@@ -739,15 +748,21 @@ class EmployeeController extends Controller
 
     public function uploadDocument(Request $request, Employee $employee): RedirectResponse
     {
-        $isOwnProfile = auth()->user()?->employee?->id === $employee->id;
+        $user = auth()->user();
+        $isOwnProfile = $user && (
+            $user->employee?->id === $employee->id ||
+            \App\Domains\HRMS\Models\Employee::resolveForUser($user)?->id === $employee->id ||
+            $user->id === $employee->user_id
+        );
+
         if (!$isOwnProfile) {
-            $this->authorizeHrms('hrms.employees.update');
+            $this->authorizeHrms(['hrms.documents.manage', 'hrms.employees.update', 'hr.settings.manage']);
         }
 
         $request->validate([
             'document_id'        => 'nullable|exists:documents,id',
             'document_master_id' => 'required_without:document_id|exists:document_masters,id',
-            'file'               => 'required|file|max:10240', // Max 10MB
+            'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240', // Max 10MB
             'expiry_date'        => 'nullable|date',
         ]);
 
@@ -769,7 +784,15 @@ class EmployeeController extends Controller
                 return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document.'])->withInput();
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            // Clean up previous files if replacing/re-uploading
+            if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+            }
+            if ($document->signed_file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->signed_file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
+            }
+
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = true;
             $requiresSignature = false;
@@ -789,6 +812,10 @@ class EmployeeController extends Controller
                 'file_size'          => $file->getSize(),
                 'expiry_date'        => $expiryApplicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
                 'requires_signature' => $requiresSignature,
+                'is_signed'          => false,
+                'signed_file_path'   => null,
+                'signed_at'          => null,
+                'signed_by_id'       => null,
                 'status'             => $status,
                 'requested_by_id'    => auth()->id(),
             ]);
@@ -799,29 +826,65 @@ class EmployeeController extends Controller
                 return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document template.'])->withInput();
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $requiresSignature = (bool) $documentMaster->requires_signature;
             $status = $requiresSignature ? 'pending_signature' : ($approvalRequired ? 'uploaded' : 'approved');
 
-            $createdDoc = \App\Domains\HRMS\Models\Document::create([
-                'tenant_id'          => $tenantId,
-                'documentable_id'    => $employee->id,
-                'documentable_type'  => Employee::class,
-                'document_master_id' => $documentMaster->id,
-                'name'               => $documentMaster->name,
-                'description'        => $documentMaster->description,
-                'file_name'          => $file->getClientOriginalName(),
-                'file_path'          => $path,
-                'file_type'          => $file->getClientMimeType(),
-                'file_size'          => $file->getSize(),
-                'requires_signature' => $requiresSignature,
-                'status'             => $status,
-                'has_expiry'         => $documentMaster->expiry_applicable,
-                'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
-                'requested_by_id'    => auth()->id(),
-            ]);
+            $existingDoc = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+                ->where('documentable_id', $employee->id)
+                ->where(function ($q) use ($documentMaster) {
+                    $q->where('document_master_id', $documentMaster->id)
+                      ->orWhere('name', $documentMaster->name);
+                })
+                ->first();
+
+            if ($existingDoc) {
+                if ($existingDoc->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($existingDoc->file_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($existingDoc->file_path);
+                }
+                if ($existingDoc->signed_file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($existingDoc->signed_file_path)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($existingDoc->signed_file_path);
+                }
+
+                $existingDoc->update([
+                    'document_master_id' => $documentMaster->id,
+                    'name'               => $documentMaster->name,
+                    'description'        => $documentMaster->description,
+                    'file_name'          => $file->getClientOriginalName(),
+                    'file_path'          => $path,
+                    'file_type'          => $file->getClientMimeType(),
+                    'file_size'          => $file->getSize(),
+                    'requires_signature' => $requiresSignature,
+                    'is_signed'          => false,
+                    'signed_file_path'   => null,
+                    'signed_at'          => null,
+                    'signed_by_id'       => null,
+                    'status'             => $status,
+                    'has_expiry'         => (bool) $documentMaster->expiry_applicable,
+                    'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                    'requested_by_id'    => auth()->id(),
+                ]);
+            } else {
+                $createdDoc = \App\Domains\HRMS\Models\Document::create([
+                    'tenant_id'          => $tenantId,
+                    'documentable_id'    => $employee->id,
+                    'documentable_type'  => Employee::class,
+                    'document_master_id' => $documentMaster->id,
+                    'name'               => $documentMaster->name,
+                    'description'        => $documentMaster->description,
+                    'file_name'          => $file->getClientOriginalName(),
+                    'file_path'          => $path,
+                    'file_type'          => $file->getClientMimeType(),
+                    'file_size'          => $file->getSize(),
+                    'requires_signature' => $requiresSignature,
+                    'status'             => $status,
+                    'has_expiry'         => (bool) $documentMaster->expiry_applicable,
+                    'expiry_date'        => $documentMaster->expiry_applicable && $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                    'requested_by_id'    => auth()->id(),
+                ]);
+            }
 
             $documentName = $documentMaster->name;
             $catName = $documentMaster->category?->name ?? 'General';
@@ -833,6 +896,14 @@ class EmployeeController extends Controller
             'category_name' => $catName ?? 'General Documents',
             'uploaded_at'   => now()->format('d M Y, h:i A'),
         ]);
+
+        if ($status === 'pending_signature') {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signature_requested', [
+                'employee_name'  => $employee->full_name,
+                'document_title' => $documentName ?? ($file->getClientOriginalName()),
+                'due_date'       => now()->addDays(7)->format('d M Y'),
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Document uploaded successfully.');
     }
@@ -850,6 +921,10 @@ class EmployeeController extends Controller
 
         if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+        }
+
+        if ($document->signed_file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->signed_file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($document->signed_file_path);
         }
 
         $document->delete();
@@ -897,7 +972,16 @@ class EmployeeController extends Controller
 
     public function updateDocumentStatus(Request $request, \App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        $this->authorizeHrms('hrms.employees.update');
+        $this->authorizeHrms(['hrms.documents.manage', 'hrms.employees.update', 'hr.settings.manage']);
+
+        $user = auth()->user();
+        $currentEmployee = $user ? \App\Domains\HRMS\Models\Employee::resolveForUser($user) : null;
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canSelfManage = $workflowService->allowsSelfApproval($user, $document, 'hrms.documents.manage');
+
+        if ($currentEmployee && (int) $document->documentable_id === (int) $currentEmployee->id && !$canSelfManage) {
+            return redirect()->back()->with('error', 'Hierarchy Conflict: Self-approval is prohibited. You cannot verify or approve your own document.');
+        }
 
         $validated = $request->validate([
             'status' => 'required|in:approved,rejected,pending_signature',
@@ -912,6 +996,17 @@ class EmployeeController extends Controller
 
     public function signDocument(Request $request, \App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
+        $user = auth()->user();
+        $isOwnProfile = $user && (
+            $user->employee?->id === $document->documentable_id ||
+            \App\Domains\HRMS\Models\Employee::resolveForUser($user)?->id === $document->documentable_id ||
+            $user->id === $document->documentable?->user_id
+        );
+
+        if (!$isOwnProfile) {
+            $this->authorizeHrms(['hrms.documents.manage', 'hrms.employees.update', 'hr.settings.manage']);
+        }
+
         $validated = $request->validate([
             'signature_image'    => 'required|string',
             'signature_position' => 'nullable|string',
@@ -942,6 +1037,21 @@ class EmployeeController extends Controller
 
     public function viewSignedDocument(Request $request, \App\Domains\HRMS\Models\Document $document): View
     {
+        if (!$document->file_path) {
+            abort(404, 'Document file not found.');
+        }
+
+        $user = auth()->user();
+        $isOwnProfile = $user && (
+            $user->employee?->id === $document->documentable_id ||
+            \App\Domains\HRMS\Models\Employee::resolveForUser($user)?->id === $document->documentable_id ||
+            $user->id === $document->documentable?->user_id
+        );
+
+        if (!$isOwnProfile) {
+            $this->authorizeHrms(['hrms.documents.view', 'hrms.documents.manage', 'hrms.employees.view', 'hr.settings.manage']);
+        }
+
         return view('modules.hrms.employees.documents.view_signed', [
             'document' => $document,
         ]);
@@ -1008,14 +1118,20 @@ class EmployeeController extends Controller
         abort(404, 'Resume file missing.');
     }
 
-    private function authorizeHrms(string $permission): void
+    private function authorizeHrms(string|array $permission): void
     {
-        abort_unless(
-            app(AccessService::class)->allows(auth()->user(), $permission, [
-                'tenant_id' => auth()->user()?->tenant_id,
-            ]),
-            403
-        );
+        $permissions = is_array($permission) ? $permission : [$permission];
+        $user = auth()->user();
+        $tenantId = $user?->tenant_id;
+
+        $access = app(AccessService::class);
+        foreach ($permissions as $perm) {
+            if ($access->allows($user, $perm, ['tenant_id' => $tenantId])) {
+                return;
+            }
+        }
+
+        abort(403);
     }
 }
 

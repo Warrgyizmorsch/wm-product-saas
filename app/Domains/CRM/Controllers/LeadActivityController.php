@@ -47,17 +47,12 @@ class LeadActivityController extends Controller
 
         $calService = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class);
 
-        if ($request->filled('auth_code') || $request->filled('code')) {
-            $authCode = $request->input('auth_code') ?: $request->input('code');
-            $calService->exchangeAuthCode($authCode);
-            return redirect()->route('crm.activities.index');
+        if ($redirect = $calService->handleAuthCallback($request, route('crm.activities.index'))) {
+            return $redirect;
         }
-        if ($request->filled('token') || $request->filled('access_token')) {
-            session(['google_token' => $request->input('token') ?: $request->input('access_token')]);
-            return redirect()->route('crm.activities.index');
-        }
+
         if ($request->filled('user_id') || $request->filled('google_user_id')) {
-            session(['google_user_id' => $request->input('google_user_id') ?: $request->input('user_id')]);
+            session(['google_user_id' => (int)($request->input('google_user_id') ?: $request->input('user_id'))]);
         }
 
         $isGoogleConnected = $calService->isAccountConnected(auth()->id());

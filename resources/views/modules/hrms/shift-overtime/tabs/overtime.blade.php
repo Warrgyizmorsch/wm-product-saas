@@ -1,5 +1,4 @@
-<div class="tab-pane fade @if($activeTab === 'overtime') show active @endif" id="overtime-pane" role="tabpanel" aria-labelledby="overtime-pane-tab">
-
+<div class="tab-pane fade @if($activeTab === 'overtime') show active @endif" id="overtime" role="tabpanel" aria-labelledby="overtime-tab">
 
     {{-- Overtime Table --}}
     <div>
@@ -51,13 +50,15 @@
                                 <option value="pending" {{ ($overtimeStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.overtime.pending') }}</option>
                                 <option value="approved" {{ ($overtimeStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.overtime.approved') }}</option>
                                 <option value="rejected" {{ ($overtimeStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.overtime.rejected') }}</option>
+                                <option value="cancellation_requested" {{ ($overtimeStatus ?? '') === 'cancellation_requested' ? 'selected' : '' }}>{{ __('hrms.overtime.cancellation_requested') }}</option>
+                                <option value="cancelled" {{ ($overtimeStatus ?? '') === 'cancelled' ? 'selected' : '' }}>{{ __('hrms.common.cancelled') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="dropdown-divider my-3"></div>
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                            <button type="button" class="btn btn-light btn-sm border flex-grow-1" onclick="resetOvertimeFilters()">Reset</button>
+                            <x-ui.button variant="primary" size="sm" type="submit" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                            <x-ui.button variant="light" size="sm" type="button" class="border flex-grow-1" onclick="resetOvertimeFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -80,15 +81,20 @@
             </thead>
             <tbody id="overtimeTableBody">
                 @forelse($overtimeRequests as $req)
-                    <tr class="overtime-row" data-employee="{{ strtolower($req->employee->full_name) }}" data-employee-id="{{ $req->employee_id }}" data-status="{{ $req->status }}" data-created-at="{{ $req->created_at->timestamp }}" data-duration="{{ $req->duration_hours }}">
+                    @php
+                        $empName = $req->employee ? $req->employee->full_name : 'Unknown';
+                        $empCode = $req->employee ? $req->employee->employee_id : 'N/A';
+                        $empInitials = $req->employee ? substr($req->employee->full_name, 0, 2) : 'EM';
+                    @endphp
+                    <tr class="overtime-row" data-employee="{{ strtolower($empName) }}" data-employee-id="{{ $req->employee_id }}" data-status="{{ $req->status }}" data-created-at="{{ $req->created_at?->timestamp ?? 0 }}" data-duration="{{ $req->duration_hours }}">
                         <td class="ps-3">
                             <div class="d-flex align-items-center gap-2">
                                 <div class="avatar bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; font-weight: bold; background-color: rgba(13, 110, 253, 0.1);">
-                                    {{ substr($req->employee->full_name, 0, 2) }}
+                                    {{ $empInitials }}
                                 </div>
                                 <div>
-                                    <div class="fw-semibold text-dark">{{ $req->employee->full_name }}</div>
-                                    <div class="text-muted fs-11">{{ $req->employee->employee_id }}</div>
+                                    <div class="fw-semibold text-dark">{{ $empName }}</div>
+                                    <div class="text-muted fs-11">{{ $empCode }}</div>
                                 </div>
                             </div>
                         </td>
@@ -99,31 +105,43 @@
                             <div class="fw-semibold text-dark">{{ substr($req->start_time, 0, 5) }} - {{ substr($req->end_time, 0, 5) }}</div>
                         </td>
                         <td>
-                            <div class="fw-bold text-dark">{{ number_format($req->duration_hours, 1) }} hrs</div>
+                            <div class="fw-bold text-dark">{{ number_format($req->duration_hours, 1) }} {{ __('hrms.overtime.hrs') }}</div>
                         </td>
                         <td>
                             @if($req->status === 'approved' && $req->approved_duration_hours !== null)
-                                <div class="fw-bold text-success">{{ number_format($req->approved_duration_hours, 1) }} hrs</div>
+                                <div class="fw-bold text-success">{{ number_format($req->approved_duration_hours, 1) }} {{ __('hrms.overtime.hrs') }}</div>
                             @else
                                 <span class="text-muted fs-11">-</span>
                             @endif
                         </td>
                         <td>
-                            <span class="badge text-uppercase fs-10" style="background-color: {{ $req->compensation_type === 'comp_off' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(25, 135, 84, 0.1)' }}; color: {{ $req->compensation_type === 'comp_off' ? '#0d6efd' : '#198754' }};">
-                                {{ $req->compensation_type === 'comp_off' ? __('hrms.overtime.comp_off') : __('hrms.overtime.payout') }}
-                            </span>
+                            <div class="d-flex align-items-center gap-1">
+                                <x-ui.badge :variant="$req->compensation_type === 'comp_off' ? 'primary' : 'success'" soft class="text-uppercase fs-10">
+                                    {{ $req->compensation_type === 'comp_off' ? __('hrms.overtime.comp_off') : __('hrms.overtime.payout') }}
+                                </x-ui.badge>
+                                @if($req->attachment_path)
+                                    <x-ui.icon-btn variant="soft-secondary" icon="feather-paperclip" :href="asset('storage/' . $req->attachment_path)" target="_blank" title="{{ __('hrms.common.view_attachment') }}" />
+                                @endif
+                            </div>
                         </td>
                         <td class="text-center">
-                            <span class="badge text-uppercase fs-10" style="background-color: {{ $req->status === 'approved' ? 'rgba(25, 135, 84, 0.1)' : ($req->status === 'rejected' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)') }}; color: {{ $req->status === 'approved' ? '#198754' : ($req->status === 'rejected' ? '#dc3545' : '#ffc107') }};">
-                                {{ $req->status === 'approved' ? __('hrms.overtime.approved') : ($req->status === 'rejected' ? __('hrms.overtime.rejected') : __('hrms.overtime.pending')) }}
-                            </span>
+                            @php
+                                $otStatusLabel = match($req->status) {
+                                    'approved' => __('hrms.overtime.approved'),
+                                    'rejected' => __('hrms.overtime.rejected'),
+                                    'cancellation_requested' => __('hrms.overtime.cancellation_requested'),
+                                    'cancelled' => __('hrms.common.cancelled'),
+                                    default => __('hrms.overtime.pending'),
+                                };
+                            @endphp
+                            <x-ui.status-badge :status="$req->status" :label="$otStatusLabel" />
                         </td>
                         <td class="text-end pe-3" style="white-space: nowrap;">
                             <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                 @if($isAdmin)
                                     <div class="dropdown d-inline-block position-relative">
-                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <span>{{ $req->status === 'cancellation_requested' ? 'Cancel Req.' : ($req->status === 'approved' ? __('hrms.overtime.approved') : ($req->status === 'rejected' ? __('hrms.overtime.rejected') : ($req->status === 'cancelled' ? 'Cancelled' : __('hrms.overtime.pending')))) }}</span>
+                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                                            <span>{{ $req->status === 'cancellation_requested' ? __('hrms.overtime.cancel_req') : ($req->status === 'approved' ? __('hrms.overtime.approved') : ($req->status === 'rejected' ? __('hrms.overtime.rejected') : ($req->status === 'cancelled' ? __('hrms.common.cancelled') : __('hrms.overtime.pending')))) }}</span>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
                                             @if($req->status === 'cancellation_requested')
@@ -131,7 +149,7 @@
                                                     <form action="{{ route('hrms.overtime.approve-cancellation', $req->id) }}" method="POST">
                                                         @csrf
                                                         <button type="submit" class="dropdown-item text-success fw-medium">
-                                                            Approve Cancel
+                                                             {{ __('hrms.overtime.approve_cancel') }}
                                                         </button>
                                                     </form>
                                                 </li>
@@ -139,9 +157,13 @@
                                                     <form action="{{ route('hrms.overtime.deny-cancellation', $req->id) }}" method="POST">
                                                         @csrf
                                                         <button type="submit" class="dropdown-item text-danger fw-medium">
-                                                            Deny Cancel
+                                                             {{ __('hrms.overtime.deny_cancel') }}
                                                         </button>
                                                     </form>
+                                                </li>
+                                            @elseif($req->status === 'cancelled')
+                                                <li>
+                                                    <span class="dropdown-item text-muted disabled">{{ __('hrms.common.cancelled') }}</span>
                                                 </li>
                                             @else
                                                 <li>
@@ -163,37 +185,21 @@
                                         </ul>
                                     </div>
 
-                                    <form action="{{ route('hrms.overtime.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this overtime request?', { title: 'Delete Overtime Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
+                                    <form action="{{ route('hrms.overtime.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.overtime.confirm_delete') }}', { title: '{{ __('hrms.overtime.delete_title') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.overtime.delete_btn') }}' });" class="d-inline m-0">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                title="Delete Request"
-                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                            <i class="feather-trash-2 fs-14"></i>
-                                        </button>
+                                        <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" type="submit" title="{{ __('hrms.overtime.delete_application') }}" />
                                     </form>
                                 @else
                                     @if($req->canWithdraw())
-                                        <form action="{{ route('hrms.overtime.withdraw', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Withdraw this overtime request?', { title: 'Withdraw Overtime Request', variant: 'warning', confirmButtonText: 'Withdraw' });" class="d-inline m-0">
+                                        <form action="{{ route('hrms.overtime.withdraw', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.overtime.confirm_withdraw') }}', { title: '{{ __('hrms.overtime.withdraw_request') }}', variant: 'warning', confirmButtonText: '{{ __('hrms.overtime.withdraw_btn') }}' });" class="d-inline m-0">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                    title="Withdraw Request"
-                                                    style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                <i class="feather-trash-2 fs-14"></i>
-                                            </button>
+                                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" type="submit" title="{{ __('hrms.overtime.withdraw_request') }}" />
                                         </form>
                                     @elseif($req->canRequestCancellation())
-                                        <button type="button" class="btn btn-sm btn-soft-danger border" 
-                                                title="Request Cancellation"
-                                                onclick="openOvertimeCancellationModal({{ $req->id }}, '{{ route('hrms.overtime.request-cancellation', $req->id) }}')"
-                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                            <i class="feather-trash-2 fs-14"></i>
-                                        </button>
+                                        <x-ui.icon-btn variant="soft-warning" icon="feather-x-circle" title="{{ __('hrms.overtime.cancel_request_title') }}" onclick="openOvertimeCancellationModal({{ $req->id }}, '{{ route('hrms.overtime.request-cancellation', $req->id) }}')" />
                                     @else
-                                        <button type="button" class="btn btn-sm btn-light border disabled" 
-                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
-                                            <i class="feather-trash-2 fs-14"></i>
-                                        </button>
+                                        <x-ui.icon-btn variant="transparent-dark" icon="feather-trash-2" disabled />
                                     @endif
                                 @endif
                             </div>
@@ -201,13 +207,13 @@
                     </tr>
                 @empty
                     <tr id="empty_initial_overtime_row">
-                        <td colspan="8" class="text-center py-4 text-muted fs-13">No overtime requests found.</td>
+                        <td colspan="8" class="text-center py-4 text-muted fs-13">{{ __('hrms.overtime.no_requests_found') }}</td>
                     </tr>
                 @endforelse
                 <tr id="no_matching_overtime_row" class="d-none">
                     <td colspan="8" class="text-center py-5 text-muted">
                         <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
-                        No matching overtime requests found.
+                        {{ __('hrms.overtime.no_matching_requests') }}
                     </td>
                 </tr>
             </tbody>
@@ -235,7 +241,7 @@
         <div class="modal-content border-0 shadow">
             <div class="modal-header border-bottom py-3">
                 <h5 class="modal-title fw-bold text-dark" id="overtimeCancellationModalLabel">
-                    <i class="feather-x-circle text-warning me-2"></i>Cancel Overtime Request
+                    <i class="feather-x-circle text-warning me-2"></i>{{ __('hrms.overtime.cancel_overtime_request') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -243,18 +249,17 @@
                 @csrf
                 <div class="modal-body p-4">
                     <p class="text-muted fs-13 mb-3">
-                        Please provide a reason for requesting cancellation of this approved overtime request.
+                        {{ __('hrms.overtime.cancellation_reason_help') }}
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark fs-13">Reason / Comments <span class="text-danger">*</span></label>
-                        <textarea name="cancellation_reason" id="overtime_cancellation_reason" class="form-control fs-13" rows="3" placeholder="Enter reason for cancellation..." required maxlength="1000"></textarea>
+                        <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.overtime.reason_comments') }}" name="cancellation_reason" id="overtime_cancellation_reason" :required="true" rows="3" placeholder="{{ __('hrms.overtime.reason_placeholder') }}" maxlength="1000" />
                     </div>
                 </div>
                 <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-warning text-dark fw-semibold">
-                        <i class="feather-send me-1"></i>Submit Cancellation
-                    </button>
+                    <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.overtime.close') }}</x-ui.button>
+                    <x-ui.button variant="warning" type="submit" icon="feather-send">
+                        {{ __('hrms.overtime.submit_cancellation') }}
+                    </x-ui.button>
                 </div>
             </form>
         </div>
@@ -272,7 +277,20 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <input type="hidden" name="employee_id" id="ot_employee_id" value="{{ $employee ? $employee->id : '' }}">
+                    @if($isAdmin)
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.overtime.employee') }}" name="employee_id" id="ot_employee_id" :required="true">
+                                <option value="">{{ __('hrms.shift_change.select_employee') }}</option>
+                                @foreach(($employees ?? []) as $emp)
+                                    <option value="{{ $emp->id }}" {{ ($employee && $employee->id === $emp->id) ? 'selected' : '' }}>
+                                        {{ $emp->full_name }} ({{ $emp->employee_id }})
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    @else
+                        <input type="hidden" name="employee_id" id="ot_employee_id" value="{{ $employee ? $employee->id : '' }}">
+                    @endif
 
                     <div class="mb-3">
                         <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.overtime.overtime_date') }}" name="date" id="ot_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
@@ -301,23 +319,14 @@
                         <x-ui.odoo-form-ui type="file" label="{{ __('hrms.overtime.attachment_optional') }}" name="attachment" id="ot_attachment" :required="false" helperText="{{ __('hrms.overtime.attachment_help') }}" />
                     </div>
                 </div>
-                <div class="modal-footer border-top py-3">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.overtime.close') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('hrms.overtime.submit_application') }}</button>
+                <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
+                    <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.overtime.close') }}</x-ui.button>
+                    <x-ui.button variant="primary" type="submit">{{ __('hrms.overtime.submit_application') }}</x-ui.button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
-
-
-{{-- Decision Forms --}}
-<form id="shiftDecisionForm" action="" method="POST" style="display: none;">
-    @csrf
-    <input type="hidden" name="action" id="shiftDecisionAction" value="">
-    <input type="hidden" name="rejection_reason" id="shiftDecisionReason" value="">
-</form>
 
 <form id="overtimeDecisionForm" action="" method="POST" style="display: none;">
     @csrf
@@ -331,19 +340,19 @@
     <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="approveOvertimeTabModalLabel">Approve Overtime</h5>
+                <h5 class="modal-title fw-bold" id="approveOvertimeTabModalLabel">{{ __('hrms.overtime.approve_request') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Approved Hours</label>
-                    <input type="number" id="overtimeTabApproveHoursInput" class="form-control" step="0.5" min="0.5" placeholder="e.g. 2.0">
-                    <div class="form-text text-muted">Enter the actual hours to approve (can differ from requested hours).</div>
+                    <label class="form-label fw-semibold">{{ __('hrms.overtime.approved_hours') }}</label>
+                    <input type="number" id="overtimeTabApproveHoursInput" class="form-control" step="0.5" min="0.5" placeholder="2.0">
+                    <div class="form-text text-muted">{{ __('hrms.overtime.enter_actual_hours_help') }}</div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="confirmOvertimeTabApproveBtn">Approve</button>
+            <div class="modal-footer d-flex justify-content-end gap-2">
+                <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                <x-ui.button variant="success" id="confirmOvertimeTabApproveBtn">{{ __('hrms.common.approve') }}</x-ui.button>
             </div>
         </div>
     </div>
@@ -354,19 +363,21 @@
     <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="rejectOvertimeTabModalLabel">Reject Overtime</h5>
+                <h5 class="modal-title fw-bold" id="rejectOvertimeTabModalLabel">{{ __('hrms.overtime.reject_request') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Rejection Reason <span class="text-muted fw-normal">(optional)</span></label>
-                    <textarea id="overtimeTabRejectReasonInput" class="form-control" rows="3" placeholder="Enter reason for rejection..."></textarea>
+                    <label class="form-label fw-semibold">{{ __('hrms.overtime.reason_comments') }} <span class="text-muted fw-normal">({{ __('hrms.common.optional') }})</span></label>
+                    <textarea id="overtimeTabRejectReasonInput" class="form-control" rows="3" placeholder="{{ __('hrms.overtime.reason_placeholder') }}"></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmOvertimeTabRejectBtn">Reject</button>
+            <div class="modal-footer d-flex justify-content-end gap-2">
+                <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                <x-ui.button variant="danger" id="confirmOvertimeTabRejectBtn">{{ __('hrms.common.reject') }}</x-ui.button>
             </div>
         </div>
     </div>
 </div>
+
+

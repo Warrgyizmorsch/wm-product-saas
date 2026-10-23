@@ -233,9 +233,9 @@
             <thead>
                 <tr>
                     <th>Cost Element</th>
-                    <th class="text-right">{{ __('production.estimated_planned') }}</th>
-                    <th class="text-right">{{ __('production.actual_incurred') }}</th>
-                    <th class="text-right">Variance</th>
+                    <th class="text-right">{{ __('production.estimated_planned') }} ({{ active_currency_symbol() }})</th>
+                    <th class="text-right">{{ __('production.actual_incurred') }} ({{ active_currency_symbol() }})</th>
+                    <th class="text-right">Variance ({{ active_currency_symbol() }})</th>
                     <th class="text-right">{{ __('production.variance_status') }}</th>
                 </tr>
             </thead>
@@ -354,7 +354,7 @@
                 <th class="text-right">Planned</th><th class="text-right">Issued</th>
                 <th class="text-right">Consumed</th><th class="text-right">Floor WIP</th>
                 <th class="text-right">Prog%</th>
-                <th class="text-right">Unit Cost</th><th class="text-right">Planned Cost</th><th class="text-right">Consumed Cost</th><th class="text-right">Var Cost</th>
+                <th class="text-right">Unit Cost ({{ active_currency_symbol() }})</th><th class="text-right">Planned Cost ({{ active_currency_symbol() }})</th><th class="text-right">Consumed Cost ({{ active_currency_symbol() }})</th><th class="text-right">Var Cost ({{ active_currency_symbol() }})</th>
             </tr>
         </thead>
         <tbody>
@@ -608,9 +608,9 @@
                 <th class="text-right">Consumed</th>
                 <th class="text-right">Floor WIP</th>
                 <th class="text-right">Prog%</th>
-                <th class="text-right">Planned Cost</th>
-                <th class="text-right">Consumed Cost</th>
-                <th class="text-right">Var Cost</th>
+                <th class="text-right">Planned Cost ({{ active_currency_symbol() }})</th>
+                <th class="text-right">Consumed Cost ({{ active_currency_symbol() }})</th>
+                <th class="text-right">Var Cost ({{ active_currency_symbol() }})</th>
             </tr>
         </thead>
         <tbody>
@@ -660,7 +660,7 @@
 
 @elseif($type === 'cost-variance')
     <table class="data-table">
-        <thead><tr><th>Order</th><th>Product / SKU</th><th>Status</th><th class="text-right">Planned</th><th class="text-right">Mat</th><th class="text-right">Labor</th><th class="text-right">Machine</th><th class="text-right">OH</th><th class="text-right">Adj</th><th class="text-right">{{ __('production.actual_total') }}</th><th class="text-right">Variance</th><th class="text-right">Var%</th></tr></thead>
+        <thead><tr><th>Order</th><th>Product / SKU</th><th>Status</th><th class="text-right">Planned ({{ active_currency_symbol() }})</th><th class="text-right">Mat</th><th class="text-right">Labor</th><th class="text-right">Machine</th><th class="text-right">OH</th><th class="text-right">Adj</th><th class="text-right">{{ __('production.actual_total') }} ({{ active_currency_symbol() }})</th><th class="text-right">Variance ({{ active_currency_symbol() }})</th><th class="text-right">Var%</th></tr></thead>
         <tbody>
             @forelse($reportData['data'] as $r)
                 <tr>

@@ -61,11 +61,18 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
             $firstWarehouseId = $attributes['warehouse_id'] ?? ($items[0]['warehouse_id'] ?? null);
             $dispatchedWipQty = (float) collect($items)->sum('quantity');
 
+            $orderId = $attributes['production_order_id'] ?? null;
+            $order = $orderId ? \App\Domains\Production\Models\ProductionOrder::find($orderId) : null;
+            $companyId = $attributes['company_id'] ?? $order?->company_id ?? company_id() ?? (class_exists(\App\Core\Company\CompanyContext::class) ? app(\App\Core\Company\CompanyContext::class)->id() : null);
+            $branchId = $attributes['branch_id'] ?? $order?->branch_id ?? branch_id() ?? (class_exists(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null);
+
             $challan = DeliveryChallan::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
                 'challan_number' => $challanNumber,
                 'type' => 'subcontract_dispatch',
-                'production_order_id' => $attributes['production_order_id'] ?? null,
+                'production_order_id' => $orderId,
                 'production_order_operation_id' => $attributes['production_order_operation_id'] ?? null,
                 'vendor_id' => $attributes['vendor_id'],
                 'warehouse_id' => $firstWarehouseId,
@@ -88,7 +95,6 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
             foreach ($items as $item) {
                 $batchId = $item['production_batch_id'] ?? null;
                 $wipId = $item['production_wip_id'] ?? null;
-                $orderId = $attributes['production_order_id'] ?? null;
 
                 if ($orderId && (!$wipId || !$batchId)) {
                     if (!$batchId) {
@@ -104,9 +110,10 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
                             ->first();
 
                         if (!$wip) {
-                            $order = \App\Domains\Production\Models\ProductionOrder::find($orderId);
                             $wip = \App\Domains\Production\Models\ProductionWip::create([
                                 'tenant_id' => $tenantId,
+                                'company_id' => $companyId,
+                                'branch_id' => $branchId,
                                 'production_order_id' => $orderId,
                                 'production_batch_id' => $batchId,
                                 'product_id' => $item['product_id'] ?? $order?->product_id,
@@ -127,6 +134,8 @@ class DeliveryChallanRepository implements DeliveryChallanRepositoryInterface
 
                 DeliveryChallanItem::create([
                     'tenant_id' => $tenantId,
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                     'delivery_challan_id' => $challan->id,
                     'product_id' => $item['product_id'],
                     'production_batch_id' => $batchId,

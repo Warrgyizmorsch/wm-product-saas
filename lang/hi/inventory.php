@@ -85,7 +85,6 @@ return array (
   'buy' => 'ट्रेड (Trade)',
   'trade' => 'ट्रेड (Trade)',
   'manufacture' => 'निर्माण (Manufacture)',
-  'planning_type' => 'योजना प्रकार',
   'stock' => 'स्टॉक (Stock)',
   'material_type' => 'सामग्री का प्रकार',
   'raw_material' => 'कच्चा माल',

@@ -4,6 +4,8 @@ namespace App\Domains\Production\Models;
 
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,12 +14,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryChallan extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToCompany, BelongsToBranch;
 
     protected $table = 'delivery_challans';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'challan_number',
         'type',
         'production_order_id',

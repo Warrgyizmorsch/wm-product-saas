@@ -83,7 +83,6 @@ return array (
   'buy' => 'Търговия (Trade)',
   'trade' => 'Търговия (Trade)',
   'manufacture' => 'Производство (Manufacture)',
-  'planning_type' => 'Тип планиране',
   'stock' => 'Запас (Stock)',
   'material_type' => 'Тип материал',
   'raw_material' => 'Суровина',

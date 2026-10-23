@@ -369,14 +369,14 @@ class ProductController extends Controller
 
         $stockMap = $product->warehouseStocks->keyBy('warehouse_id')->map(fn($ws) => [
             'quantity'  => $ws->quantity,
-            'unit_cost' => $ws->unit_cost,
+            'unit_cost' => $ws->unit_cost ? round(convert_from_base((float)$ws->unit_cost), 2) : 0,
         ])->toArray();
 
         $variantStockMap = [];
         foreach ($product->variants as $variant) {
             $variantStockMap[$variant->id] = $variant->warehouseStocks->keyBy('warehouse_id')->map(fn($ws) => [
                 'quantity'  => $ws->quantity,
-                'unit_cost' => $ws->unit_cost,
+                'unit_cost' => $ws->unit_cost ? round(convert_from_base((float)$ws->unit_cost), 2) : 0,
             ])->toArray();
         }
 
@@ -588,9 +588,9 @@ class ProductController extends Controller
                 'barcode' => $product->barcode,
                 'track_serial_number' => (bool)$product->track_serial_number,
                 'track_batch' => (bool)$product->track_batch,
-                'selling_price' => (float)($product->selling_price ?: $product->unit_cost),
-                'cost_price' => (float)($product->cost_price ?: $product->unit_cost),
-                'unit_cost' => (float)$product->unit_cost,
+                'selling_price' => round(convert_from_base((float)($product->selling_price ?: $product->unit_cost)), 2),
+                'cost_price' => round(convert_from_base((float)($product->cost_price ?: $product->unit_cost)), 2),
+                'unit_cost' => round(convert_from_base((float)$product->unit_cost), 2),
                 'gst_rate' => (float)$product->gst_rate,
                 'hsn_sac' => $product->hsn_sac,
                 'uom' => $product->uom?->name ?? 'Pcs',
@@ -617,11 +617,9 @@ class ProductController extends Controller
             ->where('warehouse_id', $warehouseId)
             ->first();
 
-        $totalReservedInWh = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->where('warehouse_id', $warehouseId)
-            ->where('status', 'Active')
-            ->sum('reserved_qty');
+        $physicalQty = $stock ? (float)$stock->quantity : 0.0;
+        $reservedQty = $stock ? (float)$stock->reserved_qty : 0.0;
+        $availableQty = $stock ? (float)$stock->available_qty : 0.0;
 
         $itemReservedQty = 0;
         $mrItem = null;
@@ -652,11 +650,21 @@ class ProductController extends Controller
             $res = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
                 ->where('product_id', $productId)
                 ->where('warehouse_id', $warehouseId)
-                ->where(function($q) use ($mrItem) {
+                ->where(function($q) use ($mrItem, $salesOrderId) {
                     $q->where(function($q2) use ($mrItem) {
-                        $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement', 'SalesOrder'])
+                        $q2->whereIn('reference_type', ['DeliveryOrder', 'MaterialRequirement', 'SalesOrder', 'DispatchOrder'])
                            ->where('reference_id', $mrItem->material_requirement_id);
                     })->orWhere('reference_item_id', $mrItem->id);
+
+                    if ($salesOrderId) {
+                        $q->orWhere(function($sq) use ($salesOrderId) {
+                            $sq->where('reference_type', 'SalesOrder')->where('reference_id', $salesOrderId);
+                        })->orWhere(function($sq) use ($salesOrderId) {
+                            $sq->where('reference_type', 'DispatchOrder')->whereIn('reference_id', function($sub) use ($salesOrderId) {
+                                $sub->select('id')->from('dispatch_orders')->where('sales_order_id', $salesOrderId);
+                            });
+                        });
+                    }
                 })
                 ->where('status', 'Active')
                 ->sum('reserved_qty');
@@ -667,10 +675,6 @@ class ProductController extends Controller
                 $itemReservedQty = (float)$mrItem->quantity_reserved;
             }
         }
-
-        $physicalQty = (float)($stock?->quantity ?? 0);
-        $reservedQty = (float)$totalReservedInWh;
-        $availableQty = max(0, $physicalQty - $reservedQty);
 
         return response()->json([
             'success' => true,

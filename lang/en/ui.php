@@ -2,7 +2,9 @@
 
 return [
     'access_control' => 'Access Control',
+    'account' => 'Account',
     'account_settings' => 'Account Settings',
+    'full_screen' => 'Full screen',
     'accounting' => 'Accounting',
     'accounting_core' => 'Accounting Core',
     'add_language' => 'Add Language',
@@ -56,6 +58,9 @@ return [
     'large_scale_erp_domains' => 'Large Scale ERP Domains',
     'loading' => 'Loading...',
     'login' => 'Login',
+    'login_caps_lock' => 'Caps Lock is on',
+    'login_show_password' => 'Show password',
+    'login_signing_in' => 'Signing in…',
     'login_badge' => 'Secure Tenant Portal',
     'login_feature_crm_desc' => 'Leads, deals & quotations',
     'login_feature_hrms_desc' => 'Attendance, leave & payroll',
@@ -110,4 +115,10 @@ return [
     'workspace' => 'Workspace',
     'optional' => 'Optional',
     'view' => 'View',
+    'my_profile' => 'My Profile',
+    'preferences' => 'Preferences',
+    'theme' => 'Theme',
+    'light' => 'Light',
+    'dark' => 'Dark',
+    'brand_color' => 'Brand colour',
 ];

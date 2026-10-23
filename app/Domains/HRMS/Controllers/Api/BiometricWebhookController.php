@@ -2,6 +2,7 @@
 
 namespace App\Domains\HRMS\Controllers\Api;
 
+use App\Core\Tenant\TenantContext;
 use App\Domains\HRMS\Models\BiometricDevice;
 use App\Domains\HRMS\Models\BiometricPunchLog;
 use App\Domains\HRMS\Models\Employee;
@@ -27,19 +28,39 @@ class BiometricWebhookController extends Controller
             'biometric_device_id'    => 'nullable|exists:biometric_devices,id',
         ]);
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+
+        if (!empty($validated['biometric_device_id'])) {
+            BiometricDevice::where('id', $validated['biometric_device_id'])->update(['last_ping_at' => now()]);
+        }
+
         $syncedCount = 0;
         foreach ($validated['logs'] as $log) {
-            $employee = Employee::where('employee_id', $log['biometric_id'])->first();
+            $bioId = (string) $log['biometric_id'];
+            $employee = Employee::where(function ($q) use ($bioId) {
+                $q->where('employee_id', $bioId);
+                if (is_numeric($bioId)) {
+                    $q->orWhere('id', (int) $bioId);
+                }
+            })
+            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->first();
+
             if (!$employee) {
                 continue;
             }
 
+            try {
+                $punchTime = Carbon::parse($log['timestamp']);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
             BiometricPunchLog::create([
-                'tenant_id'           => $tenantId,
+                'tenant_id'           => $tenantId ?? $employee->tenant_id,
                 'biometric_device_id' => $validated['biometric_device_id'] ?? null,
                 'employee_id'         => $employee->id,
-                'punch_time'          => Carbon::parse($log['timestamp']),
+                'punch_time'          => $punchTime,
                 'punch_type'          => $log['punch_type'],
                 'processed'           => false,
                 'raw_data'            => array_merge($log, ['ip' => $request->ip()]),
@@ -62,15 +83,19 @@ class BiometricWebhookController extends Controller
     {
         $serialNumber = $request->query('SN');
         if (!$serialNumber) {
-            return response("registry=not_found", 400);
+            return response("registry=not_found\n", 400);
         }
 
-        $device = BiometricDevice::where('device_serial', $serialNumber)->first();
+        $device = BiometricDevice::withoutGlobalScopes()->where('device_serial', $serialNumber)->first();
         if (!$device) {
-            return response("registry=not_found", 404);
+            return response("registry=not_found\n", 404);
         }
 
         $device->update(['last_ping_at' => now()]);
+
+        if ($device->tenant) {
+            app(TenantContext::class)->set($device->tenant);
+        }
 
         $rawContent = $request->getContent();
         if (empty($rawContent)) {
@@ -86,16 +111,26 @@ class BiometricWebhookController extends Controller
                 continue;
             }
 
-            $parts = explode("\t", $line);
+            // Support both tab and comma delimited machine records
+            $parts = str_contains($line, "\t") ? explode("\t", $line) : explode(",", $line);
             if (count($parts) < 2) {
                 continue;
             }
 
-            $biometricId = $parts[0];
-            $timestampStr = $parts[1];
-            $stateVal = isset($parts[2]) ? (int)$parts[2] : 0;
+            $biometricId = trim($parts[0]);
+            $timestampStr = trim($parts[1]);
+            $stateVal = isset($parts[2]) ? (int) trim($parts[2]) : 0;
 
-            $employee = Employee::where('employee_id', $biometricId)->first();
+            $employee = Employee::withoutGlobalScopes()
+                ->where('tenant_id', $device->tenant_id)
+                ->where(function ($q) use ($biometricId) {
+                    $q->where('employee_id', $biometricId);
+                    if (is_numeric($biometricId)) {
+                        $q->orWhere('id', (int) $biometricId);
+                    }
+                })
+                ->first();
+
             if (!$employee) {
                 continue;
             }
@@ -106,11 +141,17 @@ class BiometricWebhookController extends Controller
             elseif ($stateVal === 2) $punchType = 'break_out';
             elseif ($stateVal === 3) $punchType = 'break_in';
 
+            try {
+                $punchTime = Carbon::parse($timestampStr);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
             BiometricPunchLog::create([
                 'tenant_id'           => $device->tenant_id,
                 'biometric_device_id' => $device->id,
                 'employee_id'         => $employee->id,
-                'punch_time'          => Carbon::parse($timestampStr),
+                'punch_time'          => $punchTime,
                 'punch_type'          => $punchType,
                 'processed'           => false,
                 'raw_data'            => ['raw_line' => $line],

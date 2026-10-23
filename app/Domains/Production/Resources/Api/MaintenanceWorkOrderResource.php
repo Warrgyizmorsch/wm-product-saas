@@ -37,7 +37,6 @@ class MaintenanceWorkOrderResource extends JsonResource
             ]),
             'problem_description'    => $this->problem_description,
             'work_performed'         => $this->work_performed,
-            'labor_hours'            => $this->labor_hours !== null ? (float) $this->labor_hours : null,
             'planned_start'          => $this->planned_start?->toIso8601String(),
             'planned_end'            => $this->planned_end?->toIso8601String(),
             'actual_start'           => $this->actual_start?->toIso8601String(),

@@ -32,7 +32,7 @@ class LeaveStructureController extends Controller
             'company_id' => 'nullable|integer',
             'effective_from' => 'required|date',
             'description' => 'nullable',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -57,7 +57,7 @@ class LeaveStructureController extends Controller
             'company_id' => 'nullable|integer',
             'effective_from' => 'required|date',
             'description' => 'nullable',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -94,7 +94,7 @@ class LeaveStructureController extends Controller
             'type' => 'required|in:paid,unpaid',
             'quota' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
@@ -124,7 +124,7 @@ class LeaveStructureController extends Controller
             'type' => 'required|in:paid,unpaid',
             'quota' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'status' => 'required',
+            'status' => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);

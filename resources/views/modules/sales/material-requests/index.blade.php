@@ -80,7 +80,7 @@
                 <thead>
                     <tr>
                         <th style="width: 20%">{{ __('crm.slip_number') }}</th>
-                        <th style="width: 30%">{{ __('crm.production_order') }}</th>
+                        <th style="width: 30%">{{ __('crm.source_document') ?? 'Source Document' }}</th>
                         <th style="width: 20%">{{ __('crm.requisition_date') }}</th>
                         <th style="width: 15%" class="text-center">{{ __('crm.status') }}</th>
                         <th style="width: 15%" class="text-end">{{ __('crm.actions') }}</th>
@@ -95,12 +95,27 @@
                                 </a>
                             </td>
                             <td>
-                                <div class="fw-semibold text-dark">
-                                    {{ $slip->order->order_number ?? 'MO #' . $slip->production_order_id }}
-                                </div>
-                                <div class="text-muted fs-11">
-                                    {{ __('crm.product_label') }} {{ $slip->order->product->name ?? '—' }}
-                                </div>
+                                @if($slip->isMaintenance())
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge bg-soft-warning text-warning fw-bold fs-10 text-uppercase">Maintenance</span>
+                                        <span class="fw-semibold text-dark">
+                                            {{ $slip->maintenanceWorkOrder?->work_order_number ?? 'MWO #' . $slip->maintenance_work_order_id }}
+                                        </span>
+                                    </div>
+                                    <div class="text-muted fs-11">
+                                        <i class="feather-cpu me-1"></i>{{ $slip->maintenanceWorkOrder?->machine?->name ?? '—' }} ({{ $slip->maintenanceWorkOrder?->machine?->code ?? '—' }})
+                                    </div>
+                                @else
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge bg-soft-primary text-primary fw-bold fs-10 text-uppercase">Production</span>
+                                        <div class="fw-semibold text-dark">
+                                            {{ $slip->order?->order_number ?? 'MO #' . $slip->production_order_id }}
+                                        </div>
+                                    </div>
+                                    <div class="text-muted fs-11">
+                                        {{ __('crm.product_label') }} {{ $slip->order?->product?->name ?? '—' }}
+                                    </div>
+                                @endif
                             </td>
                             <td>{{ date('d-M-Y', strtotime($slip->requisition_date)) }}</td>
                             <td class="text-center">

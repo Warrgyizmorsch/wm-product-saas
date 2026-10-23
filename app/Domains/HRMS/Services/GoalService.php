@@ -108,10 +108,24 @@ class GoalService
                 ? (int) $data['employee_id'] 
                 : (!empty($employeeIds) ? $employeeIds[0] : null);
 
+            if (!empty($employeeIds)) {
+                $employeeIds = Employee::where('tenant_id', $tenantId)->whereIn('id', $employeeIds)->pluck('id')->all();
+            }
+            if ($primaryEmployeeId && !Employee::where('tenant_id', $tenantId)->where('id', $primaryEmployeeId)->exists()) {
+                $primaryEmployeeId = null;
+            }
+
             $goalCycleId = !empty($data['goal_cycle_id']) && is_numeric($data['goal_cycle_id']) ? (int) $data['goal_cycle_id'] : null;
             $goalCategoryId = !empty($data['goal_category_id']) && is_numeric($data['goal_category_id']) ? (int) $data['goal_category_id'] : null;
             $departmentId = !empty($data['department_id']) && is_numeric($data['department_id']) ? (int) $data['department_id'] : null;
             $parentGoalId = !empty($data['parent_goal_id']) && is_numeric($data['parent_goal_id']) ? (int) $data['parent_goal_id'] : null;
+
+            if ($departmentId && !\App\Domains\HRMS\Models\Department::where('tenant_id', $tenantId)->where('id', $departmentId)->exists()) {
+                $departmentId = null;
+            }
+            if ($parentGoalId && !Goal::where('tenant_id', $tenantId)->where('id', $parentGoalId)->exists()) {
+                $parentGoalId = null;
+            }
 
             $goal = Goal::create([
                 'tenant_id'           => $tenantId,
@@ -260,6 +274,13 @@ class GoalService
                 ? (int) $data['employee_id'] 
                 : ($employeeIds && count($employeeIds) > 0 ? $employeeIds[0] : $goal->employee_id);
 
+            if ($employeeIds !== null) {
+                $employeeIds = Employee::where('tenant_id', $goal->tenant_id)->whereIn('id', $employeeIds)->pluck('id')->all();
+            }
+            if ($primaryEmployeeId && !Employee::where('tenant_id', $goal->tenant_id)->where('id', $primaryEmployeeId)->exists()) {
+                $primaryEmployeeId = $goal->employee_id;
+            }
+
             $goalCycleId = array_key_exists('goal_cycle_id', $data) 
                 ? (!empty($data['goal_cycle_id']) && is_numeric($data['goal_cycle_id']) ? (int) $data['goal_cycle_id'] : null) 
                 : $goal->goal_cycle_id;
@@ -275,6 +296,13 @@ class GoalService
             $parentGoalId = array_key_exists('parent_goal_id', $data) 
                 ? (!empty($data['parent_goal_id']) && is_numeric($data['parent_goal_id']) ? (int) $data['parent_goal_id'] : null) 
                 : $goal->parent_goal_id;
+
+            if ($departmentId && !\App\Domains\HRMS\Models\Department::where('tenant_id', $goal->tenant_id)->where('id', $departmentId)->exists()) {
+                $departmentId = $goal->department_id;
+            }
+            if ($parentGoalId && (!Goal::where('tenant_id', $goal->tenant_id)->where('id', $parentGoalId)->exists() || (int) $parentGoalId === (int) $goal->id)) {
+                $parentGoalId = null;
+            }
 
             $goal->update([
                 'title'            => $data['title'] ?? $goal->title,
@@ -394,31 +422,55 @@ class GoalService
                 $goal->recalculateProgress();
             } else {
                 // Direct progress percentage update if no key result
-                if (isset($data['new_progress'])) {
-                    $goal->progress_percentage = (float) min(100.0, max(0.0, $data['new_progress']));
+                $directProg = $data['new_progress'] ?? $data['new_value'] ?? null;
+                if ($directProg !== null) {
+                    $goal->progress_percentage = (float) min(100.0, max(0.0, (float) $directProg));
+                    $newVal = $goal->progress_percentage;
                 }
             }
 
-            if (!empty($data['health_status'])) {
+            if ($goal->progress_percentage >= 100) {
+                $goal->health_status = 'completed';
+            } elseif (!empty($data['health_status'])) {
                 $goal->health_status = $data['health_status'];
             }
             $goal->save();
 
-            $checkIn = GoalCheckIn::create([
-                'tenant_id'          => $goal->tenant_id,
-                'goal_id'            => $goal->id,
-                'goal_key_result_id' => $kr?->id,
-                'user_id'            => $user?->id,
-                'employee_id'        => $employee?->id,
-                'previous_value'     => $prevVal,
-                'new_value'          => $newVal,
-                'previous_progress'  => $prevProg,
-                'new_progress'       => $goal->progress_percentage,
-                'health_status'      => $data['health_status'] ?? $goal->health_status,
-                'comment'            => $data['comment'] ?? 'Progress check-in logged.',
-                'blockers'           => $data['blockers'] ?? null,
-                'check_in_date'      => now(),
-            ]);
+            $checkInHealth = $data['health_status'] ?? $goal->health_status;
+
+            try {
+                $checkIn = GoalCheckIn::create([
+                    'tenant_id'          => $goal->tenant_id,
+                    'goal_id'            => $goal->id,
+                    'goal_key_result_id' => $kr?->id,
+                    'user_id'            => $user?->id,
+                    'employee_id'        => $employee?->id,
+                    'previous_value'     => $prevVal ?? $prevProg,
+                    'new_value'          => $newVal,
+                    'previous_progress'  => $prevProg,
+                    'new_progress'       => $goal->progress_percentage,
+                    'health_status'      => $checkInHealth,
+                    'comment'            => $data['comment'] ?? 'Progress check-in logged.',
+                    'blockers'           => $data['blockers'] ?? null,
+                    'check_in_date'      => now(),
+                ]);
+            } catch (\Throwable $e) {
+                $checkIn = GoalCheckIn::create([
+                    'tenant_id'          => $goal->tenant_id,
+                    'goal_id'            => $goal->id,
+                    'goal_key_result_id' => $kr?->id,
+                    'user_id'            => $user?->id,
+                    'employee_id'        => $employee?->id,
+                    'previous_value'     => $prevVal ?? $prevProg,
+                    'new_value'          => $newVal,
+                    'previous_progress'  => $prevProg,
+                    'new_progress'       => $goal->progress_percentage,
+                    'health_status'      => 'on_track',
+                    'comment'            => $data['comment'] ?? 'Progress check-in logged.',
+                    'blockers'           => $data['blockers'] ?? null,
+                    'check_in_date'      => now(),
+                ]);
+            }
 
             // Dispatch notification on milestone completion (100%) or at-risk warning
             try {
@@ -452,7 +504,7 @@ class GoalService
      */
     public function getCascadingTree(int $tenantId, ?int $cycleId = null): array
     {
-        $query = Goal::with(['category', 'department', 'employee', 'keyResults', 'childGoals.category', 'childGoals.employee', 'childGoals.department', 'childGoals.childGoals.category', 'childGoals.childGoals.employee'])
+        $query = Goal::with(['category', 'department', 'employee', 'employees', 'keyResults', 'childGoals.category', 'childGoals.employee', 'childGoals.employees', 'childGoals.department', 'childGoals.childGoals.category', 'childGoals.childGoals.employee', 'childGoals.childGoals.employees'])
             ->where('tenant_id', $tenantId)
             ->whereNull('parent_goal_id');
 
@@ -475,7 +527,8 @@ class GoalService
             'owner_name'          => match ($goal->owner_type) {
                 'company'    => 'Organization-Wide',
                 'department' => $goal->department?->name ?? 'Department',
-                default      => $goal->employee?->full_name ?? 'Individual',
+                default      => $goal->employee?->full_name 
+                                ?? ($goal->employees->isNotEmpty() ? $goal->employees->first()->full_name : 'Individual'),
             },
             'category'            => $goal->category ? [
                 'name'  => $goal->category->name,

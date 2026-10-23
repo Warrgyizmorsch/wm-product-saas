@@ -35,6 +35,13 @@ interface JournalRepositoryInterface
 
     public function findByReference(string $referenceType, int $referenceId): Collection;
 
+    /**
+     * The journal that currently stands as the posting of a source document —
+     * posted or awaiting approval, not reversed, and not itself a reversal.
+     * Null means the document isn't in the ledger (never posted, or reversed).
+     */
+    public function activeForReference(int $tenantId, string $referenceType, int $referenceId): ?Journal;
+
     public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string;
 
     public function create(array $data): Journal;
@@ -43,11 +50,12 @@ interface JournalRepositoryInterface
 
     /**
      * One row per account with summed debit/credit across every posted
-     * journal in the given period, for a Trial Balance report.
+     * journal in the given period, for a Trial Balance report. Excludes the
+     * year-end closing journal, so it reads as a pre-closing trial balance.
      *
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
-    public function trialBalance(int $periodId, ?int $costCenterId = null): Collection;
+    public function trialBalance(int $periodId, ?int $costCenterId = null, ?int $projectId = null): Collection;
 
     /**
      * Every posted JournalEntry for one account within one period, for a
@@ -72,15 +80,18 @@ interface JournalRepositoryInterface
      * Sheet (unlike trialBalance(), which is scoped to a single period's
      * movements — a Balance Sheet needs the cumulative balance since
      * inception for every asset/liability/equity/income/expense account).
+     * Pass $excludeYearEndClose for flow reports (Cash Flow) that must see the
+     * year's profit rather than its transfer into Reserves & Surplus.
      *
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
-    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate): Collection;
+    public function balancesAsOf(int $tenantId, \DateTimeInterface $asOfDate, bool $excludeYearEndClose = false): Collection;
 
     /**
      * One row per account with summed debit/credit across every posted or
      * reversed journal dated within [$from, $to] — a period's movement in one
-     * query, rather than the difference of two balancesAsOf() calls.
+     * query, rather than the difference of two balancesAsOf() calls. Excludes
+     * the year-end closing journal (it isn't income or expense).
      *
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */

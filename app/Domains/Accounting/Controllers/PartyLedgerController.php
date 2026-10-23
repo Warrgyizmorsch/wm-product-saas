@@ -48,7 +48,12 @@ class PartyLedgerController extends Controller
         }
 
         if ($party) {
-            $ledger = $this->journals->partyLedger($partyType, $partyId, $from, $to, (float) ($party->opening_balance ?? 0));
+            // Opening balances are posted to the ledger (OpeningBalanceService),
+            // so the statement reads the books only and always matches the
+            // Trial Balance. Run accounting:post-opening-balances once to post
+            // openings that were saved on a master but never reached the books.
+            $seed = 0.0;
+            $ledger = $this->journals->partyLedger($partyType, $partyId, $from, $to, $seed);
         }
 
         return view('modules.accounting.reports.party-ledger', [

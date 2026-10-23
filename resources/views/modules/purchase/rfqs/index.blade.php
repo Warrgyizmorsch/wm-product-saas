@@ -46,7 +46,7 @@
                 <div class="col-md-4">
                     <x-ui.stat-widget 
                         :title="__('purchase.filtered_spend')" 
-                        :value="$currencySymbol . number_format($totalFilteredSpend, 2)" 
+                        :value="$currencySymbol . (active_currency() === 'INR' ? format_indian_number($totalFilteredSpend, 2) : number_format($totalFilteredSpend, 2))" 
                         :subtitle="__('purchase.total_rfq_purchase_value')" 
                         icon="feather-shopping-bag" 
                         color="info" 
@@ -55,7 +55,7 @@
                 <div class="col-md-4">
                     <x-ui.stat-widget 
                         :title="__('purchase.total_savings_achieved')" 
-                        :value="'+' . $currencySymbol . number_format($totalFilteredSavings, 2)" 
+                        :value="'+' . $currencySymbol . (active_currency() === 'INR' ? format_indian_number($totalFilteredSavings, 2) : number_format($totalFilteredSavings, 2))" 
                         :subtitle="__('purchase.net_saved_across_all') . ' ' . $totalFilteredCount . ' RFQs'" 
                         icon="feather-trending-up" 
                         color="success" 
@@ -208,7 +208,7 @@
                                 <td class="text-end font-monospace">
                                     @if(isset($rfq->savings_amount) && $rfq->savings_amount > 0)
                                         <span class="badge bg-soft-success text-success font-monospace fs-11 px-2 py-1 border border-success-subtle">
-                                            +{{ $currencySymbol }}{{ number_format($rfq->savings_amount, 2) }} ({{ $rfq->savings_percent }}%)
+                                            +{{ $currencySymbol }}{{ active_currency() === 'INR' ? format_indian_number($rfq->savings_amount, 2) : number_format($rfq->savings_amount, 2) }} ({{ $rfq->savings_percent }}%)
                                         </span>
                                     @else
                                         <span class="text-muted fs-11">—</span>

@@ -63,10 +63,11 @@ class GoalRepository implements GoalRepositoryInterface
             ->where('tenant_id', $tenantId);
 
         if (!$isHrAdmin && $currentEmployee) {
-            $myTeamQuery->where(function ($q) use ($currentEmployee) {
-                $q->where('employee_id', $currentEmployee->id)
-                  ->orWhereHas('employees', function ($eq) use ($currentEmployee) {
-                      $eq->where('employees.id', $currentEmployee->id);
+            $accessibleEmpIds = $this->scopeService->getAccessibleEmployeeIds($user) ?? [$currentEmployee->id];
+            $myTeamQuery->where(function ($q) use ($currentEmployee, $accessibleEmpIds) {
+                $q->whereIn('employee_id', $accessibleEmpIds)
+                  ->orWhereHas('employees', function ($eq) use ($accessibleEmpIds) {
+                      $eq->whereIn('employees.id', $accessibleEmpIds);
                   })
                   ->orWhere('department_id', $currentEmployee->department_id)
                   ->orWhere('owner_type', 'company');
@@ -220,6 +221,10 @@ class GoalRepository implements GoalRepositoryInterface
             ->orderBy('full_name')
             ->get();
 
+        $canEdit = $this->canUpdateGoal($user, $goal);
+        $canDelete = $this->canDeleteGoal($user, $goal);
+        $canCheckIn = $this->canCheckInGoal($user, $goal);
+
         return compact(
             'goal',
             'parentGoalOptions',
@@ -228,7 +233,10 @@ class GoalRepository implements GoalRepositoryInterface
             'departments',
             'employees',
             'isHrAdmin',
-            'currentEmployee'
+            'currentEmployee',
+            'canEdit',
+            'canDelete',
+            'canCheckIn'
         );
     }
 
@@ -273,6 +281,13 @@ class GoalRepository implements GoalRepositoryInterface
      */
     public function storeCycle(array $data, int $tenantId, ?User $user = null): GoalCycle
     {
+        $status = $data['status'] ?? 'active';
+        if ($status === 'upcoming') {
+            $status = 'planning';
+        } elseif ($status === 'review_period') {
+            $status = 'review';
+        }
+
         return GoalCycle::create([
             'tenant_id'   => $tenantId,
             'company_id'  => $data['company_id'] ?? $user?->company_id,
@@ -280,9 +295,34 @@ class GoalRepository implements GoalRepositoryInterface
             'code'        => !empty($data['code']) ? $data['code'] : ('CYCLE-' . date('Ym')),
             'start_date'  => $data['start_date'],
             'end_date'    => $data['end_date'],
-            'status'      => $data['status'] ?? 'active',
+            'status'      => $status,
             'description' => $data['description'] ?? null,
         ]);
+    }
+
+    /**
+     * Update an existing Goal Cycle.
+     */
+    public function updateCycle(int $id, array $data, int $tenantId, ?User $user = null): GoalCycle
+    {
+        $cycle = GoalCycle::where('tenant_id', $tenantId)->findOrFail($id);
+        $status = $data['status'] ?? $cycle->status;
+        if ($status === 'upcoming') {
+            $status = 'planning';
+        } elseif ($status === 'review_period') {
+            $status = 'review';
+        }
+
+        $cycle->update([
+            'name'        => $data['name'] ?? $cycle->name,
+            'code'        => $data['code'] ?? $cycle->code,
+            'start_date'  => $data['start_date'] ?? $cycle->start_date,
+            'end_date'    => $data['end_date'] ?? $cycle->end_date,
+            'status'      => $status,
+            'description' => array_key_exists('description', $data) ? $data['description'] : $cycle->description,
+        ]);
+
+        return $cycle;
     }
 
     /**
@@ -292,6 +332,20 @@ class GoalRepository implements GoalRepositoryInterface
     {
         $cycle = GoalCycle::where('tenant_id', $tenantId)->findOrFail($id);
         return (bool) $cycle->delete();
+    }
+
+    /**
+     * Approve a Goal / Objective.
+     */
+    public function approveGoal(int $id, int $tenantId, ?User $user = null): Goal
+    {
+        $goal = Goal::where('tenant_id', $tenantId)->findOrFail($id);
+        $goal->update([
+            'status'      => 'active',
+            'approved_by' => $user?->id,
+            'approved_at' => now(),
+        ]);
+        return $goal;
     }
 
     /**
@@ -331,7 +385,7 @@ class GoalRepository implements GoalRepositoryInterface
     /**
      * Determine whether user has HR administrative permissions.
      */
-    private function isHrAdmin(?User $user): bool
+    public function isHrAdmin(?User $user): bool
     {
         if (!$user) {
             return false;
@@ -343,4 +397,137 @@ class GoalRepository implements GoalRepositoryInterface
             $user->hasHrPermission('hrms.performance.manage') ||
             $user->hasHrPermission('hrms.employees.view');
     }
+
+    /**
+     * Determine whether user has master management rights over goals/cycles/pillars.
+     */
+    public function canManageGoals(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $this->scopeService->isCompanyAdmin($user) ||
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.goals.manage') ||
+            $user->hasHrPermission('hrms.performance.manage');
+    }
+
+    /**
+     * Determine whether the user is authorized to edit/update a specific goal.
+     */
+    public function canUpdateGoal(?User $user, Goal $goal): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($this->canManageGoals($user) || $user->hasHrPermission('hrms.goals.update')) {
+            return true;
+        }
+
+        $employee = $this->scopeService->resolveEmployee($user, $goal->tenant_id);
+        if (!$employee) {
+            return false;
+        }
+
+        // Assigned primary employee
+        if ($goal->employee_id && (int) $goal->employee_id === (int) $employee->id) {
+            return true;
+        }
+
+        // Co-owner in pivot table
+        if ($goal->relationLoaded('employees') 
+            ? $goal->employees->contains('id', $employee->id) 
+            : $goal->employees()->where('employees.id', $employee->id)->exists()) {
+            return true;
+        }
+
+        // Creator of the goal
+        if ($goal->created_by && (int) $goal->created_by === (int) $user->id) {
+            return true;
+        }
+
+        // Reporting manager or organizational head who has scope access to the goal's owner
+        if ($goal->employee_id && $this->scopeService->canAccessEmployee($user, $goal->employee_id)) {
+            return true;
+        }
+
+        // Department Head of the goal's department
+        if ($goal->owner_type === 'department' && $goal->department_id) {
+            $summary = $this->scopeService->getScopeSummary($user);
+            if (in_array((int) $goal->department_id, array_map('intval', $summary['department_ids'] ?? []), true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Determine whether the user is authorized to delete a specific goal.
+     */
+    public function canDeleteGoal(?User $user, Goal $goal): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($this->canManageGoals($user) || $user->hasHrPermission('hrms.goals.delete')) {
+            return true;
+        }
+
+        // Creator can delete draft goal
+        return $goal->status === 'draft' && $goal->created_by && (int) $goal->created_by === (int) $user->id;
+    }
+
+    /**
+     * Determine whether the user is authorized to log a progress check-in on a specific goal.
+     */
+    public function canCheckInGoal(?User $user, Goal $goal): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($this->canManageGoals($user) || $user->hasHrPermission('hrms.goals.manage')) {
+            return true;
+        }
+
+        $employee = $this->scopeService->resolveEmployee($user, $goal->tenant_id);
+        if (!$employee) {
+            return false;
+        }
+
+        // Assigned primary employee
+        if ($goal->employee_id && (int) $goal->employee_id === (int) $employee->id) {
+            return true;
+        }
+
+        // Co-owner in pivot table
+        if ($goal->relationLoaded('employees') 
+            ? $goal->employees->contains('id', $employee->id) 
+            : $goal->employees()->where('employees.id', $employee->id)->exists()) {
+            return true;
+        }
+
+        // Reporting manager who has scope access to the goal's owner
+        if ($goal->employee_id && $this->scopeService->canAccessEmployee($user, $goal->employee_id)) {
+            return true;
+        }
+
+        // If department goal and user belongs to or heads the department
+        if ($goal->owner_type === 'department' && $goal->department_id) {
+            if ((int) $employee->department_id === (int) $goal->department_id) {
+                return true;
+            }
+            $summary = $this->scopeService->getScopeSummary($user);
+            if (in_array((int) $goal->department_id, array_map('intval', $summary['department_ids'] ?? []), true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
+

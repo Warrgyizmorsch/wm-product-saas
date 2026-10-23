@@ -43,10 +43,14 @@ class VendorController extends Controller
         $activeCount = Vendor::where('tenant_id', $tenantId)->whereIn('status', ['active', 'Active'])->count();
         $inactiveCount = Vendor::where('tenant_id', $tenantId)->whereIn('status', ['inactive', 'Inactive'])->count();
 
-        // Calculate total outstanding payable across all vendors
-        $totalOutstandingPayable = (float) VendorBill::where('tenant_id', $tenantId)
+        // Calculate total outstanding payable across all vendors (normalized in base USD in DB, convert to active currency at fetch time)
+        $rawOutstandingPayableUSD = (float) VendorBill::where('tenant_id', $tenantId)
             ->whereIn('status', ['posted', 'unpaid', 'partially_paid', 'approved'])
             ->sum('due_amount');
+
+        $totalOutstandingPayable = function_exists('convert_from_base')
+            ? convert_from_base($rawOutstandingPayableUSD)
+            : $rawOutstandingPayableUSD;
 
         $query = Vendor::query()->where('tenant_id', $tenantId);
 
@@ -101,62 +105,119 @@ class VendorController extends Controller
         $this->authorizePurchase('purchase.vendors.create');
 
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+        $companyId = company_id() ?? auth()->user()?->company_id;
+        $branchId = branch_id() ?? auth()->user()?->branch_id;
+
+        $uniqueScope = $this->scopeUniqueVendor((int) $tenantId, $companyId, $branchId);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('vendors', 'name')->where($uniqueScope),
+            ],
             'company_name' => ['nullable', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:50'],
             'email' => [
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('vendors', 'email')->where(fn ($q) => $q->where('tenant_id', $tenantId))
+                Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'pan' => ['nullable', 'string', 'max:20'],
             'bank_name' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:50'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         if (empty($validated['code'])) {
-            $nextCount = Vendor::where('tenant_id', $tenantId)->count() + 1;
-            $validated['code'] = 'VEND-' . str_pad((string)$nextCount, 4, '0', STR_PAD_LEFT);
+            $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
+            do {
+                $candidateCode = 'VEND-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
+                $exists = Vendor::where('tenant_id', $tenantId)
+                    ->where('code', $candidateCode)
+                    ->exists();
+                $counter++;
+            } while ($exists);
+            $validated['code'] = $candidateCode;
         }
 
         $validated['tenant_id'] = $tenantId;
+        $validated['company_id'] = $companyId;
+        $validated['branch_id'] = $branchId;
         $validated['status'] = strtolower($validated['status']);
-        $validated['opening_balance'] = $validated['opening_balance'] ?? 0.00;
+        $validated['opening_balance'] = isset($validated['opening_balance'])
+            ? convert_to_base((float) $validated['opening_balance'])
+            : 0.00;
 
         $vendor = Vendor::create($validated);
 
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
+
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' created successfully.");
+            ->with('success', "Vendor '{$vendor->name}' created successfully.")
+            ->with('warning', $openingWarning);
     }
 
     public function quickCreate(Request $request): JsonResponse
     {
         $tenantId = tenant_id() ?? app(TenantContext::class)->id() ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id;
+        $branchId = branch_id() ?? auth()->user()?->branch_id;
+
+        $uniqueScope = $this->scopeUniqueVendor((int) $tenantId, $companyId, $branchId);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('vendors', 'name')->where($uniqueScope),
+            ],
+            'email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('vendors', 'email')->where($uniqueScope),
+            ],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string'],
+        ], [
+            'email.email' => 'The email field must be a valid email address.',
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
         ]);
 
-        $nextCount = Vendor::where('tenant_id', $tenantId)->count() + 1;
-        $validated['code'] = 'VEND-' . str_pad((string)$nextCount, 4, '0', STR_PAD_LEFT);
+        $counter = Vendor::where('tenant_id', $tenantId)->count() + 1;
+        do {
+            $candidateCode = 'VEND-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
+            $exists = Vendor::where('tenant_id', $tenantId)
+                ->where('code', $candidateCode)
+                ->exists();
+            $counter++;
+        } while ($exists);
+
+        $validated['code'] = $candidateCode;
         $validated['tenant_id'] = $tenantId;
+        $validated['company_id'] = $companyId;
+        $validated['branch_id'] = $branchId;
         $validated['status'] = 'active';
 
         $vendor = Vendor::create($validated);
@@ -195,13 +256,16 @@ class VendorController extends Controller
             ->latest()
             ->get();
 
+        $openingBalance = $vendor->signedOpeningBalance();
+
         $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->total_amount);
         $totalPaid = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->amount_paid);
         if ($totalPaid == 0 && $payments->isNotEmpty()) {
             $totalPaid = (float) $payments->where('status', 'completed')->sum('amount');
         }
 
-        $netOutstanding = $totalBilled - $totalPaid;
+        // Net outstanding includes Opening Balance (historical dues owed to supplier)
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid;
         $outstandingPayable = max(0, $netOutstanding);
         $vendorAdvanceCredit = $netOutstanding < 0 ? abs($netOutstanding) : 0;
 
@@ -241,7 +305,7 @@ class VendorController extends Controller
         $ledgerEntries = $ledgerEntries->sortBy('date')->values();
 
         // Compute Running Payable Balance
-        $runningBalance = (float)($vendor->opening_balance ?? 0.00);
+        $runningBalance = $vendor->signedOpeningBalance();
         $ledgerWithBalance = $ledgerEntries->map(function ($entry) use (&$runningBalance) {
             $runningBalance += ($entry['credit'] - $entry['debit']);
             $entry['running_balance'] = $runningBalance;
@@ -280,37 +344,60 @@ class VendorController extends Controller
         $this->authorizePurchase('purchase.vendors.edit');
 
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+        $companyId = $vendor->company_id ?? company_id() ?? auth()->user()?->company_id;
+        $branchId = $vendor->branch_id ?? branch_id() ?? auth()->user()?->branch_id;
+
+        $uniqueScope = $this->scopeUniqueVendor((int) $tenantId, $companyId, $branchId);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('vendors', 'name')->ignore($vendor->id)->where($uniqueScope),
+            ],
             'company_name' => ['nullable', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50'],
             'email' => [
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('vendors', 'email')->ignore($vendor->id)->where(fn ($q) => $q->where('tenant_id', $tenantId))
+                Rule::unique('vendors', 'email')->ignore($vendor->id)->where($uniqueScope),
             ],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'gstin' => ['nullable', 'string', 'max:30'],
             'pan' => ['nullable', 'string', 'max:20'],
             'bank_name' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:50'],
+            'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+        ], [
+            'email.email'          => 'The email field must be a valid email address.',
+            'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'            => 'Phone number cannot exceed 20 digits.',
+            'account_number.regex' => 'Bank account number must contain digits/numbers only.',
         ]);
 
         $validated['status'] = strtolower($validated['status']);
+        if (array_key_exists('opening_balance', $validated)) {
+            $validated['opening_balance'] = $validated['opening_balance'] !== null
+                ? convert_to_base((float) $validated['opening_balance'])
+                : 0.00;
+        }
         $vendor->update($validated);
+
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' updated successfully.");
+            ->with('success', "Vendor '{$vendor->name}' updated successfully.")
+            ->with('warning', $openingWarning);
     }
 
     public function toggleStatus(Request $request, Vendor $vendor): RedirectResponse
@@ -335,5 +422,23 @@ class VendorController extends Controller
             ]),
             403
         );
+    }
+
+    private function scopeUniqueVendor(int $tenantId, ?int $companyId, ?int $branchId): \Closure
+    {
+        return function ($query) use ($tenantId, $companyId, $branchId) {
+            $query->where('tenant_id', $tenantId);
+            if ($companyId !== null) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
+            if ($branchId !== null) {
+                $query->where('branch_id', $branchId);
+            } else {
+                $query->whereNull('branch_id');
+            }
+            return $query;
+        };
     }
 }

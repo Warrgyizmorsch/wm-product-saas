@@ -7,8 +7,158 @@
 @push('styles')
 <style>
     /* ==========================================================================
-       ZOHO CRM DEALS PREMIUM STYLING & DESIGN SYSTEM
+       ODOO & ZOHO CRM DEALS PREMIUM STYLING & DESIGN SYSTEM
        ========================================================================== */
+
+    /* Odoo Two-Column Workspace Layout */
+    .odoo-layout-wrapper {
+        background-color: #ffffff !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+    .odoo-sheet-col {
+        background-color: #f8fafc !important;
+        padding: 0 !important;
+        height: 100% !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+    .odoo-chatter-col {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        background-color: #ffffff;
+    }
+    .odoo-chatter-nav-pills {
+        background-color: #f1f5f9;
+        padding: 2px !important;
+        border-radius: 6px !important;
+        display: inline-flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 2px !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .odoo-chatter-nav-pills .nav-link {
+        color: #64748b !important;
+        border-radius: 5px !important;
+        padding: 4px 10px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+        border: none !important;
+        background: transparent !important;
+        transition: all 0.15s ease-in-out !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .odoo-chatter-nav-pills .nav-link:hover {
+        color: var(--bs-primary, #1e40af) !important;
+        background-color: rgba(30, 64, 175, 0.08) !important;
+    }
+    .odoo-chatter-nav-pills .nav-link.active {
+        background-color: var(--bs-primary, #1e40af) !important;
+        color: #ffffff !important;
+        box-shadow: 0 1px 3px rgba(30, 64, 175, 0.25) !important;
+    }
+    .odoo-chatter-nav-pills .nav-link.active .badge {
+        background-color: rgba(255, 255, 255, 0.25) !important;
+        color: #ffffff !important;
+    }
+
+    /* Odoo Chatter Activity Feed & Divider Styles (Exact match with Leads) */
+    .odoo-feed-divider {
+        display: flex;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 18px 0 10px;
+        cursor: pointer;
+        user-select: none;
+        transition: opacity 0.15s ease;
+    }
+    .odoo-feed-divider:hover {
+        opacity: 0.85;
+    }
+    .odoo-feed-divider .toggle-arrow {
+        display: inline-block;
+        transition: transform 0.2s ease;
+        font-size: 11px;
+        vertical-align: middle;
+    }
+    .odoo-feed-divider.collapsed .toggle-arrow,
+    .odoo-feed-divider[aria-expanded="false"] .toggle-arrow {
+        transform: rotate(-90deg);
+    }
+    .odoo-feed-divider::before,
+    .odoo-feed-divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .odoo-feed-divider span {
+        padding: 0 16px;
+        color: #475569;
+        letter-spacing: 0.2px;
+    }
+    .odoo-feed-divider--planned span {
+        color: #16a34a !important;
+        font-weight: 700;
+    }
+    .odoo-feed-divider--overdue span {
+        color: #dc2626 !important;
+        font-weight: 700;
+    }
+    .odoo-feed-divider--today-done span {
+        color: #d97706 !important;
+        font-weight: 700;
+    }
+    .odoo-feed-divider--past-done span {
+        color: #64748b !important;
+        font-weight: 700;
+    }
+
+    .odoo-activity-item {
+        padding: 12px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        transition: all 0.15s ease;
+    }
+    .odoo-activity-item:last-child {
+        margin-bottom: 0;
+    }
+    .odoo-activity-item:hover {
+        background-color: #f8fafc;
+        border-color: #cbd5e1;
+    }
+
+    .activity-details-block {
+        line-height: 1.45;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+    .activity-detail-row {
+        color: #475569;
+        margin-bottom: 2px;
+        font-size: 12px;
+    }
+    .activity-detail-key {
+        font-weight: 600;
+        color: #334155;
+        margin-right: 4px;
+    }
+    .activity-detail-val {
+        color: #64748b;
+    }
+
 
     /* Related List Left Sidebar Navigation */
     .zoho-sidebar-nav .nav-link {
@@ -40,30 +190,50 @@
         font-size: 10px;
     }
 
-    /* Main Tab Navigation Header */
+    /* Main Tab Navigation Header - Distinct Separate Tab Cards */
     .zoho-nav-tabs {
-        gap: 6px;
+        gap: 10px !important;
+        background: transparent !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+    .zoho-nav-tabs .nav-item {
+        margin: 0 !important;
     }
     .zoho-nav-tabs .nav-link {
-        border: 1px solid #cbd5e1;
-        background-color: #ffffff;
-        color: #475569;
-        padding: 6px 18px;
-        font-size: 12px;
-        font-weight: 600;
-        border-radius: 20px !important;
-        transition: all 0.2s ease;
+        border: 1px solid #e2e8f0 !important;
+        background-color: #f8fafc !important;
+        color: #475569 !important;
+        padding: 6px 16px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease !important;
+        outline: none !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
     }
     .zoho-nav-tabs .nav-link:hover {
-        background-color: #f8fafc;
-        color: #0f172a;
-        border-color: #94a3b8;
+        background-color: #ffffff !important;
+        color: var(--bs-primary, #1e40af) !important;
+        border-color: #cbd5e1 !important;
     }
     .zoho-nav-tabs .nav-link.active {
-        background-color: var(--bs-primary) !important;
+        background-color: var(--bs-primary, #1e40af) !important;
         color: #ffffff !important;
-        border-color: var(--bs-primary) !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        border-color: var(--bs-primary, #1e40af) !important;
+        box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25) !important;
+    }
+    .zoho-nav-tabs .nav-link.active i {
+        color: #ffffff !important;
+    }
+    .zoho-nav-tabs .nav-link:focus,
+    .zoho-nav-tabs .nav-link:focus-visible,
+    .zoho-nav-tabs .nav-link:active {
+        outline: none !important;
+        box-shadow: none !important;
     }
 
     /* Timeline Subtabs */
@@ -102,72 +272,138 @@
         color: #0f172a;
     }
 
-    /* Zoho CRM Signature Deal Stage Chevron Pipeline Bar */
-    .zoho-deal-pipeline-strip {
-        background: #f8fafc;
+    /* ── Chevron / Arrow Status Pipeline (Lead / Odoo ERP Style) ── */
+    .deal-pipeline-strip {
+        background: #ffffff;
         border-bottom: 1px solid #e2e8f0;
-        padding: 6px 16px;
+        padding: 8px 16px;
     }
-    .zoho-pipeline-chevron-container {
-        display: flex;
+    .so-status-pipeline {
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
-        overflow-x: auto;
-        padding: 6px 4px 6px 4px;
-    }
-    .zoho-pipeline-step {
-        flex: 1;
-        min-width: 135px;
-        padding: 7px 12px;
-        font-size: 11px;
-        font-weight: 600;
-        text-align: center;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        user-select: none;
+        border-radius: 6px;
+        overflow: hidden;
         border: 1px solid #cbd5e1;
-        background-color: #ffffff;
-        color: #475569;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        background-color: #f8fafc;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }
-    .zoho-pipeline-step:hover {
-        background-color: #f1f5f9;
-        border-color: var(--bs-primary);
+    .so-status-pipeline .pipeline-step {
+        position: relative;
+        padding: 6px 16px 6px 24px;
+        background-color: #f8fafc;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    .so-status-pipeline .pipeline-step:first-child {
+        padding-left: 16px;
+    }
+    .so-status-pipeline .pipeline-step::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -10px;
+        width: 0;
+        height: 0;
+        border-top: 14px solid transparent;
+        border-bottom: 14px solid transparent;
+        border-left: 10px solid #f8fafc;
+        z-index: 10;
+        transition: all 0.2s ease;
+    }
+    .so-status-pipeline .pipeline-step::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        border-top: 14px solid transparent;
+        border-bottom: 14px solid transparent;
+        border-left: 10px solid #ffffff;
+        z-index: 5;
+        transition: all 0.2s ease;
+    }
+    .so-status-pipeline .pipeline-step:first-child::before {
+        display: none;
+    }
+    .so-status-pipeline .pipeline-step.active {
+        background-color: var(--bs-primary, #1e40af);
+        color: #ffffff;
+        z-index: 11;
+    }
+    .so-status-pipeline .pipeline-step.active::after {
+        border-left-color: var(--bs-primary, #1e40af);
+    }
+    .so-status-pipeline .pipeline-step.completed {
+        background-color: #e2e8f0;
+        color: #334155;
+        z-index: 6;
+    }
+    .so-status-pipeline .pipeline-step.completed::after {
+        border-left-color: #e2e8f0;
+    }
+    .so-status-pipeline .pipeline-step:hover:not(.active) {
+        background-color: #e2e8f0;
         color: #0f172a;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 8;
     }
-    .zoho-pipeline-step.passed {
-        background-color: #f1f5f9;
-        color: var(--bs-primary);
-        border-color: #cbd5e1;
+    .so-status-pipeline .pipeline-step:hover:not(.active)::after {
+        border-left-color: #e2e8f0;
     }
-    .zoho-pipeline-step.active {
-        background-color: var(--bs-primary) !important;
-        background: var(--bs-primary) !important;
+
+    /* Dark mode support */
+    html.app-skin-dark .deal-pipeline-strip {
+        background-color: #111827 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .so-status-pipeline {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .so-status-pipeline .pipeline-step {
+        background-color: #0f172a;
+        color: #94a3b8;
+    }
+    html.app-skin-dark .so-status-pipeline .pipeline-step::after {
+        border-left-color: #0f172a;
+    }
+    html.app-skin-dark .so-status-pipeline .pipeline-step::before {
+        border-left-color: #111827;
+    }
+    html.app-skin-dark .so-status-pipeline .pipeline-step.active {
+        background-color: var(--bs-primary, #1e40af) !important;
         color: #ffffff !important;
-        border-color: var(--bs-primary) !important;
-        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
     }
-    .zoho-pipeline-step.stage-won.active,
-    .zoho-pipeline-step.stage-closed-won.active,
-    .zoho-pipeline-step.active-won {
-        background: linear-gradient(135deg, #15803d 0%, #22c55e 100%);
-        color: #ffffff !important;
-        border-color: #15803d !important;
-        box-shadow: 0 3px 6px rgba(21, 128, 61, 0.25);
+    html.app-skin-dark .so-status-pipeline .pipeline-step.active::after {
+        border-left-color: var(--bs-primary, #1e40af) !important;
     }
-    .zoho-pipeline-step.stage-lost.active,
-    .zoho-pipeline-step.stage-closed-lost.active,
-    .zoho-pipeline-step.active-lost {
-        background: var(--bs-primary) !important;
-        color: #ffffff !important;
-        border-color: transparent !important;
-        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+    html.app-skin-dark .so-status-pipeline .pipeline-step.completed {
+        background-color: #1e293b;
+        color: #cbd5e1;
+    }
+    html.app-skin-dark .so-status-pipeline .pipeline-step.completed::after {
+        border-left-color: #1e293b;
+    }
+
+    /* Activity Card Highlight Pulse Effect (when redirected from calendar) */
+    @keyframes activityHighlightGlow {
+        0% { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45); transform: scale(1.01); background-color: #eff6ff !important; }
+        50% { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.55); transform: scale(1.01); background-color: #dbeafe !important; }
+        100% { box-shadow: none; transform: scale(1); background-color: transparent; }
+    }
+    .activity-highlight-pulse {
+        animation: activityHighlightGlow 2.5s ease-in-out;
+        border-radius: 6px;
     }
 
     /* Deal Metric KPI Snapshot Cards */
@@ -245,76 +481,55 @@
         color: #64748b;
     }
 
-    /* Odoo Table UI Overrides */
-    .table.odoo-table {
+    /* Quotation Order Lines Table UI Overrides & Alignment */
+    #itemsTable {
+        table-layout: fixed !important;
+        width: 100% !important;
         margin-bottom: 0;
     }
-    .table.odoo-table th {
+    #itemsTable th {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: #475569;
         background-color: #f8fafc;
         border-bottom: 1.5px solid #cbd5e1;
-        padding: 10px 12px;
+        padding: 9px 8px !important;
         font-weight: 700;
+        vertical-align: middle;
     }
-    .table.odoo-table td {
-        padding: 10px 12px;
+    #itemsTable td {
+        padding: 8px 8px !important;
         vertical-align: top;
         border-bottom: 1px solid #f1f5f9;
     }
-
-    /* Odoo Table Input Underlines (Referenced from Lead Quotations) */
-    .table.odoo-table .odoo-table-input {
-        border: none !important;
-        border-bottom: 1px solid #cbd5e1 !important;
-        background: transparent !important;
-        border-radius: 0 !important;
-        padding: 4px 2px !important;
-        width: 100%;
-        font-size: 13px !important;
-        transition: border-color 0.2s ease-in-out;
+    #itemsTable th.text-end,
+    #itemsTable td.text-end {
+        text-align: right !important;
     }
-    .table.odoo-table .odoo-table-input:hover {
-        border-bottom-color: #94a3b8 !important;
+    #itemsTable th.text-center,
+    #itemsTable td.text-center {
+        text-align: center !important;
     }
-    .table.odoo-table .odoo-table-input:focus {
-        border-bottom-color: var(--bs-primary) !important;
-        outline: none !important;
-        box-shadow: none !important;
+    #itemsTable td.text-end .odoo-table-input {
+        width: 100% !important;
+        text-align: right !important;
+        box-sizing: border-box !important;
     }
-
-    /* Borderless Select2 theme custom override for Odoo Table */
-    .table.odoo-table .select2-container--bootstrap-5 .select2-selection {
-        border: none !important;
-        border-bottom: 1px solid #ced4da !important;
-        border-radius: 0 !important;
-        background-color: transparent !important;
-        padding-left: 2px !important;
-        height: auto !important;
-        min-height: 28px !important;
-        box-shadow: none !important;
+    #itemsTable textarea.odoo-table-input {
+        text-align: left !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
-    .table.odoo-table .select2-container--bootstrap-5 .select2-selection:focus,
-    .table.odoo-table .select2-container--bootstrap-5.select2-container--focus .select2-selection {
-        border-bottom-color: var(--bs-primary) !important;
-        box-shadow: none !important;
+    #itemsTable .select2-container {
+        width: 100% !important;
     }
-    .table.odoo-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-        padding-left: 0 !important;
-        font-size: 13px !important;
-        color: #212529 !important;
-        line-height: 26px !important;
-    }
-
-    /* Hide number input spinners for clean right alignment */
-    .table.odoo-table input[type="number"]::-webkit-outer-spin-button,
-    .table.odoo-table input[type="number"]::-webkit-inner-spin-button {
+    #itemsTable input[type="number"]::-webkit-outer-spin-button,
+    #itemsTable input[type="number"]::-webkit-inner-spin-button {
         -webkit-appearance: none !important;
         margin: 0 !important;
     }
-    .table.odoo-table input[type="number"] {
+    #itemsTable input[type="number"] {
         -moz-appearance: textfield !important;
     }
 
@@ -526,20 +741,23 @@
         background-color: var(--bs-primary) !important;
         color: #ffffff !important;
     }
+    html.app-skin-dark .zoho-nav-tabs {
+        background: transparent !important;
+    }
     html.app-skin-dark .zoho-nav-tabs .nav-link {
+        background-color: #1e293b !important;
         border-color: #334155 !important;
-        background-color: #162038 !important;
         color: #94a3b8 !important;
     }
     html.app-skin-dark .zoho-nav-tabs .nav-link:hover {
-        background-color: #1e293b !important;
+        background-color: #334155 !important;
         color: #f8fafc !important;
         border-color: #475569 !important;
     }
     html.app-skin-dark .zoho-nav-tabs .nav-link.active {
-        background-color: var(--bs-primary) !important;
+        background-color: var(--bs-primary, #1e40af) !important;
         color: #ffffff !important;
-        border-color: var(--bs-primary) !important;
+        border-color: var(--bs-primary, #1e40af) !important;
     }
     html.app-skin-dark .zoho-timeline-subtabs .nav-link {
         color: #94a3b8 !important;
@@ -647,19 +865,465 @@
         border-color: #1e293b !important;
         color: #94a3b8 !important;
     }
-    html.app-skin-dark .table.odoo-table .odoo-table-input {
+
+    /* Chatter & Activities Dark Mode Support */
+    html.app-skin-dark .odoo-chatter-col,
+    html.app-skin-dark #odooRightChatter,
+    html.app-skin-dark #dealChatterTabContent,
+    html.app-skin-dark .activity-feed-container,
+    html.app-skin-dark #odooRightChatter .bg-white,
+    html.app-skin-dark #odooRightChatter .sticky-top {
+        background-color: #0b1329 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills .nav-link {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills .nav-link:hover {
+        color: #60a5fa !important;
+        background-color: rgba(96, 165, 250, 0.1) !important;
+    }
+    html.app-skin-dark .odoo-chatter-nav-pills .nav-link.active {
+        background-color: var(--bs-primary, #2563eb) !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .odoo-feed-divider::before,
+    html.app-skin-dark .odoo-feed-divider::after {
+        border-bottom-color: #1e293b !important;
+    }
+    html.app-skin-dark .odoo-feed-divider span {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-activity-item {
+        background-color: #0f172a !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 8px !important;
+        margin-bottom: 10px !important;
+        padding: 12px 14px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    }
+    html.app-skin-dark .odoo-activity-item:hover {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+    }
+    html.app-skin-dark .odoo-activity-item .activity-title-text,
+    html.app-skin-dark .odoo-activity-item strong {
         color: #f8fafc !important;
+    }
+    html.app-skin-dark .odoo-activity-item .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .odoo-activity-item .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-activity-item .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .activity-detail-row {
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .activity-detail-key {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .activity-detail-val {
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .odoo-avatar-badge {
+        border-color: #0f172a !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .btn-white {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .btn-white:hover {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #ffffff !important;
+    }
+    html.app-skin-dark .deal-history-entry {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .deal-history-entry .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .deal-history-entry .text-secondary {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .history-date-group .badge.bg-white {
+        background-color: #162038 !important;
+        border-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .history-date-group .border-top {
+        border-color: #1e293b !important;
+    }
+    html.app-skin-dark #dealHistoryQuickSearch {
+        background-color: #162038 !important;
+        border-color: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark #dealHistoryEmptySearchResults {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .text-dark {
+        color: #f8fafc !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .text-muted {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-chatter-col .text-secondary {
+        color: #94a3b8 !important;
+    }
+    /* Softphone Floating Widget Light & Dark Mode Styles */
+    .crm-softphone-dock {
+        background: #ffffff !important;
+        border: 1px solid rgba(226, 232, 240, 0.9) !important;
+        color: #1e293b;
+    }
+    .crm-softphone-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 11px 15px !important;
+    }
+    .crm-softphone-body {
+        background: #ffffff !important;
+    }
+    .crm-header-action-btn {
+        color: #f1f5f9 !important;
+        background: rgba(255, 255, 255, 0.12) !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease;
+    }
+    .crm-header-action-btn:hover {
+        color: #ffffff !important;
+        background: rgba(255, 255, 255, 0.25) !important;
+        border-color: rgba(255, 255, 255, 0.35) !important;
+        transform: scale(1.05);
+    }
+    .crm-header-close-btn {
+        color: #ffffff !important;
+        background: #ef4444 !important;
+        border: 1px solid #dc2626 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35) !important;
+        transition: all 0.2s ease;
+    }
+    .crm-header-close-btn:hover {
+        color: #ffffff !important;
+        background: #dc2626 !important;
+        border-color: #b91c1c !important;
+        box-shadow: 0 4px 10px rgba(239, 68, 68, 0.5) !important;
+        transform: scale(1.05);
+    }
+    .crm-dialer-display {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
+    }
+    .crm-dialpad-btn {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
+        transition: all 0.15s ease;
+    }
+    .crm-dialpad-btn:hover {
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+    }
+    .crm-dialer-card {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+    }
+
+    /* Dark Mode Theme Support */
+    [data-bs-theme="dark"] .crm-softphone-dock,
+    html.app-skin-dark .crm-softphone-dock {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+        box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-header,
+    html.app-skin-dark .crm-softphone-header {
+        background: #1e293b !important;
         border-bottom-color: #334155 !important;
     }
-    html.app-skin-dark .table.odoo-table .select2-container--bootstrap-5 .select2-selection__rendered {
+    [data-bs-theme="dark"] .crm-softphone-body,
+    html.app-skin-dark .crm-softphone-body {
+        background: #0f172a !important;
+    }
+    [data-bs-theme="dark"] .crm-header-action-btn,
+    html.app-skin-dark .crm-header-action-btn {
+        color: #cbd5e1 !important;
+        background: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-header-action-btn:hover,
+    html.app-skin-dark .crm-header-action-btn:hover {
+        color: #ffffff !important;
+        background: #475569 !important;
+    }
+    [data-bs-theme="dark"] .crm-header-close-btn,
+    html.app-skin-dark .crm-header-close-btn {
+        color: #cbd5e1 !important;
+        background: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-header-close-btn:hover,
+    html.app-skin-dark .crm-header-close-btn:hover {
+        color: #f87171 !important;
+        background: rgba(239, 68, 68, 0.25) !important;
+    }
+    [data-bs-theme="dark"] .crm-dialer-display,
+    html.app-skin-dark .crm-dialer-display {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-dialpad-btn,
+    html.app-skin-dark .crm-dialpad-btn {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-dialpad-btn:hover,
+    html.app-skin-dark .crm-dialpad-btn:hover {
+        background: #334155 !important;
+        border-color: #475569 !important;
+    }
+    [data-bs-theme="dark"] .crm-dialer-card,
+    html.app-skin-dark .crm-dialer-card {
+        background: #1e293b !important;
+        border-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-dock .text-dark,
+    html.app-skin-dark .crm-softphone-dock .text-dark {
         color: #f8fafc !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-dock .text-muted,
+    html.app-skin-dark .crm-softphone-dock .text-muted {
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] .crm-softphone-dock textarea,
+    html.app-skin-dark .crm-softphone-dock textarea {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border-color: #334155 !important;
+    }
+    #btnDialerBackspace {
+        transition: all 0.15s ease;
+        color: #64748b;
+    }
+    #btnDialerBackspace:hover {
+        color: #ef4444 !important;
+        background-color: rgba(239, 68, 68, 0.12) !important;
+    }
+    #btnDialerBackspace:active {
+        transform: scale(0.92);
+    }
+    [data-bs-theme="dark"] #btnDialerBackspace,
+    html.app-skin-dark #btnDialerBackspace {
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] #btnDialerBackspace:hover,
+    html.app-skin-dark #btnDialerBackspace:hover {
+        color: #f87171 !important;
+        background-color: rgba(239, 68, 68, 0.22) !important;
+    }
+
+    /* ==========================================================================
+       MOBILE & TABLET RESPONSIVE SYSTEM FOR DEALS VIEW (< 992px, < 768px, < 576px)
+       ========================================================================== */
+    @media (max-width: 991.98px) {
+        /* Allow natural vertical flow on tablet and mobile instead of locking 100vh */
+        .zoho-lead-card-container {
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+            border-radius: 0 !important;
+        }
+
+        .odoo-layout-wrapper {
+            flex-direction: column !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+        }
+
+        .odoo-sheet-col {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            overflow-y: visible !important;
+        }
+
+        .odoo-chatter-col {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            height: auto !important;
+            overflow-y: visible !important;
+            border-left: none !important;
+            border-top: 2px solid #e2e8f0 !important;
+            margin-top: 8px;
+            flex-shrink: 1 !important;
+        }
+
+        /* Top header banner on tablet/mobile */
+        .zoho-header-banner {
+            padding: 12px 14px !important;
+            gap: 10px !important;
+        }
+
+        /* Status Pipeline Scrollable Ribbon */
+        .deal-pipeline-strip {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            flex-wrap: nowrap !important;
+            padding: 8px 12px !important;
+            scrollbar-width: thin;
+        }
+        .deal-pipeline-strip::-webkit-scrollbar {
+            height: 4px;
+        }
+        .deal-pipeline-strip::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        .so-status-pipeline {
+            flex-shrink: 0 !important;
+            min-width: max-content !important;
+        }
+        .so-status-pipeline .pipeline-step {
+            padding: 5px 12px 5px 20px !important;
+            font-size: 10px !important;
+        }
+        .so-status-pipeline .pipeline-step:first-child {
+            padding-left: 12px !important;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .zoho-header-banner {
+            padding: 10px 12px !important;
+        }
+
+        .zoho-avatar {
+            width: 38px !important;
+            height: 38px !important;
+            font-size: 14px !important;
+            margin-right: 10px !important;
+        }
+
+        /* Make action buttons toolbar wrap nicely and touch-friendly */
+        .zoho-header-banner .d-flex.align-items-center.gap-2.flex-wrap {
+            width: 100% !important;
+            justify-content: flex-start !important;
+            gap: 6px !important;
+        }
+
+        /* Sticky top tab navigation on mobile */
+        .sticky-top.bg-white {
+            padding: 6px 10px !important;
+            gap: 6px !important;
+        }
+        .zoho-nav-tabs .nav-link {
+            padding: 4px 12px !important;
+            font-size: 11px !important;
+        }
+        #btnToggleChatter {
+            padding: 4px 10px !important;
+            font-size: 11px !important;
+        }
+
+        /* KPI Metric Cards compact padding */
+        .deal-metric-card {
+            padding: 8px 10px !important;
+            min-height: 62px !important;
+            gap: 8px !important;
+        }
+        .deal-metric-icon {
+            width: 32px !important;
+            height: 32px !important;
+            font-size: 14px !important;
+        }
+
+        /* AI Health Card Header */
+        .card-body .d-flex.justify-content-between.align-items-center.pb-2.border-bottom {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+        }
+        .card-body .d-flex.justify-content-between.align-items-center.pb-2.border-bottom .d-flex.align-items-center.gap-2 {
+            flex-wrap: wrap !important;
+            width: 100% !important;
+        }
+
+        /* Quotation revision history chips */
+        #sectionQuotationHistory .card-body > .d-flex.flex-wrap {
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding-bottom: 6px !important;
+        }
+        .quotation-rev-chip {
+            flex-shrink: 0 !important;
+            min-width: 150px !important;
+        }
+
+        /* Followup Offcanvas full width on mobile */
+        #dealFollowupOffcanvas {
+            width: 100% !important;
+            max-width: 100vw !important;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        /* Field rows: Label on top, Value below */
+        .zoho-field-row {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            padding: 6px 0 !important;
+            gap: 2px !important;
+        }
+        .zoho-field-label {
+            width: 100% !important;
+            font-size: 11px !important;
+            color: #64748b !important;
+            margin-bottom: 1px !important;
+        }
+        .zoho-field-value {
+            width: 100% !important;
+            font-size: 12.5px !important;
+        }
+
+        /* Floating Softphone widget on mobile: centered bottom sheet */
+        #crmFloatingSoftphoneWidget {
+            right: 12px !important;
+            bottom: 12px !important;
+            left: 12px !important;
+            width: auto !important;
+            max-width: calc(100vw - 24px) !important;
+        }
+    }
+
+    /* Dark mode overrides for mobile elements */
+    html.app-skin-dark .odoo-chatter-col {
+        border-top-color: #1e293b !important;
     }
 </style>
 @endpush
 
 @php
     $isQuotationTabActive = request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('quotation_id') || old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit';
-    $isSalesOrdersTabActive = request()->has('sales_orders_tab');
     
     // Stages array with probabilities dynamically built from DealStatus master
     if (isset($dealStatuses) && $dealStatuses->isNotEmpty()) {
@@ -697,13 +1361,58 @@
     $currentIndex = array_search($currentStageKey, $stageOrder);
     if ($currentIndex === false) $currentIndex = 0;
 
-    $expectedRevenue = $deal->estimated_value * ($deal->probability / 100);
+    $effectiveDealValue = ($deal->actual_value > 0 && ($deal->quotations->whereIn('status', ['Accepted', 'Converted', 'Won'])->isNotEmpty() || in_array(strtolower((string)$deal->stage), ['won', 'closed won']))) 
+        ? $deal->actual_value 
+        : ((float)$deal->estimated_value > 0 ? (float)$deal->estimated_value : (float)$deal->actual_value);
+    $expectedRevenue = $effectiveDealValue * ($deal->probability / 100);
 @endphp
 
 @section('content')
     @php
         $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
         $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+
+        $allDealFollowups = $followups->reject(function($item) {
+            return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
+        });
+
+        $now = now();
+        $todayStart = $now->copy()->startOfDay();
+        $todayEnd = $now->copy()->endOfDay();
+
+        // 1. Today's Executed Activities (Done / Logged Today)
+        $todayDoneActivities = $allDealFollowups->filter(function($i) use ($todayStart, $todayEnd) {
+            return $i->status !== 'Pending' && $i->updated_at >= $todayStart && $i->updated_at <= $todayEnd;
+        })->sortByDesc('updated_at');
+
+        // 2. Planned Activities (All pending scheduled for today or future)
+        $plannedActivities = $allDealFollowups->filter(function($i) use ($todayStart) {
+            return $i->status === 'Pending' && $i->followup_date >= $todayStart;
+        })->sortBy('followup_date');
+
+        // 3. Overdue Activities (Pending before today)
+        $overdueActivities = $allDealFollowups->filter(function($i) use ($todayStart) {
+            return $i->status === 'Pending' && $i->followup_date < $todayStart;
+        })->sortBy('followup_date');
+
+        // 4. Past Activities (Done before today)
+        $pastDoneActivities = $allDealFollowups->filter(function($i) use ($todayStart) {
+            return $i->status !== 'Pending' && $i->updated_at < $todayStart;
+        })->sortByDesc('updated_at');
+
+        $dealHistoryList = collect();
+        if ($linkedLead && $linkedLead->histories) {
+            $dealHistoryList = $dealHistoryList->concat($linkedLead->histories->map(function($h) {
+                $h->is_lead_history = true;
+                return $h;
+            }));
+        }
+        if (isset($histories) && $histories->isNotEmpty() && (!$linkedLead || $histories !== $linkedLead->histories)) {
+            $dealHistoryList = $dealHistoryList->concat($histories);
+        }
+        $groupedHistory = $dealHistoryList->sortByDesc('created_at')->groupBy(function($item) {
+            return $item->created_at ? $item->created_at->format('d/m/Y') : date('d/m/Y');
+        });
     @endphp
 
     <!-- Hidden Stage Change Form -->
@@ -776,17 +1485,49 @@
                     <i class="feather-arrow-left"></i>
                 </a>
 
-
                 @php
+                    $dealNumbers = [];
+                    if (!empty($deal->contact?->phone)) {
+                        $dealNumbers[] = [
+                            'type' => 'Contact Person',
+                            'label' => ($deal->contact->name ? $deal->contact->name . ': ' : '') . $deal->contact->phone,
+                            'number' => $deal->contact->phone,
+                            'is_primary' => true
+                        ];
+                    }
+                    if (!empty($deal->account?->phone) && ($deal->account->phone !== ($deal->contact?->phone ?? ''))) {
+                        $dealNumbers[] = [
+                            'type' => 'Company Phone',
+                            'label' => ($deal->account->name ? $deal->account->name . ': ' : '') . $deal->account->phone,
+                            'number' => $deal->account->phone,
+                            'is_primary' => empty($dealNumbers)
+                        ];
+                    }
+                    if ($linkedLead) {
+                        if (!empty($linkedLead->phone) && !in_array($linkedLead->phone, array_column($dealNumbers, 'number'))) {
+                            $dealNumbers[] = [
+                                'type' => 'Lead Phone',
+                                'label' => ($linkedLead->contact_person ? $linkedLead->contact_person . ': ' : '') . $linkedLead->phone,
+                                'number' => $linkedLead->phone,
+                                'is_primary' => empty($dealNumbers)
+                            ];
+                        }
+                        if (!empty($linkedLead->company_phone) && !in_array($linkedLead->company_phone, array_column($dealNumbers, 'number'))) {
+                            $dealNumbers[] = [
+                                'type' => 'Lead Company Phone',
+                                'label' => ($linkedLead->company_name ? $linkedLead->company_name . ': ' : '') . $linkedLead->company_phone,
+                                'number' => $linkedLead->company_phone,
+                                'is_primary' => empty($dealNumbers)
+                            ];
+                        }
+                    }
+                    $primaryDealPhone = $dealNumbers[0]['number'] ?? ($deal->contact?->phone ?: ($deal->account?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)));
+
                     $hasAcceptedQuotation = $deal->quotations->contains(fn($q) => in_array($q->status, ['Accepted', 'Converted', 'Won']));
                     $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
                     $hasCustomer = !empty($deal->account?->customer_id) && $isDealWon;
                     $acceptedQuote = $deal->quotations->firstWhere('status', 'Accepted') ?: ($deal->quotations->firstWhere('status', 'Converted') ?: $activeQuotation);
                 @endphp
-
-                <button type="button" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-2xs d-inline-flex align-items-center text-white btn-open-deal-followup-offcanvas" data-bs-toggle="offcanvas" data-bs-target="#dealFollowupOffcanvas">
-                    <i class="feather-calendar me-1"></i> + {{ __('crm.followup') }}
-                </button>
 
                 @if($deal->quotations->isEmpty())
                     <a href="{{ route('crm.deals.show', ['deal' => $deal->id, 'create_quotation' => 1]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
@@ -857,39 +1598,40 @@
             </div>
         </div>
 
-        <!-- ==================== ZOHO CRM DEALS CHEVRON PIPELINE PROGRESS STRIP ==================== -->
-        <div class="zoho-deal-pipeline-strip d-print-none">
-            <div class="zoho-pipeline-chevron-container">
+        <!-- ==================== CHEVRON ARROW PIPELINE STATUSBAR (LEAD STYLE) ==================== -->
+        <div class="deal-pipeline-strip d-print-none py-2 px-3 border-bottom bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="so-status-pipeline d-inline-flex align-items-center">
                 @foreach($allStages as $stg => $prob)
                     @php
                         $stgIndex = array_search($stg, $stageOrder);
-                        $stepClass = 'upcoming';
-                        $stgSlug = \Illuminate\Support\Str::slug($stg);
+                        $stepClass = '';
                         
                         if ($stg === $currentStageKey) {
-                            if ($stg === 'Won') $stepClass = 'active stage-won active-won';
-                            elseif ($stg === 'Lost') $stepClass = 'active stage-lost active-lost';
-                            else $stepClass = 'active stage-' . $stgSlug;
+                            $stepClass = 'active';
                         } elseif ($currentStageKey !== 'Lost' && $stgIndex < $currentIndex) {
-                            $stepClass = 'passed';
+                            $stepClass = 'completed';
                         }
                         $stgTitleTrans = __('crm.stages.' . $stg);
                         if ($stgTitleTrans === 'crm.stages.' . $stg) {
                             $stgTitleTrans = $stg;
                         }
+                        $isDisabledClick = $isDealWon && $stg !== $currentStageKey;
                     @endphp
-                    <div class="zoho-pipeline-step {{ $stepClass }}" onclick="submitDealStage('{{ $stg }}')" title="Click to update deal stage to {{ $stgTitleTrans }} ({{ $prob }}%)">
-                        @if($stepClass === 'passed')
-                            <i class="feather-check-circle fs-11"></i>
-                        @elseif(str_contains($stepClass, 'active'))
-                            <i class="feather-disc fs-11"></i>
-                        @else
-                            <i class="feather-circle fs-10 opacity-50"></i>
-                        @endif
-                        <span>{{ $stgTitleTrans }} ({{ $prob }}%)</span>
-                    </div>
+                    <button type="button" 
+                            class="pipeline-step {{ $stepClass }}" 
+                            @if($isDisabledClick)
+                                onclick="alert('This deal is already Won and locked. Its stage cannot be changed.')"
+                                style="opacity: 0.6; cursor: not-allowed;"
+                                title="Stage is locked (Deal is Won)"
+                            @else
+                                onclick="submitDealStage('{{ $stg }}')" 
+                                title="{{ $stgTitleTrans }} ({{ $prob }}%)"
+                            @endif>
+                        @if($stg === 'Won' && $isDealWon) <i class="feather-lock me-1"></i> @endif{{ $stgTitleTrans }} ({{ $prob }}%)
+                    </button>
                 @endforeach
             </div>
+
         </div>
 
         <!-- Flash Toast Messages -->
@@ -905,104 +1647,37 @@
             <x-ui.toast :auto="true" title="{{ $errors->first() }}" type="error" delay="6000" />
         @endif
 
-        <!-- ==================== TWO-COLUMN FLEX CONTENT ==================== -->
-        <div class="d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+        <!-- ==================== ODOO TWO-COLUMN WORKSPACE (SHEET ON LEFT, CHATTER ON RIGHT) ==================== -->
+        <div class="d-flex flex-grow-1 overflow-hidden odoo-layout-wrapper" style="min-height: 0;">
             
-            <!-- Left Sidebar Menu (STICKY RELATED LIST) -->
-            <div class="zoho-sidebar-col border-end bg-white d-print-none h-100 overflow-auto" style="width: 210px; flex-shrink: 0; user-select: none;">
-                <div class="p-3">
-                    <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">{{ __('crm.related_list_navigation') }}</h6>
-                    <ul class="nav flex-column zoho-sidebar-nav gap-1" id="zohoSidebarLinks">
-                        <li class="nav-item">
-                            <a href="#sectionDealInfo" class="nav-link active">
-                                <i class="feather-info fs-13 text-muted"></i> {{ __('crm.deal_information') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionDealProducts" class="nav-link">
-                                <i class="feather-box fs-13 text-muted"></i> {{ __('crm.product_interest') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionCustomerCard" class="nav-link">
-                                <i class="feather-users fs-13 text-muted"></i> {{ __('crm.customer_account_contact_info') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionNotes" class="nav-link">
-                                <i class="feather-grid fs-13 text-muted"></i> {{ __('crm.notes_requirement_summary') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionQuotations" class="nav-link">
-                                <i class="feather-file-text fs-13 text-muted"></i> {{ __('crm.quotation_proposals') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $deal->quotations->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionQuotationHistory" class="nav-link">
-                                <i class="feather-git-commit fs-13 text-muted"></i> {{ __('crm.quotation_revision_history') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $deal->quotations->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionSalesOrders" class="nav-link">
-                                <i class="feather-shopping-cart fs-13 text-muted"></i> {{ __('crm.sales_orders') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $deal->salesOrders->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#subtab-interactions" class="nav-link">
-                                <i class="feather-calendar fs-13 text-muted"></i> {{ __('crm.activities') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $followups->count() }}</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#subtab-history" class="nav-link">
-                                <i class="feather-clock fs-13 text-muted"></i> {{ __('crm.timeline_audit') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="#sectionDocuments" class="nav-link">
-                                <i class="feather-paperclip fs-13 text-muted"></i> {{ __('crm.lead_documents') }}
-                                <span class="badge bg-soft-secondary text-muted border">{{ $leadDocuments->count() }}</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Right Content Scrollable Column -->
-            <div class="zoho-main-col h-100 overflow-auto flex-grow-1" style="scroll-behavior: smooth; background-color: #f8fafc;" id="zohoMainScrollable">
+            <!-- LEFT MAIN SHEET (Scrollable) -->
+            <div class="odoo-sheet-col flex-grow-1 h-100 p-0" style="scroll-behavior: smooth; background-color: #f8fafc; overflow-x: hidden !important; overflow-y: auto !important;" id="odooMainScrollable">
                 
                 <!-- Sticky Top Tab Row -->
-                <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
+                <div class="d-flex align-items-center justify-content-between px-3 py-2 flex-wrap gap-2 sticky-top bg-white border-0 shadow-none" style="z-index: 90;">
                     <ul class="nav nav-pills zoho-nav-tabs" id="zohoDealTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
-                                <i class="feather-grid me-1"></i>{{ __('crm.overview') }}
+                            <button class="nav-link px-3 py-1.5 fw-bold fs-12 {{ !$isQuotationTabActive ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab">
+                                <i class="feather-grid me-1.5"></i>{{ __('crm.overview') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
-                                <i class="feather-file-text me-1"></i>{{ __('crm.quotation_proposals') }} ({{ $deal->quotations->count() }})
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ $isSalesOrdersTabActive ? 'active' : '' }}" id="salesorders-tab" data-bs-toggle="tab" data-bs-target="#salesorders-pane" type="button" role="tab">
-                                <i class="feather-shopping-cart me-1"></i>{{ __('crm.sales_orders') }} ({{ $deal->salesOrders->count() }})
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link px-3 py-1 fw-bold fs-12 {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'active' : '' }}" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab">
-                                <i class="feather-clock me-1"></i>{{ __('crm.timeline_audit') }}
+                            <button class="nav-link px-3 py-1.5 fw-bold fs-12 {{ $isQuotationTabActive ? 'active' : '' }}" id="quotations-tab" data-bs-toggle="tab" data-bs-target="#quotations-pane" type="button" role="tab">
+                                <i class="feather-file-text me-1.5"></i>{{ __('crm.quotation_proposals') }}
+                                <span class="badge {{ $isQuotationTabActive ? 'bg-white text-primary' : 'bg-primary-subtle text-primary' }} rounded-pill px-1.5 py-0.2 fs-10 font-monospace ms-1">{{ $deal->quotations->count() }}</span>
                             </button>
                         </li>
                     </ul>
 
-                    <div class="d-flex align-items-center text-muted fs-11 fw-medium" style="font-family: 'Inter', sans-serif;">
-                        <i class="feather-clock me-1.5 text-muted fs-12"></i> 
-                        {{ __('crm.last_update') }} : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : __('crm.recently') }}
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="text-muted fs-11 fw-medium d-none d-md-flex align-items-center" style="font-family: 'Inter', sans-serif;">
+                            <i class="feather-clock me-1 text-muted fs-12"></i> 
+                            {{ __('crm.last_update') }} : {{ $deal->updated_at ? $deal->updated_at->diffForHumans() : __('crm.recently') }}
+                        </div>
+                        <button type="button" class="btn btn-xs btn-white border px-2.5 py-1 rounded-2 shadow-2xs text-muted d-inline-flex align-items-center gap-1.5 fw-semibold fs-11" id="btnToggleChatter" title="{{ __('crm.toggle_chatter') }}">
+                            <i class="feather-sidebar fs-11"></i>
+                            <span id="textToggleChatter">{{ __('crm.chatter') }}</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1010,45 +1685,45 @@
                 <div class="pt-2 px-3 pb-3 tab-content" id="zohoDealTabsContent">
                     
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
-                    <div class="tab-pane fade {{ (!$isQuotationTabActive && !$isSalesOrdersTabActive && request('tab') !== 'interactions' && request('tab') !== 'timeline') ? 'show active' : '' }}" id="overview-pane" role="tabpanel">
+                    <div class="tab-pane fade {{ !$isQuotationTabActive ? 'show active' : '' }}" id="overview-pane" role="tabpanel">
                         
                         <!-- ZOHO DEAL KPI METRICS CARDS STRIP -->
-                        <div class="row g-3 mb-3 align-items-stretch">
-                            <div class="col-md-3 col-sm-6 d-flex">
-                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
+                        <div class="row g-2 g-md-3 mb-3 align-items-stretch">
+                            <div class="col-6 col-md-3 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100">
                                     <div class="deal-metric-icon bg-soft-success text-success">
                                         <i class="feather-dollar-sign"></i>
                                     </div>
                                      <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.estimated_deal_value') }}</span>
-                                        <span class="fs-14 fw-extrabold text-dark d-block">{{ format_currency($deal->estimated_value) }}</span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ format_currency($effectiveDealValue) }}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 col-sm-6 d-flex">
-                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
+                            <div class="col-6 col-md-3 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100">
                                     <div class="deal-metric-icon bg-soft-primary text-primary">
                                         <i class="feather-pie-chart"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.expected_revenue') }}</span>
-                                        <span class="fs-14 fw-extrabold text-primary d-block">{{ format_currency($expectedRevenue) }} <span class="fs-10 text-muted">({{ $deal->probability }}%)</span></span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-primary d-block text-truncate">{{ format_currency($expectedRevenue) }} <span class="fs-10 text-muted d-none d-sm-inline">({{ $deal->probability }}%)</span></span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 col-sm-6 d-flex">
-                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100">
+                            <div class="col-6 col-md-3 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100">
                                     <div class="deal-metric-icon bg-soft-warning text-warning">
                                         <i class="feather-calendar"></i>
                                     </div>
                                     <div class="min-w-0 flex-grow-1">
                                         <span class="fs-11 text-muted text-uppercase fw-bold d-block text-truncate">{{ __('crm.target_closing_date') }}</span>
-                                        <span class="fs-14 fw-extrabold text-dark d-block">{{ $deal->closing_date ? $deal->closing_date->format('d M Y') : 'Not Set' }}</span>
+                                        <span class="fs-13 fs-sm-14 fw-extrabold text-dark d-block text-truncate">{{ $deal->closing_date ? $deal->closing_date->format('d M Y') : __('crm.not_set') }}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3 col-sm-6 d-flex">
-                                <div class="deal-metric-card d-flex align-items-center gap-3 w-100 overflow-hidden" style="min-width: 0;">
+                            <div class="col-6 col-md-3 d-flex">
+                                <div class="deal-metric-card d-flex align-items-center gap-2 gap-sm-3 w-100 overflow-hidden" style="min-width: 0;">
                                     <div class="deal-metric-icon bg-soft-purple text-purple flex-shrink-0">
                                         <i class="feather-briefcase"></i>
                                     </div>
@@ -1209,7 +1884,7 @@
 
                                         <div class="zoho-field-row">
                                             <div class="zoho-field-label">{{ __('crm.estimated_revenue_val') }}</div>
-                                            <div class="zoho-field-value text-dark fw-bold">{{ format_currency($deal->estimated_value) }}</div>
+                                            <div class="zoho-field-value text-dark fw-bold">{{ format_currency($effectiveDealValue) }}</div>
                                         </div>
 
                                         <div class="zoho-field-row">
@@ -1300,7 +1975,8 @@
                                                             $pObj = $dealProductsMap->get($item['product_id']);
                                                             if (!$pObj) continue;
                                                             $pQty = floatval($item['quantity'] ?? 1);
-                                                            $pPrice = floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
+                                                            $quoteItem = $acceptedQuote?->items?->firstWhere('product_id', $item['product_id']);
+                                                            $pPrice = $quoteItem ? floatval($quoteItem->unit_price) : floatval($pObj->selling_price ?: $pObj->unit_cost ?: 0);
                                                             $lineVal = $pQty * $pPrice;
                                                             $grandProductTotal += $lineVal;
                                                         @endphp
@@ -1319,7 +1995,12 @@
                                                     <tfoot class="table-light fw-bold">
                                                         <tr>
                                                             <td colspan="4" class="text-end text-uppercase fs-12">{{ __('crm.total_estimated_product_value') }}:</td>
-                                                            <td class="text-end text-success fs-14">{{ format_currency($grandProductTotal) }}</td>
+                                                            <td class="text-end text-success fs-14">
+                                                                {{ format_currency($acceptedQuote && $acceptedQuote->total_amount > 0 ? $acceptedQuote->total_amount : $grandProductTotal) }}
+                                                                @if($acceptedQuote && $acceptedQuote->tax > 0)
+                                                                    <span class="fs-11 fw-normal text-muted">(Incl. Taxes)</span>
+                                                                @endif
+                                                            </td>
                                                         </tr>
                                                     </tfoot>
                                                 @endif
@@ -1346,10 +2027,23 @@
                                                 $accEmail = $deal->account?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email);
                                             @endphp
                                             @if($accPhone)
-                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $accPhone }}</div>
+                                                <div class="fs-12 text-dark mt-1">
+                                                    <a href="javascript:void(0)" 
+                                                       class="text-dark fw-semibold text-decoration-none btn-crm-deal-click-to-call hover-primary"
+                                                       data-deal-id="{{ $deal->id }}"
+                                                       data-deal-title="{{ addslashes($deal->title) }}"
+                                                       data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                                                       data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                                                       data-deal-stage="{{ $deal->stage }}"
+                                                       data-deal-phone="{{ $accPhone }}"
+                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}"
+                                                       title="Click to Call">
+                                                        {{ $accPhone }}
+                                                    </a>
+                                                </div>
                                             @endif
                                             @if($accEmail)
-                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $accEmail }}</div>
+                                                <div class="fs-12 text-primary mt-1"><i class="feather-mail me-1 text-muted"></i>{{ $accEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -1364,10 +2058,23 @@
                                             <div class="fw-bold text-dark fs-14 mb-1">{{ $cName ?: __('crm.no_contact_person') }}</div>
                                             <div class="fs-12 text-muted mb-2">{{ $cTitle ?: '—' }}</div>
                                             @if($cPhone)
-                                                <div class="fs-12 text-dark"><i class="feather-phone me-1 text-muted"></i>{{ $cPhone }}</div>
+                                                <div class="fs-12 text-dark mt-1">
+                                                    <a href="javascript:void(0)" 
+                                                       class="text-dark fw-semibold text-decoration-none btn-crm-deal-click-to-call hover-primary"
+                                                       data-deal-id="{{ $deal->id }}"
+                                                       data-deal-title="{{ addslashes($deal->title) }}"
+                                                       data-deal-company="{{ addslashes($deal->account?->name ?: ($linkedLead?->company_name ?: '')) }}"
+                                                       data-contact-name="{{ addslashes($deal->contact?->name ?: ($linkedLead?->contact_person ?: '')) }}"
+                                                       data-deal-stage="{{ $deal->stage }}"
+                                                       data-deal-phone="{{ $cPhone }}"
+                                                       data-deal-numbers="{{ json_encode($dealNumbers) }}"
+                                                       title="Click to Call">
+                                                        {{ $cPhone }}
+                                                    </a>
+                                                </div>
                                             @endif
                                             @if($cEmail)
-                                                <div class="fs-12 text-primary"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
+                                                <div class="fs-12 text-primary mt-1"><i class="feather-mail me-1 text-muted"></i>{{ $cEmail }}</div>
                                             @endif
                                         </div>
                                     </div>
@@ -1566,6 +2273,17 @@
 
                                                 <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : ''))" :helperText="$errors->first('email')" />
                                                 <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : ''))" :helperText="$errors->first('phone')" />
+
+                                                <x-ui.select :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect">
+                                                    <option value="exclusive" @selected(old('tax_mode', 'exclusive') === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                                                    <option value="inclusive" @selected(old('tax_mode') === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
+                                                </x-ui.select>
+
+                                                <x-ui.select :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect">
+                                                    <option value="order_wise" @selected(old('discount_type', 'order_wise') === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
+                                                    <option value="item_wise" @selected(old('discount_type') === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
+                                                    <option value="none" @selected(old('discount_type') === 'none')>{{ __('crm.without_discount') }}</option>
+                                                </x-ui.select>
                                             </div>
                                             <div class="col-md-6 d-flex flex-column gap-3">
                                                 <x-ui.input :label="__('crm.quotation_number')" name="quotation_number"
@@ -1579,11 +2297,17 @@
                                                     :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :helperText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.select :label="__('crm.initial_status')" name="status" :required="true" :helperText="$errors->first('status')">
-                                                         <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.draft') }}</option>
-                                                         <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
-                                                    </x-ui.select>
+                                                     <x-ui.select :label="__('crm.initial_status')" name="status" :required="true" :helperText="$errors->first('status')">
+                                                          <option value="Draft" @selected(old('status') === 'Draft')>{{ __('crm.draft') }}</option>
+                                                          <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>{{ __('crm.sent_for_approval') }}</option>
+                                                     </x-ui.select>
                                                 @endif
+
+                                                <x-ui.select :label="__('crm.gst_type')" name="tax_type" id="taxTypeSelect">
+                                                    <option value="intra_state" @selected(old('tax_type', 'intra_state') === 'intra_state')>{{ __('crm.intra_state_gst') }}</option>
+                                                    <option value="inter_state" @selected(old('tax_type') === 'inter_state')>{{ __('crm.inter_state_gst') }}</option>
+                                                    <option value="exempt" @selected(old('tax_type') === 'exempt')>Exempt / Non-GST (0%)</option>
+                                                </x-ui.select>
                                             </div>
                                         </div>
 
@@ -1594,11 +2318,12 @@
                                                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 38%;">{{ __('crm.product_description') }}</th>
+                                                            <th class="ps-2" style="width: 36%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
-                                                            <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
-                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
-                                                            <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
+                                                            <th class="text-end" style="width: 16%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end col-discount" style="width: 12%; display: none;">{{ __('crm.discount') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end" style="width: 11%;">{{ __('crm.taxes') }} (%)</th>
+                                                            <th class="text-end pe-3" style="width: 15%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
@@ -1627,13 +2352,53 @@
                                                     <span class="text-muted fw-semibold">{{ __('crm.subtotal') }}</span>
                                                     <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">{{ __('crm.taxes_label') }}</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
+
+                                                <!-- Discount (Right after Subtotal) -->
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom" id="orderDiscountRow">
+                                                    <span class="text-muted fw-semibold me-2" id="orderDiscountLabel">{{ __('crm.discount_colon') }}</span>
+                                                    <div class="d-flex justify-content-end align-items-center">
+                                                        <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+                                                        <span class="fw-bold text-danger d-none" id="calcItemDiscountDisplay">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
                                                 </div>
-                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
-                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+
+                                                <!-- Taxable Amount (After Discount) -->
+                                                <div class="d-flex justify-content-between py-1 border-bottom" id="taxableAmountRow">
+                                                    <span class="text-muted fw-semibold" id="taxableAmountLabel">Taxable Value</span>
+                                                    <span class="fw-bold text-dark" id="calcTaxableBase">{{ active_currency_symbol() }}0.00</span>
+                                                </div>
+
+                                                <!-- Dynamic Intra-State (CGST + SGST) -->
+                                                <div id="intraStateTaxRows">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold cgst-label-text">CGST</span>
+                                                        <span class="fw-bold text-dark" id="calcCgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold sgst-label-text">SGST</span>
+                                                        <span class="fw-bold text-dark" id="calcSgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Inter-State (IGST) -->
+                                                <div id="interStateTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold igst-label-text">IGST</span>
+                                                        <span class="fw-bold text-dark" id="calcIgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Exempt -->
+                                                <div id="exemptTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold">GST Treatment</span>
+                                                        <span class="badge bg-soft-success text-success fw-bold">Exempt (0%)</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold tax-label-text">{{ __('crm.taxes_label') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
@@ -1673,6 +2438,17 @@
 
                                                 <x-ui.input type="email" :label="__('crm.contact_email')" name="email" :value="old('email', $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '')))" :helperText="$errors->first('email')" />
                                                 <x-ui.input type="text" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '')))" :helperText="$errors->first('phone')" />
+
+                                                <x-ui.select :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect">
+                                                    <option value="exclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                                                    <option value="inclusive" @selected(old('tax_mode', $activeQuotation->effective_tax_mode) === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
+                                                </x-ui.select>
+
+                                                <x-ui.select :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect">
+                                                    <option value="order_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
+                                                    <option value="item_wise" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
+                                                    <option value="none" @selected(old('discount_type', $activeQuotation->effective_discount_type) === 'none')>{{ __('crm.without_discount') }}</option>
+                                                </x-ui.select>
                                             </div>
                                             <div class="col-md-6 d-flex flex-column gap-3">
                                                 <x-ui.input :label="__('crm.quotation_number')" name="quotation_number"
@@ -1686,11 +2462,17 @@
                                                     :value="old('expiry_date', $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('Y-m-d') : '')" :helperText="$errors->first('expiry_date')" />
 
                                                 @if(!$isQuotationAutoApprove)
-                                                    <x-ui.select :label="__('crm.status')" name="status" :required="true" :helperText="$errors->first('status')">
-                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.draft') }}</option>
-                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
-                                                    </x-ui.select>
+                                                     <x-ui.select :label="__('crm.status')" name="status" :required="true" :helperText="$errors->first('status')">
+                                                          <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.draft') }}</option>
+                                                          <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.sent_for_approval') }}</option>
+                                                     </x-ui.select>
                                                 @endif
+
+                                                <x-ui.select :label="__('crm.gst_type')" name="tax_type" id="taxTypeSelect">
+                                                    <option value="intra_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'intra_state')>{{ __('crm.intra_state_gst') }}</option>
+                                                    <option value="inter_state" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'inter_state')>{{ __('crm.inter_state_gst') }}</option>
+                                                    <option value="exempt" @selected(old('tax_type', $activeQuotation->effective_tax_type) === 'exempt')>Exempt / Non-GST (0%)</option>
+                                                </x-ui.select>
                                             </div>
                                         </div>
 
@@ -1701,11 +2483,12 @@
                                                 <x-ui.odoo-form-ui type="table" id="itemsTable">
                                                     <thead>
                                                         <tr>
-                                                            <th style="width: 38%;">{{ __('crm.product_description') }}</th>
+                                                            <th class="ps-2" style="width: 36%;">{{ __('crm.product_description') }}</th>
                                                             <th class="text-end" style="width: 10%;">{{ __('crm.qty') }}</th>
-                                                            <th class="text-end" style="width: 18%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
-                                                            <th class="text-end" style="width: 12%;">{{ __('crm.taxes') }} (%)</th>
-                                                            <th class="text-end pe-3" style="width: 17%;">{{ __('crm.amount') }}</th>
+                                                            <th class="text-end" style="width: 16%;">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end col-discount" style="width: 12%; display: none;">{{ __('crm.discount') }} ({{ active_currency_symbol() }})</th>
+                                                            <th class="text-end" style="width: 11%;">{{ __('crm.taxes') }} (%)</th>
+                                                            <th class="text-end pe-3" style="width: 15%;">{{ __('crm.amount') }}</th>
                                                             <th class="text-center" style="width: 5%;"></th>
                                                         </tr>
                                                     </thead>
@@ -1734,13 +2517,53 @@
                                                     <span class="text-muted fw-semibold">{{ __('crm.subtotal') }}</span>
                                                     <span class="fw-bold text-dark" id="calcSubtotal">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">{{ __('crm.taxes_label') }}</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
+
+                                                <!-- Discount (Right after Subtotal) -->
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom" id="orderDiscountRow">
+                                                    <span class="text-muted fw-semibold me-2" id="orderDiscountLabel">{{ __('crm.discount_colon') }}</span>
+                                                    <div class="d-flex justify-content-end align-items-center">
+                                                        <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount ? round(convert_from_base((float)$activeQuotation->discount), 2) : 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+                                                        <span class="fw-bold text-danger d-none" id="calcItemDiscountDisplay">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
                                                 </div>
-                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold me-2">{{ __('crm.discount_colon') }}</span>
-                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+
+                                                <!-- Taxable Amount (After Discount) -->
+                                                <div class="d-flex justify-content-between py-1 border-bottom" id="taxableAmountRow">
+                                                    <span class="text-muted fw-semibold" id="taxableAmountLabel">Taxable Value</span>
+                                                    <span class="fw-bold text-dark" id="calcTaxableBase">{{ active_currency_symbol() }}0.00</span>
+                                                </div>
+
+                                                <!-- Dynamic Intra-State (CGST + SGST) -->
+                                                <div id="intraStateTaxRows">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold cgst-label-text">CGST</span>
+                                                        <span class="fw-bold text-dark" id="calcCgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold sgst-label-text">SGST</span>
+                                                        <span class="fw-bold text-dark" id="calcSgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Inter-State (IGST) -->
+                                                <div id="interStateTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold igst-label-text">IGST</span>
+                                                        <span class="fw-bold text-dark" id="calcIgst">{{ active_currency_symbol() }}0.00</span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Dynamic Exempt -->
+                                                <div id="exemptTaxRow" style="display: none;">
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold">GST Treatment</span>
+                                                        <span class="badge bg-soft-success text-success fw-bold">Exempt (0%)</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold tax-label-text">{{ __('crm.taxes_label') }}</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">{{ active_currency_symbol() }}0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">{{ __('crm.grand_total') }}</span>
@@ -1784,27 +2607,35 @@
                                         </div>
 
                                         <div class="d-flex align-items-center flex-wrap gap-2">
-                                            <!-- WhatsApp Action Button -->
-                                            <button type="button" 
-                                                    class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal" 
-                                                    data-quotation-id="{{ $activeQuotation->id }}" 
-                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
-                                                    data-client-phone="{{ $activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)) }}" 
-                                                    data-deal-title="{{ addslashes($deal->title) }}"
-                                                    title="Send PDF via WhatsApp" data-bs-toggle="tooltip">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
-                                            </button>
+                                            @php
+                                                $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+                                                $isQuotationAutoApprove = ($tenantSettings['quotation_approval_policy'] ?? 'approval_required') === 'auto_approve';
+                                                $canSendToClient = $isQuotationAutoApprove || in_array($activeQuotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted']);
+                                            @endphp
 
-                                            <!-- Send Email Action Button -->
-                                            <button type="button" 
-                                                    class="action-dropdown-btn action-btn-email btn-open-send-quote-modal" 
-                                                    data-quotation-id="{{ $activeQuotation->id }}" 
-                                                    data-quotation-num="{{ $activeQuotation->quotation_number }}" 
-                                                    data-client-email="{{ $activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)) }}" 
-                                                    data-deal-title="{{ addslashes($deal->title) }}"
-                                                    title="Send PDF via Email" data-bs-toggle="tooltip">
-                                                <i class="feather-mail text-primary fs-14"></i>
-                                            </button>
+                                            @if ($canSendToClient)
+                                                <!-- WhatsApp Action Button -->
+                                                <button type="button" 
+                                                        class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal" 
+                                                        data-quotation-id="{{ $activeQuotation->id }}" 
+                                                        data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                        data-client-phone="{{ $activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)) }}" 
+                                                        data-deal-title="{{ addslashes($deal->title) }}"
+                                                        title="Send PDF via WhatsApp" data-bs-toggle="tooltip">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                                                </button>
+
+                                                <!-- Send Email Action Button -->
+                                                <button type="button" 
+                                                        class="action-dropdown-btn action-btn-email btn-open-send-quote-modal" 
+                                                        data-quotation-id="{{ $activeQuotation->id }}" 
+                                                        data-quotation-num="{{ $activeQuotation->quotation_number }}" 
+                                                        data-client-email="{{ $activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)) }}" 
+                                                        data-deal-title="{{ addslashes($deal->title) }}"
+                                                        title="Send PDF via Email" data-bs-toggle="tooltip">
+                                                    <i class="feather-mail text-primary fs-14"></i>
+                                                </button>
+                                            @endif
 
                                             <!-- Download PDF Action Button -->
                                             <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" 
@@ -1815,12 +2646,25 @@
 
                                             <!-- Status / Workflow Action Buttons -->
                                             @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
-                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="Pending Approval">
-                                                    <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Submit Approval</button>
-                                                </form>
+                                                @if (!$isQuotationAutoApprove)
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Pending Approval">
+                                                        <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Submit Approval</button>
+                                                    </form>
+                                                @else
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Quotation Sent">
+                                                        <button type="submit" class="btn btn-sm btn-primary fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
+                                                    </form>
+                                                @endif
+                                            @elseif ($activeQuotation->status === 'Pending Approval')
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fw-bold px-2.5 py-1.5 fs-12 d-inline-flex align-items-center">
+                                                    <i class="feather-clock me-1"></i>Pending Approval
+                                                </span>
                                             @elseif ($activeQuotation->status === 'Approved')
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
@@ -1829,6 +2673,9 @@
                                                     <button type="submit" class="btn btn-sm btn-primary fw-bold px-2.5 py-1.5"><i class="feather-send me-1"></i>Mark as Sent</button>
                                                 </form>
                                             @elseif ($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent')
+                                                <span class="badge bg-soft-success text-success border border-success-subtle fw-bold px-2.5 py-1.5 fs-12 d-inline-flex align-items-center">
+                                                    <i class="feather-check-circle me-1"></i>Sent
+                                                </span>
                                                 <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline m-0">
                                                     @csrf
                                                     @method('PATCH')
@@ -1885,7 +2732,7 @@
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.contact_email') }}</label>
                                                     <div class="fs-12 text-primary d-flex align-items-center flex-nowrap gap-1">
                                                         <span class="fw-semibold text-truncate" title="{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}">{{ $activeQuotation->email ?: ($deal->contact ? $deal->contact->email : ($linkedLead ? ($linkedLead->company_email ?: $linkedLead->email) : '—')) }}</span>
-                                                        @if ($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email)))
+                                                        @if ($canSendToClient && ($activeQuotation->email ?: ($deal->contact?->email ?: ($linkedLead?->company_email ?: $linkedLead?->email))))
                                                             <button type="button" 
                                                                     class="action-dropdown-btn action-btn-email btn-open-send-quote-modal ms-1 flex-shrink-0" 
                                                                     data-quotation-id="{{ $activeQuotation->id }}" 
@@ -1903,7 +2750,7 @@
                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.contact_phone') }}</label>
                                                     <div class="fs-12 text-dark d-flex align-items-center flex-nowrap gap-1">
                                                         <span class="fw-semibold text-truncate">{{ $activeQuotation->phone ?: ($deal->contact ? $deal->contact->phone : ($linkedLead ? ($linkedLead->company_phone ?: $linkedLead->phone) : '—')) }}</span>
-                                                        @if ($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone)))
+                                                        @if ($canSendToClient && ($activeQuotation->phone ?: ($deal->contact?->phone ?: ($linkedLead?->company_phone ?: $linkedLead?->phone))))
                                                             <button type="button" 
                                                                     class="action-dropdown-btn action-btn-wa btn-open-send-quote-wa-modal ms-1 flex-shrink-0" 
                                                                     data-quotation-id="{{ $activeQuotation->id }}" 
@@ -1930,31 +2777,74 @@
                                                     <div class="fw-semibold text-danger">{{ $activeQuotation->expiry_date ? \Illuminate\Support\Carbon::parse($activeQuotation->expiry_date)->format('d M Y') : '—' }}</div>
                                                 </div>
                                             </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_status') }}</label>
-                                                @php
-                                                    $qColors = [
-                                                        'Draft' => 'secondary',
-                                                        'Approved' => 'info',
-                                                        'Sent' => 'primary',
-                                                        'Quotation Sent' => 'primary',
-                                                        'Accepted' => 'success',
-                                                        'Rejected' => 'danger',
-                                                    ];
-                                                    $qBadgeColor = $qColors[$activeQuotation->status] ?? 'secondary';
-                                                @endphp
-                                                <span class="badge bg-soft-{{ $qBadgeColor }} text-{{ $qBadgeColor }} border border-{{ $qBadgeColor }}-subtle px-2.5 py-1 fw-bold fs-12">
-                                                    {{ $activeQuotation->status }}
-                                                </span>
-                                                @if ($activeQuotation->status === 'Rejected' && $activeQuotation->rejection_reason)
-                                                    <div class="mt-1.5 fs-12 text-danger fw-semibold d-flex align-items-center">
-                                                        <i class="feather-alert-triangle me-1 fs-13"></i>
-                                                        <span><strong>Reason:</strong> {{ $activeQuotation->rejection_reason }}</span>
+                                                <div>
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.quotation_status') }}</label>
+                                                    @php
+                                                        $qColors = [
+                                                            'Draft' => 'secondary',
+                                                            'Approved' => 'info',
+                                                            'Sent' => 'primary',
+                                                            'Quotation Sent' => 'primary',
+                                                            'Accepted' => 'success',
+                                                            'Rejected' => 'danger',
+                                                        ];
+                                                        $qBadgeColor = $qColors[$activeQuotation->status] ?? 'secondary';
+                                                    @endphp
+                                                    <span class="badge bg-soft-{{ $qBadgeColor }} text-{{ $qBadgeColor }} border border-{{ $qBadgeColor }}-subtle px-2.5 py-1 fw-bold fs-12">
+                                                        {{ $activeQuotation->status }}
+                                                    </span>
+                                                    @if ($activeQuotation->status === 'Rejected' && $activeQuotation->rejection_reason)
+                                                        <div class="mt-1.5 fs-12 text-danger fw-semibold d-flex align-items-center">
+                                                            <i class="feather-alert-triangle me-1 fs-13"></i>
+                                                            <span><strong>Reason:</strong> {{ $activeQuotation->rejection_reason }}</span>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            <!-- Commercial & Tax Calculation Strip -->
+                                            <div class="col-12 pt-3 border-top">
+                                                <div class="row g-3">
+                                                    <div class="col-md-4 col-sm-6">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.tax_mode') }}</label>
+                                                        <span class="badge bg-soft-info text-info border border-info-subtle px-2.5 py-1.5 fw-bold fs-11 text-wrap text-start d-inline-flex align-items-center" style="max-width: 100%;">
+                                                            <i class="feather-tag me-1.5 flex-shrink-0"></i>
+                                                            <span>{{ $activeQuotation->effective_tax_mode === 'inclusive' ? __('crm.tax_inclusive') : __('crm.tax_exclusive') }}</span>
+                                                        </span>
                                                     </div>
-                                                @endif
+                                                    <div class="col-md-4 col-sm-6">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.discount_option') }}</label>
+                                                        <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle px-2.5 py-1.5 fw-bold fs-11 text-wrap text-start d-inline-flex align-items-center" style="max-width: 100%;">
+                                                            <i class="feather-percent me-1.5 flex-shrink-0"></i>
+                                                            <span>
+                                                                @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                                    {{ __('crm.item_level_discount') }}
+                                                                @elseif($activeQuotation->effective_discount_type === 'none')
+                                                                    {{ __('crm.without_discount') }}
+                                                                @else
+                                                                    {{ __('crm.order_level_discount') }}
+                                                                @endif
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                    <div class="col-md-4 col-sm-12">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('crm.gst_type') }}</label>
+                                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2.5 py-1.5 fw-bold fs-11 text-wrap text-start d-inline-flex align-items-center" style="max-width: 100%;">
+                                                            <i class="feather-shield me-1.5 flex-shrink-0"></i>
+                                                            <span>
+                                                                @if($activeQuotation->effective_tax_type === 'intra_state')
+                                                                    {{ __('crm.intra_state_gst') }}
+                                                                @elseif($activeQuotation->effective_tax_type === 'inter_state')
+                                                                    {{ __('crm.inter_state_gst') }}
+                                                                @else
+                                                                    GST Exempt (0%)
+                                                                @endif
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
                                     <!-- Order Lines Table -->
                                     <h6 class="fw-bold text-dark mb-2 fs-13">{{ __('crm.order_lines') }}</h6>
@@ -1966,6 +2856,9 @@
                                                     <th>{{ __('crm.product_description') }}</th>
                                                     <th class="text-end">{{ __('crm.qty') }}</th>
                                                     <th class="text-end">{{ __('crm.unit_price') }} ({{ active_currency_symbol() }})</th>
+                                                    @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                        <th class="text-end">{{ __('crm.discount') }} ({{ active_currency_symbol() }})</th>
+                                                    @endif
                                                     <th class="text-end">{{ __('crm.taxes') }} (%)</th>
                                                     <th class="text-end">{{ __('crm.amount') }} ({{ active_currency_symbol() }})</th>
                                                 </tr>
@@ -1982,12 +2875,15 @@
                                                         </td>
                                                         <td class="text-end font-monospace fw-bold">{{ $item->quantity }}</td>
                                                         <td class="text-end font-monospace">{{ format_currency($item->unit_price) }}</td>
+                                                        @if($activeQuotation->effective_discount_type === 'item_wise')
+                                                            <td class="text-end font-monospace text-danger">{{ ($item->discount ?? 0) > 0 ? '-' . format_currency($item->discount) : '—' }}</td>
+                                                        @endif
                                                         <td class="text-end font-monospace">{{ $item->tax_rate }}%</td>
                                                         <td class="text-end font-monospace fw-bold text-success">{{ format_currency($item->total_price ?: ($item->amount ?: ($item->quantity * $item->unit_price))) }}</td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="6" class="text-center py-3 text-muted">{{ __('crm.no_line_items_quotation') }}</td>
+                                                        <td colspan="{{ $activeQuotation->effective_discount_type === 'item_wise' ? 7 : 6 }}" class="text-center py-3 text-muted">{{ __('crm.no_line_items_quotation') }}</td>
                                                     </tr>
                                                 @endforelse
                                             </tbody>
@@ -2009,16 +2905,44 @@
                                                 <span class="text-muted">{{ __('crm.subtotal') }}</span>
                                                 <span class="fw-bold">{{ format_currency($activeQuotation->subtotal ?? 0) }}</span>
                                             </div>
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted">{{ __('crm.taxes_label') }}</span>
-                                                <span class="fw-bold">{{ format_currency($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0) }}</span>
-                                            </div>
+
                                             @if(($activeQuotation->discount ?? 0) > 0)
                                                 <div class="d-flex justify-content-between py-1 border-bottom text-danger">
                                                     <span>{{ __('crm.discount') }}</span>
                                                     <span class="fw-bold">-{{ format_currency($activeQuotation->discount) }}</span>
                                                 </div>
                                             @endif
+
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">{{ $activeQuotation->effective_tax_mode === 'inclusive' ? 'Taxable Value (Excl. Tax)' : 'Taxable Amount' }}</span>
+                                                <span class="fw-bold text-dark">{{ format_currency($activeQuotation->taxable_amount) }}</span>
+                                            </div>
+
+                                            @if($activeQuotation->effective_tax_type === 'intra_state')
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">CGST {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->computed_cgst) }}</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">SGST {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->computed_sgst) }}</span>
+                                                </div>
+                                            @elseif($activeQuotation->effective_tax_type === 'inter_state')
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">IGST {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                    <span class="fw-bold text-dark">{{ format_currency($activeQuotation->computed_igst) }}</span>
+                                                </div>
+                                            @else
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted">Tax (GST)</span>
+                                                    <span class="badge bg-soft-success text-success fw-bold">Exempt (0%)</span>
+                                                </div>
+                                            @endif
+
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">{{ __('crm.taxes_label') }} {{ $activeQuotation->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}</span>
+                                                <span class="fw-bold">{{ format_currency($activeQuotation->tax ?? $activeQuotation->tax_amount ?? 0) }}</span>
+                                            </div>
                                             <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1">
                                                 <span class="fw-bold text-dark">{{ __('crm.grand_total') }}</span>
                                                 <span class="fw-extrabold text-primary">{{ format_currency($activeQuotation->total_amount) }}</span>
@@ -2093,447 +3017,25 @@
                         @endif
                     </div>
 
-                    <!-- ==================== TAB 3: SALES ORDERS & REVENUE REALIZATION PANE ==================== -->
-                    <div class="tab-pane fade {{ $isSalesOrdersTabActive ? 'show active' : '' }}" id="salesorders-pane" role="tabpanel">
-                        <div class="card border shadow-sm mb-4" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionSalesOrders">
-                            <div class="card-body p-4">
-                                <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4">
-                                    <div>
-                                        <h5 class="fs-15 text-dark fw-bold mb-0"><i class="feather-shopping-cart text-success me-2"></i>{{ __('crm.converted_sales_orders_revenue') }}</h5>
-                                        <span class="text-muted fs-12">{{ __('crm.track_sales_orders_desc') }}</span>
-                                    </div>
-                                    @if($activeQuotation && $activeQuotation->status === 'Accepted')
-                                        <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success fw-bold px-3">
-                                            <i class="feather-plus me-1"></i>{{ __('crm.new_sales_order') }}
-                                        </a>
-                                    @endif
-                                </div>
 
-                                @if($deal->salesOrders->isEmpty())
-                                    <div class="text-center py-5 text-muted border border-dashed rounded bg-light-50">
-                                        <i class="feather-shopping-bag fs-36 text-muted mb-2 d-block opacity-50"></i>
-                                        <h6 class="fw-bold text-dark fs-13">{{ __('crm.no_sales_orders_generated') }}</h6>
-                                        <p class="fs-12 text-muted max-w-md mx-auto">{{ __('crm.sales_order_convert_desc') }}</p>
-                                    </div>
-                                @else
-                                    <div class="table-responsive">
-                                        <x-ui.odoo-form-ui type="table">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{ __('crm.sales_order_num') }}</th>
-                                                    <th>{{ __('crm.order_date') }}</th>
-                                                    <th>{{ __('crm.customer_name') }}</th>
-                                                    <th>{{ __('crm.total_amount') }} ({{ active_currency_symbol() }})</th>
-                                                    <th>{{ __('crm.order_status') }}</th>
-                                                    <th class="text-end pe-3">{{ __('crm.actions') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="fs-13 text-dark">
-                                                @foreach($deal->salesOrders as $so)
-                                                    <tr>
-                                                        <td class="font-monospace fw-bold text-primary">{{ $so->order_number }}</td>
-                                                        <td>{{ $so->order_date ? \Illuminate\Support\Carbon::parse($so->order_date)->format('d/m/Y') : '—' }}</td>
-                                                        <td class="fw-bold text-dark">{{ $so->customer_name }}</td>
-                                                        <td class="fw-bold text-success font-monospace">{{ format_currency($so->total_amount) }}</td>
-                                                        <td>
-                                                            <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fw-bold">
-                                                                {{ $so->status }}
-                                                            </span>
-                                                        </td>
-                                                        <td class="text-end pe-3">
-                                                            <a href="{{ route('sales.orders.show', $so) }}" class="btn btn-xs btn-soft-primary fw-bold">
-                                                                <i class="feather-eye me-1"></i>{{ __('crm.view_order') }}
-                                                            </a>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+                </div> <!-- Closes zohoDealTabsContent -->
+            </div> <!-- Closes odoo-sheet-col -->
 
-                    <!-- ==================== TAB 4: TIMELINE & AUDIT LOG PANE ==================== -->
-                    <div class="tab-pane fade {{ (request('tab') === 'interactions' || request('tab') === 'timeline') ? 'show active' : '' }}" id="timeline-pane" role="tabpanel">
-                        <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
-                            <div class="card-body p-3">
-                                
-                                <!-- Subtabs Selector Row -->
-                                <div class="border-bottom pb-1 mb-3">
-                                    <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link {{ request('tab') !== 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab">
-                                                {{ __('crm.history_audit_stream') }}
-                                            </button>
-                                        </li>
-                                        <li class="nav-item" role="presentation">
-                                            <button class="nav-link {{ request('tab') === 'interactions' ? 'active' : '' }} py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab">
-                                                {{ __('crm.interactions_scheduled_calls') }}
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
-                                
-                                <!-- Subtabs Content -->
-                                <div class="tab-content" id="zohoTimelineSubTabsContent">
-                                    
-                                    <!-- SUBTAB 1: HISTORY TIMELINE -->
-                                    <div class="tab-pane fade {{ request('tab') !== 'interactions' ? 'show active' : '' }}" id="subtab-history" role="tabpanel">
-                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.timeline_history_audit_stream') }}</h5>
-                                            </div>
-                                        </div>
+            <!-- RIGHT CHATTER BOX (Activity & History with Lead & Deal distinctions) -->
+            @include('modules.crm.deals.partials.deal-chatter-box', [
+                'deal' => $deal,
+                'linkedLead' => $linkedLead,
+                'users' => $users,
+                'allDealFollowups' => $allDealFollowups,
+                'plannedActivities' => $plannedActivities,
+                'overdueActivities' => $overdueActivities,
+                'todayDoneActivities' => $todayDoneActivities,
+                'pastDoneActivities' => $pastDoneActivities,
+                'groupedHistory' => $groupedHistory
+            ])
 
-                                        <div class="zoho-timeline-container">
-                                            @php
-                                                $groupedHistory = $histories->groupBy(function($item) {
-                                                    return $item->created_at ? $item->created_at->format('d/m/Y') : date('d/m/Y');
-                                                });
-                                            @endphp
-
-                                            @if($groupedHistory->isEmpty())
-                                                <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
-                                                    <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
-                                                    {{ __('crm.no_history_events') }}
-                                                </div>
-                    </div>
-                                            @else
-                                                @foreach($groupedHistory as $date => $items)
-                                                    <!-- Date Header -->
-                                                    <div class="zoho-timeline-date-group">
-                                                        <div class="zoho-timeline-date-header">{{ $date }}</div>
-                                                        
-                                                        @foreach($items as $item)
-                                                            <!-- Timeline Row -->
-                                                            <div class="zoho-timeline-event d-flex align-items-start">
-                                                                <div class="zoho-timeline-line"></div>
-                                                                
-                                                                @php
-                                                                    $icon = 'feather-info';
-                                                                    if ($item->event_type === 'created') $icon = 'feather-plus';
-                                                                    elseif ($item->event_type === 'assigned') $icon = 'feather-user';
-                                                                    elseif ($item->event_type === 'status_changed' || $item->event_type === 'status_updated') $icon = 'feather-refresh-cw';
-                                                                    elseif ($item->event_type === 'quotation_created') $icon = 'feather-file-text';
-                                                                    elseif ($item->event_type === 'activity_scheduled') $icon = 'feather-calendar';
-                                                                @endphp
-                                                                <div class="zoho-timeline-icon">
-                                                                    <i class="{{ $icon }}"></i>
-                                                                </div>
-
-                                                                <div class="zoho-timeline-content d-flex align-items-center justify-content-between w-100 ms-2">
-                                                                    <div>
-                                                                        <span class="fs-13 fw-semibold text-dark">
-                                                                            {{ $item->notes ?: ucwords(str_replace('_', ' ', $item->event_type)) }}
-                                                                        </span>
-                                                                        @if($item->old_value || $item->new_value)
-                                                                            <span class="fs-11 text-muted ms-2 bg-light px-1.5 py-0.5 rounded border">
-                                                                                @if($item->old_value)
-                                                                                    <del>{{ $item->old_value }}</del> <i class="feather-arrow-right mx-0.5"></i>
-                                                                                @endif
-                                                                                <strong class="text-success">{{ $item->new_value }}</strong>
-                                                                            </span>
-                                                                        @endif
-                                                                        <div class="text-muted fs-11 mt-0.5">
-                                                                            by {{ $item->user?->name ?: 'Demo Admin' }} {{ $item->created_at ? $item->created_at->format('d/m/Y') : '' }}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="zoho-timeline-time text-muted fs-11 ms-3" style="white-space: nowrap;">
-                                                                        {{ $item->created_at ? $item->created_at->format('h:i A') : '' }}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
-                                                @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-
-                                    <!-- SUBTAB 2: INTERACTIONS & ACTIVITIES -->
-                                    <div class="tab-pane fade {{ request('tab') === 'interactions' ? 'show active' : '' }}" id="subtab-interactions" role="tabpanel">
-                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
-                                            <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
-                                        </div>
-
-                                        @php
-                                            $groupedFollowups = $followups->reject(function($item) {
-                                                return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
-                                            })->groupBy(function($item) {
-                                                return $item->followup_date->format('d/m/Y');
-                                            });
-                                        @endphp
-
-                                        @if($groupedFollowups->isEmpty())
-                                            <div class="text-center py-5 text-muted border border-dashed rounded-3 bg-light fs-12" style="border-color:#cbd5e1!important;">
-                                                <i class="feather-calendar fs-28 d-block mb-2 opacity-40"></i>
-                                                <span class="fw-semibold">{{ __('crm.no_activities_scheduled') }}</span><br>
-                                                <span class="fs-11">{{ __('crm.click_schedule_activity') }}</span>
-                                            </div>
-                                        @else
-                                            @foreach($groupedFollowups as $date => $items)
-                                                @php
-                                                    $hasNotConnected = $items->contains(fn($i) => $i->status === 'Not Connected');
-                                                    $hasCancelled    = $items->contains(fn($i) => $i->status === 'Cancelled');
-                                                    $hasCompleted    = $items->contains(fn($i) => $i->status === 'Completed');
-                                                    $hasRescheduled  = $items->contains(fn($i) => $i->status === 'Rescheduled');
-
-                                                    $dateBadgeBg     = '#eff6ff';
-                                                    $dateBadgeColor  = '#1d4ed8';
-                                                    $dateBadgeBorder = '#93c5fd';
-
-                                                    if ($hasNotConnected) {
-                                                        $dateBadgeBg     = '#fff7ed';
-                                                        $dateBadgeColor  = '#c2410c';
-                                                        $dateBadgeBorder = '#fdba74';
-                                                    } elseif ($hasCancelled) {
-                                                        $dateBadgeBg     = '#fef2f2';
-                                                        $dateBadgeColor  = '#b91c1c';
-                                                        $dateBadgeBorder = '#fca5a5';
-                                                    } elseif ($hasCompleted) {
-                                                        $dateBadgeBg     = '#f0fdf4';
-                                                        $dateBadgeColor  = '#15803d';
-                                                        $dateBadgeBorder = '#86efac';
-                                                    } elseif ($hasRescheduled) {
-                                                        $dateBadgeBg     = '#faf5ff';
-                                                        $dateBadgeColor  = '#6b21a8';
-                                                        $dateBadgeBorder = '#d8b4fe';
-                                                    }
-                                                @endphp
-
-                                                <!-- Date Header -->
-                                                <div class="activity-date-group mb-3">
-                                                    <div class="activity-date-badge mb-2" style="background: {{ $dateBadgeBg }}; color: {{ $dateBadgeColor }}; border: 1px solid {{ $dateBadgeBorder }}; font-weight: 700;">
-                                                        <i class="feather-calendar fs-10 me-1"></i>{{ $date }}
-                                                    </div>
-
-                                                    @foreach($items as $item)
-                                                        @php
-                                                            $actIcon = 'feather-phone-call';
-                                                            $actIconBg = 'bg-soft-primary';
-                                                            $actIconColor = 'text-primary';
-                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-warning'; $actIconColor = 'text-warning'; }
-                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple';  $actIconColor = 'text-purple'; }
-                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-danger';  $actIconColor = 'text-danger'; }
-
-                                                            $statusBadgeClass = 'bg-primary text-white';
-                                                            $statusLabel = __('crm.pending') ?? 'Pending';
-                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = __('crm.connected'); }
-                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = __('crm.not_connected'); }
-                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = __('crm.cancelled'); }
-                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-purple text-white'; $statusLabel = __('crm.reschedule'); }
-                                                        @endphp
-
-                                                        <div class="activity-card mb-2">
-                                                            <div class="activity-card-inner">
-
-                                                                <!-- Top row: Icon + Type + Time + Status -->
-                                                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                                                                    <div class="activity-type-icon {{ $actIconBg }} {{ $actIconColor }} flex-shrink-0">
-                                                                        <i class="{{ $actIcon }}"></i>
-                                                                    </div>
-                                                                    <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
-                                                                    <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
-                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2.5 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
-
-                                                                    @php
-                                                                        $lastRescheduledDate = $item->rescheduledFrom?->followup_date;
-                                                                    @endphp
-                                                                    @if($lastRescheduledDate)
-                                                                        <span class="badge bg-soft-info text-info border border-info border-opacity-25 px-2 py-1 fs-10 fw-semibold ms-auto" title="Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}">
-                                                                            <i class="feather-refresh-cw me-1 fs-9"></i>Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}
-                                                                        </span>
-                                                                    @endif
-                                                                </div>
-
-                                                                <!-- Notes & Meeting / Calendar Buttons -->
-                                                                @php
-                                                                    $rawNotes = $item->notes ?? '';
-                                                                    $meetUrlFromNotes = null;
-                                                                    $cleanNotes = $rawNotes;
-                                                                    if (preg_match('/(Google Meet:\s*)(https?:\/\/\S+)/i', $rawNotes, $m)) {
-                                                                        $meetUrlFromNotes = $m[2];
-                                                                        $cleanNotes = trim(preg_replace('/\n?Google Meet:\s*https?:\/\/\S+/i', '', $rawNotes));
-                                                                    }
-                                                                    $meetLink = $item->google_meet_link ?? $meetUrlFromNotes;
-                                                                    $calEventLink = null;
-                                                                    if (!empty($item->google_event_id) && !str_starts_with($item->google_event_id, 'g_evt_')) {
-                                                                        $calEventLink = 'https://calendar.google.com/calendar/r';
-                                                                    }
-                                                                @endphp
-
-                                                                @if($cleanNotes)
-                                                                    <div class="activity-notes">
-                                                                        {{ $cleanNotes }}
-                                                                    </div>
-                                                                @endif
-
-                                                                @if($meetLink && $item->is_google_meet && $item->status === 'Pending')
-                                                                    <div class="mt-2 d-inline-block me-2">
-                                                                        <a href="{{ $meetLink }}" target="_blank"
-                                                                           class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
-                                                                           style="background: linear-gradient(135deg, #1a73e8, #0d47a1); box-shadow: 0 2px 6px rgba(26,115,232,0.35);">
-                                                                            <i class="feather-video me-1"></i> {{ __('crm.join_google_meet') }}
-                                                                        </a>
-                                                                    </div>
-                                                                @endif
-
-                                                                @if($calEventLink)
-                                                                    <div class="mt-2 d-inline-block">
-                                                                        <a href="{{ $calEventLink }}" target="_blank"
-                                                                           class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill text-white fw-semibold fs-11 text-decoration-none"
-                                                                           style="background: linear-gradient(135deg, #34a853, #1e7e34); box-shadow: 0 2px 6px rgba(52,168,83,0.35);">
-                                                                            <i class="feather-calendar me-1"></i> {{ __('crm.view_in_google_calendar') }}
-                                                                        </a>
-                                                                    </div>
-                                                                @endif
-
-                                                                <!-- Attribution -->
-                                                                <div class="activity-by mt-1 d-flex align-items-center flex-wrap gap-2">
-                                                                    <span>
-                                                                        <i class="feather-user fs-9 me-1"></i>by {{ $deal->owner?->name ?: ($linkedLead?->owner?->name ?: 'System') }} &bull; Scheduled: {{ $item->followup_date->format('d M Y, h:i A') }}
-                                                                    </span>
-                                                                    @if($item->taggedUsers->isNotEmpty())
-                                                                        @foreach($item->taggedUsers as $tUser)
-                                                                            <span class="badge bg-soft-info text-info fs-10 px-2 py-1 border border-info border-opacity-25" title="Tagged User">
-                                                                                <i class="feather-at-sign me-1"></i>Tagged: <strong>{{ $tUser->name }}</strong>
-                                                                            </span>
-                                                                        @endforeach
-                                                                    @endif
-                                                                    @if($item->status !== 'Pending')
-                                                                        <span class="text-muted ms-auto fs-10">
-                                                                            <i class="feather-clock fs-9 me-1 text-primary"></i>Status Updated: <strong class="text-dark">{{ $item->updated_at->format('d M Y, h:i A') }}</strong>
-                                                                        </span>
-                                                                    @endif
-                                                                </div>
-
-                                                                <!-- Action Buttons — horizontal row at bottom, only for Pending -->
-                                                                @if($item->status === 'Pending')
-                                                                    <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
-                                                                        <!-- Connected -->
-                                                                        <x-ui.button type="button" variant="soft-success" size="sm" icon="feather-phone-call" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed">{{ __('crm.connected') }}</x-ui.button>
-
-                                                                        <!-- Not Connected -->
-                                                                        <x-ui.button type="button" variant="soft-warning" size="sm" icon="feather-phone-off" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected">{{ __('crm.not_connected') }}</x-ui.button>
-
-                                                                        <!-- Cancelled -->
-                                                                        <x-ui.button type="button" variant="soft-danger" size="sm" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">{{ __('crm.cancelled') }}</x-ui.button>
-
-                                                                        <!-- Reschedule -->
-                                                                        <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">{{ __('crm.reschedule') }}</x-ui.button>
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-
-                                                        @if($item->status === 'Pending')
-                                                            @php
-                                                                $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
-                                                            @endphp
-
-                                                            <!-- Status Modal: Connected / Completed -->
-                                                            <x-ui.modal
-                                                                :id="'statusModal_' . $item->id . '_Completed'"
-                                                                :title="__('crm.mark_as_connected')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.save_mark_connected')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="status" value="Completed">
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_discussion_summary')" name="notes" rows="3" placeholder="Enter notes or discussion outcome...">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-
-                                                            <!-- Status Modal: Not Connected -->
-                                                            <x-ui.modal
-                                                                :id="'statusModal_' . $item->id . '_NotConnected'"
-                                                                :title="__('crm.mark_as_not_connected')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.save_status')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="status" value="Not Connected">
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.notes_reason')" name="notes" rows="3" placeholder="Reason / notes...">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-
-                                                            <!-- Status Modal: Cancelled -->
-                                                            <x-ui.modal
-                                                                :id="'statusModal_' . $item->id . '_Cancelled'"
-                                                                :title="__('crm.cancel_activity')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.confirm_cancel')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="status" value="Cancelled">
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.cancellation_note')" name="notes" rows="3" placeholder="Reason for cancellation...">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-
-                                                            <!-- Reschedule Modal -->
-                                                            <x-ui.modal
-                                                                :id="'rescheduleModal_' . $item->id"
-                                                                :title="__('crm.reschedule_activity')"
-                                                                size="md"
-                                                                :centered="true"
-                                                                :formAction="route('crm.followups.update', $item->id)"
-                                                                formMethod="PUT"
-                                                                :submitText="__('crm.confirm_reschedule')"
-                                                                :closeText="__('crm.cancel')"
-                                                            >
-                                                                <input type="hidden" name="is_reschedule" value="1">
-                                                                <p class="text-muted fs-11 mb-3">
-                                                                    <i class="{{ $actIcon }} me-1"></i>
-                                                                    {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
-                                                                    &bull; Current: <strong>{{ $item->followup_date->format('d M Y, h:i A') }}</strong>
-                                                                </p>
-                                                                <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('crm.new_date_time')" name="followup_date" :required="true" />
-                                                                <x-ui.odoo-form-ui type="select" :label="__('crm.tag_assign_persons')" name="tagged_user_ids[]" :multiple="true" :searchable="true">
-                                                                    @foreach($users as $u)
-                                                                        <option value="{{ $u->id }}" @selected(in_array($u->id, $currentTaggedIds))>{{ $u->name }} ({{ $u->email }})</option>
-                                                                    @endforeach
-                                                                </x-ui.odoo-form-ui>
-                                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.note_optional')" name="notes" rows="2" :placeholder="__('crm.reason_rescheduling')">{{ $item->notes }}</x-ui.odoo-form-ui>
-                                                            </x-ui.modal>
-                                                        @endif
-                                                    @endforeach
-                                                </div>
-                                            @endforeach
-                                        @endif
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </div>
+        </div> <!-- Closes odoo-layout-wrapper -->
+    </div> <!-- Closes zoho-lead-card-container -->
 
     <!-- Offcanvas Drawer: Deal Followup / Schedule Activity -->
     <div class="offcanvas offcanvas-end border-0 shadow-lg d-print-none" tabindex="-1" id="dealFollowupOffcanvas" aria-labelledby="dealFollowupOffcanvasLabel" style="width: 490px; max-width: 92vw;">
@@ -2554,6 +3056,9 @@
             <form action="{{ route('crm.deals.followups.store', $deal->id) }}" method="POST" id="dealFollowupForm" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="action_mode" id="dealOffcanvasActionMode" value="log_note">
+
+                {{-- Google Calendar & Meet Integration Banner --}}
+                @include('modules.crm.partials.google-calendar-banner')
 
                 <!-- 2-Mode Switcher Tabs -->
                 <div class="p-1 bg-light rounded-3 mb-4 d-flex gap-1 border">
@@ -2748,14 +3253,19 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.deal_stage') }}</label>
-                    <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
-                        @php
-                            $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
-                        @endphp
-                        @foreach($dStatuses as $stg)
-                            <option value="{{ $stg->name }}" @selected(old('stage', $deal->stage) === $stg->name)>{{ $stg->name }}</option>
-                        @endforeach
-                    </select>
+                    @if($isDealWon)
+                        <input type="text" class="form-control form-control-sm bg-light text-success fw-bold shadow-2xs" value="{{ $deal->stage }} (Locked)" readonly>
+                        <input type="hidden" name="stage" value="{{ $deal->stage }}">
+                    @else
+                        <select name="stage" id="dealOffcanvasStage" class="form-select form-select-sm shadow-2xs">
+                            @php
+                                $dStatuses = $dealStatuses ?? \App\Domains\CRM\Models\DealStatus::getOrderedStatuses();
+                            @endphp
+                            @foreach($dStatuses as $stg)
+                                <option value="{{ $stg->name }}" @selected(old('stage', $deal->stage) === $stg->name)>{{ $stg->name }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
 
                 <div class="d-flex align-items-center justify-content-end gap-2 border-top pt-3">
@@ -2768,13 +3278,100 @@
 
     @push('scripts')
     <script>
+        let isTogglingChatter = false;
+        window.toggleChatterBox = function() {
+            if (isTogglingChatter) return;
+            isTogglingChatter = true;
+            setTimeout(function() { isTogglingChatter = false; }, 250);
+
+            var chatter = document.getElementById('odooRightChatter');
+            var btn = document.getElementById('btnToggleChatter');
+            var text = document.getElementById('textToggleChatter');
+            if (!chatter) return;
+
+            var isHidden = chatter.classList.contains('d-none') || 
+                           chatter.style.display === 'none' || 
+                           window.getComputedStyle(chatter).display === 'none';
+
+            if (isHidden) {
+                // Show chatter
+                chatter.classList.remove('d-none');
+                chatter.style.removeProperty('display');
+                if (btn) {
+                    btn.classList.remove('btn-primary', 'text-white');
+                    btn.classList.add('btn-white', 'text-muted');
+                    btn.title = "Hide Chatter Sidebar";
+                }
+                if (text) text.innerText = 'Chatter';
+                try { localStorage.setItem('deal_chatter_hidden', '0'); } catch(e){}
+                if (window.innerWidth < 992) {
+                    setTimeout(function() {
+                        chatter.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 80);
+                }
+            } else {
+                // Hide chatter
+                chatter.classList.add('d-none');
+                chatter.style.setProperty('display', 'none', 'important');
+                if (btn) {
+                    btn.classList.remove('btn-white', 'text-muted');
+                    btn.classList.add('btn-primary', 'text-white');
+                    btn.title = "Show Chatter Sidebar";
+                }
+                if (text) text.innerText = 'Show Chatter';
+                try { localStorage.setItem('deal_chatter_hidden', '1'); } catch(e){}
+            }
+        };
+
         function submitDealStage(stageVal) {
+            @if($isDealWon)
+                alert('This deal is already Won and locked. Its stage cannot be changed.');
+                return false;
+            @endif
             document.getElementById('dealStageInput').value = stageVal;
             document.getElementById('dealStageForm').submit();
         }
 
         $(document).ready(function() {
-            const crmProductsList = @json($products ?? []);
+            // Bind single click handler for Chatter toggle button
+            $(document).on('click', '#btnToggleChatter', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.toggleChatterBox();
+            });
+
+            // Restore user's previous Chatter toggle preference if saved
+            try {
+                if (localStorage.getItem('deal_chatter_hidden') === '1') {
+                    var chatter = document.getElementById('odooRightChatter');
+                    var btn = document.getElementById('btnToggleChatter');
+                    var text = document.getElementById('textToggleChatter');
+                    if (chatter) {
+                        chatter.classList.add('d-none');
+                        chatter.style.setProperty('display', 'none', 'important');
+                    }
+                    if (btn) {
+                        btn.classList.remove('btn-white', 'text-muted');
+                        btn.classList.add('btn-primary', 'text-white');
+                        btn.title = "Show Chatter Sidebar";
+                    }
+                    if (text) text.innerText = 'Show Chatter';
+                }
+            } catch(e){}
+
+            @php
+                $crmProductsFormatted = ($products ?? collect())->map(function($p) {
+                    return [
+                        'id' => $p->id,
+                        'name' => $p->name,
+                        'sku' => $p->sku,
+                        'selling_price' => round(convert_from_base((float)($p->selling_price ?: ($p->unit_cost ?: 0))), 2),
+                        'unit_cost' => round(convert_from_base((float)($p->unit_cost ?: 0)), 2),
+                        'gst_rate' => $p->gst_rate,
+                    ];
+                });
+            @endphp
+            const crmProductsList = @json($crmProductsFormatted);
             let rowIndex = 0;
 
             function buildProductOptions(selectedId = '') {
@@ -2791,7 +3388,7 @@
             function getRowHtml(index, selectedId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
-                        <td class="ps-2">
+                        <td class="ps-2" style="vertical-align: top;">
                             <select name="items[${index}][product_id]" class="odoo-table-select odoo-select2 item-name-input erp-premium-select" required data-master="product" style="width:100%;">
                                 ${buildProductOptions(selectedId)}
                             </select>
@@ -2802,20 +3399,23 @@
                                 <i class="feather-plus me-1"></i>Add Description
                             </a>
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="0.01" step="any" required style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                        <td class="text-end" style="vertical-align: top;">
+                            <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="0.01" step="any" required style="width: 100%; text-align: right;">
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; max-width: 140px; margin-left: auto; text-align: right;">
+                        <td class="text-end" style="vertical-align: top;">
+                            <input type="number" name="items[${index}][unit_price]" class="odoo-table-input text-end price-input" value="0.00" min="0" step="0.01" required style="width: 100%; text-align: right;">
                         </td>
-                        <td>
-                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; max-width: 90px; margin-left: auto; text-align: right;">
+                        <td class="text-end col-discount" style="vertical-align: top; display: none;">
+                            <input type="number" name="items[${index}][discount]" class="odoo-table-input text-end line-discount-input" value="0.00" min="0" step="0.01" style="width: 100%; text-align: right;">
                         </td>
-                        <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; padding-top: 8px;">
+                        <td class="text-end" style="vertical-align: top;">
+                            <input type="number" name="items[${index}][tax_rate]" class="odoo-table-input text-end tax-input" value="18.00" min="0" max="100" step="0.01" style="width: 100%; text-align: right;">
+                        </td>
+                        <td class="text-end fw-bold text-dark amount-display pe-3" style="font-size: 13px; vertical-align: top; line-height: 32px;">
                             {{ active_currency_symbol() }}0.00
                         </td>
-                        <td class="text-center" style="padding-top: 6px;">
-                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn">
+                        <td class="text-center" style="vertical-align: top;">
+                            <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn" style="height: 32px; width: 32px; display: inline-flex; align-items: center; justify-content: center;">
                                 <i class="feather-trash-2"></i>
                             </button>
                         </td>
@@ -2844,7 +3444,33 @@
                 }
             });
 
-            $(document).on('input change', '.qty-input, .price-input, .tax-input, #discountInput', function() {
+            function toggleTaxAndDiscountOptions() {
+                const discountType = $('#discountTypeSelect').val() || 'order_wise';
+                if (discountType === 'item_wise') {
+                    $('.col-discount').show();
+                    $('#orderDiscountRow').show();
+                    $('#discountInput').hide();
+                    $('#calcItemDiscountDisplay').removeClass('d-none').show();
+                    $('#orderDiscountLabel').text('Item Discounts:');
+                } else if (discountType === 'order_wise') {
+                    $('.col-discount').hide();
+                    $('#orderDiscountRow').show();
+                    $('#discountInput').show();
+                    $('#calcItemDiscountDisplay').addClass('d-none').hide();
+                    $('#orderDiscountLabel').text('{{ __("crm.discount_colon") }}');
+                } else {
+                    $('.col-discount').hide();
+                    $('#orderDiscountRow').hide();
+                    $('#calcItemDiscountDisplay').addClass('d-none').hide();
+                }
+            }
+
+            $(document).on('change', '#discountTypeSelect', function() {
+                toggleTaxAndDiscountOptions();
+                calculateTotals();
+            });
+
+            $(document).on('input change', '.qty-input, .price-input, .tax-input, .line-discount-input, #discountInput, #taxModeSelect, #taxTypeSelect', function() {
                 calculateTotals();
             });
 
@@ -2875,6 +3501,7 @@
                         }
                     }
                     newRow.find('.price-input').val(finalUnitPrice.toFixed(2));
+                    newRow.find('.line-discount-input').val(item.discount !== undefined && item.discount !== null ? parseFloat(item.discount).toFixed(2) : '0.00');
                     newRow.find('.tax-input').val(item.tax_rate !== undefined && item.tax_rate !== null ? parseFloat(item.tax_rate).toFixed(2) : '18.00');
                 }
 
@@ -2890,33 +3517,142 @@
                 });
 
                 rowIndex++;
+                toggleTaxAndDiscountOptions();
                 calculateTotals();
             }
 
             function calculateTotals() {
                 let subtotal = 0;
-                let taxTotal = 0;
+                const taxMode = $('#taxModeSelect').val() || 'exclusive';
+                const taxType = $('#taxTypeSelect').val() || 'intra_state';
+                const discountType = $('#discountTypeSelect').val() || 'order_wise';
+                let totalDiscount = 0;
 
+                // 1. Gather all rows, compute row amount (Qty * Price) and sum subtotal
+                const lineItems = [];
                 $('.item-row').each(function() {
                     const qty = parseFloat($(this).find('.qty-input').val()) || 0;
                     const price = parseFloat($(this).find('.price-input').val()) || 0;
-                    const taxRate = parseFloat($(this).find('.tax-input').val()) || 0;
+                    const lineDisc = parseFloat($(this).find('.line-discount-input').val()) || 0;
+                    let taxRate = parseFloat($(this).find('.tax-input').val()) || 0;
+                    if (taxType === 'exempt') {
+                        taxRate = 0;
+                    }
 
-                    const amount = qty * price;
-                    const tax = amount * (taxRate / 100);
+                    const lineAmount = qty * price;
+                    subtotal += lineAmount;
 
-                    subtotal += amount;
-                    taxTotal += tax;
+                    lineItems.push({
+                        row: $(this),
+                        qty: qty,
+                        price: price,
+                        lineDisc: lineDisc,
+                        taxRate: taxRate,
+                        lineAmount: lineAmount
+                    });
 
-                    $(this).find('.amount-display').text('{{ active_currency_symbol() }}' + amount.toFixed(2));
+                    $(this).find('.amount-display').text('{{ active_currency_symbol() }}' + lineAmount.toFixed(2));
                 });
 
-                const discount = parseFloat($('#discountInput').val()) || 0;
-                const grandTotal = subtotal + taxTotal - discount;
+                if (discountType === 'item_wise') {
+                    lineItems.forEach(function(item) {
+                        totalDiscount += item.lineDisc;
+                    });
+                    $('#calcItemDiscountDisplay').text('-{{ active_currency_symbol() }}' + totalDiscount.toFixed(2));
+                } else if (discountType === 'none') {
+                    totalDiscount = 0;
+                } else {
+                    totalDiscount = parseFloat($('#discountInput').val()) || 0;
+                }
+
+                // 2. Distribute discount across rows and compute taxes after discount
+                let totalTaxableBase = 0;
+                let taxTotal = 0;
+
+                lineItems.forEach(function(item) {
+                    let effectiveLineDiscount = 0;
+                    if (discountType === 'item_wise') {
+                        effectiveLineDiscount = item.lineDisc;
+                    } else if (discountType === 'none') {
+                        effectiveLineDiscount = 0;
+                    } else {
+                        effectiveLineDiscount = (subtotal > 0 && totalDiscount > 0) ? (item.lineAmount / subtotal) * totalDiscount : 0;
+                    }
+
+                    if (taxMode === 'inclusive') {
+                        const lineNet = Math.max(0, item.lineAmount - effectiveLineDiscount);
+                        const lineBase = (item.taxRate > 0 && taxType !== 'exempt') ? (lineNet / (1 + (item.taxRate / 100))) : lineNet;
+                        const lineTax = lineNet - lineBase;
+                        totalTaxableBase += lineBase;
+                        taxTotal += lineTax;
+
+                        if (item.taxRate > 0 && taxType !== 'exempt') {
+                            const rawBase = item.lineAmount / (1 + (item.taxRate / 100));
+                            item.row.find('.tax-base-hint').text('(Base: {{ active_currency_symbol() }}' + rawBase.toFixed(2) + ')').show();
+                        } else {
+                            item.row.find('.tax-base-hint').hide();
+                        }
+                    } else {
+                        const lineTaxable = Math.max(0, item.lineAmount - effectiveLineDiscount);
+                        const lineTax = (taxType === 'exempt') ? 0 : (lineTaxable * (item.taxRate / 100));
+                        totalTaxableBase += lineTaxable;
+                        taxTotal += lineTax;
+                        item.row.find('.tax-base-hint').hide();
+                    }
+                });
+
+                if (taxType === 'exempt') {
+                    taxTotal = 0;
+                }
+
+                // 3. Grand Total
+                let grandTotal = 0;
+                if (taxMode === 'inclusive') {
+                    grandTotal = Math.max(0, subtotal - totalDiscount);
+                } else {
+                    grandTotal = Math.max(0, totalTaxableBase + taxTotal);
+                }
+
+                // 4. Tax Split Breakdown
+                let cgst = 0, sgst = 0, igst = 0;
+                if (taxType === 'intra_state') {
+                    cgst = taxTotal / 2;
+                    sgst = taxTotal / 2;
+                    $('#intraStateTaxRows').show();
+                    $('#interStateTaxRow').hide();
+                    $('#exemptTaxRow').hide();
+                } else if (taxType === 'inter_state') {
+                    igst = taxTotal;
+                    $('#intraStateTaxRows').hide();
+                    $('#interStateTaxRow').show();
+                    $('#exemptTaxRow').hide();
+                } else {
+                    $('#intraStateTaxRows').hide();
+                    $('#interStateTaxRow').hide();
+                    $('#exemptTaxRow').show();
+                }
+
+                if (taxMode === 'inclusive') {
+                    $('#taxableAmountLabel').text('Taxable Value (Excl. Tax)');
+                    $('.cgst-label-text').text('CGST (Included)');
+                    $('.sgst-label-text').text('SGST (Included)');
+                    $('.igst-label-text').text('IGST (Included)');
+                    $('.tax-label-text').text('Total Tax (Included)');
+                } else {
+                    $('#taxableAmountLabel').text('Taxable Amount (After Disc.)');
+                    $('.cgst-label-text').text('CGST');
+                    $('.sgst-label-text').text('SGST');
+                    $('.igst-label-text').text('IGST');
+                    $('.tax-label-text').text('{{ __("crm.taxes_label") }}');
+                }
 
                 $('#calcSubtotal').text('{{ active_currency_symbol() }}' + subtotal.toFixed(2));
+                $('#calcTaxableBase').text('{{ active_currency_symbol() }}' + totalTaxableBase.toFixed(2));
+                $('#calcCgst').text('{{ active_currency_symbol() }}' + cgst.toFixed(2));
+                $('#calcSgst').text('{{ active_currency_symbol() }}' + sgst.toFixed(2));
+                $('#calcIgst').text('{{ active_currency_symbol() }}' + igst.toFixed(2));
                 $('#calcTax').text('{{ active_currency_symbol() }}' + taxTotal.toFixed(2));
-                $('#calcTotal').text('{{ active_currency_symbol() }}' + Math.max(0, grandTotal).toFixed(2));
+                $('#calcTotal').text('{{ active_currency_symbol() }}' + grandTotal.toFixed(2));
             }
 
 
@@ -2925,9 +3661,32 @@
             const hasCreateQ = @json(request()->has('create_quotation') || old('form_type') === 'quotation_create');
             const hasEditQ = @json(request()->has('edit_quotation') || old('form_type') === 'quotation_edit');
             const prefilledDealItems = @json($prefilledDealItems ?? []);
-            const existingItems = @json(old('items') ?: (request()->has('create_quotation') && !empty($prefilledDealItems) ? $prefilledDealItems : (isset($activeQuotation) ? $activeQuotation->items : [])));
+            @php
+                $mappedExistingItems = null;
+                if (old('items')) {
+                    $mappedExistingItems = old('items');
+                } elseif (request()->has('create_quotation') && !empty($prefilledDealItems)) {
+                    $mappedExistingItems = $prefilledDealItems;
+                } elseif (isset($activeQuotation)) {
+                    $mappedExistingItems = $activeQuotation->items->map(function($it) {
+                        return [
+                            'id' => $it->id,
+                            'product_id' => $it->product_id,
+                            'item_name' => $it->item_name,
+                            'description' => $it->description,
+                            'quantity' => (float)$it->quantity,
+                            'unit_price' => round(convert_from_base((float)$it->unit_price), 2),
+                            'discount' => round(convert_from_base((float)($it->discount ?? 0)), 2),
+                            'tax_rate' => (float)$it->tax_rate,
+                            'amount' => round(convert_from_base((float)$it->amount), 2),
+                        ];
+                    });
+                }
+            @endphp
+            const existingItems = @json($mappedExistingItems ?? []);
 
             if (hasCreateQ || hasEditQ) {
+                toggleTaxAndDiscountOptions();
                 if (existingItems && existingItems.length > 0) {
                     existingItems.forEach(function(item) {
                         addRow(item);
@@ -2939,7 +3698,7 @@
 
             // Scroll Spy for Overview Sections
             let isManualClick = false;
-            $('#zohoMainScrollable').on('scroll', function() {
+            $('#odooMainScrollable, #zohoMainScrollable').on('scroll', function() {
                 if (isManualClick) return;
                 const scrollContainer = this;
                 const containerTop = scrollContainer.getBoundingClientRect().top;
@@ -2970,7 +3729,7 @@
             function scrollToTarget(targetHash) {
                 if (!targetHash) return;
                 const targetEl = document.querySelector(targetHash);
-                const scrollContainer = document.getElementById('zohoMainScrollable');
+                const scrollContainer = document.getElementById('odooMainScrollable') || document.getElementById('zohoMainScrollable');
                 if (targetEl && scrollContainer) {
                     const containerTop = scrollContainer.getBoundingClientRect().top;
                     const targetTop = targetEl.getBoundingClientRect().top;
@@ -2978,12 +3737,12 @@
                     const stickyHeaderHeight = stickyHeader ? (stickyHeader.offsetHeight + 10) : 65;
                     const offset = targetTop - containerTop + scrollContainer.scrollTop - stickyHeaderHeight;
                     scrollContainer.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
-                } else if (scrollContainer && (targetHash === '#sectionQuotations' || targetHash === '#sectionSalesOrders')) {
+                } else if (scrollContainer && (targetHash === '#sectionQuotations')) {
                     scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             }
 
-            // Smooth Related List Sidebar Navigation & Tab Synchronization
+            // Smooth Related List Sidebar Navigation & Tab Synchronization (if present)
             $('#zohoSidebarLinks a').on('click', function(e) {
                 e.preventDefault();
                 const targetHash = $(this).attr('href');
@@ -2992,30 +3751,20 @@
                 $(this).addClass('active');
                 isManualClick = true;
 
-                // 1. Identify Target Main Tab and Subtab
                 let targetTabBtnId = null;
-                let targetSubtabBtnId = null;
-
                 if (['#sectionDealInfo', '#sectionCustomerCard', '#sectionNotes', '#sectionDocuments'].includes(targetHash)) {
                     targetTabBtnId = 'overview-tab';
                 } else if (targetHash === '#sectionQuotations' || targetHash === '#sectionQuotationHistory') {
                     targetTabBtnId = 'quotations-tab';
-                } else if (targetHash === '#sectionSalesOrders') {
-                    targetTabBtnId = 'salesorders-tab';
                 } else if (targetHash === '#subtab-interactions' || targetHash === '#subtab-history') {
-                    targetTabBtnId = 'timeline-tab';
-                    targetSubtabBtnId = (targetHash === '#subtab-interactions') ? 'subtab-interactions-tab' : 'subtab-history-tab';
-                }
-
-                // 2. Subtab handling if applicable
-                if (targetSubtabBtnId) {
-                    const subtabBtn = document.getElementById(targetSubtabBtnId);
-                    if (subtabBtn) {
-                        bootstrap.Tab.getOrCreateInstance(subtabBtn).show();
+                    const chatterTabId = (targetHash === '#subtab-interactions') ? 'deal-chatter-activity-tab' : 'deal-chatter-history-tab';
+                    const chatterTab = document.getElementById(chatterTabId);
+                    if (chatterTab) {
+                        bootstrap.Tab.getOrCreateInstance(chatterTab).show();
                     }
+                    return;
                 }
 
-                // 3. Main Tab activation & Scrolling
                 const tabBtn = document.getElementById(targetTabBtnId);
                 const isAlreadyActive = tabBtn && tabBtn.classList.contains('active');
 
@@ -3031,63 +3780,97 @@
             });
 
             // Tab state persistence logic
-            var activeTabKey = 'deal_active_tab_' + {{ $deal->id }};
-            var activeSubTabKey = 'deal_active_subtab_' + {{ $deal->id }};
+            var activeSheetTabKey = 'deal_active_sheet_tab_' + {{ $deal->id }};
+            var activeChatterTabKey = 'deal_active_chatter_tab_' + {{ $deal->id }};
 
             const isQTabActive = @json($isQuotationTabActive);
-            const isSOTabActive = @json($isSalesOrdersTabActive);
             if (isQTabActive) {
-                localStorage.setItem(activeTabKey, 'quotations-tab');
-            } else if (isSOTabActive) {
-                localStorage.setItem(activeTabKey, 'salesorders-tab');
+                localStorage.setItem(activeSheetTabKey, 'quotations-tab');
             }
 
             // Check URL Query Param & Hash first
             var urlParams = new URLSearchParams(window.location.search);
             var tabParam = urlParams.get('tab');
+            var activityIdParam = urlParams.get('activity_id');
             var hash = window.location.hash;
 
-            if (tabParam === 'interactions' || tabParam === 'timeline' || hash === '#timeline' || hash === '#timeline-pane' || hash === '#subtab-interactions' || hash === '#subtab-history') {
-                localStorage.setItem(activeTabKey, 'timeline-tab');
-                if (tabParam === 'interactions' || hash === '#subtab-interactions') {
-                    localStorage.setItem(activeSubTabKey, 'subtab-interactions-tab');
-                } else if (hash === '#subtab-history') {
-                    localStorage.setItem(activeSubTabKey, 'subtab-history-tab');
-                }
+            if (tabParam === 'quotations' || hash === '#quotations' || hash === '#quotations-pane') {
+                localStorage.setItem(activeSheetTabKey, 'quotations-tab');
             } else if (tabParam === 'overview' || hash === '#overview' || hash === '#overview-pane') {
-                localStorage.setItem(activeTabKey, 'overview-tab');
-            } else if (tabParam === 'quotations' || hash === '#quotations' || hash === '#quotations-pane') {
-                localStorage.setItem(activeTabKey, 'quotations-tab');
-            } else if (tabParam === 'salesorders' || hash === '#salesorders' || hash === '#salesorders-pane') {
-                localStorage.setItem(activeTabKey, 'salesorders-tab');
+                localStorage.setItem(activeSheetTabKey, 'overview-tab');
             }
 
-            // Restore saved tab from localStorage
-            var savedTabId = localStorage.getItem(activeTabKey);
-            if (savedTabId && $('#' + savedTabId).length) {
-                setTimeout(function() {
-                    var mainTabEl = document.getElementById(savedTabId);
-                    if (mainTabEl) {
-                        bootstrap.Tab.getOrCreateInstance(mainTabEl).show();
+            var isActivityIntent = (tabParam === 'interactions' || tabParam === 'activities' || tabParam === 'timeline' || activityIdParam || hash === '#deal-chatter-activity-pane' || hash === '#subtab-interactions' || hash.indexOf('activity') > -1);
+
+            if (isActivityIntent) {
+                // 1. Force reveal Chatter sidebar if hidden
+                var chatter = document.getElementById('odooRightChatter');
+                if (chatter) {
+                    chatter.classList.remove('d-none');
+                    chatter.style.removeProperty('display');
+                    var btnChatter = document.getElementById('btnToggleChatter');
+                    var textChatter = document.getElementById('textToggleChatter');
+                    if (btnChatter) {
+                        btnChatter.classList.remove('btn-primary', 'text-white');
+                        btnChatter.classList.add('btn-white', 'text-muted');
+                        btnChatter.title = "Hide Chatter Sidebar";
                     }
-                    
-                    if (savedTabId === 'timeline-tab') {
-                        var savedSubTabId = localStorage.getItem(activeSubTabKey) || 'subtab-interactions-tab';
-                        var subTabEl = document.getElementById(savedSubTabId);
-                        if (subTabEl) {
-                            bootstrap.Tab.getOrCreateInstance(subTabEl).show();
-                        }
+                    if (textChatter) textChatter.innerText = 'Chatter';
+                    try { localStorage.setItem('deal_chatter_hidden', '0'); } catch(e){}
+                }
+
+                if (tabParam === 'timeline' || hash === '#deal-chatter-history-pane' || hash === '#subtab-history') {
+                    localStorage.setItem(activeChatterTabKey, 'deal-chatter-history-tab');
+                } else {
+                    localStorage.setItem(activeChatterTabKey, 'deal-chatter-activity-tab');
+                }
+            }
+
+            // Restore saved sheet tab from localStorage
+            var savedSheetTabId = localStorage.getItem(activeSheetTabKey) || 'overview-tab';
+            if (savedSheetTabId && $('#' + savedSheetTabId).length) {
+                setTimeout(function() {
+                    var sheetTabEl = document.getElementById(savedSheetTabId);
+                    if (sheetTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(sheetTabEl).show();
                     }
                 }, 50);
             }
 
-            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], a[data-bs-toggle="tab"]', function (e) {
+            // Restore saved chatter tab from localStorage
+            var savedChatterTabId = localStorage.getItem(activeChatterTabKey) || (isActivityIntent ? 'deal-chatter-activity-tab' : null);
+            if (savedChatterTabId && $('#' + savedChatterTabId).length) {
+                setTimeout(function() {
+                    var chatterTabEl = document.getElementById(savedChatterTabId);
+                    if (chatterTabEl) {
+                        bootstrap.Tab.getOrCreateInstance(chatterTabEl).show();
+                    }
+                }, 60);
+            }
+
+            // Scroll & Highlight Target Activity if coming from Calendar
+            var targetActId = activityIdParam || (hash ? hash.replace(/^#deal-activity-|^#activity-/, '') : null);
+            if (targetActId && !isNaN(targetActId)) {
+                setTimeout(function() {
+                    var targetCard = document.getElementById('deal-activity-' + targetActId) || document.querySelector('[data-activity-id="' + targetActId + '"]');
+                    if (targetCard) {
+                        var parentCollapse = $(targetCard).closest('.collapse');
+                        if (parentCollapse.length && !parentCollapse.hasClass('show')) {
+                            parentCollapse.collapse('show');
+                        }
+                        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        $(targetCard).addClass('activity-highlight-pulse');
+                        setTimeout(function() { $(targetCard).removeClass('activity-highlight-pulse'); }, 3500);
+                    }
+                }, 300);
+            }
+
+            $(document).on('shown.bs.tab', 'button[data-bs-toggle="tab"], button[data-bs-toggle="pill"]', function (e) {
                 if (e.target.id) {
-                    if (['overview-tab', 'timeline-tab', 'quotations-tab', 'salesorders-tab'].includes(e.target.id)) {
-                        localStorage.setItem(activeTabKey, e.target.id);
-                    } else if (['subtab-history-tab', 'subtab-interactions-tab'].includes(e.target.id)) {
-                        localStorage.setItem(activeSubTabKey, e.target.id);
-                        localStorage.setItem(activeTabKey, 'timeline-tab');
+                    if (['overview-tab', 'quotations-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeSheetTabKey, e.target.id);
+                    } else if (['deal-chatter-activity-tab', 'deal-chatter-history-tab'].includes(e.target.id)) {
+                        localStorage.setItem(activeChatterTabKey, e.target.id);
                     }
                 }
             });
@@ -3101,21 +3884,6 @@
                         scrollToTarget(targetToScroll);
                         setTimeout(function() { isManualClick = false; }, 400);
                     }, 60);
-                } else {
-                    const targetPaneId = $(e.target).attr('data-bs-target');
-                    if (targetPaneId === '#overview-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#sectionDealInfo"]').addClass('active');
-                    } else if (targetPaneId === '#quotations-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#sectionQuotations"]').addClass('active');
-                    } else if (targetPaneId === '#salesorders-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#sectionSalesOrders"]').addClass('active');
-                    } else if (targetPaneId === '#timeline-pane') {
-                        $('#zohoSidebarLinks a').removeClass('active');
-                        $('#zohoSidebarLinks a[href="#subtab-history"]').addClass('active');
-                    }
                 }
             });
 
@@ -3232,6 +4000,10 @@
         });
 
         window.submitDealStage = function(stage) {
+            @if($isDealWon)
+                alert('This deal is already Won and locked. Its stage cannot be changed.');
+                return false;
+            @endif
             var form = $('#dealStageForm');
             if (form.length) {
                 $('#dealStageInput').val(stage);
@@ -3705,12 +4477,281 @@
         </div>
     </x-ui.modal>
 
+    <!-- Floating Right-Side CRM Mobile Softphone Dialer Widget for Deals -->
+    <div id="crmFloatingSoftphoneWidget" class="crm-softphone-dock shadow-2xl" style="display: none; position: fixed; bottom: 24px; right: 24px; z-index: 1055; width: 320px; max-width: calc(100vw - 48px); border-radius: 20px; overflow: hidden; background: #ffffff; border: 1px solid rgba(226, 232, 240, 0.9); box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(0,0,0,0.06); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+        
+        <!-- Header: Modern Sleek Phone Header with Clearly Visible Action Buttons -->
+        <div class="d-flex align-items-center justify-content-between crm-softphone-header" id="softphoneHeaderBar" style="cursor: pointer;">
+            <div class="d-flex align-items-center gap-2.5">
+                <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 28px; height: 28px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399;">
+                    <i class="feather-phone" style="font-size: 13px;"></i>
+                </div>
+                <span class="text-white fw-bold fs-13" style="letter-spacing: 0.2px;">Phone Dialer</span>
+                <span id="softphoneStatusPill" style="display: none;">Ready</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-action-btn" id="btnMinimizeSoftphone" title="Minimize / Expand" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
+                    <i class="feather-minus" id="iconSoftphoneMinMax" style="font-size: 15px; font-weight: bold;"></i>
+                </button>
+                <button type="button" class="btn p-0 d-flex align-items-center justify-content-center crm-header-close-btn" id="btnCloseSoftphone" title="Close Dialer" style="width: 30px; height: 30px; text-decoration: none; cursor: pointer;">
+                    <i class="feather-x" style="font-size: 16px; font-weight: bold;"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Body Content: Pure White in Light Mode, Dark in Dark Mode -->
+        <div id="softphoneBody" class="p-3 crm-softphone-body" style="background: #ffffff; max-height: 80vh; overflow-y: auto;">
+            
+            <!-- Caller Display Section (Clean Minimalist Centered Mobile Style) -->
+            <div class="text-center mb-3">
+                <div class="avatar-text bg-primary text-white rounded-circle fw-bold mx-auto mb-1.5 shadow-sm d-flex align-items-center justify-content-center" id="dialerContactAvatar" style="width: 48px; height: 48px; font-size: 18px; letter-spacing: -0.5px;">
+                    C
+                </div>
+                <div class="fw-bold text-dark fs-14 text-truncate px-2" id="dialerContactName">Customer</div>
+                <div class="text-muted fs-11 text-truncate px-2" id="dialerContactSub">Direct Call</div>
+            </div>
+
+            <!-- Phone Screen Number Display with Centered Clear/Backspace -->
+            <div class="position-relative mb-3">
+                <input type="text" class="form-control form-control-lg text-center fw-bold fs-18 text-dark bg-white border shadow-2xs rounded-3 crm-dialer-display" id="dialerDisplayNumber" placeholder="Enter number" style="letter-spacing: 1px; font-family: monospace; height: 48px; padding-left: 48px; padding-right: 48px; line-height: 48px;">
+                <button type="button" class="btn p-0 position-absolute" id="btnDialerBackspace" title="Backspace" style="right: 8px; top: 0; bottom: 0; margin: auto 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; text-decoration: none; border-radius: 50%; z-index: 5; cursor: pointer;">
+                    <i class="feather-delete" style="font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center;"></i>
+                </button>
+            </div>
+
+            <!-- Mobile Round Keypad (3x4) -->
+            <div id="dialerIdlePanel">
+                <div class="p-1 mb-3">
+                    <div class="row g-2 text-center">
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="1"><span class="d-block fw-bold fs-15 lh-1">1</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">&nbsp;</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="2"><span class="d-block fw-bold fs-15 lh-1">2</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">ABC</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="3"><span class="d-block fw-bold fs-15 lh-1">3</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">DEF</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="4"><span class="d-block fw-bold fs-15 lh-1">4</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">GHI</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="5"><span class="d-block fw-bold fs-15 lh-1">5</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">JKL</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="6"><span class="d-block fw-bold fs-15 lh-1">6</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">MNO</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="7"><span class="d-block fw-bold fs-15 lh-1">7</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">PQRS</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="8"><span class="d-block fw-bold fs-15 lh-1">8</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">TUV</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="9"><span class="d-block fw-bold fs-15 lh-1">9</span><span class="fs-8 text-muted d-block mt-0.5" style="letter-spacing: 1px;">WXYZ</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="*"><span class="d-block fw-bold fs-15 lh-1">*</span><span class="fs-8 text-muted d-block mt-0.5">&nbsp;</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="0"><span class="d-block fw-bold fs-15 lh-1">0</span><span class="fs-8 text-muted d-block mt-0.5">+</span></button></div>
+                        <div class="col-4"><button type="button" class="btn btn-white w-100 py-2 border rounded-3 shadow-2xs dialpad-key crm-dialpad-btn" data-key="#"><span class="d-block fw-bold fs-15 lh-1">#</span><span class="fs-8 text-muted d-block mt-0.5">&nbsp;</span></button></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active In-Call Panel -->
+            <div id="dialerInCallPanel" style="display: none;">
+                <div class="p-3 bg-white rounded-3 border mb-3 shadow-2xs text-center crm-dialer-card">
+                    <div class="d-flex align-items-center justify-content-center gap-1.5 mb-1.5">
+                        <span class="spinner-grow spinner-grow-sm text-danger" style="width: 8px; height: 8px;" role="status"></span>
+                        <span class="badge bg-soft-danger text-danger fs-10 fw-bold px-2 py-0.5" id="dialerLiveStatusTag">
+                            Calling...
+                        </span>
+                        <span class="badge bg-soft-success text-success fs-11 fw-bold px-2 py-0.5" id="dialerLiveTimer">00:00</span>
+                    </div>
+                    <div class="fw-bold text-dark fs-14" id="inCallTargetDisplay">+91 0000000000</div>
+                    <span class="text-muted fs-10" id="inCallSubtext">Telephony Active</span>
+
+                    <!-- Audio Waveform -->
+                    <div class="d-flex align-items-center justify-content-center gap-1 mt-2.5" style="height: 18px;">
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 12px; animation: pulseWave 1s infinite alternate;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 18px; animation: pulseWave 0.7s infinite alternate 0.2s;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 10px; animation: pulseWave 0.9s infinite alternate 0.4s;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 16px; animation: pulseWave 0.6s infinite alternate 0.1s;"></div>
+                        <div class="bg-success rounded-pill audio-wave-bar" style="width: 3px; height: 12px; animation: pulseWave 0.8s infinite alternate 0.3s;"></div>
+                    </div>
+                </div>
+
+                <!-- Call Notes / Transcript Input -->
+                <div class="mb-3">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold fs-10 text-muted text-uppercase">Voice Notes:</span>
+                        <span class="text-muted fs-9" id="liveSpeechStatus">Listening...</span>
+                    </div>
+                    <textarea class="form-control fs-11 bg-white" id="dialerCallNotes" rows="2" placeholder="Voice transcript & notes..."></textarea>
+                </div>
+            </div>
+
+            <!-- Dial Button Action Container -->
+            <div>
+                <!-- 1. Start Call -->
+                <div id="dialerStartAction">
+                    <button type="button" class="btn btn-success w-100 py-2.5 fs-13 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm rounded-pill" id="btnStartRealCall" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                        <i class="feather-phone-call fs-14"></i>
+                        <span>Start Call</span>
+                    </button>
+                </div>
+
+                <!-- 2. Disconnect Call -->
+                <div id="dialerEndAction" style="display: none;">
+                    <button type="button" class="btn btn-danger w-100 py-2.5 fs-13 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm rounded-pill" id="btnDisconnectAndAnalyze" style="background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);">
+                        <i class="feather-phone-off fs-14"></i>
+                        <span id="btnDisconnectText">End Call & AI Summary</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal 2: Gemini AI Deal Call Analysis & Confirmation Popup (Human-in-the-Loop using common component) -->
+    <x-ui.modal id="geminiAiCallReviewModal" size="lg" :centered="true" :static="true" :showFooter="false">
+        <x-slot:title>
+            <div class="d-flex align-items-center gap-2">
+                <div class="avatar-text avatar-sm bg-primary text-white rounded-circle shadow-xs">
+                    <i class="feather-cpu fs-14"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="modal-title fs-14 fw-bold mb-0 text-dark" id="geminiAiCallReviewModalLabel">Gemini AI Deal Call Recording Analysis & Next Steps</h5>
+                        <span class="badge bg-soft-primary text-primary fs-10 fw-bold px-2 py-0.5 rounded-pill shadow-xs">Gemini Flash AI</span>
+                    </div>
+                    <span class="fs-11 text-muted">Audio transcribed & analyzed. Review before confirming activity to Deal.</span>
+                </div>
+            </div>
+        </x-slot:title>
+
+        <!-- Target Deal Quick Header -->
+        <div class="bg-light p-3 rounded-3 border mb-3 shadow-xs d-flex align-items-center justify-content-between">
+            <div>
+                <span class="text-muted fs-10 text-uppercase fw-bold">Target Deal / Account</span>
+                <div class="fw-bold text-dark fs-13" id="aiModalDealName">Deal Title</div>
+                <span class="text-muted fs-11" id="aiModalDialedNumber">+91 0000000000</span>
+            </div>
+            <div class="text-end">
+                <span class="text-muted fs-10 text-uppercase fw-bold d-block">AI Sentiment</span>
+                <span class="badge bg-soft-success text-success border border-success-subtle fs-11 fw-bold" id="aiModalSentimentBadge">Positive / Interested</span>
+            </div>
+        </div>
+
+        <form id="geminiAiDealApprovalForm">
+            <input type="hidden" id="aiModalDealId" value="">
+            <input type="hidden" id="aiModalCallDuration" value="0">
+            <input type="hidden" id="aiModalDialedPhoneVal" value="">
+            <input type="hidden" id="aiModalRecordingUrl" value="">
+
+            <!-- Audio Recording Preview & Playback -->
+            <div id="aiModalAudioPreviewContainer" class="p-3 mb-3 bg-white rounded-3 border shadow-xs" style="display: none; border-color: #bfdbfe !important; background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom border-primary border-opacity-10 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="avatar-text avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width: 26px; height: 26px; font-size: 11px;">
+                            <i class="feather-phone-call"></i>
+                        </div>
+                        <div>
+                            <span class="fw-bold text-dark fs-12 d-block">Call Recording Audio</span>
+                            <span class="text-muted fs-10">Play & verify speech before Deal confirmation</span>
+                        </div>
+                    </div>
+                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 fw-bold px-2.5 py-1 rounded-pill">
+                        <i class="feather-disc me-1 fs-9"></i>2-Way Audio
+                    </span>
+                </div>
+                <div class="px-0.5 pt-0.5">
+                    <audio id="aiModalAudioPlayer" controls preload="metadata" class="w-100" style="height: 38px; border-radius: 25px; outline: none;">
+                        Your browser does not support audio playback.
+                    </audio>
+                </div>
+            </div>
+
+            <!-- 1. Voice Recording Transcription (Speech-to-Text) -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label fw-bold fs-12 text-dark mb-0">
+                        <i class="feather-volume-2 text-primary me-1"></i> Audio Recording Transcript (What was spoken)
+                    </label>
+                    <span class="badge bg-soft-info text-info fs-10">Gemini Audio Speech-to-Text</span>
+                </div>
+                <textarea class="form-control fs-12 bg-white" id="aiModalTranscript" rows="2" placeholder="Transcribed conversation text..."></textarea>
+            </div>
+
+            <!-- 2. Discussion Summary -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label fw-bold fs-12 text-dark mb-0">
+                        <i class="feather-file-text text-primary me-1"></i> Discussion Summary & Next Milestones
+                    </label>
+                    <span class="text-muted fs-10">Editable</span>
+                </div>
+                <textarea class="form-control fs-12 bg-white" id="aiModalDiscussionSummary" rows="3" required placeholder="Discussion details analyzed by Gemini..."></textarea>
+            </div>
+
+            <!-- 3. Next Follow-up & Activity Details -->
+            <div class="p-3 bg-light rounded-3 border mb-3 shadow-xs">
+                <div class="d-flex align-items-center gap-1.5 mb-2.5 pb-2 border-bottom">
+                    <i class="feather-calendar text-primary fs-13"></i>
+                    <h6 class="fs-12 fw-bold text-dark mb-0">Proposed Next Activity & Schedule</h6>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Activity Type</label>
+                        <select class="form-select form-select-sm fs-12" id="aiModalNextActivityType">
+                            <option value="Call">📞 Call Back</option>
+                            <option value="Meeting">🤝 Meeting</option>
+                            <option value="Demo">💻 Demo</option>
+                            <option value="WhatsApp">💬 WhatsApp Follow-up</option>
+                            <option value="Email">✉️ Email Follow-up</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Follow-up Date & Time</label>
+                        <input type="datetime-local" class="form-control form-control-sm fs-12" id="aiModalNextFollowupDate">
+                    </div>
+                </div>
+
+                <div class="mb-1">
+                    <label class="form-label fw-semibold fs-11 text-muted mb-1">Next Activity Agenda / Title</label>
+                    <input type="text" class="form-control form-control-sm fs-12" id="aiModalNextActivityTitle" placeholder="e.g. Follow-up call for quotation revision and order closing">
+                </div>
+            </div>
+
+            <!-- 4. Suggested Deal Stage & Sync Notice -->
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <div class="p-2.5 bg-white rounded-3 border shadow-xs h-100">
+                        <label class="form-label fw-semibold fs-11 text-muted mb-1">Suggested Deal Stage</label>
+                        <select class="form-select form-select-sm fs-12" id="aiModalDealStage">
+                            @foreach($dealStatuses as $ds)
+                                <option value="{{ $ds->name }}">{{ $ds->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-2.5 bg-soft-info border border-info-subtle rounded-3 text-dark fs-11 h-100 d-flex align-items-center">
+                        <div>
+                            <div class="fw-bold text-info mb-0.5"><i class="feather-check-circle me-1"></i>Deal Timeline Auto-Sync</div>
+                            <span class="text-muted fs-10">Follow-up recorded to Deal Interactions & Timeline automatically.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Follow-up Confirmation Message Preview -->
+            <div class="mb-2">
+                <label class="form-label fw-semibold fs-11 text-muted mb-1">
+                    <i class="feather-send text-success me-1"></i> Customer Follow-up Message Note
+                </label>
+                <textarea class="form-control fs-11 bg-white" id="aiModalFollowupMessage" rows="2" placeholder="Summary message note for WhatsApp/Email..."></textarea>
+            </div>
+
+            <!-- Footer: Actions -->
+            <div class="d-flex align-items-center justify-content-between pt-3 border-top mt-3">
+                <button type="button" class="btn btn-light border px-3 py-2 fs-12 fw-semibold" data-bs-dismiss="modal">Cancel / Edit Later</button>
+                <button type="button" class="btn btn-primary px-4 py-2 fs-12 fw-bold d-flex align-items-center gap-1.5 shadow-sm" id="btnApproveAndScheduleDeal">
+                    <i class="feather-check-circle fs-13"></i>
+                    <span id="btnApproveDealText">Approve & Save to Deal</span>
+                </button>
+            </div>
+        </form>
+    </x-ui.modal>
+
     <script>
         let defaultQuotationPdfName = 'Quotation.pdf';
         let defaultQuotationPdfUrl = '';
         let customWaPdfFile = null;
 
-        function showNotificationModal(isSuccess, title, message) {
+        function showNotificationModal(isSuccess, title, message, reloadOnClose = false) {
             const iconHtml = isSuccess 
                 ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
                 : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
@@ -3722,6 +4763,15 @@
             const modalEl = document.getElementById('waResultModal');
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
+
+            if (isSuccess && reloadOnClose) {
+                $(modalEl).one('hidden.bs.modal', function () {
+                    window.location.reload();
+                });
+                setTimeout(function () {
+                    window.location.reload();
+                }, 2000);
+            }
         }
 
         function checkWhatsAppStatus() {
@@ -3865,7 +4915,7 @@
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     if (modal) modal.hide();
 
-                    showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                    showNotificationModal(true, "WhatsApp Message Delivered!", res.message, true);
                 },
                 error: function (xhr) {
                     btn.prop('disabled', false).html(origHtml);
@@ -3915,7 +4965,7 @@
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     if (modal) modal.hide();
 
-                    showNotificationModal(true, "Quotation Email Dispatched!", res.message);
+                    showNotificationModal(true, "Quotation Email Dispatched!", res.message, true);
                 },
                 error: function (xhr) {
                     btn.prop('disabled', false).html(origHtml);
@@ -3928,7 +4978,709 @@
                 }
             });
         });
+
+        // =========================================================================
+        // DEAL CRM LIVE CALLING, WEBRTC & GEMINI AI INTEGRATION
+        // =========================================================================
+        var activeDealCallId = null;
+        var activeDealTitle = '';
+        var activeDealCompany = '';
+        var activeDealCallInterval = null;
+        var activeDealDurationSeconds = 0;
+        var isSoftphoneMinimized = false;
+        var activeTwilioCallSid = null;
+        var activeTwilioPollTimer = null;
+
+        var audioChunks = [];
+        var activeMediaRecorder = null;
+        var activeAudioStream = null;
+
+        var speechRecognition = null;
+        var isSpeechRecording = false;
+
+        // Browser Ringing Sound Generator
+        var ringingAudioCtx = null;
+        var ringingOscillator = null;
+        var ringingGainNode = null;
+        var isRingingPlaying = false;
+        var ringingIntervalId = null;
+
+        function startBrowserRingingTone() {
+            try {
+                if (isRingingPlaying) return;
+                var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                ringingAudioCtx = new AudioContextClass();
+                isRingingPlaying = true;
+
+                function playBeepCycle() {
+                    if (!isRingingPlaying || !ringingAudioCtx) return;
+                    try {
+                        var osc1 = ringingAudioCtx.createOscillator();
+                        var osc2 = ringingAudioCtx.createOscillator();
+                        var gain = ringingAudioCtx.createGain();
+
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(440, ringingAudioCtx.currentTime);
+                        osc2.type = 'sine';
+                        osc2.frequency.setValueAtTime(480, ringingAudioCtx.currentTime);
+
+                        gain.gain.setValueAtTime(0.04, ringingAudioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ringingAudioCtx.currentTime + 1.8);
+
+                        osc1.connect(gain);
+                        osc2.connect(gain);
+                        gain.connect(ringingAudioCtx.destination);
+
+                        osc1.start();
+                        osc2.start();
+                        osc1.stop(ringingAudioCtx.currentTime + 1.8);
+                        osc2.stop(ringingAudioCtx.currentTime + 1.8);
+                    } catch(e) {}
+                }
+
+                playBeepCycle();
+                ringingIntervalId = setInterval(playBeepCycle, 4000);
+            } catch(e) {
+                console.warn('Ringing sound error:', e);
+            }
+        }
+
+        function stopBrowserRingingTone() {
+            isRingingPlaying = false;
+            if (ringingIntervalId) {
+                clearInterval(ringingIntervalId);
+                ringingIntervalId = null;
+            }
+            if (ringingAudioCtx) {
+                try { ringingAudioCtx.close(); } catch(e) {}
+                ringingAudioCtx = null;
+            }
+        }
+
+        function formatDealCallTimer(totalSeconds) {
+            var m = Math.floor(totalSeconds / 60);
+            var s = totalSeconds % 60;
+            return (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+        }
+
+        function toggleSoftphoneMinimize() {
+            isSoftphoneMinimized = !isSoftphoneMinimized;
+            if (isSoftphoneMinimized) {
+                $('#softphoneBody').slideUp(200);
+                $('#iconSoftphoneMinMax').removeClass('feather-minus').addClass('feather-maximize-2');
+                $('#crmFloatingSoftphoneWidget').css({'width': '240px'});
+            } else {
+                $('#softphoneBody').slideDown(200);
+                $('#iconSoftphoneMinMax').removeClass('feather-maximize-2').addClass('feather-minus');
+                $('#crmFloatingSoftphoneWidget').css({'width': '320px'});
+            }
+        }
+
+        $('#btnMinimizeSoftphone').on('click', function(e) {
+            e.stopPropagation();
+            toggleSoftphoneMinimize();
+        });
+
+        $('#softphoneHeaderBar').on('click', function() {
+            if (isSoftphoneMinimized) {
+                toggleSoftphoneMinimize();
+            }
+        });
+
+        $('#btnCloseSoftphone').on('click', function(e) {
+            e.stopPropagation();
+            if ($('#dialerInCallPanel').is(':visible')) {
+                if (confirm('A call is currently in progress. Do you want to disconnect?')) {
+                    $('#btnDisconnectAndAnalyze').trigger('click');
+                } else {
+                    return;
+                }
+            }
+            stopBrowserRingingTone();
+            stopActiveCallMedia();
+            $('#crmFloatingSoftphoneWidget').fadeOut(250);
+        });
+
+        // Click-to-Call Trigger for Deals
+        $(document).on('click', '.btn-crm-deal-click-to-call', function(e) {
+            e.preventDefault();
+            var btn = $(this);
+            activeDealCallId = btn.attr('data-deal-id');
+            activeDealTitle = btn.attr('data-deal-title') || 'Deal';
+            activeDealCompany = btn.attr('data-deal-company') || btn.attr('data-contact-name') || '';
+            var contactName = btn.attr('data-contact-name') || activeDealCompany || activeDealTitle || 'Client';
+            
+            var numbers = [];
+            try {
+                var rawNumbers = btn.attr('data-deal-numbers');
+                if (rawNumbers) {
+                    numbers = JSON.parse(rawNumbers);
+                }
+            } catch(err) {
+                numbers = [];
+            }
+
+            if (!numbers.length && btn.attr('data-deal-phone')) {
+                numbers.push({
+                    type: 'Direct Phone',
+                    label: btn.attr('data-deal-phone'),
+                    number: btn.attr('data-deal-phone'),
+                    is_primary: true
+                });
+            }
+
+            // Populate Clean Calling Info Header (No deal badges/stages)
+            $('#dialerContactName').text(contactName);
+            $('#dialerContactSub').text(activeDealCompany && activeDealCompany !== contactName ? activeDealCompany : 'CRM Outbound Call');
+            $('#dialerContactAvatar').text((contactName.trim().charAt(0) || 'C').toUpperCase());
+
+            // Set Phone Number directly in Screen Display
+            if (numbers.length > 0 && numbers[0].number) {
+                $('#dialerDisplayNumber').val(numbers[0].number);
+            } else {
+                $('#dialerDisplayNumber').val('');
+            }
+
+            // Reset UI to Idle / Ready to Call State
+            $('#dialerIdlePanel').show();
+            $('#dialerInCallPanel').hide();
+            $('#dialerStartAction').show();
+            $('#dialerEndAction').hide();
+            $('#softphoneStatusPill').text('Ready').removeClass('bg-danger bg-warning').addClass('bg-success');
+            $('#dialerLiveTimer').text('00:00');
+            $('#dialerCallNotes').val('');
+            activeDealDurationSeconds = 0;
+            audioChunks = [];
+            activeTwilioCallSid = null;
+
+            if (isSoftphoneMinimized) {
+                toggleSoftphoneMinimize();
+            }
+            $('#crmFloatingSoftphoneWidget').fadeIn(250);
+        });
+
+        // Dialpad Digit Keys Click
+        $(document).on('click', '.dialpad-key', function() {
+            var digit = $(this).attr('data-key');
+            var cur = $('#dialerDisplayNumber').val();
+            $('#dialerDisplayNumber').val(cur + digit);
+        });
+
+        $('#btnDialerBackspace').on('click', function() {
+            var cur = $('#dialerDisplayNumber').val();
+            if (cur.length > 0) {
+                $('#dialerDisplayNumber').val(cur.slice(0, -1));
+            }
+        });
+
+        $('#btnDialerClear').on('click', function() {
+            $('#dialerDisplayNumber').val('').focus();
+        });
+
+        $('#btnToggleDialpadView').on('click', function() {
+            var container = $('#dialpadContainer');
+            var icon = $('#dialpadToggleIcon');
+            if (container.is(':visible')) {
+                container.slideUp(200);
+                icon.removeClass('feather-chevron-up').addClass('feather-chevron-down');
+            } else {
+                container.slideDown(200);
+                icon.removeClass('feather-chevron-down').addClass('feather-chevron-up');
+            }
+        });
+
+        $(document).on('click', '.quick-chip-btn', function() {
+            var text = $(this).attr('data-text');
+            var current = $('#dialerCallNotes').val();
+            $('#dialerCallNotes').val((current ? current.trim() + ' ' : '') + text).focus();
+        });
+
+        // =========================================================================
+        // TWILIO WEBRTC 2-WAY LIVE VOICE DEVICE INITIALIZATION
+        // =========================================================================
+        var twilioDevice = null;
+        var activeTwilioCall = null;
+
+        function setupTwilioVoiceDevice() {
+            if (typeof Twilio === 'undefined' || !Twilio.Device) {
+                console.log('Twilio WebRTC Voice SDK not yet loaded.');
+                return;
+            }
+
+            fetch("{{ route('crm.twilio.voiceToken') }}")
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.success && res.token) {
+                        try {
+                            twilioDevice = new Twilio.Device(res.token, {
+                                codecPreferences: ['opus', 'pcmu'],
+                                fakeLocalDTMF: true,
+                                enableRingingState: true
+                            });
+
+                            twilioDevice.on('registered', function() {
+                                console.log('Twilio 2-Way Voice Softphone registered and ready for Deals.');
+                                $('#softphoneStatusPill').text('Ready (2-Way)').addClass('bg-success');
+                            });
+
+                            twilioDevice.on('incoming', function(conn) {
+                                conn.accept();
+                            });
+
+                            twilioDevice.on('error', function(err) {
+                                console.warn('Twilio Device warning:', err);
+                            });
+
+                            twilioDevice.register();
+                        } catch(e) {
+                            console.warn('Twilio Device register error:', e);
+                        }
+                    }
+                })
+                .catch(function(err) {
+                    console.warn('Twilio voice token fetch error:', err);
+                });
+        }
+
+        setTimeout(setupTwilioVoiceDevice, 500);
+
+        function triggerRestOutboundCall(targetNumber) {
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+            var initiateUrl = "{{ url('crm/deals') }}/" + activeDealCallId + "/call-ai/initiate-call";
+
+            fetch(initiateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ to_number: targetNumber })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    activeTwilioCallSid = res.call_sid || null;
+                    $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1"></i> Phone Ringing: ' + (res.to || targetNumber));
+                    $('#inCallSubtext').text('Twilio call connected to ' + (res.to || targetNumber) + '. Waiting for answer...');
+
+                    if (activeTwilioCallSid) {
+                        startTwilioCallStatusPolling(activeDealCallId, activeTwilioCallSid);
+                    }
+                } else {
+                    console.warn('Twilio initiate status:', res.message);
+                    $('#inCallSubtext').text(res.message || 'Call initiated via browser.');
+                }
+            })
+            .catch(function(err) {
+                console.error('Twilio initiate error:', err);
+                $('#inCallSubtext').text('Call in progress on browser.');
+            });
+        }
+
+        // START REAL OUTBOUND CALL
+        $('#btnStartRealCall').on('click', function() {
+            var targetNumber = $('#dialerDisplayNumber').val().trim();
+            if (!targetNumber) {
+                alert('Please enter or select a phone number to call.');
+                $('#dialerDisplayNumber').focus();
+                return;
+            }
+
+            if (!activeDealCallId) {
+                alert('No active deal selected.');
+                return;
+            }
+
+            startBrowserRingingTone();
+
+            $('#dialerIdlePanel').hide();
+            $('#dialerInCallPanel').fadeIn(250);
+            $('#dialerStartAction').hide();
+            $('#dialerEndAction').show();
+            $('#softphoneStatusPill').text('Calling...').removeClass('bg-success').addClass('bg-danger');
+            $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1"></i> Ringing Mobile...');
+            $('#inCallTargetDisplay').text(targetNumber + ' (' + activeDealTitle + ')');
+            $('#inCallSubtext').text('Connecting 2-way live audio with customer phone...');
+
+            activeDealDurationSeconds = 0;
+            $('#dialerLiveTimer').text('00:00');
+            if (activeDealCallInterval) clearInterval(activeDealCallInterval);
+            activeDealCallInterval = setInterval(function() {
+                activeDealDurationSeconds++;
+                $('#dialerLiveTimer').text(formatDealCallTimer(activeDealDurationSeconds));
+            }, 1000);
+
+            if (twilioDevice && twilioDevice.state === 'registered') {
+                try {
+                    twilioDevice.connect({ params: { To: targetNumber, deal_id: activeDealCallId } })
+                        .then(function(call) {
+                            activeTwilioCall = call;
+                            activeTwilioCallSid = call.parameters.CallSid || null;
+
+                            call.on('ringing', function() {
+                                $('#softphoneStatusPill').text('Ringing...').removeClass('bg-success').addClass('bg-danger');
+                                $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1"></i> Phone Ringing: ' + targetNumber);
+                                $('#inCallSubtext').text('Ringing mobile phone... Waiting for answer.');
+                            });
+
+                            call.on('accept', function() {
+                                stopBrowserRingingTone();
+                                $('#softphoneStatusPill').text('Connected (2-Way)').removeClass('bg-danger bg-warning').addClass('bg-success');
+                                $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1 text-success"></i> Two-Way Live Audio Connected');
+                                $('#inCallSubtext').text('Connected! Speak directly into your microphone.');
+                            });
+
+                            call.on('disconnect', function() {
+                                stopBrowserRingingTone();
+                                activeTwilioCall = null;
+                                $('#btnDisconnectAndAnalyze').trigger('click');
+                            });
+
+                            call.on('error', function(err) {
+                                console.warn('Twilio Call error:', err);
+                                triggerRestOutboundCall(targetNumber);
+                            });
+                        })
+                        .catch(function(e) {
+                            console.warn('Twilio Device connect catch:', e);
+                            triggerRestOutboundCall(targetNumber);
+                        });
+                } catch(err) {
+                    console.warn('Twilio WebRTC connect error, falling back to REST call:', err);
+                    triggerRestOutboundCall(targetNumber);
+                }
+            } else {
+                triggerRestOutboundCall(targetNumber);
+            }
+
+            // Start Audio Recording via MediaRecorder
+            audioChunks = [];
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        activeAudioStream = stream;
+                        var mimeType = 'audio/webm';
+                        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                            mimeType = 'audio/webm;codecs=opus';
+                        }
+                        activeMediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+                        activeMediaRecorder.ondataavailable = function(e) {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+                        activeMediaRecorder.start(1000);
+                    })
+                    .catch(function(err) {
+                        console.warn('Microphone stream error:', err);
+                    });
+            }
+
+            // Start Web Speech Recognition
+            var SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognitionClass) {
+                try {
+                    speechFinalTranscript = '';
+                    $('#dialerCallNotes').val('');
+                    if (speechRecognition) {
+                        try { speechRecognition.stop(); } catch(err) {}
+                    }
+                    speechRecognition = new SpeechRecognitionClass();
+                    speechRecognition.continuous = true;
+                    speechRecognition.interimResults = true;
+                    speechRecognition.lang = 'hi-IN';
+
+                    speechRecognition.onresult = function(e) {
+                        var interimTranscript = '';
+                        for (var i = e.resultIndex; i < e.results.length; ++i) {
+                            var chunk = e.results[i][0].transcript;
+                            if (e.results[i].isFinal) {
+                                speechFinalTranscript += chunk + ' ';
+                            } else {
+                                interimTranscript += chunk;
+                            }
+                        }
+                        var fullText = (speechFinalTranscript + ' ' + interimTranscript).trim();
+                        if (fullText) {
+                            $('#dialerCallNotes').val(fullText);
+                            $('#liveSpeechStatus').html('<span class="text-success fw-bold"><i class="feather-mic"></i> Converting speech to text...</span>');
+                        }
+                    };
+
+                    speechRecognition.onerror = function(err) {
+                        console.warn('Speech recognition status:', err.error);
+                    };
+
+                    speechRecognition.onend = function() {
+                        if (isSpeechRecording && speechRecognition) {
+                            try { speechRecognition.start(); } catch(e) {}
+                        }
+                    };
+
+                    speechRecognition.start();
+                    isSpeechRecording = true;
+                    $('#liveSpeechStatus').html('<span class="text-success"><i class="feather-mic"></i> Listening... Speak in Hindi or English</span>');
+                } catch(e) {
+                    console.warn('Speech recognition error:', e);
+                }
+            }
+        });
+
+        function startTwilioCallStatusPolling(dealId, callSid) {
+            if (activeTwilioPollTimer) clearInterval(activeTwilioPollTimer);
+            var pollUrl = "{{ url('crm/deals') }}/" + dealId + "/call-ai/status";
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+            activeTwilioPollTimer = setInterval(function() {
+                if (!activeDealCallId || !callSid) {
+                    clearInterval(activeTwilioPollTimer);
+                    return;
+                }
+
+                fetch(pollUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({ call_sid: callSid })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.success) {
+                        var status = res.status;
+                        if (status === 'in-progress') {
+                            stopBrowserRingingTone();
+                            $('#softphoneStatusPill').text('Connected (Mobile)').removeClass('bg-danger bg-warning').addClass('bg-success');
+                            $('#dialerLiveStatusTag').html('<i class="feather-phone-call me-1 text-success"></i> Customer Answered (Live)');
+                            $('#inCallSubtext').text('Customer picked up the call! Speaking live on telephony...');
+                        } else if (status === 'completed' || status === 'canceled' || status === 'busy' || status === 'no-answer') {
+                            clearInterval(activeTwilioPollTimer);
+                            activeTwilioPollTimer = null;
+                            stopBrowserRingingTone();
+                            $('#btnDisconnectAndAnalyze').trigger('click');
+                        }
+                    }
+                })
+                .catch(function(){});
+            }, 1500);
+        }
+
+        function stopActiveCallMedia() {
+            stopBrowserRingingTone();
+            if (activeTwilioCall) {
+                try {
+                    activeTwilioCall.disconnect();
+                } catch(e) {}
+                activeTwilioCall = null;
+            }
+            if (activeTwilioPollTimer) {
+                clearInterval(activeTwilioPollTimer);
+                activeTwilioPollTimer = null;
+            }
+            if (activeDealCallInterval) {
+                clearInterval(activeDealCallInterval);
+                activeDealCallInterval = null;
+            }
+            if (speechRecognition && isSpeechRecording) {
+                isSpeechRecording = false;
+                try { speechRecognition.stop(); } catch(e) {}
+            }
+            if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+                try { activeMediaRecorder.stop(); } catch(e) {}
+            }
+            if (activeAudioStream) {
+                try {
+                    activeAudioStream.getTracks().forEach(function(track) { track.stop(); });
+                } catch(e) {}
+                activeAudioStream = null;
+            }
+        }
+
+        // DISCONNECT CALL & ANALYZE WITH GEMINI AI
+        $('#btnDisconnectAndAnalyze').on('click', function() {
+            if (!activeDealCallId) return;
+
+            var currentCallSid = activeTwilioCallSid;
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+            // 1. Forcefully terminate telephony call leg immediately so customer's phone disconnects
+            var terminateUrl = "{{ url('crm/deals') }}/" + activeDealCallId + "/call-ai/terminate-call";
+            fetch(terminateUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ call_sid: currentCallSid || '' })
+            }).catch(function(){});
+
+            stopActiveCallMedia();
+            activeTwilioCallSid = null;
+
+            var notes = $('#dialerCallNotes').val().trim();
+            var dialedPhone = $('#dialerDisplayNumber').val().trim();
+
+            var btn = $(this);
+            var origHtml = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Gemini AI Transcribing & Processing...');
+
+            var analyzeUrl = "{{ url('crm/deals') }}/" + activeDealCallId + "/call-ai/analyze";
+
+            var formData = new FormData();
+            formData.append('call_notes', notes);
+            formData.append('duration_seconds', activeDealDurationSeconds || 60);
+            formData.append('dialed_number', dialedPhone);
+            if (currentCallSid) {
+                formData.append('call_sid', currentCallSid);
+            }
+
+            if (audioChunks && audioChunks.length > 0) {
+                var audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                formData.append('audio_file', audioBlob, 'deal_call_recording.webm');
+            }
+
+            fetch(analyzeUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                btn.prop('disabled', false).html(origHtml);
+
+                if (res.success) {
+                    $('#crmFloatingSoftphoneWidget').fadeOut(250);
+
+                    // Populate Gemini AI Confirmation Popup
+                    $('#aiModalDealId').val(activeDealCallId);
+                    $('#aiModalCallDuration').val(activeDealDurationSeconds);
+                    $('#aiModalDialedPhoneVal').val(dialedPhone);
+                    $('#aiModalRecordingUrl').val(res.recording_url || '');
+                    $('#aiModalDealName').text(activeDealTitle + (activeDealCompany ? ' (' + activeDealCompany + ')' : ''));
+                    $('#aiModalDialedNumber').text('Dialed: ' + (res.dialed_number || dialedPhone || 'Contact Number'));
+
+                    if (res.recording_url) {
+                        $('#aiModalAudioPreviewContainer').show();
+                        var audioSrc = res.recording_url.startsWith('http') ? res.recording_url : ('/' + res.recording_url.replace(/^\/+/, ''));
+                        $('#aiModalAudioPlayer').attr('src', audioSrc);
+                    } else {
+                        $('#aiModalAudioPreviewContainer').hide();
+                        $('#aiModalAudioPlayer').removeAttr('src');
+                    }
+
+                    var sentiment = res.sentiment || 'Interested';
+                    $('#aiModalSentimentBadge').text(sentiment);
+                    if (sentiment.toLowerCase().indexOf('hot') > -1 || sentiment.toLowerCase().indexOf('positive') > -1) {
+                        $('#aiModalSentimentBadge').attr('class', 'badge bg-soft-success text-success border border-success-subtle fs-11 fw-bold');
+                    } else if (sentiment.toLowerCase().indexOf('cold') > -1 || sentiment.toLowerCase().indexOf('not interested') > -1) {
+                        $('#aiModalSentimentBadge').attr('class', 'badge bg-soft-danger text-danger border border-danger-subtle fs-11 fw-bold');
+                    } else {
+                        $('#aiModalSentimentBadge').attr('class', 'badge bg-soft-warning text-warning border border-warning-subtle fs-11 fw-bold');
+                    }
+
+                    $('#aiModalTranscript').val(res.transcript || '');
+                    $('#aiModalDiscussionSummary').val(res.discussion_summary || res.summary || '');
+                    $('#aiModalNextActivityType').val(res.next_activity_type || 'Call');
+                    $('#aiModalNextFollowupDate').val(res.next_followup_date || '');
+                    $('#aiModalNextActivityTitle').val(res.next_activity_title || (res.summary === 'Not answering' ? 'Retry Call' : 'Follow-up Call'));
+                    $('#aiModalDealStage').val(res.suggested_deal_stage || 'Qualification');
+                    $('#aiModalFollowupMessage').val(res.followup_message_preview || '');
+
+                    setTimeout(function() {
+                        var reviewModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('geminiAiCallReviewModal'));
+                        reviewModal.show();
+                    }, 300);
+
+                } else {
+                    alert(res.message || 'Error processing AI call analysis.');
+                }
+            })
+            .catch(function(err) {
+                btn.prop('disabled', false).html(origHtml);
+                console.error('Call analysis error:', err);
+                alert('An error occurred during Gemini AI processing.');
+            });
+        });
+
+        // APPROVE & SCHEDULE ACTIVITY IN DEAL
+        $('#btnApproveAndScheduleDeal').on('click', function(e) {
+            e.preventDefault();
+            var dealId = $('#aiModalDealId').val();
+            if (!dealId) return;
+
+            var payload = {
+                summary: $('#aiModalDiscussionSummary').val(),
+                transcript: $('#aiModalTranscript').val(),
+                next_activity_type: $('#aiModalNextActivityType').val(),
+                next_action: $('#aiModalNextActivityTitle').val() || $('#aiModalNextActivityType').val(),
+                next_followup_date: $('#aiModalNextFollowupDate').val(),
+                deal_stage: $('#aiModalDealStage').val(),
+                sentiment: $('#aiModalSentimentBadge').text(),
+                followup_message_preview: $('#aiModalFollowupMessage').val(),
+                recording_url: $('#aiModalRecordingUrl').val() || null,
+                duration_seconds: parseInt($('#aiModalCallDuration').val()) || activeDealDurationSeconds
+            };
+
+            var btn = $(this);
+            var origHtml = btn.html();
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span> Applying to Deal...');
+
+            var csrfToken = $('meta[name="csrf-token"]').attr('content');
+            var confirmUrl = "{{ url('crm/deals') }}/" + dealId + "/call-ai/confirm";
+
+            fetch(confirmUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                btn.prop('disabled', false).html(origHtml);
+
+                if (res.success) {
+                    var reviewModalEl = document.getElementById('geminiAiCallReviewModal');
+                    var reviewModal = bootstrap.Modal.getInstance(reviewModalEl);
+                    if (reviewModal) reviewModal.hide();
+
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Deal Call Saved & Activity Scheduled!',
+                            html: '<p class="fs-12 text-muted mb-2">' + (res.message || 'Call logged & next follow-up scheduled to Deal successfully.') + '</p>' +
+                                  (payload.next_followup_date ? '<div class="badge bg-soft-primary text-primary fs-11 p-2">📅 Next Follow-up: ' + payload.next_followup_date.replace('T', ' ') + '</div>' : ''),
+                            confirmButtonColor: '#4f46e5',
+                            confirmButtonText: 'Great, Done!'
+                        }).then(function() {
+                            window.location.reload();
+                        });
+                    } else {
+                        alert(res.message || 'Deal call and follow-up saved successfully!');
+                        window.location.reload();
+                    }
+                } else {
+                    alert(res.message || 'Error saving deal follow-up.');
+                }
+            })
+            .catch(function(err) {
+                btn.prop('disabled', false).html(origHtml);
+                console.error('Save error:', err);
+                alert('An error occurred while saving the activity.');
+            });
+        });
     </script>
+    <!-- Twilio Voice WebRTC SDK for 2-Way Live Calling -->
+    <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.11.1/dist/twilio.min.js"></script>
+    <script src="{{ asset('assets/vendors/js/sweetalert2.all.min.js') }}"></script>
     @endpush
 
     @push('styles')

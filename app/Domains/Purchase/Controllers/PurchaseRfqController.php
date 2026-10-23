@@ -134,7 +134,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => $costRate,
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -177,7 +177,7 @@ class PurchaseRfqController extends Controller
                         'product_id'           => $productId,
                         'product_name'         => $product?->name ?? 'Product #' . $productId,
                         'quantity'             => $pendingQty,
-                        'estimated_cost'       => $costRate,
+                        'estimated_cost'       => round(convert_from_base($costRate), 4),
                         'vendor_id'            => $product?->preferred_vendor_id,
                     ];
                 }
@@ -329,7 +329,7 @@ class PurchaseRfqController extends Controller
                                 'tenant_id'  => $rfq->tenant_id,
                                 'company_id' => $rfq->company_id,
                                 'branch_id'  => $rfq->branch_id,
-                                'rate'       => $rData['rate'],
+                                'rate'       => convert_to_base((float) $rData['rate']),
                             ]
                         );
                     }
@@ -522,7 +522,7 @@ class PurchaseRfqController extends Controller
                 }
 
                 if (isset($files[$rvId]['attachment']) && $files[$rvId]['attachment']->isValid()) {
-                    $updateData['attachment_path'] = $files[$rvId]['attachment']->store('rfq_attachments', 'public');
+                    $updateData['attachment_path'] = $files[$rvId]['attachment']->storeTenantFile('rfq_attachments', 'public');
                 }
 
                 $hasRates = false;
@@ -539,7 +539,7 @@ class PurchaseRfqController extends Controller
                                     'tenant_id'     => $rfq->tenant_id,
                                     'company_id'    => $rfq->company_id,
                                     'branch_id'     => $rfq->branch_id,
-                                    'rate'          => (float) $qItem['rate'],
+                                    'rate'          => convert_to_base((float) $qItem['rate']),
                                     'quantity'      => isset($qItem['quantity']) && $qItem['quantity'] !== '' ? (float) $qItem['quantity'] : null,
                                     'delivery_date' => !empty($qItem['delivery_date']) ? $qItem['delivery_date'] : null,
                                     'validity_date' => !empty($qItem['validity_date']) ? $qItem['validity_date'] : null,
@@ -582,7 +582,7 @@ class PurchaseRfqController extends Controller
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
                 'quantity' => (float)$item->quantity,
-                'estimated_cost' => (float)$item->estimated_cost,
+                'estimated_cost' => round(convert_from_base((float)$item->estimated_cost), 4),
             ];
         }
 
@@ -639,6 +639,18 @@ class PurchaseRfqController extends Controller
             'items.*.product_id' => 'required|integer',
             'items.*.quantity' => 'required|numeric',
             'items.*.rate' => 'required|numeric',
+            'items.*.amount' => 'nullable|numeric',
+            'items.*.discount_percent' => 'nullable|numeric',
+            'items.*.discount_amount' => 'nullable|numeric',
+            'items.*.tax_percent' => 'nullable|numeric',
+            'items.*.cgst_percent' => 'nullable|numeric',
+            'items.*.sgst_percent' => 'nullable|numeric',
+            'items.*.igst_percent' => 'nullable|numeric',
+            'items.*.cgst_amount' => 'nullable|numeric',
+            'items.*.sgst_amount' => 'nullable|numeric',
+            'items.*.igst_amount' => 'nullable|numeric',
+            'items.*.tax_amount' => 'nullable|numeric',
+            'items.*.total_amount' => 'nullable|numeric',
         ]);
 
         $po = $this->rfqService->createPoFromRfq($rfq, $validated, $tenantId);
@@ -707,7 +719,7 @@ class PurchaseRfqController extends Controller
 
         $attachmentPath = $rfqVendor->attachment_path;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('rfq_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('rfq_attachments', 'public');
         }
 
         DB::transaction(function () use ($validated, $rfqVendor, $attachmentPath, $rfq) {
@@ -732,7 +744,7 @@ class PurchaseRfqController extends Controller
                         'company_id'    => $rfqVendor->company_id ?? $rfq?->company_id,
                         'branch_id'     => $rfqVendor->branch_id ?? $rfq?->branch_id,
                         'quantity'      => $itemData['quantity'] ?? null,
-                        'rate'          => $itemData['rate'],
+                        'rate'          => convert_to_base((float) $itemData['rate']),
                         'delivery_date' => $itemData['delivery_date'] ?? null,
                         'validity_date' => $itemData['validity_date'] ?? null,
                     ]

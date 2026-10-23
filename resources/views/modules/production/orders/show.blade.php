@@ -17,7 +17,9 @@
             max-height: calc(100vh - 260px);
             min-height: 480px;
             overflow-y: auto;
-            overflow-x: auto;
+            overflow-x: hidden;
+            min-width: 0;
+            max-width: 100%;
             padding-right: 8px;
             padding-top: 10px;
             background-color: #F8FAFC;
@@ -52,8 +54,29 @@
             flex-shrink: 0;
         }
 
-        .table-responsive {
-            overflow: visible !important;
+        .production-main-content-scroll .table-responsive {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            position: relative;
+            width: 100%;
+        }
+
+        .production-main-content-scroll .table-responsive::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .production-main-content-scroll .table-responsive::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .production-main-content-scroll .table-responsive::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(0, 0, 0, 0.35);
+        }
+
+        html.app-skin-dark .production-main-content-scroll .table-responsive::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.2);
         }
 
         @media (max-width: 767.98px) {
@@ -156,6 +179,14 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
+        @if($order->project)
+            <x-ui.button href="{{ route('projects.show', $order->project->project_code) }}"
+                icon="feather-folder me-1" variant="outline-primary" target="_blank"
+                title="{{ __('production.view_project') ?: 'View Project' }}">
+                <span class="d-none d-sm-inline">{{ __('projects.project') ?: 'Project' }}:</span> {{ $order->project->project_code }}
+            </x-ui.button>
+        @endif
+
         {{-- Print Order Label Button --}}
         <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank"
             icon="feather-printer me-1" variant="outline-secondary">
@@ -354,7 +385,7 @@
             <div class="d-flex align-items-center gap-2">
                 <h4 class="fw-bold text-dark mb-0">{{ __('production.production_order') }} ({{ $order->order_number }})</h4>
                 @php
-                    $model = $order->production_model ?? 'pure_manufacturing';
+                    $model = $order->effective_production_model ?? $order->production_model ?? 'pure_manufacturing';
                 @endphp
                 @if($model === 'subcontract_complete')
                     <span class="badge bg-soft-warning text-warning border border-warning-subtle ms-2"><i
@@ -431,6 +462,32 @@
                         @endif
                     </div>
                 </div>
+                @if($order->project)
+                    <div class="row erp-form-row mb-2">
+                        <div class="col-md-4">
+                            <span class="fw-semibold text-muted fs-13">{{ __('projects.project_context') ?: 'Project Context' }}:</span>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="d-flex flex-wrap align-items-center gap-1.5">
+                                <a href="{{ route('projects.show', $order->project->project_code) }}"
+                                    class="badge bg-soft-primary text-primary border border-primary-subtle text-decoration-none" target="_blank">
+                                    <i class="feather-folder me-1"></i>{{ $order->project->project_code }} — {{ $order->project->name }}
+                                </a>
+                                @if($order->projectMilestone)
+                                    <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle">
+                                        <i class="feather-flag me-1"></i>{{ $order->projectMilestone->name }}
+                                    </span>
+                                @endif
+                                @if($order->projectTask)
+                                    <a href="{{ route('projects.tasks.show', [$order->project, $order->projectTask]) }}"
+                                        class="badge bg-soft-info text-info border border-info-subtle text-decoration-none" target="_blank">
+                                        <i class="feather-check-square me-1"></i>{{ $order->projectTask->task_code }} — {{ $order->projectTask->title }}
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
             <div class="col-md-6">
                 <div class="row erp-form-row mb-2">
@@ -505,7 +562,7 @@
             $verticalTabs[] = ['is_header' => true, 'header' => __('production.quality_and_subcontracting')];
             $verticalTabs[] = ['id' => 'vtab-scrap', 'label' => __('production.scrap_rework'), 'active' => $activeTab === 'vtab-scrap', 'icon' => 'feather-alert-triangle'];
 
-            if ($order->production_model !== 'pure_manufacturing' || $order->operations->contains('is_external', true)) {
+            if ($order->operations->contains('is_external', true)) {
                 $verticalTabs[] = ['id' => 'vtab-subcontract', 'label' => __('production.subcontracting_vendor_wip'), 'active' => $activeTab === 'vtab-subcontract', 'icon' => 'feather-truck'];
             }
 
@@ -840,7 +897,7 @@
 
 
                         {{-- Tab 2.5: Subcontracting & Vendor WIP --}}
-                        @if($order->production_model !== 'pure_manufacturing' || $order->operations->contains('is_external', true))
+                        @if($order->operations->contains('is_external', true))
                             <div class="tab-pane fade {{ $activeTab === 'vtab-subcontract' ? 'show active' : '' }}"
                                 id="vtab-subcontract" role="tabpanel" aria-labelledby="vtab-subcontract-tab">
                                 @php
@@ -882,7 +939,7 @@
 
                                 {{-- Top Summary Cards --}}
                                 <div class="row g-3 mb-4">
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-light h-100">
                                             <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.subcontract_model') }}</span>
                                             <div class="fs-14 fw-bold text-dark mt-1">
@@ -892,7 +949,7 @@
                                                 class="text-muted fs-11 mt-1">{{ __('production.outsourced_steps_count', ['count' => $order->operations->where('is_external', true)->count()]) }}</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-soft-primary h-100">
                                             <span class="fs-11 text-uppercase text-primary fw-bold">{{ __('production.authoritative_cost') }}</span>
                                             <div class="fs-18 fw-bold text-primary mt-1">
@@ -902,7 +959,7 @@
                                                 {{ ($subcost['actual'] ?? 0) > 0 ? __('production.actual_vendor_bill') : (($subcost['committed'] ?? 0) > 0 ? __('production.po_committed') : __('production.routing_estimate')) }}</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-light h-100">
                                             <span class="fs-11 text-uppercase text-muted fw-bold">{{ __('production.cost_breakdown') }}</span>
                                             <div class="fs-12 text-dark mt-1">
@@ -913,7 +970,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-12 col-sm-6 col-xl-3">
                                         <div class="card shadow-sm border p-3 bg-soft-warning h-100">
                                             <span class="fs-11 text-uppercase text-warning fw-bold">{{ __('production.vendor_wip_status') }}</span>
                                             @php
@@ -934,8 +991,8 @@
                                             {{ __('production.operations_count_suffix') }}</span>
                                     </div>
                                     <div class="table-responsive">
-                                        <table class="table table-sm align-middle mb-0 fs-12 table-hover">
-                                            <thead class="bg-light text-uppercase fs-11 text-muted">
+                                        <x-ui.odoo-form-ui type="table" class="table table-sm align-middle mb-0 fs-12 table-hover text-nowrap" style="min-width: 1050px;">
+                                            <thead class="bg-light text-uppercase fs-11 text-muted text-nowrap">
                                                 <tr>
                                                     <th>{{ __('production.op_hash') }}</th>
                                                     <th>{{ __('production.operation') }}</th>
@@ -1111,7 +1168,7 @@
                                                     </tr>
                                                 @endforelse
                                             </tbody>
-                                        </table>
+                                        </x-ui.odoo-form-ui>
                                     </div>
                                 </div>
 
@@ -1122,14 +1179,14 @@
                                     });
                                 @endphp
 
-                                @if($hasCompanyMaterialOps || $order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid')
+                                @if($hasCompanyMaterialOps)
                                     <div class="card border shadow-sm mb-4">
                                         <div class="card-header bg-light py-2">
                                             <h6 class="fw-bold text-dark mb-0"><i class="feather-box me-1 text-warning"></i>{{ __('production.company_material_balance_subcontractor') }}</h6>
                                         </div>
                                         <div class="table-responsive">
-                                            <table class="table table-sm align-middle mb-0 fs-12">
-                                                <thead class="bg-light text-uppercase fs-11 text-muted">
+                                            <x-ui.odoo-form-ui type="table" class="table table-sm align-middle mb-0 fs-12 text-nowrap" style="min-width: 850px;">
+                                                <thead class="bg-light text-uppercase fs-11 text-muted text-nowrap">
                                                     <tr>
                                                         <th>{{ __('production.operation') }}</th>
                                                         <th>{{ __('production.material_item') }}</th>
@@ -1170,7 +1227,7 @@
                                                         </tr>
                                                     @endforelse
                                                 </tbody>
-                                            </table>
+                                            </x-ui.odoo-form-ui>
                                         </div>
                                     </div>
                                 @endif
@@ -1689,6 +1746,12 @@
                                                     @else
                                                         @php
                                                             $activeAssignment = $op->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->first();
+                                                            $schedOp = $schedOpsMap->get($op->id);
+                                                            $isOpStarted = in_array($op->status, ['running', 'paused', 'completed'])
+                                                                || ($schedOp && in_array($schedOp->status, ['running', 'paused', 'completed']))
+                                                                || !empty($op->actual_start_time)
+                                                                || ($schedOp && !empty($schedOp->actual_start))
+                                                                || ((float) ($op->quantity_produced ?? 0) > 0);
                                                         @endphp
                                                         @if($activeAssignment)
                                                             <div>
@@ -1702,7 +1765,7 @@
                                                                         <span
                                                                             class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
                                                                     @endif
-                                                                    @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
+                                                                    @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed' && !$isOpStarted)
                                                                         @if($order->schedules->isNotEmpty())
                                                                             <button type="button"
                                                                                 class="btn btn-xs btn-outline-secondary p-0.5 border-0"
@@ -1995,9 +2058,9 @@
                                                                         class="feather-chevron-right fs-12 accordion-rotate-icon"></i>
                                                                 </button>
                                                                 <div>
-                                                                    <div class="d-flex align-items-center gap-1.5 mb-0.5">
+                                                                    <div class="d-flex align-items-center gap-2 mb-0.5">
                                                                         <span
-                                                                            class="badge {{ $level > 1 ? 'bg-soft-purple text-purple border border-purple-subtle' : 'bg-soft-primary text-primary border' }} fs-10 py-0.5 px-1.5">
+                                                                            class="badge bg-soft-primary text-primary border border-primary-subtle fs-10 py-0.5 px-1.5 fw-bold me-1">
                                                                             {{ $level > 1 ? 'L' . $level . ' SFG' : 'L1 FG' }}
                                                                         </span>
                                                                         <span
@@ -2025,7 +2088,7 @@
                                                             <div class="fs-10 text-muted">
                                                                 @if($isExternal)
                                                                     <span
-                                                                        class="badge bg-soft-purple text-purple border fs-10 px-1.5 py-0.5">
+                                                                        class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5">
                                                                         <i class="feather-truck me-1"></i>External Subcontract
                                                                     </span>
                                                                 @else
@@ -2041,7 +2104,7 @@
                                                         <td class="bg-white">
                                                             @if($isExternal)
                                                                 <div class="fw-semibold text-dark fs-11"><i
-                                                                        class="feather-users me-1 text-purple"></i>{{ $cOp->vendor->name ?? 'Outsourced Vendor' }}
+                                                                        class="feather-users me-1 text-primary"></i>{{ $cOp->vendor->name ?? 'Outsourced Vendor' }}
                                                                 </div>
                                                                 <div class="fs-10 text-muted">Subcontract Vendor</div>
                                                             @else
@@ -2244,7 +2307,7 @@
                                                                                 </a>
                                                                                 @if($isExternal)
                                                                                     <a href="{{ route('production.subcontract.delivery-challans.index') }}"
-                                                                                        class="btn btn-sm btn-outline-purple fs-11 py-1 px-2">
+                                                                                        class="btn btn-sm btn-outline-primary fs-11 py-1 px-2">
                                                                                         <i class="feather-file-text me-1"></i>Manage
                                                                                         Subcontract
                                                                                     </a>
@@ -2620,9 +2683,9 @@
                                     <tbody>
                                         @forelse($order->issues as $iss)
                                             <tr>
-                                                <td class="text-muted">{{ $iss->issued_at->format('Y-m-d H:i') }}</td>
-                                                <td class="fw-bold text-dark font-monospace fs-12">{{ $iss->product->sku }}</td>
-                                                <td>{{ $iss->product->name }}</td>
+                                                <td class="text-muted">{{ $iss->issued_at?->format('Y-m-d H:i') ?? '—' }}</td>
+                                                <td class="fw-bold text-dark font-monospace fs-12">{{ $iss->product?->sku ?? '—' }}</td>
+                                                <td>{{ $iss->product?->name ?? 'Unknown Item' }}</td>
                                                 <td class="text-muted">{{ $iss->warehouse?->name ?? '—' }}</td>
                                                 <td
                                                     class="text-center fw-bold {{ $iss->quantity_issued < 0 ? 'text-danger' : 'text-success' }}">
@@ -2636,6 +2699,8 @@
                                                             class="badge bg-light text-warning border border-warning">{{ __('production.additional') }}</span>
                                                     @elseif($iss->issue_type === 'return')
                                                         <span class="badge bg-light text-danger border border-danger">{{ __('production.return') }}</span>
+                                                    @elseif($iss->issue_type === 'rework' || $iss->rework_order_id)
+                                                        <span class="badge bg-light text-info border border-info">Rework</span>
                                                     @else
                                                         <span class="badge bg-light text-dark">{{ $iss->issue_type }}</span>
                                                     @endif
@@ -2645,7 +2710,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="7" class="text-center py-5 text-muted">
+                                                <td colspan="8" class="text-center py-5 text-muted">
                                                     <i
                                                         class="feather-info fs-20 d-block mb-2"></i>{{ __('production.no_issues_logged') }}
                                                 </td>
@@ -4666,7 +4731,7 @@
                             <div class="p-2.5 bg-light rounded text-dark fs-13 border">
                                 <strong>Order Number:</strong> {{ $order->order_number }} <br>
                                 <strong>Target Product:</strong> {{ $order->product->name }} ({{ $order->product->sku }}) <br>
-                                <strong>Ordered Quantity:</strong> {{ number_format($order->quantity_planned, 2) }}
+                                <strong>Ordered Quantity:</strong> {{ number_format($order->quantity_ordered ?? $order->quantity_planned ?? 0, 2) }}
                                 {{ $order->product->uom?->code ?? 'units' }}
                             </div>
                         </div>

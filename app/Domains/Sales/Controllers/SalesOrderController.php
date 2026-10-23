@@ -63,6 +63,14 @@ class SalesOrderController extends Controller
             if ($prefillQuotation) {
                 // Ensure customer object & ID are resolved/synced for the quotation
                 $prefillCustomer = $prefillQuotation->customer;
+                if (!$prefillCustomer) {
+                    $dealId = $prefillQuotation->crm_deal_id;
+                    $convertUrl = $dealId
+                        ? route('crm.deals.showConvertForm', $dealId)
+                        : route('crm.quotations.showConvertForm', $prefillQuotation->id);
+
+                    return redirect($convertUrl)->with('warning', 'Please convert this quotation/deal to a customer before creating a Sales Order.');
+                }
             }
         }
 
@@ -72,8 +80,10 @@ class SalesOrderController extends Controller
         
         $quotations = Quotation::query()
             ->where('is_current', true)
+            ->whereIn('status', ['Accepted', 'Converted', 'Won'])
             ->latest()
-            ->get();
+            ->get()
+            ->filter(fn ($q) => !empty($q->customer));
 
         $warehouses = Warehouse::query()->orderBy('name')->get();
         $paymentTerms = PaymentTerm::query()->where('is_active', true)->orderBy('due_days')->get();
@@ -105,6 +115,7 @@ class SalesOrderController extends Controller
             'billing_address'    => ['nullable', 'string'],
             'shipping_address'   => ['nullable', 'string'],
             'discount_type'      => ['nullable', 'string', 'in:without_discount,item_wise,order_wise'],
+            'tax_mode'           => ['nullable', 'string', 'in:exclusive,inclusive'],
             'tax_type'           => ['nullable', 'string', 'in:without_tax,item_wise_tax,order_wise_tax'],
             'gst_type'           => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'order_tax_rate'     => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -220,6 +231,7 @@ class SalesOrderController extends Controller
             'billing_address'    => ['nullable', 'string'],
             'shipping_address'   => ['nullable', 'string'],
             'discount_type'      => ['nullable', 'string', 'in:without_discount,item_wise,order_wise'],
+            'tax_mode'           => ['nullable', 'string', 'in:exclusive,inclusive'],
             'tax_type'           => ['nullable', 'string', 'in:without_tax,item_wise_tax,order_wise_tax'],
             'gst_type'           => ['nullable', 'string', 'in:cgst_sgst,igst'],
             'order_tax_rate'     => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -309,5 +321,45 @@ class SalesOrderController extends Controller
         $this->salesOrders->delete($order);
 
         return redirect()->route('sales.orders.index')->with('success', 'Sales Order deleted successfully.');
+    }
+
+    public function convertToProject(Request $request, SalesOrder|int|string $order, \App\Domains\Sales\Services\SalesOrderProjectBridgeService $bridgeService): RedirectResponse
+    {
+        $order = $order instanceof SalesOrder ? $order : $this->orderRepo->find((int) $order);
+        if (!$order) abort(404, 'Sales Order not found.');
+
+        $this->authorize('view', $order);
+        $this->authorize('create', \App\Domains\Projects\Models\Project::class);
+
+        if ($order->status !== 'Confirmed') {
+            return back()->withErrors(['status' => 'Only Confirmed Sales Orders can be converted to a Delivery Project.']);
+        }
+
+        $validated = $request->validate([
+            'project_name'   => 'nullable|string|max:255',
+            'manager_id'     => 'nullable|integer|exists:users,id',
+            'start_date'     => 'nullable|date',
+            'end_date'       => 'nullable|date|after_or_equal:start_date',
+            'budget_amount'  => 'nullable|numeric|min:0',
+            'cost_center_id' => 'nullable|integer|exists:cost_centers,id',
+        ]);
+
+        $customData = array_filter([
+            'name'           => $validated['project_name'] ?? null,
+            'manager_id'     => $validated['manager_id'] ?? null,
+            'start_date'     => $validated['start_date'] ?? null,
+            'end_date'       => $validated['end_date'] ?? null,
+            'budget_amount'  => $validated['budget_amount'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
+        ]);
+
+        try {
+            $project = $bridgeService->convertSalesOrderToProject($order, $customData);
+
+            return redirect()->route('projects.show', $project->project_code)
+                ->with('success', "Delivery Project {$project->project_code} created successfully from Sales Order {$order->sales_order_number}.");
+        } catch (\Exception $e) {
+            return back()->withErrors(['conversion' => $e->getMessage()]);
+        }
     }
 }

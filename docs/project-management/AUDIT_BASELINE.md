@@ -114,7 +114,7 @@ All models extend [`App\Core\Database\BaseModel`](file:///c:/Users/windo/Documen
 
 > [!NOTE]
 > The audit table above records the historical snapshot from September 10, 2026.
-> All items previously marked **MISSING** or **INCORRECT FLOW** were subsequently implemented, verified, and enhanced through Phases 1–11 and the post-completion targeted pass:
+> All items previously marked **MISSING** or **INCORRECT FLOW** were subsequently implemented, verified, and enhanced through Phases 1–12 and the post-completion targeted pass:
 > - **Time Tracking & Approval (Phase 3):** `TimeLog` model, daily task logging, PM approval queue with Production approval banners.
 > - **Issue Management & Retesting (Phase 4):** `Issue` model, full retest loop, QA verification.
 > - **Document Repository (Phase 4):** `ProjectDocument` model, tenant-isolated private disk storage, category tags.
@@ -126,5 +126,21 @@ All models extend [`App\Core\Database\BaseModel`](file:///c:/Users/windo/Documen
 > - **Executive Dashboard & 7 Reports (Phase 10):** Real-time portfolio health scores, 7 operational paginated reports, CSV/XLSX exports.
 > - **End-to-End Lifecycle Verification (Phase 11):** Contiguous automated lifecycle test covering all 12 canonical stages.
 > - **Dynamic Tenant Currency & Approval UX (Post-Completion Pass):** Reused ERP Production helpers (`format_currency`, `active_currency_symbol()`, `window.AppCurrency`) and Production BOM/Routing approval banners across PM. Zero hardcoded currency symbols.
+> - **Cross-Module ERP Integration & Commercial Bridges (Phase 12):**
+>   - Bidirectional Sales Order to Project conversion decomposing confirmed orders into projects and auto-generating milestones mapped to sales order items (`1:N` sales order items to milestones supported).
+>   - Loose coupling between Project Tasks and Production Orders (`project_tasks.production_order_id`, `production_orders.project_id`, `production_orders.project_milestone_id`, `production_orders.project_task_id`). Standalone production orders remain fully operational without project links.
+>   - Event-driven sync via `ProductionOrderCompleted` and `SyncProductionTaskCompletionListener`. A Project Task linked to Production Orders is automatically completed strictly when all linked Production Orders are completed and their aggregate good production quantity satisfies the aggregate ordered quantity (`SUM(quantity_produced) >= (SUM(quantity_ordered) - 0.0001)`, accounting for QC yield where rejected/scrapped units do not count toward produced). If an aggregate shortfall occurs or sibling orders remain open, the task safely remains `In Progress` with an activity log warning.
+>   - Direct task procurement linkage on Purchase Requisitions via `purchase_requisition_items.project_task_id`.
+>   - Centralized Notification Event Catalog integration mapping all 19 canonical PM event keys.
+> - **Production ↔ Project Reverse Integration & Financial Cost Flow (Phase 13):**
+>   - Production → Project/Task reverse navigation on Production Order index and show views.
+>   - Project-level Manufacturing Summary card aggregating live production orders and progress.
+>   - Project-aware Production Order creation preserving project/milestone/task context (`/production/orders/create?project_id=X&project_task_id=Y`).
+>   - Strict tenant, company, and branch validation blocking cross-company or cross-branch linking.
+>   - Production actual cost dynamically integrated into Project financial reports (`getBudgetCostReportData`, `getPortfolioKpis`) consuming authoritative `ProductionCostVarianceService` and `ProductionCostAdjustmentService` without duplicating costs or adding schema columns.
 > 
-> **Current Live Test Suite:** **230 passed tests (3,117 assertions)**, 0 failures, 0 errors, 100% clean.
+> **Current Live PM Test Suite:** **256 passed tests (3,208 assertions)**, 0 failures, 0 errors, 100% clean across all Project, Phase 12, and Phase 13 integration suites.
+> 
+> **Legacy Baseline Debt Note:**
+> Two test failures exist in `tests/Feature/SalesOrderTest.php` (`test_sales_order_can_be_stored` and `test_supplier_method_routing_rules_enforce_purchase_requisition_and_production_order_creation`). These were introduced in legacy commit `d797f0e4` ("new material requirment changes") prior to Phase 12 work and represent pre-existing ERP baseline debt in the Sales/Material domain, completely unrelated to Phase 12/13 or Project Management. Phase 13 introduced 0 regressions.
+

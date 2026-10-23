@@ -190,7 +190,7 @@ class DocumentMasterApiController extends Controller
             return $this->sendError('Unauthorized action. Only HR Admins can manage document masters.', 403);
         }
 
-        $tenantId = auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
 
         $validated = $request->validate([
             'document_category_id'  => 'required|exists:document_categories,id',
@@ -199,14 +199,15 @@ class DocumentMasterApiController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('document_masters', 'code')->where('tenant_id', $tenantId),
+                Rule::unique('document_masters', 'code')->where(fn($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q->whereNull('tenant_id')),
             ],
             'description'           => 'nullable|string|max:1000',
             'is_required'           => 'nullable|boolean',
             'upload_responsibility' => 'required|string|in:employee,hr,both',
             'approval_required'     => 'nullable|boolean',
+            'requires_signature'    => 'nullable|boolean',
             'expiry_applicable'     => 'nullable|boolean',
-            'reminder_days_before'  => 'nullable|required_if:expiry_applicable,1|integer|min:1',
+            'reminder_days_before'  => 'nullable|required_if:expiry_applicable,1,true,on|integer|min:1',
             'employee_can_view'     => 'nullable|boolean',
             'employee_can_download' => 'nullable|boolean',
             'status'                => 'required|string|in:active,inactive',
@@ -214,9 +215,16 @@ class DocumentMasterApiController extends Controller
 
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
-        $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
-        $validated['employee_can_view'] = $request->boolean('employee_can_view');
-        $validated['employee_can_download'] = $request->boolean('employee_can_download');
+        $validated['requires_signature'] = $request->boolean('requires_signature');
+        if ($validated['upload_responsibility'] !== 'hr') {
+            $validated['employee_can_view'] = true;
+            $validated['employee_can_download'] = true;
+        } else {
+            $validated['employee_can_view'] = $request->boolean('employee_can_view');
+            $validated['employee_can_download'] = $request->has('employee_can_download')
+                ? $request->boolean('employee_can_download')
+                : $validated['employee_can_view'];
+        }
 
         if (!$validated['expiry_applicable']) {
             $validated['reminder_days_before'] = null;
@@ -246,7 +254,7 @@ class DocumentMasterApiController extends Controller
             return $this->sendError("Document master with ID '{$id}' not found.", 404);
         }
 
-        $tenantId = $document->tenant_id ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = $document->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id;
 
         $validated = $request->validate([
             'document_category_id'  => 'required|exists:document_categories,id',
@@ -255,14 +263,15 @@ class DocumentMasterApiController extends Controller
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('document_masters', 'code')->where('tenant_id', $tenantId)->ignore($document->id),
+                Rule::unique('document_masters', 'code')->where(fn($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q->whereNull('tenant_id'))->ignore($document->id),
             ],
             'description'           => 'nullable|string|max:1000',
             'is_required'           => 'nullable|boolean',
             'upload_responsibility' => 'required|string|in:employee,hr,both',
             'approval_required'     => 'nullable|boolean',
+            'requires_signature'    => 'nullable|boolean',
             'expiry_applicable'     => 'nullable|boolean',
-            'reminder_days_before'  => 'nullable|required_if:expiry_applicable,1|integer|min:1',
+            'reminder_days_before'  => 'nullable|required_if:expiry_applicable,1,true,on|integer|min:1',
             'employee_can_view'     => 'nullable|boolean',
             'employee_can_download' => 'nullable|boolean',
             'status'                => 'required|string|in:active,inactive',
@@ -270,9 +279,16 @@ class DocumentMasterApiController extends Controller
 
         $validated['is_required'] = $request->boolean('is_required');
         $validated['approval_required'] = $request->boolean('approval_required');
-        $validated['expiry_applicable'] = $request->boolean('expiry_applicable');
-        $validated['employee_can_view'] = $request->boolean('employee_can_view');
-        $validated['employee_can_download'] = $request->boolean('employee_can_download');
+        $validated['requires_signature'] = $request->boolean('requires_signature');
+        if ($validated['upload_responsibility'] !== 'hr') {
+            $validated['employee_can_view'] = true;
+            $validated['employee_can_download'] = true;
+        } else {
+            $validated['employee_can_view'] = $request->boolean('employee_can_view');
+            $validated['employee_can_download'] = $request->has('employee_can_download')
+                ? $request->boolean('employee_can_download')
+                : $validated['employee_can_view'];
+        }
 
         if (!$validated['expiry_applicable']) {
             $validated['reminder_days_before'] = null;

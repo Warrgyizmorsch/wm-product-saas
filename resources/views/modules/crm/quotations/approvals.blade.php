@@ -197,9 +197,22 @@
                                             <i class="feather-x-circle"></i>
                                         </button>
                                     @elseif ($quotation->status === 'Accepted' && !$quotation->salesOrder)
-                                        <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="{{ __('crm.convert_to_sales_order') }}" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
-                                            <i class="feather-shopping-cart"></i>
-                                        </a>
+                                        @php
+                                            $deal = $quotation->crmDeal;
+                                            $hasCustomer = !empty($deal?->account?->customer_id)
+                                                || !empty($quotation->crmAccount?->customer_id)
+                                                || !empty($quotation->account?->customer_id)
+                                                || !empty($quotation->customer);
+                                        @endphp
+                                        @if (!$hasCustomer)
+                                            <a href="{{ $quotation->crm_deal_id ? route('crm.deals.showConvertForm', $quotation->crm_deal_id) : route('crm.quotations.showConvertForm', $quotation->id) }}" class="action-dropdown-btn" title="{{ __('crm.convert_to_customer') }}" data-bs-toggle="tooltip" style="color: #d97706; border-color: #fde68a; background-color: #fef3c7; text-decoration: none;">
+                                                <i class="feather-user-check"></i>
+                                            </a>
+                                        @else
+                                            <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="{{ __('crm.convert_to_sales_order') }}" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
+                                                <i class="feather-shopping-cart"></i>
+                                            </a>
+                                        @endif
                                     @endif
 
                                     <div class="flex-shrink-0">

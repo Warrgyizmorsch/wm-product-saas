@@ -9,7 +9,9 @@ use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 
 class ShiftChangeRequestController extends Controller
 {
@@ -17,11 +19,9 @@ class ShiftChangeRequestController extends Controller
         private readonly ShiftChangeRequestRepositoryInterface $shiftChangeRepository
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        $data = $this->shiftChangeRepository->getIndexData($request->all());
-
-        return view('modules.hrms.shift-change.index', $data);
+        return redirect()->route('hrms.shift-overtime.index', array_merge(['tab' => 'shift'], $request->all()));
     }
 
     public function store(Request $request): RedirectResponse
@@ -49,8 +49,13 @@ class ShiftChangeRequestController extends Controller
 
         $employee = Employee::findOrFail($validated['employee_id']);
 
-        if (!$employee) {
-            return redirect()->back()->with('error', __('hrms.shift_change.profile_not_found'));
+        // Check for duplicate pending requests for the same employee and start date
+        $existingPending = ShiftChangeRequest::where('employee_id', $employee->id)
+            ->whereIn('status', ['pending', 'cancellation_requested'])
+            ->where('start_date', $validated['start_date'])
+            ->exists();
+        if ($existingPending) {
+            return redirect()->back()->with('error', __('hrms.shift_change.duplicate_pending_error'))->withInput();
         }
 
         // Set current shift
@@ -69,17 +74,36 @@ class ShiftChangeRequestController extends Controller
 
         $validated['current_shift_id'] = $currentShiftId;
         $validated['employee_id'] = $employee->id;
-        $validated['company_id']  = $employee->company_id;
+        $validated['company_id']  = $employee->company_id ?? ($user?->company_id ?? 1);
 
-        $this->shiftChangeRepository->storeShiftChangeRequest($validated, $request);
+        DB::transaction(function () use ($validated, $request) {
+            return $this->shiftChangeRepository->storeShiftChangeRequest($validated, $request);
+        });
 
-        \App\Services\Notification\NotificationService::sendToHrAdmins(
-            title: 'New Shift Change Request',
-            message: "{$employee->full_name} submitted a shift change request.",
-            actionUrl: \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime'),
-            type: 'shift_change_request',
-            iconClass: 'feather-refresh-cw'
-        );
+        // Safely notify HR Admins and Reporting Manager
+        try {
+            $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift']) : url('/hrms/shift-overtime?tab=shift');
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'New Shift Change Request',
+                message: "{$employee->full_name} submitted a shift change request.",
+                actionUrl: $actionUrl,
+                type: 'shift_change_request',
+                iconClass: 'feather-refresh-cw'
+            );
+
+            if ($employee->reportingManager && $employee->reportingManager->user_id) {
+                \App\Services\Notification\NotificationService::sendToUser(
+                    userId: $employee->reportingManager->user_id,
+                    title: 'New Shift Change Request',
+                    message: "{$employee->full_name} submitted a shift change request.",
+                    actionUrl: $actionUrl,
+                    type: 'shift_change_request',
+                    iconClass: 'feather-refresh-cw'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Shift change request notification dispatch failed: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', __('hrms.shift_change.submitted_successfully'));
     }
@@ -122,20 +146,29 @@ class ShiftChangeRequestController extends Controller
             $reason = $request->input('rejection_reason');
         }
 
-        $this->shiftChangeRepository->updateStatus($shiftChangeRequest, [
-            'action'           => $action,
-            'rejection_reason' => $reason,
-        ], $request);
+        DB::transaction(function () use ($shiftChangeRequest, $action, $reason, $request) {
+            $lockedRequest = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
+            $this->shiftChangeRepository->updateStatus($lockedRequest, [
+                'action'           => $action,
+                'rejection_reason' => $reason,
+            ], $request);
+        });
 
-        if ($shiftChangeRequest->employee_id) {
-            \App\Services\Notification\NotificationService::sendToEmployee(
-                employeeId: $shiftChangeRequest->employee_id,
-                title: 'Shift Change Request ' . ucfirst($action),
-                message: "Your shift change request has been {$action}.",
-                actionUrl: \Illuminate\Support\Facades\Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime'),
-                type: 'shift_change_' . $action,
-                iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
-            );
+        // Safely notify Employee
+        try {
+            if ($shiftChangeRequest->employee_id) {
+                $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift']) : url('/hrms/shift-overtime?tab=shift');
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $shiftChangeRequest->employee_id,
+                    title: 'Shift Change Request ' . ucfirst($action),
+                    message: "Your shift change request has been {$action}.",
+                    actionUrl: $actionUrl,
+                    type: 'shift_change_' . $action,
+                    iconClass: $action === 'approved' ? 'feather-check-circle' : 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Shift change status notification dispatch failed: ' . $e->getMessage());
         }
 
         return redirect()->back()->with('success', __('hrms.shift_change.status_updated'));
@@ -153,12 +186,18 @@ class ShiftChangeRequestController extends Controller
         }
 
         if (!$shiftChangeRequest->canWithdraw()) {
-            return redirect()->back()->with('error', 'Only pending requests can be withdrawn.');
+            return redirect()->back()->with('error', __('hrms.shift_change.withdraw_only_pending'));
         }
 
-        $shiftChangeRequest->delete();
+        DB::transaction(function () use ($shiftChangeRequest) {
+            $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
+            if (!$locked->canWithdraw()) {
+                throw new \RuntimeException('Only pending requests can be withdrawn.');
+            }
+            $locked->delete();
+        });
 
-        return redirect()->back()->with('success', 'Shift change request withdrawn successfully.');
+        return redirect()->back()->with('success', __('hrms.shift_change.withdraw_success'));
     }
 
     public function requestCancellation(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
@@ -173,23 +212,45 @@ class ShiftChangeRequestController extends Controller
         }
 
         if (!$shiftChangeRequest->canRequestCancellation()) {
-            return redirect()->back()->with('error', 'Only approved requests can have a cancellation requested.');
+            return redirect()->back()->with('error', __('hrms.shift_change.only_approved_can_cancel'));
         }
 
         $validated = $request->validate([
             'cancellation_reason' => 'required|string|max:1000',
         ]);
 
-        $updateData = ['status' => 'cancellation_requested'];
-        if (\Illuminate\Support\Facades\Schema::hasColumn('shift_change_requests', 'cancellation_reason')) {
-            $updateData['cancellation_reason'] = $validated['cancellation_reason'];
-        } else {
-            $updateData['rejection_reason'] = $validated['cancellation_reason'];
+        DB::transaction(function () use ($shiftChangeRequest, $validated) {
+            $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
+            if (!$locked->canRequestCancellation()) {
+                throw new \RuntimeException('Only approved requests can have a cancellation requested.');
+            }
+
+            $updateData = ['status' => 'cancellation_requested'];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('shift_change_requests', 'cancellation_reason')) {
+                $updateData['cancellation_reason'] = $validated['cancellation_reason'];
+            } else {
+                $updateData['rejection_reason'] = $validated['cancellation_reason'];
+            }
+
+            $locked->update($updateData);
+        });
+
+        // Safely notify HR Admins
+        try {
+            $empName = $shiftChangeRequest->employee ? $shiftChangeRequest->employee->full_name : 'An employee';
+            $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift']) : url('/hrms/shift-overtime?tab=shift');
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Shift Change Cancellation Requested',
+                message: "{$empName} requested cancellation for a shift change request.",
+                actionUrl: $actionUrl,
+                type: 'shift_change_cancellation_requested',
+                iconClass: 'feather-alert-circle'
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Shift change cancellation notification dispatch failed: ' . $e->getMessage());
         }
 
-        $shiftChangeRequest->update($updateData);
-
-        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+        return redirect()->back()->with('success', __('hrms.shift_change.cancellation_submitted'));
     }
 
     public function approveCancellation(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
@@ -198,13 +259,36 @@ class ShiftChangeRequestController extends Controller
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
         abort_unless($isHrAdmin, 403);
 
-        if ($shiftChangeRequest->status !== 'cancellation_requested') {
-            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        DB::transaction(function () use ($shiftChangeRequest) {
+            $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'cancellation_requested') {
+                throw new \RuntimeException(__('hrms.shift_change.no_pending_cancellation'));
+            }
+
+            $locked->update(['status' => 'cancelled']);
+
+            // Revert shift roster records that were generated upon approval
+            $this->shiftChangeRepository->revertShiftChange($locked);
+        });
+
+        // Safely notify Employee
+        try {
+            if ($shiftChangeRequest->employee_id) {
+                $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift']) : url('/hrms/shift-overtime?tab=shift');
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $shiftChangeRequest->employee_id,
+                    title: 'Shift Change Cancellation Approved',
+                    message: 'Your shift change cancellation request has been approved.',
+                    actionUrl: $actionUrl,
+                    type: 'shift_change_cancellation_approved',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Shift change cancellation approval notification failed: ' . $e->getMessage());
         }
 
-        $shiftChangeRequest->update(['status' => 'cancelled']);
-
-        return redirect()->back()->with('success', 'Shift change cancellation approved.');
+        return redirect()->back()->with('success', __('hrms.shift_change.cancellation_approved'));
     }
 
     public function denyCancellation(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
@@ -213,18 +297,38 @@ class ShiftChangeRequestController extends Controller
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
         abort_unless($isHrAdmin, 403);
 
-        if ($shiftChangeRequest->status !== 'cancellation_requested') {
-            return redirect()->back()->with('error', 'This request does not have a pending cancellation request.');
+        DB::transaction(function () use ($shiftChangeRequest) {
+            $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== 'cancellation_requested') {
+                throw new \RuntimeException(__('hrms.shift_change.no_pending_cancellation'));
+            }
+
+            $updateData = ['status' => 'approved'];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('shift_change_requests', 'cancellation_reason')) {
+                $updateData['cancellation_reason'] = null;
+            }
+
+            $locked->update($updateData);
+        });
+
+        // Safely notify Employee
+        try {
+            if ($shiftChangeRequest->employee_id) {
+                $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift']) : url('/hrms/shift-overtime?tab=shift');
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employeeId: $shiftChangeRequest->employee_id,
+                    title: 'Shift Change Cancellation Denied',
+                    message: 'Your shift change cancellation request was denied. Request remains approved.',
+                    actionUrl: $actionUrl,
+                    type: 'shift_change_cancellation_denied',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Shift change cancellation denial notification failed: ' . $e->getMessage());
         }
 
-        $updateData = ['status' => 'approved'];
-        if (\Illuminate\Support\Facades\Schema::hasColumn('shift_change_requests', 'cancellation_reason')) {
-            $updateData['cancellation_reason'] = null;
-        }
-
-        $shiftChangeRequest->update($updateData);
-
-        return redirect()->back()->with('success', 'Cancellation request denied. Request remains approved.');
+        return redirect()->back()->with('success', __('hrms.shift_change.cancellation_denied'));
     }
 
     public function destroy(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
@@ -237,11 +341,17 @@ class ShiftChangeRequestController extends Controller
                 abort(403, 'Unauthorized action.');
             }
             if ($shiftChangeRequest->status !== 'pending') {
-                return redirect()->back()->with('error', 'Only pending requests can be deleted.');
+                return redirect()->back()->with('error', __('hrms.shift_change.delete_only_pending'));
             }
         }
 
-        $shiftChangeRequest->delete();
+        DB::transaction(function () use ($shiftChangeRequest) {
+            $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'approved') {
+                $this->shiftChangeRepository->revertShiftChange($locked);
+            }
+            $locked->delete();
+        });
 
         return redirect()->back()->with('success', __('hrms.shift_change.deleted_successfully'));
     }

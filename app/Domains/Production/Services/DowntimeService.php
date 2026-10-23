@@ -93,21 +93,22 @@ class DowntimeService
         int $downtimeId,
         ?int $userId = null,
         ?string $remarks = null,
-        ?string $targetState = 'Idle'
+        ?string $targetState = 'Idle',
+        mixed $endTime = null
     ): ProductionMachineDowntime {
-        return DB::transaction(function () use ($tenantId, $downtimeId, $userId, $remarks, $targetState) {
+        return DB::transaction(function () use ($tenantId, $downtimeId, $userId, $remarks, $targetState, $endTime) {
             $downtime = ProductionMachineDowntime::findOrFail($downtimeId);
 
             if ($downtime->status === ProductionMachineDowntime::STATUS_CLOSED) {
                 throw new InvalidArgumentException("Downtime event is already closed.");
             }
 
-            $endTime = now();
+            $resolvedEndTime = $endTime ? \Illuminate\Support\Carbon::parse($endTime) : now();
             $start = \Illuminate\Support\Carbon::parse($downtime->start_time);
-            $durationMinutes = max(0.00, round($start->diffInSeconds($endTime) / 60.0, 2));
+            $durationMinutes = max(0.00, round($start->diffInSeconds($resolvedEndTime) / 60.0, 2));
 
             $downtime->update([
-                'end_time'         => $endTime,
+                'end_time'         => $resolvedEndTime,
                 'duration_minutes' => $durationMinutes,
                 'approved_by'      => $userId,
                 'remarks'          => $remarks ?? $downtime->remarks,
@@ -130,24 +131,17 @@ class DowntimeService
                 ->first();
 
             if ($wo) {
-                $workCenter = \App\Domains\Production\Models\WorkCenter::find($downtime->work_center_id);
-                $laborRate  = $workCenter ? (float) $workCenter->cost_per_hour : 0.00;
-
-                $laborHours = max(0.1, round($durationMinutes / 60.0, 2));
-                $calculatedLaborCost = round($laborHours * $laborRate, 2);
-
+                $repairHours = max(0.1, round($durationMinutes / 60.0, 2));
+                $mechanicCost = (float) ($wo->mechanic_cost ?? 0.00);
                 $sparesCost = (float) \App\Domains\Production\Models\ProductionMaintenanceWorkOrderSpare::where('tenant_id', $tenantId)
                     ->where('maintenance_work_order_id', $wo->id)
                     ->sum('total_cost');
 
-                $totalCost = round($calculatedLaborCost + $sparesCost, 2);
+                $totalCost = round($mechanicCost + $sparesCost, 2);
 
                 $wo->update([
-                    'actual_end'       => $endTime,
+                    'actual_end'       => $resolvedEndTime,
                     'work_performed'   => $remarks ?: ($wo->work_performed ?: 'Downtime Resolved & Maintenance Completed'),
-                    'labor_hours'      => $laborHours,
-                    'labor_cost_rate'  => $laborRate,
-                    'labor_cost'       => $calculatedLaborCost,
                     'spare_parts_cost' => $sparesCost,
                     'total_cost'       => $totalCost,
                     'status'           => \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_COMPLETED,
@@ -159,13 +153,13 @@ class DowntimeService
                     if ($pmSchedule) {
                         $pmService = app(PmScheduleService::class);
                         $nextDue = $pmService->computeNextDueDate(
-                            $endTime,
+                            $resolvedEndTime,
                             $pmSchedule->frequency_type,
                             $pmSchedule->frequency_value
                         );
 
                         $pmSchedule->update([
-                            'last_completed_date' => $endTime->toDateString(),
+                            'last_completed_date' => $resolvedEndTime->toDateString(),
                             'next_due_date'       => $nextDue->toDateString(),
                         ]);
                     }
@@ -178,7 +172,7 @@ class DowntimeService
                 $machine->update([
                     'status'             => Machine::STATUS_ACTIVE,
                     'maintenance_status' => 'none',
-                    'last_maintenance_date' => $endTime->toDateString(),
+                    'last_maintenance_date' => $resolvedEndTime->toDateString(),
                 ]);
             }
 

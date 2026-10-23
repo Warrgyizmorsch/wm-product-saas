@@ -147,10 +147,15 @@ class ProjectRepository implements ProjectRepositoryInterface
         return $project->delete();
     }
 
-    public function latestCode(): ?string
+    public function latestCode(?int $tenantId = null, ?int $branchId = null): ?string
     {
-        return Project::query()
+        $tenantId = $tenantId ?? (tenant_id() ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null) ?? 1);
+        $branchId = $branchId ?? (branch_id() ?? (app()->bound(\App\Core\Branch\BranchContext::class) ? app(\App\Core\Branch\BranchContext::class)->id() : null));
+
+        return Project::withoutGlobalScopes()
             ->withTrashed()
+            ->where('tenant_id', $tenantId)
+            ->when($branchId !== null, fn ($q) => $q->where('branch_id', $branchId))
             ->orderByDesc('id')
             ->value('project_code');
     }

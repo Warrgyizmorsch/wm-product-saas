@@ -11,6 +11,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Domains\Sales\Models\DispatchOrderItem;
+use App\Domains\Sales\Models\PaymentAllocation;
+use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
+use App\Domains\Accounting\Models\ChartOfAccount;
+use App\Domains\Accounting\Services\VoucherService;
+use App\Domains\Accounting\Support\VoucherType;
 
 class InvoiceApiController extends Controller
 {
@@ -392,6 +399,20 @@ class InvoiceApiController extends Controller
 
         $this->authorize('update', $invoice);
 
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot record payment against a cancelled invoice.',
+            ], 422);
+        }
+
+        if ($invoice->status === 'Paid' || (float)$invoice->balance_due <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice is already fully paid.',
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'amount'         => ['required', 'numeric', 'min:0.01', "max:{$invoice->balance_due}"],
             'payment_date'   => ['required', 'date'],
@@ -579,5 +600,350 @@ class InvoiceApiController extends Controller
                 'message' => 'Failed to send WhatsApp: ' . $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * GET /api/sales/invoices/{id}/cancellation-check
+     * Check if invoice can be cancelled via Credit Note or requires Sales Return (if goods already dispatched).
+     */
+    public function checkCancellationEligibility(int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+
+        $invoice = Invoice::where('tenant_id', $tenantId)
+            ->with(['customer', 'salesOrder.customer', 'allocations'])
+            ->find($id);
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
+
+        $this->authorize('view', $invoice);
+
+        // Check if any goods have been dispatched for this invoice or its sales order
+        $hasDispatched = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId, $invoice) {
+            $q->where('tenant_id', $tenantId)
+              ->where('status', '!=', 'Cancelled')
+              ->where(function ($sub) use ($invoice) {
+                  $sub->where('invoice_id', $invoice->id);
+                  if ($invoice->sales_order_id) {
+                      $sub->orWhere('sales_order_id', $invoice->sales_order_id);
+                  }
+                  if ($invoice->material_requirement_id) {
+                      $sub->orWhere('material_requirement_id', $invoice->material_requirement_id);
+                  }
+              });
+        })
+        ->where(function ($q) {
+            $q->where('quantity_dispatched', '>', 0)
+              ->orWhere('quantity_ordered', '>', 0);
+        })
+        ->exists();
+
+        // Linked Financial Credit Notes
+        $linkedCreditNotes = Journal::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('reference_type', 'invoice')
+            ->where('reference_id', $invoice->id)
+            ->where('voucher_type', VoucherType::CREDIT_NOTE)
+            ->get(['id', 'journal_number', 'journal_date', 'total_debit', 'total_credit', 'memo', 'status']);
+
+        // Active Cash and Bank accounts for potential refunds
+        $cashBankAccounts = ChartOfAccount::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('is_cash_or_bank', true)
+                  ->orWhere('name', 'like', '%Bank%')
+                  ->orWhere('name', 'like', '%Cash%');
+            })
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'type']);
+
+        $isCancelled = in_array(strtolower((string)$invoice->status), ['cancelled', 'void']);
+        $canCancelViaCreditNote = !$hasDispatched && !$isCancelled;
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'invoice_id'                 => $invoice->id,
+                'invoice_number'             => $invoice->invoice_number,
+                'status'                     => $invoice->status,
+                'is_cancelled'               => $isCancelled,
+                'total_amount'               => (float)$invoice->total_amount,
+                'amount_paid'                => (float)$invoice->amount_paid,
+                'balance_due'                => (float)$invoice->balance_due,
+                'has_dispatched'             => $hasDispatched,
+                'recommended_action'         => $hasDispatched ? 'sales_return' : 'credit_note',
+                'action_message'             => $hasDispatched
+                    ? 'Goods for this order/invoice have already been dispatched. In accordance with standard ERP compliance, please use the Sales Return workflow instead of direct credit note cancellation.'
+                    : 'Goods have not been dispatched. You may issue a Financial Credit Note to cancel this invoice without altering warehouse inventory.',
+                'can_cancel_via_credit_note' => $canCancelViaCreditNote,
+                'payment_handling'           => [
+                    'has_payment' => (float)$invoice->amount_paid > 0,
+                    'amount_paid' => (float)$invoice->amount_paid,
+                    'options'     => [
+                        [
+                            'value'       => 'credit_balance',
+                            'label'       => 'Retain as Customer Advance Credit',
+                            'description' => 'Unallocates payment from this cancelled invoice so it stands as advance credit for future orders.',
+                        ],
+                        [
+                            'value'       => 'bank_refund',
+                            'label'       => 'Refund to Customer via Bank Account',
+                            'description' => 'Generates a payment voucher posting payout from selected Bank/Cash account to customer.',
+                        ],
+                    ],
+                ],
+                'cash_bank_accounts'         => $cashBankAccounts,
+                'linked_credit_notes'        => $linkedCreditNotes,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/sales/invoices/{id}/credit-note
+     * Issue a Financial Credit Note directly from the Invoice (for un-dispatched orders or financial adjustments).
+     */
+    public function storeCreditNote(Request $request, int $id): JsonResponse
+    {
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+
+        $inv = Invoice::where('tenant_id', $tenantId)
+            ->with(['customer', 'salesOrder.customer'])
+            ->find($id);
+
+        if (!$inv) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice not found',
+            ], 404);
+        }
+
+        $this->authorize('update', $inv);
+
+        if (in_array(strtolower((string)$inv->status), ['cancelled', 'void'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This invoice is already cancelled.',
+            ], 422);
+        }
+
+        // Enforce dispatch guard
+        $hasDispatched = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId, $inv) {
+            $q->where('tenant_id', $tenantId)
+              ->where('status', '!=', 'Cancelled')
+              ->where(function ($sub) use ($inv) {
+                  $sub->where('invoice_id', $inv->id);
+                  if ($inv->sales_order_id) {
+                      $sub->orWhere('sales_order_id', $inv->sales_order_id);
+                  }
+                  if ($inv->material_requirement_id) {
+                      $sub->orWhere('material_requirement_id', $inv->material_requirement_id);
+                  }
+              });
+        })
+        ->where(function ($q) {
+            $q->where('quantity_dispatched', '>', 0)
+              ->orWhere('quantity_ordered', '>', 0);
+        })
+        ->exists();
+
+        if ($hasDispatched) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Goods for this invoice have already been dispatched. Please create a Sales Return instead of a direct financial credit note.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reason'                 => ['required', 'string', 'max:255'],
+            'credit_note_date'       => ['required', 'date'],
+            'refund_action'          => ['required', 'string', 'in:credit_balance,bank_refund'],
+            'refund_bank_account_id' => ['nullable', 'required_if:refund_action,bank_refund', 'integer'],
+            'notes'                  => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+
+        $journal = DB::transaction(function () use ($inv, $tenantId, $companyId, $branchId, $validated) {
+            $accountsReceivable = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '1100')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Accounts Receivable%')->first();
+            $salesReturnAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '4030')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Sales Return%')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '4010')->first();
+            $cgstAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '2110')->first();
+            $sgstAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '2120')->first();
+            $igstAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '2130')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Output IGST%')->first();
+            $freightAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '4900')->first()
+                ?? ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('name', 'like', '%Freight%')->first();
+            $roundOffAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', '5730')->first();
+
+            $taxableNet  = max(0, (float)$inv->subtotal - (float)$inv->discount_amount);
+            $cgst        = (float)$inv->cgst_amount;
+            $sgst        = (float)$inv->sgst_amount;
+            $igst        = (float)$inv->igst_amount;
+            $freight     = ($inv->freight_terms === 'To Be Billed') ? (float)$inv->freight_amount : 0;
+            $totalAmount = (float)$inv->total_amount;
+
+            $lines = [];
+            if ($taxableNet > 0 && $salesReturnAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $salesReturnAccount->id,
+                    'debit'               => round($taxableNet, 2),
+                    'credit'              => 0,
+                    'description'         => "Sales Return / Credit Note - {$inv->invoice_number}",
+                ];
+            }
+            if ($cgst > 0 && $cgstAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $cgstAccount->id,
+                    'debit'               => round($cgst, 2),
+                    'credit'              => 0,
+                    'description'         => "CGST Output Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($sgst > 0 && $sgstAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $sgstAccount->id,
+                    'debit'               => round($sgst, 2),
+                    'credit'              => 0,
+                    'description'         => "SGST Output Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($igst > 0 && $igstAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $igstAccount->id,
+                    'debit'               => round($igst, 2),
+                    'credit'              => 0,
+                    'description'         => "IGST Output Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($freight > 0 && $freightAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $freightAccount->id,
+                    'debit'               => round($freight, 2),
+                    'credit'              => 0,
+                    'description'         => "Freight Charges Reversal - {$inv->invoice_number}",
+                ];
+            }
+            if ($accountsReceivable) {
+                $lines[] = [
+                    'chart_of_account_id' => $accountsReceivable->id,
+                    'debit'               => 0,
+                    'credit'              => round($totalAmount, 2),
+                    'description'         => "Credit Note Total Value - {$inv->invoice_number}",
+                    'party_type'          => JournalEntry::PARTY_CUSTOMER,
+                    'party_id'            => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                ];
+            }
+
+            // Penny balance check
+            $totalDebit  = round(array_sum(array_column($lines, 'debit')), 2);
+            $totalCredit = round(array_sum(array_column($lines, 'credit')), 2);
+            $diff        = round($totalDebit - $totalCredit, 2);
+            if (abs($diff) > 0 && abs($diff) <= 0.05 && $roundOffAccount) {
+                $lines[] = [
+                    'chart_of_account_id' => $roundOffAccount->id,
+                    'debit'               => $diff < 0 ? abs($diff) : 0,
+                    'credit'              => $diff > 0 ? $diff : 0,
+                    'description'         => "Round Off - Credit Note {$inv->invoice_number}",
+                ];
+            }
+
+            /** @var VoucherService $voucherService */
+            $voucherService = app(VoucherService::class);
+            $journal = $voucherService->post(VoucherType::CREDIT_NOTE, $lines, [
+                'tenant_id'      => $tenantId,
+                'company_id'     => $inv->company_id ?? $companyId,
+                'branch_id'      => $inv->branch_id ?? $branchId,
+                'journal_date'   => $validated['credit_note_date'],
+                'reference_type' => 'invoice',
+                'reference_id'   => $inv->id,
+                'memo'           => "Credit Note for Invoice {$inv->invoice_number}: {$validated['reason']}",
+                'party_type'     => 'customer',
+                'party_id'       => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                'party_name'     => $inv->customer?->name ?: $inv->salesOrder?->customer?->name,
+                'reference_no'   => $inv->invoice_number,
+                'posted_by'      => auth()->id(),
+            ]);
+
+            // Handle payments if any
+            if ((float)$inv->amount_paid > 0) {
+                if ($validated['refund_action'] === 'bank_refund' && !empty($validated['refund_bank_account_id'])) {
+                    $bankAccount = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($validated['refund_bank_account_id']);
+                    if ($bankAccount && $accountsReceivable) {
+                        $refundLines = [
+                            [
+                                'chart_of_account_id' => $accountsReceivable->id,
+                                'debit'               => round((float)$inv->amount_paid, 2),
+                                'credit'              => 0,
+                                'description'         => "Customer Refund for Invoice {$inv->invoice_number}",
+                                'party_type'          => JournalEntry::PARTY_CUSTOMER,
+                                'party_id'            => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                            ],
+                            [
+                                'chart_of_account_id' => $bankAccount->id,
+                                'debit'               => 0,
+                                'credit'              => round((float)$inv->amount_paid, 2),
+                                'description'         => "Bank Payout - Customer Refund {$inv->invoice_number}",
+                            ],
+                        ];
+                        $voucherService->post(VoucherType::PAYMENT, $refundLines, [
+                            'tenant_id'      => $tenantId,
+                            'company_id'     => $inv->company_id ?? $companyId,
+                            'branch_id'      => $inv->branch_id ?? $branchId,
+                            'journal_date'   => $validated['credit_note_date'],
+                            'reference_type' => 'invoice_refund',
+                            'reference_id'   => $inv->id,
+                            'memo'           => "Customer Refund for {$inv->invoice_number} via {$bankAccount->name}",
+                            'party_type'     => 'customer',
+                            'party_id'       => $inv->customer_id ?: $inv->salesOrder?->customer_id,
+                            'party_name'     => $inv->customer?->name ?: $inv->salesOrder?->customer?->name,
+                            'reference_no'   => $inv->invoice_number,
+                            'posted_by'      => auth()->id(),
+                        ]);
+                    }
+                } else {
+                    // Retain as Customer Advance Credit: unallocate payment allocation from this invoice
+                    PaymentAllocation::where('invoice_id', $inv->id)
+                        ->update(['invoice_id' => null]);
+                }
+            }
+
+            // Update Invoice
+            $inv->status      = 'Cancelled';
+            $inv->balance_due = 0;
+            $cancellationNote = "Cancelled via Financial Credit Note #{$journal->journal_number} on " . date('Y-m-d') . ". Reason: " . $validated['reason'];
+            if (!empty($validated['notes'])) {
+                $cancellationNote .= " | Notes: " . $validated['notes'];
+            }
+            $inv->notes = $inv->notes ? ($inv->notes . "\n" . $cancellationNote) : $cancellationNote;
+            $inv->save();
+
+            return $journal;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Financial Credit Note {$journal->journal_number} created successfully. Invoice {$inv->invoice_number} has been cancelled without altering warehouse inventory.",
+            'data'    => [
+                'credit_note'    => $journal->fresh(['entries.account']),
+                'invoice'        => $inv->fresh(['customer', 'items.product']),
+                'refund_action'  => $validated['refund_action'],
+            ],
+        ], 201);
     }
 }

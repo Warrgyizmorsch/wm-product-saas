@@ -118,6 +118,11 @@ class CodeService
             'ORD', 'PO'  => 'order',
             'BAT', 'LOT' => 'batch',
             'SER', 'SN'  => 'serial',
+            'PRD'        => 'product',
+            'MCH'        => 'machine',
+            'WKC'        => 'work_center',
+            'WHS'        => 'warehouse',
+            'OPR'        => 'operator',
             default      => 'unknown',
         };
 
@@ -231,59 +236,226 @@ class CodeService
         $rawCode    = $decoded['raw_code'] ?? $identifier;
 
         return match ($type) {
-            'order' => ProductionOrder::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where(function ($q) use ($identifier, $rawCode) {
-                    $q->where('order_number', $identifier)
-                      ->orWhere('order_number', $rawCode)
-                      ->orWhere('barcode', $rawCode)
-                      ->orWhere('barcode', 'PO:' . $identifier);
-                    if (is_numeric($identifier)) {
-                        $q->orWhere('id', (int) $identifier);
-                    }
-                })->first(),
+            'order' => (function () use ($tenantId, $identifier, $rawCode) {
+                $order = ProductionOrder::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('order_number', $identifier)
+                          ->orWhere('order_number', $rawCode)
+                          ->orWhere('barcode', $rawCode)
+                          ->orWhere('qr_code', $rawCode)
+                          ->orWhere('barcode', 'PO:' . $identifier)
+                          ->orWhere('qr_code', 'PO:' . $identifier);
+                    })->first();
 
-            'batch' => ProductionBatch::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where(function ($q) use ($identifier, $rawCode) {
-                    $q->where('batch_number', $identifier)
-                      ->orWhere('batch_number', $rawCode)
-                      ->orWhere('barcode', $rawCode)
-                      ->orWhere('barcode', 'LOT:' . $identifier);
-                    if (is_numeric($identifier)) {
-                        $q->orWhere('id', (int) $identifier);
-                    }
-                })->first(),
+                if ($order) {
+                    return $order;
+                }
 
-            'serial' => ProductionSerialNumber::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where(function ($q) use ($identifier, $rawCode) {
-                    $q->where('serial_number', $identifier)
-                      ->orWhere('serial_number', $rawCode)
-                      ->orWhere('barcode', $rawCode)
-                      ->orWhere('barcode', 'SN:' . $identifier);
-                    if (is_numeric($identifier)) {
-                        $q->orWhere('id', (int) $identifier);
-                    }
-                })->first(),
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:ORD|PO)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:ORD|PO)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
 
-            'product' => Product::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where(function ($q) use ($identifier) {
-                    $q->where('sku', $identifier)->orWhere('barcode', $identifier);
-                })->first(),
+                if ($numericId !== null) {
+                    return ProductionOrder::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
 
-            'machine' => Machine::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('code', $identifier)->first(),
+                return null;
+            })(),
 
-            'work_center' => WorkCenter::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('code', $identifier)->first(),
+            'batch' => (function () use ($tenantId, $identifier, $rawCode) {
+                $batch = ProductionBatch::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('batch_number', $identifier)
+                          ->orWhere('batch_number', $rawCode)
+                          ->orWhere('barcode', $rawCode)
+                          ->orWhere('qr_code', $rawCode)
+                          ->orWhere('barcode', 'LOT:' . $identifier)
+                          ->orWhere('qr_code', 'LOT:' . $identifier);
+                    })->first();
 
-            'warehouse' => Warehouse::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('code', $identifier)->first(),
+                if ($batch) {
+                    return $batch;
+                }
+
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:BAT|LOT)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:BAT|LOT)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
+
+                if ($numericId !== null) {
+                    return ProductionBatch::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
+
+                return null;
+            })(),
+
+            'serial' => (function () use ($tenantId, $identifier, $rawCode) {
+                $serial = ProductionSerialNumber::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('serial_number', $identifier)
+                          ->orWhere('serial_number', $rawCode)
+                          ->orWhere('barcode', $rawCode)
+                          ->orWhere('qr_code', $rawCode)
+                          ->orWhere('barcode', 'SN:' . $identifier)
+                          ->orWhere('qr_code', 'SN:' . $identifier);
+                    })->first();
+
+                if ($serial) {
+                    return $serial;
+                }
+
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:SER|SN)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:SER|SN)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
+
+                if ($numericId !== null) {
+                    return ProductionSerialNumber::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
+
+                return null;
+            })(),
+
+            'product' => (function () use ($tenantId, $identifier, $rawCode) {
+                $product = Product::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('sku', $identifier)
+                          ->orWhere('sku', $rawCode)
+                          ->orWhere('barcode', $identifier)
+                          ->orWhere('barcode', $rawCode);
+                    })->first();
+
+                if ($product) {
+                    return $product;
+                }
+
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:PRD)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:PRD)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
+
+                if ($numericId !== null) {
+                    return Product::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
+
+                return null;
+            })(),
+
+            'machine' => (function () use ($tenantId, $identifier, $rawCode) {
+                $machine = Machine::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('code', $identifier)
+                          ->orWhere('code', $rawCode)
+                          ->orWhere('barcode', $rawCode)
+                          ->orWhere('qr_code', $rawCode);
+                    })->first();
+
+                if ($machine) {
+                    return $machine;
+                }
+
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:MCH)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:MCH)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
+
+                if ($numericId !== null) {
+                    return Machine::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
+
+                return null;
+            })(),
+
+            'work_center' => (function () use ($tenantId, $identifier, $rawCode) {
+                $wc = WorkCenter::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('code', $identifier)
+                          ->orWhere('code', $rawCode)
+                          ->orWhere('barcode', $rawCode)
+                          ->orWhere('qr_code', $rawCode);
+                    })->first();
+
+                if ($wc) {
+                    return $wc;
+                }
+
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:WKC)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:WKC)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
+
+                if ($numericId !== null) {
+                    return WorkCenter::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
+
+                return null;
+            })(),
+
+            'warehouse' => (function () use ($tenantId, $identifier, $rawCode) {
+                $wh = Warehouse::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($identifier, $rawCode) {
+                        $q->where('code', $identifier)
+                          ->orWhere('code', $rawCode);
+                    })->first();
+
+                if ($wh) {
+                    return $wh;
+                }
+
+                $numericId = null;
+                if (is_numeric($identifier)) {
+                    $numericId = (int) $identifier;
+                } elseif (preg_match('/^(?:WHS)-(\d+)$/i', $rawCode, $m) || preg_match('/^(?:WHS)-(\d+)$/i', $identifier, $m)) {
+                    $numericId = (int) $m[1];
+                }
+
+                if ($numericId !== null) {
+                    return Warehouse::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $numericId)
+                        ->first();
+                }
+
+                return null;
+            })(),
 
             'operator' => (function () use ($identifier, $tenantId) {
                 $employee = \App\Domains\HRMS\Models\Employee::where('employee_id', $identifier)->first();

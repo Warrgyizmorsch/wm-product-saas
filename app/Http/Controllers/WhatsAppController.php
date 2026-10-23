@@ -61,12 +61,35 @@ class WhatsAppController extends Controller
     public function handleWebhook(Request $request): JsonResponse
     {
         $payload = $request->all();
-        $sessionKey = $payload['session_key'] ?? 'default';
-        $config = \App\Models\WhatsAppConfiguration::where('session_key', $sessionKey)->first()
-            ?? $this->waService->getConfig();
+        $sessionKey = (string) ($payload['session_key'] ?? '');
+
+        // Only the bridge may call this: it echoes back the session's bridge token
+        // (sent to it by the ERP on every bridge call) in X-Bridge-Token. No
+        // fallback config — an unknown session or wrong token is rejected (QA-06).
+        $config = $sessionKey === '' ? null : \App\Models\WhatsAppConfiguration::where('session_key', $sessionKey)->first();
+        $token = (string) $request->header('X-Bridge-Token', '');
+
+        if ($config === null || blank($config->bridge_token) || ! hash_equals((string) $config->bridge_token, $token)) {
+            return response()->json(['status' => 'unauthorized'], 401);
+        }
 
         $rawNumber = (string) ($payload['sender_number'] ?? '');
         $senderNumber = str_contains($rawNumber, '@') ? trim($rawNumber) : preg_replace('/\D/', '', $rawNumber);
+
+        // If sender number is an @lid, attempt resolution from saved lid-map.json
+        if (str_contains($senderNumber, '@lid')) {
+            $lidId = explode('@', $senderNumber)[0];
+            $lidMapFile = storage_path("app/whatsapp-sessions/{$sessionKey}/lid-map.json");
+            if (file_exists($lidMapFile)) {
+                $lidData = json_decode(file_get_contents($lidMapFile), true);
+                if (!empty($lidData['lidToPhone'][$lidId])) {
+                    $senderNumber = $lidData['lidToPhone'][$lidId];
+                } elseif (!empty($lidData['lidToPhone'][$senderNumber])) {
+                    $senderNumber = $lidData['lidToPhone'][$senderNumber];
+                }
+            }
+        }
+
         $senderName = (!empty($payload['sender_name']) && $payload['sender_name'] !== $senderNumber) ? $payload['sender_name'] : ($senderNumber ?: 'Unknown');
         $messageBody = (string) ($payload['message_body'] ?? '');
         $messageId = $payload['message_id'] ?? null;

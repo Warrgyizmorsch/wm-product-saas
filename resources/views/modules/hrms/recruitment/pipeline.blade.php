@@ -144,8 +144,54 @@
                         <span class="me-3"><i class="feather-users me-1"></i>Openings: <strong>{{ $requisition->vacancies }} Vacancies</strong></span>
                     </div>
                 </div>
-                <div>
+                <div class="d-flex align-items-center gap-2">
                     <x-ui.status-badge :status="$requisition->status" :label="in_array($requisition->status, ['approved', 'published', 'open']) ? 'Open' : (in_array($requisition->status, ['closed']) ? 'Closed' : null)" size="lg" />
+                    
+                    @if($canUpdateRecruitment)
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-light border dropdown-toggle text-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Requisition Status">
+                                <i class="feather-settings me-1"></i> Status
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 fs-12">
+                                <li>
+                                    <form action="{{ route('hrms.recruitment.requisitions.status', $requisition->id) }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="status" value="approved">
+                                        <button type="submit" class="dropdown-item py-1.5 {{ $requisition->status === 'approved' ? 'active fw-bold' : '' }}">
+                                            <i class="feather-check-circle text-success me-2"></i> Mark as Open (Approved)
+                                        </button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form action="{{ route('hrms.recruitment.requisitions.status', $requisition->id) }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="status" value="published">
+                                        <button type="submit" class="dropdown-item py-1.5 {{ $requisition->status === 'published' ? 'active fw-bold' : '' }}">
+                                            <i class="feather-globe text-primary me-2"></i> Mark as Published
+                                        </button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form action="{{ route('hrms.recruitment.requisitions.status', $requisition->id) }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="status" value="closed">
+                                        <button type="submit" class="dropdown-item py-1.5 {{ $requisition->status === 'closed' ? 'active fw-bold' : '' }}">
+                                            <i class="feather-lock text-danger me-2"></i> Mark as Closed
+                                        </button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form action="{{ route('hrms.recruitment.requisitions.status', $requisition->id) }}" method="POST">
+                                        @csrf
+                                        <input type="hidden" name="status" value="cancelled">
+                                        <button type="submit" class="dropdown-item py-1.5 {{ $requisition->status === 'cancelled' ? 'active fw-bold' : '' }}">
+                                            <i class="feather-slash text-muted me-2"></i> Mark as Cancelled
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -155,7 +201,7 @@
             $targetApp = $targetCandidateId ? $applications->firstWhere('candidate_id', $targetCandidateId) : null;
             $activeStageKey = 'applied';
             if ($targetApp) {
-                if (in_array($targetApp->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3'])) {
+                if (in_array($targetApp->current_stage, ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr'])) {
                     $activeStageKey = 'interview';
                 } else {
                     $activeStageKey = $targetApp->current_stage;
@@ -247,6 +293,34 @@
                                             </x-ui.button>
                                         @endif
                                     </div>
+
+                                    @if($offer)
+                                        <div class="mb-3 p-2 rounded-2 border bg-light d-flex align-items-center justify-content-between shadow-xs">
+                                            <div>
+                                                <small class="text-muted d-block fs-10 text-uppercase fw-semibold">Offer Letter</small>
+                                                <strong class="text-dark fs-12">{{ $offer->offer_code }}</strong>
+                                            </div>
+                                            <div>
+                                                @if($offer->status === 'accepted')
+                                                    <span class="badge bg-soft-success text-success border border-success-subtle fs-11 px-2 py-1">
+                                                        <i class="feather-check-circle me-1"></i>Accepted
+                                                    </span>
+                                                @elseif($offer->status === 'declined')
+                                                    <span class="badge bg-soft-danger text-danger border border-danger-subtle fs-11 px-2 py-1">
+                                                        <i class="feather-x-circle me-1"></i>Declined
+                                                    </span>
+                                                @elseif($offer->status === 'sent')
+                                                    <span class="badge bg-soft-info text-info border border-info-subtle fs-11 px-2 py-1">
+                                                        <i class="feather-mail me-1"></i>Sent
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11 px-2 py-1">
+                                                        <i class="feather-file-text me-1"></i>Draft
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
 
                                     @if($app->interviews->count() > 0)
                                         <button type="button" class="btn btn-sm btn-light border w-100 mb-3 py-2 px-3 text-start d-flex align-items-center justify-content-between text-dark rounded-2 shadow-xs" data-bs-toggle="modal" data-bs-target="#interviewDetailsModal{{ $app->id }}">
@@ -349,18 +423,29 @@
                                                             </button>
                                                         @else
                                                             <button class="btn btn-sm btn-info text-white fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#viewOfferModal{{ $offer->id }}">
-                                                                <i class="feather-file-text me-1"></i>View Offer
+                                                                <i class="feather-file-text me-1"></i>Offer
                                                             </button>
                                                             <button class="btn btn-sm btn-primary fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#sendOfferEmailModal{{ $offer->id }}">
-                                                                <i class="feather-send me-1"></i>Send Mail
+                                                                <i class="feather-send me-1"></i>Email
                                                             </button>
+                                                            @if(!in_array($offer->status, ['accepted', 'declined']))
+                                                                <button class="btn btn-sm btn-outline-success fw-semibold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#offerStatusModal{{ $offer->id }}" title="Record candidate acceptance or decline">
+                                                                    <i class="feather-check-circle me-1"></i>Decision
+                                                                </button>
+                                                            @endif
                                                         @endif
                                                     @endif
 
                                                     @if($canManageRecruitment && $offer && $stageKey !== 'hired' && $stageKey !== 'rejected')
-                                                        <button type="button" class="btn btn-sm btn-success text-white fw-bold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#confirmConvertModal{{ $offer->id }}">
-                                                            ⚡ Convert
-                                                        </button>
+                                                        @if($offer->status === 'accepted')
+                                                            <button type="button" class="btn btn-sm btn-success text-white fw-bold fs-11 px-2 py-1 flex-shrink-0" data-bs-toggle="modal" data-bs-target="#confirmConvertModal{{ $offer->id }}">
+                                                                ⚡ Convert
+                                                            </button>
+                                                        @else
+                                                            <button type="button" class="btn btn-sm btn-secondary text-white fw-semibold fs-11 px-2 py-1 flex-shrink-0 opacity-75" title="Offer must be accepted before conversion" data-bs-toggle="modal" data-bs-target="#confirmConvertModal{{ $offer->id }}">
+                                                                ⚡ Convert
+                                                            </button>
+                                                        @endif
                                                     @endif
                                                 </div>
                                             @endif
@@ -669,7 +754,7 @@
                                                     </x-ui.odoo-form-ui>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Annual CTC ($)" name="offered_annual_ctc" placeholder="e.g. 75000.00" :required="true" />
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" min="0" label="Annual CTC ($)" name="offered_annual_ctc" placeholder="e.g. 75000.00" :required="true" />
                                                 </div>
                                                 <div class="mb-3">
                                                     <x-ui.odoo-form-ui type="input" inputType="date" label="Joining Date" name="joining_date" value="{{ optional($requisition->target_joining_date)->format('Y-m-d') }}" :required="true" />
@@ -802,12 +887,79 @@
                                                 @endif
                                             </div>
                                             <div class="modal-footer bg-light py-2 justify-content-between">
-                                                <button type="button" class="btn btn-outline-secondary px-3" onclick="window.print()"><i class="feather-printer me-1"></i> Print / Download PDF</button>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <a href="{{ route('hrms.recruitment.offer.download', $offer->id) }}" target="_blank" class="btn btn-primary px-3 fw-bold">
+                                                        <i class="feather-download me-1"></i> Download PDF
+                                                    </a>
+                                                    <button type="button" class="btn btn-outline-secondary px-3" onclick="window.print()">
+                                                        <i class="feather-printer me-1"></i> Print
+                                                    </button>
+                                                    @if(!in_array($offer->status, ['accepted', 'declined']))
+                                                        <button type="button" class="btn btn-success px-3 fw-bold" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#offerStatusModal{{ $offer->id }}">
+                                                            <i class="feather-check-circle me-1"></i> Record Decision
+                                                        </button>
+                                                    @endif
+                                                </div>
                                                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Modal: Candidate Offer Decision (Accept / Decline) -->
+                                <x-ui.modal id="offerStatusModal{{ $offer->id }}" title="<i class='feather-check-circle text-primary me-2'></i>Record Candidate Offer Decision" size="md" :centered="true" :showFooter="false">
+                                    <form action="{{ route('hrms.recruitment.offer.status', $offer->id) }}" method="POST">
+                                        @csrf
+                                        <div class="text-start py-2">
+                                            <div class="p-3 bg-light border rounded-3 mb-3 fs-12">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Offer Code:</span>
+                                                    <strong class="text-dark">{{ $offer->offer_code }}</strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Candidate:</span>
+                                                    <strong class="text-dark">{{ $candidate->full_name }}</strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Offered CTC:</span>
+                                                    <strong class="text-success">${{ number_format($offer->offered_annual_ctc, 2) }}</strong>
+                                                </div>
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="text-muted">Current Status:</span>
+                                                    <span class="badge bg-secondary">{{ strtoupper($offer->status) }}</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold text-dark fs-12">Candidate Decision <span class="text-danger">*</span></label>
+                                                <div class="d-flex gap-3">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="status" id="status_accept_{{ $offer->id }}" value="accepted" checked>
+                                                        <label class="form-check-label fw-semibold text-success fs-13" for="status_accept_{{ $offer->id }}">
+                                                            <i class="feather-check-circle me-1"></i>Candidate Accepted
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="status" id="status_decline_{{ $offer->id }}" value="declined">
+                                                        <label class="form-check-label fw-semibold text-danger fs-13" for="status_decline_{{ $offer->id }}">
+                                                            <i class="feather-x-circle me-1"></i>Candidate Declined
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold text-dark fs-12">Notes / Decision Details (Optional)</label>
+                                                <textarea name="reason" rows="2" class="form-control fs-12" placeholder="e.g. Acceptance received via signed email or letter..."></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
+                                            <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary px-4 fw-bold">Save Decision</button>
+                                        </div>
+                                    </form>
+                                </x-ui.modal>
 
                             <!-- Modal: Send Email Confirmation for Job Offer -->
                                 <x-ui.modal id="sendOfferEmailModal{{ $offer->id }}" title="<i class='feather-send text-primary me-2'></i>Send Job Offer Email to Candidate" size="lg" :centered="true" :showFooter="false">
@@ -884,6 +1036,18 @@
                                                 This action will create/link a system User account for <code>{{ $candidate->email }}</code> and open the Employee Profile form.
                                             </p>
 
+                                            @if($offer->status !== 'accepted')
+                                                <div class="alert alert-warning text-start fs-12 mb-3 border-warning">
+                                                    <i class="feather-alert-triangle me-1 fw-bold"></i>
+                                                    <strong>Offer Not Yet Accepted:</strong> The current status of this offer is <code>{{ strtoupper($offer->status) }}</code>. In accordance with hiring policy, the candidate must accept their offer before being provisioned as an active employee.
+                                                </div>
+                                                <div class="d-flex justify-content-center mb-3">
+                                                    <button type="button" class="btn btn-outline-success btn-sm px-3 fw-semibold" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#offerStatusModal{{ $offer->id }}">
+                                                        <i class="feather-check-circle me-1"></i>Record Candidate Acceptance First
+                                                    </button>
+                                                </div>
+                                            @endif
+
                                             <div class="p-3 bg-light border rounded-3 text-start mb-3 fs-12">
                                                 <div class="d-flex justify-content-between mb-1">
                                                     <span class="text-muted">Candidate Name:</span>
@@ -894,6 +1058,16 @@
                                                     <strong class="text-dark">{{ $candidate->email }}</strong>
                                                 </div>
                                                 <div class="d-flex justify-content-between mb-1">
+                                                    <span class="text-muted">Offer Status:</span>
+                                                    <span class="badge bg-{{ $offer->status === 'accepted' ? 'success' : 'warning' }}">{{ strtoupper($offer->status) }}</span>
+                                                </div>
+                                                @if($offer->accepted_at)
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span class="text-muted">Accepted At:</span>
+                                                        <strong class="text-success">{{ optional($offer->accepted_at)->format('d M, Y H:i') }}</strong>
+                                                    </div>
+                                                @endif
+                                                <div class="d-flex justify-content-between mb-1">
                                                     <span class="text-muted">Offered Position:</span>
                                                     <strong class="text-dark">{{ $offer->designation->name ?? 'N/A' }}</strong>
                                                 </div>
@@ -902,11 +1076,23 @@
                                                     <strong class="text-dark">{{ $offer->department->name ?? 'N/A' }}</strong>
                                                 </div>
                                             </div>
+
+                                            @if($offer->status === 'accepted')
+                                                <div class="mb-3 text-start">
+                                                    <label class="form-label fs-12 fw-semibold text-dark">Initial Password (Optional)</label>
+                                                    <input type="text" name="initial_password" class="form-control fs-12" placeholder="Leave blank to auto-generate a secure random 16-character password">
+                                                    <small class="text-muted fs-11">If left blank, a cryptographically secure random password will be generated automatically.</small>
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top">
                                             <button type="button" class="btn btn-light border px-4" data-bs-dismiss="modal">Cancel</button>
-                                            <button type="submit" class="btn btn-success text-white px-4 fw-bold"><i class="feather-check-circle me-1"></i> Confirm & Proceed</button>
+                                            @if($offer->status === 'accepted')
+                                                <button type="submit" class="btn btn-success text-white px-4 fw-bold"><i class="feather-check-circle me-1"></i> Confirm & Proceed</button>
+                                            @else
+                                                <button type="submit" class="btn btn-secondary px-4 fw-bold" disabled><i class="feather-lock me-1"></i> Acceptance Required</button>
+                                            @endif
                                         </div>
                                     </form>
                                 </x-ui.modal>
@@ -938,7 +1124,7 @@
                 </div>
                 <div class="modal-body p-4 text-start">
                     <div class="row g-3">
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" label="Source" name="source" :required="true">
                                 <option value="direct">Direct Entry</option>
                                 <option value="referral">Employee Referral</option>
@@ -947,29 +1133,28 @@
                                 <option value="other">Other</option>
                             </x-ui.odoo-form-ui>
                         </div>
-
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" inputType="number" label="Total Exp (Yrs)" name="total_experience_years" value="0" :required="true" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="First Name" name="first_name" :required="true" placeholder="e.g. John" />
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Last Name" name="last_name" placeholder="e.g. Doe" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" :required="true" placeholder="john.doe@example.com" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Current Role" name="current_designation" placeholder="e.g. Software Developer" />
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Current Company" name="current_company" placeholder="e.g. Tech Corp" />
                         </div>
 

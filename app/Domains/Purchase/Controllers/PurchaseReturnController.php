@@ -101,7 +101,7 @@ class PurchaseReturnController extends Controller
             'id' => $p->id,
             'name' => $p->name,
             'sku' => $p->sku ?: '',
-            'price' => floatval($p->cost_price ?: $p->unit_cost ?? 0),
+            'price' => floatval(convert_from_base($p->cost_price ?: $p->unit_cost ?? 0)),
         ])->values()->toArray();
 
         $warehousesJson = $warehouses->map(fn($w) => [
@@ -116,14 +116,14 @@ class PurchaseReturnController extends Controller
                 'product_id'   => $i->product_id,
                 'warehouse_id' => $i->warehouse_id ?? $grnWhId,
                 'quantity'     => floatval(($i->accepted_qty > 0) ? $i->accepted_qty : (($i->received_qty > 0) ? $i->received_qty : 1)),
-                'unit_price'   => floatval($i->unit_rate ?? 0),
+                'unit_price'   => floatval(convert_from_base($i->unit_rate ?? 0)),
             ])->values()->toArray();
         } elseif ($mode === 'po' && $purchaseOrder && $purchaseOrder->items) {
             $prefillItemsJson = $purchaseOrder->items->map(fn($i) => [
                 'product_id'   => $i->product_id,
                 'warehouse_id' => $i->warehouse_id ?? $firstWhId,
                 'quantity'     => floatval($i->quantity),
-                'unit_price'   => floatval($i->unit_price),
+                'unit_price'   => floatval(convert_from_base($i->unit_price ?? 0)),
             ])->values()->toArray();
         }
 
@@ -170,7 +170,8 @@ class PurchaseReturnController extends Controller
         $return = DB::transaction(function () use ($validated) {
             $totalAmount = 0;
             foreach ($validated['items'] as $item) {
-                $totalAmount += floatval($item['quantity']) * floatval($item['unit_price']);
+                $basePrice = convert_to_base((float) $item['unit_price']);
+                $totalAmount += floatval($item['quantity']) * $basePrice;
             }
 
             $purchaseReturn = PurchaseReturn::create([
@@ -188,13 +189,14 @@ class PurchaseReturnController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
+                $basePrice = convert_to_base((float) $item['unit_price']);
                 PurchaseReturnItem::create([
                     'purchase_return_id' => $purchaseReturn->id,
                     'product_id'         => $item['product_id'],
                     'warehouse_id'       => $item['warehouse_id'],
                     'quantity'           => $item['quantity'],
-                    'unit_price'         => $item['unit_price'],
-                    'total_amount'       => floatval($item['quantity']) * floatval($item['unit_price']),
+                    'unit_price'         => $basePrice,
+                    'total_amount'       => floatval($item['quantity']) * $basePrice,
                     'serial_numbers'     => $item['serial_numbers'] ?? null,
                 ]);
             }

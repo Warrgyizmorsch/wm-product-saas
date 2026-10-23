@@ -25,6 +25,14 @@ class EInvoiceController extends Controller
         $invoice = Invoice::findOrFail($id);
         $this->authorize('update', $invoice);
 
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            $msg = 'Cannot generate E-Invoice for a cancelled invoice.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
         $result = $this->eInvoiceService->generate($invoice);
 
         if ($request->wantsJson() || $request->ajax()) {
@@ -69,6 +77,14 @@ class EInvoiceController extends Controller
     {
         $invoice = Invoice::findOrFail($id);
         $this->authorize('update', $invoice);
+
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            $msg = 'Cannot generate E-Way Bill for a cancelled invoice.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         $validated = $request->validate([
             'transport_mode'     => ['required', 'string'],

@@ -43,14 +43,36 @@ class ProductionOrderScrap extends BaseModel
     ];
 
     protected $casts = [
-        'quantity'    => 'float',
-        'length'      => 'float',
-        'width'       => 'float',
-        'thickness'   => 'float',
-        'pieces'      => 'integer',
-        'weight'      => 'float',
+        'quantity' => 'float',
+        'length' => 'float',
+        'width' => 'float',
+        'thickness' => 'float',
+        'pieces' => 'integer',
+        'weight' => 'float',
         'recorded_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($scrap) {
+            if (empty($scrap->recorded_at)) {
+                $scrap->recorded_at = now();
+            }
+            if ((empty($scrap->company_id) || empty($scrap->branch_id)) && !empty($scrap->production_order_id)) {
+                $order = $scrap->order ?: ProductionOrder::withoutGlobalScopes()->find($scrap->production_order_id);
+                if ($order) {
+                    if (empty($scrap->company_id)) {
+                        $scrap->company_id = $order->company_id;
+                    }
+                    if (empty($scrap->branch_id)) {
+                        $scrap->branch_id = $order->branch_id;
+                    }
+                }
+            }
+        });
+    }
 
     public function order(): BelongsTo
     {
@@ -128,6 +150,6 @@ class ProductionOrderScrap extends BaseModel
      */
     public function isStockPosted(): bool
     {
-        return ! is_null($this->stock_transaction_id);
+        return !is_null($this->stock_transaction_id);
     }
 }

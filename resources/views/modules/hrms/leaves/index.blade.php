@@ -4,20 +4,41 @@
 @section('page-title', __('hrms.leave.app.title'))
 @section('breadcrumb', 'HRMS / ' . __('hrms.leave.app.title'))
 
+@php
+    $currentTab = request()->query('tab', 'applications');
+    $isEncashActive = ($currentTab === 'encashments' || request()->query('action') === 'encash');
+@endphp
+
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('hrms.leaves.export') }}"
-           id="btnExportHeader"
-           class="btn btn-light border fw-bold text-uppercase d-flex align-items-center gap-1"
-           style="height: 38px; color: #475569; border-color: #cbd5e1 !important;">
-            <i class="feather-download"></i> {{ __('hrms.common.export_excel') }}
-        </a>
-        <button type="button" id="btnApplyEncashmentHeader" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1 d-none" data-bs-toggle="modal" data-bs-target="#applyEncashmentModal" style="height: 38px;">
-            <i class="feather-dollar-sign"></i> {{ __('hrms.leave.encashment_app.apply_encashment') }}
-        </button>
-        <button type="button" id="btnApplyLeaveHeader" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#applyLeaveModal" style="height: 38px;">
-            <i class="feather-plus"></i> {{ __('hrms.leave.app.apply_leave') }}
-        </button>
+        <x-ui.button href="{{ $isEncashActive ? route('hrms.leaves.encashment.export') : route('hrms.leaves.export') }}"
+                     id="btnExportHeader"
+                     variant="light"
+                     icon="feather-download"
+                     class="border fw-bold text-uppercase"
+                     style="height: 38px; color: #475569; border-color: #cbd5e1 !important;">
+            {{ __('hrms.common.export_excel') }}
+        </x-ui.button>
+        <x-ui.button type="button"
+                     id="btnApplyEncashmentHeader"
+                     variant="primary"
+                     icon="feather-dollar-sign"
+                     class="fw-bold text-uppercase {{ $isEncashActive ? '' : 'd-none' }}"
+                     data-bs-toggle="modal"
+                     data-bs-target="#applyEncashmentModal"
+                     style="height: 38px;">
+            {{ __('hrms.leave.encashment_app.apply_encashment') }}
+        </x-ui.button>
+        <x-ui.button type="button"
+                     id="btnApplyLeaveHeader"
+                     variant="primary"
+                     icon="feather-plus"
+                     class="fw-bold text-uppercase {{ $isEncashActive ? 'd-none' : '' }}"
+                     data-bs-toggle="modal"
+                     data-bs-target="#applyLeaveModal"
+                     style="height: 38px;">
+            {{ __('hrms.leave.app.apply_leave') }}
+        </x-ui.button>
     </div>
 @endsection
 
@@ -93,7 +114,13 @@
             return [];
         }
 
-        $humanize = static fn ($value) => strtolower(str_replace('_', ' ', (string) $value));
+        $humanize = static function ($value) {
+            $v = (string) $value;
+            if (\Illuminate\Support\Facades\Lang::has('hrms.leave.' . $v)) {
+                return __('hrms.leave.' . $v);
+            }
+            return strtolower(str_replace('_', ' ', $v));
+        };
         $formatNumber = static fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
         $sections = [];
 
@@ -102,22 +129,22 @@
             $points = [];
 
             if (!empty($application['apply_in_advance'])) {
-                $points[] = 'You have to apply for this leave at least ' . ($application['advance_days'] ?? 0) . ' day(s) in advance.';
+                $points[] = __('hrms.leave.app.rule_apply_advance', ['days' => $application['advance_days'] ?? 0]);
             } else {
-                $points[] = 'You can apply for this leave without an advance-day restriction.';
+                $points[] = __('hrms.leave.app.rule_no_advance');
             }
 
-            $points[] = 'One request can be from ' . ($application['min_duration'] ?? 1) . ' to ' . ($application['max_duration'] ?? 10) . ' day(s).';
+            $points[] = __('hrms.leave.app.rule_request_range', ['min' => $application['min_duration'] ?? 1, 'max' => $application['max_duration'] ?? 10]);
 
             if (!empty($application['require_attachment'])) {
-                $points[] = 'You must attach supporting documents when the leave duration is more than ' . ($application['attachment_days'] ?? 0) . ' day(s).';
+                $points[] = __('hrms.leave.app.rule_attach_required', ['days' => $application['attachment_days'] ?? 0]);
             }
 
             if (!empty($application['sandwich_rule'])) {
-                $points[] = 'Sandwich Rule is active: intervening holidays and weekly offs will be counted as leave days.';
+                $points[] = __('hrms.leave.app.rule_sandwich_active');
             }
 
-            $sections[] = ['title' => 'Application Rules', 'icon' => 'feather-file-text', 'points' => $points];
+            $sections[] = ['title' => __('hrms.leave.app.rule_sec_application'), 'icon' => 'feather-file-text', 'points' => $points];
         }
 
         if (!empty($rules['approval'])) {
@@ -125,46 +152,57 @@
             $points = [];
 
             if (($approval['workflow_level'] ?? null) === 'auto') {
-                $points[] = 'This leave is approved automatically after submission.';
+                $points[] = __('hrms.leave.app.rule_auto_approved');
             } elseif (($approval['workflow_level'] ?? null) === '2_level') {
-                $points[] = 'This leave needs two approvals: first by ' . $humanize($approval['first_approver'] ?? 'reporting_manager') . ', then by ' . $humanize($approval['second_approver'] ?? 'hr_manager') . '.';
+                $points[] = __('hrms.leave.app.rule_two_level', [
+                    'first' => $humanize($approval['first_approver'] ?? 'reporting_manager'),
+                    'second' => $humanize($approval['second_approver'] ?? 'hr_manager')
+                ]);
             } else {
-                $points[] = 'This leave needs approval from ' . $humanize($approval['first_approver'] ?? 'reporting_manager') . '.';
+                $points[] = __('hrms.leave.app.rule_one_level', [
+                    'approver' => $humanize($approval['first_approver'] ?? 'reporting_manager')
+                ]);
             }
 
-            $sections[] = ['title' => 'Approval Rules', 'icon' => 'feather-check-square', 'points' => $points];
+            $sections[] = ['title' => __('hrms.leave.app.rule_sec_approval'), 'icon' => 'feather-check-square', 'points' => $points];
         }
 
         if (!empty($rules['accrual'])) {
             $accrual = $rules['accrual'];
             $points = [];
-            $unit = $humanize($accrual['calculate_in'] ?? 'days');
+            $unit = ($accrual['calculate_in'] ?? 'days') === 'hours' ? __('hrms.leave.app.hours') : __('hrms.leave.days');
 
             if (($accrual['quota_type'] ?? 'fixed') === 'unlimited') {
-                $points[] = 'This leave has unlimited quota.';
+                $points[] = __('hrms.leave.app.rule_unlimited_quota');
             } else {
-                $points[] = 'You get ' . $formatNumber($accrual['quota_value'] ?? 0) . ' ' . $unit . ' of this leave.';
+                $points[] = __('hrms.leave.app.rule_quota_value', [
+                    'quota' => $formatNumber($accrual['quota_value'] ?? 0),
+                    'unit' => $unit
+                ]);
             }
 
             $rate = $accrual['rate'] ?? 'immediate';
             if ($rate === 'attendance') {
-                $points[] = 'Leave is earned based on attendance: ' . ($accrual['attendance_earn'] ?? 1) . ' day for every ' . ($accrual['attendance_period'] ?? 20) . ' present day(s).';
+                $points[] = __('hrms.leave.app.rule_attendance_earn', [
+                    'earn' => $accrual['attendance_earn'] ?? 1,
+                    'period' => $accrual['attendance_period'] ?? 20
+                ]);
             } elseif ($rate === 'periodic') {
-                $points[] = 'Leave is credited periodically as configured in the leave policy.';
+                $points[] = __('hrms.leave.app.rule_periodic_credit');
             } else {
-                $points[] = 'Leave is credited immediately.';
+                $points[] = __('hrms.leave.app.rule_immediate_credit');
             }
 
             if (!empty($accrual['limit_carry'])) {
-                $points[] = 'Maximum accumulated balance is limited to ' . ($accrual['max_accum'] ?? 0) . ' day(s).';
+                $points[] = __('hrms.leave.app.rule_max_accum', ['days' => $accrual['max_accum'] ?? 0]);
             }
 
             if (!empty($accrual['allow_negative'])) {
                 $maxNeg = $formatNumber($accrual['max_negative'] ?? 0);
-                $points[] = 'Negative Leave Balance is allowed up to ' . $maxNeg . ' day(s) without current month salary deduction.';
+                $points[] = __('hrms.leave.app.rule_negative_allowed', ['days' => $maxNeg]);
             }
 
-            $sections[] = ['title' => 'Accrual Rules', 'icon' => 'feather-calendar', 'points' => $points];
+            $sections[] = ['title' => __('hrms.leave.app.rule_sec_accrual'), 'icon' => 'feather-calendar', 'points' => $points];
         }
 
         if (!empty($rules['yearend'])) {
@@ -172,36 +210,36 @@
             $points = [];
 
             if (($yearend['action'] ?? 'lapse') === 'carry_forward') {
-                $points[] = 'Unused leave can be carried forward at year end.';
-                $points[] = 'Maximum carry-forward limit is ' . ($yearend['max_carry'] ?? 0) . ' day(s).';
+                $points[] = __('hrms.leave.app.rule_carry_forward');
+                $points[] = __('hrms.leave.app.rule_max_carry', ['days' => $yearend['max_carry'] ?? 0]);
             } elseif (($yearend['action'] ?? null) === 'encash') {
-                $points[] = 'Unused leave can be encashed at year end.';
-                $points[] = 'Maximum encashment limit is ' . ($yearend['max_encash'] ?? 0) . ' day(s).';
+                $points[] = __('hrms.leave.app.rule_encash_allowed');
+                $points[] = __('hrms.leave.app.rule_max_encash', ['days' => $yearend['max_encash'] ?? 0]);
             } else {
-                $points[] = 'Unused leave lapses at year end.';
+                $points[] = __('hrms.leave.app.rule_lapse');
             }
 
-            $sections[] = ['title' => 'Year-End Rules', 'icon' => 'feather-refresh-cw', 'points' => $points];
+            $sections[] = ['title' => __('hrms.leave.app.rule_sec_yearend'), 'icon' => 'feather-refresh-cw', 'points' => $points];
         }
 
         if (!empty($rules['probation'])) {
             $probation = $rules['probation'];
             $point = match ($probation['rule'] ?? 'allow') {
-                'disallow' => 'You cannot apply for this leave during probation.',
-                'allow_after_months' => 'You can apply for this leave after completing ' . ($probation['months'] ?? 0) . ' month(s) from joining.',
-                default => 'You can apply for this leave during the probation.',
+                'disallow' => __('hrms.leave.app.rule_probation_disallow'),
+                'allow_after_months' => __('hrms.leave.app.rule_probation_after', ['months' => $probation['months'] ?? 0]),
+                default => __('hrms.leave.app.rule_probation_allow'),
             };
-            $sections[] = ['title' => 'Probation Rules', 'icon' => 'feather-shield', 'points' => [$point]];
+            $sections[] = ['title' => __('hrms.leave.app.rule_sec_probation'), 'icon' => 'feather-shield', 'points' => [$point]];
         }
 
         if (!empty($rules['notice'])) {
             $notice = $rules['notice'];
             $point = match ($notice['rule'] ?? 'allow') {
-                'disallow' => 'You cannot apply for this leave during the notice period.',
-                'special_approval' => 'You need special HR approval to apply during the notice period.',
-                default => 'You can apply for this leave during the notice period.',
+                'disallow' => __('hrms.leave.app.rule_notice_disallow'),
+                'special_approval' => __('hrms.leave.app.rule_notice_special'),
+                default => __('hrms.leave.app.rule_notice_allow'),
             };
-            $sections[] = ['title' => 'Notice Period Rules', 'icon' => 'feather-alert-triangle', 'points' => [$point]];
+            $sections[] = ['title' => __('hrms.leave.app.rule_sec_notice'), 'icon' => 'feather-alert-triangle', 'points' => [$point]];
         }
 
         return $sections;
@@ -283,41 +321,45 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
         }
-        .policy-info-box {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        .leave-balances-container {
+            margin-bottom: 1.5rem;
         }
-        .policy-info-item {
-            font-size: 12.5px;
-            margin-bottom: 10px;
-            color: #475569;
+        .leave-balances-track {
             display: flex;
-            align-items: center;
+            gap: 16px;
+            padding-bottom: 6px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scroll-behavior: smooth;
         }
-        .policy-info-item:last-child {
-            margin-bottom: 0;
+        .leave-balances-track::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
         }
-        .policy-icon-wrapper {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #ffffff;
-            color: #3b82f6;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            margin-right: 10px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            flex-shrink: 0;
+        .leave-balances-track .leave-balance-card-item {
+            flex: 0 0 calc(25% - 12px);
+            min-width: 250px;
         }
-        .policy-icon-wrapper i {
-            font-size: 12px;
-            color: #3b82f6;
+        @media (max-width: 1200px) {
+            .leave-balances-track .leave-balance-card-item {
+                flex: 0 0 calc(33.333% - 11px);
+            }
         }
+        @media (max-width: 992px) {
+            .leave-balances-track .leave-balance-card-item {
+                flex: 0 0 calc(50% - 8px);
+            }
+        }
+        @media (max-width: 576px) {
+            .leave-balances-track .leave-balance-card-item {
+                flex: 0 0 85%;
+            }
+        }
+
         .badge-pending {
             background-color: #fef3c7;
             color: #d97706;
@@ -438,27 +480,6 @@
             padding: 8px 12px !important;
             white-space: nowrap !important;
         }
-        /* Underlined Horizontal Tabs (matching Org Structure theme) */
-        #leavesModuleTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 500;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        #leavesModuleTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #leavesModuleTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-            font-weight: 600;
-        }
 
         /* ── Table Responsive Dropdown Visibility Fix ── */
         .table-responsive {
@@ -500,6 +521,10 @@
         var employeeDataMap = @json($employeeDataMap);
 
         $(document).ready(function() {
+            $('#applyLeaveModal form').attr('enctype', 'multipart/form-data');
+            $('#leaveCancellationModal form').attr('id', 'leaveCancellationForm');
+            $('#rejectLeaveModal form').attr('id', 'rejectLeaveForm');
+            $('#leavesTableBody').closest('table').attr('id', 'leavesTable');
             // Append modals to document.body to completely prevent blur/backdrop z-index issues
             ['applyLeaveModal', 'rejectLeaveModal', 'applyEncashmentModal', 'leaveCancellationModal'].forEach(function(id) {
                 var el = document.getElementById(id);
@@ -512,14 +537,26 @@
             var leavesExportUrl = "{{ route('hrms.leaves.export') }}";
             var encashmentExportUrl = "{{ route('hrms.leaves.encashment.export') }}";
 
+            function syncEncashmentExportUrl() {
+                var params = new URLSearchParams();
+                var search = $('#encashments_search').val() || '';
+                var employeeId = $('#filter_encashment_employee_id').val() || '';
+                var status = $('#filter_encashment_status').val() || '';
+                if (search) params.set('search', search);
+                if (employeeId) params.set('employee_id', employeeId);
+                if (status) params.set('status', status);
+                $('#btnExportHeader').attr('href', encashmentExportUrl + (params.toString() ? '?' + params.toString() : ''));
+            }
+            $(document).on('input change', '#encashments_search, #filter_encashment_employee_id, #filter_encashment_status', syncEncashmentExportUrl);
+
             $('button[data-bs-toggle="tab"]').on('shown.bs.tab click', function (e) {
                 var target = $(this).attr('data-bs-target') || $(this).attr('id');
-                var isEncashment = target === '#pane-leave-encashments' || target === 'tab-encashments';
+                var isEncashment = target === '#pane-leave-encashments' || target === 'tab-encashments' || target === 'pane-leave-encashments-tab' || target === 'pane-leave-encashments';
 
                 if (isEncashment) {
                     $('#btnApplyLeaveHeader').addClass('d-none');
                     $('#btnApplyEncashmentHeader').removeClass('d-none');
-                    $('#btnExportHeader').attr('href', encashmentExportUrl);
+                    syncEncashmentExportUrl();
                 } else {
                     $('#btnApplyEncashmentHeader').addClass('d-none');
                     $('#btnApplyLeaveHeader').removeClass('d-none');
@@ -536,13 +573,13 @@
             var actionParam = urlParams.get('action');
 
             if (activeTabParam === 'encashments' || actionParam === 'encash') {
-                var encashTab = document.querySelector('#tab-encashments');
+                var encashTab = document.querySelector('#pane-leave-encashments-tab') || document.querySelector('#tab-encashments');
                 if (encashTab) {
                     var tabObj = new bootstrap.Tab(encashTab);
                     tabObj.show();
                     $('#btnApplyLeaveHeader').addClass('d-none');
                     $('#btnApplyEncashmentHeader').removeClass('d-none');
-                    $('#btnExportHeader').attr('href', encashmentExportUrl);
+                    syncEncashmentExportUrl();
                 }
             } else {
                 $('#btnApplyEncashmentHeader').addClass('d-none');
@@ -591,6 +628,17 @@
                 return new bootstrap.Popover(popoverTriggerEl)
             });
 
+            // Leave Balances Horizontal Smooth Scroll with Mouse Wheel / Trackpad
+            var balancesTrackEl = document.getElementById('leaveBalancesTrack');
+            if (balancesTrackEl) {
+                balancesTrackEl.addEventListener('wheel', function(e) {
+                    if (e.deltaY !== 0 && balancesTrackEl.scrollWidth > balancesTrackEl.clientWidth) {
+                        e.preventDefault();
+                        balancesTrackEl.scrollLeft += e.deltaY;
+                    }
+                }, { passive: false });
+            }
+
             // Dynamic Employee On-Behalf selection change handler
             $('#employee_select').on('change', function() {
                 var empId = $(this).val();
@@ -601,13 +649,16 @@
                 if (empId && employeeDataMap[empId]) {
                     var types = employeeDataMap[empId];
                     types.forEach(function(t) {
-                        var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + '{{ __('hrms.leave.days') }}' + ')';
+                        var isHourlyType = t.calculate_in === 'hours' || (t.rules && t.rules.accrual && t.rules.accrual.calculate_in === 'hours');
+                        var unitStr = isHourlyType ? '{{ __('hrms.leave.app.hours') }}' : '{{ __('hrms.leave.days') }}';
+                        var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + unitStr + ')';
                         var option = $('<option>', {
                             value: t.id,
                             text: text
                         });
                         option.attr('data-rules', JSON.stringify(t.rules));
                         option.attr('data-type', t.type);
+                        option.attr('data-calculate-in', isHourlyType ? 'hours' : 'days');
                         $leaveTypeSelect.append(option);
                     });
                 }
@@ -626,48 +677,62 @@
                     $leaveTypeSelect.empty().append('<option value="">{{ __('hrms.leave.app.select_leave_type') }}</option>');
                     var types = employeeDataMap[defaultEmpId];
                     types.forEach(function(t) {
-                        var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + '{{ __('hrms.leave.days') }}' + ')';
+                        var isHourlyType = t.calculate_in === 'hours' || (t.rules && t.rules.accrual && t.rules.accrual.calculate_in === 'hours');
+                        var unitStr = isHourlyType ? '{{ __('hrms.leave.app.hours') }}' : '{{ __('hrms.leave.days') }}';
+                        var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + unitStr + ')';
                         var option = $('<option>', {
                             value: t.id,
                             text: text
                         });
                         option.attr('data-rules', JSON.stringify(t.rules));
                         option.attr('data-type', t.type);
+                        option.attr('data-calculate-in', isHourlyType ? 'hours' : 'days');
                         $leaveTypeSelect.append(option);
                     });
                     $leaveTypeSelect.trigger('change');
                 }
             }
 
-            // Dynamic Policy Display & Dates logic
+            // Dynamic Leave Type Selection & Hourly UI logic
             $('#leave_type_select').on('change', function() {
                 var selectedOption = $(this).find('option:selected');
                 var rulesStr = selectedOption.attr('data-rules');
-                var leaveType = selectedOption.attr('data-type') || 'paid';
                 
                 if (!rulesStr) {
-                    $('#policy_display').addClass('d-none');
+                    $('#hourly_leave_container').addClass('d-none');
+                    $('#start_date_col').removeClass('col-md-12').addClass('col-md-6');
+                    $('#start_session_col').removeClass('d-none');
+                    $('#end_date_row').removeClass('d-none');
+                    $('#start_date_col .odoo-form-label').text("{{ __('hrms.leave.app.start_date') }}");
+                    calculateExpectedDuration();
                     return;
                 }
 
                 try {
                     var rules = JSON.parse(rulesStr);
-                    $('#policy_display').removeClass('d-none');
-                    
                     var appRules = rules.application || {};
-                    var probRules = rules.probation || {};
-                    var noticeRules = rules.notice || {};
-                    var approvalRules = rules.approval || {};
                     var accrualRules = rules.accrual || {};
+                    var isHourly = (accrualRules.calculate_in === 'hours') || (selectedOption.attr('data-calculate-in') === 'hours');
 
-                    // Type label
-                    $('#policy_type').text(leaveType.toUpperCase());
-
-                    // Minimum & Maximum Duration
-                    var minDur = appRules.min_duration || 1;
-                    var maxDur = appRules.max_duration || 10;
-                    var durationTpl = "{{ __('hrms.leave.app.duration_range', ['min' => '__min__', 'max' => '__max__']) }}";
-                    $('#policy_duration').html('<span class="policy-icon-wrapper"><i class="feather-clock"></i></span><span>' + durationTpl.replace('__min__', '<strong>' + minDur + '</strong>').replace('__max__', '<strong>' + maxDur + '</strong>') + '</span>');
+                    // Toggle Hourly vs Standard Session Mode
+                    if (isHourly) {
+                        $('#hourly_leave_container').removeClass('d-none');
+                        $('#start_date_col').removeClass('col-md-6').addClass('col-md-12');
+                        $('#start_session_col').addClass('d-none');
+                        $('#end_date_row').addClass('d-none');
+                        $('#start_date_col .odoo-form-label').text("{{ __('hrms.leave.app.date') }}");
+                        $('#end_date').prop('required', false);
+                        if ($('#start_date').val()) {
+                            $('#end_date').val($('#start_date').val());
+                        }
+                    } else {
+                        $('#hourly_leave_container').addClass('d-none');
+                        $('#start_date_col').removeClass('col-md-12').addClass('col-md-6');
+                        $('#start_session_col').removeClass('d-none');
+                        $('#end_date_row').removeClass('d-none');
+                        $('#start_date_col .odoo-form-label').text("{{ __('hrms.leave.app.start_date') }}");
+                        $('#end_date').prop('required', true);
+                    }
 
                     // Apply in Advance & Disable invalid dates
                     if (appRules.apply_in_advance) {
@@ -691,57 +756,12 @@
                         if (curEnd && curEnd < minDateStr) {
                             $('#end_date').val('');
                         }
-
-                        var advanceTpl = "{{ __('hrms.leave.app.notice_required_days', ['days' => '__days__']) }}";
-                        $('#policy_advance').html('<span class="policy-icon-wrapper"><i class="feather-alert-circle"></i></span><span>' + advanceTpl.replace('__days__', '<strong>' + advanceDays + '</strong>') + '</span>').removeClass('d-none');
                     } else {
                         $('#start_date').removeAttr('min');
                         $('#end_date').removeAttr('min');
-                        $('#policy_advance').addClass('d-none');
                     }
 
-                    // Probation Rule
-                    if (probRules.probation_rule && probRules.probation_rule !== 'allow') {
-                        var cannotProbTxt = "{{ __('hrms.leave.app.cannot_apply_probation') }}";
-                        var allowedProbTpl = "{{ __('hrms.leave.app.allowed_after_months', ['months' => '__months__']) }}";
-                        var probTxt = probRules.probation_rule === 'disallow' 
-                            ? cannotProbTxt 
-                            : allowedProbTpl.replace('__months__', '<strong>' + (probRules.probation_months || 3) + '</strong>');
-                        $('#policy_probation').html('<span class="policy-icon-wrapper"><i class="feather-user-check"></i></span><span>' + '{{ __('hrms.leave.probation') }}' + ': ' + probTxt + '</span>').removeClass('d-none');
-                    } else {
-                        $('#policy_probation').addClass('d-none');
-                    }
-
-                    // Notice Period Rule
-                    if (noticeRules.notice_rule && noticeRules.notice_rule !== 'allow') {
-                        var cannotNoticeTxt = "{{ __('hrms.leave.app.cannot_apply_notice') }}";
-                        var specialNoticeTxt = "{{ __('hrms.leave.app.special_permission_notice') }}";
-                        var noticeTxt = noticeRules.notice_rule === 'disallow' 
-                            ? cannotNoticeTxt 
-                            : specialNoticeTxt;
-                        $('#policy_notice').html('<span class="policy-icon-wrapper"><i class="feather-user-x"></i></span><span>' + '{{ __('hrms.leave.notice') }}' + ': ' + noticeTxt + '</span>').removeClass('d-none');
-                    } else {
-                        $('#policy_notice').addClass('d-none');
-                    }
-
-                    // Attachment Required
-                    if (appRules.require_attachment) {
-                        var attachmentTpl = "{{ __('hrms.leave.app.attachment_required_for', ['days' => '__days__']) }}";
-                        $('#policy_attachment').html('<span class="policy-icon-wrapper"><i class="feather-paperclip"></i></span><span>' + attachmentTpl.replace('__days__', '<strong>' + (appRules.attachment_days || 3) + '</strong>') + '</span>').removeClass('d-none');
-                    } else {
-                        $('#policy_attachment').addClass('d-none');
-                    }
-
-                    // Approval levels
-                    var approvalLevel = approvalRules.workflow_level || '1_level';
-                    var autoTxt = "{{ __('hrms.leave.app.auto_approved') }}";
-                    var oneLvlTxt = "{{ __('hrms.leave.app.one_level_req') }}";
-                    var twoLvlTxt = "{{ __('hrms.leave.app.two_level_req') }}";
-                    var approvalText = approvalLevel === 'auto' ? autoTxt : (approvalLevel === '1_level' ? oneLvlTxt : twoLvlTxt);
-                    var workflowTpl = "{{ __('hrms.leave.app.workflow_label', ['type' => '__type__']) }}";
-                    $('#policy_approval').html('<span class="policy-icon-wrapper"><i class="feather-check-square"></i></span><span>' + workflowTpl.replace('__type__', approvalText) + '</span>');
-
-                    // Re-calculate expected duration and attachment requirement immediately
+                    // Re-calculate expected duration immediately
                     calculateExpectedDuration();
 
                 } catch (e) {
@@ -749,7 +769,7 @@
                 }
             });
 
-            // Block form submission if dynamic attachment requirement is violated
+            // Block form submission if dynamic rule requirements are violated
             $('#applyLeaveModal form').on('submit', function(e) {
                 var selectedOption = $('#leave_type_select').find('option:selected');
                 var rulesStr = selectedOption.attr('data-rules');
@@ -758,9 +778,73 @@
                 try {
                     var rules = JSON.parse(rulesStr);
                     var appRules = rules.application || {};
+                    var isHourly = rules.accrual && rules.accrual.calculate_in === 'hours';
+                    var duration = lastCalculatedDuration || 0;
+
+                    if (isHourly) {
+                        if (!$('#end_date').val() && $('#start_date').val()) {
+                            $('#end_date').val($('#start_date').val());
+                        }
+                        var sTime = $('#leave_start_time').val();
+                        var eTime = $('#leave_end_time').val();
+                        if (sTime && eTime) {
+                            var sParts = sTime.split(':');
+                            var eParts = eTime.split(':');
+                            var sMins = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                            var eMins = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+                            if (eMins <= sMins) {
+                                e.preventDefault();
+                                alert("{{ __('hrms.leave.app.time_validation_error') }}");
+                                $('#leave_end_time').focus();
+                                return false;
+                            }
+                        }
+
+                        if (duration < 0.5) {
+                            e.preventDefault();
+                            alert("{{ __('hrms.leave.app.min_hourly_error') }}");
+                            return false;
+                        }
+                        var minDur = parseFloat(appRules.min_duration || 0);
+                        var maxDur = parseFloat(appRules.max_duration || 0);
+                        if (minDur > 0 && duration < minDur) {
+                            e.preventDefault();
+                            var minHourlyAlert = "{{ __('hrms.leave.app.duration_min_error', ['duration' => '__dur__', 'min' => '__min__', 'unit' => '__unit__']) }}";
+                            alert(minHourlyAlert.replace('__dur__', duration).replace('__min__', minDur).replace('__unit__', "{{ __('hrms.leave.app.hours') }}"));
+                            return false;
+                        }
+                        if (maxDur > 0 && duration > maxDur) {
+                            e.preventDefault();
+                            var maxHourlyAlert = "{{ __('hrms.leave.app.duration_max_error', ['duration' => '__dur__', 'max' => '__max__', 'unit' => '__unit__']) }}";
+                            alert(maxHourlyAlert.replace('__dur__', duration).replace('__max__', maxDur).replace('__unit__', "{{ __('hrms.leave.app.hours') }}"));
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    if (duration < 0.5) {
+                        e.preventDefault();
+                        alert("{{ __('hrms.leave.app.duration_zero_error') }}");
+                        return false;
+                    }
+
+                    var minDur = parseFloat(appRules.min_duration || 0);
+                    var maxDur = parseFloat(appRules.max_duration || 0);
+                    if (minDur > 0 && duration < minDur) {
+                        e.preventDefault();
+                        var minDayAlert = "{{ __('hrms.leave.app.duration_min_error', ['duration' => '__dur__', 'min' => '__min__', 'unit' => '__unit__']) }}";
+                        alert(minDayAlert.replace('__dur__', duration).replace('__min__', minDur).replace('__unit__', "{{ __('hrms.leave.days') }}"));
+                        return false;
+                    }
+                    if (maxDur > 0 && duration > maxDur) {
+                        e.preventDefault();
+                        var maxDayAlert = "{{ __('hrms.leave.app.duration_max_error', ['duration' => '__dur__', 'max' => '__max__', 'unit' => '__unit__']) }}";
+                        alert(maxDayAlert.replace('__dur__', duration).replace('__max__', maxDur).replace('__unit__', "{{ __('hrms.leave.days') }}"));
+                        return false;
+                    }
+
                     if (appRules.require_attachment) {
                         var attachmentDays = parseInt(appRules.attachment_days || 3);
-                        var duration = calculateExpectedDuration();
                         var hasFile = $('#attachment').val();
 
                         if (duration >= attachmentDays && !hasFile) {
@@ -775,21 +859,116 @@
                 }
             });
 
-            // Handle date range select types
-            $('#start_date_type, #end_date_type').on('change', function() {
-                calculateExpectedDuration();
-            });
-
+            // Handle date range and session sync
             $('#start_date, #end_date').on('change', function() {
-                // If single day is selected, force types and match dates
+                var selectedOption = $('#leave_type_select').find('option:selected');
+                var rulesStr = selectedOption.attr('data-rules');
+                var isHourly = false;
+                if (rulesStr) {
+                    try {
+                        var rules = JSON.parse(rulesStr);
+                        isHourly = (rules.accrual && rules.accrual.calculate_in === 'hours') || (selectedOption.attr('data-calculate-in') === 'hours');
+                    } catch(e) {}
+                }
+
                 var startDateVal = $('#start_date').val();
+
+                if (isHourly) {
+                    if (startDateVal) {
+                        $('#end_date').val(startDateVal);
+                    }
+                    calculateExpectedDuration();
+                    return;
+                }
+
                 var endDateVal = $('#end_date').val();
 
                 if (startDateVal && !endDateVal) {
                     $('#end_date').val(startDateVal);
+                    endDateVal = startDateVal;
+                }
+
+                if (startDateVal && endDateVal && startDateVal === endDateVal) {
+                    $('#end_date_type').val($('#start_date_type').val()).trigger('change.select2');
                 }
 
                 calculateExpectedDuration();
+            });
+
+            function formatTime12h(timeStr) {
+                if (!timeStr) return '';
+                var parts = timeStr.split(':');
+                var h = parseInt(parts[0], 10);
+                var m = parts[1] || '00';
+                var ampm = h >= 12 ? 'PM' : 'AM';
+                h = h % 12;
+                h = h ? h : 12;
+                return (h < 10 ? '0' + h : h) + ':' + m + ' ' + ampm;
+            }
+
+            // Sync hours when Start Time or End Time changes
+            $('#leave_start_time, #leave_end_time').on('input change', function() {
+                var sTime = $('#leave_start_time').val();
+                var eTime = $('#leave_end_time').val();
+                if (sTime && eTime) {
+                    var sParts = sTime.split(':');
+                    var eParts = eTime.split(':');
+                    var sMins = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                    var eMins = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+                    if (eMins > sMins) {
+                        var diffHours = (eMins - sMins) / 60;
+                        var roundedHours = Math.round(diffHours * 2) / 2;
+                        if (roundedHours >= 0.5) {
+                            $('#leave_hours').val(roundedHours);
+                        }
+                    } else if (this.id === 'leave_start_time') {
+                        var curHours = parseFloat($('#leave_hours').val()) || 1.0;
+                        var newEMins = sMins + Math.round(curHours * 60);
+                        if (newEMins < 24 * 60) {
+                            var endH = String(Math.floor(newEMins / 60)).padStart(2, '0');
+                            var endM = String(newEMins % 60).padStart(2, '0');
+                            $('#leave_end_time').val(endH + ':' + endM);
+                        }
+                    }
+                }
+                calculateExpectedDuration();
+            });
+
+            // When user adjusts #leave_hours directly, auto-advance end_time if start_time is set
+            $('#leave_hours').on('input change', function() {
+                var hours = parseFloat($(this).val()) || 0;
+                var sTime = $('#leave_start_time').val();
+                if (hours >= 0.5 && sTime) {
+                    var sParts = sTime.split(':');
+                    var sMins = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                    var eMins = sMins + Math.round(hours * 60);
+                    if (eMins < 24 * 60) {
+                        var endH = String(Math.floor(eMins / 60)).padStart(2, '0');
+                        var endM = String(eMins % 60).padStart(2, '0');
+                        $('#leave_end_time').val(endH + ':' + endM);
+                    }
+                }
+                calculateExpectedDuration();
+            });
+
+            $('#start_date_type').on('change', function() {
+                var startDateVal = $('#start_date').val();
+                var endDateVal = $('#end_date').val();
+                if (startDateVal && endDateVal && startDateVal === endDateVal) {
+                    $('#end_date_type').val($(this).val()).trigger('change.select2');
+                }
+                calculateExpectedDuration();
+            });
+
+            $('#end_date_type').on('change', function() {
+                calculateExpectedDuration();
+            });
+
+            // Dynamic Encashment Employee selection change handler
+            $(document).on('change', '#encashment_employee_select, #encashment_employee_id', function() {
+                if (typeof updateEncashmentLeaveTypes === 'function') {
+                    updateEncashmentLeaveTypes($(this).val());
+                }
             });
 
             function getSelectedEmployeeId() {
@@ -804,14 +983,108 @@
             var durationXhr = null;
 
             function calculateExpectedDuration() {
+                var selectedOption = $('#leave_type_select').find('option:selected');
+                var rulesStr = selectedOption.attr('data-rules');
+                var isHourly = false;
+                if (rulesStr) {
+                    try {
+                        var rules = JSON.parse(rulesStr);
+                        isHourly = (rules.accrual && rules.accrual.calculate_in === 'hours') || selectedOption.attr('data-calculate-in') === 'hours';
+                    } catch(e) {}
+                }
+
                 var startDateStr = $('#start_date').val();
+                var empId = getSelectedEmployeeId();
+
+                if (isHourly) {
+                    var hoursInput = parseFloat($('#leave_hours').val());
+                    var hoursVal = (!isNaN(hoursInput) && hoursInput > 0) ? Math.round(hoursInput * 2) / 2 : 1.0;
+
+                    var sTime = $('#leave_start_time').val();
+                    var eTime = $('#leave_end_time').val();
+
+                    if ((isNaN(hoursInput) || hoursInput <= 0) && sTime && eTime) {
+                        var sParts = sTime.split(':');
+                        var eParts = eTime.split(':');
+                        var sMins = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                        var eMins = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+                        if (eMins > sMins) {
+                            hoursVal = Math.round(((eMins - sMins) / 60) * 2) / 2;
+                            $('#leave_hours').val(hoursVal);
+                        }
+                    }
+
+                    hoursVal = Math.max(0.5, hoursVal);
+                    lastCalculatedDuration = hoursVal;
+
+                    if (startDateStr) {
+                        $('#end_date').val(startDateStr);
+                    }
+
+                    var hasTimeError = false;
+                    if (sTime && eTime) {
+                        var sParts = sTime.split(':');
+                        var eParts = eTime.split(':');
+                        var sMins = parseInt(sParts[0], 10) * 60 + parseInt(sParts[1], 10);
+                        var eMins = parseInt(eParts[0], 10) * 60 + parseInt(eParts[1], 10);
+                        if (eMins <= sMins) {
+                            hasTimeError = true;
+                        }
+                    }
+
+                    var timeRangeStr = (sTime && eTime) ? ' <span class="badge bg-soft-primary text-primary ms-1 fs-11" style="padding: 4px 8px;"><i class="feather-clock me-1"></i>' + formatTime12h(sTime) + ' – ' + formatTime12h(eTime) + '</span>' : '';
+
+                    var estTpl = "{{ __('hrms.leave.app.estimated_duration_simple', ['duration' => '__duration__']) }}";
+                    var hoursLabel = "{{ __('hrms.leave.app.hours') }}";
+                    var displayText = estTpl.replace('__duration__', '<strong>' + hoursVal + '</strong>')
+                                             .replace('day(s)', hoursLabel)
+                                             .replace('Day(s)', hoursLabel)
+                                             .replace('दिन', hoursLabel)
+                                             .replace('дни', hoursLabel);
+                    if (displayText.indexOf(hoursLabel) === -1) {
+                        displayText = estTpl.replace('__duration__', '<strong>' + hoursVal + '</strong> ' + hoursLabel);
+                    }
+                    displayText += timeRangeStr;
+
+                    if (hasTimeError) {
+                        displayText += ' <div class="text-danger mt-1 fs-11 fw-bold"><i class="feather-alert-triangle me-1"></i>{{ __("hrms.leave.app.time_validation_error") }}</div>';
+                    }
+
+                    if (rulesStr) {
+                        try {
+                            var parsedRules = JSON.parse(rulesStr);
+                            var appRules = parsedRules.application || {};
+                            var minDur = parseFloat(appRules.min_duration || 0);
+                            var maxDur = parseFloat(appRules.max_duration || 0);
+                            if (minDur > 0 && hoursVal < minDur) {
+                                var minErrMsg = "{{ __('hrms.leave.app.duration_min_error', ['duration' => '__dur__', 'min' => '__min__', 'unit' => '__unit__']) }}"
+                                    .replace('__dur__', hoursVal)
+                                    .replace('__min__', minDur)
+                                    .replace(/__unit__/g, "{{ __('hrms.leave.app.hours') }}");
+                                displayText += ' <div class="text-danger mt-1 fs-11 fw-bold"><i class="feather-alert-triangle me-1"></i>' + minErrMsg + '</div>';
+                            }
+                            if (maxDur > 0 && hoursVal > maxDur) {
+                                var maxErrMsg = "{{ __('hrms.leave.app.duration_max_error', ['duration' => '__dur__', 'max' => '__max__', 'unit' => '__unit__']) }}"
+                                    .replace('__dur__', hoursVal)
+                                    .replace('__max__', maxDur)
+                                    .replace(/__unit__/g, "{{ __('hrms.leave.app.hours') }}");
+                                displayText += ' <div class="text-danger mt-1 fs-11 fw-bold"><i class="feather-alert-triangle me-1"></i>' + maxErrMsg + '</div>';
+                            }
+                        } catch (e) {}
+                    }
+
+                    $('#calculated_duration_display').html(displayText);
+                    $('#applyLeaveModal form button[type="submit"]').prop('disabled', hasTimeError);
+                    return hoursVal;
+                }
+
                 var endDateStr = $('#end_date').val();
                 var startType = $('#start_date_type').val() || 'full_day';
                 var endType = $('#end_date_type').val() || 'full_day';
-                var empId = getSelectedEmployeeId();
 
                 if (!startDateStr || !endDateStr || !empId) {
-                    $('#calculated_duration_display').text("0.0 Day(s)");
+                    var estZeroTpl = "{{ __('hrms.leave.app.estimated_duration_simple', ['duration' => 0]) }}";
+                    $('#calculated_duration_display').html(estZeroTpl);
                     return 0;
                 }
 
@@ -826,7 +1099,7 @@
                 }
 
                 // Show calculation indicator and disable submit
-                $('#calculated_duration_display').html('<span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span>Calculating duration...');
+                $('#calculated_duration_display').html('<span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span>{{ __("hrms.leave.app.calculating_duration") }}');
                 $('#applyLeaveModal form button[type="submit"]').prop('disabled', true);
 
                 if (durationXhr) {
@@ -857,23 +1130,51 @@
                                 displayText += ' <span class="badge bg-soft-warning text-warning ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.sandwich_days.join(', ') + '"><i class="feather-layers me-1"></i>' + '{{ __("hrms.leave.sandwich_rule_applied") }}' + ' (' + response.sandwich_days.length + ' {{ __("hrms.leave.days") }})</span>';
                             } else {
                                 if (response.holidays && response.holidays.length > 0) {
-                                    displayText += ' <span class="badge bg-soft-success text-success ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.holidays.join(', ') + '"><i class="feather-calendar me-1"></i>Excludes ' + response.holidays.length + ' Holiday(s)</span>';
+                                    var holTxt = "{{ __('hrms.leave.app.excludes_holidays', ['count' => '__count__']) }}".replace('__count__', response.holidays.length);
+                                    displayText += ' <span class="badge bg-soft-success text-success ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.holidays.join(', ') + '"><i class="feather-calendar me-1"></i>' + holTxt + '</span>';
                                 }
                                 if (response.rest_days && response.rest_days.length > 0) {
-                                    displayText += ' <span class="badge bg-soft-secondary text-secondary ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.rest_days.join(', ') + '"><i class="feather-coffee me-1"></i>Excludes ' + response.rest_days.length + ' Rest Day(s)</span>';
+                                    var restTxt = "{{ __('hrms.leave.app.excludes_rest_days', ['count' => '__count__']) }}".replace('__count__', response.rest_days.length);
+                                    displayText += ' <span class="badge bg-soft-secondary text-secondary ms-1" style="font-size: 10px; padding: 4px 6px;" title="' + response.rest_days.join(', ') + '"><i class="feather-coffee me-1"></i>' + restTxt + '</span>';
                                 }
+                            }
+
+                            // Real-time min/max duration policy check
+                            var selectedOption = $('#leave_type_select').find('option:selected');
+                            var rulesStr = selectedOption.attr('data-rules');
+                            if (rulesStr) {
+                                try {
+                                    var parsedRules = JSON.parse(rulesStr);
+                                    var appRules = parsedRules.application || {};
+                                    var minDur = parseFloat(appRules.min_duration || 0);
+                                    var maxDur = parseFloat(appRules.max_duration || 0);
+                                    if (minDur > 0 && duration < minDur) {
+                                        var minDayErrMsg = "{{ __('hrms.leave.app.duration_min_error', ['duration' => '__dur__', 'min' => '__min__', 'unit' => '__unit__']) }}"
+                                            .replace('__dur__', duration)
+                                            .replace('__min__', minDur)
+                                            .replace(/__unit__/g, "{{ __('hrms.leave.days') }}");
+                                        displayText += ' <div class="text-danger mt-1 fs-11 fw-bold"><i class="feather-alert-triangle me-1"></i>' + minDayErrMsg + '</div>';
+                                    }
+                                    if (maxDur > 0 && duration > maxDur) {
+                                        var maxDayErrMsg = "{{ __('hrms.leave.app.duration_max_error', ['duration' => '__dur__', 'max' => '__max__', 'unit' => '__unit__']) }}"
+                                            .replace('__dur__', duration)
+                                            .replace('__max__', maxDur)
+                                            .replace(/__unit__/g, "{{ __('hrms.leave.days') }}");
+                                        displayText += ' <div class="text-danger mt-1 fs-11 fw-bold"><i class="feather-alert-triangle me-1"></i>' + maxDayErrMsg + '</div>';
+                                    }
+                                } catch (e) {}
                             }
 
                             $('#calculated_duration_display').html(displayText);
 
                             evaluateAttachmentRules(duration);
                         } else {
-                            $('#calculated_duration_display').text("Error calculating duration");
+                            $('#calculated_duration_display').text("{{ __('hrms.leave.app.error_calculating_duration') }}");
                         }
                     },
                     error: function(xhr, status, error) {
                         if (status !== 'abort') {
-                            $('#calculated_duration_display').text("Error calculating duration");
+                            $('#calculated_duration_display').text("{{ __('hrms.leave.app.error_calculating_duration') }}");
                         }
                     },
                     complete: function() {
@@ -890,6 +1191,12 @@
                 if (rulesStr) {
                     try {
                         var rules = JSON.parse(rulesStr);
+                        var isHourly = (rules.accrual && rules.accrual.calculate_in === 'hours') || (selectedOption.attr('data-calculate-in') === 'hours');
+                        if (isHourly) {
+                            $('#attachment_required_warning').addClass('d-none');
+                            $('#attachment').prop('required', false);
+                            return;
+                        }
                         var appRules = rules.application || {};
                         if (appRules.require_attachment) {
                             var attachmentDays = parseInt(appRules.attachment_days || 3);
@@ -965,6 +1272,16 @@
                 loadLeaveApplications(1);
             });
 
+            $(document).on('click', '#btnExportHeader', function() {
+                var search = $('#leaves_search').val() || '';
+                var empId = $('#filter_employee_id').val() || '';
+                var status = $('#filter_status').val() || '';
+                var exportUrl = '{{ route("hrms.leaves.export") }}?leaves_search=' + encodeURIComponent(search) +
+                                '&leaves_employee_id=' + encodeURIComponent(empId) +
+                                '&leaves_status=' + encodeURIComponent(status);
+                $(this).attr('href', exportUrl);
+            });
+
             $(document).on('click', '#btnResetFilters', function(e) {
                 e.preventDefault();
                 $('#leaves_search').val('');
@@ -991,9 +1308,11 @@
             });
 
             // Reject Leave Trigger Modal
-            $('.reject-leave-btn').on('click', function() {
+            $(document).on('click', '.reject-leave-btn', function(e) {
+                e.preventDefault();
                 var id = $(this).attr('data-id');
-                var actionUrl = "{{ route('hrms.leaves.reject', ':id') }}".replace(':id', id);
+                var actionUrl = $(this).attr('data-action-url') || "{{ route('hrms.leaves.reject', ':id') }}".replace(':id', id);
+                $('#rejection_reason').val('');
                 $('#rejectLeaveForm').attr('action', actionUrl);
                 $('#rejectLeaveModal').modal('show');
             });
@@ -1022,6 +1341,7 @@
             });
 
             function loadLeaveEncashments(page = 1) {
+                syncEncashmentExportUrl();
                 var search = $('#encashments_search').val() || '';
                 var empId = $('#filter_encashment_employee_id').val() || '';
                 var status = $('#filter_encashment_status').val() || '';
@@ -1125,16 +1445,35 @@
                 $select.trigger('change');
             }
 
-            $('#encashment_employee_id').on('change', function() {
-                updateEncashmentLeaveTypes($(this).val());
-            });
-
             $('#applyEncashmentModal').on('show.bs.modal', function() {
-                var empId = $('#encashment_employee_id').length ? $('#encashment_employee_id').val() : "{{ $employee ? $employee->id : '' }}";
+                var empId = $('#encashment_employee_select').length
+                    ? ($('#encashment_employee_select').val() || "{{ $employee ? $employee->id : '' }}")
+                    : ($('#encashment_employee_id').val() || "{{ $employee ? $employee->id : '' }}");
                 updateEncashmentLeaveTypes(empId);
             });
 
-            var initialEncashEmpId = $('#encashment_employee_id').length ? $('#encashment_employee_id').val() : "{{ $employee ? $employee->id : '' }}";
+            $('#applyLeaveModal').on('show.bs.modal', function() {
+                var empId = getSelectedEmployeeId();
+                if (empId) {
+                    $('#employee_select').val(empId).trigger('change');
+                }
+                var todayStr = new Date().toISOString().split('T')[0];
+                $('#start_date').val(todayStr);
+                $('#end_date').val(todayStr);
+                $('#leave_hours').val('1.0');
+                $('#leave_start_time').val('09:00');
+                $('#leave_end_time').val('10:00');
+                $('#attachment').val('');
+                $('#attachment_required_warning').addClass('d-none');
+                $('#applyLeaveModal form textarea[name="reason"]').val('');
+                var estZeroTpl = "{{ __('hrms.leave.app.estimated_duration_simple', ['duration' => 0]) }}";
+                $('#calculated_duration_display').html(estZeroTpl);
+                $('#applyLeaveModal form button[type="submit"]').prop('disabled', false);
+            });
+
+            var initialEncashEmpId = $('#encashment_employee_select').length
+                ? ($('#encashment_employee_select').val() || "{{ $employee ? $employee->id : '' }}")
+                : ($('#encashment_employee_id').val() || "{{ $employee ? $employee->id : '' }}");
             if (initialEncashEmpId) {
                 updateEncashmentLeaveTypes(initialEncashEmpId);
             }
@@ -1206,7 +1545,9 @@
             // Leave type banner
             $('#lid-color-dot').css('background', d.leaveColor || '#3b82f6');
             $('#lid-leave-type').text(d.leaveType || '—');
-            $('#lid-balance-inline').text("{{ __('hrms.leave.app.remaining') }}: " + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' ' + "{{ __('hrms.leave.days') }}");
+            var isHourUnit = (d.calculateIn === 'hours' || d.sessionInfo === 'Hourly');
+            var unitWord = isHourUnit ? "{{ __('hrms.leave.app.hours') }}" : "{{ __('hrms.leave.days') }}";
+            $('#lid-balance-inline').text("{{ __('hrms.leave.app.remaining') }}: " + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' ' + unitWord);
 
             // Status badge
             $('#lid-status-badge')
@@ -1219,7 +1560,8 @@
 
             // Duration
             var dur = parseFloat(d.duration) || 0;
-            $('#lid-duration').text(dur + ' ' + (dur == 1 ? "{{ __('hrms.leave.day') }}" : "{{ __('hrms.leave.days') }}"));
+            var durUnitWord = isHourUnit ? (dur == 1 ? "{{ __('hrms.leave.app.hour') }}" : "{{ __('hrms.leave.app.hours') }}") : (dur == 1 ? "{{ __('hrms.leave.day') }}" : "{{ __('hrms.leave.days') }}");
+            $('#lid-duration').text(dur + ' ' + durUnitWord);
 
             // Reason / Workflow / Applied
             $('#lid-reason').text(d.reason || '—');
@@ -1278,15 +1620,15 @@
             $select.empty();
 
             if (d.status === 'cancellation_requested') {
-                $select.append('<option value="approve_cancellation">Approve Cancellation</option>');
-                $select.append('<option value="deny_cancellation">Deny Cancellation</option>');
+                $select.append('<option value="approve_cancellation">{{ __("hrms.leave.app.approve_cancellation") }}</option>');
+                $select.append('<option value="deny_cancellation">{{ __("hrms.leave.app.deny_cancellation") }}</option>');
                 $select.val('approve_cancellation').trigger('change');
             } else {
-                $select.append('<option value="approved">Approve</option>');
-                $select.append('<option value="rejected">Reject</option>');
-                $select.append('<option value="pending">Pending</option>');
-                $select.append('<option value="unauthorized">Unauthorized</option>');
-                $select.append('<option value="unpaid">Unpaid</option>');
+                $select.append('<option value="approved">{{ __("hrms.leave.app.status_approved") }}</option>');
+                $select.append('<option value="rejected">{{ __("hrms.leave.app.status_rejected") }}</option>');
+                $select.append('<option value="pending">{{ __("hrms.leave.app.status_pending") }}</option>');
+                $select.append('<option value="unauthorized">{{ __("hrms.leave.app.status_unauthorized") }}</option>');
+                $select.append('<option value="unpaid">{{ __("hrms.leave.app.status_unpaid") }}</option>');
                 $select.val(d.status).trigger('change');
             }
 
@@ -1321,6 +1663,19 @@
             }
         });
 
+        $(document).on('submit', '#lid-status-form', function(e) {
+            var selectedVal = $('#lid-status-select').val();
+            if (selectedVal === 'rejected') {
+                var reason = $.trim($('#lid-rejection-reason-input').val());
+                if (!reason) {
+                    e.preventDefault();
+                    alert("{{ __('hrms.leave.app.rejection_reason_alert') }}");
+                    $('#lid-rejection-reason-input').focus();
+                    return false;
+                }
+            }
+        });
+
         // ── Leave Cancellation Modal ───────────────────────────────────────────
         function openLeaveCancellationModal(leaveId, actionUrl) {
             var form = document.getElementById('leaveCancellationForm');
@@ -1337,11 +1692,11 @@
             if (textEl.style.display === 'block') {
                 textEl.style.display = '-webkit-box';
                 textEl.style.webkitLineClamp = '2';
-                btn.textContent = 'See more';
+                btn.textContent = "{{ __('hrms.leave.app.see_more') }}";
             } else {
                 textEl.style.display = 'block';
                 textEl.style.webkitLineClamp = 'none';
-                btn.textContent = 'See less';
+                btn.textContent = "{{ __('hrms.leave.app.see_less') }}";
             }
         }
     </script>
@@ -1353,31 +1708,149 @@
 
 
         <!-- Main Module Navigation Tabs -->
+        @php
+            $currentTab = request()->query('tab', 'applications');
+            $isEncashActive = ($currentTab === 'encashments' || request()->query('action') === 'encash');
+            $leavesTabs = [
+                [
+                    'id' => 'pane-leave-applications',
+                    'label' => __('hrms.leave.app.title'),
+                    'active' => !$isEncashActive,
+                    'icon' => 'feather-file-text'
+                ],
+                [
+                    'id' => 'pane-leave-encashments',
+                    'label' => __('hrms.leave.encashment_app.title'),
+                    'active' => $isEncashActive,
+                    'icon' => 'feather-dollar-sign',
+                    'badge' => (isset($leaveEncashments) && $leaveEncashments->where('status', 'pending')->count() > 0) ? $leaveEncashments->where('status', 'pending')->count() : null,
+                    'badgeClass' => 'bg-warning text-dark'
+                ]
+            ];
+        @endphp
+
         <div class="col-12 mb-2">
-            <ul class="nav gap-2 border-bottom pb-2" id="leavesModuleTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="tab-applications" data-bs-toggle="tab" data-bs-target="#pane-leave-applications" type="button" role="tab">
-                        <i class="feather-file-text me-1"></i> {{ __('hrms.leave.app.title') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="tab-encashments" data-bs-toggle="tab" data-bs-target="#pane-leave-encashments" type="button" role="tab">
-                        <i class="feather-dollar-sign me-1"></i> {{ __('hrms.leave.encashment_app.title') }}
-                        @if(isset($leaveEncashments) && $leaveEncashments->where('status', 'pending')->count() > 0)
-                            <span class="badge bg-warning text-dark rounded-pill px-2 py-0.5 fs-11">
-                                {{ $leaveEncashments->where('status', 'pending')->count() }}
-                            </span>
-                        @endif
-                    </button>
-                </li>
-            </ul>
+            <x-ui.horizontal-tabs id="leavesModuleTabs" :tabs="$leavesTabs" />
         </div>
 
         <div class="col-12">
             <div class="tab-content" id="leavesModuleTabContent">
                 <!-- Pane 1: Leave Applications -->
-                <div class="tab-pane fade show active" id="pane-leave-applications" role="tabpanel">
+                <div class="tab-pane fade {{ !$isEncashActive ? 'show active' : '' }}" id="pane-leave-applications" role="tabpanel">
                     <div>
+                        {{-- Leave Balances Summary Cards with Dynamic Multi-Type Carousel / Grid View --}}
+                        @if(isset($balances) && $balances->isNotEmpty())
+                            @php
+                                $totalBalances = $balances->count();
+                            @endphp
+                            <div class="leave-balances-container mb-4">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fs-12 fw-bold text-uppercase text-muted" style="letter-spacing: .5px;">
+                                            <i class="feather-pie-chart me-1 text-primary"></i> {{ __('hrms.leave.balances') }}
+                                        </span>
+                                        <x-ui.badge variant="primary" soft class="rounded-pill px-2 py-0.5 fs-11">
+                                            {{ $totalBalances }} {{ __('hrms.leave.types') }}
+                                        </x-ui.badge>
+                                    </div>
+                                </div>
+
+                                <div class="leave-balances-track" id="leaveBalancesTrack">
+                                    @foreach($balances as $bal)
+                                        @php
+                                            $type = $bal->leaveType;
+                                            if (!$type) continue;
+                                            $color = $type->color ?: '#3b82f6';
+                                            $allocated = floatval($bal->allocated);
+                                            $remaining = floatval($bal->remaining);
+                                            $used = floatval($bal->used);
+                                            $encashed = floatval($bal->encashed ?? 0);
+                                            $pct = $allocated > 0 ? min(100, max(0, round(($used / $allocated) * 100))) : 0;
+                                            $ruleSections = isset($formatLeaveRulePoints) ? $formatLeaveRulePoints($type->rules) : [];
+                                        @endphp
+                                        <div class="leave-balance-card-item">
+                                            <div class="leave-balance-card p-3 h-100 position-relative">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <div class="d-flex align-items-center gap-2" style="min-width: 0;">
+                                                        <span style="width: 10px; height: 10px; border-radius: 50%; background-color: {{ $color }}; display: inline-block; flex-shrink: 0;"></span>
+                                                        <h6 class="fw-bold fs-13 text-dark mb-0 text-truncate" title="{{ $type->name }}">{{ $type->name }}</h6>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
+                                                        <x-ui.badge variant="{{ strtolower($type->type) === 'paid' ? 'success' : 'secondary' }}" soft class="fs-10 text-uppercase py-1 px-2">
+                                                            {{ strtolower($type->type) === 'paid' ? __('hrms.leave.paid') : __('hrms.leave.unpaid') }}
+                                                        </x-ui.badge>
+                                                        @if(!empty($ruleSections))
+                                                            <button type="button" class="leave-rules-icon-btn ms-1" data-bs-toggle="modal" data-bs-target="#leaveRulesModal_{{ $type->id }}" title="{{ __('hrms.leave.view_policy') }}">
+                                                                <i class="feather-info fs-13"></i>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                </div>
+
+                                                @php
+                                                    $balUnit = ($type->rules['accrual']['calculate_in'] ?? 'days') === 'hours' ? __('hrms.leave.app.hours') : __('hrms.leave.days');
+                                                @endphp
+                                                <div class="d-flex align-items-baseline gap-1 my-2">
+                                                    <span class="fw-bold fs-22 text-dark">{{ $remaining }}</span>
+                                                    <span class="fs-12 text-muted">/ {{ $allocated }} {{ $balUnit }}</span>
+                                                </div>
+
+                                                <div class="progress mb-2" style="height: 6px; background-color: #f1f5f9; border-radius: 4px;">
+                                                    <div class="progress-bar" role="progressbar" style="width: {{ $pct }}%; background-color: {{ $color }}; border-radius: 4px;" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between align-items-center fs-11 text-muted">
+                                                    <span>{{ __('hrms.leave.app.used') }}: <strong class="text-dark">{{ $used }} {{ $balUnit }}</strong></span>
+                                                    <span>{{ __('hrms.leave.app.remaining') }}: <strong class="text-primary">{{ $remaining }} {{ $balUnit }}</strong></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        @if(!empty($ruleSections))
+                                            <!-- Modal for Leave Rules for {{ $type->name }} -->
+                                            <div class="modal fade" id="leaveRulesModal_{{ $type->id }}" tabindex="-1" aria-labelledby="leaveRulesModalLabel_{{ $type->id }}" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                    <div class="modal-content border-0 shadow">
+                                                        <div class="modal-header border-bottom py-3">
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <span style="width: 12px; height: 12px; border-radius: 50%; background-color: {{ $color }}; display: inline-block;"></span>
+                                                                <h5 class="modal-title fw-bold text-dark" id="leaveRulesModalLabel_{{ $type->id }}">
+                                                                    {{ $type->name }} – {{ __('hrms.leave.rules') }}
+                                                                </h5>
+                                                            </div>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <div class="modal-body p-4">
+                                                            <div class="row g-3">
+                                                                @foreach($ruleSections as $sec)
+                                                                    <div class="col-md-6">
+                                                                        <div class="leave-rule-detail-section">
+                                                                            <div class="leave-rule-detail-title">
+                                                                                <i class="{{ $sec['icon'] }} text-primary"></i>
+                                                                                <span>{{ $sec['title'] }}</span>
+                                                                            </div>
+                                                                            <ul class="leave-rule-points">
+                                                                                @foreach($sec['points'] as $pt)
+                                                                                    <li class="leave-rule-point">{{ $pt }}</li>
+                                                                                @endforeach
+                                                                            </ul>
+                                                                        </div>
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer border-top py-2">
+                                                            <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <div>
                                 <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.title') }}</h5>
@@ -1388,9 +1861,8 @@
                                 <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="leavesFilterForm">
                                     <input type="hidden" id="leaves_sort_value" value="{{ $leavesSort ?? 'date_desc' }}">
                                     <!-- Registry Style Search Input -->
-                                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
-                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;" value="{{ $leavesSearch ?? '' }}">
+                                    <div style="min-width: 220px; max-width: 280px;">
+                                        <x-ui.input type="search" name="leaves_search" id="leaves_search" :placeholder="__('hrms.leave.app.search_employee')" :value="$leavesSearch ?? ''" class="form-control-sm" />
                                     </div>
 
                                     <!-- Sort Dropdown with Checkmark Icons -->
@@ -1415,9 +1887,9 @@
                                         
                                         @if($isAdmin)
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_employee_id">
-                                                    <option value="" {{ ($leavesEmployeeId ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
+                                                    <option value="" {{ ($leavesEmployeeId ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_employees') }}</option>
                                                     @foreach(($allEmployees ?? $employees ?? []) as $emp)
                                                         <option value="{{ $emp->id }}" {{ ($leavesEmployeeId ?? '') == $emp->id ? 'selected' : '' }}>
                                                             {{ $emp->full_name }}
@@ -1428,7 +1900,7 @@
                                         @endif
 
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="status" id="filter_status">
                                                 <option value="" {{ ($leavesStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.common.all_statuses') }}</option>
                                                 <option value="pending" {{ ($leavesStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
@@ -1440,8 +1912,8 @@
                                         <div class="dropdown-divider my-3"></div>
 
                                         <div class="d-flex gap-2">
-                                            <button type="button" id="btnApplyFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
-                                            <button type="button" id="btnResetFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
+                                            <x-ui.button type="button" id="btnApplyFilters" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                            <x-ui.button type="button" id="btnResetFilters" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                                         </div>
                                     </x-ui.filter>
                                 </form>
@@ -1449,18 +1921,17 @@
                         </div>
                         
                         <div>
-                            <div class="table-responsive" style="overflow: visible;">
-                                <table class="table table-hover align-middle mb-0" id="leavesTable">
+                            <x-ui.table class="p-0">
                                     <thead class="table-light">
                                         <tr>
                                             @if($isAdmin)
-                                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 18%;">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
+                                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 18%;">{{ __('hrms.employees.tbl_employee') }}</th>
                                             @endif
                                             <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="width: 18%;">{{ __('hrms.leave.leave_types') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 16%;">{{ __('hrms.leave.app.duration_timeline') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">{{ __('hrms.leave.days') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 14%;">{{ __('ui.status') ?? 'Status' }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">File</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">{{ __('hrms.leave.app.duration') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 14%;">{{ __('ui.status') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">{{ __('hrms.leave.app.file') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 18%;">{{ __('hrms.common.action') }}</th>
                                         </tr>
                                     </thead>
@@ -1474,6 +1945,9 @@
                                                     ? $req->start_date->format('d M Y')
                                                     : $startStr . ' – ' . $endStr;
 
+                                                $isHourlyReq  = ($req->start_date_type === 'hourly') || ($req->session === 'hourly') || ($req->leaveType && ($req->leaveType->rules['accrual']['calculate_in'] ?? 'days') === 'hours');
+                                                $rowUnit      = $isHourlyReq ? __('hrms.leave.app.hours') : __('hrms.leave.days');
+
                                                 $rowBalance   = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $req->employee_id)->where('leave_type_id', $req->leave_type_id)->first();
                                                 $rowRemaining = $rowBalance ? floatval($rowBalance->remaining) : 0.0;
                                                 $rowAllocated = $rowBalance ? floatval($rowBalance->allocated) : floatval($req->leaveType->quota);
@@ -1486,20 +1960,39 @@
 
                                                 $statusBadge = match($req->status) {
                                                     'approved'                => ['cls' => 'bg-soft-success text-success',    'icon' => 'feather-check-circle',  'lbl' => __('hrms.leave.app.status_approved')],
-                                                    'pending'                 => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',          'lbl' => ((string)$req->current_level === '2') ? 'L1 Approved (L2 Pending)' : __('hrms.leave.app.status_pending')],
+                                                    'pending'                 => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',          'lbl' => ((string)$req->current_level === '2') ? __('hrms.leave.app.l1_approved_l2_pending') : __('hrms.leave.app.status_pending')],
                                                     'rejected'                => ['cls' => 'bg-soft-danger text-danger',      'icon' => 'feather-x-circle',       'lbl' => __('hrms.leave.app.status_rejected')],
-                                                    'cancellation_requested'  => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-rotate-ccw',     'lbl' => 'Cancellation Requested'],
-                                                    'cancelled'               => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => 'Cancelled'],
+                                                    'cancellation_requested'  => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-rotate-ccw',     'lbl' => __('hrms.leave.app.status_cancellation_requested')],
+                                                    'cancelled'               => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => __('hrms.leave.app.status_cancelled')],
                                                     'unauthorized'            => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => __('hrms.leave.app.status_unauthorized')],
                                                     'unpaid'                  => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-alert-circle',   'lbl' => __('hrms.leave.app.status_unpaid')],
                                                     default                   => ['cls' => 'bg-light text-secondary',         'icon' => 'feather-circle',         'lbl' => ucfirst($req->status)],
                                                 };
 
+                                                $timeRange = '';
+                                                if ($isHourlyReq && !empty($req->start_time) && !empty($req->end_time)) {
+                                                    try {
+                                                        $timeRange = \Carbon\Carbon::parse($req->start_time)->format('h:i A') . ' – ' . \Carbon\Carbon::parse($req->end_time)->format('h:i A');
+                                                    } catch (\Throwable $e) {
+                                                        $timeRange = $req->start_time . ' – ' . $req->end_time;
+                                                    }
+                                                }
+
+                                                $sessionLabels = [
+                                                    'full_day' => __('hrms.leave.app.full_day'),
+                                                    'first_half' => __('hrms.leave.app.first_half'),
+                                                    'second_half' => __('hrms.leave.app.second_half'),
+                                                    'hourly' => __('hrms.leave.app.hourly'),
+                                                ];
                                                 $sessionInfo = '';
-                                                if ($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day') {
-                                                    $sessionInfo = ucwords(str_replace('_', ' ', $req->start_date_type));
+                                                if ($req->session === 'hourly' || $req->start_date_type === 'hourly') {
+                                                    $sessionInfo = $timeRange ?: __('hrms.leave.app.hourly');
+                                                } elseif ($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day') {
+                                                    $startSessionLabel = $sessionLabels[$req->start_date_type] ?? ucwords(str_replace('_', ' ', $req->start_date_type));
+                                                    $sessionInfo = $startSessionLabel;
                                                     if (!$req->start_date->isSameDay($req->end_date) && $req->end_date_type !== 'full_day') {
-                                                        $sessionInfo .= ' → ' . ucwords(str_replace('_', ' ', $req->end_date_type));
+                                                        $endSessionLabel = $sessionLabels[$req->end_date_type] ?? ucwords(str_replace('_', ' ', $req->end_date_type));
+                                                        $sessionInfo .= ' → ' . $endSessionLabel;
                                                     }
                                                 }
                                                 $isLongCancelReason = (mb_strlen($req->cancellation_reason ?? '') > 70) || (substr_count($req->cancellation_reason ?? '', "\n") > 1);
@@ -1515,6 +2008,7 @@
                                                 data-leave-color="{{ $req->leaveType->color ?: '#3b82f6' }}"
                                                 data-date-range="{{ $dateRange }}"
                                                 data-session-info="{{ $sessionInfo }}"
+                                                data-calculate-in="{{ $isHourlyReq ? 'hours' : 'days' }}"
                                                 data-remaining="{{ $rowRemaining }}"
                                                 data-allocated="{{ $rowAllocated }}"
                                                 data-reason="{{ addslashes($req->reason) }}"
@@ -1543,32 +2037,36 @@
                                                     <div class="d-flex align-items-center gap-2">
                                                         <span class="flex-shrink-0 rounded-circle" style="width:9px;height:9px;background:{{ $req->leaveType->color ?: '#3b82f6' }};display:inline-block;"></span>
                                                         <div>
-                                                            <div class="fw-semibold text-dark fs-13">{{ $req->leaveType->name }}</div>
-                                                            <div class="text-muted fs-11">Rem: {{ $rowRemaining }} / {{ $rowAllocated }} {{ __('hrms.leave.days') }}</div>
+                                                             <div class="fw-semibold text-dark fs-13">{{ $req->leaveType->name }}</div>
+                                                            <div class="text-muted fs-11">{{ __('hrms.leave.app.remaining') }}: {{ $rowRemaining }} / {{ $rowAllocated }} {{ $rowUnit }}</div>
                                                         </div>
                                                     </div>
                                                     @if(in_array($req->status, ['cancellation_requested', 'cancelled']) && !empty($req->cancellation_reason))
                                                         <div class="text-warning fs-11 mt-2" style="max-width: 250px;">
-                                                            <span class="fw-semibold"><i class="feather-rotate-ccw me-1"></i>Cancellation:</span>
+                                                            <span class="fw-semibold"><i class="feather-rotate-ccw me-1"></i>{{ __('hrms.leave.app.cancellation_prefix') }}</span>
                                                             <div class="leave-cancel-reason-text mb-0 text-muted fs-11" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; white-space: normal; line-height: 1.4; color: inherit;">
                                                                 {{ $req->cancellation_reason }}
                                                             </div>
                                                             @if($isLongCancelReason)
-                                                                <a href="#" class="leave-toggle-cancel-reason-btn fs-10 text-primary fw-semibold d-inline-block mt-0.5" onclick="toggleLeaveCancelReasonText(this); return false;">See more</a>
+                                                                <a href="#" class="leave-toggle-cancel-reason-btn fs-10 text-primary fw-semibold d-inline-block mt-0.5" onclick="toggleLeaveCancelReasonText(this); return false;">{{ __('hrms.leave.app.see_more') }}</a>
                                                             @endif
                                                         </div>
                                                     @endif
                                                 </td>
                                                 <td>
                                                     <div class="fs-13 text-dark">{{ $dateRange }}</div>
+                                                    @if(!empty($timeRange))
+                                                        <div class="fs-11 text-muted mt-0.5"><i class="feather-clock me-1 text-primary"></i>{{ $timeRange }}</div>
+                                                    @endif
                                                 </td>
                                                 <td class="text-center">
                                                     <span class="fw-bold fs-13 text-dark">{{ floatval($req->duration) }}</span>
+                                                    <div class="fs-10 text-muted">{{ $rowUnit }}</div>
                                                 </td>
                                                 <td>
-                                                    <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2 py-1 fs-11">
+                                                    <x-ui.badge variant="{{ $req->status === 'approved' ? 'success' : ($req->status === 'pending' || $req->status === 'cancellation_requested' ? 'warning' : ($req->status === 'rejected' ? 'danger' : 'secondary')) }}" soft class="rounded-pill px-2 py-1 fs-11">
                                                         <i class="{{ $statusBadge['icon'] }} me-1"></i>{{ $statusBadge['lbl'] }}
-                                                    </span>
+                                                    </x-ui.badge>
                                                 </td>
                                                 <td class="text-center">
                                                     @if($req->attachment_path)
@@ -1580,22 +2078,19 @@
                                                 <td class="text-end pe-3" style="white-space: nowrap;">
                                                      <div class="d-flex align-items-center justify-content-end gap-2 flex-nowrap">
                                                          {{-- Eye / detail button --}}
-                                                         <button type="button"
-                                                             class="btn btn-sm btn-soft-primary open-leave-detail-idx"
-                                                             title="View Details"
+                                                         <x-ui.icon-btn type="button"
+                                                             variant="soft-primary"
+                                                             size="sm"
+                                                             icon="feather-eye"
+                                                             class="open-leave-detail-idx"
+                                                             title="{{ __('hrms.leave.app.view_details') }}"
                                                              data-bs-toggle="offcanvas"
                                                              data-bs-target="#leaveDetailDrawerIdx"
-                                                             style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                             <i class="feather-eye fs-14"></i>
-                                                         </button>
+                                                             style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" />
 
                                                          @if($isAdmin && $req->status !== 'cancelled')
                                                              {{-- Status Dropdown --}}
-                                                             <div class="dropdown d-inline-block position-relative">
-                                                                 <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
-                                                                     <span>{{ $statusBadge['lbl'] }}</span>
-                                                                 </button>
-                                                                 <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
+                                                              <x-ui.action-dropdown align="end" :id="'leave-actions-' . $req->id">
                                                                      @if($req->status === 'cancellation_requested')
                                                                          <li>
                                                                              <form action="{{ route('hrms.leaves.approve-cancellation', $req->id) }}" method="POST">
@@ -1625,52 +2120,41 @@
                                                                          @endphp
                                                                          @foreach($actionsList as $actionKey => $actionLabel)
                                                                              <li>
-                                                                                 <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST">
+                                                                                 @if($actionKey === 'rejected')
+                                                                                    <button type="button" class="dropdown-item reject-leave-btn text-danger fw-medium {{ $req->status === 'rejected' ? 'active-status' : '' }}" data-id="{{ $req->id }}" data-action-url="{{ route('hrms.leaves.reject', $req->id) }}">
+                                                                                        {{ $actionLabel }}
+                                                                                    </button>
+                                                                                @else
+                                                                                <form action="{{ route('hrms.leaves.update-status', $req->id) }}" method="POST">
                                                                                      @csrf
                                                                                      <input type="hidden" name="action" value="{{ $actionKey }}">
                                                                                      <button type="submit" class="dropdown-item {{ $req->status === $actionKey ? 'active-status' : '' }}">
                                                                                          {{ $actionLabel }}
                                                                                      </button>
                                                                                  </form>
+                                                                                @endif
                                                                              </li>
                                                                          @endforeach
                                                                      @endif
-                                                                 </ul>
-                                                             </div>
+                                                              </x-ui.action-dropdown>
                                                          @endif
 
                                                          {{-- Unified Withdraw / Cancellation Delete button --}}
                                                          @if($isAdmin)
-                                                             <form method="POST" action="{{ route('hrms.leaves.destroy', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this leave application?', { title: 'Delete Leave Application', variant: 'danger', confirmButtonText: 'Delete' })" class="d-inline">
+                                                             <form method="POST" action="{{ route('hrms.leaves.destroy', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.app.confirm_delete_application') }}', { title: '{{ __('hrms.leave.app.delete_application_title') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.leave.app.delete') }}' })" class="d-inline">
                                                                  @csrf
                                                                  @method('DELETE')
-                                                                 <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                                         title="Delete Application"
-                                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                     <i class="feather-trash-2 fs-14"></i>
-                                                                 </button>
+                                                              <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="{{ __('hrms.leave.app.delete_application_title') }}" />
                                                              </form>
                                                          @elseif($req->canWithdraw())
-                                                             <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, 'Withdraw this leave application?', { title: 'Withdraw Leave Application', variant: 'warning', confirmButtonText: 'Withdraw' })" class="d-inline">
+                                                             <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.app.confirm_withdraw') }}', { title: '{{ __('hrms.leave.app.withdraw_title') }}', variant: 'warning', confirmButtonText: '{{ __('hrms.leave.app.withdraw') }}' })" class="d-inline">
                                                                  @csrf
-                                                                 <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                                         title="Withdraw Application"
-                                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                     <i class="feather-trash-2 fs-14"></i>
-                                                                 </button>
+                                                              <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="{{ __('hrms.leave.app.withdraw_title') }}" />
                                                              </form>
                                                          @elseif($req->canRequestCancellation())
-                                                             <button type="button" class="btn btn-sm btn-soft-danger border" 
-                                                                     title="Request Cancellation"
-                                                                     onclick="openLeaveCancellationModal({{ $req->id }}, '{{ route('hrms.leaves.request-cancellation', $req->id) }}')"
-                                                                     style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                 <i class="feather-trash-2 fs-14"></i>
-                                                             </button>
+                                                              <x-ui.icon-btn type="button" variant="soft-danger" size="sm" icon="feather-trash-2" title="{{ __('hrms.leave.app.request_cancellation') }}" onclick="openLeaveCancellationModal({{ $req->id }}, '{{ route('hrms.leaves.request-cancellation', $req->id) }}')" />
                                                          @else
-                                                             <button type="button" class="btn btn-sm btn-light border disabled" 
-                                                                     style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
-                                                                 <i class="feather-trash-2 fs-14"></i>
-                                                             </button>
+                                                              <x-ui.icon-btn type="button" variant="light-brand" size="sm" icon="feather-trash-2" disabled />
                                                          @endif
                                                      </div>
                                                 </td>
@@ -1690,8 +2174,7 @@
                                             </td>
                                         </tr>
                                     </tbody>
-                                </table>
-                            </div>
+                            </x-ui.table>
                             <div id="leaves_pagination_container">
                                 @if($leaveRequests instanceof \Illuminate\Pagination\LengthAwarePaginator && $leaveRequests->hasPages())
                                     <x-ui.pagination
@@ -1778,7 +2261,7 @@
 
                     {{-- Cancellation Reason --}}
                     <div class="mb-3 d-none" id="lid-cancellation-wrap">
-                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Cancellation Reason</div>
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.cancellation_reason') }}</div>
                         <div class="alert alert-soft-warning py-2 px-3 fs-13 mb-0" id="lid-cancellation" style="word-break: break-word !important; overflow-wrap: anywhere !important;"></div>
                     </div>
 
@@ -1805,9 +2288,9 @@
                                             <option value="unpaid">{{ __('hrms.leave.app.status_unpaid') }}</option>
                                         </x-ui.select>
                                     </div>
-                                    <button type="submit" class="btn btn-primary btn-sm fw-bold px-3 d-flex align-items-center gap-1" style="height: 38px; border-radius: 6px;">
-                                        <i class="feather-check fs-12"></i> {{ __('hrms.common.apply') }}
-                                    </button>
+                                    <x-ui.button type="submit" variant="primary" size="sm" icon="feather-check" class="fw-bold px-3" style="height: 38px; border-radius: 6px;">
+                                        {{ __('hrms.common.apply') }}
+                                    </x-ui.button>
                                 </div>
                                 <div class="mt-2 d-none" id="lid-rejection-input-wrap">
                                     <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">{{ __('hrms.leave.app.rejection_reason') }}</div>
@@ -1818,12 +2301,12 @@
                     @endif
 
                     <x-slot:footer>
-                        <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">CLOSE PANEL</button>
+                        <x-ui.button variant="light-brand" data-bs-dismiss="offcanvas">{{ __('hrms.leave.app.close_panel') }}</x-ui.button>
                     </x-slot:footer>
                 </x-ui.drawer>
 
                 <!-- Pane 2: Leave Encashments -->
-                <div class="tab-pane fade" id="pane-leave-encashments" role="tabpanel">
+                <div class="tab-pane fade {{ $isEncashActive ? 'show active' : '' }}" id="pane-leave-encashments" role="tabpanel">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <div>
@@ -1835,9 +2318,8 @@
                                 <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="encashmentFilterForm">
                                     <input type="hidden" id="encashments_sort_value" value="{{ $encashmentsSort ?? 'date_desc' }}">
                                     <!-- Registry Style Search Input -->
-                                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
-                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" id="encashments_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;" value="{{ $encashmentsSearch ?? '' }}">
+                                    <div style="min-width: 220px; max-width: 280px;">
+                                        <x-ui.input type="search" name="encashments_search" id="encashments_search" :placeholder="__('hrms.leave.app.search_employee')" :value="$encashmentsSearch ?? ''" class="form-control-sm" />
                                     </div>
 
                                     <!-- Sort Dropdown -->
@@ -1879,7 +2361,7 @@
                                         @endif
 
                                         <div class="mb-3" style="min-width: 250px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="status" id="filter_encashment_status">
                                                 <option value="" {{ ($encashmentsStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.leave.encashment_app.all_statuses') }}</option>
                                                 <option value="pending" {{ ($encashmentsStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
@@ -1891,8 +2373,8 @@
                                         <div class="dropdown-divider my-3"></div>
 
                                         <div class="d-flex gap-2">
-                                            <button type="button" id="btnApplyEncashmentFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
-                                            <button type="button" id="btnResetEncashmentFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
+                                            <x-ui.button type="button" id="btnApplyEncashmentFilters" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                            <x-ui.button type="button" id="btnResetEncashmentFilters" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                                         </div>
                                     </x-ui.filter>
                                 </form>
@@ -1900,8 +2382,7 @@
                         </div>
 
                         <div>
-                            <div class="table-responsive" style="overflow: visible;">
-                                <table class="table table-hover align-middle mb-0">
+                            <x-ui.table class="p-0">
                                     <thead class="table-light">
                                         <tr>
                                             @if($isAdmin)
@@ -1911,8 +2392,8 @@
                                             <th>{{ __('hrms.leave.encashment_app.requested_days') }}</th>
                                             <th>{{ __('hrms.leave.encashment_app.reason') }}</th>
                                             <th>{{ __('hrms.leave.encashment_app.submitted_date') }}</th>
-                                            <th>{{ __('ui.status') ?? 'Status' }}</th>
-                                            @if($isAdmin)
+                                            <th>{{ __('ui.status') }}</th>
+                                            @if($canManageEncashments ?? $isAdmin)
                                                 <th class="text-end">{{ __('hrms.leave.app.actions') }}</th>
                                             @endif
                                         </tr>
@@ -1920,19 +2401,19 @@
                                     <tbody id="encashmentsTableBody">
                                         @forelse(($leaveEncashments ?? $encashments ?? []) as $enc)
                                             <tr class="encashment-row"
-                                                data-employee="{{ strtolower($enc->employee->full_name) }} {{ strtolower($enc->employee->employee_id) }}"
+                                                data-employee="{{ strtolower($enc->employee?->full_name ?? '') }} {{ strtolower($enc->employee?->employee_id ?? '') }}"
                                                 data-employee-id="{{ $enc->employee_id }}"
                                                 data-status="{{ $enc->status }}"
                                                 data-days="{{ floatval($enc->requested_days) }}"
                                                 data-created-at="{{ $enc->created_at->timestamp }}">
                                                 @if($isAdmin)
                                                     <td>
-                                                        <h6 class="fw-bold mb-0 fs-13 text-dark">{{ $enc->employee->full_name }}</h6>
-                                                        <small class="text-muted fs-11">{{ $enc->employee->employee_id }}</small>
+                                                        <h6 class="fw-bold mb-0 fs-13 text-dark">{{ $enc->employee?->full_name ?? __('hrms.employees.tbl_employee') }}</h6>
+                                                        <small class="text-muted fs-11">{{ $enc->employee?->employee_id ?? '—' }}</small>
                                                     </td>
                                                 @endif
                                                 <td>
-                                                    <span class="badge bg-light text-primary fw-semibold fs-12 mb-1">{{ $enc->leaveType->name }}</span>
+                                            <x-ui.badge variant="primary" soft class="fw-semibold fs-12 mb-1">{{ $enc->leaveType?->name ?? __('hrms.leave.encashment_app.select_leave_type') }}</x-ui.badge>
                                                 </td>
                                                 <td>
                                                     <span class="fs-13 fw-bold text-dark">{{ floatval($enc->requested_days) }} {{ __('hrms.leave.days') }}</span>
@@ -1945,58 +2426,42 @@
                                                 </td>
                                                 <td>
                                                     @if($enc->status === 'pending')
-                                                        <span class="badge badge-pending px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-clock me-1"></i> {{ __('hrms.leave.app.status_pending') }}</span>
+                                                        <x-ui.badge variant="warning" soft class="px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-clock me-1"></i> {{ __('hrms.leave.app.status_pending') }}</x-ui.badge>
                                                     @elseif($enc->status === 'approved')
-                                                        <span class="badge badge-approved px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-check-circle me-1"></i> {{ __('hrms.leave.app.status_approved') }}</span>
+                                                        <x-ui.badge variant="success" soft class="px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-check-circle me-1"></i> {{ __('hrms.leave.app.status_approved') }}</x-ui.badge>
                                                     @else
-                                                        <span class="badge badge-rejected px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-x-circle me-1"></i> {{ __('hrms.leave.app.status_rejected') }}</span>
+                                                        <x-ui.badge variant="danger" soft class="px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-x-circle me-1"></i> {{ __('hrms.leave.app.status_rejected') }}</x-ui.badge>
                                                     @endif
                                                 </td>
-                                                @if($isAdmin)
-                                                    <td class="text-end pe-3" style="white-space: nowrap;">
-                                                        <div class="dropdown d-inline-block position-relative">
-                                                            <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Change Status">
-                                                                <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
-                                                            </button>
-                                                            <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu shadow" style="z-index: 1060;">
-                                                                <li>
-                                                                    <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
-                                                                        @csrf
-                                                                        <button type="submit" class="dropdown-item {{ $enc->status === 'approved' ? 'active-status' : '' }}">
-                                                                            {{ __('hrms.leave.app.status_approved') }}
-                                                                        </button>
-                                                                    </form>
-                                                                </li>
-                                                                <li>
-                                                                    <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
-                                                                        @csrf
-                                                                        <button type="submit" class="dropdown-item {{ $enc->status === 'rejected' ? 'active-status' : '' }}">
-                                                                            {{ __('hrms.leave.app.status_rejected') }}
-                                                                        </button>
-                                                                    </form>
-                                                                </li>
-                                                            </ul>
-                                                        </div>
+                                                @if($canManageEncashments ?? $isAdmin)
+                                                <td class="text-end pe-3" style="white-space: nowrap;">
+                                                    @if($enc->status === 'pending')
+                                                        <x-ui.action-dropdown align="end" :id="'encashment-actions-' . $enc->id">
+                                                            <li><form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">@csrf<button type="submit" class="dropdown-item">{{ __('hrms.leave.app.status_approved') }}</button></form></li>
+                                                            <li><form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">@csrf<button type="submit" class="dropdown-item text-danger">{{ __('hrms.leave.app.status_rejected') }}</button></form></li>
+                                                        </x-ui.action-dropdown>
+                                                    @else
+                                                        <span class="text-muted fs-12">—</span>
+                                                    @endif
                                                     </td>
                                                 @endif
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="{{ $isAdmin ? 7 : 5 }}" class="text-center py-5 text-muted fs-13">
+                                                <td colspan="{{ ($isAdmin ? 6 : 5) + (($canManageEncashments ?? $isAdmin) ? 1 : 0) }}" class="text-center py-5 text-muted fs-13">
                                                     <i class="feather-dollar-sign fs-3 d-block mb-2 text-secondary"></i>
                                                     {{ __('hrms.leave.encashment_app.no_encashments') }}
                                                 </td>
                                             </tr>
                                         @endforelse
                                         <tr id="no_matching_encashments_row" class="d-none">
-                                            <td colspan="{{ $isAdmin ? 7 : 5 }}" class="text-center py-5 text-muted fs-13">
+                                            <td colspan="{{ ($isAdmin ? 6 : 5) + (($canManageEncashments ?? $isAdmin) ? 1 : 0) }}" class="text-center py-5 text-muted fs-13">
                                                 <i class="feather-folder fs-3 d-block mb-2 text-secondary"></i>
                                                 {{ __('hrms.leave.encashment_app.no_matching_encashments') }}
                                             </td>
                                         </tr>
                                     </tbody>
-                                </table>
-                            </div>
+                            </x-ui.table>
                             <div id="encashments_pagination_container">
                                 @if($leaveEncashments instanceof \Illuminate\Pagination\LengthAwarePaginator && $leaveEncashments->hasPages())
                                     <x-ui.pagination
@@ -2018,48 +2483,17 @@
     </div>
 
     <!-- Leave Cancellation Request Modal -->
-    <div class="modal fade" id="leaveCancellationModal" tabindex="-1" aria-labelledby="leaveCancellationModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold text-dark" id="leaveCancellationModalLabel">
-                        <i class="feather-x-circle text-warning me-2"></i>Request Leave Cancellation
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="leaveCancellationForm" method="POST" action="">
-                    @csrf
-                    <div class="modal-body p-4">
-                        <p class="text-muted fs-13 mb-3">
-                            Please provide a reason for requesting cancellation of this approved leave. The admin will review and approve or deny your request.
-                        </p>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-dark fs-13">Cancellation Reason <span class="text-danger">*</span></label>
-                            <textarea name="cancellation_reason" id="leave_cancellation_reason" class="form-control fs-13" rows="3" placeholder="Explain why you want to cancel this leave..." required maxlength="1000"></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-warning text-dark fw-semibold">
-                            <i class="feather-send me-1"></i>Submit Request
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <x-ui.modal id="leaveCancellationModal" :title="__('hrms.leave.app.request_cancellation')" formAction="#" :showFooter="true" :scrollable="true">
+                    <p class="text-muted fs-13 mb-3">{{ __('hrms.leave.app.cancellation_reason_desc') }}</p>
+                    <x-ui.odoo-form-ui type="textarea" :label="__('hrms.leave.app.cancellation_reason')" name="cancellation_reason" id="leave_cancellation_reason" :required="true" :placeholder="__('hrms.leave.app.cancellation_placeholder')" rows="3" maxlength="1000" />
+                    <x-slot:footer>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                        <x-ui.button variant="warning" type="submit" icon="feather-send" class="text-dark fw-semibold">{{ __('hrms.leave.app.submit_request') }}</x-ui.button>
+                    </x-slot:footer>
+    </x-ui.modal>
 
     <!-- Apply Leave Modal -->
-    <div class="modal fade" id="applyLeaveModal" aria-labelledby="applyLeaveModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content border-0">
-                <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold text-dark" id="applyLeaveModalLabel">{{ __('hrms.leave.app.apply_for_leave') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="{{ route('hrms.leaves.store') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <div class="modal-body p-4">
+    <x-ui.modal id="applyLeaveModal" :title="__('hrms.leave.app.apply_for_leave')" size="lg" :formAction="route('hrms.leaves.store')" :showFooter="true" :scrollable="true">
                         @if ($errors->any())
                             <div class="alert alert-danger">
                                 <ul class="mb-0">
@@ -2070,7 +2504,22 @@
                             </div>
                         @endif
 
-                        <input type="hidden" name="employee_id" id="employee_select" value="{{ $employee ? $employee->id : '' }}">
+                        @if($isAdmin)
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.employees.tbl_employee')" name="employee_id" id="employee_select" :required="true" class="odoo-select2-custom">
+                                        <option value="">{{ __('hrms.leave.app.select_employee') }}</option>
+                                        @foreach (($allEmployees ?? $employees ?? []) as $emp)
+                                            <option value="{{ $emp->id }}" {{ ($employee && $employee->id === $emp->id) ? 'selected' : '' }}>
+                                                {{ $emp->full_name }} ({{ $emp->employee_id }})
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            </div>
+                        @else
+                            <input type="hidden" name="employee_id" id="employee_select" value="{{ $employee ? $employee->id : '' }}">
+                        @endif
 
                         <div class="row">
                             <div class="col-12 mb-3">
@@ -2080,11 +2529,11 @@
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.leave.app.start_date')" name="start_date" id="start_date" :required="true" class="odoo-underline-input" />
+                        <div class="row" id="leave_date_row">
+                            <div class="col-md-6 mb-3" id="start_date_col">
+                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.leave.app.start_date')" name="start_date" id="start_date" :required="true" class="odoo-underline-input" :value="date('Y-m-d')" />
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-3" id="start_session_col">
                                 <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.app.start_session')" name="start_date_type" id="start_date_type" :required="true" class="odoo-select2-custom">
                                     <option value="full_day">{{ __('hrms.leave.app.full_day') }}</option>
                                     <option value="first_half">{{ __('hrms.leave.app.first_half') }}</option>
@@ -2093,9 +2542,22 @@
                             </div>
                         </div>
 
-                        <div class="row">
+                        {{-- Hourly / Permission Leave Time & Duration Container --}}
+                        <div class="row d-none" id="hourly_leave_container">
+                            <div class="col-md-4 mb-3">
+                                <x-ui.odoo-form-ui type="input" inputType="time" :label="__('hrms.leave.app.from_time')" name="start_time" id="leave_start_time" :required="false" class="odoo-underline-input" value="09:00" />
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <x-ui.odoo-form-ui type="input" inputType="time" :label="__('hrms.leave.app.to_time')" name="end_time" id="leave_end_time" :required="false" class="odoo-underline-input" value="10:00" />
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.leave.app.leave_hours')" name="hours" id="leave_hours" :required="false" class="odoo-underline-input" step="0.5" min="0.5" max="24" value="1.0" placeholder="e.g. 1.0, 1.5, 2.0" />
+                            </div>
+                        </div>
+
+                        <div class="row" id="end_date_row">
                             <div class="col-md-6 mb-3">
-                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.leave.app.end_date')" name="end_date" id="end_date" :required="true" class="odoo-underline-input" />
+                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.leave.app.end_date')" name="end_date" id="end_date" :required="true" class="odoo-underline-input" :value="date('Y-m-d')" />
                             </div>
                             <div class="col-md-6 mb-3">
                                 <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.app.end_session')" name="end_date_type" id="end_date_type" :required="true" class="odoo-select2-custom">
@@ -2132,28 +2594,29 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
-                    </div>
-                    <div class="modal-header border-top py-3 d-flex justify-content-end gap-2" style="border-bottom: none;">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
-                        <button type="submit" class="btn btn-primary text-dark">{{ __('hrms.leave.app.submit_request') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+                    <x-slot:footer>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                        <x-ui.button variant="primary" type="submit">{{ __('hrms.leave.app.submit_request') }}</x-ui.button>
+                    </x-slot:footer>
+    </x-ui.modal>
 
     <!-- Apply Encashment Modal -->
-    <div class="modal fade" id="applyEncashmentModal" tabindex="-1" aria-labelledby="applyEncashmentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold text-dark" id="applyEncashmentModalLabel">{{ __('hrms.leave.encashment_app.apply_for_encashment') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" action="{{ route('hrms.leaves.encashment.store') }}">
-                    @csrf
-                    <div class="modal-body p-4">
-                        <input type="hidden" name="employee_id" id="encashment_employee_id" value="{{ $employee ? $employee->id : '' }}">
+    <x-ui.modal id="applyEncashmentModal" :title="__('hrms.leave.encashment_app.apply_for_encashment')" :formAction="route('hrms.leaves.encashment.store')" :showFooter="true" :scrollable="true">
+                    <div class="row g-3">
+                        @if($isAdmin)
+                            <div class="mb-3">
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.employees.tbl_employee')" name="employee_id" id="encashment_employee_select" :required="true" class="odoo-select2-custom">
+                                    <option value="">{{ __('hrms.leave.app.select_employee') }}</option>
+                                    @foreach (($allEmployees ?? $employees ?? []) as $emp)
+                                        <option value="{{ $emp->id }}" {{ ($employee && $employee->id === $emp->id) ? 'selected' : '' }}>
+                                            {{ $emp->full_name }} ({{ $emp->employee_id }})
+                                        </option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        @else
+                            <input type="hidden" name="employee_id" id="encashment_employee_id" value="{{ $employee ? $employee->id : '' }}">
+                        @endif
 
                         <div class="mb-3">
                             <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.encashment_app.select_leave_type')" name="leave_type_id" id="encashment_leave_type_id" :required="true" class="odoo-select2-custom">
@@ -2174,37 +2637,18 @@
                             <x-ui.odoo-form-ui type="textarea" :label="__('hrms.leave.encashment_app.reason')" name="reason" id="encashment_reason" :required="false" class="odoo-underline-input" :placeholder="__('hrms.leave.encashment_app.reason_placeholder')" />
                         </div>
                     </div>
-                    <div class="modal-header border-top py-3 d-flex justify-content-end gap-2" style="border-bottom: none;">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
-                        <button type="submit" class="btn btn-primary text-dark"><i class="feather-check me-1"></i> {{ __('hrms.leave.encashment_app.submit_encashment') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+                    <x-slot:footer>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                        <x-ui.button variant="primary" type="submit" icon="feather-check">{{ __('hrms.leave.encashment_app.submit_encashment') }}</x-ui.button>
+                    </x-slot:footer>
+    </x-ui.modal>
 
     <!-- Reject Leave Modal -->
-    <div class="modal fade" id="rejectLeaveModal" aria-labelledby="rejectLeaveModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0">
-                <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold text-dark" id="rejectLeaveModalLabel">{{ __('hrms.leave.app.reject_title') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="rejectLeaveForm" method="POST">
-                    @csrf
-                    <div class="modal-body p-4">
-                        <div class="mb-3">
-                            <label for="rejection_reason" class="form-label fw-bold text-secondary fs-13">{{ __('hrms.leave.app.rejection_reason') }} <span class="text-danger">*</span></label>
-                            <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="4" :placeholder="__('hrms.leave.app.rejection_reason_placeholder')" required></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer border-top py-3">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
-                        <button type="submit" class="btn btn-danger text-white">{{ __('hrms.leave.app.confirm_rejection') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <x-ui.modal id="rejectLeaveModal" :title="__('hrms.leave.app.reject_title')" formAction="#" :showFooter="true" :scrollable="true">
+        <x-ui.odoo-form-ui type="textarea" :label="__('hrms.leave.app.rejection_reason')" name="rejection_reason" id="rejection_reason" :required="true" :placeholder="__('hrms.leave.app.rejection_reason_placeholder')" rows="4" />
+        <x-slot:footer>
+            <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button variant="danger" type="submit">{{ __('hrms.leave.app.confirm_rejection') }}</x-ui.button>
+        </x-slot:footer>
+    </x-ui.modal>
 @endsection

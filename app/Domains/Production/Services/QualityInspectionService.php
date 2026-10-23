@@ -25,8 +25,14 @@ class QualityInspectionService
         return DB::transaction(function () use ($tenantId, $data) {
             $plan = ProductionQualityPlan::where('tenant_id', $tenantId)->findOrFail($data['quality_plan_id']);
 
+            $order = !empty($data['production_order_id'])
+                ? \App\Domains\Production\Models\ProductionOrder::withoutGlobalScopes()->find($data['production_order_id'])
+                : null;
+
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $data['company_id'] ?? $order?->company_id ?? company_id(),
+                'branch_id' => $data['branch_id'] ?? $order?->branch_id ?? branch_id(),
                 'quality_plan_id' => $plan->id,
                 'stage' => $data['stage'],
                 'status' => 'draft',
@@ -106,6 +112,8 @@ class QualityInspectionService
 
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $data['company_id'] ?? $orderOp?->company_id ?? $orderOp?->order?->company_id ?? $order?->company_id ?? company_id(),
+                'branch_id' => $data['branch_id'] ?? $orderOp?->branch_id ?? $orderOp?->order?->branch_id ?? $order?->branch_id ?? branch_id(),
                 'quality_plan_id' => $planId,
                 'inspection_number' => 'INSP-OP-' . date('Ymd') . '-' . rand(1000, 9999),
                 'stage' => $data['stage'] ?? 'in_process',
@@ -338,6 +346,23 @@ class QualityInspectionService
                 throw new \InvalidArgumentException('Inspected quantity must be greater than zero.');
             }
 
+            $skipPendingQcCheck = (bool) ($data['skip_pending_qc_check'] ?? false);
+            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
+
+            if (!$skipPendingQcCheck) {
+                if (!$isQcRequired) {
+                    throw new \InvalidArgumentException("Quality inspection cannot be recorded for operation #{$orderOp->operation_number} because Quality Control is not required.");
+                }
+
+                $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($orderOpId, $batchId);
+                if ($pendingQcQty <= 0) {
+                    throw new \InvalidArgumentException("Cannot record quality inspection: There are no pending QC units for operation #{$orderOp->operation_number}. Output must be logged first.");
+                }
+                if ($inspectedQty > ($pendingQcQty + 0.0001)) {
+                    throw new \InvalidArgumentException("Total inspected quantity ({$inspectedQty}) cannot exceed pending QC units ({$pendingQcQty}) for operation #{$orderOp->operation_number}.");
+                }
+            }
+
             $result = ($rejectedQty > 0) ? ($acceptedQty > 0 ? 'partially_passed' : 'failed') : 'passed';
 
             // Find or fallback Quality Plan
@@ -361,6 +386,8 @@ class QualityInspectionService
 
             $inspection = ProductionQualityInspection::create([
                 'tenant_id' => $tenantId,
+                'company_id' => $data['company_id'] ?? $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                'branch_id' => $data['branch_id'] ?? $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                 'quality_plan_id' => $planId,
                 'inspection_number' => 'INSP-SF-' . date('Ymd') . '-' . rand(1000, 9999),
                 'stage' => 'in_process',

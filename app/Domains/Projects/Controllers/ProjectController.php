@@ -21,6 +21,8 @@ use App\Domains\Projects\Services\ProjectMemberService;
 use App\Domains\Projects\Services\ProjectService;
 use App\Domains\Projects\Services\TaskListService;
 use App\Domains\Projects\Services\TaskService;
+use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Sales\Services\SalesOrderProjectBridgeService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\InlineEdit\HandlesInlineFieldUpdates;
@@ -28,6 +30,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -88,9 +91,46 @@ class ProjectController extends Controller
 
         if ($canCreate) {
             $data['nextCode'] = $this->projects->getNextProjectCode();
+            $data['confirmedSalesOrders'] = $this->getAvailableConfirmedSalesOrders();
         }
 
         return view('modules.projects.index', $data);
+    }
+
+    /**
+     * Get confirmed sales orders available for project conversion within the current tenant and company.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    private function getAvailableConfirmedSalesOrders(): \Illuminate\Database\Eloquent\Collection
+    {
+        $tenantId = require_tenant_id();
+        $companyId = current_company_id();
+        $selectedSoId = (int) (old('sales_order_id') ?: request('sales_order_id'));
+
+        $orders = SalesOrder::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'Confirmed')
+            ->when($companyId, fn ($q) => $q->where(fn ($sub) => $sub->whereNull('company_id')->orWhere('company_id', $companyId)))
+            ->whereDoesntHave('projects')
+            ->with('customer:id,name')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get(['id', 'sales_order_number', 'customer_id', 'total_amount', 'order_date', 'shipment_date']);
+
+        if ($selectedSoId && !$orders->contains('id', $selectedSoId)) {
+            $selectedSo = SalesOrder::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $selectedSoId)
+                ->with('customer:id,name')
+                ->first(['id', 'sales_order_number', 'customer_id', 'total_amount', 'order_date', 'shipment_date']);
+
+            if ($selectedSo) {
+                $orders->prepend($selectedSo);
+            }
+        }
+
+        return $orders;
     }
 
     /**
@@ -140,11 +180,48 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function store(StoreProjectRequest $request): RedirectResponse
+    public function store(StoreProjectRequest $request, SalesOrderProjectBridgeService $bridgeService): RedirectResponse
     {
         $this->authorize('create', Project::class);
 
-        $project = $this->projects->create($request->validated());
+        $validated = $request->validated();
+
+        if (!empty($validated['sales_order_id'])) {
+            $order = SalesOrder::query()
+                ->where('tenant_id', require_tenant_id())
+                ->findOrFail($validated['sales_order_id']);
+
+            if ($order->status !== 'Confirmed') {
+                return back()
+                    ->withInput()
+                    ->withErrors(['sales_order_id' => 'Only Confirmed Sales Orders can be converted to a Delivery Project.']);
+            }
+
+            if ($order->projects()->exists()) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['sales_order_id' => 'This Sales Order is already linked to an existing project.']);
+            }
+
+            $conversionData = array_filter([
+                'name'        => $validated['name'] ?? null,
+                'owner_id'    => $validated['owner_id'] ?? null,
+                'manager_id'  => $validated['manager_id'] ?? null,
+                'start_date'  => $validated['start_date'] ?? null,
+                'end_date'    => $validated['end_date'] ?? null,
+                'priority'    => $validated['priority'] ?? null,
+                'status'      => Project::STATUS_ACTIVE,
+                'description' => $validated['description'] ?? null,
+            ]);
+
+            $project = $bridgeService->convertSalesOrderToProject($order, $conversionData);
+
+            return redirect()
+                ->route('projects.show', $project)
+                ->with('success', __('projects.project_created_from_sales_order', ['order' => $order->sales_order_number]));
+        }
+
+        $project = $this->projects->create($validated);
 
         return redirect()
             ->route('projects.show', $project)
@@ -226,8 +303,77 @@ class ProjectController extends Controller
             ? $this->tasks->list($project, $taskFilters)->groupBy('task_list_id')
             : $tasksByList;
 
+        $productionOrders = \App\Domains\Production\Models\ProductionOrder::query()
+            ->where('tenant_id', $project->tenant_id)
+            ->where(function ($q) use ($project) {
+                $q->where('project_id', $project->id)
+                  ->orWhereHas('projectTask', function ($tq) use ($project) {
+                      $tq->where('project_id', $project->id);
+                  });
+            })
+            ->with(['product', 'projectTask'])
+            ->get();
+
+        $manufacturingSummary = null;
+        if ($productionOrders->isNotEmpty()) {
+            $totalOrders = $productionOrders->count();
+            $completedOrders = $productionOrders->where('status', \App\Domains\Production\Models\ProductionOrder::STATUS_COMPLETED)->count();
+            $inProgressOrders = $productionOrders->whereIn('status', [
+                \App\Domains\Production\Models\ProductionOrder::STATUS_IN_PROGRESS,
+                \App\Domains\Production\Models\ProductionOrder::STATUS_RELEASED,
+            ])->count();
+            $pendingOrders = $productionOrders->where('status', \App\Domains\Production\Models\ProductionOrder::STATUS_DRAFT)->count();
+
+            $orderedQuantity = (float) $productionOrders->sum('quantity_ordered');
+            $producedQuantity = (float) $productionOrders->sum('quantity_produced');
+            $overallProgress = $orderedQuantity > 0
+                ? round(min(100.0, ($producedQuantity / $orderedQuantity) * 100), 1)
+                : 0.0;
+
+            $manufacturingSummary = [
+                'total_orders'       => $totalOrders,
+                'completed_orders'   => $completedOrders,
+                'in_progress_orders' => $inProgressOrders,
+                'pending_orders'     => $pendingOrders,
+                'ordered_quantity'   => $orderedQuantity,
+                'produced_quantity'  => $producedQuantity,
+                'overall_progress'   => $overallProgress,
+                'orders'             => $productionOrders,
+            ];
+        }
+
+        $mfgCostData = app(\App\Domains\Projects\Services\ProjectReportService::class)->getProjectProductionCost($project);
+        $mfgCost = (float) ($mfgCostData['total_cost'] ?? 0.0);
+
+        if ($manufacturingSummary) {
+            $manufacturingSummary['total_cost'] = $mfgCost;
+            $manufacturingSummary['material_cost'] = (float) ($mfgCostData['material_cost'] ?? 0.0);
+            $manufacturingSummary['labor_cost'] = (float) ($mfgCostData['labor_cost'] ?? 0.0);
+        }
+
+        $timesheetCost = (float) $project->timeLogs()->sum(DB::raw('hours * COALESCE(hourly_rate, 0)'));
+        $totalCostConsumed = $timesheetCost + $mfgCost;
+
+        $baseBudgetAmount = (float) ($project->budget_amount ?? 0);
+        $approvedCrBudget = (float) $changeRequests->where('status', 'Approved')->sum('impact_budget');
+        $revisedBudget = $baseBudgetAmount + $approvedCrBudget;
+
+        $costPercent = $revisedBudget > 0 ? round(($totalCostConsumed / $revisedBudget) * 100, 1) : null;
+        $isOverBudget = $revisedBudget > 0 && $totalCostConsumed > $revisedBudget;
+
+        $costSummary = [
+            'total_consumed'  => $totalCostConsumed,
+            'mfg_cost'        => $mfgCost,
+            'timesheet_cost'  => $timesheetCost,
+            'revised_budget'  => $revisedBudget,
+            'percent'         => $costPercent,
+            'is_over_budget'  => $isOverBudget,
+        ];
+
         return view('modules.projects.show', [
             'project'             => $project,
+            'manufacturingSummary' => $manufacturingSummary,
+            'costSummary'         => $costSummary,
             'members'             => $members,
             'canManageMembers'    => $canManageMembers,
             'canUpdateProject'    => $canUpdateProject,

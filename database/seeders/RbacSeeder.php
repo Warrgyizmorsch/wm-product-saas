@@ -496,6 +496,10 @@ class RbacSeeder extends Seeder
             // outside that special-cased prefix so its normal tenant-scoped grant
             // actually takes effect in the sidebar and the policy check.
             ['name' => 'tenant.subscription.manage', 'module' => 'tenant', 'entity' => 'subscription', 'action' => 'manage'],
+            // The workspace's own integration/master settings (SMTP, WhatsApp, GST,
+            // Meta, Twilio, payment terms, notification rules). Same reasoning as
+            // above: per-tenant, so outside the 'platform.' prefix.
+            ['name' => 'tenant.settings.manage', 'module' => 'tenant', 'entity' => 'settings', 'action' => 'manage'],
             ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'platform.payment_gateway.manage', 'module' => 'platform', 'entity' => 'payment_gateway', 'action' => 'manage'],
@@ -784,8 +788,12 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.fiscal_years.view', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'view'],
             ['name' => 'accounting.fiscal_years.create', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'create'],
             ['name' => 'accounting.fiscal_years.close', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'close'],
+            // Reopening closed books is separate from closing them, so a tenant
+            // can let someone close periods/years without letting them reopen.
+            ['name' => 'accounting.fiscal_years.reopen', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'reopen'],
             ['name' => 'accounting.periods.view', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'view'],
             ['name' => 'accounting.periods.manage', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'manage'],
+            ['name' => 'accounting.periods.reopen', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'reopen'],
             ['name' => 'accounting.journals.view', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'view'],
             ['name' => 'accounting.journals.post', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'post'],
             ['name' => 'accounting.journals.reverse', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'reverse'],

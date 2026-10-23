@@ -13,6 +13,13 @@ class EWayBillService
      */
     public function generate(Invoice $invoice, array $transportData): array
     {
+        if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void'])) {
+            return [
+                'success' => false,
+                'message' => 'Cannot generate E-Way Bill for a cancelled invoice.',
+            ];
+        }
+
         if ($invoice->eway_bill_status === 'Generated' && !empty($invoice->eway_bill_no)) {
             return [
                 'success'         => true,

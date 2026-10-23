@@ -63,6 +63,18 @@ class GoalKeyResult extends BaseModel
             return $this->current_value >= 1 ? 100.0 : 0.0;
         }
 
+        // Descending / reduction goal (e.g., reduce cycle time from 40 to 20 days)
+        if ($this->start_value > $this->target_value) {
+            $range = $this->start_value - $this->target_value;
+            if ($range <= 0) {
+                return $this->current_value <= $this->target_value ? 100.0 : 0.0;
+            }
+            $achieved = $this->start_value - $this->current_value;
+            $pct = ($achieved / $range) * 100;
+            return (float) max(0.0, min(100.0, round($pct, 2)));
+        }
+
+        // Standard ascending goal
         $range = $this->target_value - $this->start_value;
         if ($range <= 0) {
             return $this->current_value >= $this->target_value ? 100.0 : 0.0;

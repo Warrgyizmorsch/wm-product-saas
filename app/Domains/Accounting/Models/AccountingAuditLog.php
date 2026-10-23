@@ -3,7 +3,7 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AccountingAuditLog extends BaseModel
 {
-    use BelongsToCompany, BelongsToBranch;
+    use BelongsToCompany, RecordsBranch;
 
     public const UPDATED_AT = null;
 

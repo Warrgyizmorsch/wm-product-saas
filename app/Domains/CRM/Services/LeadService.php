@@ -113,9 +113,11 @@ class LeadService
         $additionalContacts = $this->cleanAdditionalContacts($validated['additional_contacts'] ?? []);
         $firstAddl = $additionalContacts[0] ?? null;
 
+        $explicitOwner = !empty($validated['lead_owner_id']) ? (int)$validated['lead_owner_id'] : null;
+
         $leadData = [
             'call_date' => $callDateTime,
-            'lead_owner_id' => !empty($validated['lead_owner_id']) ? $validated['lead_owner_id'] : (auth()->id() ?: null),
+            'lead_owner_id' => $explicitOwner,
             'company_name' => !empty($validated['company_name']) ? $validated['company_name'] : (!empty($validated['contact_person']) ? $validated['contact_person'] : 'Individual Customer'),
             'company_email' => $validated['company_email'] ?? null,
             'company_phone' => $validated['company_phone'] ?? null,
@@ -127,7 +129,7 @@ class LeadService
             'phone' => $validated['phone'] ?? null,
             'additional_contacts' => $additionalContacts,
             'requirement' => $validated['requirement'] ?? null,
-            'expected_amount' => !empty($validated['expected_amount']) ? floatval($validated['expected_amount']) : 0.00,
+            'expected_amount' => !empty($validated['expected_amount']) ? convert_to_base((float) $validated['expected_amount']) : 0.00,
             'expected_sale_date' => !empty($validated['expected_sale_date']) ? Carbon::parse($validated['expected_sale_date']) : null,
             'source' => $validated['source'] ?? 'Select an Option',
             'priority' => $validated['priority'] ?? 'Select an Option',
@@ -151,14 +153,24 @@ class LeadService
             'Lead created with initial stage: ' . ($lead->status ?: 'New')
         );
 
-        if ($lead->lead_owner_id) {
+        if (!$explicitOwner) {
+            // Auto-assign based on CRM settings if no explicit owner chosen
+            try {
+                app(\App\Domains\CRM\Services\LeadAssignmentService::class)->assignLeadOwner($lead, 'manual_create', $validated);
+            } catch (\Throwable $e) {
+                if (auth()->id()) {
+                    $lead->lead_owner_id = auth()->id();
+                    $lead->save();
+                }
+            }
+        } elseif ($lead->lead_owner_id) {
             $ownerName = User::find($lead->lead_owner_id)?->name ?: 'Unknown';
             LeadHistory::logEvent(
                 $lead,
                 'assigned',
                 null,
                 $ownerName,
-                'Lead automatically assigned to lead owner: ' . $ownerName
+                'Lead assigned to lead owner: ' . $ownerName
             );
         }
 
@@ -189,7 +201,7 @@ class LeadService
             'phone' => $validated['phone'] ?? null,
             'additional_contacts' => $additionalContacts,
             'requirement' => $validated['requirement'] ?? null,
-            'expected_amount' => !empty($validated['expected_amount']) ? floatval($validated['expected_amount']) : 0.00,
+            'expected_amount' => !empty($validated['expected_amount']) ? convert_to_base((float) $validated['expected_amount']) : 0.00,
             'expected_sale_date' => !empty($validated['expected_sale_date']) ? Carbon::parse($validated['expected_sale_date']) : null,
             'source' => $validated['source'] ?? 'Select an Option',
             'priority' => $validated['priority'] ?? 'Select an Option',
@@ -224,20 +236,36 @@ class LeadService
     /**
      * Update lead status and handle customer conversion logic.
      */
-    public function updateLeadStatus(Lead $lead, string $newStatus): array
+    public function updateLeadStatus(Lead $lead, string $newStatus, bool $isSystemTriggered = false): array
     {
         $oldStatus = $lead->status ?: 'New';
 
-        // Permanent Lock Check: Once a lead is Won, it can NEVER be changed to any other status
-        if (($oldStatus === 'Won' || $lead->is_customer) && $newStatus !== 'Won') {
+        // Permanent Lock Check: Once a lead is Won, it can NEVER be changed to any other status manually
+        if (($oldStatus === 'Won' || $lead->is_customer) && $newStatus !== 'Won' && !$isSystemTriggered) {
             return [
                 'success' => false,
                 'message' => 'Lead status is Won and permanently locked. Status cannot be changed.'
             ];
         }
 
+        // Lock Check: Once a lead is in Dealing, it cannot be changed to another status manually
+        if (strcasecmp($oldStatus, 'Dealing') === 0 && strcasecmp($newStatus, 'Dealing') !== 0 && !$isSystemTriggered) {
+            return [
+                'success' => false,
+                'message' => "Lead status in '{$oldStatus}' stage is locked. Status cannot be changed."
+            ];
+        }
+
         if ($oldStatus === $newStatus) {
             return ['success' => true, 'message' => "Lead status is already {$newStatus}."];
+        }
+
+        // Direct Won transition guard: manual transition to Won is strictly blocked!
+        if (strcasecmp($newStatus, 'Won') === 0 && !$isSystemTriggered) {
+            return [
+                'success' => false,
+                'message' => 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.'
+            ];
         }
 
         $updateData = ['status' => $newStatus];
@@ -257,7 +285,7 @@ class LeadService
                 app(\App\Domains\CRM\Repositories\LeadRepository::class)->qualifyLead($lead);
             }
             $message = 'Lead status updated to Dealing.';
-        } elseif ($newStatus === 'Won') {
+        } elseif (strcasecmp($newStatus, 'Won') === 0) {
             if (!$lead->crm_account_id) {
                 $acc = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $lead->tenant_id ?? 1)
                     ->where(function($q) use ($lead) {
@@ -286,7 +314,12 @@ class LeadService
         }
 
         $oldStatus = $lead->status ?: 'New';
-        $lead->update($updateData);
+        Lead::$allowWonTransition = true;
+        try {
+            $lead->update($updateData);
+        } finally {
+            Lead::$allowWonTransition = false;
+        }
 
         if ($oldStatus !== $lead->status) {
             LeadHistory::logEvent(
@@ -322,7 +355,7 @@ class LeadService
         $uploadedIds = $lead->documents ?? [];
 
         foreach ($files as $file) {
-            $path = $file->store('lead_documents/' . $lead->id, 'public');
+            $path = $file->storeTenantFile('lead_documents/' . $lead->id, 'public');
 
             $document = LeadDocument::create([
                 'tenant_id' => $lead->tenant_id,

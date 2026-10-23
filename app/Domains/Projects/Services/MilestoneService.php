@@ -53,6 +53,8 @@ class MilestoneService
         return DB::transaction(function () use ($project, $data) {
             $data['project_id'] = $project->id;
             $data['tenant_id'] = $project->tenant_id;
+            $data['company_id'] = $data['company_id'] ?? $project->company_id;
+            $data['branch_id'] = $data['branch_id'] ?? $project->branch_id;
 
             $milestone = $this->milestones->create($data);
 

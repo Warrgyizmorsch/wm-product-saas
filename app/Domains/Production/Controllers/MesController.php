@@ -52,6 +52,9 @@ class MesController extends Controller
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
             'operations.orderOperation.operatorAssignments.user',
+            'operations.orderOperation.operator',
+            'operations.orderOperation.executedBy',
+            'operations.orderOperation.progressLogs.user',
         ])
             ->where('tenant_id', $tenantId);
 
@@ -140,6 +143,10 @@ class MesController extends Controller
             'operations.orderOperation.vendor',
             'operations.orderOperation.latestDeliveryChallan',
             'operations.orderOperation.deliveryChallans',
+            'operations.orderOperation.operatorAssignments.user',
+            'operations.orderOperation.operator',
+            'operations.orderOperation.executedBy',
+            'operations.orderOperation.progressLogs.user',
         ])
             ->where('tenant_id', $tenantId)
             ->where('status', ProductionSchedule::STATUS_COMPLETED)
@@ -194,13 +201,19 @@ class MesController extends Controller
     }
 
 
-    public function start(Request $request, int $op)
+    public function start(Request $request, mixed $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
+        if ($op === 'downtime') {
+            return app(DowntimeController::class)->start($request);
+        }
+
+        $operationId = (int) $op;
+
         try {
             $machineId = $request->input('machine_id') ? (int) $request->input('machine_id') : null;
-            $this->mesService->startOperation($op, $machineId, auth()->id());
+            $this->mesService->startOperation($operationId, $machineId, auth()->id());
             return redirect()->back()->with('success', 'Operation started successfully.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -325,14 +338,39 @@ class MesController extends Controller
 
         try {
             $tenantId = require_tenant_id();
+            $orderOp = ProductionOrderOperation::where('tenant_id', $tenantId)->findOrFail($op);
+            $batchId = $request->input('batch_id');
+
+            $acceptedQty = (float) $request->input('accepted_qty');
+            $rejectedQty = (float) $request->input('rejected_qty');
+            $totalInspected = $acceptedQty + $rejectedQty;
+
+            if ($totalInspected <= 0) {
+                return redirect()->back()->with('error', 'Total inspected quantity (Accepted + Rejected) must be greater than zero.');
+            }
+
+            $isQcRequired = (bool) ($orderOp->quality_required || ($orderOp->routingOperation?->quality_required ?? false));
+            if (!$isQcRequired) {
+                return redirect()->back()->with('error', "Quality inspection cannot be recorded for operation #{$orderOp->operation_number} because Quality Control is not required.");
+            }
+
+            $pendingQcQty = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($op, $batchId);
+            if ($pendingQcQty <= 0) {
+                return redirect()->back()->with('error', "Cannot record quality inspection: There are no pending QC units for operation #{$orderOp->operation_number}. Output must be logged first.");
+            }
+
+            if ($totalInspected > ($pendingQcQty + 0.0001)) {
+                return redirect()->back()->with('error', "Total inspected quantity ({$totalInspected}) cannot exceed pending QC units ({$pendingQcQty}) for operation #{$orderOp->operation_number}.");
+            }
+
             app(\App\Domains\Production\Services\QualityInspectionService::class)->processShopfloorInspection($tenantId, [
                 'production_order_operation_id' => $op,
-                'accepted_qty' => (float) $request->input('accepted_qty'),
-                'rejected_qty' => (float) $request->input('rejected_qty'),
+                'accepted_qty' => $acceptedQty,
+                'rejected_qty' => $rejectedQty,
                 'quality_plan_id' => $request->input('quality_plan_id'),
                 'audited_by' => $request->input('audited_by'),
                 'defect_reason' => $request->input('defect_reason'),
-                'batch_id' => $request->input('batch_id'),
+                'batch_id' => $batchId,
                 'remarks' => $request->input('remarks'),
             ], $request->input('audited_by') ?? auth()->id());
 
@@ -425,6 +463,8 @@ class MesController extends Controller
             DB::transaction(function () use ($tenantId, $orderOp, $qty, $reason, $batchId, $productId, $userId, $isOutputProduct, $scrapType, $scrapWarehouseId, $storageLocation, $measurementType, $request) {
                 ProductionOrderScrap::create([
                     'tenant_id' => $tenantId,
+                    'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                    'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                     'production_order_id' => $orderOp->production_order_id,
                     'production_order_operation_id' => $orderOp->id,
                     'production_batch_id' => $batchId,
@@ -495,7 +535,8 @@ class MesController extends Controller
             $reworkLoc = $request->input('rework_location');
             $isVendorRework = ($dispType === 'rework') && ($reworkLoc === 'vendor_rework' || ($orderOp->is_external && $reworkLoc !== 'internal_repair'));
 
-            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request, $isVendorRework) {
+            $createdRework = null;
+            DB::transaction(function () use ($tenantId, $orderOp, $dispType, $qty, $reason, $batchId, $userId, $request, $isVendorRework, &$createdRework) {
                 $ncr = ProductionNcr::where('tenant_id', $tenantId)
                     ->where('production_order_operation_id', $orderOp->id)
                     ->where('status', 'open')
@@ -519,7 +560,7 @@ class MesController extends Controller
                 }
 
                 if ($dispType === 'rework') {
-                    app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($tenantId, $ncr->id, [
+                    $createdRework = app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($tenantId, $ncr->id, [
                         'original_production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'batch_id' => $batchId,
@@ -529,11 +570,13 @@ class MesController extends Controller
                         'machine_id' => $request->input('machine_id') ?? $orderOp->machine_id,
                         'instructions' => $request->input('instructions') ?? "Rework for {$qty} rejected units.",
                         'assigned_to' => $request->input('assigned_to') ?? $userId,
-                        'cost_estimate' => (float) ($request->input('cost_estimate') ?? 150.00),
+                        'cost_estimate' => $request->filled('cost_estimate') ? convert_to_base((float) $request->input('cost_estimate')) : null,
                     ]);
 
                     \App\Domains\Production\Models\ProductionOrderRework::create([
                         'tenant_id' => $tenantId,
+                        'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                        'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                         'production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
@@ -560,6 +603,8 @@ class MesController extends Controller
                 } else { // scrap
                     ProductionOrderScrap::create([
                         'tenant_id' => $tenantId,
+                        'company_id' => $orderOp->company_id ?? $orderOp->order?->company_id ?? company_id(),
+                        'branch_id' => $orderOp->branch_id ?? $orderOp->order?->branch_id ?? branch_id(),
                         'production_order_id' => $orderOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
@@ -582,11 +627,22 @@ class MesController extends Controller
                 }
             });
 
+            $reworkNum = $createdRework?->rework_number;
             $msg = ($dispType === 'rework')
                 ? ($isVendorRework
                     ? "Subcontract Rework Gate Pass created. {$qty} rejected unit(s) ready for dispatch back to vendor."
-                    : "Rework recorded for {$qty} units. Ready for Re-QC upon completion.")
+                    : ($reworkNum
+                        ? "Rework Order {$reworkNum} created successfully for {$qty} unit(s) and queued in Quality & Rework."
+                        : "Rework Order created successfully for {$qty} unit(s) and queued in Quality & Rework."))
                 : "Scrap recorded successfully for {$qty} units.";
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $msg,
+                    'rework_number' => $reworkNum,
+                ]);
+            }
 
             return redirect()->back()->with('success', $msg);
         } catch (InvalidArgumentException $e) {
@@ -914,7 +970,7 @@ class MesController extends Controller
                 ->sum('quantity')
         );
         $rejectedQty = (float) ($op->quantity_rejected ?? 0.0);
-        $remainingQty = max(0.0, $targetQty - ($doneQty + $scrapQty + $rejectedQty));
+        $remainingQty = max(0.0, $targetQty - ($doneQty + $pendingQcQty + $scrapQty + $rejectedQty));
         $progressPercent = $targetQty > 0 ? min(100.0, round(($doneQty / $targetQty) * 100, 1)) : ($op->status === 'completed' ? 100.0 : 0.0);
 
         return view('modules.production.mes.operator.operation-execution', compact(

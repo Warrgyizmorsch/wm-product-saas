@@ -39,7 +39,9 @@
             $liabilityGroups = [
                 [
                     'label' => 'Capital Account',
-                    'total' => $totals['equity'],
+                    // $totals['equity'] already includes the period's profit, which
+                    // has its own row above; show only the capital accounts here.
+                    'total' => $totals['equity'] - $netIncome,
                     'rows' => $sections['equity']->map($mapRow)->all(),
                 ],
             ];

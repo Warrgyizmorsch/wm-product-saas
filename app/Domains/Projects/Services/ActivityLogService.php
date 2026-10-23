@@ -30,6 +30,8 @@ class ActivityLogService
     ): ActivityLog {
         return $this->logs->create([
             'tenant_id'    => $project->tenant_id,
+            'company_id'   => $project->company_id,
+            'branch_id'    => $project->branch_id,
             'project_id'   => $project->id,
             'subject_type' => $subject?->getMorphClass(),
             'subject_id'   => $subject?->getKey(),

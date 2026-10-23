@@ -299,6 +299,23 @@
                             @if($order->plan)
                                 <div class="fs-11 text-muted">Plan: {{ $order->plan->plan_number }}</div>
                             @endif
+                            @if($order->project)
+                                <div class="fs-11 mt-0.5">
+                                    <a href="{{ route('projects.show', $order->project->project_code) }}"
+                                        class="text-decoration-none text-muted hover-primary" target="_blank"
+                                        title="{{ __('projects.project') }}: {{ $order->project->name }}">
+                                        <i class="feather-folder me-0.5 text-primary fs-10"></i>{{ $order->project->project_code }}
+                                    </a>
+                                    @if($order->projectTask)
+                                        <span class="text-muted">/</span>
+                                        <a href="{{ route('projects.tasks.show', [$order->project, $order->projectTask]) }}"
+                                            class="text-decoration-none text-muted hover-primary" target="_blank"
+                                            title="{{ __('projects.task') }}: {{ $order->projectTask->title }}">
+                                            <i class="feather-check-square me-0.5 text-info fs-10"></i>{{ $order->projectTask->task_code }}
+                                        </a>
+                                    @endif
+                                </div>
+                            @endif
 
                             {{-- Subcontract Badges & Exception Pills --}}
                             @php

@@ -125,7 +125,7 @@ class StockAdjustmentController extends Controller
             foreach ($validated['items'] as $item) {
                 $product = Product::where('tenant_id', $tenantId)->find($item['product_id']);
                 $unitCost = isset($item['unit_cost']) && $item['unit_cost'] > 0 
-                    ? (float)$item['unit_cost'] 
+                    ? convert_to_base((float)$item['unit_cost']) 
                     : (float)($product?->cost_price ?? 0);
                 $total = (float)$item['quantity'] * $unitCost;
 

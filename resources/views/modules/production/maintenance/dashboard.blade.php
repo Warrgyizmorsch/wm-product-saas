@@ -83,7 +83,7 @@
                         </div>
                         <div>
                             <span class="fs-12 text-muted d-block">Monthly Expense</span>
-                            <h4 class="mb-0 fw-bold text-dark">${{ number_format($monthlyExpense, 2) }}</h4>
+                            <h4 class="mb-0 fw-bold text-dark">{{ format_currency($monthlyExpense) }}</h4>
                         </div>
                     </div>
                 </div>
@@ -109,7 +109,7 @@
                                         <th>{{ __('production.routing_type') }}</th>
                                         <th>{{ __('production.priority') }}</th>
                                         <th>{{ __('production.status') }}</th>
-                                        <th class="text-end">Cost</th>
+                                        <th class="text-end">{{ __('production.cost') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -136,7 +136,7 @@
                                                     {{ ucfirst(str_replace('_', ' ', $wo->status)) }}
                                                 </span>
                                             </td>
-                                            <td class="text-end fw-bold">${{ number_format($wo->total_cost, 2) }}</td>
+                                            <td class="text-end fw-bold">{{ format_currency($wo->total_cost) }}</td>
                                         </tr>
                                     @empty
                                         <tr>
@@ -196,7 +196,7 @@
     </div>
 
     <!-- Report Breakdown Modal Component -->
-    <x-ui.modal id="reportBreakdownModal" title="<span class='text-danger fw-bold'><i class='feather-alert-octagon me-2'></i>Report Emergency Breakdown</span>" formAction="{{ route('production.maintenance.work-orders.breakdown') }}" submitText="Report & Start Breakdown WO">
+    <x-ui.modal id="reportBreakdownModal" title="<span class='text-danger fw-bold'><i class='feather-alert-octagon me-2'></i>Report Emergency Breakdown</span>" formAction="{{ route('production.maintenance.work-orders.breakdown') }}" submitText="Report Breakdown">
         <x-ui.odoo-form-ui type="select" label="Machine" name="machine_id" :required="true">
             <option value="">Select Machine</option>
             @foreach(\App\Domains\Production\Models\Machine::all() as $m)

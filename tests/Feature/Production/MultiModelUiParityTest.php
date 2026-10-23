@@ -24,6 +24,7 @@ class MultiModelUiParityTest extends TestCase
     private User $user;
     private int $tenantId = 1;
     private Uom $uom;
+    private WorkCenter $workCenter;
 
     protected function setUp(): void
     {
@@ -61,18 +62,24 @@ class MultiModelUiParityTest extends TestCase
             'status' => 'active',
         ]);
 
+        $this->workCenter = WorkCenter::create([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Main Machining Center',
+            'code' => 'WC-MAIN',
+            'status' => 'active',
+        ]);
+
         session(['tenant_id' => $this->tenantId, 'errors' => new ViewErrorBag()]);
         view()->share('errors', new ViewErrorBag());
     }
 
-    public function test_product_create_and_edit_page_contains_default_production_model_field(): void
+    public function test_product_create_and_edit_page_does_not_contain_default_production_model_field(): void
     {
         $response = $this->withHeader('X-Tenant', 'test-tenant')
             ->get(route('inventory.products.create'));
         $response->assertStatus(200);
-        $response->assertSee('default_production_model');
-        $response->assertSee('Pure Manufacturing');
-        $response->assertSee('Complete Subcontracting');
+        $response->assertDontSee('name="default_production_model"', false);
+        $response->assertDontSee('Default Production Model');
 
         $product = Product::create([
             'tenant_id' => $this->tenantId,
@@ -86,8 +93,105 @@ class MultiModelUiParityTest extends TestCase
         $editResponse = $this->withHeader('X-Tenant', 'test-tenant')
             ->get(route('inventory.products.edit', $product->id));
         $editResponse->assertStatus(200);
-        $editResponse->assertSee('default_production_model');
-        $editResponse->assertSee('Subcontracting with Company Material');
+        $editResponse->assertDontSee('name="default_production_model"', false);
+        $editResponse->assertDontSee('Default Production Model');
+    }
+
+    public function test_product_can_be_created_and_edited_without_submitting_default_production_model(): void
+    {
+        // 1. Create product without default_production_model
+        $createResponse = $this->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('inventory.products.store'), [
+                'name' => 'New Product Without Model',
+                'sku' => 'PROD-NOMODEL-01',
+                'item_type' => 'Goods',
+                'variation_type' => 'Single',
+                'type' => 'finished_good',
+                'uom_id' => $this->uom->id,
+                'selling_price' => 150.00,
+                'cost_price' => 100.00,
+            ]);
+
+        $createResponse->assertRedirect();
+        $product = Product::where('sku', 'PROD-NOMODEL-01')->first();
+        $this->assertNotNull($product);
+        $this->assertEquals('pure_manufacturing', $product->default_production_model);
+
+        // 2. Edit product without submitting default_production_model
+        $updateResponse = $this->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('inventory.products.update', $product->id), [
+                'name' => 'Updated Product Without Model',
+                'sku' => 'PROD-NOMODEL-01',
+                'type' => 'finished_good',
+                'uom_id' => $this->uom->id,
+                'selling_price' => 175.00,
+                'cost_price' => 110.00,
+                'status' => 'active',
+            ]);
+
+        $updateResponse->assertRedirect();
+        $product->refresh();
+        $this->assertEquals('Updated Product Without Model', $product->name);
+        $this->assertEquals('pure_manufacturing', $product->default_production_model);
+    }
+
+    public function test_product_legacy_model_does_not_override_actual_routing_operations(): void
+    {
+        // Create product with legacy default_production_model set to complete_subcontracting
+        $product = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Legacy Subcontract Product',
+            'sku' => 'LEG-SUB-01',
+            'type' => 'finished_good',
+            'uom_id' => $this->uom->id,
+            'default_production_model' => 'complete_subcontracting',
+        ]);
+
+        $bom = \App\Domains\Production\Models\ProductionBom::create([
+            'tenant_id' => $this->tenantId,
+            'product_id' => $product->id,
+            'bom_number' => 'BOM-LEG-01',
+            'bom_name' => 'BOM for Legacy',
+            'version' => '1.0',
+            'status' => 'approved',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $routing = \App\Domains\Production\Models\Routing::create([
+            'tenant_id' => $this->tenantId,
+            'product_id' => $product->id,
+            'routing_number' => 'RTG-LEG-01',
+            'name' => 'Routing for Legacy',
+            'version' => '1.0',
+            'status' => 'active',
+        ]);
+
+        // Operations are purely INTERNAL
+        \App\Domains\Production\Models\RoutingOperation::create([
+            'tenant_id' => $this->tenantId,
+            'routing_id' => $routing->id,
+            'operation_number' => 'OP-010',
+            'name' => 'Pure In-House Milling',
+            'sequence' => 1,
+            'work_center_id' => $this->workCenter->id,
+            'processing_time_minutes' => 20,
+            'setup_time_minutes' => 5,
+            'is_external' => false,
+        ]);
+
+        $orderService = app(\App\Domains\Production\Services\ProductionOrderService::class);
+        $order = $orderService->createDirect([
+            'product_id' => $product->id,
+            'bom_id' => $bom->id,
+            'routing_id' => $routing->id,
+            'quantity_ordered' => 25,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addDays(3)->toDateString(),
+        ], $this->user->id);
+
+        // Even though product had legacy complete_subcontracting, routing is internal -> pure_manufacturing!
+        $this->assertEquals(ProductionOrder::MODEL_PURE_MANUFACTURING, $order->production_model);
+        $this->assertEquals(ProductionOrder::MODEL_PURE_MANUFACTURING, $order->effective_production_model);
     }
 
     public function test_bom_create_and_edit_page_contains_bom_type_contextual_help(): void
@@ -99,14 +203,12 @@ class MultiModelUiParityTest extends TestCase
         $response->assertSee('Subcontracting:');
     }
 
-    public function test_production_order_create_page_contains_production_model_select(): void
+    public function test_production_order_create_page_does_not_contain_manual_production_model_select(): void
     {
         $response = $this->withHeader('X-Tenant', 'test-tenant')
             ->get(route('production.orders.create'));
         $response->assertStatus(200);
-        $response->assertSee('production_model');
-        $response->assertSee('Pure Manufacturing');
-        $response->assertSee('Hybrid Manufacturing + Subcontracting');
+        $response->assertDontSee('id="production_model_select"', false);
     }
 
     public function test_get_engineering_options_returns_default_production_model(): void

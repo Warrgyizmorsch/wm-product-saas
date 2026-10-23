@@ -11,9 +11,6 @@
             :can-import="false" 
             :can-download-template="false" 
             export-route="{{ route('crm.quotations.export') }}" />
-        <x-ui.button href="{{ route('crm.quotations.create') }}" variant="primary" icon="feather-plus">
-            {{ __('crm.create_quotation') }}
-        </x-ui.button>
     </div>
 @endsection
 
@@ -176,11 +173,12 @@
                                 <div class="d-inline-flex gap-2 align-items-center justify-content-end">
                                     @if ($quotation->status === 'Accepted' && !$quotation->salesOrder)
                                         @php
-                                            // Already converted if: deal is Won, OR deal/quotation account has a customer
+                                            // Check if quotation or its deal/lead is already converted/linked to an ERP customer
                                             $deal = $quotation->crmDeal;
-                                            $hasCustomer = ($deal && strtolower($deal->stage) === 'won')
-                                                || !empty($deal?->account?->customer_id)
-                                                || !empty($quotation->account?->customer_id);
+                                            $hasCustomer = !empty($deal?->account?->customer_id)
+                                                || !empty($quotation->crmAccount?->customer_id)
+                                                || !empty($quotation->account?->customer_id)
+                                                || !empty($quotation->customer);
                                         @endphp
                                         @if (!$hasCustomer)
                                             <a href="{{ $quotation->crm_deal_id ? route('crm.deals.showConvertForm', $quotation->crm_deal_id) : route('crm.quotations.showConvertForm', $quotation->id) }}" class="action-dropdown-btn" title="{{ __('crm.convert_to_customer') }}" data-bs-toggle="tooltip" style="color: #d97706; border-color: #fde68a; background-color: #fef3c7; text-decoration: none;">

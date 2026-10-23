@@ -74,7 +74,7 @@ class TaxRateController extends Controller
             'type' => ['required', 'string', 'in:sales_tax,gst,vat,withholding'],
             'rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'is_compound' => ['nullable', 'boolean'],
-            'tax_payable_account_id' => ['nullable', 'integer', 'exists:chart_of_accounts,id'],
+            'tax_payable_account_id' => ['nullable', 'integer', tenant_exists('chart_of_accounts')],
         ]);
 
         $validated['is_compound'] = $request->boolean('is_compound');

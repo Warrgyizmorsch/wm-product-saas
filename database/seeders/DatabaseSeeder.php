@@ -30,7 +30,11 @@ class DatabaseSeeder extends Seeder
                 'plan_started_at' => now(),
                 'timezone' => 'Asia/Kolkata',
                 'locale' => 'en',
-                'settings' => [],
+                'settings' => [
+                    'display_name' => 'Mossie ERP',
+                    'currency' => 'INR',
+                    'financial_year' => 'FY 2026',
+                ],
             ],
         );
 
@@ -46,6 +50,7 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
+            PlanCatalogSeeder::class,
             RbacSeeder::class,
             PlatformAdminSeeder::class,
             CurrencySeeder::class,

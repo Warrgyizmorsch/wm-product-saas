@@ -104,7 +104,7 @@ return [
         'children' => [
             ['label' => 'Tickets', 'route' => 'hrms.helpdesk.tickets.index', 'permission' => $selfService],
             ['label' => 'Categories', 'route' => 'hrms.helpdesk.categories.index', 'permission' => ['hrms.helpdesk.manage', 'hr.settings.manage']],
-            ['label' => 'Knowledge Base', 'route' => 'hrms.helpdesk.kb.index', 'permission' => ['hrms.helpdesk.manage', 'hr.settings.manage']],
+            ['label' => 'Knowledge Base', 'route' => 'hrms.helpdesk.kb.index', 'permission' => $selfService],
         ],
     ],
     [

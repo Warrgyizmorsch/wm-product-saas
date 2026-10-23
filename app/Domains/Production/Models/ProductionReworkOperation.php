@@ -5,6 +5,7 @@ namespace App\Domains\Production\Models;
 use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionReworkOperation extends BaseModel
 {
@@ -47,5 +48,10 @@ class ProductionReworkOperation extends BaseModel
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(ProductionOrderIssue::class, 'rework_operation_id');
     }
 }

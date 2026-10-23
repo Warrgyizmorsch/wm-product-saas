@@ -3,12 +3,12 @@
 namespace App\Domains\Accounting\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\RecordsBranch;
 use App\Models\Concerns\BelongsToCompany;
 
 class AccountingPostingFailure extends BaseModel
 {
-    use BelongsToCompany, BelongsToBranch;
+    use BelongsToCompany, RecordsBranch;
 
     protected $table = 'accounting_posting_failures';
 

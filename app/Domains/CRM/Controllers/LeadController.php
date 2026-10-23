@@ -38,53 +38,39 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback($request)) {
+            return $redirect;
+        }
+
         $filters = $request->only([
             'search', 'duplicates_only', 'priority', 'segment', 'status', 'lead_owner_id', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
 
-        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
-        $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
-
         if ($request->input('duplicates_only') === '1') {
-            $filtered = array_values(array_filter($leads->items(), function ($lead) {
-                return !empty($lead->is_duplicate) || !empty($lead->is_original);
-            }));
-
-            usort($filtered, function ($a, $b) {
-                $groupA = $a->is_duplicate ? $a->duplicate_of_id : $a->id;
-                $groupB = $b->is_duplicate ? $b->duplicate_of_id : $b->id;
-                if ($groupA === $groupB) {
-                    return $a->id <=> $b->id;
-                }
-                return $groupA <=> $groupB;
-            });
-
-            $leads->setCollection(collect($filtered));
+            $graph = $this->duplicateService->getDuplicateGraph($tenantId);
+            $filters['duplicate_lead_ids'] = $graph['allDuplicateAndOriginalIds'];
         }
 
-        $quotations = $this->quotationService->latest();
-        $users = \App\Models\User::orderBy('name')->get();
+        $leads = $this->leadRepo->getPaginatedLeads($filters, 10);
+        $duplicatesCount = $this->duplicateService->annotateDuplicates($leads->items(), $tenantId);
 
+        $users = \App\Models\User::select(['id', 'name', 'email'])->orderBy('name')->get();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
 
-        $statusCounts = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->select('status', \DB::raw('count(*) as aggregate'))
-            ->groupBy('status')
-            ->pluck('aggregate', 'status')
-            ->toArray();
+        $statusCounts = \Illuminate\Support\Facades\Cache::remember(
+            "tenant_{$tenantId}_lead_status_counts",
+            30,
+            fn() => Lead::query()
+                ->where('tenant_id', $tenantId)
+                ->select('status', \DB::raw('count(*) as aggregate'))
+                ->groupBy('status')
+                ->pluck('aggregate', 'status')
+                ->toArray()
+        );
 
-        $totalLeadsCount = Lead::query()->where('tenant_id', $tenantId)->whereNull('deleted_at')->count();
+        $totalLeadsCount = array_sum($statusCounts);
 
-        $allTenantLeads = Lead::query()
-            ->where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
-            ->select(['id', 'lead_number', 'gstin', 'email', 'company_email', 'phone', 'company_phone'])
-            ->get();
-        $this->duplicateService->annotateDuplicates($allTenantLeads, $tenantId);
-        $duplicatesCount = $allTenantLeads->filter(fn($l) => $l->is_duplicate || $l->is_original)->count();
-
-        return view('modules.crm.leads.index', compact('leads', 'quotations', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
+        return view('modules.crm.leads.index', compact('leads', 'statusCounts', 'totalLeadsCount', 'duplicatesCount', 'users', 'leadStatuses'));
     }
 
     public function kanban(Request $request)
@@ -367,12 +353,6 @@ class LeadController extends Controller
             ->with('success', "Lead #{$lead->id} converted to Deal{$dealMsg} successfully!");
     }
 
-    public function trackStatus()
-    {
-        $this->authorize('viewAny', Lead::class);
-        return view('modules.crm.leads.track-status');
-    }
-
     public function downloadSample()
     {
         $this->authorize('viewAny', Lead::class);
@@ -482,6 +462,11 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $this->authorize('view', $lead);
+
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback()) {
+            return $redirect;
+        }
+
         $details = $this->leadRepo->getLeadDetails($lead, request()->input('active_quotation_id'));
         $users = User::orderBy('name')->get();
         $products = Product::sellable()->with('parent')->orderBy('name')->get();
@@ -492,6 +477,47 @@ class LeadController extends Controller
             compact('lead', 'users', 'products', 'nextQuotationNumber', 'leadStatuses'),
             $details
         ));
+    }
+
+    /**
+     * Fetch past activities paginated via AJAX for lazy loading infinite scroll.
+     */
+    public function getPastActivities(Lead $lead, Request $request)
+    {
+        $this->authorize('view', $lead);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(50, (int) $request->input('per_page', 5)));
+        $todayStart = now()->startOfDay();
+
+        $query = $lead->followups()
+            ->where('status', '!=', 'Pending')
+            ->where('updated_at', '<', $todayStart)
+            ->whereDoesntHave('rescheduledTo')
+            ->with(['taggedUser:id,name,email', 'rescheduledTo:id,rescheduled_from_id,followup_date,status'])
+            ->orderByDesc('updated_at');
+
+        $total = $query->count();
+        $items = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+        $users = User::orderBy('name')->get();
+
+        $html = '';
+        foreach ($items as $item) {
+            $html .= view('modules.crm.leads.partials.activity-card-item', [
+                'item' => $item,
+                'category' => 'history',
+                'lead' => $lead,
+                'users' => $users,
+            ])->render();
+        }
+
+        return response()->json([
+            'html' => $html,
+            'count' => $items->count(),
+            'has_more' => ($page * $perPage) < $total,
+            'remaining' => max(0, $total - ($page * $perPage)),
+            'total' => $total,
+            'page' => $page,
+        ]);
     }
 
     public function store(Request $request)
@@ -505,7 +531,7 @@ class LeadController extends Controller
             'company_name' => $lead->company_name ?? 'Lead',
             'contact_person' => $lead->contact_person ?? 'N/A',
             'source' => $lead->source ?? 'Direct',
-            'expected_amount' => number_format((float)($lead->expected_amount ?? 0), 2),
+            'expected_amount' => format_currency($lead->expected_amount ?? 0),
             'created_by' => auth()->user()?->name ?? 'User',
         ], route('crm.leads.edit', $lead->id), $lead);
 
@@ -539,6 +565,16 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
+
+        $targetStatus = (string) $request->input('status');
+        if (strcasecmp($targetStatus, 'Won') === 0) {
+            $msg = 'Lead cannot be marked as Won directly. It is automatically marked as Won when Quotation is accepted in Deal.';
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->withErrors(['status' => $msg])->with('error', $msg);
+        }
+
         if (in_array(strtolower($lead->status), ['dealing', 'won'])) {
             if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
                 return response()->json(['success' => false, 'message' => "Lead status in '{$lead->status}' stage is locked."], 422);
@@ -546,7 +582,7 @@ class LeadController extends Controller
             return redirect()->back()->withErrors(['status' => "Lead status in '{$lead->status}' stage is locked."]);
         }
         $dbStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses()->pluck('name')->toArray();
-        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost'], $dbStatuses)));
+        $allowedStatuses = implode(',', array_unique(array_merge(['New', 'Qualified', 'Dealing', 'Won', 'Lost', 'Converted'], $dbStatuses)));
         $validated = $request->validate(['status' => 'required|string|in:' . $allowedStatuses]);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);

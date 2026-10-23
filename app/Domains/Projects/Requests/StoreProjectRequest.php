@@ -19,6 +19,10 @@ class StoreProjectRequest extends FormRequest
 
         return [
             'name'           => ['required', 'string', 'max:255'],
+            'sales_order_id' => [
+                'nullable', 'integer',
+                Rule::exists('sales_orders', 'id')->where('tenant_id', $tenantId),
+            ],
             'customer_id'    => [
                 'nullable', 'integer',
                 Rule::exists('customers', 'id')->where('tenant_id', $tenantId),

@@ -13,6 +13,7 @@ use App\Domains\CRM\Controllers\QuotationController;
 use App\Domains\CRM\Controllers\CrmSettingsController;
 use App\Domains\CRM\Controllers\CrmDashboardController;
 use App\Domains\CRM\Controllers\GoogleCalendarController;
+use App\Domains\CRM\Controllers\WebToLeadController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('crm')
@@ -23,10 +24,15 @@ Route::prefix('crm')
         Route::get('dashboard', [CrmDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export/{format}', [CrmDashboardController::class, 'export'])->name('dashboard.export');
 
+        // Web-to-Lead Forms & Widget Builder
+        Route::get('web-forms', [WebToLeadController::class, 'index'])->name('web-forms.index');
+        Route::post('web-forms/save-schema', [WebToLeadController::class, 'saveSchema'])->name('web-forms.save-schema');
+
         // CRM Settings Routes
         Route::get('settings', [CrmSettingsController::class, 'index'])->name('settings.index');
-        Route::post('settings/invoicing-policy', [CrmSettingsController::class, 'updateInvoicingPolicy'])->name('settings.update-invoicing-policy');
         Route::post('settings/quotation-approval-policy', [CrmSettingsController::class, 'updateQuotationApprovalPolicy'])->name('settings.update-quotation-approval-policy');
+        Route::post('settings/lead-assignment', [CrmSettingsController::class, 'updateLeadAssignment'])->name('settings.update-lead-assignment');
+        Route::post('settings/field-visit-verification', [CrmSettingsController::class, 'updateFieldVisitVerification'])->name('settings.update-field-visit-verification');
         // CRM Masters Routes
         Route::prefix('masters')->as('masters.')->group(function (): void {
             Route::get('lead-statuses', [LeadStatusController::class, 'index'])->name('lead-statuses.index');
@@ -83,12 +89,31 @@ Route::prefix('crm')
         Route::post('deals/{deal}/sync-health', [CrmDealController::class, 'syncHealth'])->name('deals.syncHealth');
         Route::post('deals/{deal}/save-health-evaluation', [CrmDealController::class, 'saveHealthEvaluation'])->name('deals.saveHealthEvaluation');
         Route::post('deals/{deal}/generate-draft-reply', [CrmDealController::class, 'generateDraftReply'])->name('deals.generateDraftReply');
+        Route::post('deals/{deal}/call-ai/initiate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'initiateDealOutboundCall'])->name('deals.callAi.initiateCall');
+        Route::post('deals/{deal}/call-ai/terminate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'terminateDealOutboundCall'])->name('deals.callAi.terminateCall');
+        Route::post('deals/{deal}/call-ai/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'checkDealCallStatus'])->name('deals.callAi.status');
+        Route::post('deals/{deal}/call-ai/analyze', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'analyzeDealCall'])->name('deals.callAi.analyze');
+        Route::post('deals/{deal}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmDealCallFollowup'])->name('deals.callAi.confirm');
         Route::get('leads/create', [LeadController::class, 'create'])
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])
             ->name('leads.index');
         Route::get('leads/kanban', [LeadController::class, 'kanban'])
             ->name('leads.kanban');
+
+        // AI Call Assistant & Click-to-Call Routes
+        Route::get('twilio/voice-token', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'generateVoiceToken'])
+            ->name('twilio.voiceToken');
+        Route::post('leads/{lead}/call-ai/initiate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'initiateOutboundCall'])
+            ->name('leads.callAi.initiateCall');
+        Route::post('leads/{lead}/call-ai/terminate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'terminateOutboundCall'])
+            ->name('leads.callAi.terminateCall');
+        Route::post('leads/{lead}/call-ai/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'checkCallStatus'])
+            ->name('leads.callAi.status');
+        Route::post('leads/{lead}/call-ai/analyze', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'analyzeCall'])
+            ->name('leads.callAi.analyze');
+        Route::post('leads/{lead}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmCallFollowup'])
+            ->name('leads.callAi.confirm');
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');
         Route::post('google-calendar/schedule-event', [GoogleCalendarController::class, 'scheduleEvent'])
@@ -99,8 +124,6 @@ Route::prefix('crm')
             ->name('google-calendar.connect');
         Route::match(['get', 'post'], 'google-calendar/disconnect', [GoogleCalendarController::class, 'disconnectGoogleAccount'])
             ->name('google-calendar.disconnect');
-        Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
-            ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
             ->name('leads.downloadSample');
         Route::post('leads/import/parse', [LeadController::class, 'parseImportFile'])
@@ -121,6 +144,8 @@ Route::prefix('crm')
             ->name('leads.processConvert');
         Route::patch('leads/{lead}/qualify', [LeadController::class, 'qualify'])
             ->name('leads.qualify');
+        Route::get('leads/{lead}/past-activities', [LeadController::class, 'getPastActivities'])
+            ->name('leads.pastActivities');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
             ->name('leads.show');
         Route::post('leads', [LeadController::class, 'store'])
@@ -158,6 +183,16 @@ Route::prefix('crm')
             ->name('followups.update');
         Route::delete('followups/{followup}', [LeadFollowupController::class, 'destroy'])
             ->name('followups.destroy');
+
+        // AI Call Assistant & Twilio Outbound Telephony
+        Route::post('leads/{lead}/call-ai/initiate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'initiateOutboundCall'])
+            ->name('leads.callAi.initiateCall');
+        Route::post('leads/{lead}/call-ai/terminate-call', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'terminateOutboundCall'])
+            ->name('leads.callAi.terminateCall');
+        Route::post('leads/{lead}/call-ai/analyze', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'analyzeCall'])
+            ->name('leads.callAi.analyze');
+        Route::post('leads/{lead}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmCallFollowup'])
+            ->name('leads.callAi.confirm');
 
         Route::get('customers', [CustomerController::class, 'index'])
             ->name('customers.index');

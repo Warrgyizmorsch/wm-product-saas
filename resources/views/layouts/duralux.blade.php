@@ -79,6 +79,13 @@
 
 
     <style>
+        .modal {
+            z-index: 1060 !important;
+        }
+        .modal-backdrop {
+            z-index: 1050 !important;
+        }
+
         .dark-light-theme .light-button {
             display: none;
         }
@@ -214,6 +221,15 @@
                             <a href="{{ route('platform.subscription.index') }}" class="btn btn-sm btn-warning">Go to billing</a>
                         @endcan
                     </div>
+                @endif
+                @if(session('success'))
+                    <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+                @endif
+                @if(session('error'))
+                    <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
+                @endif
+                @if(session('warning'))
+                    <x-ui.toast :auto="true" type="warning" title="{{ session('warning') }}" />
                 @endif
                 @yield('content')
             </div>
@@ -595,6 +611,27 @@
                 }
             });
         }
+
+        // Global numeric-only restriction for Phone and Zip fields across modals and forms
+        var numericFieldSelector = 'input[name="phone"], input[name="contact_phone"], input[name="company_phone"], input[name="mobile"], input[name="zip_code"], input[name="billing_zip"]';
+        $(document).on('input', numericFieldSelector, function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+        $(document).on('keypress', numericFieldSelector, function(e) {
+            if (e.which < 48 || e.which > 57) {
+                if (e.which !== 8 && e.which !== 0 && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                }
+            }
+        });
+        $(document).on('paste', numericFieldSelector, function(e) {
+            var pasteData = (e.originalEvent.clipboardData || window.clipboardData).getData('text');
+            if (pasteData && !/^\d+$/.test(pasteData)) {
+                e.preventDefault();
+                var clean = pasteData.replace(/\D/g, '');
+                document.execCommand('insertText', false, clean);
+            }
+        });
     </script>
 
     <!-- Upgraded Custom Premium Confirmation Modal Component -->
@@ -731,6 +768,15 @@
     @endif
 
     <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
+    <script>
+        // Global safety: automatically hoist any opened Bootstrap modal to document.body
+        // to prevent CSS stacking context traps (e.g. nested inside .nxl-container or .main-content)
+        document.addEventListener('show.bs.modal', function (e) {
+            if (e.target && e.target.classList && e.target.classList.contains('modal') && e.target.parentElement !== document.body) {
+                document.body.appendChild(e.target);
+            }
+        }, true);
+    </script>
     @stack('scripts')
 </body>
 

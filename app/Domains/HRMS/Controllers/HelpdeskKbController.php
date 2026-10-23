@@ -23,7 +23,8 @@ class HelpdeskKbController extends Controller
         $tenantId = tenant_id();
         $user = auth()->user();
 
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
 
         $search = $request->input('search');
@@ -43,20 +44,38 @@ class HelpdeskKbController extends Controller
     {
         $tenantId = tenant_id();
         $user = auth()->user();
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
             || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
 
-        $article = $this->kbRepository->findArticleBySlug($slug);
+        $article = $this->kbRepository->findArticleBySlug($slug, $canManage);
         $categories = $this->kbRepository->getActiveCategories();
 
         return view('modules.hrms.helpdesk.kb.show', compact('article', 'canManage', 'categories'));
     }
 
+    private function checkCanManage(): void
+    {
+        $tenantId = tenant_id();
+        $user = auth()->user();
+
+        $canManage = $user && ($user->is_admin
+            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
+            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+
+        if (!$canManage) {
+            abort(403, 'Unauthorized to manage knowledge base articles.');
+        }
+    }
+
     public function store(Request $request): RedirectResponse
     {
+        $this->checkCanManage();
+        $tenantId = tenant_id();
+
         $request->validate([
             'title'        => 'required|string|max:255',
-            'category_id'  => 'nullable|exists:helpdesk_categories,id',
+            'category_id'  => ['nullable', \Illuminate\Validation\Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'content'      => 'required|string',
             'is_published' => 'nullable|boolean',
         ]);
@@ -74,18 +93,12 @@ class HelpdeskKbController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
+        $this->checkCanManage();
         $tenantId = tenant_id();
-        $user = auth()->user();
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
-
-        if (!$canManage) {
-            abort(403, 'Unauthorized to update knowledge base articles.');
-        }
 
         $request->validate([
             'title'        => 'required|string|max:255',
-            'category_id'  => 'nullable|exists:helpdesk_categories,id',
+            'category_id'  => ['nullable', \Illuminate\Validation\Rule::exists('helpdesk_categories', 'id')->where('tenant_id', $tenantId)],
             'content'      => 'required|string',
             'is_published' => 'nullable|boolean',
         ]);
@@ -103,14 +116,7 @@ class HelpdeskKbController extends Controller
 
     public function destroy(int $id): RedirectResponse
     {
-        $tenantId = tenant_id();
-        $user = auth()->user();
-        $canManage = $user && ($this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
-
-        if (!$canManage) {
-            abort(403, 'Unauthorized to delete knowledge base articles.');
-        }
+        $this->checkCanManage();
 
         $this->kbRepository->deleteArticle($id);
 

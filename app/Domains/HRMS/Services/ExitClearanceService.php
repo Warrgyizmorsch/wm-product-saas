@@ -20,7 +20,7 @@ class ExitClearanceService
         if ($tenantId) {
             $tenantHasTemplates = ExitClearanceTemplate::where('tenant_id', $tenantId)->exists();
             if (!$tenantHasTemplates) {
-                $this->resetTemplatesToDefaults($tenantId, null);
+                $this->resetTemplatesToDefaults($tenantId, $companyId);
             }
         }
 
@@ -68,7 +68,7 @@ class ExitClearanceService
             // Auto-initialize standard default templates in database if tenant has none
             $tenantHasTemplates = ExitClearanceTemplate::where('tenant_id', $tenantId)->exists();
             if (!$tenantHasTemplates) {
-                $this->resetTemplatesToDefaults($tenantId, null);
+                $this->resetTemplatesToDefaults($tenantId, $companyId);
             }
         }
 
@@ -79,9 +79,13 @@ class ExitClearanceService
         }
 
         if ($companyId) {
-            $query->where(function ($q) use ($companyId) {
-                $q->where('company_id', $companyId)->orWhereNull('company_id');
-            });
+            // If company-specific templates exist, display only them; otherwise fallback to global tenant templates
+            $hasCompanySpecific = ExitClearanceTemplate::where('tenant_id', $tenantId)->where('company_id', $companyId)->exists();
+            if ($hasCompanySpecific) {
+                $query->where('company_id', $companyId);
+            } else {
+                $query->whereNull('company_id');
+            }
         }
 
         return $query->orderBy('sort_order')->get();
@@ -110,6 +114,15 @@ class ExitClearanceService
                 'items' => $items,
             ];
         });
+    }
+
+    /**
+     * Check if all department clearance items have been reviewed/completed.
+     */
+    public function checkAllClearancesCompleted(EmployeeExit $exit): bool
+    {
+        $hasPending = $exit->clearances()->where('status', 'pending')->exists();
+        return !$hasPending;
     }
 
     /**
@@ -158,15 +171,50 @@ class ExitClearanceService
 
         $templates = $this->getActiveTemplatesForCompany($companyId, $tenantId);
 
-        foreach ($templates as $template) {
-            $catKey = is_object($template) ? $template->clearance_category : $template['clearance_category'];
-            $itemName = is_object($template) ? $template->item_name : $template['item_name'];
+        $hasAllocatedAssets = \App\Domains\HRMS\Models\AssetAllocation::where('employee_id', $exit->employee_id)->whereNull('returned_at')->exists()
+            || \App\Domains\HRMS\Models\Asset::where('assigned_employee_id', $exit->employee_id)->where('status', '!=', 'available')->exists();
+
+        $createItem = function ($catKey, $itemName) use ($tenantId, $exit, $hasAllocatedAssets) {
+            $normCat = ExitClearanceTemplate::normalizeCategoryKey($catKey);
+            $isHardwarePoint = in_array($normCat, ['it_assets', 'it', 'facilities_admin']) 
+                && (str_contains(strtolower($itemName), 'hardware') || str_contains(strtolower($itemName), 'laptop') || str_contains(strtolower($itemName), 'asset recovery'));
+
+            $isAutoCleared = $isHardwarePoint && !$hasAllocatedAssets;
 
             EmployeeExitClearance::create([
                 'tenant_id' => $tenantId,
                 'employee_exit_id' => $exit->id,
-                'department' => ExitClearanceTemplate::normalizeCategoryKey($catKey),
+                'department' => $normCat,
                 'item_name' => $itemName,
+                'status' => $isAutoCleared ? 'cleared' : 'pending',
+                'remarks' => $isAutoCleared ? 'Auto-cleared: No company physical assets assigned (BYOD/Digital Only)' : null,
+                'cleared_at' => $isAutoCleared ? now() : null,
+                'deduction_amount' => 0.00,
+            ]);
+        };
+
+        if ($templates->isEmpty()) {
+            foreach (ExitClearanceTemplate::DEFAULT_TEMPLATES as $item) {
+                $createItem($item['clearance_category'], $item['item_name']);
+            }
+        } else {
+            foreach ($templates as $template) {
+                $catKey = is_object($template) ? $template->clearance_category : $template['clearance_category'];
+                $itemName = is_object($template) ? $template->item_name : $template['item_name'];
+                $createItem($catKey, $itemName);
+            }
+        }
+
+        // Automatic Inventory Asset Recovery Safeguard:
+        // If employee has assigned assets, ensure IT / Equipment Recovery clearance point is present
+        $hasItClearance = $exit->clearances()->whereIn('department', ['it_assets', 'it'])->exists();
+
+        if ($hasAllocatedAssets && !$hasItClearance) {
+            EmployeeExitClearance::create([
+                'tenant_id' => $tenantId,
+                'employee_exit_id' => $exit->id,
+                'department' => 'it_assets',
+                'item_name' => 'Company Hardware & Equipment Recovery',
                 'status' => 'pending',
                 'deduction_amount' => 0.00,
             ]);
@@ -192,15 +240,15 @@ class ExitClearanceService
     }
 
     /**
-     * Seed or reset templates to the standard 12 default items for a tenant.
+     * Seed or reset templates to the standard 5 default items for a tenant/company.
      */
     public function resetTemplatesToDefaults(int $tenantId, ?int $companyId = null): void
     {
         $query = ExitClearanceTemplate::where('tenant_id', $tenantId);
         if ($companyId) {
-            $query->where('company_id', $companyId);
-        } else {
-            $query->whereNull('company_id');
+            $query->where(function ($q) use ($companyId) {
+                $q->where('company_id', $companyId)->orWhereNull('company_id');
+            });
         }
         $query->delete();
 

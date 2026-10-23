@@ -73,10 +73,6 @@
                             rtHtml += '<option value="' + rt.id + '">' + rt.routing_number + ' — ' + rt.name + ' (v' + rt.version + ')</option>';
                         });
                         $('#routing_select').html(rtHtml).trigger('change');
-
-                        if (response.default_production_model) {
-                            $('#production_model_select').val(response.default_production_model).trigger('change');
-                        }
                     }
                 });
             });
@@ -162,6 +158,41 @@
                     <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 </div>
 
+                @if(isset($project) && $project)
+                    <div class="alert alert-info d-flex align-items-center justify-content-between mb-4 border-info">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-folder text-info fs-18"></i>
+                            <div>
+                                <strong>{{ __('projects.linked_to_project') ?: 'Linked to Project' }}:</strong>
+                                <span class="badge bg-soft-info text-info ms-1">{{ $project->project_code }} — {{ $project->name }}</span>
+                                @if(isset($projectTask) && $projectTask)
+                                    <span class="mx-1 text-muted">/</span>
+                                    <strong>{{ __('projects.task') ?: 'Task' }}:</strong>
+                                    <span class="badge bg-soft-primary text-primary ms-1">{{ $projectTask->task_code }} — {{ $projectTask->title }}</span>
+                                @endif
+                                @if(isset($projectMilestone) && $projectMilestone)
+                                    <span class="mx-1 text-muted">/</span>
+                                    <strong>{{ __('projects.milestone') ?: 'Milestone' }}:</strong>
+                                    <span class="badge bg-soft-secondary text-secondary ms-1">{{ $projectMilestone->name }}</span>
+                                @endif
+                            </div>
+                        </div>
+                        @if(isset($projectTask) && $projectTask)
+                            <a href="{{ route('projects.tasks.show', [$project, $projectTask]) }}" class="btn btn-xs btn-outline-info" target="_blank">
+                                <i class="feather-external-link me-1"></i>{{ __('projects.view_task') ?: 'View Task' }}
+                            </a>
+                        @else
+                            <a href="{{ route('projects.show', $project->project_code) }}" class="btn btn-xs btn-outline-info" target="_blank">
+                                <i class="feather-external-link me-1"></i>{{ __('projects.view_project') ?: 'View Project' }}
+                            </a>
+                        @endif
+                    </div>
+                @endif
+
+                <input type="hidden" name="project_id" value="{{ old('project_id', $project?->id) }}">
+                <input type="hidden" name="project_milestone_id" value="{{ old('project_milestone_id', $projectMilestone?->id) }}">
+                <input type="hidden" name="project_task_id" value="{{ old('project_task_id', $projectTask?->id) }}">
+
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
@@ -237,13 +268,6 @@
                             <option value="batch" @selected(old('production_mode') === 'batch')>{{ __('production.mode_batch') }}</option>
                             <option value="serial" @selected(old('production_mode') === 'serial')>{{ __('production.mode_serial') }}</option>
                             <option value="batch_and_serial" @selected(old('production_mode') === 'batch_and_serial')>{{ __('production.mode_batch_and_serial') }}</option>
-                        </x-ui.odoo-form-ui>
-
-                        <x-ui.odoo-form-ui type="select" label="Production Model" name="production_model" id="production_model_select">
-                            <option value="pure_manufacturing" @selected(old('production_model') === 'pure_manufacturing')>Pure Manufacturing</option>
-                            <option value="subcontract_complete" @selected(old('production_model') === 'subcontract_complete')>Complete Subcontracting</option>
-                            <option value="subcontract_company_material" @selected(old('production_model') === 'subcontract_company_material')>Subcontracting with Company Material</option>
-                            <option value="hybrid" @selected(old('production_model') === 'hybrid')>Hybrid Manufacturing + Subcontracting</option>
                         </x-ui.odoo-form-ui>
                     </div>
 

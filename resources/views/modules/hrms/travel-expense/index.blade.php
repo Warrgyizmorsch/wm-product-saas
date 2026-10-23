@@ -61,57 +61,90 @@
             background-color: transparent !important;
         }
 
-        /* Odoo Table Form Input & Select Custom Styling */
-        .odoo-table-input, .odoo-table-select {
-            border: none !important;
-            border-bottom: 1px solid #ced4da !important;
-            border-radius: 0 !important;
-            padding: 5px 0 !important;
-            background-color: transparent !important;
-            font-size: 13px !important;
-            color: #212529 !important;
+        /* Enterprise Expense Claim Items Table Styling */
+        .expense-claims-table {
             width: 100% !important;
-            transition: border-color 0.2s ease-in-out !important;
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
         }
-        .odoo-table-input:hover, .odoo-table-select:hover {
-            border-bottom-color: #64748b !important;
+        .expense-claims-table thead th {
+            background-color: #f8fafc !important;
+            color: #475569 !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            padding: 10px 12px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            vertical-align: middle !important;
         }
-        .odoo-table-input:focus, .odoo-table-select:focus {
-            border-bottom-color: var(--bs-primary) !important;
-            outline: none !important;
+        .expense-claims-table tbody td {
+            padding: 10px 10px !important;
+            vertical-align: top !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+            background-color: #ffffff !important;
+        }
+        .expense-claims-table tbody tr:hover td {
+            background-color: #fafbfc !important;
+        }
+        .expense-claims-table .form-control-sm,
+        .expense-claims-table .form-select-sm,
+        .expense-claims-table select.category-select {
+            font-size: 13px !important;
+            border-radius: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            padding: 6px 12px !important;
+            line-height: 1.5 !important;
+            color: #1e293b !important;
             box-shadow: none !important;
+            transform: none !important;
+            box-sizing: border-box !important;
+            vertical-align: middle !important;
         }
-
-        /* Custom dropdown arrow for table select */
-        select.odoo-table-select {
-            appearance: none !important;
-            -webkit-appearance: none !important;
-            -moz-appearance: none !important;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 4px center !important;
-            background-size: 10px 10px !important;
-            padding-right: 15px !important;
+        .expense-claims-table .form-select-sm,
+        .expense-claims-table select.category-select {
+            padding-top: 5px !important;
+            padding-bottom: 5px !important;
+            padding-left: 10px !important;
+            padding-right: 32px !important;
+            line-height: 24px !important;
+            background-position: right 10px center !important;
+            background-size: 12px 10px !important;
         }
-
-        /* Custom Receipt File Input Wrapper Styles */
-        .odoo-table-file-label {
+        .expense-claims-table .form-control-sm:focus,
+        .expense-claims-table .form-select-sm:focus,
+        .expense-claims-table select.category-select:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15) !important;
+            outline: none !important;
+            transform: none !important;
+        }
+        .erp-custom-file-upload .file-upload-label {
             display: inline-flex !important;
             align-items: center !important;
             gap: 6px !important;
-            padding: 6px 12px !important;
+            padding: 6px 10px !important;
             border: 1px dashed #cbd5e1 !important;
             border-radius: 6px !important;
             background-color: #f8fafc !important;
             color: #475569 !important;
-            font-size: 11px !important;
-            font-weight: 600 !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
             cursor: pointer !important;
             transition: all 0.2s ease !important;
             width: 100% !important;
+            height: 36px !important;
             justify-content: center !important;
+            box-sizing: border-box !important;
+            line-height: 22px !important;
         }
-        .odoo-table-file-label:hover {
+        .erp-custom-file-upload .file-upload-label:hover {
             background-color: #f1f5f9 !important;
             border-color: #94a3b8 !important;
             color: #1e293b !important;
@@ -127,6 +160,15 @@
             overflow-wrap: break-word !important;
             word-break: break-word !important;
             white-space: normal !important;
+        }
+        .travel-expense-table th.text-end,
+        .travel-expense-table td.text-end {
+            white-space: nowrap !important;
+            overflow: visible !important;
+        }
+        .travel-expense-table th.text-center,
+        .travel-expense-table td.text-center {
+            white-space: nowrap !important;
         }
     </style>
 @endpush
@@ -146,6 +188,9 @@
 @endsection
 
 @section('content')
+    @php
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+    @endphp
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show mb-4 text-dark" role="alert">
             <i class="feather-check-circle me-2"></i>
@@ -230,7 +275,7 @@
                                 <th style="width: 13%;">Dates</th>
                                 <th style="width: 12%;">Budget</th>
                                 <th class="text-center" style="width: 13%;">Status</th>
-                                <th class="text-end pe-3" style="width: 15%;">Actions</th>
+                                <th class="text-end pe-3" style="width: 15%; min-width: 150px; white-space: nowrap;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="travelTableBody">
@@ -269,13 +314,11 @@
                                     </td>
                                     <td class="text-center">
                                         @if($req->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Approved</span>
-                                        @elseif($req->status === 'l1_approved')
-                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill" title="Level 1 Passed - Pending Level 2 Final Approval"><i class="feather-clock me-1"></i>Pending L2</span>
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Approved</span>
                                         @elseif($req->status === 'rejected')
-                                            <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 rounded-pill">Rejected</span>
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 rounded-pill"><i class="feather-x-circle me-1"></i>Rejected</span>
                                         @else
-                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($req->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Pending' }}</span>
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Pending</span>
                                         @endif
 
                                         @php
@@ -283,31 +326,32 @@
                                         @endphp
                                         @if($linkedAdv)
                                             <div class="mt-1 d-flex justify-content-center">
-                                                @if($linkedAdv->status === 'pending')
-                                                    <span class="badge bg-soft-warning text-dark px-1.5 py-0.5 fs-10" title="Cash Advance Requested"><i class="feather-dollar-sign me-0.5"></i>Advance: {{ $currencySymbol }}{{ number_format($linkedAdv->amount, 2) }}</span>
-                                                @elseif($linkedAdv->status === 'l1_approved')
-                                                    <span class="badge bg-soft-info text-info px-1.5 py-0.5 fs-10" title="Cash Advance L1 Approved"><i class="feather-clock me-0.5"></i>Advance: Pending L2</span>
+                                                @if($linkedAdv->status === 'pending' || $linkedAdv->status === 'l1_approved')
+                                                    <span class="badge bg-soft-warning text-dark border border-warning-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="Cash Advance Requested"><i class="feather-dollar-sign me-0.5"></i>Advance: {{ $currencySymbol }}{{ number_format($linkedAdv->amount, 2) }}</span>
                                                 @elseif($linkedAdv->status === 'approved' || $linkedAdv->status === 'disbursed')
-                                                    <span class="badge bg-soft-info text-info px-1.5 py-0.5 fs-10" title="Cash Advance Approved"><i class="feather-check-circle me-0.5"></i>Advance Approved</span>
+                                                    <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="Cash Advance Approved"><i class="feather-check-circle me-0.5"></i>Advance Approved</span>
                                                 @elseif($linkedAdv->status === 'rejected')
-                                                    <span class="badge bg-soft-danger text-danger px-1.5 py-0.5 fs-10" title="Cash Advance Rejected"><i class="feather-x-circle me-0.5"></i>Advance Rejected</span>
+                                                    <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="Cash Advance Rejected"><i class="feather-x-circle me-0.5"></i>Advance Rejected</span>
                                                 @endif
                                             </div>
                                         @endif
                                     </td>
-                                    <td class="text-end pe-3">
+                                    <td class="text-end pe-3" style="white-space: nowrap;">
+                                        @php
+                                            $isTrOwner = $employee && $req->employee_id == $employee->id;
+                                            $canApproveTr = $workflowService->canApprove(auth()->user(), $req->employee, $req, 'hrms.travel_expenses.approve');
+                                        @endphp
                                         @if(in_array($req->status, ['pending', 'l1_approved']))
-                                            @if($isAdmin)
-                                                <div class="d-flex justify-content-end gap-1">
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">
-                                                        {{ $req->status === 'l1_approved' ? 'Final Approve (L2)' : (($req->approval_levels ?? 1) == 2 ? 'Approve (L1)' : 'Approve') }}
+                                            @if($canApproveTr)
+                                                <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap" style="white-space: nowrap;">
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 px-2.5 fw-bold fs-11 text-nowrap" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">
+                                                        Approve
                                                     </button>
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.travel.reject', $req) }}" class="m-0">
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.travel.reject', $req) }}" class="m-0 d-inline-block">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-nowrap">Reject</button>
                                                     </form>
                                                 </div>
-
                                                 <!-- Modal to Approve Travel Request with Custom Budget & Linked Cash Advance -->
                                                 <div class="modal fade text-start" id="approveTravelModal_{{ $req->id }}" tabindex="-1" aria-labelledby="approveTravelModalLabel_{{ $req->id }}" aria-hidden="true">
                                                     <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
@@ -363,6 +407,12 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                            @elseif($isTrOwner && in_array($req->status, ['pending', 'rejected']))
+                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.destroy', $req) }}" class="m-0" onsubmit="return confirm('Are you sure you want to cancel this travel request?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Cancel Request"><i class="feather-trash-2 me-1"></i>Cancel</button>
+                                                </form>
                                             @endif
                                         @elseif($req->status === 'approved')
                                             @php
@@ -399,7 +449,7 @@
                                                         $hasRejectedInMainReq = $paidReport->claims->where('status', 'rejected')->count() > 0;
                                                         $showReqSupplementary = $hasRejectedInMainReq && !$hasPaidSupplementaryReq;
                                                     @endphp
-                                                    @if($showReqSupplementary)
+                                                    @if($showReqSupplementary && ($isTrOwner || $isAdmin))
                                                         <button type="button" 
                                                                 class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
                                                                 data-travel-id="{{ $req->id }}"
@@ -407,14 +457,22 @@
                                                             <i class="feather-plus me-1"></i>Supplementary Claim
                                                         </button>
                                                     @endif
-                                                @else
+                                                @elseif($isTrOwner || $isAdmin)
                                                     <button type="button" 
                                                             class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
                                                             data-travel-id="{{ $req->id }}"
-                                                            data-cash-advance-id="{{ $req->cashAdvances->whereIn('status', ['approved', 'disbursed'])->first()?->id ?? '' }}">
+                                                            data-cash-advance-id="{{ $req->cashAdvances->whereIn('status', ['approved', 'disbursed'])->whereNull('expense_report_id')->first()?->id ?? '' }}">
                                                         <i class="feather-dollar-sign me-1"></i>Claim Expense
                                                     </button>
                                                 @endif
+                                            </div>
+                                        @elseif($req->status === 'rejected' && ($isTrOwner || $isAdmin))
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.destroy', $req) }}" class="m-0" onsubmit="return confirm('Are you sure you want to delete this rejected travel request?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Delete Request"><i class="feather-trash-2 me-1"></i>Delete</button>
+                                                </form>
                                             </div>
                                         @else
                                             -
@@ -494,9 +552,9 @@
                             <tr>
                                 <th class="ps-3" style="width: 20%;">Employee</th>
                                 <th style="width: 15%;">Amount</th>
-                                <th style="width: 38%;">Purpose / Trip</th>
+                                <th style="width: 35%;">Purpose / Trip</th>
                                 <th class="text-center" style="width: 12%;">Status</th>
-                                <th class="text-end pe-3" style="width: 15%;">Actions</th>
+                                <th class="text-end pe-3" style="width: 18%; min-width: 150px; white-space: nowrap;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="advanceTableBody">
@@ -524,33 +582,43 @@
                                         @endif
                                     </td>
                                     <td class="text-center">
-                                        @if($adv->status === 'disbursed')
-                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill">Disbursed</span>
-                                        @elseif($adv->status === 'l1_approved')
-                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill" title="Level 1 Passed - Pending Level 2 Final Approval"><i class="feather-clock me-1"></i>Pending L2</span>
-                                        @elseif($adv->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Approved</span>
+                                        @if($adv->status === 'approved')
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Approved</span>
+                                        @elseif($adv->status === 'disbursed')
+                                            <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check me-1"></i>Disbursed</span>
                                         @elseif($adv->status === 'settled')
-                                            <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Settled</span>
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill">Settled</span>
                                         @elseif($adv->status === 'rejected')
-                                            <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 rounded-pill">Rejected</span>
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 rounded-pill"><i class="feather-x-circle me-1"></i>Rejected</span>
                                         @else
-                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($adv->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Pending' }}</span>
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Pending</span>
                                         @endif
                                     </td>
-                                    <td class="text-end pe-3">
+                                    <td class="text-end pe-3" style="white-space: nowrap;">
+                                        @php
+                                            $isAdvOwner = $employee && $adv->employee_id == $employee->id;
+                                            $canApproveAdv = $workflowService->canApprove(auth()->user(), $adv->employee, $adv, 'hrms.travel_expenses.approve');
+                                        @endphp
                                         @if(in_array($adv->status, ['pending', 'l1_approved']))
-                                            @if($isAdmin)
-                                                <div class="d-flex justify-content-end gap-1">
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">
-                                                        {{ $adv->status === 'l1_approved' ? 'Final Approve (L2)' : (($adv->approval_levels ?? 1) == 2 ? 'Approve (L1)' : 'Approve') }}
+                                            <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap" style="white-space: nowrap;">
+                                                @if($canApproveAdv)
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 px-2.5 fw-bold fs-11 text-nowrap" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">
+                                                        Approve
                                                     </button>
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.reject', $adv) }}" class="m-0">
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.reject', $adv) }}" class="m-0 d-inline-block">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11">Reject</button>
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-nowrap">Reject</button>
                                                     </form>
-                                                </div>
+                                                @elseif($isAdvOwner && $adv->status === 'pending')
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.destroy', $adv) }}" class="m-0 d-inline-block" onsubmit="return confirm('Are you sure you want to cancel this cash advance request?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-uppercase text-nowrap" title="Cancel Cash Advance"><i class="feather-trash-2 me-1"></i>Cancel</button>
+                                                    </form>
+                                                @endif
+                                            </div>
 
+                                            @if($canApproveAdv)
                                                 <!-- Modal to Approve Cash Advance with Custom Amount -->
                                                 <div class="modal fade text-start" id="approveAdvanceModal_{{ $adv->id }}" tabindex="-1" aria-labelledby="approveAdvanceModalLabel_{{ $adv->id }}" aria-hidden="true">
                                                     <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
@@ -588,7 +656,17 @@
                                                         <button type="submit" class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11"><i class="feather-dollar-sign me-1"></i>Disburse</button>
                                                     </form>
                                                 </div>
+                                            @else
+                                                -
                                             @endif
+                                        @elseif($adv->status === 'rejected' && ($isAdvOwner || $isAdmin))
+                                            <div class="d-flex justify-content-end gap-1">
+                                                <form method="POST" action="{{ route('hrms.travel-expense.advance.destroy', $adv) }}" class="m-0" onsubmit="return confirm('Are you sure you want to delete this rejected cash advance?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Delete Cash Advance"><i class="feather-trash-2 me-1"></i>Delete</button>
+                                                </form>
+                                            </div>
                                         @else
                                             -
                                         @endif
@@ -669,7 +747,7 @@
                                 <th style="width: 28%;">Claim Items</th>
                                 <th style="width: 24%;">Totals</th>
                                 <th class="text-center" style="width: 12%;">Status</th>
-                                <th class="text-end pe-3" style="width: 14%;">Actions</th>
+                                <th class="text-end pe-3" style="width: 14%; min-width: 160px; white-space: nowrap;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="reportTableBody">
@@ -776,19 +854,17 @@
                                     </td>
                                     <td class="text-center">
                                         @if($rep->status === 'draft')
-                                            <span class="badge bg-secondary text-white px-2 py-1 fs-11 rounded-pill">Draft</span>
-                                        @elseif($rep->status === 'submitted' || $rep->status === 'pending')
-                                            <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill">{{ ($rep->approval_levels ?? 1) == 2 ? 'Pending L1' : 'Submitted' }}</span>
-                                        @elseif($rep->status === 'l1_approved')
-                                            <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill" title="Level 1 Passed - Pending Level 2 Final Approval"><i class="feather-clock me-1"></i>Pending L2</span>
+                                            <span class="badge bg-secondary text-white px-2.5 py-1 fs-11 rounded-pill">Draft</span>
+                                        @elseif(in_array($rep->status, ['submitted', 'pending', 'l1_approved']))
+                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Submitted</span>
                                         @elseif($rep->status === 'partially_approved')
-                                            <span class="badge bg-soft-warning text-dark px-2 py-1 fs-11 rounded-pill"><i class="feather-alert-circle me-1"></i>Partially Approved</span>
+                                            <span class="badge bg-soft-warning text-dark px-2.5 py-1 fs-11 rounded-pill"><i class="feather-alert-circle me-1"></i>Partially Approved</span>
                                         @elseif($rep->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill">Approved</span>
+                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Approved</span>
                                         @elseif($rep->status === 'rejected')
-                                            <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 rounded-pill">Rejected</span>
+                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 rounded-pill"><i class="feather-x-circle me-1"></i>Rejected</span>
                                         @elseif($rep->status === 'paid')
-                                            <span class="badge bg-soft-primary text-primary px-2 py-1 fs-11 rounded-pill">Paid</span>
+                                            <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check me-1"></i>Paid</span>
                                         @endif
 
                                         @if($rep->status === 'approved' || $rep->status === 'paid' || $rep->status === 'partially_approved')
@@ -826,10 +902,11 @@
 
                                             @php
                                                 $isOwner = $employee && $rep->employee_id == $employee->id;
+                                                $canApproveRep = $workflowService->canApprove(auth()->user(), $rep->employee, $rep, 'hrms.travel_expenses.approve');
                                             @endphp
 
                                             {{-- EMPLOYEE / OWNER ACTIONS --}}
-                                            @if(in_array($rep->status, ['draft', 'partially_approved']) || ($rep->status === 'rejected' && !$rep->travel_request_id))
+                                            @if(($isOwner || $isAdmin) && (in_array($rep->status, ['draft', 'partially_approved']) || ($rep->status === 'rejected' && !$rep->travel_request_id)))
                                                 <x-ui.icon-btn type="button" variant="soft-primary" size="sm" class="btn-edit-report"
                                                     icon="feather-edit-3"
                                                     title="{{ in_array($rep->status, ['partially_approved', 'rejected']) ? 'Fix & Resubmit Claims' : 'Edit Report' }}"
@@ -838,13 +915,14 @@
                                                     data-status="{{ $rep->status }}"
                                                     data-travel-id="{{ $rep->travel_request_id }}"
                                                     data-advance-id="{{ $rep->cash_advance_id }}"
+                                                    data-advance-text="{{ $rep->cashAdvance ? ($currencySymbol . number_format($rep->cashAdvance->approved_amount ?? $rep->cashAdvance->amount, 2) . ' - ' . $rep->cashAdvance->purpose) : '' }}"
                                                     data-claims="{{ $rep->claims->load('category') }}"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#editReportModal"
                                                 />
                                             @endif
 
-                                            @if($rep->status === 'draft')
+                                            @if(($isOwner || $isAdmin) && $rep->status === 'draft')
                                                 <form method="POST" action="{{ route('hrms.travel-expense.report.submit', $rep) }}" class="m-0">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-primary py-1 fw-bold fs-11 text-uppercase">Submit</button>
@@ -870,7 +948,7 @@
                                                     );
                                             @endphp
 
-                                            @if($showSupplementary)
+                                            @if(($isOwner || $isAdmin) && $showSupplementary)
                                                 <button type="button" 
                                                         class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-supplementary-btn"
                                                         data-travel-id="{{ $rep->travel_request_id }}"
@@ -882,19 +960,19 @@
                                             @endif
 
                                             {{-- ADMIN ACTIONS --}}
-                                            @if($isAdmin)
+                                            @if($canApproveRep)
                                                 @if(in_array($rep->status, ['submitted', 'pending', 'l1_approved']))
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">
-                                                        {{ $rep->status === 'l1_approved' ? 'Final Approve (L2)' : (($rep->approval_levels ?? 1) == 2 ? 'Approve (L1)' : 'Review & Approve') }}
+                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 px-2.5 fw-bold fs-11 text-nowrap text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">
+                                                        Review & Approve
                                                     </button>
 
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.report.reject', $rep) }}" class="m-0">
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.report.reject', $rep) }}" class="m-0 d-inline-block">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase">Reject</button>
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-nowrap text-uppercase">Reject</button>
                                                     </form>
 
                                                     <!-- Modal to Approve Expense Report with Custom Amount & Itemized Partial Approval -->
-                                                    <div class="modal fade text-start" id="approveReportModal_{{ $rep->id }}" tabindex="-1" aria-labelledby="approveReportModalLabel_{{ $rep->id }}" aria-hidden="true">
+                                                    <div class="modal fade text-start" id="approveReportModal_{{ $rep->id }}" data-rem-advance="{{ $remAdv }}" tabindex="-1" aria-labelledby="approveReportModalLabel_{{ $rep->id }}" aria-hidden="true">
                                                         <div class="modal-dialog modal-lg modal-dialog-centered">
                                                             <div class="modal-content">
                                                                 <form method="POST" action="{{ route('hrms.travel-expense.report.approve', $rep) }}">
@@ -976,13 +1054,21 @@
                                                         </div>
                                                     </div>
                                                 @endif
+                                            @endif
 
-                                                @if(in_array($rep->status, ['approved', 'partially_approved']))
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.report.pay', $rep) }}" class="m-0">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Pay Out Approved Amount ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})"><i class="feather-credit-card me-1"></i> Pay Out</button>
-                                                    </form>
-                                                @endif
+                                            @if($isAdmin && in_array($rep->status, ['approved', 'partially_approved']))
+                                                <form method="POST" action="{{ route('hrms.travel-expense.report.pay', $rep) }}" class="m-0">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Pay Out Approved Amount ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})"><i class="feather-credit-card me-1"></i> Pay Out</button>
+                                                </form>
+                                            @endif
+
+                                            @if(in_array($rep->status, ['draft', 'rejected']) && ($isOwner || $isAdmin))
+                                                <form method="POST" action="{{ route('hrms.travel-expense.report.destroy', $rep) }}" class="m-0" onsubmit="return confirm('Are you sure you want to delete this expense report?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Delete Report"><i class="feather-trash-2 me-1"></i>Delete</button>
+                                                </form>
                                             @endif
                                         </div>
                                     </td>
@@ -1071,7 +1157,14 @@
                             <x-ui.odoo-form-ui type="select" label="Travel Request" name="travel_request_id" select2-selector="default">
                                 <option value="">Standalone / Business Expense</option>
                                 @foreach($myApprovedTravelRequests as $tr)
-                                    <option value="{{ $tr->id }}">{{ $tr->purpose }} (to {{ $tr->destination }}) - Budget: {{ $currencySymbol }}{{ number_format($tr->approved_budget ?? $tr->estimated_budget, 2) }}</option>
+                                    @php
+                                        $hasActiveAdv = $tr->cashAdvances->whereIn('status', ['pending', 'l1_approved', 'approved', 'disbursed'])->isNotEmpty();
+                                    @endphp
+                                    @if(!$hasActiveAdv)
+                                        <option value="{{ $tr->id }}">
+                                            {{ $tr->purpose }} (to {{ $tr->destination }}) - Budget: {{ $currencySymbol }}{{ number_format($tr->approved_budget ?? $tr->estimated_budget, 2) }}
+                                        </option>
+                                    @endif
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -1092,7 +1185,7 @@
 
     {{-- MODAL: FILE EXPENSE REPORT --}}
     <div class="modal fade" id="addReportModal" tabindex="-1" aria-labelledby="addReportModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content text-dark">
                 <form method="POST" action="{{ route('hrms.travel-expense.report.store') }}" enctype="multipart/form-data"
                     id="addReportForm"
@@ -1116,11 +1209,23 @@
                                         <option value="">None</option>
                                         @foreach($myApprovedTravelRequests as $tr)
                                             @php
-                                                $hasUnpaidClaim = $tr->expenseReports->whereIn('status', ['draft', 'submitted', 'partially_approved'])->isNotEmpty();
+                                                $inProgressClaim = $tr->expenseReports->whereIn('status', ['draft', 'submitted', 'l1_approved', 'approved', 'partially_approved'])->first();
+                                                $paidClaim = $tr->expenseReports->where('status', 'paid')->first();
+                                                $hasRejectedItemsInPaid = $paidClaim && $paidClaim->claims->where('status', 'rejected')->count() > 0;
+                                                $hasPaidSupplementary = $tr->expenseReports->where('status', 'paid')->filter(function($r) {
+                                                    return str_contains(strtolower($r->title ?? ''), 'supplementary');
+                                                })->isNotEmpty();
+                                                $canClaim = !$inProgressClaim && (!$paidClaim || ($hasRejectedItemsInPaid && !$hasPaidSupplementary));
+                                                $statusNote = '';
+                                                if ($paidClaim && $hasRejectedItemsInPaid && !$hasPaidSupplementary) {
+                                                    $statusNote = ' — (Supplementary Claim)';
+                                                }
                                             @endphp
-                                            <option value="{{ $tr->id }}" {{ $hasUnpaidClaim ? 'disabled' : '' }}>
-                                                {{ $tr->destination }} ({{ $tr->purpose }}) {{ $hasUnpaidClaim ? ' - (Claim In Review)' : '' }}
-                                            </option>
+                                            @if($canClaim)
+                                                <option value="{{ $tr->id }}">
+                                                    {{ $tr->destination }} ({{ $tr->purpose }}){{ $statusNote }}
+                                                </option>
+                                            @endif
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
@@ -1129,7 +1234,7 @@
                                     <x-ui.odoo-form-ui type="select" name="cash_advance_id" id="report_cash_advance" select2-selector="default">
                                         <option value="">None</option>
                                         @foreach($myOpenCashAdvances as $ca)
-                                            <option value="{{ $ca->id }}">${{ number_format($ca->approved_amount ?? $ca->amount, 2) }} - {{ $ca->purpose }}</option>
+                                            <option value="{{ $ca->id }}">{{ $currencySymbol }}{{ number_format($ca->approved_amount ?? $ca->amount, 2) }} - {{ $ca->purpose }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
@@ -1138,28 +1243,32 @@
                             {{-- Claims items array dynamically added --}}
                             <div class="border-top pt-3 mt-2">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="fw-bold mb-0" style="font-size: 13px;">Expense Claim Items *</h6>
+                                    <div>
+                                        <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">Expense Claim Items *</h6>
+                                        <small class="text-muted fs-11">Attach receipts and specify expenses for reimbursement</small>
+                                    </div>
                                     <button type="button" class="btn btn-sm btn-soft-primary px-2.5 py-1 text-uppercase fw-bold fs-11" id="btnAddClaimLine">
-                                        <i class="feather-plus"></i> Add Row
+                                        <i class="feather-plus me-1"></i> Add Row
                                     </button>
                                 </div>
 
-                                <div class="table-responsive overflow-hidden">
-                                    <table class="odoo-table" id="claimsLinesTable">
+                                <div class="table-responsive">
+                                    <table class="expense-claims-table" id="claimsLinesTable">
                                         <thead>
                                             <tr>
-                                                <th style="width: 20%;">Category</th>
-                                                <th style="width: 14%;">Date</th>
-                                                <th style="width: 14%;">Amount</th>
-                                                <th style="width: 26%;">Merchant / Details</th>
-                                                <th style="width: 18%;">Receipt File</th>
-                                                <th style="width: 8%;" class="text-center">Action</th>
+                                                <th style="width: 25%; min-width: 190px;">Category *</th>
+                                                <th style="width: 14%; min-width: 130px;">Date *</th>
+                                                <th style="width: 15%; min-width: 120px;">Amount *</th>
+                                                <th style="width: 23%; min-width: 170px;">Merchant / Notes</th>
+                                                <th style="width: 19%; min-width: 160px;">Receipts</th>
+                                                <th style="width: 4%; min-width: 40px;" class="text-center">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="claimsLinesContainer">
                                             <tr class="claim-line-row">
                                                 <td>
-                                                    <select name="claims[0][category_id]" class="odoo-table-select text-dark" required onchange="validateLinePolicy(this)">
+                                                    <select name="claims[0][category_id]" class="form-select form-select-sm text-dark category-select" required>
+                                                        <option value="" disabled selected>Choose Category...</option>
                                                         @foreach($categories as $cat)
                                                             <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                                         @endforeach
@@ -1168,25 +1277,28 @@
                                                     <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
                                                 </td>
                                                 <td>
-                                                    <input type="date" name="claims[0][date]" class="odoo-table-input text-dark text-center" value="{{ date('Y-m-d') }}" required>
+                                                    <input type="date" name="claims[0][date]" class="form-control form-control-sm text-dark text-center" value="{{ date('Y-m-d') }}" required>
                                                 </td>
                                                 <td>
-                                                    <input type="number" name="claims[0][amount]" class="odoo-table-input text-dark text-end claim-amount-input" placeholder="0.00" step="0.01" min="0.01" required oninput="validateLinePolicy(this); updateReportTotals()">
+                                                    <input type="number" name="claims[0][amount]" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" step="0.01" min="0.01" required>
                                                 </td>
                                                 <td>
-                                                    <input type="text" name="claims[0][merchant]" class="odoo-table-input text-dark mb-1" placeholder="Merchant name (e.g. Uber, Hilton)">
-                                                    <input type="text" name="claims[0][desc]" class="odoo-table-input text-dark" placeholder="Reason / notes (optional)">
+                                                    <input type="text" name="claims[0][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)">
+                                                    <input type="text" name="claims[0][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)">
                                                 </td>
                                                 <td>
-                                                    <label class="odoo-table-file-label mb-0" style="display: inline-flex !important; align-items: center !important; gap: 6px !important; padding: 6px 12px !important; border: 1px dashed #cbd5e1 !important; border-radius: 6px !important; background-color: #f8fafc !important; color: #475569 !important; font-size: 11px !important; font-weight: 600 !important; cursor: pointer !important; width: 100% !important; justify-content: center !important;">
-                                                        <i class="feather-upload-cloud" style="font-size: 13px !important; color: #64748b !important;"></i>
-                                                        <span class="file-label-text text-muted">Attach Receipts</span>
-                                                        <input type="file" name="claims[0][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
-                                                    </label>
+                                                    <div class="erp-custom-file-upload">
+                                                        <label class="file-upload-label mb-0 cursor-pointer">
+                                                            <i class="feather-upload-cloud text-primary fs-14"></i>
+                                                            <span class="file-label-text text-muted">Upload Files</span>
+                                                            <input type="file" name="claims[0][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
+                                                        </label>
+                                                        <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
+                                                    </div>
                                                 </td>
                                                 <td class="text-center">
-                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
-                                                        <i class="feather-trash-2"></i>
+                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                                        <i class="feather-trash-2 fs-13"></i>
                                                     </button>
                                                 </td>
                                             </tr>
@@ -1220,7 +1332,7 @@
 
     {{-- MODAL: EDIT EXPENSE REPORT --}}
     <div class="modal fade" id="editReportModal" tabindex="-1" aria-labelledby="editReportModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content text-dark">
                 <form method="POST" action="" enctype="multipart/form-data"
                     id="editReportForm"
@@ -1252,7 +1364,7 @@
                                     <x-ui.odoo-form-ui type="select" name="cash_advance_id" id="edit_report_cash_advance" select2-selector="default">
                                         <option value="">None</option>
                                         @foreach($myOpenCashAdvances as $ca)
-                                            <option value="{{ $ca->id }}">${{ number_format($ca->approved_amount ?? $ca->amount, 2) }} - {{ $ca->purpose }}</option>
+                                            <option value="{{ $ca->id }}">{{ $currencySymbol }}{{ number_format($ca->approved_amount ?? $ca->amount, 2) }} - {{ $ca->purpose }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
@@ -1261,22 +1373,25 @@
                             {{-- Claims items array dynamically added --}}
                             <div class="border-top pt-3 mt-2">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="fw-bold mb-0" style="font-size: 13px;">Expense Claim Items *</h6>
+                                    <div>
+                                        <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">Expense Claim Items *</h6>
+                                        <small class="text-muted fs-11">Attach receipts and specify expenses for reimbursement</small>
+                                    </div>
                                     <button type="button" class="btn btn-sm btn-soft-primary px-2.5 py-1 text-uppercase fw-bold fs-11" id="btnEditAddClaimLine">
-                                        <i class="feather-plus"></i> Add Row
+                                        <i class="feather-plus me-1"></i> Add Row
                                     </button>
                                 </div>
 
-                                <div class="table-responsive overflow-hidden">
-                                    <table class="odoo-table" id="editClaimsLinesTable">
+                                <div class="table-responsive">
+                                    <table class="expense-claims-table" id="editClaimsLinesTable">
                                         <thead>
                                             <tr>
-                                                <th style="width: 20%;">Category</th>
-                                                <th style="width: 14%;">Date</th>
-                                                <th style="width: 14%;">Amount</th>
-                                                <th style="width: 26%;">Merchant / Details</th>
-                                                <th style="width: 18%;">Receipt File</th>
-                                                <th style="width: 8%;" class="text-center">Action</th>
+                                                <th style="width: 25%; min-width: 190px;">Category *</th>
+                                                <th style="width: 14%; min-width: 130px;">Date *</th>
+                                                <th style="width: 15%; min-width: 120px;">Amount *</th>
+                                                <th style="width: 23%; min-width: 170px;">Merchant / Notes</th>
+                                                <th style="width: 19%; min-width: 160px;">Receipts</th>
+                                                <th style="width: 4%; min-width: 40px;" class="text-center">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="editClaimsLinesContainer">
@@ -1879,49 +1994,42 @@
                     const rowTemplate = `
                         <tr class="claim-line-row">
                             <td>
-                                <select name="claims[${lineIndex}][category_id]" class="odoo-table-select odoo-select2 text-dark" required>
-                                    <option value="" disabled selected>-- Category --</option>
+                                <select name="claims[${lineIndex}][category_id]" class="form-select form-select-sm text-dark category-select" required>
+                                    <option value="" disabled selected>Choose Category...</option>
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
+                                <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
                             </td>
                             <td>
-                                <input type="date" name="claims[${lineIndex}][date]" class="odoo-table-input text-dark text-center" required value="{{ date('Y-m-d') }}">
+                                <input type="date" name="claims[${lineIndex}][date]" class="form-control form-control-sm text-dark text-center" required value="{{ date('Y-m-d') }}">
                             </td>
                             <td>
-                                <input type="number" name="claims[${lineIndex}][amount]" step="0.01" min="0.01" class="odoo-table-input text-dark text-end claim-amount-input" placeholder="0.00" required>
+                                <input type="number" name="claims[${lineIndex}][amount]" step="0.01" min="0.01" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" required>
                             </td>
                             <td>
-                                <input type="text" name="claims[${lineIndex}][merchant]" class="odoo-table-input text-dark mb-1" placeholder="Merchant name (e.g. Uber, Hilton)">
-                                <input type="text" name="claims[${lineIndex}][desc]" class="odoo-table-input text-dark" placeholder="Reason / notes (optional)">
+                                <input type="text" name="claims[${lineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)">
+                                <input type="text" name="claims[${lineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)">
                             </td>
                             <td>
-                                <label class="odoo-table-file-label mb-0" style="display: inline-flex !important; align-items: center !important; gap: 6px !important; padding: 6px 12px !important; border: 1px dashed #cbd5e1 !important; border-radius: 6px !important; background-color: #f8fafc !important; color: #475569 !important; font-size: 11px !important; font-weight: 600 !important; cursor: pointer !important; width: 100% !important; justify-content: center !important;">
-                                    <i class="feather-upload-cloud" style="font-size: 13px !important; color: #64748b !important;"></i>
-                                    <span class="file-label-text text-muted">Attach Receipts</span>
-                                    <input type="file" name="claims[${lineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
-                                </label>
+                                <div class="erp-custom-file-upload">
+                                    <label class="file-upload-label mb-0 cursor-pointer">
+                                        <i class="feather-upload-cloud text-primary fs-14"></i>
+                                        <span class="file-label-text text-muted">Upload Files</span>
+                                        <input type="file" name="claims[${lineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
+                                    </label>
+                                    <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
+                                </div>
                             </td>
                             <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
-                                    <i class="feather-trash-2"></i>
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                    <i class="feather-trash-2 fs-13"></i>
                                 </button>
                             </td>
                         </tr>
                     `;
                     tableBody.insertAdjacentHTML('beforeend', rowTemplate);
-
-                    // Re-initialize select2 for the newly added row select box
-                    if (window.$ && $.fn.select2) {
-                        var $newRow = $(tableBody).find('tr').last();
-                        $newRow.find('.odoo-select2').select2({
-                            theme: 'bootstrap-5',
-                            width: '100%',
-                            dropdownParent: $('#addReportModal')
-                        });
-                    }
-
                     lineIndex++;
                 });
             }
@@ -1939,9 +2047,51 @@
             // Accumulative multi-file store with DataTransfer
             window.rowFileStores = {};
 
+            function formatBytes(bytes) {
+                if (!bytes || bytes === 0) return '0 B';
+                var k = 1024, sizes = ['B', 'KB', 'MB'];
+                var i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + (sizes[i] || 'MB');
+            }
+
+            window.renderRowFiles = function(input, rowId) {
+                var $input = $(input);
+                var $td = $input.closest('td');
+                var $chipsContainer = $td.find('.new-files-container');
+                if ($chipsContainer.length === 0) {
+                    $td.find('.erp-custom-file-upload').append('<div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>');
+                    $chipsContainer = $td.find('.new-files-container');
+                }
+                $chipsContainer.empty();
+
+                var files = window.rowFileStores[rowId] || [];
+                files.forEach(function(file, idx) {
+                    var nameStr = file.name.length > 16 ? file.name.substring(0, 13) + '...' : file.name;
+                    var sizeStr = formatBytes(file.size);
+                    var chipHtml = `
+                        <span class="badge bg-white text-dark border shadow-xs px-2 py-1 fs-11 rounded-pill d-inline-flex align-items-center gap-1 mb-1 new-file-chip" style="border-color: #cbd5e1 !important;">
+                            <i class="feather-file-text text-primary fs-11"></i>
+                            <span class="fw-medium" title="${file.name}">${nameStr}</span>
+                            <span class="text-muted fs-10">(${sizeStr})</span>
+                            <i class="feather-x text-danger cursor-pointer ms-1" style="font-size: 11px;" title="Remove file" onclick="removeNewSelectedFile('${rowId}', ${idx}, this)"></i>
+                        </span>
+                    `;
+                    $chipsContainer.append(chipHtml);
+                });
+
+                var fileTextSpan = $input.siblings('.file-label-text');
+                var totalNewCount = files.length;
+                var hasExistingChips = $td.find('.existing-receipt-chip').length > 0;
+
+                if (totalNewCount > 0) {
+                    fileTextSpan.text(totalNewCount + (totalNewCount > 1 ? ' files selected' : ' file selected'));
+                } else {
+                    fileTextSpan.text(hasExistingChips ? '+ Add Files' : 'Upload Files');
+                }
+            };
+
             window.updateRowFileName = function(input) {
                 if (!input) return;
-                var $input = $(input);
                 var rowId = input.getAttribute('data-row-id');
                 if (!rowId) {
                     rowId = 'row_' + Math.random().toString(36).substring(2, 9);
@@ -1971,44 +2121,7 @@
                 });
                 try { input.files = dt.files; } catch(e) {}
 
-                // Render chips container inside <td>
-                var $td = $input.closest('td');
-                var $chipsContainer = $td.find('.new-files-container');
-                if ($chipsContainer.length === 0) {
-                    $td.prepend('<div class="new-files-container d-flex flex-wrap gap-1 mb-1 justify-content-center"></div>');
-                    $chipsContainer = $td.find('.new-files-container');
-                }
-                $chipsContainer.empty();
-
-                window.rowFileStores[rowId].forEach(function(file, idx) {
-                    var nameStr = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
-                    var chipHtml = `
-                        <span class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-1 fs-10 rounded-pill d-inline-flex align-items-center me-1 mb-1 new-file-chip">
-                            <i class="feather-paperclip me-1"></i>${nameStr}
-                            <i class="feather-x ms-1 text-danger cursor-pointer" style="font-size: 11px;" title="Remove file" onclick="removeNewSelectedFile('${rowId}', ${idx}, this)"></i>
-                        </span>
-                    `;
-                    $chipsContainer.append(chipHtml);
-                });
-
-                var fileTextSpan = $input.siblings('.file-label-text');
-                var labelContainer = $input.closest('.odoo-table-file-label');
-                var totalNewCount = window.rowFileStores[rowId].length;
-                var hasExistingChips = $td.find('.existing-receipt-chip').length > 0;
-
-                if (totalNewCount > 0 || hasExistingChips) {
-                    fileTextSpan.text('+ Add More Files').css('color', '#0284c7');
-                    labelContainer.css({
-                        'border-color': '#0284c7',
-                        'background-color': '#f0f9ff'
-                    }).find('i').css('color', '#0284c7');
-                } else {
-                    fileTextSpan.text('Attach Receipts').css('color', '#64748b');
-                    labelContainer.css({
-                        'border-color': '#cbd5e1',
-                        'background-color': '#f8fafc'
-                    }).find('i').css('color', '#64748b');
-                }
+                renderRowFiles(input, rowId);
             };
 
             window.removeNewSelectedFile = function(rowId, fileIdx, btn) {
@@ -2022,8 +2135,7 @@
                             dt.items.add(f);
                         });
                         try { input.files = dt.files; } catch(e) {}
-                        input.value = '';
-                        updateRowFileName(input);
+                        renderRowFiles(input, rowId);
                     }
                 }
             };
@@ -2033,7 +2145,8 @@
                 $(btn).closest('.existing-receipt-chip').remove();
                 var input = $td.find('.odoo-table-file-input')[0];
                 if (input) {
-                    updateRowFileName(input);
+                    var rowId = input.getAttribute('data-row-id');
+                    if (rowId) renderRowFiles(input, rowId);
                 }
             };
 
@@ -2074,6 +2187,10 @@
                 if (form) form.action = '{{ url('hrms/travel-expense/report') }}/' + id + '/update';
 
                 document.getElementById('edit_report_title').value = title || '';
+                var advanceText = this.getAttribute('data-advance-text') || '';
+                if (advanceId && !$('#edit_report_cash_advance option[value="' + advanceId + '"]').length) {
+                    $('#edit_report_cash_advance').append(new Option(advanceText || ('Advance #' + advanceId), advanceId, true, true));
+                }
                 $('#edit_report_travel_request').val(travelId || '').trigger('change.select2');
                 $('#edit_report_cash_advance').val(advanceId || '').trigger('change.select2');
 
@@ -2100,10 +2217,10 @@
                         }
                     }
                     if (rPaths.length > 0) {
-                        receiptLabelHtml = `<div class="existing-receipts-container mb-1 d-flex flex-wrap gap-1 align-items-center justify-content-center">`;
+                        receiptLabelHtml = `<div class="existing-receipts-container mb-1 d-flex flex-wrap gap-1 align-items-center justify-content-start">`;
                         rPaths.forEach(function(p, pIdx) {
                             receiptLabelHtml += `
-                                <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-1 fs-10 rounded-pill d-inline-flex align-items-center me-1 mb-1 existing-receipt-chip">
+                                <span class="badge bg-white text-success border border-success-subtle shadow-xs px-2 py-1 fs-11 rounded-pill d-inline-flex align-items-center me-1 mb-1 existing-receipt-chip">
                                     <a href="/storage/${p}" target="_blank" class="text-success text-decoration-none me-1"><i class="feather-paperclip me-1"></i>File ${rPaths.length > 1 ? (pIdx + 1) : ''}</a>
                                     <i class="feather-x cursor-pointer text-danger ms-1" style="font-size: 11px;" title="Remove file" onclick="removeExistingReceipt(this)"></i>
                                     <input type="hidden" name="claims[${editLineIndex}][existing_receipts][]" value="${p}">
@@ -2127,35 +2244,39 @@
                             <input type="hidden" name="claims[${editLineIndex}][status]" value="${claim.status || ''}">
                             <input type="hidden" name="claims[${editLineIndex}][approved_amount]" value="${claim.approved_amount || ''}">
                             <td>
-                                <select name="claims[${editLineIndex}][category_id]" class="odoo-table-select odoo-select2 text-dark" required>
-                                    <option value="" disabled>-- Category --</option>
+                                <select name="claims[${editLineIndex}][category_id]" class="form-select form-select-sm text-dark category-select" required>
+                                    <option value="" disabled>Choose Category...</option>
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat->id }}" ${claim.expense_category_id == {{ $cat->id }} ? 'selected' : ''}>{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
+                                <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
                             </td>
                             <td>
-                                <input type="date" name="claims[${editLineIndex}][date]" class="odoo-table-input text-dark text-center" required value="${dateStr}">
+                                <input type="date" name="claims[${editLineIndex}][date]" class="form-control form-control-sm text-dark text-center" required value="${dateStr}">
                             </td>
                             <td>
-                                <input type="number" name="claims[${editLineIndex}][amount]" step="0.01" min="0.01" class="odoo-table-input text-dark text-end claim-amount-input" placeholder="0.00" required value="${claim.amount}">
+                                <input type="number" name="claims[${editLineIndex}][amount]" step="0.01" min="0.01" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" required value="${claim.amount}">
                             </td>
                             <td>
                                 ${rejectionAlertHtml}
-                                <input type="text" name="claims[${editLineIndex}][merchant]" class="odoo-table-input text-dark mb-1" placeholder="Merchant name (e.g. Uber, Hilton)" value="${claim.merchant || ''}">
-                                <input type="text" name="claims[${editLineIndex}][desc]" class="odoo-table-input text-dark" placeholder="Reason / notes (optional)" value="${claim.description || ''}">
+                                <input type="text" name="claims[${editLineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)" value="${claim.merchant || ''}">
+                                <input type="text" name="claims[${editLineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)" value="${claim.description || ''}">
                             </td>
                             <td>
                                 ${receiptLabelHtml}
-                                <label class="odoo-table-file-label mb-0" style="display: inline-flex !important; align-items: center !important; gap: 6px !important; padding: 6px 12px !important; border: 1px dashed #cbd5e1 !important; border-radius: 6px !important; background-color: #f8fafc !important; color: #475569 !important; font-size: 11px !important; font-weight: 600 !important; cursor: pointer !important; width: 100% !important; justify-content: center !important;">
-                                    <i class="feather-upload-cloud" style="font-size: 13px !important; color: #64748b !important;"></i>
-                                    <span class="file-label-text text-muted">${rPaths.length > 0 ? '+ Add Files' : 'Attach Receipts'}</span>
-                                    <input type="file" name="claims[${editLineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
-                                </label>
+                                <div class="erp-custom-file-upload">
+                                    <label class="file-upload-label mb-0 cursor-pointer">
+                                        <i class="feather-upload-cloud text-primary fs-14"></i>
+                                        <span class="file-label-text text-muted">${rPaths.length > 0 ? '+ Add Files' : 'Upload Files'}</span>
+                                        <input type="file" name="claims[${editLineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
+                                    </label>
+                                    <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
+                                </div>
                             </td>
                             <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
-                                    <i class="feather-trash-2"></i>
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                    <i class="feather-trash-2 fs-13"></i>
                                 </button>
                             </td>
                         </tr>
@@ -2163,15 +2284,6 @@
                     editTableBody.insertAdjacentHTML('beforeend', rowHtml);
                     editLineIndex++;
                 });
-
-                // Initialize select2 inside newly populated rows
-                if (window.$ && $.fn.select2) {
-                    $('#editReportModal .odoo-select2').select2({
-                        theme: 'bootstrap-5',
-                        width: '100%',
-                        dropdownParent: $('#editReportModal')
-                    });
-                }
             });
 
             // Add row inside Edit modal
@@ -2180,47 +2292,42 @@
                 var rowHtml = `
                     <tr class="edit-claim-line-row">
                         <td>
-                            <select name="claims[${editLineIndex}][category_id]" class="odoo-table-select odoo-select2 text-dark" required>
-                                <option value="" disabled selected>-- Category --</option>
+                            <select name="claims[${editLineIndex}][category_id]" class="form-select form-select-sm text-dark category-select" required>
+                                <option value="" disabled selected>Choose Category...</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                 @endforeach
                             </select>
+                            <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
                         </td>
                         <td>
-                            <input type="date" name="claims[${editLineIndex}][date]" class="odoo-table-input text-dark text-center" required value="{{ date('Y-m-d') }}">
+                            <input type="date" name="claims[${editLineIndex}][date]" class="form-control form-control-sm text-dark text-center" required value="{{ date('Y-m-d') }}">
                         </td>
                         <td>
-                            <input type="number" name="claims[${editLineIndex}][amount]" step="0.01" min="0.01" class="odoo-table-input text-dark text-end claim-amount-input" placeholder="0.00" required>
+                            <input type="number" name="claims[${editLineIndex}][amount]" step="0.01" min="0.01" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" required>
                         </td>
                         <td>
-                            <input type="text" name="claims[${editLineIndex}][merchant]" class="odoo-table-input text-dark mb-1" placeholder="Merchant name (e.g. Uber, Hilton)">
-                            <input type="text" name="claims[${editLineIndex}][desc]" class="odoo-table-input text-dark" placeholder="Reason / notes (optional)">
+                            <input type="text" name="claims[${editLineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)">
+                            <input type="text" name="claims[${editLineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)">
                         </td>
                         <td>
-                            <label class="odoo-table-file-label mb-0" style="display: inline-flex !important; align-items: center !important; gap: 6px !important; padding: 6px 12px !important; border: 1px dashed #cbd5e1 !important; border-radius: 6px !important; background-color: #f8fafc !important; color: #475569 !important; font-size: 11px !important; font-weight: 600 !important; cursor: pointer !important; width: 100% !important; justify-content: center !important;">
-                                <i class="feather-upload-cloud" style="font-size: 13px !important; color: #64748b !important;"></i>
-                                <span class="file-label-text text-muted">Attach Receipts</span>
-                                <input type="file" name="claims[${editLineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
-                            </label>
+                            <div class="erp-custom-file-upload">
+                                <label class="file-upload-label mb-0 cursor-pointer">
+                                    <i class="feather-upload-cloud text-primary fs-14"></i>
+                                    <span class="file-label-text text-muted">Upload Files</span>
+                                    <input type="file" name="claims[${editLineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
+                                </label>
+                                <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
+                            </div>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
-                                <i class="feather-trash-2"></i>
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                <i class="feather-trash-2 fs-13"></i>
                             </button>
                         </td>
                     </tr>
                 `;
                 editTableBody.insertAdjacentHTML('beforeend', rowHtml);
-
-                if (window.$ && $.fn.select2) {
-                    var $newRow = $(editTableBody).find('tr').last();
-                    $newRow.find('.odoo-select2').select2({
-                        theme: 'bootstrap-5',
-                        width: '100%',
-                        dropdownParent: $('#editReportModal')
-                    });
-                }
                 editLineIndex++;
             });
 
@@ -2396,7 +2503,10 @@
                     var mainApprovedInput = document.getElementById('approve_amount_input_' + reportId);
                     if (mainApprovedInput) {
                         mainApprovedInput.value = totalApproved.toFixed(2);
-                        calculateApprovalNet(reportId, fullAdvance);
+                        var effectiveAdv = modal.getAttribute('data-rem-advance') !== null 
+                            ? parseFloat(modal.getAttribute('data-rem-advance')) 
+                            : fullAdvance;
+                        calculateApprovalNet(reportId, isNaN(effectiveAdv) ? fullAdvance : effectiveAdv);
                     }
                 }
             };
@@ -2459,13 +2569,14 @@
             $(document).on('shown.bs.modal', '[id^="approveReportModal_"]', function () {
                 var modalId = this.id;
                 var id = modalId.replace('approveReportModal_', '');
+                var remAdvAttr = this.getAttribute('data-rem-advance');
+                var effectiveAdv = remAdvAttr !== null && !isNaN(parseFloat(remAdvAttr)) ? parseFloat(remAdvAttr) : 0;
                 var firstSelect = this.querySelector('.claim-item-decision-select');
                 if (firstSelect) {
-                    var fullAdv = parseFloat(firstSelect.getAttribute('data-full-advance')) || 0;
-                    handleItemDecisionChange(firstSelect, id, fullAdv);
+                    handleItemDecisionChange(firstSelect, id, effectiveAdv);
                 } else {
                     var input = document.getElementById('approve_amount_input_' + id);
-                    if (input) input.dispatchEvent(new Event('input'));
+                    if (input) calculateApprovalNet(id, effectiveAdv);
                 }
                 var select = document.getElementById('payout_channel_' + id);
                 if (select) {

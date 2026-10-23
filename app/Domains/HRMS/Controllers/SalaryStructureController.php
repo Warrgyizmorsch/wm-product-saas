@@ -32,12 +32,51 @@ class SalaryStructureController extends Controller
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name' => 'required|string|max:255',
             'min_ctc' => 'required|numeric|min:0',
-            'max_ctc' => 'required|numeric|min:0',
+            'max_ctc' => 'required|numeric|gt:min_ctc',
             'status' => 'required|boolean',
             'components' => 'nullable|array',
         ];
 
-        $validated = $request->validate($rules);
+        $messages = [
+            'max_ctc.gt' => __('hrms.salary.max_ctc_must_be_greater'),
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        $payGroupId = !empty($validated['pay_group_id']) ? (int)$validated['pay_group_id'] : null;
+        $minCtc = (float)$validated['min_ctc'];
+        $maxCtc = (float)$validated['max_ctc'];
+
+        if (!empty($validated['status'])) {
+            $overlap = $this->salaryStructureRepository->findOverlappingStructure($payGroupId, $minCtc, $maxCtc);
+            if ($overlap) {
+                $overlapMsg = __('hrms.salary.structure_overlap_error', [
+                    'name' => $overlap->name,
+                    'min' => number_format($minCtc, 2),
+                    'max' => number_format($maxCtc, 2),
+                    'existing_min' => number_format($overlap->min_ctc, 2),
+                    'existing_max' => number_format($overlap->max_ctc, 2),
+                ]);
+
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $overlapMsg,
+                        'errors' => ['min_ctc' => [$overlapMsg]],
+                    ], 422);
+                }
+
+                $redirectUrl = route('hrms.salary-structure.index');
+                if ($payGroupId) {
+                    $redirectUrl .= '?pay_group_id=' . $payGroupId . '&tab=structures';
+                }
+
+                return redirect($redirectUrl)
+                    ->withInput()
+                    ->with('error', $overlapMsg)
+                    ->withErrors(['min_ctc' => $overlapMsg]);
+            }
+        }
 
         if (!empty($validated['pay_group_id'])) {
             $payGroup = PayGroup::find($validated['pay_group_id']);
@@ -63,12 +102,52 @@ class SalaryStructureController extends Controller
         $rules = [
             'name' => 'required|string|max:255',
             'min_ctc' => 'required|numeric|min:0',
-            'max_ctc' => 'required|numeric|min:0',
+            'max_ctc' => 'required|numeric|gt:min_ctc',
             'status' => 'required|boolean',
             'components' => 'nullable|array',
         ];
 
-        $validated = $request->validate($rules);
+        $messages = [
+            'max_ctc.gt' => __('hrms.salary.max_ctc_must_be_greater'),
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        $payGroupId = $salaryStructure->pay_group_id;
+        $minCtc = (float)$validated['min_ctc'];
+        $maxCtc = (float)$validated['max_ctc'];
+
+        if (!empty($validated['status'])) {
+            $overlap = $this->salaryStructureRepository->findOverlappingStructure($payGroupId, $minCtc, $maxCtc, $salaryStructure->id);
+            if ($overlap) {
+                $overlapMsg = __('hrms.salary.structure_overlap_error', [
+                    'name' => $overlap->name,
+                    'min' => number_format($minCtc, 2),
+                    'max' => number_format($maxCtc, 2),
+                    'existing_min' => number_format($overlap->min_ctc, 2),
+                    'existing_max' => number_format($overlap->max_ctc, 2),
+                ]);
+
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $overlapMsg,
+                        'errors' => ['min_ctc' => [$overlapMsg]],
+                    ], 422);
+                }
+
+                $redirectUrl = route('hrms.salary-structure.index');
+                if ($payGroupId) {
+                    $redirectUrl .= '?pay_group_id=' . $payGroupId . '&tab=structures';
+                }
+
+                return redirect($redirectUrl)
+                    ->withInput()
+                    ->with('error', $overlapMsg)
+                    ->withErrors(['min_ctc' => $overlapMsg]);
+            }
+        }
+
         $this->salaryStructureRepository->updateStructure($salaryStructure, $validated);
 
         $redirectUrl = route('hrms.salary-structure.index');
@@ -210,7 +289,7 @@ class SalaryStructureController extends Controller
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
             'description' => 'nullable',
-            'status'      => 'required',
+            'status'      => 'required|in:0,1',
         ]);
 
         $validated['status'] = in_array($request->status, ['success', '1', 'active', true], true);
@@ -228,7 +307,7 @@ class SalaryStructureController extends Controller
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
             'description' => 'nullable',
-            'status'      => 'required',
+            'status'      => 'required|in:0,1',
         ]);
 
         $validated['status'] = in_array($request->status, ['success', '1', 'active', true], true);

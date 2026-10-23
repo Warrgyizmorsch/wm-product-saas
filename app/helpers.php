@@ -48,6 +48,26 @@ if (! function_exists('tenant_context')) {
     }
 }
 
+if (! function_exists('tenant_exists')) {
+    /**
+     * `exists` validation limited to the current tenant's rows. Use instead of a
+     * bare 'exists:table,id' for any tenant-owned table, so a request can't point
+     * at another tenant's record. Fails closed when no tenant is resolved.
+     */
+    function tenant_exists(string $table, string $column = 'id'): \Illuminate\Validation\Rules\Exists
+    {
+        return \Illuminate\Validation\Rule::exists($table, $column)->where('tenant_id', tenant_id());
+    }
+}
+
+if (! function_exists('tenant_storage')) {
+    /** Quota-checked, usage-recorded file storage for the current tenant. */
+    function tenant_storage(): \App\Domains\Platform\Services\TenantStorage
+    {
+        return app(\App\Domains\Platform\Services\TenantStorage::class);
+    }
+}
+
 if (! function_exists('tenant_allowed_modules')) {
     /**
      * @return list<string>|null null means unrestricted (no plan gating; tenant
@@ -216,7 +236,12 @@ if (! function_exists('active_currency')) {
             return $sessionCurrency;
         }
 
-        return config('currency.base', 'USD');
+        $tenantCurrency = tenant()?->settings['currency'] ?? null;
+        if ($tenantCurrency && isset($currencies[$tenantCurrency])) {
+            return $tenantCurrency;
+        }
+
+        return config('currency.base', 'INR');
     }
 }
 
@@ -227,9 +252,9 @@ if (! function_exists('active_currency_info')) {
         $currencies = config('currency.currencies', []);
 
         return $currencies[$code] ?? [
-            'code' => 'USD',
-            'name' => 'US Dollar',
-            'symbol' => '$',
+            'code' => 'INR',
+            'name' => 'Indian Rupee',
+            'symbol' => '₹',
             'rate' => 1.0,
             'position' => 'prefix',
         ];
@@ -239,7 +264,7 @@ if (! function_exists('active_currency_info')) {
 if (! function_exists('active_currency_symbol')) {
     function active_currency_symbol(): string
     {
-        return active_currency_info()['symbol'] ?? '$';
+        return active_currency_info()['symbol'] ?? '₹';
     }
 }
 
@@ -321,7 +346,7 @@ if (! function_exists('format_currency')) {
         }
 
         $info = active_currency_info();
-        $symbol = $info['symbol'] ?? '$';
+        $symbol = $info['symbol'] ?? '₹';
         $position = $info['position'] ?? 'prefix';
 
         if ($position === 'suffix') {
@@ -329,6 +354,90 @@ if (! function_exists('format_currency')) {
         }
 
         return ($isNegative ? '-' : '') . $symbol . $formatted;
+    }
+}
+
+if (! function_exists('hours_to_decimal')) {
+    /**
+     * Convert H.MM format (where .MM is 00-59 minutes) or H:MM into decimal hours for costing.
+     * E.g. 0.09 (9 mins) -> 0.15, 1.25 (1 hr 25 mins) -> 1.4167, 2.5 (decimal) -> 2.5, "1:30" -> 1.5
+     */
+    function hours_to_decimal($hmm): float
+    {
+        if (is_string($hmm) && str_contains($hmm, ':')) {
+            $parts = explode(':', trim($hmm));
+            $h = (int) ($parts[0] ?? 0);
+            $m = (int) ($parts[1] ?? 0);
+            return (float) ($h + ($m / 60.0));
+        }
+
+        $val = (float) ($hmm ?: 0.0);
+        $str = (string) $val;
+        $dotPos = strpos($str, '.');
+
+        // If 1 decimal digit (e.g. 2.5, 0.5, 1.8), it is standard decimal hours
+        if ($dotPos !== false && strlen(substr($str, $dotPos + 1)) === 1) {
+            return $val;
+        }
+
+        $h = (int) floor($val);
+        $m = (int) round(($val - $h) * 100);
+
+        if ($m >= 60) {
+            return $val;
+        }
+
+        return (float) ($h + ($m / 60.0));
+    }
+}
+
+if (! function_exists('format_hours')) {
+    /**
+     * Format hours such that the decimal part represents actual minutes (00-59),
+     * ensuring it never exceeds .59.
+     *
+     * Example: 0.25 (decimal) -> "0.15 hrs" (15 minutes)
+     *          0.50 (decimal) -> "0.30 hrs" (30 minutes)
+     *          1.75 (decimal) -> "1.45 hrs" (1 hour, 45 minutes)
+     *          2.50 (decimal) -> "2.30 hrs" (2 hours, 30 minutes)
+     *          "43.50 hrs"    -> "43.50 hrs" (idempotent, never double-converted)
+     */
+    function format_hours($val, bool $includeSuffix = true): string
+    {
+        if ($val === null || $val === '' || $val === false) {
+            return $includeSuffix ? '0.00 hrs' : '0.00';
+        }
+
+        // If already formatted with suffix (e.g. "43.50 hrs"), return as is (idempotent)
+        if (is_string($val) && preg_match('/hrs?$/i', trim($val))) {
+            return $includeSuffix ? trim($val) : preg_replace('/\s*hrs?$/i', '', trim($val));
+        }
+
+        if (is_array($val) || $val instanceof \Traversable) {
+            $totalMinutes = 0;
+            foreach ($val as $item) {
+                $hVal = is_object($item) ? ($item->worked_hours ?? 0) : (is_array($item) ? ($item['worked_hours'] ?? 0) : $item);
+                $totalMinutes += (int) round(hours_to_decimal($hVal) * 60);
+            }
+            $hours = intdiv($totalMinutes, 60);
+            $minutes = $totalMinutes % 60;
+            $formatted = sprintf('%d.%02d', $hours, $minutes);
+            return $includeSuffix ? $formatted . ' hrs' : $formatted;
+        }
+
+        $raw = trim((string) $val);
+        $rawNum = preg_replace('/[^\d.]/', '', $raw);
+        $f = (float) ($rawNum ?: 0.0);
+
+        // Standard decimal hours to clock minutes conversion:
+        // Any calculation or backend sending decimal hours (e.g. 0.25 = 15m, 0.5 = 30m, 1.75 = 1h45m, 2.5 = 2h30m)
+        $totalMinutes = (int) round($f * 60);
+        $hours = intdiv($totalMinutes, 60);
+        $minutes = $totalMinutes % 60;
+
+        $formatted = sprintf('%d.%02d', $hours, $minutes);
+
+        return $includeSuffix ? $formatted . ' hrs' : $formatted;
     }
 }
 

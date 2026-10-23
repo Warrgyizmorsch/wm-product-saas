@@ -14,8 +14,11 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
 use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionRequisitionSlip;
+use App\Domains\Production\Models\ProductionSerialNumber;
+use App\Domains\Inventory\Models\Batch as InventoryBatch;
 use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\SalesOrder;
 
@@ -40,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
 
         // One builder per request, so the sidebar and the header's app launcher share a single computation.
         $this->app->scoped(\App\Core\Navigation\MenuBuilder::class);
+        // Per request / job: caches each tenant's excluded plan features for that request only.
+        $this->app->scoped(\App\Domains\Platform\Services\PlanFeatureGate::class);
+        $this->app->scoped(\App\Domains\Platform\Services\UsageLimitService::class);
+        $this->app->scoped(\App\Domains\Platform\Services\TenantStorage::class);
 
         // Loads every module's Dashboard/widgets.php once per request.
         $this->app->singleton(\App\Core\Dashboard\WidgetRegistry::class);
@@ -473,6 +480,36 @@ class AppServiceProvider extends ServiceProvider
         // users.email) exceed that. 191 chars * 4 bytes = 764 bytes, safely under it.
         Schema::defaultStringLength(191);
 
+        // Plan usage caps (config/plan_limits.php) on every capped model's creating event.
+        \App\Domains\Platform\Services\UsageLimitService::guardModels();
+
+        // Local disks that update tenant storage usage on delete/move, so usage
+        // drops as soon as any module removes a file.
+        foreach (config('filesystems.disks', []) as $diskName => $diskConfig) {
+            if (($diskConfig['driver'] ?? null) === 'local') {
+                config(["filesystems.disks.$diskName.tracked_name" => $diskName]);
+            }
+        }
+        \Illuminate\Support\Facades\Storage::extend('local', function ($app, array $config) {
+            $name = $config['tracked_name'] ?? 'local';
+            $base = $app['filesystem']->createLocalDriver($config, $name);
+
+            return (new \App\Domains\Platform\Support\TrackedLocalFilesystemAdapter($base->getDriver(), $base->getAdapter(), $config))
+                ->trackAs($name)
+                ->shouldServeSignedUrls($config['serve'] ?? false, fn () => $app['url']);
+        });
+
+        // Uploads counted against the tenant's storage allowance: same arguments
+        // as store()/storeAs(), but checked and recorded by TenantStorage.
+        \Illuminate\Http\UploadedFile::macro('storeTenantFile', function (string $path = '', array|string $options = []) {
+            /** @var \Illuminate\Http\UploadedFile $this */
+            return tenant_storage()->store($this, $path, $options);
+        });
+        \Illuminate\Http\UploadedFile::macro('storeTenantFileAs', function (string $path, ?string $name = null, array|string $options = []) {
+            /** @var \Illuminate\Http\UploadedFile $this */
+            return tenant_storage()->store($this, $path, $options, $name ?? $this->hashName());
+        });
+
         // ── Production Module Named API Rate Limiters ─────────────────────────
         $productionRateLimitKey = function (\Illuminate\Http\Request $request): string {
             $tenantId = $request->user()?->tenant_id
@@ -509,6 +546,10 @@ class AppServiceProvider extends ServiceProvider
             'material_request' => ProductionRequisitionSlip::class,
             'material_requirement' => MaterialRequirement::class,
             'so' => SalesOrder::class,
+            'order' => ProductionOrder::class,
+            'batch' => ProductionBatch::class,
+            'serial' => ProductionSerialNumber::class,
+            'lot' => InventoryBatch::class,
         ]);
 
         // ── Domain Event Listeners ───────────────────────────────────────────
@@ -570,6 +611,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Event::listen(
             \App\Domains\Purchase\Events\GrnAssetLineReceived::class,
             \App\Domains\HRMS\Listeners\CreateAssetFromGrnLine::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Production\Events\ProductionOrderCompleted::class,
+            \App\Domains\Projects\Listeners\SyncProductionTaskCompletionListener::class
         );
 
         // ── Project Management Event Notifications ───────────────────────────
@@ -1003,6 +1049,21 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentMaster::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentCategory::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\DocumentTemplate::class,
+            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\DocumentType::class,
             \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
         );
@@ -1024,6 +1085,11 @@ class AppServiceProvider extends ServiceProvider
 
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\ExitClearanceItem::class,
+            \App\Domains\HRMS\Policies\ExitClearancePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\ExitClearanceTemplate::class,
             \App\Domains\HRMS\Policies\ExitClearancePolicy::class
         );
 

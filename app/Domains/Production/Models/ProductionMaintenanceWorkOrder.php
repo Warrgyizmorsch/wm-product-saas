@@ -6,9 +6,11 @@ use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\User;
+use App\Domains\Accounting\Models\Journal;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ProductionMaintenanceWorkOrder extends BaseModel
 {
@@ -31,6 +33,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public const PRIORITY_HIGH     = 'high';
     public const PRIORITY_CRITICAL = 'critical';
 
+    // Legacy mechanic-type constants kept for backwards-compat with existing log records / test fixtures.
+    public const MECHANIC_TYPE_INHOUSE = 'inhouse';
+    public const MECHANIC_TYPE_EXTERNAL = 'external';
+    public const MECHANIC_TYPE_BOTH = 'both';
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -48,10 +55,12 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         'problem_description',
         'work_performed',
         'checklist_json',
-        'labor_hours',
-        'labor_cost_rate',
-        'labor_cost',
+        'mechanic_cost',
         'spare_parts_cost',
+        'additional_cost',
+        'external_parts_purchased',
+        'was_machine_scraped',
+        'decision_note',
         'total_cost',
         'downtime_id',
         'status',
@@ -60,17 +69,66 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     ];
 
     protected $casts = [
-        'planned_start'    => 'datetime',
-        'planned_end'      => 'datetime',
-        'actual_start'     => 'datetime',
-        'actual_end'       => 'datetime',
-        'checklist_json'   => 'array',
-        'labor_hours'      => 'decimal:2',
-        'labor_cost_rate'  => 'decimal:2',
-        'labor_cost'       => 'decimal:2',
-        'spare_parts_cost' => 'decimal:2',
-        'total_cost'       => 'decimal:2',
+        'planned_start'            => 'datetime',
+        'planned_end'              => 'datetime',
+        'actual_start'             => 'datetime',
+        'actual_end'               => 'datetime',
+        'checklist_json'           => 'array',
+        'mechanic_cost'            => 'decimal:2',
+        'spare_parts_cost'         => 'decimal:2',
+        'additional_cost'          => 'decimal:2',
+        'external_parts_purchased' => 'boolean',
+        'was_machine_scraped'      => 'boolean',
+        'total_cost'               => 'decimal:2',
     ];
+
+    public function getWasMachineScrapedAttribute($value): bool
+    {
+        return (bool) ($value ?? false);
+    }
+
+    public function getMechanicCostAttribute($value): float
+    {
+        return (float) ($value ?? 0.0);
+    }
+
+    public function getAdditionalExpenseAttribute(): float
+    {
+        return (float) ($this->additional_cost ?? 0.0);
+    }
+
+    public function setAdditionalExpenseAttribute($value): void
+    {
+        $this->attributes['additional_cost'] = $value;
+    }
+
+    public function getDowntimeHoursAttribute(): string
+    {
+        $totalMinutes = 0;
+        if ($this->downtime) {
+            if ($this->downtime->status === 'closed' || $this->downtime->duration_minutes !== null) {
+                if ($this->downtime->duration_minutes !== null) {
+                    $totalMinutes = (int) round((float) $this->downtime->duration_minutes);
+                } elseif ($this->downtime->start_time && $this->downtime->end_time) {
+                    $start = \Illuminate\Support\Carbon::parse($this->downtime->start_time);
+                    $end = \Illuminate\Support\Carbon::parse($this->downtime->end_time);
+                    $totalMinutes = max(0, (int) round($start->diffInSeconds($end) / 60));
+                }
+            } elseif ($this->downtime->status === 'open') {
+                $start = $this->downtime->start_time ? \Illuminate\Support\Carbon::parse($this->downtime->start_time) : null;
+                $totalMinutes = $start ? max(0, (int) round($start->diffInSeconds(now()) / 60)) : 0;
+            }
+        } elseif ($this->actual_start) {
+            $start = \Illuminate\Support\Carbon::parse($this->actual_start);
+            $end = $this->actual_end ? \Illuminate\Support\Carbon::parse($this->actual_end) : ($this->status === 'in_progress' ? now() : null);
+            $totalMinutes = $end ? max(0, (int) round($start->diffInSeconds($end) / 60)) : 0;
+        }
+
+        $h = intdiv($totalMinutes, 60);
+        $m = $totalMinutes % 60;
+
+        return sprintf('%d.%02d hrs', $h, $m);
+    }
 
     public function machine(): BelongsTo
     {
@@ -92,9 +150,24 @@ class ProductionMaintenanceWorkOrder extends BaseModel
         return $this->belongsTo(ProductionMachineDowntime::class, 'downtime_id');
     }
 
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ProductionMaintenanceWorkOrderAssignment::class, 'work_order_id');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(ProductionMaintenanceWorkOrderLog::class, 'work_order_id');
+    }
+
     public function spares(): HasMany
     {
         return $this->hasMany(ProductionMaintenanceWorkOrderSpare::class, 'maintenance_work_order_id');
+    }
+
+    public function requisitionSlips(): HasMany
+    {
+        return $this->hasMany(ProductionRequisitionSlip::class, 'maintenance_work_order_id');
     }
 
     public function creator(): BelongsTo
@@ -105,5 +178,11 @@ class ProductionMaintenanceWorkOrder extends BaseModel
     public function completer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function journal(): HasOne
+    {
+        return $this->hasOne(Journal::class, 'reference_id', 'id')
+            ->where('reference_type', 'maintenance_work_order');
     }
 }

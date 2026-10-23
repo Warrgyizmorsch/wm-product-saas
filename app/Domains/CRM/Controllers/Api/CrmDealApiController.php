@@ -8,6 +8,7 @@ use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\LeadHistory;
 use App\Domains\CRM\Models\DealStatus;
 use App\Domains\CRM\Services\DealHealthService;
 use App\Domains\Inventory\Models\Product;
@@ -504,6 +505,33 @@ class CrmDealApiController extends Controller
         $validated = $validator->validated();
         $newStage = $validated['stage'];
 
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isDealWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isDealWon && !in_array(strtolower((string)$newStage), ['won', 'closed won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This deal is already Won and finalized. Its stage cannot be changed.',
+            ], 422);
+        }
+
+        if (in_array(strtolower((string)$newStage), ['won', 'closed won'])) {
+            $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+            if (!$hasAcceptedQuote) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.',
+                ], 422);
+            }
+            $hasCustomer = !empty($deal->account?->customer_id);
+            if (!$hasCustomer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer conversion required! Please convert Deal to Customer first before marking Deal as Won.',
+                ], 422);
+            }
+            $newStage = 'Won';
+        }
+
         $deal->stage = $newStage;
         if (!empty($validated['close_reason'])) {
             $deal->close_reason = $validated['close_reason'];
@@ -538,6 +566,33 @@ class CrmDealApiController extends Controller
     {
         $this->authorize('update', $deal);
 
+        if (in_array(strtolower((string)$deal->stage), ['won', 'closed won'])) {
+            return response()->json([
+                'success' => true,
+                'message' => "Deal #{$deal->deal_number} is already Won.",
+                'data'    => [
+                    'id'    => $deal->id,
+                    'stage' => 'Won',
+                ],
+            ]);
+        }
+
+        $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+        if (!$hasAcceptedQuote) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.',
+            ], 422);
+        }
+
+        $hasCustomer = !empty($deal->account?->customer_id);
+        if (!$hasCustomer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Customer conversion required! Please click "Convert to Customer" button first before marking Deal as Won.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'close_reason' => 'nullable|string|max:255',
         ]);
@@ -564,6 +619,13 @@ class CrmDealApiController extends Controller
     public function markLost(Request $request, CrmDeal $deal): JsonResponse
     {
         $this->authorize('update', $deal);
+
+        if (in_array(strtolower((string)$deal->stage), ['won', 'closed won'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This deal is already Won and finalized. It cannot be marked as Lost.',
+            ], 422);
+        }
 
         $validator = Validator::make($request->all(), [
             'close_reason' => 'required|string|max:255',
@@ -706,12 +768,25 @@ class CrmDealApiController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $targetAccount->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $targetAccount->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} marked as Won and linked to Customer '{$customer->name}'."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             return response()->json([
@@ -765,12 +840,25 @@ class CrmDealApiController extends Controller
         ]);
 
         if ($leadObj) {
-            $leadObj->update([
-                'status'         => 'Won',
-                'crm_account_id' => $newAccount->id,
-                'is_customer'    => true,
-                'converted_at'   => now(),
-            ]);
+            Lead::$allowWonTransition = true;
+            try {
+                $oldLeadStatus = $leadObj->status;
+                $leadObj->update([
+                    'status'         => 'Won',
+                    'crm_account_id' => $newAccount->id,
+                    'is_customer'    => true,
+                    'converted_at'   => now(),
+                ]);
+                LeadHistory::logEvent(
+                    $leadObj,
+                    'status_changed',
+                    $oldLeadStatus,
+                    'Won',
+                    "Deal #{$deal->deal_number} converted to new Customer & Account. Lead marked as Won."
+                );
+            } finally {
+                Lead::$allowWonTransition = false;
+            }
         }
 
         return response()->json([
@@ -941,5 +1029,119 @@ class CrmDealApiController extends Controller
             new \App\Exports\DealExport($tenantId, $request->all()),
             'deals_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * GET /api/crm/deals/{deal}/documents
+     * List all documents attached to deal / linked lead.
+     */
+    public function documents(CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('view', $deal);
+
+        $linkedLead = Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function ($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                } elseif ($deal->crm_account_id) {
+                    $q->where('crm_account_id', $deal->crm_account_id);
+                }
+            })
+            ->with('leadDocuments')
+            ->first();
+
+        $documents = $linkedLead ? $linkedLead->leadDocuments->map(function ($doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        }) : collect();
+
+        return response()->json([
+            'success' => true,
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ]);
+    }
+
+    /**
+     * POST /api/crm/deals/{deal}/documents
+     * Upload documents for a deal.
+     */
+    public function uploadDocuments(Request $request, CrmDeal $deal): JsonResponse
+    {
+        $this->authorize('update', $deal);
+
+        $validator = Validator::make($request->all(), [
+            'documents'   => 'required',
+            'documents.*' => 'file|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+
+        $linkedLead = Lead::where('crm_deal_id', $deal->id)
+            ->orWhere(function ($q) use ($deal) {
+                if ($deal->lead_id) {
+                    $q->where('id', $deal->lead_id);
+                } elseif ($deal->crm_account_id) {
+                    $q->where('crm_account_id', $deal->crm_account_id);
+                }
+            })
+            ->first();
+
+        if (!$linkedLead) {
+            $linkedLead = Lead::create([
+                'tenant_id'      => $tenantId,
+                'company_id'     => $companyId,
+                'branch_id'      => $branchId,
+                'company_name'   => $deal->account ? $deal->account->name : $deal->title,
+                'contact_person' => $deal->contact ? $deal->contact->name : 'N/A',
+                'phone'          => $deal->contact?->phone ?: $deal->account?->phone,
+                'email'          => $deal->contact?->email ?: $deal->account?->email,
+                'requirement'    => $deal->title,
+                'crm_account_id' => $deal->crm_account_id,
+                'crm_contact_id' => $deal->crm_contact_id,
+                'crm_deal_id'    => $deal->id,
+                'status'         => 'Qualified',
+            ]);
+        }
+
+        $files = $request->file('documents');
+        if (!is_array($files)) {
+            $files = [$files];
+        }
+
+        app(\App\Domains\CRM\Services\LeadService::class)->uploadDocuments($linkedLead, $files);
+
+        $linkedLead->refresh();
+        $documents = $linkedLead->leadDocuments->map(function ($doc) {
+            return [
+                'id'         => $doc->id,
+                'file_name'  => $doc->file_name,
+                'file_type'  => $doc->file_type,
+                'size'       => $doc->size,
+                'url'        => \Storage::disk('public')->url($doc->file_path),
+                'created_at' => $doc->created_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Deal document(s) uploaded successfully.',
+            'count'   => $documents->count(),
+            'data'    => $documents,
+        ], 201);
     }
 }

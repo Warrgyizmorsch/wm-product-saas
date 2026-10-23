@@ -125,7 +125,8 @@ class ProductionReadinessService
             $overallStatus = $readyQty > 0.0 ? self::STATUS_PARTIALLY_READY : self::STATUS_BLOCKED;
         }
 
-            $totalProcessed = (float) ($operation->quantity_produced ?? 0.0) + (float) ($operation->quantity_rejected ?? 0.0) + (float) ($operation->quantity_scrapped ?? 0.0);
+            $pendingQc = app(\App\Domains\Production\Services\MesExecutionService::class)->getPendingQcQuantity($operation->id);
+            $totalProcessed = (float) ($operation->quantity_produced ?? 0.0) + $pendingQc + (float) ($operation->quantity_rejected ?? 0.0) + (float) ($operation->quantity_scrapped ?? 0.0);
             $effectiveClaimed = max((float) ($operation->quantity_claimed ?? 0.0), $totalProcessed);
             $remainingExecutable = ($operation->status === 'completed') ? 0.0 : max(0.0, round($readyQty - $effectiveClaimed, 4));
 

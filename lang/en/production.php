@@ -403,7 +403,7 @@ return array (
   'physical_location' => 'Physical Location',
   'capacity_per_hour' => 'Capacity Per Hour',
   'efficiency' => 'Efficiency (%)',
-  'cost_per_hour' => 'Cost Per Hour ($)',
+  'cost_per_hour' => 'Cost Per Hour',
   'active_shifts' => 'Active Shifts',
   'save_work_center' => 'Save Work Center',
   'update_work_center' => 'Update Work Center',
@@ -641,6 +641,8 @@ return array (
   'schedule_details' => 'Schedule Details (:number)',
   'remaining' => 'Remaining',
   'capacity_overload_warnings' => 'Capacity Overload Warnings',
+  'factory_conflicts_notice' => ':count conflict(s) detected across other factory schedules.',
+  'view_capacity_planning' => 'View Capacity Planning',
   'schedule_operations' => 'Schedule Operations',
   'capacity_analysis' => 'Capacity Analysis',
   'actual_machine' => 'Actual Machine',
@@ -895,7 +897,7 @@ return array (
   'cost_element' => 'Cost Element',
   'planned_cost' => 'Planned Cost',
   'actual_cost' => 'Actual Cost',
-  'variance_amount_pct' => 'Variance ($ / %)',
+  'variance_amount_pct' => 'Variance',
   'material_costs' => 'Material Costs',
   'machine_utilization_cost' => 'Machine Utilization Cost',
   'total_cost' => 'Total Cost',
@@ -2153,6 +2155,8 @@ return array (
   'fg_produced' => 'FG Produced',
   'sfg_produced' => 'SFG Output',
   'comp_output' => 'Comp. Output',
+  'view_project' => 'View Project',
+  'project_context' => 'Project Context',
 );
 
 

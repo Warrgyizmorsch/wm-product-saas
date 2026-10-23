@@ -61,7 +61,7 @@ class DispatchOrderController extends Controller
         );
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
         $this->authorize('create', DispatchOrder::class);
 
@@ -75,31 +75,20 @@ class DispatchOrderController extends Controller
         $prefillSalesOrder = null;
         if ($soId) {
             $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::with(['items', 'customer'])->find($soId);
+            if ($prefillSalesOrder && !in_array($prefillSalesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+                return redirect()->route('sales.dispatches.index')
+                    ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
+            }
             if ($prefillSalesOrder) {
                 $mr = MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
-                if (!$mr && $prefillSalesOrder->items->count() > 0) {
-                    $mrService = app(\App\Domains\Sales\Services\MaterialRequirementService::class);
-                    $mrItems = $prefillSalesOrder->items->map(fn($it) => [
-                        'product_id' => $it->product_id,
-                        'warehouse_id' => $it->warehouse_id ?: ($warehouses->first()?->id ?: 1),
-                        'quantity' => $it->quantity,
-                        'quantity_reserved' => 0,
-                        'sales_order_item_id' => $it->id,
-                    ])->toArray();
-
-                    $mr = $mrService->create([
-                        'tenant_id' => $tenantId,
-                        'company_id' => $prefillSalesOrder->company_id,
-                        'branch_id' => $prefillSalesOrder->branch_id,
-                        'sales_order_id' => $prefillSalesOrder->id,
-                        'status' => 'Pending',
-                        'requirement_date' => now()->toDateString(),
-                    ], $mrItems);
-                }
                 $mrId = $mr?->id;
             }
         } elseif ($mrId) {
             $mr = MaterialRequirement::with('salesOrder.customer')->find($mrId);
+            if ($mr && $mr->salesOrder && !in_array($mr->salesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+                return redirect()->route('sales.dispatches.index')
+                    ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
+            }
             $prefillSalesOrder = $mr?->salesOrder;
             $soId = $prefillSalesOrder?->id;
         }
@@ -115,6 +104,9 @@ class DispatchOrderController extends Controller
             'items.product',
             'items.warehouse',
         ])
+        ->whereHas('salesOrder', function ($q) {
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+        })
         ->whereIn('id', $pendingDOIds)
         ->latest()
         ->get();
@@ -351,7 +343,7 @@ class DispatchOrderController extends Controller
         ];
 
         if ($request->hasFile('pod_file')) {
-            $updateData['pod_attachment_path'] = $request->file('pod_file')->store('pods', 'public');
+            $updateData['pod_attachment_path'] = $request->file('pod_file')->storeTenantFile('pods', 'public');
         }
 
         $dispatch->update($updateData);

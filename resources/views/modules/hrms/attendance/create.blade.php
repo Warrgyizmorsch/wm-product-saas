@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Manual Attendance Entry | SaaS ERP')
-@section('page-title', 'Manual Attendance Entry')
-@section('breadcrumb', isset($employee) ? 'HRMS / Attendance / Employee Entry' : 'HRMS / Attendance / Manual Entry')
+@section('title', __('hrms.attendance.manual_entry_title') . ' | SaaS ERP')
+@section('page-title', __('hrms.attendance.manual_entry_title'))
+@section('breadcrumb', isset($employee) ? ('HRMS / ' . __('hrms.attendance.title') . ' / ' . __('hrms.attendance.employee_entry')) : ('HRMS / ' . __('hrms.attendance.title') . ' / ' . __('hrms.attendance.manual_entry')))
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <x-ui.button href="{{ route('hrms.attendance.index', isset($employee) ? array_merge(['view' => 'employee'], request()->except(['employee_id', 'date', 'view'])) : request()->except(['employee_id', 'date', 'view'])) }}" variant="light" icon="feather-arrow-left">
-            Back to Attendance
+            {{ __('hrms.attendance.back_to_attendance') }}
         </x-ui.button>
     </div>
 @endsection
@@ -18,21 +18,21 @@
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 w-100">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1">
-                        <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-list text-primary me-2"></i>Attendance Logs</h5>
+                        <h5 class="fw-bold text-dark mb-0 fs-16"><i class="feather-list text-primary me-2"></i>{{ __('hrms.attendance.attendance_logs') }}</h5>
                         @if(isset($employee))
                             <span class="badge bg-soft-primary text-primary px-2.5 py-1 rounded-pill fs-11 fw-bold" id="visible_count_badge">
-                                {{ count($dates) }} Days Listed
+                                {{ __('hrms.attendance.days_listed', ['count' => count($dates)]) }}
                             </span>
                         @else
                             <span class="badge bg-soft-primary text-primary px-2.5 py-1 rounded-pill fs-11 fw-bold" id="visible_count_badge">
-                                {{ $employees->count() }} Employees Listed
+                                {{ __('hrms.attendance.employees_listed', ['count' => $employees->count()]) }}
                             </span>
                         @endif
                     </div>
                     @if(isset($employee))
-                        <p class="text-muted fs-12 mb-0">Record logs for employee: <strong>{{ $employee->display_name }} ({{ $employee->employee_id }})</strong></p>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.attendance.record_logs_employee', ['name' => $employee->display_name, 'code' => $employee->employee_id]) }}</p>
                     @else
-                        <p class="text-muted fs-12 mb-0">Record logs for the date: <strong>{{ \Carbon\Carbon::parse($date)->format('M d, Y') }}</strong></p>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.attendance.record_logs_date', ['date' => \Carbon\Carbon::parse($date)->format('M d, Y')]) }}</p>
                     @endif
                 </div>
 
@@ -57,13 +57,13 @@
                                 type="text" 
                                 id="employee_search_input" 
                                 class="form-control border-0 bg-transparent p-0 fs-13" 
-                                placeholder="Search employee..." 
+                                placeholder="{{ __('hrms.attendance.search_placeholder') }}" 
                                 style="box-shadow: none; width: 180px;"
                             >
                         </div>
 
                         <!-- Sort Dropdown -->
-                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                        <x-ui.sort-dropdown :label="__('hrms.common.sort')">
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" onclick="applyClientSort('name_asc', this)">
                                 <span>{{ __('hrms.common.sort_name_asc') }}</span>
                                 <i class="feather-check ms-3 text-primary sort-check"></i>
@@ -74,23 +74,23 @@
                             </a>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" onclick="applyClientSort('dept_asc', this)">
-                                <span>Department (A-Z)</span>
+                                <span>{{ __('hrms.common.sort_dept_asc') }}</span>
                                 <i class="feather-check ms-3 text-primary sort-check d-none"></i>
                             </a>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" onclick="applyClientSort('dept_desc', this)">
-                                <span>Department (Z-A)</span>
+                                <span>{{ __('hrms.common.sort_dept_desc') }}</span>
                                 <i class="feather-check ms-3 text-primary sort-check d-none"></i>
                             </a>
                         </x-ui.sort-dropdown>
 
                         <!-- Filter Dropdown -->
-                        <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
+                        <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Department</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.department') }}</label>
                                 <x-ui.odoo-form-ui type="select" id="filter_department_id" select2-selector="default">
-                                    <option value="">All Departments</option>
+                                    <option value="">{{ __('hrms.common.all_departments') }}</option>
                                     @foreach($departments as $dept)
                                         <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                                     @endforeach
@@ -98,15 +98,15 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" id="filter_attendance_status" select2-selector="default">
-                                    <option value="">All Statuses</option>
-                                    <option value="present">Present</option>
-                                    <option value="late">Late</option>
-                                    <option value="half_day">Half Day</option>
-                                    <option value="absent">Absent</option>
-                                    <option value="on_leave">Leave</option>
-                                    <option value="wfh">Work from home</option>
+                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                    <option value="present">{{ __('hrms.common.present') }}</option>
+                                    <option value="late">{{ __('hrms.common.late') }}</option>
+                                    <option value="half_day">{{ __('hrms.common.half_day') }}</option>
+                                    <option value="absent">{{ __('hrms.common.absent') }}</option>
+                                    <option value="on_leave">{{ __('hrms.common.leave') }}</option>
+                                    <option value="wfh">{{ __('hrms.common.wfh') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
@@ -132,11 +132,11 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light text-uppercase fs-10 tracking-wider">
                                 <tr>
-                                    <th class="ps-4">Date</th>
-                                    <th>Check In</th>
-                                    <th>Check Out</th>
-                                    <th>Total Hours</th>
-                                    <th>Status</th>
+                                    <th class="ps-4">{{ __('hrms.common.date') }}</th>
+                                    <th>{{ __('hrms.attendance.th_check_in') }}</th>
+                                    <th>{{ __('hrms.attendance.th_check_out') }}</th>
+                                    <th>{{ __('hrms.attendance.th_total_hours') }}</th>
+                                    <th>{{ __('hrms.common.status') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -194,12 +194,13 @@
                                         <td>
                                             <div style="max-width: 160px;">
                                                 <x-ui.odoo-form-ui type="select" name="attendance[{{ $dateStr }}][status]" class="status-select">
-                                                    <option value="auto" @selected($log ? $log->status === 'auto' : true)>Auto (Detect)</option>
-                                                    <option value="present" @selected($log ? $log->status === 'present' : false)>Present</option>
-                                                    <option value="absent" @selected($log ? $log->status === 'absent' : false)>Absent</option>
-                                                    <option value="half_day" @selected($log ? $log->status === 'half_day' : false)>Half Day</option>
-                                                    <option value="on_leave" @selected($log ? $log->status === 'on_leave' : false)>Leave</option>
-                                                    <option value="wfh" @selected($log ? $log->status === 'wfh' : false)>Work from home</option>
+                                                    <option value="auto" @selected($log ? $log->status === 'auto' : true)>{{ __('hrms.attendance.auto_detect') }}</option>
+                                                    <option value="present" @selected($log ? $log->status === 'present' : false)>{{ __('hrms.common.present') }}</option>
+                                                    <option value="late" @selected($log ? $log->status === 'late' : false)>{{ __('hrms.common.late') }}</option>
+                                                    <option value="absent" @selected($log ? $log->status === 'absent' : false)>{{ __('hrms.common.absent') }}</option>
+                                                    <option value="half_day" @selected($log ? $log->status === 'half_day' : false)>{{ __('hrms.common.half_day') }}</option>
+                                                    <option value="on_leave" @selected($log ? $log->status === 'on_leave' : false)>{{ __('hrms.common.leave') }}</option>
+                                                    <option value="wfh" @selected($log ? $log->status === 'wfh' : false)>{{ __('hrms.common.wfh') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </td>
@@ -211,8 +212,8 @@
                     
                     <!-- Submit Toolbar -->
                     <div class="card-footer bg-transparent border-top p-4 d-flex justify-content-end gap-3">
-                        <x-ui.button href="{{ route('hrms.attendance.index', array_merge(['view' => 'employee'], request()->except(['employee_id', 'date', 'view']))) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
-                        <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Save Attendance Logs</x-ui.button>
+                        <x-ui.button href="{{ route('hrms.attendance.index', array_merge(['view' => 'employee'], request()->except(['employee_id', 'date', 'view']))) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">{{ __('hrms.attendance.save_logs') }}</x-ui.button>
                     </div>
                 </form>
             @else
@@ -220,7 +221,7 @@
                 @if($employees->isEmpty())
                     <div class="text-center py-5 text-muted">
                         <i class="feather-alert-circle d-block fs-32 text-warning mb-2"></i>
-                        <span class="fs-13 fw-semibold">No active employees found.</span>
+                        <span class="fs-13 fw-semibold">{{ __('hrms.attendance.no_active_employees') }}</span>
                     </div>
                 @else
                     <form method="POST" action="{{ route('hrms.attendance.store-manual') }}">
@@ -232,11 +233,11 @@
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="bg-light text-uppercase fs-10 tracking-wider">
                                     <tr>
-                                        <th class="ps-4">Employee Details</th>
-                                        <th>Check In</th>
-                                        <th>Check Out</th>
-                                        <th>Total Hours</th>
-                                        <th>Status</th>
+                                        <th class="ps-4">{{ __('hrms.attendance.th_employee_details') }}</th>
+                                        <th>{{ __('hrms.attendance.th_check_in') }}</th>
+                                        <th>{{ __('hrms.attendance.th_check_out') }}</th>
+                                        <th>{{ __('hrms.attendance.th_total_hours') }}</th>
+                                        <th>{{ __('hrms.common.status') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -265,7 +266,7 @@
                                                     </div>
                                                     <div>
                                                         <span class="fw-bold text-dark fs-13 d-block">{{ $employee->display_name }}</span>
-                                                        <span class="text-muted fs-11 d-block"><code class="fw-bold fs-11">{{ $employee->employee_id }}</code> &bull; {{ $employee->department?->name ?? 'No Department' }}</span>
+                                                        <span class="text-muted fs-11 d-block"><code class="fw-bold fs-11">{{ $employee->employee_id }}</code> &bull; {{ $employee->department?->name ?? __('hrms.attendance.no_department') }}</span>
                                                     </div>
                                                 </div>
                                             </td>
@@ -305,12 +306,13 @@
                                             <td>
                                                 <div style="max-width: 160px;">
                                                     <x-ui.odoo-form-ui type="select" name="attendance[{{ $employee->id }}][status]" class="status-select">
-                                                        <option value="auto" @selected($log ? $log->status === 'auto' : true)>Auto (Detect)</option>
-                                                        <option value="present" @selected($log ? $log->status === 'present' : false)>Present</option>
-                                                        <option value="absent" @selected($log ? $log->status === 'absent' : false)>Absent</option>
-                                                        <option value="half_day" @selected($log ? $log->status === 'half_day' : false)>Half Day</option>
-                                                        <option value="on_leave" @selected($log ? $log->status === 'on_leave' : false)>Leave</option>
-                                                        <option value="wfh" @selected($log ? $log->status === 'wfh' : false)>Work from home</option>
+                                                        <option value="auto" @selected($log ? $log->status === 'auto' : true)>{{ __('hrms.attendance.auto_detect') }}</option>
+                                                        <option value="present" @selected($log ? $log->status === 'present' : false)>{{ __('hrms.common.present') }}</option>
+                                                        <option value="late" @selected($log ? $log->status === 'late' : false)>{{ __('hrms.common.late') }}</option>
+                                                        <option value="absent" @selected($log ? $log->status === 'absent' : false)>{{ __('hrms.common.absent') }}</option>
+                                                        <option value="half_day" @selected($log ? $log->status === 'half_day' : false)>{{ __('hrms.common.half_day') }}</option>
+                                                        <option value="on_leave" @selected($log ? $log->status === 'on_leave' : false)>{{ __('hrms.common.leave') }}</option>
+                                                        <option value="wfh" @selected($log ? $log->status === 'wfh' : false)>{{ __('hrms.common.wfh') }}</option>
                                                     </x-ui.odoo-form-ui>
                                                 </div>
                                             </td>
@@ -322,8 +324,8 @@
                         
                         <!-- Submit Toolbar -->
                         <div class="border-top pt-4 mt-3 d-flex justify-content-end gap-3">
-                            <x-ui.button href="{{ route('hrms.attendance.index', request()->except(['employee_id', 'date', 'view'])) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Cancel</x-ui.button>
-                            <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">Save Attendance Logs</x-ui.button>
+                            <x-ui.button href="{{ route('hrms.attendance.index', request()->except(['employee_id', 'date', 'view'])) }}" variant="light" class="border fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</x-ui.button>
+                            <x-ui.button type="submit" variant="primary" class="fw-semibold text-uppercase px-4 py-2" style="font-size: 11px;">{{ __('hrms.attendance.save_logs') }}</x-ui.button>
                         </div>
                     </form>
                 @endif
@@ -437,7 +439,8 @@
         });
 
         // Update count badge
-        document.getElementById('visible_count_badge').textContent = `${visibleCount} Employees Listed`;
+        const employeesListedTemplate = @json(__('hrms.attendance.employees_listed', ['count' => '__COUNT__']));
+        document.getElementById('visible_count_badge').textContent = employeesListedTemplate.replace('__COUNT__', visibleCount);
     }
 
     // Sort rows dynamically
@@ -529,19 +532,22 @@
         const hasPunch = checkInInput.value.trim() !== '';
         
         const optPresent = statusSelect.querySelector('option[value="present"]');
+        const optLate = statusSelect.querySelector('option[value="late"]');
         const optHalfDay = statusSelect.querySelector('option[value="half_day"]');
         const optWfh = statusSelect.querySelector('option[value="wfh"]');
 
         if (!hasPunch) {
             if (optPresent) optPresent.disabled = true;
+            if (optLate) optLate.disabled = true;
             if (optHalfDay) optHalfDay.disabled = true;
             if (optWfh) optWfh.disabled = true;
 
-            if (['present', 'half_day', 'wfh'].includes(statusSelect.value)) {
+            if (['present', 'late', 'half_day', 'wfh'].includes(statusSelect.value)) {
                 statusSelect.value = 'auto';
             }
         } else {
             if (optPresent) optPresent.disabled = false;
+            if (optLate) optLate.disabled = false;
             if (optHalfDay) optHalfDay.disabled = false;
             if (optWfh) optWfh.disabled = false;
         }

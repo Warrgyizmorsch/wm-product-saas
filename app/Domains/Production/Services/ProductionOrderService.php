@@ -65,6 +65,9 @@ class ProductionOrderService
                 'order_number' => $data['order_number'] ?? $this->numberService->generateNextNumber($tenantId, $branchId),
                 'product_id' => $productId,
                 'bom_id' => $bomId,
+                'project_id' => $data['project_id'] ?? null,
+                'project_milestone_id' => $data['project_milestone_id'] ?? null,
+                'project_task_id' => $data['project_task_id'] ?? null,
                 'quantity_ordered' => $data['quantity_ordered'] ?? 1,
                 'start_date' => $data['start_date'] ?? now()->toDateString(),
                 'end_date' => $data['end_date'] ?? now()->addDays(7)->toDateString(),
@@ -97,9 +100,10 @@ class ProductionOrderService
             $productionMode = !empty($plan->production_mode)
                 ? $plan->production_mode
                 : ($product ? $product->getDefaultProductionMode() : 'standard');
-            $productionModel = !empty($plan->production_model)
+            $hasExplicitModel = !empty($plan->production_model);
+            $productionModel = $hasExplicitModel
                 ? $plan->production_model
-                : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
+                : ProductionOrder::MODEL_PURE_MANUFACTURING;
 
             $branchId = $plan->branch_id ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $plan->company_id ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
@@ -220,12 +224,12 @@ class ProductionOrderService
                     'quantity_produced' => 0.0000,
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
-                    'is_external' => (bool) (($planOp->is_external ?? $routingOp?->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                    'is_external' => (bool) ($planOp->is_external ?? $routingOp?->is_external ?? false),
                     'vendor_id' => $planOp->vendor_id ?? $routingOp?->vendor_id,
                     'subcontract_lead_time_days' => (int) ($routingOp?->subcontract_lead_time_days ?? 0),
                     'subcontract_cost_per_unit' => (float) ($routingOp?->subcontract_cost_per_unit ?? 0.0),
                     'subcontract_service_product_id' => $routingOp?->subcontract_service_product_id,
-                    'material_supply_type' => $routingOp?->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                    'material_supply_type' => $routingOp?->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
                     'subcontract_input_type' => $routingOp?->subcontract_input_type ?? 'bom_raw_materials',
                     'dispatch_buffer_days' => (int) ($routingOp?->dispatch_buffer_days ?? 0),
                     'return_buffer_days' => (int) ($routingOp?->return_buffer_days ?? 0),
@@ -264,6 +268,15 @@ class ProductionOrderService
                 }
                 $currentOrderOp->save();
             }
+            }
+
+            // Derive and save production model from snapshotted operations (routing operations are authoritative unless explicitly specified by caller)
+            $currentModel = $order->production_model;
+            if (empty($currentModel) || $currentModel === ProductionOrder::MODEL_PURE_MANUFACTURING) {
+                $fallback = $product?->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING;
+                $derivedModel = ProductionOrder::determineProductionModelFromOperations($order->operations()->get(), $fallback);
+                $order->production_model = $derivedModel;
+                $order->save();
             }
 
             // Auto-orchestrate Subcontract Procurement according to tenant settings (Manual PR/PO, Auto Draft PO, Auto Approved PO)
@@ -377,12 +390,25 @@ class ProductionOrderService
             $product = Product::find($productId);
             $defaultMode = $product ? $product->getDefaultProductionMode() : 'standard';
             $productionMode = !empty($data['production_mode']) ? $data['production_mode'] : $defaultMode;
-            $productionModel = !empty($data['production_model'])
+            $hasExplicitModel = !empty($data['production_model']);
+            $productionModel = $hasExplicitModel
                 ? $data['production_model']
-                : ($product->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING);
+                : ProductionOrder::MODEL_PURE_MANUFACTURING;
 
             $branchId = $data['branch_id'] ?? branch_id() ?? app(\App\Core\Branch\BranchContext::class)->id();
             $companyId = $data['company_id'] ?? company_id() ?? app(\App\Core\Company\CompanyContext::class)->id();
+
+            $projectId = $data['project_id'] ?? null;
+            $projectTaskId = $data['project_task_id'] ?? null;
+            $projectMilestoneId = $data['project_milestone_id'] ?? null;
+
+            if ($projectTaskId && ! $projectId) {
+                $task = \App\Domains\Projects\Models\Task::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($projectTaskId);
+                if ($task) {
+                    $projectId = $task->project_id;
+                    $projectMilestoneId = $projectMilestoneId ?? $task->milestone_id;
+                }
+            }
 
             $order = ProductionOrder::create([
                 'tenant_id' => $tenantId,
@@ -395,6 +421,9 @@ class ProductionOrderService
                 'routing_id' => $routing->id,
                 'sales_order_id' => $data['sales_order_id'] ?? null,
                 'sales_order_item_id' => $data['sales_order_item_id'] ?? null,
+                'project_id' => $projectId,
+                'project_milestone_id' => $projectMilestoneId,
+                'project_task_id' => $projectTaskId,
                 'quantity_ordered' => $quantity,
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
@@ -404,6 +433,24 @@ class ProductionOrderService
                 'description' => $data['description'] ?? null,
                 'created_by' => $userId,
             ]);
+
+            if ($order->project_id) {
+                try {
+                    $proj = $order->project ?: \App\Domains\Projects\Models\Project::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($order->project_id);
+                    if ($proj) {
+                        app(\App\Domains\Projects\Services\ActivityLogService::class)->record(
+                            $proj,
+                            'production.created',
+                            "Production Order {$order->order_number} created from Project Task",
+                            null,
+                            $order->projectTask,
+                            ['production_order_id' => $order->id]
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    // Do not break order creation if activity logging fails
+                }
+            }
 
             if ($selectedRequest) {
                 $selectedRequest->update([
@@ -1224,6 +1271,15 @@ class ProductionOrderService
         );
 
         $this->reconcileOperationReadiness($order);
+
+        // Derive and save production model from snapshotted operations (routing operations are authoritative unless explicitly specified by caller)
+        $currentModel = $order->production_model;
+        if (empty($currentModel) || $currentModel === ProductionOrder::MODEL_PURE_MANUFACTURING) {
+            $fallback = $order->product?->default_production_model ?? ProductionOrder::MODEL_PURE_MANUFACTURING;
+            $derivedModel = ProductionOrder::determineProductionModelFromOperations($order->operations()->get(), $fallback);
+            $order->production_model = $derivedModel;
+            $order->save();
+        }
     }
 
     protected function buildMultiLevelSnapshot(
@@ -1310,12 +1366,12 @@ class ProductionOrderService
                 'quantity_produced' => 0.0000,
                 'quantity_rejected' => 0.0000,
                 'quantity_scrapped' => 0.0000,
-                'is_external' => (bool) (($routingOp->is_external ?? false) || in_array($order->production_model, ['complete_subcontracting', 'subcontract_company_material'])),
+                'is_external' => (bool) ($routingOp->is_external ?? false),
                 'vendor_id' => $routingOp->vendor_id,
                 'subcontract_lead_time_days' => (int) ($routingOp->subcontract_lead_time_days ?? 0),
                 'subcontract_cost_per_unit' => (float) ($routingOp->subcontract_cost_per_unit ?? 0.0),
                 'subcontract_service_product_id' => $routingOp->subcontract_service_product_id,
-                'material_supply_type' => $routingOp->material_supply_type ?? ($order->production_model === 'complete_subcontracting' ? 'vendor_supplied' : 'company_supplied'),
+                'material_supply_type' => $routingOp->material_supply_type ?? (in_array($order->production_model, ['complete_subcontracting', 'subcontract_complete']) ? 'vendor_supplied' : 'company_supplied'),
                 'subcontract_input_type' => $routingOp->subcontract_input_type ?? 'bom_raw_materials',
                 'dispatch_buffer_days' => (int) ($routingOp->dispatch_buffer_days ?? 0),
                 'return_buffer_days' => (int) ($routingOp->return_buffer_days ?? 0),

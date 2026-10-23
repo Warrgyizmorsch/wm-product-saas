@@ -8,6 +8,7 @@ use App\Domains\CRM\Models\CrmContact;
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\LeadHistory;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\DealStatus;
 use App\Domains\CRM\Services\DealHealthService;
@@ -22,9 +23,13 @@ use Illuminate\View\View;
 
 class CrmDealController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): mixed
     {
         $this->authorize('viewAny', CrmDeal::class);
+
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback($request)) {
+            return $redirect;
+        }
 
         $tenantId = tenant_id() ?? 1;
         $search = $request->input('search');
@@ -67,7 +72,7 @@ class CrmDealController extends Controller
             }
         }
 
-        $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations', 'lead'])
+        $query = CrmDeal::with(['account', 'contact', 'owner', 'quotations', 'lead', 'followups'])
             ->where('tenant_id', $tenantId);
 
         if ($search) {
@@ -240,7 +245,7 @@ class CrmDealController extends Controller
             'crm_contact_id'  => $validated['crm_contact_id'] ?? null,
             'deal_number'     => $nextNumber,
             'title'           => $validated['title'],
-            'estimated_value' => $validated['estimated_value'],
+            'estimated_value' => convert_to_base((float) $validated['estimated_value']),
             'stage'           => $stage,
             'probability'     => $prob,
             'closing_date'    => $validated['closing_date'] ?? null,
@@ -274,9 +279,13 @@ class CrmDealController extends Controller
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal created successfully.');
     }
 
-    public function show(Request $request, CrmDeal $deal): View
+    public function show(Request $request, CrmDeal $deal): mixed
     {
         $this->authorize('view', $deal);
+
+        if ($redirect = app(\App\Domains\CRM\Services\GoogleCalendarIntegrationService::class)->handleAuthCallback($request)) {
+            return $redirect;
+        }
 
         if ($request->has('google_connected') || $request->has('connected')) {
             session(['google_calendar_connected' => true]);
@@ -347,7 +356,7 @@ class CrmDealController extends Controller
                 $prefilledDealItems[] = [
                     'product_id' => $productObj->id,
                     'quantity'   => floatval($it['quantity'] ?? 1),
-                    'unit_price' => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
+                    'unit_price' => floatval(convert_from_base($productObj->selling_price ?: $productObj->unit_cost ?: 0)),
                     'tax_rate'   => floatval($productObj->gst_rate ?: 18),
                 ];
             }
@@ -401,7 +410,13 @@ class CrmDealController extends Controller
         if ($stage === 'Closed Won') $stage = 'Won';
         if ($stage === 'Closed Lost') $stage = 'Lost';
 
-        if ($stage === 'Won') {
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isCurrentlyWon && strtolower((string)$stage) !== 'won') {
+            return back()->withErrors(['stage' => 'This deal is already Won and finalized. Its stage cannot be changed.'])->withInput();
+        }
+
+        if (!$isCurrentlyWon && $stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
             if (!$hasAcceptedQuote) {
                 return back()->withErrors(['stage' => 'Deal cannot be marked as Won directly. A Quotation must be created and Accepted first.'])->withInput();
@@ -423,6 +438,7 @@ class CrmDealController extends Controller
 
         $validated['product_ids'] = $processed['product_ids'];
         $validated['product_items'] = $processed['product_items'];
+        $validated['estimated_value'] = convert_to_base((float) $validated['estimated_value']);
 
         $deal->update($validated);
 
@@ -479,6 +495,30 @@ class CrmDealController extends Controller
         if ($stage === 'Closed Lost') $stage = 'Lost';
         if ($stage === 'New') $stage = 'Qualification';
         if ($stage === 'Qualified') $stage = 'Needs Analysis';
+
+        // Lock check: Once Won, a deal cannot be moved to any other stage
+        $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+        if ($isCurrentlyWon) {
+            if (strtolower((string)$stage) !== 'won') {
+                $errMsg = 'This deal is already Won and finalized. Its stage cannot be changed.';
+                if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $errMsg
+                    ], 422);
+                }
+                return redirect()->back()->with('error', $errMsg);
+            }
+
+            if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Deal is already Won.',
+                    'stage' => $deal->stage
+                ]);
+            }
+            return redirect()->back()->with('info', 'Deal is already Won.');
+        }
 
         if ($stage === 'Won') {
             $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
@@ -777,12 +817,25 @@ class CrmDealController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $account->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $account->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} marked as Won and linked to Customer '{$customer->name}'."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             // Sync all quotations linked to this deal or lead
@@ -853,12 +906,25 @@ class CrmDealController extends Controller
             ]);
 
             if ($leadObj) {
-                $leadObj->update([
-                    'status'         => 'Won',
-                    'crm_account_id' => $newAccount->id,
-                    'is_customer'    => true,
-                    'converted_at'   => now(),
-                ]);
+                Lead::$allowWonTransition = true;
+                try {
+                    $oldLeadStatus = $leadObj->status;
+                    $leadObj->update([
+                        'status'         => 'Won',
+                        'crm_account_id' => $newAccount->id,
+                        'is_customer'    => true,
+                        'converted_at'   => now(),
+                    ]);
+                    LeadHistory::logEvent(
+                        $leadObj,
+                        'status_changed',
+                        $oldLeadStatus,
+                        'Won',
+                        "Deal #{$deal->deal_number} converted to new Customer & Account. Lead marked as Won."
+                    );
+                } finally {
+                    Lead::$allowWonTransition = false;
+                }
             }
 
             // Sync lead contacts → account

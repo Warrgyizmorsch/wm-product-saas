@@ -4,15 +4,21 @@ namespace App\Domains\Production\Models;
 
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DeliveryChallanItem extends Model
 {
+    use BelongsToCompany, BelongsToBranch;
+
     protected $table = 'delivery_challan_items';
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
+        'branch_id',
         'delivery_challan_id',
         'product_id',
         'production_batch_id',

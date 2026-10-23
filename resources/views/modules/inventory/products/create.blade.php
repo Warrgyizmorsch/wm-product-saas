@@ -294,12 +294,6 @@
                                 <option value="service" {{ old('type') === 'service' ? 'selected' : '' }} style="display:none;">{{ __('inventory.service') }}</option>
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="select" :label="__('inventory.default_production_model')" name="default_production_model" :errorText="$errors->first('default_production_model')">
-                                <option value="pure_manufacturing" {{ old('default_production_model', 'pure_manufacturing') === 'pure_manufacturing' ? 'selected' : '' }}>{{ __('inventory.pure_manufacturing') }}</option>
-                                <option value="subcontract_complete" {{ old('default_production_model') === 'subcontract_complete' ? 'selected' : '' }}>{{ __('inventory.subcontract_complete') }}</option>
-                                <option value="subcontract_company_material" {{ old('default_production_model') === 'subcontract_company_material' ? 'selected' : '' }}>{{ __('inventory.subcontract_company_material') }}</option>
-                                <option value="hybrid" {{ old('default_production_model') === 'hybrid' ? 'selected' : '' }}>{{ __('inventory.hybrid_manufacturing') }}</option>
-                            </x-ui.odoo-form-ui>
 
                             <div class="physical-goods-only">
                                 <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" :value="old('brand')" :placeholder="__('inventory.brand_placeholder')" :errorText="$errors->first('brand')" />
@@ -461,7 +455,7 @@
                                         <th>{{ __('inventory.warehouse_code') }}</th>
                                         <th>{{ __('inventory.warehouse_name') }}</th>
                                         <th>{{ __('inventory.quantity_on_hand') }}</th>
-                                        <th>{{ __('inventory.unit_cost') }}</th>
+                                        <th>{{ __('inventory.unit_cost') }} ({{ active_currency_symbol() }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>

@@ -90,6 +90,16 @@ interface KraKpiRepositoryInterface
     public function addGoalItem(int $planId, array $validated, int $tenantId): EmployeeGoalItem;
 
     /**
+     * Batch add multiple KPI goal items to an employee scorecard.
+     */
+    public function addGoalItems(int $planId, array $items, int $tenantId): int;
+
+    /**
+     * Batch sync (create, update, delete) KPI goal items for an employee scorecard.
+     */
+    public function syncGoalItems(int $planId, array $items, int $tenantId): int;
+
+    /**
      * Delete single KPI goal item from scorecard and recalculate score.
      */
     public function deleteGoalItem(int $itemId, int $tenantId): bool;
@@ -118,16 +128,6 @@ interface KraKpiRepositoryInterface
      * Submit Manager-Appraisal.
      */
     public function submitManagerAppraisal(int $planId, array $validated, bool $promotionRecommended, int $tenantId): EmployeeGoalPlan;
-
-    /**
-     * HR / Committee Calibration & Normalization.
-     */
-    public function calibrateAppraisal(int $planId, array $validated, int $tenantId): EmployeeGoalPlan;
-
-    /**
-     * Employee final sign-off.
-     */
-    public function signOffAppraisal(int $planId, int $tenantId): EmployeeGoalPlan;
 
     /**
      * Trigger PIP from low appraisal score.

@@ -94,77 +94,22 @@ class ChartOfAccountsService
     }
 
     /**
-     * Keeps the GL in sync with a ledger's opening_balance field: reverses any
-     * previously-posted opening-balance journal for this account (if the
-     * balance changed) and posts a fresh one against a suspense/equity offset
-     * account, so opening balances flow through the same double-entry ledger
-     * that Trial Balance/Balance Sheet read from, rather than being a field
-     * that reports would have to special-case.
-     *
-     * Posted with today's date (not the fiscal year start) since a tenant's
-     * accounting periods may not yet cover that back-date — this keeps ledger
-     * creation from failing when period setup is incomplete. Failures here are
-     * logged and swallowed rather than propagated, since a missing opening
-     * journal shouldn't block basic Chart of Accounts CRUD.
+     * Keeps the GL in sync with a ledger's opening_balance field via
+     * OpeningBalanceService: dated at the books' start, offset to Opening
+     * Balance Difference, re-posted when it changes. Throws when it cannot post
+     * (no financial year, period closed) so the screen can say so.
      */
-    public function syncOpeningBalance(ChartOfAccount $account): void
+    public function syncOpeningBalance(ChartOfAccount $account): ?\App\Domains\Accounting\Models\Journal
     {
-        try {
-            $existing = $this->journals->findByReference('chart_of_account_opening_balance', $account->id)
-                ->whereNotIn('status', [\App\Domains\Accounting\Models\Journal::STATUS_REVERSED])
-                ->first();
-
-            $balance = round((float) $account->opening_balance, 2);
-
-            if ($existing && round((float) $existing->total_debit, 2) !== $balance) {
-                $this->journals->reverse($existing->id, 'Opening balance changed');
-                $existing = null;
-            }
-
-            if ($balance <= 0 || $existing) {
-                return;
-            }
-
-            $suspense = $this->accountResolver->resolveAccount(
-                identifier: null,
-                tenantId: $account->tenant_id,
-                fallbackCode: '3020',
-                fallbackType: ChartOfAccount::TYPE_EQUITY,
-            );
-
-            if (!$suspense) {
-                return;
-            }
-
-            $isDebitOpening = $account->opening_balance_type === ChartOfAccount::BALANCE_DEBIT;
-
-            $this->journals->post([
-                [
-                    'chart_of_account_id' => $account->id,
-                    'debit' => $isDebitOpening ? $balance : 0,
-                    'credit' => $isDebitOpening ? 0 : $balance,
-                    'description' => "Opening balance for {$account->code} {$account->name}",
-                ],
-                [
-                    'chart_of_account_id' => $suspense->id,
-                    'debit' => $isDebitOpening ? 0 : $balance,
-                    'credit' => $isDebitOpening ? $balance : 0,
-                    'description' => "Opening balance offset for {$account->code} {$account->name}",
-                ],
-            ], [
-                'tenant_id' => $account->tenant_id,
-                'journal_date' => now(),
-                'source' => \App\Domains\Accounting\Models\Journal::SOURCE_MANUAL,
-                'reference_type' => 'chart_of_account_opening_balance',
-                'reference_id' => $account->id,
-                'memo' => "Opening balance — {$account->code} {$account->name}",
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('ChartOfAccountsService::syncOpeningBalance failed', [
-                'chart_of_account_id' => $account->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
+        return app(OpeningBalanceService::class)->sync([
+            'tenant_id' => (int) $account->tenant_id,
+            'company_id' => $account->company_id,
+            'branch_id' => $account->branch_id,
+            'reference_type' => 'chart_of_account_opening_balance',
+            'reference_id' => (int) $account->id,
+            'chart_of_account_id' => (int) $account->id,
+            'label' => "{$account->code} {$account->name}",
+        ], (float) $account->opening_balance, $account->opening_balance_type ?: $account->normal_balance);
     }
 
     /**
@@ -252,6 +197,7 @@ class ChartOfAccountsService
             ['code' => '3020', 'key' => 'reserves_and_surplus', 'name' => 'Reserves & Surplus', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'reserves_surplus', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
             ['code' => '3030', 'key' => 'partners_proprietors_capital', 'name' => "Partner's/Proprietor's Capital", 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'capital', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
             ['code' => '3040', 'key' => 'drawings', 'name' => 'Drawings', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'capital', 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'parent' => '3000'],
+            ['code' => '3050', 'key' => 'opening_balance_difference', 'name' => 'Opening Balance Difference', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'capital', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
             ['code' => '3200', 'key' => 'revaluation_reserve', 'name' => 'Revaluation Reserve', 'type' => ChartOfAccount::TYPE_EQUITY, 'subtype' => 'reserves_surplus', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
 
             // --- Loans (Liability) (sheet rows 5-8) ---

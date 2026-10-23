@@ -57,18 +57,34 @@ class CustomerPaymentController extends Controller
         $nextSeq = $latest ? intval(str_replace('PAY-', '', $latest->payment_number)) + 1 : 1;
         $nextPaymentNumber = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
 
-        $prefillCustomerId    = $request->input('customer_id');
-        $prefillInvoiceId     = $request->input('invoice_id');
-        $prefillSalesOrderId  = $request->input('sales_order_id');
+        $prefillCustomerId    = $request->input('customer_id') ?? $request->input('amp;customer_id');
+        $prefillInvoiceId     = $request->input('invoice_id') ?? $request->input('amp;invoice_id');
+        $prefillSalesOrderId  = $request->input('sales_order_id') ?? $request->input('amp;sales_order_id');
         $prefillAmount        = null;
 
         if ($prefillInvoiceId) {
             $prefillInvoice = Invoice::find($prefillInvoiceId);
             if ($prefillInvoice && in_array($prefillInvoice->status, ['Posted', 'Partially Paid', 'Overdue'])) {
                 $prefillAmount      = $prefillInvoice->balance_due;
-                $prefillCustomerId  = $prefillCustomerId ?: $prefillInvoice->customer_id;
+                $prefillCustomerId  = $prefillCustomerId ?: ($prefillInvoice->customer_id ?? $prefillInvoice->salesOrder?->customer_id);
             } else {
                 $prefillInvoiceId = null;
+            }
+        }
+
+        if ($prefillSalesOrderId) {
+            $prefillOrder = SalesOrder::with('allocations')->find($prefillSalesOrderId);
+            if ($prefillOrder) {
+                $prefillCustomerId = $prefillCustomerId ?: $prefillOrder->customer_id;
+                if ($prefillAmount === null) {
+                    $paid = (float) $prefillOrder->allocations->sum('allocated_amount');
+                    $unpaid = max(0, (float) $prefillOrder->total_amount - $paid);
+                    if ($unpaid > 0) {
+                        $prefillAmount = $unpaid;
+                    }
+                }
+            } else {
+                $prefillSalesOrderId = null;
             }
         }
 
@@ -95,21 +111,23 @@ class CustomerPaymentController extends Controller
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
         ]);
 
-        $payment = DB::transaction(function () use ($validated) {
+        $baseAmount = convert_to_base((float) $validated['amount']);
+
+        $payment = DB::transaction(function () use ($validated, $baseAmount) {
             $payment = CustomerPayment::create([
                 'tenant_id'      => tenant_id() ?? 1,
                 'customer_id'    => $validated['customer_id'],
                 'payment_number' => $validated['payment_number'],
                 'payment_date'   => $validated['payment_date'],
                 'payment_method' => $validated['payment_method'],
-                'amount'         => $validated['amount'],
+                'amount'         => $baseAmount,
                 'reference_no'   => $validated['reference_no'] ?? null,
                 'notes'          => $validated['notes'] ?? null,
                 'status'         => 'Posted',   // Direct post — Odoo/Tally style
             ]);
 
             $allocateTo    = $validated['allocate_to'] ?? 'unallocated';
-            $allocatedAmt  = (float) $validated['amount'];
+            $allocatedAmt  = $baseAmount;
 
             // ── Link to Invoice ─────────────────────────────────────────────
             if ($allocateTo === 'invoice' && !empty($validated['invoice_id'])) {
@@ -150,7 +168,7 @@ class CustomerPaymentController extends Controller
         \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.payment.received', [
             'doc_no' => $payment->payment_number,
             'customer_name' => $payment->customer?->name ?? 'Customer',
-            'amount' => number_format((float)$payment->amount, 2),
+            'amount' => format_currency((float)$payment->amount),
             'payment_method' => $payment->payment_method ?? 'Bank/Cash',
             'date' => $payment->payment_date ? (is_string($payment->payment_date) ? $payment->payment_date : $payment->payment_date->format('Y-m-d')) : now()->format('Y-m-d'),
         ], route('sales.payments.show', $payment->id), $payment);

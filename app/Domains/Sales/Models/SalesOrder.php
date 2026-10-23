@@ -46,6 +46,7 @@ class SalesOrder extends BaseModel
         'payment_terms',
         'sales_person_id',
         'discount_type',
+        'tax_mode',
         'tax_type',
         'gst_type',
         'order_tax_rate',
@@ -73,6 +74,24 @@ class SalesOrder extends BaseModel
         'adjustment'       => 'decimal:2',
         'total_amount'     => 'decimal:2',
     ];
+
+    public function getEffectiveTaxModeAttribute(): string
+    {
+        return !empty($this->tax_mode) ? $this->tax_mode : 'exclusive';
+    }
+
+    public function getTaxableAmountAttribute(): float
+    {
+        $subtotal = (float) ($this->subtotal ?? 0);
+        $discount = (float) ($this->discount ?? 0);
+        $tax = (float) ($this->tax ?? 0);
+
+        if ($this->effective_tax_mode === 'inclusive') {
+            return round(max(0, ($subtotal - $discount) - $tax), 2);
+        }
+
+        return round(max(0, $subtotal - $discount), 2);
+    }
 
     public function customer(): BelongsTo
     {
@@ -129,4 +148,8 @@ class SalesOrder extends BaseModel
         return $this->hasMany(PurchaseRequisition::class, 'sales_order_id');
     }
 
+    public function projects(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Projects\Models\Project::class, 'sales_order_id');
+    }
 }

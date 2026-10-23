@@ -1,56 +1,23 @@
 @extends('layouts.duralux')
 
-@section('title', 'My Assets | SaaS ERP')
-@section('page-title', 'My Assets')
-@section('breadcrumb', 'HRMS / Assets / My Assets')
+@section('title', __('hrms.assets.my_assets') . ' | SaaS ERP')
+@section('page-title', __('hrms.assets.my_assets'))
+@section('breadcrumb', __('hrms.common.hrms') . ' / ' . __('hrms.assets.title') . ' / ' . __('hrms.assets.my_assets'))
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <!-- Toggle View Button: Switch between history and log -->
-        <button type="button" class="btn btn-outline-light border text-dark fw-bold text-uppercase d-flex align-items-center gap-1.5" id="btn-toggle-asset-view" style="height: 38px; border-radius: 6px; font-size: 11px; padding-inline: 14px; background-color: #fff; border-color: #cbd5e1 !important; color: #334155 !important;">
-            <i class="feather-git-pull-request text-muted" id="toggle-view-icon"></i>
-            <span id="toggle-view-text">Request Log</span>
-        </button>
-
-        <!-- Action: Request Asset -->
-        <x-ui.button type="button" variant="primary" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#requestAssetModal" style="height: 38px; border-radius: 6px; font-size: 11px;">
-            <i class="feather-plus-circle"></i> Request Asset
+        <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#requestAssetModal" class="fw-bold text-uppercase">
+            {{ __('hrms.assets.request_asset') }}
         </x-ui.button>
     </div>
 @endsection
 
 @section('content')
 <style>
-    .card-custom {
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        background-color: #fff;
-        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.02);
-        margin-bottom: 24px;
-    }
-
-    .card-custom-header {
-        padding: 20px 24px;
-        border-bottom: 1px solid #f1f5f9;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .card-custom-title {
-        font-size: 16px;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
     .documents-search {
         height: 38px;
         min-width: 230px;
         border: 1px solid #e2e8f0;
-        border-radius: 10px;
+        border-radius: 8px;
         background: #f8fafc;
         transition: all 0.2s ease;
     }
@@ -65,43 +32,12 @@
         color: #94a3b8;
     }
 
-    .asset-toolbar .documents-search {
-        min-width: 220px;
+    .table-responsive {
+        position: relative;
     }
 
-    .asset-toolbar .sort-toggle-custom,
-    .asset-toolbar .filter-toggle-custom,
-    .asset-action-btn {
-        height: 38px;
-        border-radius: 10px !important;
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        border: 1px solid #dbe3ec !important;
-        background: #fff !important;
-        color: #0f172a !important;
-        box-shadow: none !important;
-        padding-inline: 14px !important;
-    }
-
-    .asset-toolbar .sort-toggle-custom:hover,
-    .asset-toolbar .filter-toggle-custom:hover,
-    .asset-action-btn:hover {
-        border-color: var(--bs-primary) !important;
-        color: var(--bs-primary) !important;
-        background: rgba(var(--bs-primary-rgb), 0.06) !important;
-    }
-
-    .asset-action-btn-primary {
-        border-color: var(--bs-primary) !important;
-        background: var(--bs-primary) !important;
-        color: #fff !important;
-    }
-
-    .asset-action-btn-primary:hover {
-        background: color-mix(in srgb, var(--bs-primary) 88%, #000) !important;
-        color: #fff !important;
+    .table-responsive:has(.dropdown-menu.show) {
+        overflow: visible !important;
     }
 
     .info-label {
@@ -112,6 +48,7 @@
         text-transform: uppercase;
         margin-bottom: 4px;
     }
+
     /* Scoped wrap rules for modal columns so they stack vertically if width is cramped */
     .modal-body .odoo-form-group {
         flex-wrap: wrap !important;
@@ -124,279 +61,342 @@
         margin-bottom: 5px !important;
     }
 </style>
+
+@if(session('success'))
+    <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-3">
+        {{ session('success') }}
+    </x-ui.alert>
+@endif
+
+@if(session('error'))
+    <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-3">
+        {{ session('error') }}
+    </x-ui.alert>
+@endif
+
+@if($errors->any())
+    <x-ui.alert variant="danger" icon="feather-alert-octagon" dismissible class="mb-3">
+        <h6 class="fw-bold mb-2">{{ __('hrms.common.validation_errors') ?? 'Please fix the errors:' }}</h6>
+        <ul class="mb-0 ps-3">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </x-ui.alert>
+@endif
+
 <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 pb-3 border-bottom">
+    @php
+        $assetTabs = [
+            [
+                'id' => 'assigned-assets-pane',
+                'label' => __('hrms.employees.lbl_co_assets'),
+                'icon' => 'feather-package',
+                'active' => true,
+            ],
+            [
+                'id' => 'requests-log-pane',
+                'label' => __('hrms.assets.request_log'),
+                'icon' => 'feather-git-pull-request',
+                'active' => false,
+            ],
+        ];
+    @endphp
+
+    <!-- Common Horizontal Tabs Navigation -->
+    <x-ui.horizontal-tabs id="myAssetsTabList" :tabs="$assetTabs" class="mb-4" />
+
+    <div class="tab-content" id="myAssetsTabContent">
+        <!-- TAB 1: ASSIGNED ASSETS -->
+        <div class="tab-pane fade show active" id="assigned-assets-pane" role="tabpanel" aria-labelledby="assigned-assets-pane-tab">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 pb-3 border-bottom">
                 <div>
-                    <h5 class="card-custom-title" id="my_assets_card_title">
-                        <i class="feather-package text-primary"></i> {{ __('hrms.employees.lbl_co_assets') }}
+                    <h5 class="fw-bold mb-0 text-dark fs-15">
+                        <i class="feather-package text-primary me-2"></i>{{ __('hrms.employees.lbl_co_assets') }}
                     </h5>
-                    <small class="text-muted d-block mt-1" id="my_assets_card_desc">{{ __('hrms.employees.lbl_co_assets_desc') }}</small>
+                    <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_co_assets_desc') }}</small>
                 </div>
-                <div class="asset-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
+                <div class="d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
                     <!-- Search bar (Assigned Assets) -->
-                    <div class="documents-search d-flex align-items-center px-3 py-1" id="search_assigned_wrapper">
+                    <div class="documents-search d-flex align-items-center px-3 py-1">
                         <i class="feather-search text-muted me-2 fs-14"></i>
                         <input type="text" id="assignedAssetSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.employees.lbl_search_assets') }}" autocomplete="off" style="box-shadow: none; height: 32px;">
                     </div>
+
+                    <!-- Assigned Toolbar Action Dropdowns -->
+                    <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                        <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="name_asc">
+                            <span>{{ __('hrms.employees.lbl_asset_name_asc') }}</span>
+                            <i class="feather-check ms-3"></i>
+                        </a>
+                        <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="name_desc">
+                            <span>{{ __('hrms.employees.lbl_asset_name_desc') }}</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_desc">
+                            <span>{{ __('hrms.employees.lbl_assigned_latest') }}</span>
+                        </a>
+                        <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_asc">
+                            <span>{{ __('hrms.employees.lbl_assigned_oldest') }}</span>
+                        </a>
+                    </x-ui.sort-dropdown>
+
+                    <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                        <div class="document-filter-panel">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
+                            <form id="assignedAssetFilterForm" onsubmit="return false;">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_category') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="category">
+                                        <option value="">{{ __('hrms.employees.tbl_category') }} - {{ __('hrms.common.filter') }}</option>
+                                        @foreach($assignedAssetCategories as $catName)
+                                            <option value="{{ $catName }}">{{ $catName }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="dropdown-divider my-3"></div>
+                                <div class="d-flex gap-2">
+                                    <x-ui.button type="button" id="btnAssignedAssetFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="button" id="btnResetAssignedAssetFilter" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
+                                </div>
+                            </form>
+                        </div>
+                    </x-ui.filter>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 assigned-assets-table" id="assignedAssetsTable" style="table-layout: fixed; width: 100%;">
+                    <thead class="table-light text-uppercase fs-11">
+                        <tr>
+                            <th class="ps-3" style="width: 38%;">{{ __('hrms.employees.tbl_asset_name') }}</th>
+                            <th style="width: 24%;">{{ __('hrms.employees.tbl_category') }}</th>
+                            <th class="text-center" style="width: 10%;">{{ __('hrms.employees.tbl_units_assigned') }}</th>
+                            <th style="width: 16%;">{{ __('hrms.employees.tbl_date_assigned') }}</th>
+                            <th class="text-end pe-3" style="width: 12%;">{{ __('hrms.employees.tbl_actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($assignedAssets as $groupedAsset)
+                            @php
+                                $asset = $groupedAsset['asset'];
+                                $units = $groupedAsset['units'];
+                                $latestAssignedDate = $groupedAsset['latest_assigned_date'];
+                            @endphp
+                            <tr class="assigned-asset-row" 
+                                data-name="{{ strtolower($asset->name) }}" 
+                                data-search="{{ strtolower($asset->name) }}" 
+                                data-category="{{ $asset->category->name ?? '' }}"
+                                data-assigned="{{ $latestAssignedDate ? $latestAssignedDate->timestamp : 0 }}">
+                                <td class="ps-3" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px; background-color: rgba(59, 130, 246, 0.08) !important; color: #3b82f6 !important; flex-shrink: 0;">
+                                            <i class="feather-package fs-16"></i>
+                                        </div>
+                                        <div style="flex-grow: 1; min-width: 0;">
+                                            <div class="fw-bold text-dark mb-0.5" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ $asset->name }}">{{ $asset->name }}</div>
+                                            @if($asset->model_number)
+                                                <small class="text-muted d-block" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ __('hrms.employees.lbl_model') }}: {{ $asset->model_number }}">{{ __('hrms.employees.lbl_model') }}: {{ $asset->model_number }}</small>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-medium text-dark">{{ $asset->category->name ?? __('hrms.common.na') }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <x-ui.badge variant="primary" :soft="true" class="fw-bold fs-12 px-2.5 py-1">{{ count($units) }}</x-ui.badge>
+                                </td>
+                                <td>
+                                    <span class="text-dark fw-medium fs-12">{{ $latestAssignedDate ? $latestAssignedDate->format('d M, Y') : __('hrms.common.na') }}</span>
+                                </td>
+                                <td class="text-end pe-3">
+                                    <x-ui.action-dropdown align="end">
+                                        <li>
+                                            <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" 
+                                               data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" 
+                                               data-item-name="{{ $asset->name }}" 
+                                               data-allocated-assets="{{ base64_encode(json_encode($units)) }}">
+                                                <i class="feather-info text-primary fs-14"></i>
+                                                <span>{{ __('hrms.common.detail') }}</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="javascript:void(0)" 
+                                               data-bs-toggle="modal" data-bs-target="#returnAssetModal" 
+                                               data-item-id="{{ $asset->asset_item_id }}" 
+                                               data-item-name="{{ $asset->name }}" 
+                                               data-allocated-assets="{{ base64_encode(json_encode($units)) }}">
+                                                <i class="feather-corner-up-left text-warning fs-14"></i>
+                                                <span>{{ __('hrms.employees.lbl_return') }}</span>
+                                            </a>
+                                        </li>
+                                    </x-ui.action-dropdown>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr id="noAssignedAssetsRowEmpty">
+                                <td colspan="5" class="text-center py-5 text-muted fs-13">
+                                    <i class="feather-package d-block fs-32 text-light-muted mb-2"></i>
+                                    {{ __('hrms.employees.lbl_no_assigned_assets') }}
+                                </td>
+                            </tr>
+                        @endforelse
+                        <tr id="assignedAssetNoResultsRow" class="d-none">
+                            <td colspan="5" class="text-center py-5 text-muted fs-13">
+                                <i class="feather-package d-block fs-32 text-light-muted mb-2"></i>
+                                {{ __('hrms.employees.lbl_no_matching_assigned_assets') }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: REQUEST LOG -->
+        <div class="tab-pane fade" id="requests-log-pane" role="tabpanel" aria-labelledby="requests-log-pane-tab">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 pb-3 border-bottom">
+                <div>
+                    <h5 class="fw-bold mb-0 text-dark fs-15">
+                        <i class="feather-git-pull-request text-primary me-2"></i>{{ __('hrms.assets.request_log') }}
+                    </h5>
+                    <small class="text-muted d-block mt-1">{{ __('hrms.assets.asset_requests_history_desc') }}</small>
+                </div>
+                <div class="d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
                     <!-- Search bar (Requests Log) -->
-                    <div class="documents-search d-flex align-items-center px-3 py-1 d-none" id="search_requests_wrapper">
+                    <div class="documents-search d-flex align-items-center px-3 py-1">
                         <i class="feather-search text-muted me-2 fs-14"></i>
                         <input type="text" id="assetRequestSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.employees.lbl_search_requests') }}" autocomplete="off" style="box-shadow: none; height: 32px;">
                     </div>
 
-                    <!-- Assigned Toolbar Action Dropdowns -->
-                    <div id="toolbar_assigned_buttons" class="d-flex align-items-center gap-2">
-                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                            <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="name_asc">
-                                <span>{{ __('hrms.employees.lbl_asset_name_asc') }}</span>
-                                <i class="feather-check ms-3"></i>
-                            </a>
-                            <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="name_desc">
-                                <span>{{ __('hrms.employees.lbl_asset_name_desc') }}</span>
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_desc">
-                                <span>{{ __('hrms.employees.lbl_assigned_latest') }}</span>
-                            </a>
-                            <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_asc">
-                                <span>{{ __('hrms.employees.lbl_assigned_oldest') }}</span>
-                            </a>
-                        </x-ui.sort-dropdown>
-                        <x-ui.filter label="{{ __('hrms.common.filter') }}">
-                            <div class="document-filter-panel">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
-                                <form id="assignedAssetFilterForm" onsubmit="return false;">
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_category') }}</label>
-                                        <x-ui.odoo-form-ui type="select" name="category">
-                                            <option value="">{{ __('hrms.employees.tbl_category') }} - {{ __('hrms.common.filter') }}</option>
-                                            @foreach($assignedAssetCategories as $catName)
-                                                <option value="{{ $catName }}">{{ $catName }}</option>
-                                            @endforeach
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                    <div class="dropdown-divider my-3"></div>
-                                    <div class="d-flex gap-2">
-                                        <x-ui.button type="button" id="btnAssignedAssetFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
-                                        <x-ui.button type="button" id="btnResetAssignedAssetFilter" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
-                                    </div>
-                                </form>
-                            </div>
-                        </x-ui.filter>
-                    </div>
-
                     <!-- Requests Toolbar Action Dropdowns -->
-                    <div id="toolbar_requests_buttons" class="d-flex align-items-center gap-2 d-none">
-                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                            <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="date_desc">
-                                <span>{{ __('hrms.employees.lbl_req_date_desc') }}</span>
-                                <i class="feather-check ms-3"></i>
-                            </a>
-                            <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="date_asc">
-                                <span>{{ __('hrms.employees.lbl_req_date_asc') }}</span>
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_desc">
-                                <span>{{ __('hrms.employees.lbl_qty_desc') }}</span>
-                            </a>
-                            <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_asc">
-                                <span>{{ __('hrms.employees.lbl_qty_asc') }}</span>
-                            </a>
-                        </x-ui.sort-dropdown>
-                        <x-ui.filter label="{{ __('hrms.common.filter') }}">
-                            <div class="document-filter-panel">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
-                                <form id="assetRequestFilterForm" onsubmit="return false;">
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_category') }}</label>
-                                        <x-ui.odoo-form-ui type="select" name="category">
-                                            <option value="">{{ __('hrms.employees.tbl_category') }} - {{ __('hrms.common.filter') }}</option>
-                                            @foreach($requestAssetCategories as $catName)
-                                                <option value="{{ $catName }}">{{ $catName }}</option>
-                                            @endforeach
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_status') }}</label>
-                                        <x-ui.odoo-form-ui type="select" name="status">
-                                            <option value="">{{ __('hrms.employees.tbl_status') }} - {{ __('hrms.common.filter') }}</option>
-                                            @foreach($requestAssetStatuses as $statVal)
-                                                <option value="{{ $statVal }}">{{ ucfirst($statVal) }}</option>
-                                            @endforeach
-                                        </x-ui.odoo-form-ui>
-                                    </div>
-                                    <div class="dropdown-divider my-3"></div>
-                                    <div class="d-flex gap-2">
-                                        <x-ui.button type="button" id="btnAssetRequestFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
-                                        <x-ui.button type="button" id="btnAssetRequestFilterReset" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
-                                    </div>
-                                </form>
-                            </div>
-                        </x-ui.filter>
-                    </div>
+                    <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                        <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="date_desc">
+                            <span>{{ __('hrms.employees.lbl_req_date_desc') }}</span>
+                            <i class="feather-check ms-3"></i>
+                        </a>
+                        <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="date_asc">
+                            <span>{{ __('hrms.employees.lbl_req_date_asc') }}</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_desc">
+                            <span>{{ __('hrms.employees.lbl_qty_desc') }}</span>
+                        </a>
+                        <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_asc">
+                            <span>{{ __('hrms.employees.lbl_qty_asc') }}</span>
+                        </a>
+                    </x-ui.sort-dropdown>
 
-                    </div>
-                </div>
-
-                <!-- VIEW 1: ASSIGNED ASSETS -->
-                <div id="view_assigned_assets" class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 assigned-assets-table" id="assignedAssetsTable" style="table-layout: fixed; width: 100%;">
-                        <thead class="table-light text-uppercase fs-11">
-                            <tr>
-                                <th class="ps-3" style="width: 40%;">{{ __('hrms.employees.tbl_asset_name') }}</th>
-                                <th style="width: 22%;">{{ __('hrms.employees.tbl_category') }}</th>
-                                <th class="text-center" style="width: 8%;">{{ __('hrms.employees.tbl_units_assigned') }}</th>
-                                <th style="width: 13%;">{{ __('hrms.employees.tbl_date_assigned') }}</th>
-                                <th class="text-end pe-3" style="width: 17%;">{{ __('hrms.employees.tbl_actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($assignedAssets as $groupedAsset)
-                                @php
-                                    $asset = $groupedAsset['asset'];
-                                    $units = $groupedAsset['units'];
-                                    $latestAssignedDate = $groupedAsset['latest_assigned_date'];
-                                @endphp
-                                <tr class="assigned-asset-row" 
-                                    data-name="{{ strtolower($asset->name) }}" 
-                                    data-search="{{ strtolower($asset->name) }}" 
-                                    data-category="{{ $asset->category->name ?? '' }}"
-                                    data-assigned="{{ $latestAssignedDate ? $latestAssignedDate->timestamp : 0 }}">
-                                    <td class="ps-3" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar-sm rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px; background-color: rgba(59, 130, 246, 0.08) !important; color: #3b82f6 !important;">
-                                                <i class="feather-package fs-16"></i>
-                                            </div>
-                                            <div style="flex-grow: 1; min-width: 0;">
-                                                <div class="fw-bold text-dark mb-0.5" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ $asset->name }}">{{ $asset->name }}</div>
-                                                @if($asset->model_number)
-                                                    <small class="text-muted d-block" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ __('hrms.employees.lbl_model') }}: {{ $asset->model_number }}">{{ __('hrms.employees.lbl_model') }}: {{ $asset->model_number }}</small>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="fw-medium text-dark">{{ $asset->category->name ?? 'N/A' }}</div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-soft-primary text-primary fw-bold fs-12 px-2.5 py-1">{{ count($units) }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-dark fw-medium fs-12">{{ $latestAssignedDate ? $latestAssignedDate->format('d M, Y') : 'N/A' }}</span>
-                                    </td>
-                                    <td class="text-end pe-3">
-                                        <div class="d-flex align-items-center justify-content-end gap-2">
-                                            <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase px-3" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="font-size: 11px; height: 30px; border-radius: 6px;">
-                                                <i class="feather-info me-1.5 fs-12 text-primary"></i>{{ __('hrms.common.detail') }}
-                                            </button>
-                                            
-                                            <button type="button" class="btn btn-sm btn-soft-warning fw-bold text-uppercase px-3" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $asset->asset_item_id }}" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="font-size: 11px; height: 30px; border-radius: 6px;">
-                                                <i class="feather-corner-up-left me-1.5 fs-12 text-warning"></i>{{ __('hrms.employees.lbl_return') }}
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr id="noAssignedAssetsRowEmpty">
-                                    <td colspan="5" class="text-center py-5 text-muted fs-13">
-                                        <i class="feather-package d-block fs-32 text-light-muted mb-2"></i>
-                                        {{ __('hrms.employees.lbl_no_assigned_assets') }}
-                                    </td>
-                                </tr>
-                            @endforelse
-                            <tr id="assignedAssetNoResultsRow" class="d-none">
-                                <td colspan="5" class="text-center py-5 text-muted fs-13">
-                                    <i class="feather-package d-block fs-32 text-light-muted mb-2"></i>
-                                    {{ __('hrms.employees.lbl_no_matching_assigned_assets') }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- VIEW 2: REQUEST LOG (Initially Hidden) -->
-                <div id="view_request_log" class="table-responsive d-none">
-                    <table class="table table-hover align-middle mb-0 asset-requests-table" id="reqAssetsTable" style="table-layout: fixed; width: 100%;">
-                        <thead class="table-light text-uppercase fs-11">
-                            <tr>
-                                <th class="ps-3" style="width: 40%;">{{ __('hrms.employees.tbl_item') }}</th>
-                                <th style="width: 22%;">{{ __('hrms.employees.tbl_category') }}</th>
-                                <th class="text-center" style="width: 8%;">{{ __('hrms.employees.tbl_quantity') }}</th>
-                                <th style="width: 12%;">{{ __('hrms.employees.tbl_date_requested') }}</th>
-                                <th style="width: 10%;">{{ __('hrms.employees.tbl_status') }}</th>
-                                <th class="text-end pe-3" style="width: 8%;">{{ __('hrms.employees.tbl_action') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($employee->assetRequests()->with('item.category')->get()->sortByDesc('created_at') as $request)
-                                @php
-                                    $statusBadgeClass = match($request->status) {
-                                        'pending' => 'bg-soft-warning text-warning',
-                                        'approved' => 'bg-soft-success text-success',
-                                        'allocated' => 'bg-soft-info text-info',
-                                        'rejected' => 'bg-soft-danger text-danger',
-                                        'returned' => 'bg-soft-secondary text-secondary',
-                                        default => 'bg-light text-secondary'
-                                    };
-                                @endphp
-                                <tr class="asset-request-row" 
-                                    data-name="{{ strtolower($request->item->name ?? '') }}" 
-                                    data-search="{{ strtolower($request->item->name ?? '') }}" 
-                                    data-category="{{ $request->item->category->name ?? '' }}" 
-                                    data-status="{{ $request->status }}"
-                                    data-qty="{{ $request->quantity }}"
-                                    data-date="{{ $request->created_at ? $request->created_at->timestamp : 0 }}">
-                                    <td class="ps-3" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
-                                        <div class="fw-bold text-dark mb-0.5" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ $request->item->name ?? 'N/A' }}">{{ $request->item->name ?? 'N/A' }}</div>
-                                        @if($request->reason)
-                                            <small class="text-muted d-block" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ $request->reason }}">{{ $request->reason }}</small>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <div class="fw-medium text-dark">{{ $request->item->category->name ?? 'N/A' }}</div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-soft-primary text-primary fw-bold fs-12 px-2 py-0.5">{{ $request->quantity }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-dark fw-medium fs-12">{{ $request->created_at ? $request->created_at->format('d M, Y') : 'N/A' }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge {{ $statusBadgeClass }} px-2.5 py-1 rounded-pill fs-11 text-uppercase">{{ $request->status }}</span>
-                                    </td>
-                                    <td class="text-end pe-3">
-                                        <div class="d-flex align-items-center justify-content-end gap-2">
-                                            @if($request->status === 'pending')
-                                                <form action="{{ route('hrms.assets.requests.reject', $request->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_withdraw_request') }}', { title: '{{ __('hrms.employees.lbl_withdraw_request') }}', variant: 'warning', confirmButtonText: '{{ __('hrms.employees.btn_withdraw') }}' });" class="m-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px;" title="Withdraw Request">
-                                                        <i class="feather-trash-2 fs-13"></i>
-                                                    </button>
-                                                </form>
-                                            @else
-                                                <span class="text-muted fs-12 italic">{{ __('hrms.employees.lbl_locked') }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr id="noReqAssetsRowEmpty">
-                                    <td colspan="6" class="text-center py-5 text-muted fs-13">
-                                        <i class="feather-git-pull-request d-block fs-32 text-light-muted mb-2"></i>
-                                        {{ __('hrms.employees.lbl_no_requests_history') }}
-                                    </td>
-                                </tr>
-                            @endforelse
-                            <tr id="assetRequestNoResultsRow" class="d-none">
-                                <td colspan="6" class="text-center py-5 text-muted fs-13">
-                                    <i class="feather-git-pull-request d-block fs-32 text-light-muted mb-2"></i>
-                                    {{ __('hrms.employees.lbl_no_matching_requests') }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                        <div class="document-filter-panel">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
+                            <form id="assetRequestFilterForm" onsubmit="return false;">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_category') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="category">
+                                        <option value="">{{ __('hrms.employees.tbl_category') }} - {{ __('hrms.common.filter') }}</option>
+                                        @foreach($requestAssetCategories as $catName)
+                                            <option value="{{ $catName }}">{{ $catName }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_status') }}</label>
+                                    <x-ui.odoo-form-ui type="select" name="status">
+                                        <option value="">{{ __('hrms.employees.tbl_status') }} - {{ __('hrms.common.filter') }}</option>
+                                        @foreach($requestAssetStatuses as $statVal)
+                                            <option value="{{ $statVal }}">{{ ucfirst($statVal) }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                                <div class="dropdown-divider my-3"></div>
+                                <div class="d-flex gap-2">
+                                    <x-ui.button type="button" id="btnAssetRequestFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="button" id="btnAssetRequestFilterReset" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
+                                </div>
+                            </form>
+                        </div>
+                    </x-ui.filter>
                 </div>
             </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 asset-requests-table" id="reqAssetsTable" style="table-layout: fixed; width: 100%;">
+                    <thead class="table-light text-uppercase fs-11">
+                        <tr>
+                            <th class="ps-3" style="width: 36%;">{{ __('hrms.employees.tbl_item') }}</th>
+                            <th style="width: 20%;">{{ __('hrms.employees.tbl_category') }}</th>
+                            <th class="text-center" style="width: 8%;">{{ __('hrms.employees.tbl_quantity') }}</th>
+                            <th style="width: 16%;">{{ __('hrms.employees.tbl_date_requested') }}</th>
+                            <th style="width: 12%;">{{ __('hrms.employees.tbl_status') }}</th>
+                            <th class="text-end pe-3" style="width: 8%;">{{ __('hrms.employees.tbl_action') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($employee->assetRequests()->with('item.category')->get()->sortByDesc('created_at') as $request)
+                            <tr class="asset-request-row" 
+                                data-name="{{ strtolower($request->item->name ?? '') }}" 
+                                data-search="{{ strtolower($request->item->name ?? '') }}" 
+                                data-category="{{ $request->item->category->name ?? '' }}" 
+                                data-status="{{ $request->status }}"
+                                data-qty="{{ $request->quantity }}"
+                                data-date="{{ $request->created_at ? $request->created_at->timestamp : 0 }}">
+                                <td class="ps-3" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
+                                    <div class="fw-bold text-dark mb-0.5" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ $request->item->name ?? __('hrms.common.na') }}">{{ $request->item->name ?? __('hrms.common.na') }}</div>
+                                    @if($request->reason)
+                                        <small class="text-muted d-block" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;" title="{{ $request->reason }}">{{ $request->reason }}</small>
+                                    @endif
+                                </td>
+                                <td>
+                                    <div class="fw-medium text-dark">{{ $request->item->category->name ?? __('hrms.common.na') }}</div>
+                                </td>
+                                <td class="text-center">
+                                    <x-ui.badge variant="primary" :soft="true" class="fw-bold fs-12 px-2 py-0.5">{{ $request->quantity }}</x-ui.badge>
+                                </td>
+                                <td>
+                                    <span class="text-dark fw-medium fs-12">{{ $request->created_at ? $request->created_at->format('d M, Y') : __('hrms.common.na') }}</span>
+                                </td>
+                                <td>
+                                    <x-ui.status-badge :status="$request->status" :dot="true" size="sm" />
+                                </td>
+                                <td class="text-end pe-3">
+                                    @if($request->status === 'pending')
+                                        <x-ui.action-dropdown align="end">
+                                            <li>
+                                                <form action="{{ route('hrms.assets.requests.reject', $request->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_withdraw_request') }}', { title: '{{ __('hrms.employees.lbl_withdraw_request') }}', variant: 'warning', confirmButtonText: '{{ __('hrms.employees.btn_withdraw') }}' });" class="m-0">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger">
+                                                        <i class="feather-trash-2 fs-14"></i>
+                                                        <span>{{ __('hrms.employees.lbl_withdraw_request') }}</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </x-ui.action-dropdown>
+                                    @else
+                                        <span class="text-muted fs-12 italic d-inline-block text-center w-100">-</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr id="noReqAssetsRowEmpty">
+                                <td colspan="6" class="text-center py-5 text-muted fs-13">
+                                    <i class="feather-git-pull-request d-block fs-32 text-light-muted mb-2"></i>
+                                    {{ __('hrms.employees.lbl_no_requests_history') }}
+                                </td>
+                            </tr>
+                        @endforelse
+                        <tr id="assetRequestNoResultsRow" class="d-none">
+                            <td colspan="6" class="text-center py-5 text-muted fs-13">
+                                <i class="feather-git-pull-request d-block fs-32 text-light-muted mb-2"></i>
+                                {{ __('hrms.employees.lbl_no_matching_requests') }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- RETURN ASSET MODAL -->
 <div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
@@ -408,7 +408,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="returnAssetForm" method="POST">
+            <form id="returnAssetForm" action="{{ route('hrms.assets-module.return-direct-multi') }}" method="POST">
                 @csrf
                 <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                 <div class="modal-body">
@@ -425,7 +425,7 @@
                             <div id="my_return_checklist_error" class="d-none mt-2">
                                 <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-2" style="background: #fff3f3; border: 1px solid #f5c2c7;">
                                     <i class="feather-alert-circle text-danger" style="font-size: 15px; flex-shrink: 0;"></i>
-                                    <span class="text-danger fs-12 fw-semibold">Please select at least one unit to return.</span>
+                                    <span class="text-danger fs-12 fw-semibold">{{ __('hrms.assets.alert_select_unit_to_return') }}</span>
                                 </div>
                             </div>
                             <small class="text-muted mt-1 d-block">{{ __('hrms.employees.mdl_select_units_desc') }}</small>
@@ -434,7 +434,7 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_return_condition') }}" name="condition_on_return" :required="true" select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_return_condition') }}" name="condition_on_return" :required="true">
                                 <option value="good">{{ __('hrms.employees.mdl_condition_good') }}</option>
                                 <option value="new">{{ __('hrms.employees.mdl_condition_new') }}</option>
                                 <option value="fair">{{ __('hrms.employees.mdl_condition_fair') }}</option>
@@ -448,8 +448,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_process_return') }}</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_cancel') }}</button>
+                    <x-ui.button type="submit" variant="primary" class="px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_process_return') }}</x-ui.button>
+                    <x-ui.button type="button" variant="light" class="border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_cancel') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -489,7 +489,7 @@
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_cancel') }}</button>
+                <x-ui.button type="button" variant="light" class="border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_cancel') }}</x-ui.button>
             </div>
         </div>
     </div>
@@ -516,9 +516,9 @@
                         <div class="col-12">
                             <div class="d-flex align-items-center justify-content-between mb-2">
                                 <label class="info-label fw-bold text-dark mb-0">{{ __('hrms.employees.mdl_req_items_qty') }}</label>
-                                <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-req-item-row" style="font-size: 11px;">
-                                    <i class="feather-plus me-1"></i>{{ __('hrms.employees.mdl_add_another_item') }}
-                                </button>
+                                <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-req-item-row" icon="feather-plus" class="fw-bold text-uppercase" style="font-size: 11px;">
+                                    {{ __('hrms.employees.mdl_add_another_item') }}
+                                </x-ui.button>
                             </div>
                             <div class="table-responsive border rounded bg-white req-item-table-container">
                                 <table class="table table-sm align-middle mb-0" id="req-items-table" style="table-layout: fixed; width: 100%;">
@@ -535,7 +535,7 @@
                                                 <select name="items[0][asset_item_id]" class="form-select form-select-sm req-item-select" required style="width: 100%;">
                                                     <option value="">{{ __('hrms.employees.mdl_select_item') }}</option>
                                                     @foreach($availableAssetItems as $item)
-                                                        <option value="{{ $item->id }}">{{ $item->name }} (Category: {{ $item->category->name ?? 'N/A' }})</option>
+                                                        <option value="{{ $item->id }}">{{ $item->name }} ({{ __('hrms.assets.category') }}: {{ $item->category->name ?? __('hrms.common.na') }})</option>
                                                     @endforeach
                                                 </select>
                                             </td>
@@ -556,8 +556,8 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2 gap-2">
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_submit_request') }}</button>
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
+                    <x-ui.button type="submit" variant="primary" class="px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_submit_request') }}</x-ui.button>
+                    <x-ui.button type="button" variant="light" class="border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -567,6 +567,18 @@
 
 @push('scripts')
 <script>
+    const langAssets = {
+        code: "{{ __('hrms.assets.asset_code_label') }}",
+        serial: "{{ __('hrms.assets.serial_number') }}",
+        na: "{{ __('hrms.common.na') }}",
+        condGood: "{{ __('hrms.assets.cond_good') }}",
+        condNew: "{{ __('hrms.assets.cond_new') }}",
+        condFair: "{{ __('hrms.assets.cond_fair') }}",
+        condDamaged: "{{ __('hrms.assets.cond_damaged') }}",
+        condScrapped: "{{ __('hrms.assets.cond_scrapped') }}",
+        duplicateItem: "{{ __('hrms.assets.error_dup_assets_selected') }}"
+    };
+
     $(document).ready(function() {
         // Append modals to body
         $('#returnAssetModal').appendTo('body');
@@ -858,6 +870,48 @@
             }
         });
 
+        // Client-side validation for Multi-Item Asset Request Form
+        $('#requestAssetMultiForm').on('submit', function(e) {
+            var form = $(this);
+            var reason = form.find('textarea[name="reason"]').val() ? form.find('textarea[name="reason"]').val().trim() : '';
+            var hasInvalidItem = false;
+            var selectedItems = 0;
+            var itemIds = [];
+            var hasDuplicateItem = false;
+
+            form.find('.req-item-select').each(function() {
+                var val = $(this).val();
+                if (!val) {
+                    hasInvalidItem = true;
+                } else {
+                    if (itemIds.includes(val)) {
+                        hasDuplicateItem = true;
+                    }
+                    itemIds.push(val);
+                    selectedItems++;
+                }
+            });
+
+            if (selectedItems === 0 || hasInvalidItem) {
+                e.preventDefault();
+                alert("{{ __('hrms.assets.alert_select_item_all_rows') }}");
+                return false;
+            }
+
+            if (hasDuplicateItem) {
+                e.preventDefault();
+                alert(langAssets.duplicateItem || "{{ __('hrms.assets.error_dup_assets_selected') }}");
+                return false;
+            }
+
+            if (!reason) {
+                e.preventDefault();
+                alert("{{ __('hrms.assets.alert_provide_reason') }}");
+                form.find('textarea[name="reason"]').focus();
+                return false;
+            }
+        });
+
         // Handle Return modal binding
         $('#returnAssetModal').on('show.bs.modal', function(event) {
             var button = $(event.relatedTarget);
@@ -880,7 +934,7 @@
             }
 
             if (assets.length === 0) {
-                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>{{ __("hrms.assets.alert_no_active_allocations") }}</span>');
             } else {
                 assets.forEach(function(asset) {
                     var checkboxId = 'my_return_asset_check_' + asset.id;
@@ -888,7 +942,7 @@
                         <div class="form-check py-1 border-bottom-dashed d-flex align-items-center">
                             <input class="form-check-input return-allocated-asset-checkbox" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" style="cursor: pointer;">
                             <label class="form-check-label fs-12 ms-2 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
-                                <strong>Code:</strong> ${asset.asset_code} | <strong>Serial:</strong> ${asset.serial_number || 'N/A'}
+                                <strong>${langAssets.code}:</strong> ${asset.asset_code} | <strong>${langAssets.serial}:</strong> ${asset.serial_number || langAssets.na}
                             </label>
                         </div>
                     `;
@@ -931,25 +985,34 @@
             }
 
             if (assets.length === 0) {
-                tbody.append('<tr><td colspan="5" class="py-3 text-muted">No units assigned.</td></tr>');
+                tbody.append('<tr><td colspan="5" class="py-3 text-muted">{{ __("hrms.assets.no_units_assigned") }}</td></tr>');
             } else {
                 assets.forEach(function(asset) {
-                    var dateStr = asset.allocated_at ? new Date(asset.allocated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+                    var dateStr = langAssets.na;
+                    if (asset.allocated_at) {
+                        var parts = String(asset.allocated_at).split('-');
+                        if (parts.length === 3) {
+                            var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                            dateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                        } else {
+                            dateStr = asset.allocated_at;
+                        }
+                    }
                     var condBadge = {
-                        'new': 'bg-soft-success text-success',
-                        'good': 'bg-soft-info text-info',
-                        'fair': 'bg-soft-warning text-warning',
-                        'damaged': 'bg-soft-danger text-danger',
-                        'scrapped': 'bg-soft-secondary text-secondary'
+                        'new': { cls: 'bg-soft-success text-success', label: langAssets.condNew },
+                        'good': { cls: 'bg-soft-info text-info', label: langAssets.condGood },
+                        'fair': { cls: 'bg-soft-warning text-warning', label: langAssets.condFair },
+                        'damaged': { cls: 'bg-soft-danger text-danger', label: langAssets.condDamaged },
+                        'scrapped': { cls: 'bg-soft-secondary text-secondary', label: langAssets.condScrapped }
                     };
-                    var badgeClass = condBadge[asset.condition] || 'bg-light text-muted';
+                    var condInfo = condBadge[asset.condition] || { cls: 'bg-light text-muted', label: asset.condition || langAssets.na };
                     var rowHtml = `
                         <tr>
                             <td class="text-start py-2 px-3 fw-bold text-dark"><code>${asset.asset_code}</code></td>
-                            <td class="py-2">${asset.serial_number || 'N/A'}</td>
+                            <td class="py-2">${asset.serial_number || langAssets.na}</td>
                             <td class="py-2 text-muted">${dateStr}</td>
                             <td class="py-2">
-                                <span class="badge ${badgeClass} rounded-pill px-2 py-0.5" style="font-size: 11px;">${asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)}</span>
+                                <span class="badge ${condInfo.cls} rounded-pill px-2 py-0.5" style="font-size: 11px;">${condInfo.label}</span>
                             </td>
                             <td class="text-start py-2 px-3 text-muted" style="white-space: normal; word-wrap: break-word; overflow-wrap: break-word; max-width: 320px;" title="${asset.notes || ''}">${asset.notes || '-'}</td>
                         </tr>
@@ -959,52 +1022,15 @@
             }
         });
 
-        // 8. UNIFIED VIEW TOGGLER JS
-        var activeAssetView = 'assigned'; // 'assigned' or 'requests'
-        $('#btn-toggle-asset-view').on('click', function() {
-            if (activeAssetView === 'assigned') {
-                // Change to requests log view
-                activeAssetView = 'requests';
-                $('#my_assets_card_title').html('<i class="feather-git-pull-request text-primary"></i> Asset Requests History');
-                $('#my_assets_card_desc').text('History of submitted asset requests.');
-                
-                $('#search_assigned_wrapper').addClass('d-none');
-                $('#search_requests_wrapper').removeClass('d-none');
-                
-                $('#toolbar_assigned_buttons').addClass('d-none');
-                $('#toolbar_requests_buttons').removeClass('d-none');
-                
-                $('#view_assigned_assets').addClass('d-none');
-                $('#view_request_log').removeClass('d-none');
-                
-                $('#toggle-view-icon').attr('class', 'feather-package');
-                $('#toggle-view-text').text('Asset History');
-            } else {
-                // Change back to assigned assets history view
-                activeAssetView = 'assigned';
-                $('#my_assets_card_title').html('<i class="feather-package text-primary"></i> {{ __("hrms.employees.lbl_co_assets") }}');
-                $('#my_assets_card_desc').text('{{ __("hrms.employees.lbl_co_assets_desc") }}');
-                
-                $('#search_assigned_wrapper').removeClass('d-none');
-                $('#search_requests_wrapper').addClass('d-none');
-                
-                $('#toolbar_assigned_buttons').removeClass('d-none');
-                $('#toolbar_requests_buttons').addClass('d-none');
-                
-                $('#view_assigned_assets').removeClass('d-none');
-                $('#view_request_log').addClass('d-none');
-                
-                $('#toggle-view-icon').attr('class', 'feather-git-pull-request');
-                $('#toggle-view-text').text('Request Log');
-            }
-        });
     });
 
     function confirmFormSubmit(event, message, options) {
         event.preventDefault();
-        var form = event.target;
+        var form = event.currentTarget || (event.target && event.target.closest ? event.target.closest('form') : event.target);
         if (confirm(message)) {
-            form.submit();
+            if (form && typeof form.submit === 'function') {
+                form.submit();
+            }
         }
         return false;
     }

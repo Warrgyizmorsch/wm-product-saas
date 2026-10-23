@@ -87,6 +87,16 @@ class PurchaseOrder extends BaseModel
         'grand_total' => 'decimal:2',
     ];
 
+    public function getOrderNumberAttribute(): string
+    {
+        return $this->attributes['purchase_order_number'] ?? '';
+    }
+
+    public function getOrderDateAttribute()
+    {
+        return $this->attributes['date'] ?? null;
+    }
+
     public function productionOrder(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');

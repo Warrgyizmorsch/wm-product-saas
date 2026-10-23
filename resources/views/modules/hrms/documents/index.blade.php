@@ -89,8 +89,19 @@
         .odoo-form-label {
             white-space: nowrap !important;
         }
+        #uploadDocumentModal .modal-dialog {
+            max-width: 560px;
+        }
         #uploadDocumentModal .odoo-form-label {
             width: 190px !important;
+        }
+        #docHrSigInputTabs {
+            flex-wrap: nowrap !important;
+            white-space: nowrap !important;
+        }
+        #docHrSigInputTabs .nav-item,
+        #docHrSigInputTabs .nav-link {
+            white-space: nowrap !important;
         }
         .file-upload-box {
             transition: all 0.2s ease-in-out;
@@ -124,46 +135,51 @@
     <div class="row">
         <div class="col-12">
             @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="feather-check-circle me-1.5"></i> {{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-3">
+                    {{ session('success') }}
+                </x-ui.alert>
             @endif
 
             @if(session('error'))
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="feather-alert-triangle me-1.5"></i> {{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-3">
+                    {{ session('error') }}
+                </x-ui.alert>
             @endif
 
             @if($errors->any())
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <h6 class="fw-bold mb-2"><i class="feather-alert-octagon me-1"></i> Please fix the errors:</h6>
+                <x-ui.alert variant="danger" icon="feather-alert-octagon" dismissible class="mb-3">
+                    <h6 class="fw-bold mb-2">Please fix the errors:</h6>
                     <ul class="mb-0 ps-3">
                         @foreach($errors->all() as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
+                </x-ui.alert>
             @endif
 
             <!-- Main Registry Panel -->
             <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-                <!-- Tabs Navigation -->
-                <ul class="nav nav-tabs border-bottom mb-4" id="documentTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link {{ $activeTab === 'employee' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'employee']) }}">
-                            <i class="feather-user me-2"></i>Employee Uploaded
-                        </a>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link {{ $activeTab === 'hr' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'hr']) }}">
-                            <i class="feather-shield me-2"></i>HR Uploaded
-                        </a>
-                    </li>
-                </ul>
+                @php
+                    $registryTabs = [
+                        [
+                            'id' => 'tab-employee',
+                            'label' => 'Employee Uploaded',
+                            'active' => $activeTab === 'employee',
+                            'icon' => 'feather-user',
+                            'url' => request()->fullUrlWithQuery(['tab' => 'employee', 'page' => null]),
+                        ],
+                        [
+                            'id' => 'tab-hr',
+                            'label' => 'HR Uploaded',
+                            'active' => $activeTab === 'hr',
+                            'icon' => 'feather-shield',
+                            'url' => request()->fullUrlWithQuery(['tab' => 'hr', 'page' => null]),
+                        ],
+                    ];
+                @endphp
+
+                <!-- Common Horizontal Tabs Navigation -->
+                <x-ui.horizontal-tabs id="documentRegistryTabs" :tabs="$registryTabs" class="mb-4" />
 
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 pb-3 border-bottom mb-4">
                     <div>
@@ -293,9 +309,9 @@
                                         <td>
                                             <div class="fw-bold text-dark fs-13 text-truncate" title="{{ $doc->name }}">{{ $doc->name }}</div>
                                             <div class="mt-1">
-                                                <span class="badge bg-soft-secondary text-secondary px-1.5 py-0.5 rounded fs-10" style="background-color: rgba(108, 117, 125, 0.08) !important; color: #6c757d !important; border: 1px solid rgba(108, 117, 125, 0.15);">
+                                                <x-ui.badge soft variant="secondary" class="border px-1.5 py-0.5 fs-10">
                                                     {{ $doc->documentMaster?->category?->name ?? 'Uncategorized' }}
-                                                </span>
+                                                </x-ui.badge>
                                             </div>
                                         </td>
 
@@ -351,14 +367,14 @@
                                                     );
                                                 @endphp
                                                 @if(!$doc->file_path || $isExpired)
-                                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
+                                                    <x-ui.badge soft variant="warning" class="border px-2.5 py-1 fs-11 d-inline-flex align-items-center gap-1" style="font-weight: 500;">
                                                         <i class="feather-clock fs-11"></i>
                                                         Pending Upload
-                                                    </span>
+                                                    </x-ui.badge>
                                                 @elseif($doc->status === 'pending_signature')
-                                                    <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.2); font-weight: 600;">
+                                                    <x-ui.badge soft variant="warning" class="border px-2.5 py-1 fs-11 d-inline-flex align-items-center gap-1" style="font-weight: 600;">
                                                         <i class="feather-edit-3 fs-11"></i> Pending Signature
-                                                    </span>
+                                                    </x-ui.badge>
                                                 @else
                                                     @if($requiresApproval && $canManageDocStatus)
                                                         <div class="dropdown d-inline-block">
@@ -405,9 +421,9 @@
                                                     @endif
                                                     @if($doc->is_signed)
                                                         <div class="mt-0.5">
-                                                            <span class="badge bg-soft-success text-success px-1.5 py-0.5 rounded fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
+                                                            <x-ui.badge soft variant="success" class="border px-1.5 py-0.5 fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
                                                                 <i class="feather-check-circle fs-9 me-0.5"></i> Signed
-                                                            </span>
+                                                            </x-ui.badge>
                                                         </div>
                                                     @endif
                                                 @endif
@@ -417,14 +433,14 @@
                                             <div class="mt-1 text-muted fs-11">
                                                 @if($doc->expiry_date)
                                                     @if($isExpired)
-                                                        <span class="text-danger fw-bold"><i class="feather-alert-triangle me-1"></i>Expired ({{ $doc->expiry_date->format('d M Y') }})</span>
+                                                        <x-ui.badge soft variant="danger" class="border"><i class="feather-alert-triangle me-1"></i>Expired ({{ $doc->expiry_date->format('d M Y') }})</x-ui.badge>
                                                     @elseif($isExpiringSoon)
-                                                        <span class="text-warning fw-bold"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M Y') }})</span>
+                                                        <x-ui.badge soft variant="warning" class="border"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M Y') }})</x-ui.badge>
                                                     @else
                                                         <span><i class="feather-clock me-1"></i>Expiry: {{ $doc->expiry_date->format('d M Y') }}</span>
                                                     @endif
                                                 @elseif($doc->has_expiry)
-                                                    <span class="text-warning"><i class="feather-alert-circle me-1"></i>Expiry Required</span>
+                                                    <x-ui.badge soft variant="warning" class="border"><i class="feather-alert-circle me-1"></i>Expiry Required</x-ui.badge>
                                                 @else
                                                     <span class="text-success"><i class="feather-check-circle me-1"></i>No Expiry</span>
                                                 @endif
@@ -440,9 +456,7 @@
                                                          <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
                                                              @csrf
                                                              @method('DELETE')
-                                                             <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
-                                                                 <i class="feather-trash-2 fs-13"></i>
-                                                             </button>
+                                                             <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="{{ __('hrms.common.delete') }}" />
                                                          </form>
                                                      @endif
                                                 </div>
@@ -483,142 +497,134 @@
     </form>
 
     <!-- Upload / Generate Document Modal -->
-    <div class="modal fade" id="uploadDocumentModal" tabindex="-1" aria-labelledby="uploadDocumentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-dark fs-15" id="uploadDocumentModalLabel"><i class="feather-file-plus text-primary me-1"></i> Add / Generate Employee Document</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <x-ui.modal id="uploadDocumentModal" title="<i class='feather-file-plus text-primary me-1'></i> Add / Generate Employee Document" size="md" :showFooter="false" :centered="true">
+        <form action="{{ route('hrms.documents.bulk-upload') }}" method="POST" enctype="multipart/form-data" id="bulkUploadForm" onsubmit="return validateBulkUploadForm(event, this);">
+            @csrf
+            <div>
+                <!-- Mode Switcher -->
+                <div class="p-3 bg-light rounded border mb-3">
+                    <label class="form-label fw-bold text-dark fs-12 mb-2 d-block">Select Operation Mode:</label>
+                    <div class="d-flex gap-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="upload_mode" id="mode_file_upload" value="file" checked onchange="toggleUploadMode(this.value)">
+                            <label class="form-check-label fw-bold text-dark fs-13" for="mode_file_upload">
+                                <i class="feather-upload-cloud me-1 text-primary"></i> Upload Local File
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="upload_mode" id="mode_template_gen" value="generate" onchange="toggleUploadMode(this.value)">
+                            <label class="form-check-label fw-bold text-primary fs-13" for="mode_template_gen">
+                                <i class="feather-zap me-1 text-warning"></i> Generate From Document Template
+                            </label>
+                        </div>
+                    </div>
                 </div>
-                <form action="{{ route('hrms.documents.bulk-upload') }}" method="POST" enctype="multipart/form-data" id="bulkUploadForm">
-                    @csrf
-                    <div class="modal-body p-4">
-                        <!-- Mode Switcher -->
-                        <div class="p-3 bg-light rounded border mb-3">
-                            <label class="form-label fw-bold text-dark fs-12 mb-2 d-block">Select Operation Mode:</label>
-                            <div class="d-flex gap-4">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="upload_mode" id="mode_file_upload" value="file" checked onchange="toggleUploadMode(this.value)">
-                                    <label class="form-check-label fw-bold text-dark fs-13" for="mode_file_upload">
-                                        <i class="feather-upload-cloud me-1 text-primary"></i> Upload Local File
-                                    </label>
+
+                <!-- Select Employee (Dropdown) -->
+                <div class="mb-3">
+                    <x-ui.odoo-form-ui type="select" label="Select Employee" name="employee_id" id="employee_id" :required="true" select2-selector="default">
+                        <option value="all" selected>All Employees</option>
+                        @foreach($employees as $emp)
+                            <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+
+                <!-- Section for File Upload Mode -->
+                <div id="section_file_upload_mode">
+                    <!-- Document Category Selection -->
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id" id="document_category_id" select2-selector="default" onchange="filterTemplatesByCategory(this)">
+                            <option value="">Choose Category...</option>
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <!-- Document Master Selection -->
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="select" label="Document Master" name="document_master_id" id="document_master_id" select2-selector="default" disabled="disabled">
+                            <option value="">Choose Master...</option>
+                            @foreach($templates as $tmpl)
+                                <option value="{{ $tmpl->id }}" data-category-id="{{ $tmpl->document_category_id }}" data-expiry="{{ $tmpl->expiry_applicable ? '1' : '0' }}">{{ $tmpl->name }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <!-- File Upload -->
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="file" label="File Attachment" name="file" id="modal_upload_file" />
+                    </div>
+
+                    <!-- Expiry Date -->
+                    <div class="mb-3 d-none" id="expiry-date-container">
+                        <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" id="modal_expiry_date" inputType="date" />
+                    </div>
+                </div>
+
+                <!-- Section for Generate Template Mode -->
+                <div id="section_template_gen_mode" class="d-none">
+                    <div class="mb-3">
+                        <x-ui.odoo-form-ui type="select" label="Select Document Template" name="document_template_id" id="modal_document_template_id" select2-selector="default">
+                            <option value="">Select Template...</option>
+                            @foreach($documentTemplates as $dt)
+                                <option value="{{ $dt->id }}">{{ $dt->name }} ({{ $dt->code }})</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        <small class="text-muted mt-1 d-block">Selecting a template will auto-populate live profile details for the chosen employee.</small>
+                    </div>
+
+                    <!-- HR DIGITAL SIGNATURE SECTION -->
+                    <div class="p-3 bg-white border rounded mb-3">
+                        <h6 class="fw-bold text-dark fs-13 mb-2"><i class="feather-edit-3 text-warning me-1"></i> HR / Authoriser Signature Stamp</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="input" label="HR Signer Name" name="hr_name" value="{{ auth()->user()->name }}" placeholder="e.g. {{ auth()->user()->name }}" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="input" label="HR Designation / Title" name="hr_designation" value="HR Manager" placeholder="e.g. HR Manager / Director" />
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                    <label class="form-label fw-bold fs-12 text-dark mb-0 text-nowrap">HR Signature</label>
+                                    <ul class="nav nav-pills flex-nowrap bg-light p-1 rounded-pill border gap-1" id="docHrSigInputTabs" role="tablist">
+                                        <li class="nav-item">
+                                            <button type="button" id="btn_doc_hr_sig_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary text-nowrap" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchDocHrSigMode('draw')">
+                                                <i class="feather-edit-2 me-1"></i> Draw Signature
+                                            </button>
+                                        </li>
+                                        <li class="nav-item">
+                                            <button type="button" id="btn_doc_hr_sig_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0 text-nowrap" onclick="switchDocHrSigMode('upload')">
+                                                <i class="feather-upload-cloud me-1"></i> Upload Image
+                                            </button>
+                                        </li>
+                                    </ul>
                                 </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="upload_mode" id="mode_template_gen" value="generate" onchange="toggleUploadMode(this.value)">
-                                    <label class="form-check-label fw-bold text-primary fs-13" for="mode_template_gen">
-                                        <i class="feather-zap me-1 text-warning"></i> Generate From Document Template
-                                    </label>
+                                <input type="hidden" name="hr_signature_data" id="doc_hr_sig_input_data">
+
+                                <!-- DRAW HR SIGNATURE TAB -->
+                                <div id="doc_hr_sig_draw_container">
+                                    <div class="d-flex justify-content-end mb-1">
+                                        <x-ui.button type="button" variant="light" size="sm" class="border btn-xs py-0.5 px-2 fs-11" onclick="clearDocHrSigCanvas()">
+                                            <i class="feather-rotate-ccw me-1"></i>Clear Canvas
+                                        </x-ui.button>
+                                    </div>
+                                    <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
+                                        <canvas id="docHrSignatureCanvas" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px;"></canvas>
+                                    </div>
+                                    <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw HR signature using mouse or touch.</small>
                                 </div>
-                            </div>
-                        </div>
 
-                        <!-- Select Employee (Dropdown) -->
-                        <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Select Employee" name="employee_id" id="employee_id" :required="true" select2-selector="default">
-                                <option value="all" selected>All Employees</option>
-                                @foreach($employees as $emp)
-                                    <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
-
-                        <!-- Section for File Upload Mode -->
-                        <div id="section_file_upload_mode">
-                            <!-- Document Category Selection -->
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id" id="document_category_id" select2-selector="default" onchange="filterTemplatesByCategory(this)">
-                                    <option value="">Choose Category...</option>
-                                    @foreach($categories as $cat)
-                                        <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-
-                            <!-- Document Master Selection -->
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Document Master" name="document_master_id" id="document_master_id" select2-selector="default" disabled="disabled">
-                                    <option value="">Choose Master...</option>
-                                    @foreach($templates as $tmpl)
-                                        <option value="{{ $tmpl->id }}" data-category-id="{{ $tmpl->document_category_id }}" data-expiry="{{ $tmpl->expiry_applicable ? '1' : '0' }}">{{ $tmpl->name }}</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-
-                            <!-- File Upload -->
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="file" label="File Attachment" name="file" id="modal_upload_file" />
-                            </div>
-
-                            <!-- Expiry Date -->
-                            <div class="mb-3 d-none" id="expiry-date-container">
-                                <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" id="modal_expiry_date" inputType="date" />
-                            </div>
-                        </div>
-
-                        <!-- Section for Generate Template Mode -->
-                        <div id="section_template_gen_mode" class="d-none">
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Select Document Template" name="document_template_id" id="modal_document_template_id" select2-selector="default">
-                                    <option value="">Select Template...</option>
-                                    @foreach($documentTemplates as $dt)
-                                        <option value="{{ $dt->id }}">{{ $dt->name }} ({{ $dt->code }})</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                                <small class="text-muted mt-1 d-block">Selecting a template will auto-populate live profile details for the chosen employee.</small>
-                            </div>
-
-                            <!-- HR DIGITAL SIGNATURE SECTION -->
-                            <div class="p-3 bg-white border rounded mb-3">
-                                <h6 class="fw-bold text-dark fs-13 mb-2"><i class="feather-edit-3 text-warning me-1"></i> HR / Authoriser Signature Stamp</h6>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="HR Signer Name" name="hr_name" value="{{ auth()->user()->name }}" placeholder="e.g. {{ auth()->user()->name }}" />
-                                    </div>
-                                    <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="HR Designation / Title" name="hr_designation" value="HR Manager" placeholder="e.g. HR Manager / Director" />
-                                    </div>
-                                    <div class="col-12">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <label class="form-label fw-bold fs-12 text-dark mb-0">HR Signature Image (Draw or Upload)</label>
-                                            <ul class="nav nav-pills bg-light p-1 rounded-pill border gap-1" id="docHrSigInputTabs" role="tablist">
-                                                <li class="nav-item">
-                                                    <button type="button" id="btn_doc_hr_sig_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchDocHrSigMode('draw')">
-                                                        <i class="feather-edit-2 me-1"></i> Draw Signature
-                                                    </button>
-                                                </li>
-                                                <li class="nav-item">
-                                                    <button type="button" id="btn_doc_hr_sig_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0" onclick="switchDocHrSigMode('upload')">
-                                                        <i class="feather-upload-cloud me-1"></i> Upload Image
-                                                    </button>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                        <input type="hidden" name="hr_signature_data" id="doc_hr_sig_input_data">
-
-                                        <!-- DRAW HR SIGNATURE TAB -->
-                                        <div id="doc_hr_sig_draw_container">
-                                            <div class="d-flex justify-content-end mb-1">
-                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="clearDocHrSigCanvas()">
-                                                    <i class="feather-rotate-ccw me-1"></i>Clear Canvas
-                                                </button>
-                                            </div>
-                                            <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
-                                                <canvas id="docHrSignatureCanvas" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px;"></canvas>
-                                            </div>
-                                            <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw HR signature using mouse or touch.</small>
-                                        </div>
-
-                                        <!-- UPLOAD HR SIGNATURE IMAGE TAB -->
-                                        <div id="doc_hr_sig_upload_container" class="d-none">
-                                            <div class="position-relative w-100">
-                                                <input type="file" name="hr_signature_file" id="doc_hr_sig_file_input" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleDocHrSigUpload(this)">
-                                                <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 110px;">
-                                                    <div id="doc_hr_sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
-                                                        <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
-                                                        <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop HR signature image</span>
-                                                        <small class="text-muted fs-10 mt-0.5">PNG or JPG transparent signature images recommended</small>
-                                                    </div>
-                                                </div>
+                                <!-- UPLOAD HR SIGNATURE IMAGE TAB -->
+                                <div id="doc_hr_sig_upload_container" class="d-none">
+                                    <div class="position-relative w-100">
+                                        <input type="file" name="hr_signature_file" id="doc_hr_sig_file_input" accept="image/png, image/jpeg, image/jpg, image/webp" class="position-absolute opacity-0 w-100 h-100" style="left:0; top:0; cursor:pointer; z-index:5;" onchange="handleDocHrSigUpload(this)">
+                                        <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 110px;">
+                                            <div id="doc_hr_sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
+                                                <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
+                                                <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop HR signature image</span>
+                                                <small class="text-muted fs-10 mt-0.5">PNG or JPG transparent signature images recommended</small>
                                             </div>
                                         </div>
                                     </div>
@@ -626,14 +632,14 @@
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light border fw-bold text-uppercase fs-11" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary fw-bold text-uppercase fs-11" id="btn_submit_modal_action">Submit & Save</button>
-                    </div>
-                </form>
+                </div>
             </div>
-        </div>
-    </div>
+            <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
+                <x-ui.button type="button" variant="light" class="border fw-bold text-uppercase fs-11" data-bs-dismiss="modal">Close</x-ui.button>
+                <x-ui.button type="submit" variant="primary" class="fw-bold text-uppercase fs-11" id="btn_submit_modal_action">Submit & Save</x-ui.button>
+            </div>
+        </form>
+    </x-ui.modal>
 @endsection
 
 @push('scripts')
@@ -847,43 +853,55 @@
                 isValid = false;
             }
 
-            // 2. Validate category choice
-            var categoryId = $('#document_category_id').val();
-            if (!categoryId) {
-                var $catContainer = $('#document_category_id').closest('.mb-3');
-                $catContainer.find('.error-msg').removeClass('d-none');
-                $('#document_category_id').addClass('is-invalid');
-                isValid = false;
-            }
+            var mode = $('input[name="upload_mode"]:checked').val() || 'file';
 
-            // 3. Validate document template choice
-            var templateId = $('#document_master_id').val();
-            if (!templateId) {
-                var $tmplContainer = $('#document_master_id').closest('.mb-3');
-                $tmplContainer.find('.error-msg').removeClass('d-none');
-                $('#document_master_id').addClass('is-invalid');
-                isValid = false;
-            }
+            if (mode === 'generate') {
+                var templateId = $('#modal_document_template_id').val();
+                if (!templateId) {
+                    var $tmplContainer = $('#modal_document_template_id').closest('.mb-3');
+                    $tmplContainer.find('.error-msg').removeClass('d-none');
+                    $('#modal_document_template_id').addClass('is-invalid');
+                    isValid = false;
+                }
+            } else {
+                // 2. Validate category choice
+                var categoryId = $('#document_category_id').val();
+                if (!categoryId) {
+                    var $catContainer = $('#document_category_id').closest('.mb-3');
+                    $catContainer.find('.error-msg').removeClass('d-none');
+                    $('#document_category_id').addClass('is-invalid');
+                    isValid = false;
+                }
 
-            // 4. Validate file choosing
-            var fileInput = $form.find('input[type="file"]')[0];
-            if (!fileInput.files || fileInput.files.length === 0) {
-                var $fileContainer = $(fileInput).closest('.mb-3');
-                $fileContainer.find('.error-msg').removeClass('d-none');
-                $fileContainer.find('.form-control').addClass('is-invalid');
-                isValid = false;
-            }
+                // 3. Validate document master choice
+                var templateId = $('#document_master_id').val();
+                if (!templateId) {
+                    var $tmplContainer = $('#document_master_id').closest('.mb-3');
+                    $tmplContainer.find('.error-msg').removeClass('d-none');
+                    $('#document_master_id').addClass('is-invalid');
+                    isValid = false;
+                }
 
-            // 5. Validate dynamic expiry requirements
-            var selectedTemplate = $('#document_master_id').find('option:selected');
-            var requiresExpiry = selectedTemplate.data('expiry') == '1';
-            var expiryDate = $('#modal_expiry_date').val();
+                // 4. Validate file choosing
+                var fileInput = $('#modal_upload_file')[0];
+                if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                    var $fileContainer = $(fileInput).closest('.mb-3');
+                    $fileContainer.find('.error-msg').removeClass('d-none');
+                    $fileContainer.find('.form-control').addClass('is-invalid');
+                    isValid = false;
+                }
 
-            if (requiresExpiry && !expiryDate) {
-                var $expiryContainer = $('#modal_expiry_date').closest('.mb-3');
-                $expiryContainer.find('.error-msg').removeClass('d-none');
-                $('#modal_expiry_date').addClass('is-invalid');
-                isValid = false;
+                // 5. Validate dynamic expiry requirements
+                var selectedTemplate = $('#document_master_id').find('option:selected');
+                var requiresExpiry = selectedTemplate.data('expiry') == '1';
+                var expiryDate = $('#modal_expiry_date').val();
+
+                if (requiresExpiry && !expiryDate) {
+                    var $expiryContainer = $('#modal_expiry_date').closest('.mb-3');
+                    $expiryContainer.find('.error-msg').removeClass('d-none');
+                    $('#modal_expiry_date').addClass('is-invalid');
+                    isValid = false;
+                }
             }
 
             if (!isValid) {

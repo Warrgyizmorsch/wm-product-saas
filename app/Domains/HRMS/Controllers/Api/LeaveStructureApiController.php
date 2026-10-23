@@ -175,6 +175,60 @@ class LeaveStructureApiController extends Controller
     // ==========================================
 
     /**
+     * GET /api/hrms/leave-structure/my
+     * Return the authenticated employee's assigned leave plan, types, and balances.
+     */
+    public function myLeaveStructure(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $user = auth()->user();
+        $tenantId = tenant_id() ?? $user?->tenant_id;
+        if (!$tenantId) {
+            return $this->sendError('Tenant context could not be resolved.', 404);
+        }
+
+        $employeeQuery = Employee::where('tenant_id', $tenantId);
+        if ($this->isHrAdmin() && $request->filled('employee_id')) {
+            $employee = (clone $employeeQuery)->find($request->integer('employee_id'));
+        } else {
+            $employee = (clone $employeeQuery)->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+                if (!empty($user->email)) {
+                    $query->orWhere('office_email', $user->email)
+                        ->orWhere('personal_email', $user->email);
+                }
+            })->first();
+        }
+
+        if (!$employee) {
+            return $this->sendError('Employee profile not found for the authenticated user.', 404);
+        }
+
+        $plan = $employee->leave_plan_id
+            ? LeavePlan::where('tenant_id', $tenantId)
+                ->with(['company', 'types' => fn ($query) => $query->where('status', true)])
+                ->find($employee->leave_plan_id)
+            : null;
+
+        $balances = LeaveBalance::where('tenant_id', $tenantId)
+            ->where('employee_id', $employee->id)
+            ->with(['leaveType.plan'])
+            ->get();
+
+        return $this->sendSuccess([
+            'employee_id' => (int) $employee->id,
+            'leave_plan' => $plan ? $this->transformLeavePlan($plan, true) : null,
+            'leave_types' => $plan
+                ? $plan->types->map(fn ($type) => $this->transformLeaveType($type))->values()
+                : collect(),
+            'leave_balances' => $balances,
+        ], 'Your assigned leave structure loaded successfully.');
+    }
+
+    /**
      * GET /api/hrms/leave-structure/plans
      * List all leave plans cleanly.
      */
@@ -261,7 +315,7 @@ class LeaveStructureApiController extends Controller
             'company_id'     => 'nullable|integer|exists:companies,id',
             'effective_from' => 'required|date',
             'description'    => 'nullable|string',
-            'status'         => 'required',
+            'status'         => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
@@ -301,7 +355,7 @@ class LeaveStructureApiController extends Controller
             'company_id'     => 'nullable|integer|exists:companies,id',
             'effective_from' => 'required|date',
             'description'    => 'nullable|string',
-            'status'         => 'required',
+            'status'         => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
@@ -433,7 +487,7 @@ class LeaveStructureApiController extends Controller
             'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
             'description'   => 'nullable|string',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);
@@ -479,7 +533,7 @@ class LeaveStructureApiController extends Controller
             'color'         => 'nullable|string|max:20',
             'quota'         => 'required|numeric|min:0',
             'description'   => 'nullable|string',
-            'status'        => 'required',
+            'status'        => 'required|in:0,1',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true || $request->status === 1);

@@ -414,8 +414,8 @@
                                 }
 
                                 $dealUrl = $f->crm_deal_id 
-                                    ? route('crm.deals.show', ['deal' => $f->crm_deal_id, 'tab' => 'interactions']) . '#subtab-interactions' 
-                                    : ($f->lead_id ? route('crm.leads.show', ['lead' => $f->lead_id, 'tab' => 'interactions']) . '#subtab-interactions' : '#');
+                                    ? route('crm.deals.show', ['deal' => $f->crm_deal_id, 'activity_id' => $f->id]) . '#deal-activity-' . $f->id 
+                                    : ($f->lead_id ? route('crm.leads.show', ['lead' => $f->lead_id, 'activity_id' => $f->id]) . '#lead-activity-' . $f->id : '#');
                                 $dealLabel = $f->deal?->title ?: ($f->deal?->account?->name ?: ($f->crm_deal_id ? 'Deal #'.$f->crm_deal_id : 'Activity'));
                                 $accountName = $f->deal?->account?->name ?: ($f->deal?->contact?->first_name ?: null);
                                 $assigneeName = $f->tagged_users->pluck('name')->first() ?: ($f->deal?->owner?->name ?: null);
@@ -426,7 +426,7 @@
                             <a href="{{ $dealUrl }}" 
                                class="activity-card-rich {{ $cardBgClass }} p-2 rounded-2 border-0 d-block text-decoration-none shadow-xs position-relative" 
                                title="{{ $f->title ?: ($f->notes ?: $f->type) }} [Status: {{ $statusText }}]" 
-                               onclick="event.stopPropagation(); if (window.localStorage && '{{ $f->crm_deal_id }}') { localStorage.setItem('deal_active_tab_{{ $f->crm_deal_id }}', 'timeline-tab'); localStorage.setItem('deal_active_subtab_{{ $f->crm_deal_id }}', 'subtab-interactions-tab'); }">
+                               onclick="event.stopPropagation(); if (window.localStorage) { if ('{{ $f->crm_deal_id }}') { localStorage.setItem('deal_active_chatter_tab_{{ $f->crm_deal_id }}', 'deal-chatter-activity-tab'); localStorage.setItem('deal_chatter_hidden', '0'); } else if ('{{ $f->lead_id }}') { localStorage.setItem('lead_active_chatter_tab_{{ $f->lead_id }}', 'chatter-activity-tab'); } }">
                                 
                                 <!-- Top Row: Time + Type & Meet Indicator -->
                                 <div class="d-flex align-items-center justify-content-between gap-1 mb-1">

@@ -34,6 +34,8 @@ class TaskListService
         return DB::transaction(function () use ($project, $data) {
             $data['project_id'] = $project->id;
             $data['tenant_id'] = $project->tenant_id;
+            $data['company_id'] = $data['company_id'] ?? $project->company_id;
+            $data['branch_id'] = $data['branch_id'] ?? $project->branch_id;
 
             // New task lists are always inserted at the top: shift every existing
             // list down a position first, then take position 1 ourselves.

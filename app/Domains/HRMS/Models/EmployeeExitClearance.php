@@ -32,6 +32,11 @@ class EmployeeExitClearance extends BaseModel
         return $this->belongsTo(EmployeeExit::class, 'employee_exit_id');
     }
 
+    public function employeeExit(): BelongsTo
+    {
+        return $this->exit();
+    }
+
     public function clearedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cleared_by');

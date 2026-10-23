@@ -311,7 +311,7 @@
                             </div>
                             <div class="d-flex flex-wrap gap-2">
                                 @foreach($ticket->attachments as $att)
-                                    <a href="{{ Storage::url($att->file_path) }}" target="_blank" class="attachment-pill">
+                                    <a href="{{ route('hrms.helpdesk.tickets.attachment', [$ticket->id, $att->id]) }}" class="attachment-pill">
                                         <i class="feather-file me-1 text-primary"></i>
                                         <span>{{ $att->file_name }}</span>
                                         <i class="feather-download ms-1 text-muted" style="font-size: 11px;"></i>
@@ -338,31 +338,33 @@
                     <div class="d-flex flex-column gap-3">
                         @forelse($ticket->replies as $reply)
                             @if($reply->is_internal_note)
-                                <!-- Internal HR Note Card -->
-                                <div class="internal-note-card">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="internal-note-pill">
-                                                <i class="feather-lock me-1"></i> Internal HR Note
-                                            </span>
-                                            <span class="fw-bold text-dark" style="font-size: 14px;">
-                                                {{ $reply->sender ? ($reply->sender->full_name ?? $reply->sender->first_name . ' ' . $reply->sender->last_name) : 'HR Staff' }}
-                                            </span>
+                                @if($canManage)
+                                    <!-- Internal HR Note Card -->
+                                    <div class="internal-note-card">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="internal-note-pill">
+                                                    <i class="feather-lock me-1"></i> Internal HR Note
+                                                </span>
+                                                <span class="fw-bold text-dark" style="font-size: 14px;">
+                                                    {{ $reply->sender ? ($reply->sender->full_name ?? $reply->sender->first_name . ' ' . $reply->sender->last_name) : 'HR Staff' }}
+                                                </span>
+                                            </div>
+                                            <small class="text-muted" style="font-size: 13px;">{{ $reply->created_at->diffForHumans() }}</small>
                                         </div>
-                                        <small class="text-muted" style="font-size: 13px;">{{ $reply->created_at->diffForHumans() }}</small>
-                                    </div>
-                                    <div class="text-dark" style="font-size: 14px; line-height: 1.6; white-space: pre-line;">{{ $reply->message }}</div>
+                                        <div class="text-dark" style="font-size: 14px; line-height: 1.6; white-space: pre-line;">{{ $reply->message }}</div>
 
-                                    @if($reply->attachments->count() > 0)
-                                        <div class="mt-2 pt-2 border-top border-warning-subtle d-flex flex-wrap gap-2">
-                                            @foreach($reply->attachments as $att)
-                                                <a href="{{ Storage::url($att->file_path) }}" target="_blank" class="attachment-pill">
-                                                    <i class="feather-paperclip me-1 text-warning"></i> {{ $att->file_name }}
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
+                                        @if($reply->attachments->count() > 0)
+                                            <div class="mt-2 pt-2 border-top border-warning-subtle d-flex flex-wrap gap-2">
+                                                @foreach($reply->attachments as $att)
+                                                    <a href="{{ route('hrms.helpdesk.tickets.attachment', [$ticket->id, $att->id]) }}" class="attachment-pill">
+                                                        <i class="feather-paperclip me-1 text-warning"></i> {{ $att->file_name }}
+                                                    </a>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
                             @else
                                 <!-- Standard Public Reply Card -->
                                 <div class="reply-card">
@@ -392,7 +394,7 @@
                                             <div class="small text-muted mb-2" style="font-size: 12px;">Attached files:</div>
                                             <div class="d-flex flex-wrap gap-2">
                                                 @foreach($reply->attachments as $att)
-                                                    <a href="{{ Storage::url($att->file_path) }}" target="_blank" class="attachment-pill">
+                                                    <a href="{{ route('hrms.helpdesk.tickets.attachment', [$ticket->id, $att->id]) }}" class="attachment-pill">
                                                         <i class="feather-paperclip me-1 text-primary"></i> {{ $att->file_name }}
                                                     </a>
                                                 @endforeach
@@ -418,7 +420,7 @@
         <!-- Right Column: Post Response, Ticket Controls & Overview Summary -->
         <div class="col-lg-4">
             <!-- Agent Control Actions Box -->
-            @if($canManage)
+            @if($canUpdate ?? $canManage)
                 <div class="ticket-card mb-4">
                     <div class="ticket-card-header">
                         <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
@@ -439,16 +441,18 @@
                                 </x-ui.odoo-form-ui>
                             </div>
 
-                            <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Assign Agent" name="assigned_to">
-                                    <option value="">-- Unassigned --</option>
-                                    @foreach($agents as $agent)
-                                        <option value="{{ $agent->id }}" {{ $ticket->assigned_to == $agent->id ? 'selected' : '' }}>
-                                            {{ $agent->full_name ?? trim(($agent->first_name ?? '') . ' ' . ($agent->last_name ?? '')) }} ({{ $agent->employee_id ?? $agent->employee_code }})
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
+                            @if($canManage)
+                                <div class="mb-3">
+                                    <x-ui.odoo-form-ui type="select" label="Assign Agent" name="assigned_to">
+                                        <option value="">-- Unassigned --</option>
+                                        @foreach($agents as $agent)
+                                            <option value="{{ $agent->id }}" {{ $ticket->assigned_to == $agent->id ? 'selected' : '' }}>
+                                                {{ $agent->full_name ?? trim(($agent->first_name ?? '') . ' ' . ($agent->last_name ?? '')) }} ({{ $agent->employee_id ?? $agent->employee_code }})
+                                            </option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            @endif
 
                             <div class="mb-3">
                                 <x-ui.odoo-form-ui type="select" label="Priority Level" name="priority">
@@ -524,7 +528,7 @@
                                     <p class="text-muted small mt-2 fst-italic mb-0">"{{ $ticket->rating->feedback }}"</p>
                                 @endif
                             </div>
-                        @else
+                        @elseif($isOwnTicket ?? false)
                             <form action="{{ route('hrms.helpdesk.tickets.csat', $ticket->id) }}" method="POST">
                                 @csrf
                                 <div class="mb-3">
@@ -543,6 +547,11 @@
                                     Submit Rating
                                 </x-ui.button>
                             </form>
+                        @else
+                            <div class="text-center py-3 text-muted">
+                                <i class="feather-clock fs-3 mb-2 d-block"></i>
+                                <p class="small mb-0">Awaiting satisfaction rating from ticket requester.</p>
+                            </div>
                         @endif
                     </div>
                 </div>

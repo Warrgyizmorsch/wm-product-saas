@@ -220,7 +220,7 @@ class MesExecutionService
             if ($orderOp) {
                 $orderOp->status = ProductionOrderOperation::STATUS_RUNNING;
                 $orderOp->actual_start_time = $orderOp->actual_start_time ?? now();
-                $orderOp->operator_id = $operatorId;
+                $orderOp->executed_by = $operatorId ?? $orderOp->executed_by;
                 $orderOp->machine_used_id = $resolvedMachineId ?? $orderOp->machine_id;
                 $orderOp->save();
             }
@@ -510,10 +510,13 @@ class MesExecutionService
                     throw new InvalidArgumentException('Quantities cannot be negative.');
                 }
 
+                $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);
+                $pendingQc = $this->getPendingQcQuantity($orderOp->id, $batchId);
+
                 // Overproduction Limit Check
                 // Scrapped quantities represent discarded material and should not count toward the overproduction limit.
                 $plannedQty = (float) ($orderOp->target_produced_qty > 0 ? $orderOp->target_produced_qty : ($schedOp->schedule->order->quantity_ordered ?? 1.0));
-                $totalProcessedSoFar = $orderOp->quantity_produced;
+                $totalProcessedSoFar = (float) $orderOp->quantity_produced + $pendingQc;
                 $currentProcessed = $produced;
                 $totalProcessed = $totalProcessedSoFar + $currentProcessed;
 
@@ -527,8 +530,6 @@ class MesExecutionService
 
                 // Prevent processing beyond available transferred input WIP
                 $isFirstOp = $orderOp->isEntryOperation();
-
-                $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);
 
                 $availableWip = app(ProductionWipService::class)->getAvailableInputWip($orderOp, $batchId);
                 $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
@@ -589,6 +590,7 @@ class MesExecutionService
                     $orderOp->quantity_produced += $produced;
                     $orderOp->quantity_rejected += $rejected;
                 }
+                $orderOp->executed_by = $operatorId ?? $orderOp->executed_by;
                 $orderOp->quantity_scrapped += $scrapped;
                 $orderOp->save();
 
@@ -641,7 +643,6 @@ class MesExecutionService
                     app(\App\Domains\Production\Services\ReworkService::class)->createReworkOrder($order->tenant_id, $ncr->id, [
                         'original_production_order_id' => $order->id,
                         'work_center_id' => $orderOp->work_center_id,
-                        'cost_estimate' => 50.00,
                     ]);
                 }
 
@@ -649,6 +650,8 @@ class MesExecutionService
                 if ($scrapped > 0 && $order) {
                     \App\Domains\Production\Models\ProductionOrderScrap::create([
                         'tenant_id' => $order->tenant_id,
+                        'company_id' => $order->company_id ?? company_id(),
+                        'branch_id' => $order->branch_id ?? branch_id(),
                         'production_order_id' => $schedOp->production_order_id,
                         'production_order_operation_id' => $orderOp->id,
                         'production_batch_id' => $batchId,
@@ -851,6 +854,9 @@ class MesExecutionService
                 $data['idempotency_key'] ?? null,
                 $batchId
             );
+
+            $orderOp->executed_by = $operatorId ?? $orderOp->executed_by;
+            $orderOp->save();
 
             app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
                 'production_order_id' => $schedOp->production_order_id,

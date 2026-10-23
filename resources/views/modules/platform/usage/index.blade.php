@@ -12,7 +12,9 @@
                 <tr>
                     <th class="ps-4">Tenant</th>
                     <th>Plan</th>
-                    <th style="min-width: 220px;">Users</th>
+                    <th style="min-width: 200px;">Users</th>
+                    <th style="min-width: 160px;">Storage</th>
+                    <th style="min-width: 360px;">Resources</th>
                     <th>Limit Source</th>
                     <th class="text-end pe-4">Status</th>
                 </tr>
@@ -20,10 +22,12 @@
             <tbody>
                 @forelse ($rows as $row)
                     @php
+                        $barVariant = fn ($p) => $p === null ? 'primary' : ($p >= 100 ? 'danger' : ($p >= 80 ? 'warning' : 'success'));
                         $percent = $row['user_percent'];
-                        $barVariant = $percent === null ? 'primary' : ($percent >= 100 ? 'danger' : ($percent >= 80 ? 'warning' : 'success'));
-                        $statusVariant = $percent === null ? 'secondary' : ($percent >= 100 ? 'danger' : ($percent >= 80 ? 'warning' : 'success'));
-                        $statusLabel = $percent === null ? 'Unlimited' : ($percent >= 100 ? 'At Limit' : ($percent >= 80 ? 'Near Limit' : 'OK'));
+                        // Status reflects the tightest cap, users or any resource.
+                        $worst = $row['worst_percent'];
+                        $statusVariant = $worst === null ? 'secondary' : ($worst >= 100 ? 'danger' : ($worst >= 80 ? 'warning' : 'success'));
+                        $statusLabel = $worst === null ? 'Unlimited' : ($worst >= 100 ? 'At Limit' : ($worst >= 80 ? 'Near Limit' : 'OK'));
                     @endphp
                     <tr>
                         <td class="ps-4">
@@ -45,9 +49,38 @@
                             </div>
                             @if ($percent !== null)
                                 <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar bg-{{ $barVariant }}" role="progressbar" style="width: {{ $percent }}%;" aria-valuenow="{{ $percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    <div class="progress-bar bg-{{ $barVariant($percent) }}" role="progressbar" style="width: {{ $percent }}%;" aria-valuenow="{{ $percent }}" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
                             @endif
+                        </td>
+                        <td>
+                            @php $storage = $row['storage']; @endphp
+                            <div class="fs-12 mb-1">
+                                {{ \App\Domains\Platform\Services\TenantStorage::format($storage['used']) }}
+                                / {{ $storage['limit'] === null ? '∞' : \App\Domains\Platform\Services\TenantStorage::format($storage['limit']) }}
+                            </div>
+                            @if ($storage['percent'] !== null)
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{{ $barVariant($storage['percent']) }}" role="progressbar" style="width: {{ $storage['percent'] }}%;" aria-label="Storage usage" aria-valuenow="{{ $storage['percent'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="row g-2">
+                                @foreach ($row['resources'] as $resource)
+                                    <div class="col-6">
+                                        <div class="d-flex justify-content-between fs-11 mb-1">
+                                            <span class="text-muted">{{ $resource['label'] }}</span>
+                                            <span class="{{ ($resource['percent'] ?? 0) >= 100 ? 'text-danger fw-semibold' : '' }}">{{ number_format($resource['used']) }} / {{ $resource['limit'] === null ? '∞' : number_format($resource['limit']) }}</span>
+                                        </div>
+                                        @if ($resource['percent'] !== null)
+                                            <div class="progress" style="height: 4px;">
+                                                <div class="progress-bar bg-{{ $barVariant($resource['percent']) }}" role="progressbar" style="width: {{ $resource['percent'] }}%;" aria-label="{{ $resource['label'] }} usage" aria-valuenow="{{ $resource['percent'] }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
                         </td>
                         <td><span class="fs-12 text-muted text-capitalize">{{ $row['source'] }}</span></td>
                         <td class="text-end pe-4">
@@ -56,7 +89,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-5">No tenants yet.</td>
+                        <td colspan="7" class="text-center text-muted py-5">No tenants yet.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -64,6 +97,6 @@
     </x-ui.card>
 
     <p class="text-muted fs-12 mt-3">
-        Storage consumption is not tracked yet — this console currently reports seat usage only.
+        Resource caps come from each tenant's plan (Plans → Edit → Usage Limits); ∞ = no cap. "Limit Source" applies to users and storage. Storage counts uploaded files and is recounted nightly (tenant:storage-sync).
     </p>
 @endsection

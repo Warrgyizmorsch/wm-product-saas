@@ -14,7 +14,7 @@ interface AttendanceCorrectionRepositoryInterface
 
     public function storeCorrection(array $validated, ?User $user, int $tenantId): array;
 
-    public function approve(AttendanceCorrection $correction, ?User $user): array;
+    public function approve(AttendanceCorrection $correction, ?User $user, ?string $approvedCheckIn = null, ?string $approvedCheckOut = null): array;
 
     public function reject(AttendanceCorrection $correction, ?string $reason, ?User $user): array;
 

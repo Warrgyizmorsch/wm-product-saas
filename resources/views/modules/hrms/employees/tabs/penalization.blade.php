@@ -43,8 +43,8 @@
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2 justify-content-end">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.employees.mdl_btn_close') }}</button>
-                        <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_add_component') }}</button>
+                        <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.employees.mdl_btn_close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.employees.mdl_btn_add_component') }}</x-ui.button>
                     </div>
                 </form>
             </div>

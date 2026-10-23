@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Api\MapApiController;
 use App\Http\Controllers\Api\NotificationApiController;
+use App\Http\Controllers\Api\ProfileApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -30,7 +31,20 @@ Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/logout', [LoginController::class, 'apiLogout'])
         ->middleware('auth:sanctum')
         ->name('logout');
+
+    // Authenticated change password route
+    Route::post('/change-password', [ProfileApiController::class, 'changePassword'])
+        ->middleware('auth:sanctum')
+        ->name('change-password');
 });
+
+// User Profile API (Change Password)
+Route::prefix('profile')
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
+    ->name('api.profile.')
+    ->group(function () {
+        Route::post('/change-password', [ProfileApiController::class, 'changePassword'])->name('change-password');
+    });
 
 // Map & Location Utility routes
 Route::get('/config', [MapApiController::class, 'config'])->name('api.config');
@@ -51,6 +65,8 @@ Route::prefix('notifications')
         Route::get('/', [NotificationApiController::class, 'index'])->name('index');
         Route::post('/mark-all-read', [NotificationApiController::class, 'markAllRead'])->name('mark-all-read');
         Route::post('/device-token', [NotificationApiController::class, 'updateDeviceToken'])->name('device-token');
+        Route::delete('/device-token', [NotificationApiController::class, 'removeDeviceToken'])->name('device-token.destroy');
+        Route::post('/test-fcm', [NotificationApiController::class, 'testFcm'])->name('test-fcm');
         Route::post('/{id}/read', [NotificationApiController::class, 'markAsRead'])->name('read');
         Route::post('/{id}/unread', [NotificationApiController::class, 'markAsUnread'])->name('unread');
         Route::delete('/{id}', [NotificationApiController::class, 'destroy'])->name('destroy');
@@ -58,4 +74,10 @@ Route::prefix('notifications')
 
 // Production Module API v1
 Route::prefix('v1/production')->group(base_path('app/Domains/Production/Routes/api.php'));
+
+// Twilio Voice Telephony Webhook Routes (Public endpoints called by Twilio Cloud)
+Route::match(['get', 'post'], 'crm/webhooks/twilio/voice', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioVoiceWebhook'])
+    ->name('api.crm.webhooks.twilio.voice');
+Route::match(['get', 'post'], 'crm/webhooks/twilio/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioStatusWebhook'])
+    ->name('api.crm.webhooks.twilio.status');
 

@@ -77,7 +77,7 @@ class LandedCostService
             // Save Expense lines & sum total
             $totalExpenses = 0.0;
             foreach ($expensesData as $exp) {
-                $amt = (float) ($exp['amount'] ?? 0);
+                $amt = convert_to_base((float) ($exp['amount'] ?? 0));
                 if ($amt <= 0) continue;
 
                 $taxRate = (float) ($exp['tax_rate'] ?? 0);
@@ -227,9 +227,9 @@ class LandedCostService
                 $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
                 $isIgst     = in_array($gstType, ['igst', 'rcm_igst']);
 
-                $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
-                $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
-                $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+                $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 4);
+                $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 4);
+                $igstAmount = $isIgst ? round($taxAmount, 4) : 0;
                 $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
                 $bill = \App\Domains\Purchase\Models\VendorBill::create([
@@ -250,7 +250,7 @@ class LandedCostService
                     'igst_amount'           => $igstAmount,
                     'grand_total'           => $grandTotal,
                     'paid_amount'           => 0,
-                    'due_amount'            => round($grandTotal, 2),
+                    'due_amount'            => round($grandTotal, 4),
                     'notes'                 => "Auto-generated Service Bill for Landed Cost Voucher {$voucher->voucher_number}",
                     'created_by'            => auth()->id() ?: 1,
                 ]);

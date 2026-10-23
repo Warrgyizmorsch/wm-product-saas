@@ -26,7 +26,7 @@ class PostCustomerPaymentJournal
     {
         $payment = $event->payment;
 
-        if ($this->journals->findByReference('customer_payment', $payment->id)->isNotEmpty()) {
+        if ($this->journals->activePosting((int) $payment->tenant_id, 'customer_payment', $payment->id) !== null) {
             return;
         }
 
@@ -62,7 +62,7 @@ class PostCustomerPaymentJournal
                 return;
             }
 
-            $this->journals->post([
+            $this->journals->postOnce([
                 [
                     'chart_of_account_id' => $bank->id,
                     'debit' => (float) $payment->amount,

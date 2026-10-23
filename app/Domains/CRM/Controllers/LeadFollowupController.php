@@ -129,7 +129,15 @@ class LeadFollowupController extends Controller
             $this->authorize('update', $followup->lead);
         }
 
-        $validated = $request->validate([
+        $tenant = tenant();
+        $settings = is_array($tenant?->settings) ? $tenant->settings : [];
+        $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
+
+        $targetStatus = $request->input('status', $followup->status);
+        $activityType = $request->input('type', $followup->type);
+        $isCompletingMeeting = in_array($targetStatus, ['Completed', 'Not Connected']) && strcasecmp((string)$activityType, 'Meeting') === 0;
+
+        $rules = [
             'status' => 'nullable|string|in:Pending,Completed,Not Connected,Cancelled,Rescheduled',
             'notes' => 'nullable|string',
             'type' => 'nullable|string|in:Call,Email,Meeting,Demo,Task',
@@ -138,7 +146,68 @@ class LeadFollowupController extends Controller
             'tagged_user_ids' => 'nullable|array',
             'tagged_user_ids.*' => 'nullable|exists:users,id',
             'is_reschedule' => 'nullable|boolean',
-        ]);
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'location_address' => ['nullable', 'string', 'max:500'],
+            'selfie' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
+            'selfie_base64' => ['nullable', 'string'],
+        ];
+
+        // Controller-side strict enforcement only when setting is enabled
+        if ($isGeoVerificationEnabled && $isCompletingMeeting) {
+            $rules['latitude'] = ['required', 'numeric', 'between:-90,90'];
+            $rules['longitude'] = ['required', 'numeric', 'between:-180,180'];
+            
+            // Selfie is strictly required if not already uploaded/captured
+            if (!$followup->selfie_path && !$request->hasFile('selfie') && !$request->filled('selfie_base64')) {
+                $rules['selfie_base64'] = ['required', 'string'];
+            }
+        }
+
+        $messages = [
+            'latitude.required' => 'Live GPS location is required to complete this meeting.',
+            'longitude.required' => 'Live GPS coordinates are required to complete this meeting.',
+            'selfie.required' => 'A live front camera selfie is required to complete this meeting.',
+            'selfie_base64.required' => 'A live front camera selfie is required to complete this meeting.',
+        ];
+
+        $validated = $request->validate($rules, $messages);
+
+        if ($request->filled('selfie_base64')) {
+            $base64Data = (string)$request->input('selfie_base64');
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+                $imageType = strtolower($type[1]);
+                if (in_array($imageType, ['jpeg', 'jpg', 'png', 'webp'])) {
+                    $data = substr($base64Data, strpos($base64Data, ',') + 1);
+                    $decoded = base64_decode($data);
+                    if ($decoded !== false && strlen($decoded) <= 5242880) { // Max 5MB
+                        $filename = \Illuminate\Support\Str::uuid() . '.' . ($imageType === 'jpeg' ? 'jpg' : $imageType);
+                        \Illuminate\Support\Facades\Storage::disk('public')->put('crm/selfies/' . $filename, $decoded);
+                        $validated['selfie_path'] = 'storage/crm/selfies/' . $filename;
+                        $validated['location_verified_at'] = now();
+                    }
+                }
+            }
+        } elseif ($request->hasFile('selfie')) {
+            $file = $request->file('selfie');
+            $filename = \Illuminate\Support\Str::uuid() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('crm/selfies', $filename, 'public');
+            $validated['selfie_path'] = 'storage/' . $path;
+            $validated['location_verified_at'] = now();
+        }
+
+        if ($request->filled('latitude')) {
+            $validated['latitude'] = (float)$request->input('latitude');
+        }
+        if ($request->filled('longitude')) {
+            $validated['longitude'] = (float)$request->input('longitude');
+        }
+        if ($request->filled('location_address')) {
+            $validated['location_address'] = $request->input('location_address');
+        }
+        if ($request->filled('latitude') && empty($validated['location_verified_at'])) {
+            $validated['location_verified_at'] = now();
+        }
 
         $msg = $this->followupService->updateOrReschedule($followup, $validated, $request->boolean('is_reschedule'));
 
@@ -177,8 +246,21 @@ class LeadFollowupController extends Controller
         $actionMode = $request->input('action_mode', 'log_note');
 
         if (!empty($validated['stage'])) {
-            $deal->stage = $validated['stage'];
-            $deal->save();
+            $isCurrentlyWon = in_array(strtolower((string)$deal->stage), ['won', 'closed won']);
+            if (!$isCurrentlyWon) {
+                $targetStage = $validated['stage'];
+                if (in_array(strtolower($targetStage), ['won', 'closed won'])) {
+                    $hasAcceptedQuote = $deal->quotations()->where('status', 'Accepted')->exists();
+                    $hasCustomer = !empty($deal->account?->customer_id);
+                    if ($hasAcceptedQuote && $hasCustomer) {
+                        $deal->stage = 'Won';
+                        $deal->save();
+                    }
+                } else {
+                    $deal->stage = $targetStage;
+                    $deal->save();
+                }
+            }
         }
 
         $tenantId = tenant_id() ?? $deal->tenant_id ?? 1;

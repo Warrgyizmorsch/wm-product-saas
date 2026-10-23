@@ -808,10 +808,10 @@
                                 <th class="text-end">{{ __('production.consumed_qty') }}</th>
                                 <th class="text-end">{{ __('production.floor_balance') }}</th>
                                 <th class="text-center" style="min-width: 110px;">{{ __('production.consumption_pct') }}</th>
-                                <th class="text-end">Unit Cost</th>
-                                <th class="text-end">Planned Cost</th>
-                                <th class="text-end">{{ __('production.issued_cost') }}</th>
-                                <th class="text-end">{{ __('production.consumed_cost') }}</th>
+                                <th class="text-end">Unit Cost ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">Planned Cost ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.issued_cost') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.consumed_cost') }} ({{ active_currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -936,14 +936,14 @@
                                 <th>Order Number</th>
                                 <th>Product / SKU</th>
                                 <th>Status</th>
-                                <th class="text-end">Planned Cost</th>
-                                <th class="text-end">{{ __('production.actual_material') }}</th>
-                                <th class="text-end">{{ __('production.actual_labor') }}</th>
-                                <th class="text-end">Actual Machine</th>
-                                <th class="text-end">{{ __('production.actual_overhead') }}</th>
-                                <th class="text-end">{{ __('production.adjustments') }}</th>
-                                <th class="text-end">{{ __('production.actual_total') }}</th>
-                                <th class="text-end">{{ __('production.variance_amount') }}</th>
+                                <th class="text-end">Planned Cost ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.actual_material') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.actual_labor') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">Actual Machine ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.actual_overhead') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.adjustments') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.actual_total') }} ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">{{ __('production.variance_amount') }} ({{ active_currency_symbol() }})</th>
                                 <th class="text-end">{{ __('production.variance_pct') }}</th>
                             </tr>
                         </thead>
@@ -1081,9 +1081,9 @@
                             <thead>
                                 <tr>
                                     <th>Cost Element</th>
-                                    <th class="text-end">{{ __('production.estimated_planned') }}</th>
-                                    <th class="text-end">{{ __('production.actual_incurred') }}</th>
-                                    <th class="text-end">Variance</th>
+                                    <th class="text-end">{{ __('production.estimated_planned') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-end">{{ __('production.actual_incurred') }} ({{ active_currency_symbol() }})</th>
+                                    <th class="text-end">Variance ({{ active_currency_symbol() }})</th>
                                     <th class="text-end">{{ __('production.variance_status') }}</th>
                                 </tr>
                             </thead>
@@ -1228,10 +1228,10 @@
                                 <th class="text-end">Consumed</th>
                                 <th class="text-end">Floor WIP</th>
                                 <th class="text-end">Prog%</th>
-                                <th class="text-end">Unit Cost</th>
-                                <th class="text-end">Planned Cost</th>
-                                <th class="text-end">Consumed Cost</th>
-                                <th class="text-end">Var Cost</th>
+                                <th class="text-end">Unit Cost ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">Planned Cost ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">Consumed Cost ({{ active_currency_symbol() }})</th>
+                                <th class="text-end">Var Cost ({{ active_currency_symbol() }})</th>
                             </tr>
                         </thead>
                         <tbody>

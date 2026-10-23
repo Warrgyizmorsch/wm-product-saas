@@ -29,6 +29,19 @@ class Product extends BaseModel
         self::MODEL_HYBRID,
     ];
 
+    protected static function booted(): void
+    {
+        // product_images rows cascade away with the product, but the image files
+        // don't — remove the product's folder (ProductImageService layout) too,
+        // which also frees it from the tenant's storage usage.
+        static::deleted(function (Product $product): void {
+            if ($product->tenant_id) {
+                \Illuminate\Support\Facades\Storage::disk('public')
+                    ->deleteDirectory("uploads/tenants/{$product->tenant_id}/products/{$product->id}");
+            }
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -37,7 +50,6 @@ class Product extends BaseModel
         'name',
         'sku',
         'type', // finished_good, raw_material, component, etc.
-        'planning_type', // stock, manufacture, purchase, manual
         'default_production_model', // pure_manufacturing, subcontract_complete, subcontract_company_material, hybrid
         'supplier_method',
         'item_type', // Goods, Service

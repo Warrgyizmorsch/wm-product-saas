@@ -2,7 +2,7 @@
 
 @section('title', __('hrms.employees.profile_title') . ' | SaaS ERP')
 @section('page-title', __('hrms.employees.profile_title'))
-@section('breadcrumb', 'HRMS / Employees / ' . __('hrms.employees.profile_title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.employees.title') . ' / ' . __('hrms.employees.profile_title'))
 
 @section('page-actions')
     <div class="d-flex gap-2">
@@ -18,7 +18,7 @@
         @endphp
         @if($canEditProfile)
             <x-ui.button type="button" variant="primary" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#editEmployeeModal">
-                Edit Profile
+                {{ __('hrms.employees.edit_profile') }}
             </x-ui.button>
         @endif
     </div>
@@ -502,50 +502,6 @@
             font-size: 15px;
         }
 
-        .tab-nav-custom {
-            border-bottom: 2px solid #e2e8f0;
-            gap: 8px;
-            margin-bottom: 24px;
-            flex-wrap: nowrap !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
-        }
-
-        .tab-nav-custom::-webkit-scrollbar {
-            display: none; /* Chrome/Safari */
-        }
-
-        .tab-nav-custom .nav-item {
-            flex-shrink: 0;
-        }
-
-        .tab-nav-custom .nav-link {
-            border: none !important;
-            border-bottom: 3px solid transparent !important;
-            background: transparent !important;
-            color: #64748b !important;
-            font-size: 14px;
-            font-weight: 600;
-            padding: 12px 16px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .tab-nav-custom .nav-link:hover {
-            color: var(--bs-primary) !important;
-            border-bottom-color: #cbd5e1 !important;
-        }
-
-        .tab-nav-custom .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom-color: var(--bs-primary) !important;
-            font-weight: 700;
-        }
 
         .leave-rules-summary {
             display: flex;
@@ -978,16 +934,16 @@
                     <div class="d-flex flex-column flex-md-row align-items-center gap-2 mb-1">
                         <h3 class="fw-bold text-dark mb-0">{{ $employee->display_name }}</h3>
                         @if($employee->status)
-                            <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                            <x-ui.badge variant="success" soft>{{ __('hrms.common.active') }}</x-ui.badge>
                         @else
-                            <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                            <x-ui.badge variant="danger" soft>{{ __('hrms.common.inactive') }}</x-ui.badge>
                         @endif
                     </div>
-                    <p class="text-muted fs-14 mb-2">{{ $employee->job_title ?: 'No Job Title' }} &bull; {{ $employee->department?->name ?? 'No Department' }}</p>
+                    <p class="text-muted fs-14 mb-2">{{ $employee->job_title ?: __('hrms.employees.frm_job_title') }} &bull; {{ $employee->department?->name ?? __('hrms.employees.tbl_department') }}</p>
                     <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-3 text-muted fs-12">
                         <span><i class="feather-tag me-1"></i><code class="fs-13 fw-bold">{{ $employee->employee_id }}</code></span>
-                        <span><i class="feather-mail me-1"></i>{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: 'No Email')) }}</span>
-                        <span><i class="feather-phone me-1"></i>{{ $employee->personal_mobile_number ?: 'No Mobile' }}</span>
+                        <span><i class="feather-mail me-1"></i>{{ $employee->office_email ?: ($employee->user?->email ?: ($employee->personal_email ?: __('hrms.employees.lbl_no_email'))) }}</span>
+                        <span><i class="feather-phone me-1"></i>{{ $employee->personal_mobile_number ?: __('hrms.employees.no_mobile') }}</span>
                     </div>
                 </div>
             </div>
@@ -1000,12 +956,12 @@
                         <i class="feather-clock fs-18"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold mb-1" style="color: #92400e;">Pending Profile Edit Request</h6>
+                        <h6 class="fw-bold mb-1" style="color: #92400e;">{{ __('hrms.employees.pending_profile_request_title') }}</h6>
                         <p class="mb-0 fs-13" style="color: #b45309;">
                             @if($isHrOrAdmin)
-                                This employee submitted a profile edit request on <strong>{{ $pendingRequest->created_at->format('M d, Y h:i A') }}</strong> awaiting HR review and approval.
+                                {{ __('hrms.employees.pending_profile_request_admin_desc', ['date' => $pendingRequest->created_at->format('M d, Y h:i A')]) }}
                             @else
-                                You have submitted a profile edit request on <strong>{{ $pendingRequest->created_at->format('M d, Y h:i A') }}</strong>. Changes are awaiting HR review.
+                                {{ __('hrms.employees.pending_profile_request_self_desc', ['date' => $pendingRequest->created_at->format('M d, Y h:i A')]) }}
                             @endif
                         </p>
                     </div>
@@ -1013,11 +969,11 @@
                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
                     @if($isHrOrAdmin)
                         <x-ui.button href="{{ route('hrms.employees.profile-requests.index', ['search' => $employee->employee_id]) }}" variant="warning" size="sm" icon="feather-check-square" class="fw-bold shadow-none text-dark">
-                            Review Edit Request
+                            {{ __('hrms.employees.review_edit_request') }}
                         </x-ui.button>
                     @else
                         <x-ui.button type="button" variant="outline-warning" size="sm" icon="feather-eye" data-bs-toggle="modal" data-bs-target="#viewPendingRequestModal" class="fw-bold text-dark">
-                            View Requested Changes
+                            {{ __('hrms.employees.view_requested_changes') }}
                         </x-ui.button>
                     @endif
                 </div>
@@ -1025,43 +981,18 @@
         @endif
 
         @php
-            $rawTab = request('tab', request('active_tab', session('active_tab')));
-            $activeTabName = $rawTab ? str_replace(['#', '-pane'], '', $rawTab) : 'overview';
+            $employeeTabs = [
+                ['id' => 'overview-pane', 'label' => __('hrms.employees.tab_overview'), 'active' => ($activeTabName === 'overview'), 'icon' => 'feather-user'],
+                ['id' => 'compensation-pane', 'label' => __('hrms.employees.tab_compensation'), 'active' => ($activeTabName === 'compensation'), 'icon' => 'feather-dollar-sign'],
+                ['id' => 'documents-pane', 'label' => __('hrms.employees.tab_documents'), 'active' => ($activeTabName === 'documents'), 'icon' => 'feather-file-text'],
+                ['id' => 'probation-pane', 'label' => __('hrms.employees.tab_probation'), 'active' => ($activeTabName === 'probation'), 'icon' => 'feather-award'],
+                ['id' => 'exit-clearance-pane', 'label' => __('hrms.employees.tab_exit_noc'), 'active' => ($activeTabName === 'exit-clearance'), 'icon' => 'feather-log-out'],
+                ['id' => 'pip-pane', 'label' => __('hrms.employees.tab_pip'), 'active' => ($activeTabName === 'pip'), 'icon' => 'feather-trending-up'],
+            ];
         @endphp
 
         <!-- Navigation Tabs -->
-        <ul class="nav nav-tabs tab-nav-custom" id="profileTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'overview' ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="{{ $activeTabName === 'overview' ? 'true' : 'false' }}">
-                    <i class="feather-user"></i> {{ __('hrms.employees.tab_overview') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'compensation' ? 'active' : '' }}" id="compensation-tab" data-bs-toggle="tab" data-bs-target="#compensation-pane" type="button" role="tab" aria-controls="compensation-pane" aria-selected="{{ $activeTabName === 'compensation' ? 'true' : 'false' }}">
-                    <i class="feather-dollar-sign"></i> {{ __('hrms.employees.tab_compensation') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'documents' ? 'active' : '' }}" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="{{ $activeTabName === 'documents' ? 'true' : 'false' }}">
-                    <i class="feather-file-text"></i> {{ __('hrms.employees.tab_documents') }}
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'probation' ? 'active' : '' }}" id="probation-tab" data-bs-toggle="tab" data-bs-target="#probation-pane" type="button" role="tab" aria-controls="probation-pane" aria-selected="{{ $activeTabName === 'probation' ? 'true' : 'false' }}">
-                    <i class="feather-award"></i> Probation
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'exit-clearance' ? 'active' : '' }}" id="exit-clearance-tab" data-bs-toggle="tab" data-bs-target="#exit-clearance-pane" type="button" role="tab" aria-controls="exit-clearance-pane" aria-selected="{{ $activeTabName === 'exit-clearance' ? 'true' : 'false' }}">
-                    <i class="feather-log-out"></i> Exit & NOC
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $activeTabName === 'pip' ? 'active' : '' }}" id="pip-tab" data-bs-toggle="tab" data-bs-target="#pip-pane" type="button" role="tab" aria-controls="pip-pane" aria-selected="{{ $activeTabName === 'pip' ? 'true' : 'false' }}">
-                    <i class="feather-trending-up"></i> PIP Plans
-                </button>
-            </li>
-        </ul>
+        <x-ui.horizontal-tabs id="profileTabs" :tabs="$employeeTabs" :syncUrl="true" />
 
         <!-- Tab Content -->
         <div class="tab-content" id="profileTabsContent">
@@ -1082,7 +1013,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="editEmployeeModalLabel">
-                        <i class="feather-edit-3 me-2 text-primary"></i>Edit Profile
+                        <i class="feather-edit-3 me-2 text-primary"></i>{{ __('hrms.employees.edit_profile') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1100,8 +1031,8 @@
                         @include('modules.hrms.employees.form-fields', ['mode' => 'edit', 'employee' => $employee, 'isHrOrAdmin' => $showOfficeSection])
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                        <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.employees.mdl_btn_update_employee') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1128,8 +1059,8 @@
                 $('#profileEvaluateModal').appendTo('body');
                 $('#profileExitModal').appendTo('body');
 
-                // Initialize select2 inside edit modal with dropdownParent to fix Bootstrap focus/typing issue
-                $('#editEmployeeModal select').each(function() {
+                // Initialize select2 inside edit and upload modals with dropdownParent to fix Bootstrap focus/typing issue
+                $('#editEmployeeModal select, #uploadDocumentModal select, #addAdhocModal select').each(function() {
                     var $select = $(this);
                     if ($select.hasClass('select2-hidden-accessible')) {
                         $select.select2('destroy');
@@ -1145,9 +1076,10 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const activeTab = urlParams.get('tab');
                 if (activeTab) {
-                    const tabEl = document.querySelector(`#${activeTab}-tab`);
-                    if (tabEl) {
-                        const tab = new bootstrap.Tab(tabEl);
+                    const cleanTab = activeTab.replace(/(-pane|tab-)/g, '');
+                    const tabEl = document.querySelector(`#${cleanTab}-pane-tab`) || document.querySelector(`#${cleanTab}-tab`) || document.querySelector(`#tab-${cleanTab}-tab`);
+                    if (tabEl && window.bootstrap) {
+                        const tab = bootstrap.Tab.getOrCreateInstance(tabEl);
                         tab.show();
                     }
                 }
@@ -2158,6 +2090,7 @@
                     if (docId) {
                         modal.find('#upload_doc_modal_document_id').val(docId);
                         modal.find('#upload_template_select_group').hide();
+                        modal.find('#upload_document_master_id').prop('required', false);
                         modal.find('#upload_document_name_label_group').show();
                         modal.find('#upload_document_name_label').text(docName);
                         modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>Upload ' + docName);
@@ -2167,8 +2100,9 @@
                     } else {
                         modal.find('#upload_doc_modal_document_id').val('');
                         modal.find('#upload_template_select_group').show();
+                        modal.find('#upload_document_master_id').prop('required', true);
                         modal.find('#upload_document_name_label_group').hide();
-                        modal.find('#upload_document_master_id').val('').trigger('change.select2');
+                        modal.find('#upload_document_master_id').val('').trigger('change');
                         window.setExpiryDateRequired(modal, false);
                         modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>' + "{{ __('hrms.employees.mdl_upload_doc_title') }}");
                     }
@@ -2395,24 +2329,24 @@
                                 <i class="feather-clock"></i>
                             </div>
                             <div>
-                                <h6 class="modal-title fw-bold mb-0 text-dark">Profile Edit Request Details</h6>
-                                <small class="text-muted">Submitted on {{ $pendingRequest->created_at->format('M d, Y h:i A') }}</small>
+                                <h6 class="modal-title fw-bold mb-0 text-dark">{{ __('hrms.employees.review_request') }}</h6>
+                                <small class="text-muted">{{ __('hrms.employees.requested_on') }}: {{ $pendingRequest->created_at->format('M d, Y h:i A') }}</small>
                             </div>
                         </div>
                         <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <div class="alert alert-info border-0 rounded-3 mb-4 py-2 px-3 fs-13 d-flex align-items-center gap-2">
+                        <x-ui.alert variant="info" class="border-0 rounded-3 mb-4 py-2 px-3 fs-13 d-flex align-items-center gap-2">
                             <i class="feather-info"></i>
-                            <span>These changes have been submitted to HR. They will reflect on your profile once reviewed and approved.</span>
-                        </div>
+                            <span>{{ __('hrms.employees.pending_profile_request_notice') }}</span>
+                        </x-ui.alert>
                         <div class="border rounded-3 overflow-hidden">
                             <table class="table align-middle mb-0" style="table-layout: fixed; width: 100%;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="ps-3 text-muted text-uppercase fs-11 fw-bold" style="width: 28%;">Field</th>
-                                        <th class="text-muted text-uppercase fs-11 fw-bold text-danger" style="width: 36%;">Current Value</th>
-                                        <th class="pe-3 text-muted text-uppercase fs-11 fw-bold text-success" style="width: 36%;">Requested New Value</th>
+                                        <th class="ps-3 text-muted text-uppercase fs-11 fw-bold" style="width: 28%;">{{ __('hrms.employees.field_name') }}</th>
+                                        <th class="text-muted text-uppercase fs-11 fw-bold text-danger" style="width: 36%;">{{ __('hrms.employees.current_value') }}</th>
+                                        <th class="pe-3 text-muted text-uppercase fs-11 fw-bold text-success" style="width: 36%;">{{ __('hrms.employees.requested_new_value') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2424,7 +2358,7 @@
                                                     @if($change['old'] && $change['old'] !== '—')
                                                         <img src="{{ asset('storage/' . $change['old']) }}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;">
                                                     @else
-                                                        <span class="text-muted">&mdash;</span>
+                                                        <span class="text-muted">{{ __('hrms.employees.no_photo') }}</span>
                                                     @endif
                                                 @else
                                                     @if(empty($change['old']) || $change['old'] === '—')
@@ -2453,7 +2387,7 @@
                     </div>
                     <div class="modal-footer bg-light border-top px-4 py-3">
                         <x-ui.button type="button" variant="light" class="border px-4" data-bs-dismiss="modal">
-                            Close
+                            {{ __('hrms.common.close') }}
                         </x-ui.button>
                     </div>
                 </div>

@@ -280,7 +280,7 @@
                 </div>
                 <div class="modal-body p-4 text-start">
                     <div class="row g-3">
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" label="Target Job Requisition" name="job_requisition_id" :required="true">
                                 <option value="">Select Job Opening...</option>
                                 @foreach($requisitions as $req)
@@ -288,8 +288,7 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
-
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="select" label="Candidate Source" name="source" :required="true">
                                 <option value="direct">Direct Entry</option>
                                 <option value="referral">Employee Referral</option>
@@ -299,38 +298,38 @@
                             </x-ui.odoo-form-ui>
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="First Name" name="first_name" :required="true" placeholder="e.g. John" />
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Last Name" name="last_name" placeholder="e.g. Doe" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" inputType="email" label="Email Address" name="email" :required="true" placeholder="john.doe@example.com" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="tel" pattern="(?=.*[0-9])[0-9+().\s-]+" label="Phone Number" name="phone" placeholder="+1 234 567 8900" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" inputType="number" label="Total Experience (Yrs)" name="total_experience_years" value="0" :required="true" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Current Designation" name="current_designation" placeholder="e.g. Software Developer" />
-                        </div>
-
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Current Company" name="current_company" placeholder="e.g. Tech Corp" />
-                        </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" inputType="number" label="Notice Period (Days)" name="notice_period_days" value="30" />
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Current Designation" name="current_designation" placeholder="e.g. Software Developer" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Current Company" name="current_company" placeholder="e.g. Tech Corp" />
+                        </div>
+
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Current Location" name="current_location" placeholder="e.g. New York, USA" />
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="file" label="Attach Resume / CV" name="resume" :required="true" helperText="Formats: .pdf, .doc, .docx" />
                         </div>
                     </div>

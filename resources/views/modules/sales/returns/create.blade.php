@@ -114,6 +114,17 @@
                         </div>
                     </div>
 
+                    <!-- Not Dispatched Warning Banner -->
+                    <div id="notDispatchedAlert" class="d-none mb-3">
+                        <div class="alert alert-warning border-0 shadow-sm d-flex align-items-start gap-3 p-3 mb-0 rounded-3" style="background-color: #fff8e6; border-left: 4px solid #ffc107 !important;">
+                            <i class="feather-alert-triangle text-warning fs-20 flex-shrink-0 mt-1"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="fw-bold text-dark mb-1 fs-13">{{ __('crm.order_not_dispatched_title') }}</h6>
+                                <p class="text-muted fs-12 mb-0">{{ __('crm.order_not_dispatched_desc') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="table-responsive border rounded bg-white">
                         <x-ui.odoo-form-ui type="table" id="returnItemsTable">
                             <thead class="table-light fs-12">
@@ -121,7 +132,7 @@
                                     <th style="width: 40%;" class="ps-3">{{ __('crm.product_details_serials') }}</th>
                                     <th style="width: 25%;">{{ __('crm.restock_warehouse') }}</th>
                                     <th class="text-end" style="width: 13%;">{{ __('crm.return_qty') }}</th>
-                                    <th class="text-end pe-3" style="width: 17%;">{{ __('crm.refund_unit_price') }}</th>
+                                    <th class="text-end pe-3" style="width: 17%;">{{ __('crm.refund_unit_price') }} ({{ active_currency_symbol() }})</th>
                                     <th class="text-center pe-3" style="width: 5%;"></th>
                                 </tr>
                             </thead>
@@ -157,7 +168,7 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     @php
-        $salesOrdersData = $salesOrders->map(function($so) {
+        $salesOrdersData = $salesOrders->map(function($so) use ($soDispatchedMap, $soReturnedMap) {
             $soSubtotal = (float)($so->subtotal ?: 1);
             $soDiscountType = $so->discount_type ?? 'item_wise';
             $soOrderDiscount = ($soDiscountType === 'order_wise') ? (float)($so->discount ?: 0) : 0;
@@ -165,7 +176,7 @@
                 'id' => $so->id,
                 'sales_order_number' => $so->sales_order_number,
                 'customer_name' => $so->customer?->name,
-                'items' => $so->items->map(function($item) use ($soSubtotal, $soOrderDiscount, $soDiscountType) {
+                'items' => $so->items->map(function($item) use ($so, $soSubtotal, $soOrderDiscount, $soDiscountType, $soDispatchedMap, $soReturnedMap) {
                     $qty = (float)$item->quantity;
                     $grossPrice = (float)$item->unit_price;
                     $lineGrossTotal = $qty * $grossPrice;
@@ -175,11 +186,20 @@
                     } else {
                         $totalItemDisc = (float)($item->discount ?? 0);
                     }
-                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
+                    $netPrice = ($qty > 0) ? round(convert_from_base(($lineGrossTotal - $totalItemDisc) / $qty), 2) : round(convert_from_base($grossPrice), 2);
+
+                    $dispQty = (float)($soDispatchedMap[$so->id . '_' . $item->product_id] ?? 0.0);
+                    $retQty = (float)($soReturnedMap[$so->id . '_' . $item->product_id] ?? 0.0);
+                    $maxReturnable = max(0.0, round($dispQty - $retQty, 4));
+
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
-                        'quantity' => $qty,
+                        'ordered_quantity' => $qty,
+                        'dispatched_quantity' => $dispQty,
+                        'already_returned_quantity' => $retQty,
+                        'max_returnable_quantity' => $maxReturnable,
+                        'quantity' => $maxReturnable,
                         'unit_price' => $netPrice,
                         'warehouse_id' => $item->warehouse_id,
                         'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
@@ -189,7 +209,7 @@
             ];
         })->values()->toArray();
 
-        $invoicesData = $invoices->map(function($inv) {
+        $invoicesData = $invoices->map(function($inv) use ($invDispatchedMap, $soDispatchedMap, $invReturnedMap, $soReturnedMap) {
             $invSubtotal = (float)($inv->subtotal ?: 1);
             $invDiscountType = $inv->discount_type ?? 'item_wise';
             $invOrderDiscount = ($invDiscountType === 'order_wise') ? (float)($inv->discount_amount ?: 0) : 0;
@@ -198,9 +218,9 @@
                 'invoice_number' => $inv->invoice_number,
                 'sales_order_id' => $inv->sales_order_id,
                 'invoice_date' => $inv->invoice_date ? $inv->invoice_date->format('d/m/Y') : '',
-                'total_amount' => (float)$inv->total_amount,
+                'total_amount' => round(convert_from_base((float)$inv->total_amount), 2),
                 'gst_type' => $inv->gst_type ?? ((float)$inv->igst_amount > 0 ? 'IGST' : 'CGST + SGST'),
-                'items' => $inv->items->map(function($item) use ($invSubtotal, $invOrderDiscount, $invDiscountType) {
+                'items' => $inv->items->map(function($item) use ($inv, $invSubtotal, $invOrderDiscount, $invDiscountType, $invDispatchedMap, $soDispatchedMap, $invReturnedMap, $soReturnedMap) {
                     $qty = (float)$item->quantity;
                     $grossPrice = (float)$item->unit_price;
                     $lineGrossTotal = $qty * $grossPrice;
@@ -210,11 +230,20 @@
                     } else {
                         $totalItemDisc = (float)($item->discount ?? 0);
                     }
-                    $netPrice = ($qty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $qty, 2) : $grossPrice;
+                    $netPrice = ($qty > 0) ? round(convert_from_base(($lineGrossTotal - $totalItemDisc) / $qty), 2) : round(convert_from_base($grossPrice), 2);
+
+                    $dispQty = (float)($invDispatchedMap[$inv->id . '_' . $item->product_id] ?? ($inv->sales_order_id ? ($soDispatchedMap[$inv->sales_order_id . '_' . $item->product_id] ?? 0.0) : 0.0));
+                    $retQty = (float)($invReturnedMap[$inv->id . '_' . $item->product_id] ?? ($inv->sales_order_id ? ($soReturnedMap[$inv->sales_order_id . '_' . $item->product_id] ?? 0.0) : 0.0));
+                    $maxReturnable = max(0.0, round($dispQty - $retQty, 4));
+
                     return [
                         'product_id' => $item->product_id,
                         'item_name' => $item->item_name ?? $item->product?->name ?? 'Product Item',
-                        'quantity' => $qty,
+                        'ordered_quantity' => $qty,
+                        'dispatched_quantity' => $dispQty,
+                        'already_returned_quantity' => $retQty,
+                        'max_returnable_quantity' => $maxReturnable,
+                        'quantity' => $maxReturnable,
                         'unit_price' => $netPrice,
                         'warehouse_id' => $item->warehouse_id,
                         'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
@@ -237,6 +266,16 @@
         const soSelectBlock = document.getElementById('soSelectBlock');
         const customerSelectBlock = document.getElementById('customerSelectBlock');
 
+        const returnI18n = {
+            notDispatchedYetBadge: @json(__('crm.not_dispatched_yet_badge')),
+            notDispatchedShort: @json(__('crm.not_dispatched_short')),
+            alreadyReturnedShort: @json(__('crm.already_returned_short')),
+            dispatchedBadge: @json(__('crm.dispatched_badge_label')),
+            returnedBadge: @json(__('crm.returned_badge_label')),
+            maxReturnable: @json(__('crm.max_returnable_label')),
+            maxReturnableQtyIs: @json(__('crm.max_returnable_qty_is')),
+        };
+
         let directItemIndex = 0;
 
         function initSelect2(context) {
@@ -251,10 +290,22 @@
 
             function renderItemsList(items) {
                 itemsBody.innerHTML = '';
+                const mode = document.querySelector('input[name="return_mode"]:checked')?.value || 'so';
+                const soId = $('#salesOrderSelect').val();
+
                 if (!items || items.length === 0) {
                     itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found.</td></tr>';
+                    $('#notDispatchedAlert').addClass('d-none');
                     validateReturnForm();
                     return;
+                }
+
+                const hasZeroReturnableAll = (mode === 'so') && Boolean(soId) && (items.length > 0) && items.every(it => (parseFloat(it.max_returnable_quantity) || 0) <= 0);
+
+                if (hasZeroReturnableAll) {
+                    $('#notDispatchedAlert').removeClass('d-none');
+                } else {
+                    $('#notDispatchedAlert').addClass('d-none');
                 }
 
                 items.forEach((item, index) => {
@@ -276,41 +327,93 @@
                         </div>
                     ` : '';
 
+                    const dispQty = parseFloat(item.dispatched_quantity) || 0;
+                    const retQty = parseFloat(item.already_returned_quantity) || 0;
+                    const maxReturnable = (item.max_returnable_quantity !== undefined) ? parseFloat(item.max_returnable_quantity) : parseFloat(item.quantity);
+                    const isNotDispatched = (mode === 'so' && dispQty <= 0);
+                    const isFullyReturned = (mode === 'so' && !isNotDispatched && maxReturnable <= 0);
+                    const isNotReturnable = (mode === 'so' && maxReturnable <= 0);
+
+                    // Badge rendering
+                    let badgeHtml = '';
+                    if (mode === 'so') {
+                        if (isNotDispatched) {
+                            badgeHtml = `
+                                <div class="mt-1">
+                                    <span class="badge bg-soft-warning text-warning fs-11 fw-semibold d-inline-flex align-items-center">
+                                        <i class="feather-alert-triangle me-1"></i>${returnI18n.notDispatchedYetBadge}
+                                    </span>
+                                </div>
+                            `;
+                        } else {
+                            badgeHtml = `
+                                <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                    <span class="badge bg-soft-info text-info fs-10 fw-semibold d-inline-flex align-items-center">
+                                        <i class="feather-truck me-1"></i>${returnI18n.dispatchedBadge}: ${dispQty}
+                                    </span>
+                                    ${retQty > 0 ? `
+                                        <span class="badge bg-soft-secondary text-muted fs-10 fw-semibold">
+                                            ${returnI18n.returnedBadge}: ${retQty}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                    }
+
                     const row = `
-                        <tr class="item-row align-top">
+                        <tr class="item-row align-top ${isNotReturnable ? 'table-light bg-light opacity-75' : ''}">
                             <td class="ps-3 pe-2 py-2">
                                 <strong class="text-dark fs-13 d-block">${escapeHtml(item.item_name)}</strong>
-                                <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
-                                ${serialBlock}
+                                ${badgeHtml}
+                                <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}" ${isNotReturnable ? 'disabled' : ''}>
+                                ${!isNotReturnable ? serialBlock : ''}
                             </td>
                             <td class="px-2 py-2">
                                 <span class="text-dark fw-semibold fs-12">${escapeHtml(item.warehouse_name)}</span>
-                                <input type="hidden" name="items[${index}][warehouse_id]" value="${item.warehouse_id}">
+                                <input type="hidden" name="items[${index}][warehouse_id]" value="${item.warehouse_id}" ${isNotReturnable ? 'disabled' : ''}>
                             </td>
                             <td class="text-end px-2 py-2">
                                 <div class="d-inline-flex flex-column align-items-end" style="min-width: 120px;">
-                                    <input type="number" 
-                                           name="items[${index}][quantity]" 
-                                           class="form-control odoo-table-input text-end fw-bold text-primary return-qty-input" 
-                                           value="${item.quantity}" 
-                                           data-max="${item.quantity}"
-                                           min="0.0001" 
-                                           max="${item.quantity}" 
-                                           step="any"
-                                           required 
-                                           style="width: 100px;">
-                                    <span class="text-muted fs-10 mt-1 font-monospace">Max: <strong class="text-dark">${item.quantity}</strong></span>
-                                    <div class="qty-error-msg text-danger fs-11 text-end mt-1 fw-semibold" style="display: none;"></div>
+                                    ${isNotReturnable ? `
+                                        <input type="number" 
+                                               name="items[${index}][quantity]" 
+                                               class="form-control odoo-table-input text-end fw-bold text-muted bg-light return-qty-input" 
+                                               value="0" 
+                                               data-max="0"
+                                               min="0" 
+                                               max="0" 
+                                               disabled
+                                               style="width: 100px; cursor: not-allowed;">
+                                        <span class="text-danger fs-10 mt-1 fw-semibold">
+                                            <i class="feather-x-circle me-1"></i>${isNotDispatched ? returnI18n.notDispatchedShort : returnI18n.alreadyReturnedShort}
+                                        </span>
+                                    ` : `
+                                        <input type="number" 
+                                               name="items[${index}][quantity]" 
+                                               class="form-control odoo-table-input text-end fw-bold text-primary return-qty-input" 
+                                               value="${maxReturnable}" 
+                                               data-max="${maxReturnable}"
+                                               data-dispatched="${dispQty}"
+                                               data-returned="${retQty}"
+                                               min="0.0001" 
+                                               max="${maxReturnable}" 
+                                               step="any"
+                                               required 
+                                               style="width: 100px;">
+                                        <span class="text-muted fs-10 mt-1 font-monospace">${returnI18n.maxReturnable}: <strong class="text-dark">${maxReturnable}</strong></span>
+                                        <div class="qty-error-msg text-danger fs-11 text-end mt-1 fw-semibold" style="display: none;"></div>
+                                    `}
                                 </div>
                             </td>
                             <td class="text-end pe-3 py-2">
                                 <input type="number" 
                                        name="items[${index}][unit_price]" 
-                                       class="form-control odoo-table-input text-end text-muted fw-bold" 
+                                       class="form-control odoo-table-input text-end text-muted fw-bold ${isNotReturnable ? 'bg-light' : ''}" 
                                        value="${item.unit_price}" 
                                        min="0" 
                                        step="0.01" 
-                                       required 
+                                       ${isNotReturnable ? 'disabled' : 'required'} 
                                        style="width: 120px; margin-left: auto;">
                             </td>
                             <td class="text-center pe-3 py-2 align-middle">
@@ -327,6 +430,7 @@
                         $tr.remove();
                         if (itemsBody.querySelectorAll('tr.item-row').length === 0) {
                             itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>No products found.</td></tr>';
+                            $('#notDispatchedAlert').addClass('d-none');
                         }
                         validateReturnForm();
                     });
@@ -338,6 +442,7 @@
             }
 
             function updateModeValidation(mode) {
+                $('#notDispatchedAlert').addClass('d-none');
                 if (mode === 'direct') {
                     soSelectBlock.style.display = 'none';
                     customerSelectBlock.style.display = 'block';
@@ -380,10 +485,19 @@
                     isValid = false;
                 }
 
+                let returnableRowsCount = 0;
+                let totalReturnQty = 0;
+
                 $rows.each(function() {
                     const $row = $(this);
                     const $qtyInput = $row.find('.return-qty-input');
                     const $errorMsg = $row.find('.qty-error-msg');
+
+                    if ($qtyInput.prop('disabled')) {
+                        return; // Skip non-returnable / disabled rows
+                    }
+
+                    returnableRowsCount++;
                     const rawVal = $qtyInput.val();
                     const val = parseFloat(rawVal);
                     const maxAttr = $qtyInput.attr('data-max');
@@ -399,19 +513,26 @@
                         isValid = false;
                         $qtyInput.addClass('is-invalid');
                         if ($errorMsg.length) {
-                            $errorMsg.text(`Max allowed qty is ${maxVal}`).show();
+                            $errorMsg.text(`${returnI18n.maxReturnableQtyIs} ${maxVal}`).show();
                         }
                     } else {
                         $qtyInput.removeClass('is-invalid');
                         if ($errorMsg.length) {
                             $errorMsg.text('').hide();
                         }
+                        totalReturnQty += val;
                     }
                 });
 
-                if (mode === 'so' && !$('#salesOrderSelect').val()) {
-                    isValid = false;
+                if (mode === 'so') {
+                    if (!$('#salesOrderSelect').val()) {
+                        isValid = false;
+                    }
+                    if (returnableRowsCount === 0 || totalReturnQty <= 0) {
+                        isValid = false;
+                    }
                 }
+
                 if (mode === 'direct' && !$('#customerSelect').val()) {
                     isValid = false;
                 }
@@ -442,6 +563,7 @@
                 if (!soId) {
                     $invoiceSel.trigger('change.select2');
                     itemsBody.innerHTML = '<tr id="emptyItemsRow"><td colspan="5" class="text-center text-muted py-4 fs-12"><i class="feather-info me-1"></i>Please select a Sales Order to populate items.</td></tr>';
+                    $('#notDispatchedAlert').addClass('d-none');
                     validateReturnForm();
                     return;
                 }

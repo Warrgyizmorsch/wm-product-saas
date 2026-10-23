@@ -236,6 +236,25 @@
             </style>
         @endif
 
+        {{-- Factory-Wide Schedule Conflicts (Unrelated to current schedule) --}}
+        @if(!empty($factoryConflicts))
+            <div class="alert alert-secondary border-secondary bg-soft-secondary p-3 rounded mb-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="feather-info text-secondary fs-16"></i>
+                        <span class="fs-13 text-secondary-800">
+                            {{ __('production.factory_conflicts_notice', ['count' => count($factoryConflicts)]) }}
+                        </span>
+                    </div>
+                    @if(\Illuminate\Support\Facades\Route::has('production.capacity.index'))
+                        <a href="{{ route('production.capacity.index') }}" class="btn btn-sm btn-outline-secondary">
+                            {{ __('production.view_capacity_planning') }}
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         {{-- Tabs --}}
         <x-ui.horizontal-tabs id="scheduleTabs" :tabs="[
         ['id' => 'tab-operations', 'label' => __('production.schedule_operations'), 'active' => true, 'icon' => 'feather-list'],

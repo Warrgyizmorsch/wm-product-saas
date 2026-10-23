@@ -38,7 +38,12 @@
         }
 
         @if($auto)
-            showToast();
+            window.__autoToastsShown = window.__autoToastsShown || new Set();
+            const toastKey = (@json($type)) + ':' + (@json($title));
+            if (!window.__autoToastsShown.has(toastKey)) {
+                window.__autoToastsShown.add(toastKey);
+                showToast();
+            }
         @else
             const el = document.getElementById(@json($id));
             if (el) {

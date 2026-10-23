@@ -55,7 +55,7 @@
                     <th>Vendor</th>
                     <th>Date</th>
                     <th>Problems</th>
-                    <th class="text-end">Amount</th>
+                    <th class="text-end">Amount ({{ active_currency_symbol() }})</th>
                     <th>Status</th>
                     <th class="text-end pe-4">Actions</th>
                 </tr>
@@ -77,7 +77,7 @@
                                 <div class="text-muted">+{{ $problems->count() - 2 }} more</div>
                             @endif
                         </td>
-                        <td class="text-end fw-semibold">{{ number_format((float) $bill->grand_total, 2) }}</td>
+                        <td class="text-end fw-semibold">{{ format_currency($bill->grand_total) }}</td>
                         <td>
                             @if ($bill->isOnHold())
                                 <x-ui.badge variant="primary" soft>On hold</x-ui.badge>

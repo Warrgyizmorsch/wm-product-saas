@@ -108,7 +108,7 @@ class GoodsReceiptNoteController extends Controller
                 'code' => $p->sku ?? $p->code ?? '',
                 'hsn_sac' => $p->hsn_sac ?? $p->hsn_code ?? '',
                 'uom_name' => $p->uom?->name ?? 'Pcs',
-                'cost_price' => (float)($p->cost_price ?? $p->unit_cost ?? 0.00),
+                'cost_price' => round(convert_from_base((float)($p->cost_price ?? $p->unit_cost ?? 0.00)), 4),
                 'track_serial_number' => (bool)$p->track_serial_number,
                 'track_batch' => (bool)$p->track_batch,
             ];
@@ -171,7 +171,7 @@ class GoodsReceiptNoteController extends Controller
             }
 
             $totalItemDisc = ($order->discount_type === 'order_wise') ? $orderDiscShare : $itemDiscount;
-            $netUnitRate = ($orderedQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $orderedQty, 2) : $grossPrice;
+            $netUnitRate = ($orderedQty > 0) ? round(($lineGrossTotal - $totalItemDisc) / $orderedQty, 4) : $grossPrice;
 
             return [
                 'purchase_order_item_id' => $first->id,
@@ -184,7 +184,7 @@ class GoodsReceiptNoteController extends Controller
                 'ordered_qty' => $orderedQty,
                 'previous_received_qty' => $prevReceived,
                 'remaining_qty' => $remainingQty,
-                'unit_rate' => $netUnitRate,
+                'unit_rate' => round(convert_from_base($netUnitRate), 4),
                 'track_serial_number' => (bool)($first->product?->track_serial_number ?? false),
                 'track_batch' => (bool)($first->product?->track_batch ?? false),
             ];

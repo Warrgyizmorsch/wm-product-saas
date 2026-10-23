@@ -121,7 +121,7 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
 
             return $this->createdResponse(
                 new MaintenanceWorkOrderResource($wo->load(['machine:id,name,code,current_state', 'technician:id,name'])),
-                "Machine breakdown reported. Work order {$wo->work_order_number} created and machine placed under maintenance."
+                "Machine breakdown reported. Work order {$wo->work_order_number} created in draft with open downtime."
             );
         } catch (\Throwable $e) {
             return $this->handleDomainException($e);
@@ -139,7 +139,6 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
         $tenantId = $this->getTenantId();
         $validated = $request->validate([
             'work_performed' => ['required', 'string', 'max:2000'],
-            'labor_hours'    => ['required', 'numeric', 'min:0.1'],
         ]);
 
         try {
@@ -147,8 +146,7 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
                 $id,
                 $tenantId,
                 auth()->id(),
-                $validated['work_performed'],
-                (float) $validated['labor_hours']
+                $validated['work_performed']
             );
 
             return $this->successResponse(
@@ -169,9 +167,21 @@ class MaintenanceWorkOrderApiController extends ApiBaseController
         Gate::authorize('create', Machine::class);
 
         $tenantId = $this->getTenantId();
-        $reason = $request->input('reason', 'Cancelled via API');
 
         try {
+            $wo = ProductionMaintenanceWorkOrder::where('tenant_id', $tenantId)->with('machine')->findOrFail($id);
+            $isBreakdown = $wo->type === ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN
+                || ($wo->machine && ($wo->machine->maintenance_status === 'breakdown' || $wo->machine->current_state === 'Breakdown'));
+
+            if ($isBreakdown) {
+                $request->validate([
+                    'reason' => ['required', 'string', 'min:3'],
+                ]);
+                $reason = $request->input('reason');
+            } else {
+                $reason = $request->input('reason') ?: 'Cancelled via API';
+            }
+
             $wo = $this->service->cancelWorkOrder($id, $tenantId, auth()->id(), $reason);
 
             return $this->successResponse(

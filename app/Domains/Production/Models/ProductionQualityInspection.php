@@ -50,6 +50,25 @@ class ProductionQualityInspection extends BaseModel
         'inspected_at'     => 'datetime',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($inspection) {
+            if ((empty($inspection->company_id) || empty($inspection->branch_id)) && !empty($inspection->production_order_id)) {
+                $order = $inspection->order ?: ProductionOrder::withoutGlobalScopes()->find($inspection->production_order_id);
+                if ($order) {
+                    if (empty($inspection->company_id)) {
+                        $inspection->company_id = $order->company_id;
+                    }
+                    if (empty($inspection->branch_id)) {
+                        $inspection->branch_id = $order->branch_id;
+                    }
+                }
+            }
+        });
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(ProductionQualityPlan::class, 'quality_plan_id');

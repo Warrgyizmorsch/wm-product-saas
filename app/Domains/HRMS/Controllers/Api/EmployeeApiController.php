@@ -17,13 +17,11 @@ use App\Domains\HRMS\Models\AttendancePenalty;
 use App\Domains\HRMS\Models\EmployeeAdhocComponent;
 use App\Domains\HRMS\Models\EmployeePenalty;
 use App\Domains\HRMS\Models\Document;
-use App\Domains\HRMS\Helpers\XlsxHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
 
 class EmployeeApiController extends Controller
 {
@@ -334,6 +332,24 @@ class EmployeeApiController extends Controller
         ], 'Employee profile loaded successfully');
     }
 
+    /**
+     * GET /api/hrms/employees/me
+     * Load the employee profile linked to the authenticated token.
+     */
+    public function myProfile(): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $employee = $this->getAuthenticatedEmployee();
+        if (!$employee) {
+            return $this->sendError('Employee profile not found for the authenticated user.', 404);
+        }
+
+        return $this->showEmployee($employee->id);
+    }
+
     public function storeEmployee(Request $request): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
@@ -383,7 +399,7 @@ class EmployeeApiController extends Controller
             $validated['status'] = $request->input('status', '1') === '1' || $request->input('status') === 'true' || $request->input('status') === true;
 
             if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('employees', 'public');
+                $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             }
 
             $employee = Employee::create($validated);
@@ -438,7 +454,7 @@ class EmployeeApiController extends Controller
             }
 
             if ($request->hasFile('photo')) {
-                $validated['photo'] = $request->file('photo')->store('employees', 'public');
+                $validated['photo'] = $request->file('photo')->storeTenantFile('employees', 'public');
             } else {
                 unset($validated['photo']);
             }
@@ -567,6 +583,7 @@ class EmployeeApiController extends Controller
         ]);
 
         $validated['employee_id'] = $employee->id;
+        $validated['tenant_id']   = $employee->tenant_id ?? (auth()->user()?->tenant_id ?? 1);
         $validated['status']      = 'pending';
 
         $penalty = EmployeePenalty::create($validated);
@@ -652,7 +669,7 @@ class EmployeeApiController extends Controller
         $request->validate([
             'document_id'        => 'nullable|exists:documents,id',
             'document_master_id' => 'required_without:document_id|exists:document_masters,id',
-            'file'               => 'required|file|max:10240', // Max 10MB
+            'file'               => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx,xlsx,csv|max:10240', // Max 10MB
             'expiry_date'        => 'nullable|date',
         ]);
 
@@ -679,7 +696,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = true;
             if ($document->document_master_id) {
@@ -711,7 +728,7 @@ class EmployeeApiController extends Controller
                 ]);
             }
 
-            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+            $path = $file->storeTenantFile("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
 
             $approvalRequired = (bool) $documentMaster->approval_required;
             $status = $approvalRequired ? 'uploaded' : 'approved';
@@ -826,40 +843,79 @@ class EmployeeApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
-
-        $headers = [
-            'Employee ID', 'Full Name', 'Personal Email', 'Office Email',
-            'Mobile Number', 'Gender', 'Marital Status', 'Employment Type',
-            'Date of Joining', 'Date of Birth', 'Current Salary', 'Experience (Years)',
-            'Qualification', 'Company Name', 'Department Name', 'Designation Name', 'Status'
-        ];
-
-        $employees = Employee::with(['company', 'department', 'designation'])->get();
-        $data = [];
-
-        foreach ($employees as $emp) {
-            $data[] = [
-                $emp->employee_id,
-                $emp->full_name,
-                $emp->personal_email,
-                $emp->office_email,
-                $emp->personal_mobile_number,
-                $emp->gender,
-                $emp->marital_status,
-                $emp->employment_type,
-                $emp->date_of_joining ? $emp->date_of_joining->format('Y-m-d') : '',
-                $emp->date_of_birth ? $emp->date_of_birth->format('Y-m-d') : '',
-                $emp->current_salary,
-                $emp->experience,
-                $emp->qualification,
-                $emp->company?->company_name,
-                $emp->department?->name,
-                $emp->designation?->name,
-                $emp->status ? 'Active' : 'Inactive'
-            ];
+        if (!app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.employees.view', [
+            'tenant_id' => auth()->user()?->tenant_id,
+        ])) {
+            return $this->sendError('Unauthorized action.', 403);
         }
 
-        return XlsxHelper::export($headers, $data, 'employees_export_' . now()->format('Y-m-d') . '.xlsx');
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+        $employees = Employee::with(['department', 'designation', 'company'])
+            ->where('tenant_id', $tenantId)
+            ->orderBy('full_name')
+            ->get();
+
+        $columns = [
+            'Employee Code', 'Full Name', 'Personal Email', 'Office Email',
+            'Department', 'Designation', 'Company', 'Date of Joining', 'Status',
+        ];
+
+        $callback = static function () use ($employees, $columns): void {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($employees as $employee) {
+                fputcsv($file, [
+                    $employee->employee_id ?? '',
+                    $employee->full_name ?? '',
+                    $employee->personal_email ?? '',
+                    $employee->office_email ?? '',
+                    $employee->department?->name ?? '',
+                    $employee->designation?->name ?? '',
+                    $employee->company?->company_name ?? '',
+                    $employee->date_of_joining ? $employee->date_of_joining->format('Y-m-d') : '',
+                    $employee->status ? 'Active' : 'Inactive',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename=employees_export_' . date('Ymd_His') . '.csv',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ]);
+    }
+
+    public function downloadTemplate(): mixed
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+        if (!app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.employees.create', [
+            'tenant_id' => auth()->user()?->tenant_id,
+        ])) {
+            return $this->sendError('Unauthorized action.', 403);
+        }
+
+        $columns = ['full_name', 'personal_email', 'employee_id', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
+        $callback = static function () use ($columns): void {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            fputcsv($file, ['Jane Doe', 'jane.doe@example.com', 'EMP-0001', '1', '1', '1', '2026-01-15', 'female']);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename=employees_import_template.csv',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ]);
     }
 
     public function import(Request $request): JsonResponse
@@ -867,138 +923,99 @@ class EmployeeApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
+        if (!app(\App\Services\Access\AccessService::class)->allows(auth()->user(), 'hrms.employees.create', [
+            'tenant_id' => auth()->user()?->tenant_id,
+        ])) {
+            return $this->sendError('Unauthorized action.', 403);
+        }
 
         $request->validate([
-            'file' => 'required|file',
+            'file' => 'required|file|mimes:csv,txt|max:5120',
         ]);
 
-        try {
-            $filePath = $request->file('file')->getRealPath();
-            $rows = XlsxHelper::import($filePath);
-
-            if (empty($rows)) {
-                return $this->sendError('The Excel file is empty.', 422);
-            }
-
-            $headers = array_shift($rows);
-            $headers = array_map(function ($h) {
-                $h = strtolower(trim(preg_replace('/[\x{FEFF}\x{FFFE}]/u', '', $h)));
-                $h = str_replace([' ', '-'], '_', $h);
-                $h = preg_replace('/[^a-z0-9_]/', '', $h);
-                if ($h === 'full_name' || $h === 'fullname' || $h === 'name') return 'full_name';
-                if ($h === 'personal_email' || $h === 'email') return 'personal_email';
-                if ($h === 'mobile_number' || $h === 'personal_mobile_number' || $h === 'phone_number' || $h === 'phone' || $h === 'mobile') return 'personal_mobile_number';
-                if ($h === 'experience_years' || $h === 'experience') return 'experience';
-                return $h;
-            }, $headers);
-
-            $headerMap = array_flip($headers);
-
-            if (!isset($headerMap['full_name'])) {
-                return $this->sendError("Required column 'full_name' is missing in the Excel file.", 422);
-            }
-
-            $importedCount = 0;
-            $errors = [];
-            $rowNumber = 1;
-
-            DB::beginTransaction();
-            foreach ($rows as $row) {
-                $rowNumber++;
-                if (empty(array_filter($row))) continue;
-                if (count($row) < count($headers)) $row = array_pad($row, count($headers), '');
-
-                $data = [];
-                foreach ($headerMap as $field => $index) {
-                    $data[$field] = isset($row[$index]) && $row[$index] !== '' ? trim($row[$index]) : null;
-                }
-
-                $companyId = null;
-                if (!empty($data['company_name'])) {
-                    $company = Company::where('company_name', 'like', $data['company_name'])->first() ?: Company::first();
-                    $companyId = $company?->id;
-                } else {
-                    $company = Company::first();
-                    $companyId = $company?->id;
-                }
-
-                if (!$companyId) {
-                    $errors[] = "Row {$rowNumber}: No valid company found.";
-                    continue;
-                }
-
-                $departmentId = null;
-                if (!empty($data['department_name'])) {
-                    $dept = Department::where('name', 'like', $data['department_name'])->where('company_id', $companyId)->first();
-                    if (!$dept) {
-                        $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $data['department_name']);
-                        $deptCode = strtoupper(substr($cleanName, 0, 10)) ?: 'DEPT-' . rand(100, 999);
-                        $originalCode = $deptCode;
-                        $counter = 1;
-                        while (Department::where('code', $deptCode)->exists()) {
-                            $deptCode = substr($originalCode, 0, 7) . $counter;
-                            $counter++;
-                        }
-                        $dept = Department::create(['company_id' => $companyId, 'name' => $data['department_name'], 'code' => $deptCode, 'status' => true]);
-                    }
-                    $departmentId = $dept->id;
-                }
-
-                $designationId = null;
-                if (!empty($data['designation_name'])) {
-                    $desg = Designation::where('name', 'like', $data['designation_name']);
-                    if ($departmentId) $desg = $desg->where('department_id', $departmentId);
-                    $desg = $desg->first();
-                    if (!$desg) {
-                        $desg = Designation::create(['department_id' => $departmentId, 'name' => $data['designation_name'], 'status' => true]);
-                    }
-                    $designationId = $desg->id;
-                }
-
-                $employeeData = [
-                    'company_id'             => $companyId,
-                    'department_id'          => $departmentId,
-                    'designation_id'         => $designationId,
-                    'full_name'              => $data['full_name'],
-                    'personal_email'         => $data['personal_email'] ?? null,
-                    'office_email'           => $data['office_email'] ?? null,
-                    'personal_mobile_number' => $data['personal_mobile_number'] ?? null,
-                    'gender'                 => isset($data['gender']) ? strtolower($data['gender']) : 'male',
-                    'marital_status'         => isset($data['marital_status']) ? strtolower($data['marital_status']) : 'single',
-                    'employment_type'        => isset($data['employment_type']) ? strtolower($data['employment_type']) : 'full-time',
-                    'current_salary'         => isset($data['current_salary']) ? floatval($data['current_salary']) : 0,
-                    'experience'             => isset($data['experience']) ? floatval($data['experience']) : 0,
-                    'qualification'          => $data['qualification'] ?? null,
-                    'status'                 => true
-                ];
-
-                if (!empty($data['date_of_joining'])) {
-                    try { $employeeData['date_of_joining'] = \Carbon\Carbon::parse($data['date_of_joining'])->format('Y-m-d'); }
-                    catch (\Exception $e) { $employeeData['date_of_joining'] = now()->format('Y-m-d'); }
-                } else {
-                    $employeeData['date_of_joining'] = now()->format('Y-m-d');
-                }
-
-                if (!empty($data['date_of_birth'])) {
-                    try { $employeeData['date_of_birth'] = \Carbon\Carbon::parse($data['date_of_birth'])->format('Y-m-d'); }
-                    catch (\Exception $e) {}
-                }
-
-                Employee::create($employeeData);
-                $importedCount++;
-            }
-
-            DB::commit();
-
-            return $this->sendSuccess([
-                'imported_count' => $importedCount,
-                'warnings'       => $errors,
-            ], "{$importedCount} employees imported successfully");
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return $this->sendError('Error reading Excel file: ' . $e->getMessage(), 500);
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        if ($handle === false) {
+            return $this->sendError('Unable to read the uploaded CSV file.', 422);
         }
+
+        $header = fgetcsv($handle);
+        if (!$header) {
+            fclose($handle);
+            return $this->sendError('The uploaded file is empty.', 422);
+        }
+
+        $header = array_map(static fn ($value) => strtolower(trim((string) $value)), $header);
+        $required = ['full_name', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
+        $optional = ['employee_id', 'personal_email'];
+        $colIndex = [];
+        foreach (array_merge($required, $optional) as $column) {
+            $colIndex[$column] = array_search($column, $header, true);
+        }
+
+        foreach ($required as $column) {
+            if ($colIndex[$column] === false) {
+                fclose($handle);
+                return $this->sendError("Invalid template. Missing required column \"{$column}\".", 422);
+            }
+        }
+
+        $importedCount = 0;
+        $warnings = [];
+        $rowNum = 1;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+            if (empty($row) || count($row) < 2) {
+                continue;
+            }
+
+            $rowData = [
+                'tenant_id' => $tenantId,
+                'full_name' => trim($row[$colIndex['full_name']] ?? ''),
+                'personal_email' => $colIndex['personal_email'] !== false ? trim($row[$colIndex['personal_email']] ?? '') : null,
+                'employee_id' => $colIndex['employee_id'] !== false ? trim($row[$colIndex['employee_id']] ?? '') : null,
+                'company_id' => trim($row[$colIndex['company_id']] ?? ''),
+                'department_id' => trim($row[$colIndex['department_id']] ?? ''),
+                'designation_id' => trim($row[$colIndex['designation_id']] ?? ''),
+                'date_of_joining' => trim($row[$colIndex['date_of_joining']] ?? ''),
+                'gender' => trim($row[$colIndex['gender']] ?? ''),
+                'status' => true,
+            ];
+
+            $validator = \Illuminate\Support\Facades\Validator::make($rowData, [
+                'full_name' => 'required|string|max:255',
+                'personal_email' => [
+                    'nullable', 'email', 'max:255',
+                    Rule::unique('employees', 'personal_email')->where('tenant_id', $tenantId)->whereNull('deleted_at'),
+                ],
+                'company_id' => 'required|exists:companies,id',
+                'department_id' => 'required|exists:departments,id',
+                'designation_id' => 'required|exists:designations,id',
+                'date_of_joining' => 'required|date',
+                'gender' => 'required|string|max:50',
+            ]);
+
+            if ($validator->fails()) {
+                $warnings[] = 'Row ' . $rowNum . ': ' . implode(' ', $validator->errors()->all());
+                continue;
+            }
+
+            Employee::create($rowData);
+            $importedCount++;
+        }
+
+        fclose($handle);
+
+        $message = "{$importedCount} employee(s) imported successfully.";
+        if ($warnings) {
+            $message .= ' ' . count($warnings) . ' row(s) skipped: ' . implode(' | ', array_slice($warnings, 0, 5));
+        }
+
+        return $this->sendSuccess([
+            'imported_count' => $importedCount,
+            'warnings' => $warnings,
+        ], $message);
     }
 
     // ==========================================
@@ -1046,8 +1063,8 @@ class EmployeeApiController extends Controller
             'permanent_address'           => ['nullable', 'string'],
             'city'                        => ['nullable', 'string', 'max:255'],
             'postal_code'                 => ['nullable', 'string', 'max:20'],
-            'personal_mobile_number'      => ['nullable', 'string', 'max:20'],
-            'home_phone'                  => ['nullable', 'string', 'max:20'],
+            'personal_mobile_number'      => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
+            'home_phone'                  => ['nullable', 'string', 'max:20', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'personal_email'              => ['nullable', 'email', 'max:255', Rule::unique('employees', 'personal_email')->ignore($employee?->id)],
             'experience'                  => ['nullable', 'numeric', 'min:0'],
             'source_of_hire'              => ['nullable', 'string', 'max:255'],
@@ -1055,7 +1072,7 @@ class EmployeeApiController extends Controller
             'current_salary'              => ['nullable', 'numeric', 'min:0'],
             'qualification'               => ['nullable', 'string', 'max:255'],
             'reporting_manager_id'        => ['nullable', 'integer', 'exists:employees,id'],
-            'date_of_birth'               => ['nullable', 'date'],
+            'date_of_birth'               => ['nullable', 'date', 'before_or_equal:today'],
             'probation_end_date'          => ['nullable', 'date'],
             'confirmation_date'           => ['nullable', 'date'],
             'shift_id'                    => ['nullable', 'integer', 'exists:production_shifts,id'],
@@ -1064,9 +1081,9 @@ class EmployeeApiController extends Controller
             'account_number'              => ['nullable', 'string', 'max:255'],
             'ifsc_code'                   => ['nullable', 'string', 'max:50'],
             'emergency_contact_name'      => ['nullable', 'string', 'max:255'],
-            'emergency_contact_number'    => ['nullable', 'string', 'max:50'],
+            'emergency_contact_number'    => ['nullable', 'string', 'max:50', 'regex:/^(?=.*[0-9])[0-9+().\s-]+$/'],
             'emergency_contact_relation'  => ['nullable', 'string', 'max:100'],
-            'status'                      => ['required'],
+            'status'                      => ['required', 'boolean'],
             'weekly_pattern'              => ['nullable', 'array'],
             'weekly_pattern.*'            => ['nullable', 'string'],
         ]);

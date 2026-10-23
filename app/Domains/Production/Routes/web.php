@@ -115,7 +115,7 @@ Route::prefix('production')
         Route::post('machines/{machine}/link-asset', [MachineController::class, 'linkAsset'])->name('machines.link-asset');
         Route::post('machines/{machine}/unlink-asset', [MachineController::class, 'unlinkAsset'])->name('machines.unlink-asset');
         Route::resource('machines', MachineController::class)->except(['show']);
-        Route::get('machines/{id}', fn ($id) => redirect()->route('production.mes.machines.show', $id))->name('machines.show');
+        Route::get('machines/{id}', fn($id) => redirect()->route('production.mes.machines.show', $id))->name('machines.show');
 
         // ── Plant Maintenance ──────────────────────────────────────────────────
         Route::prefix('maintenance')->as('maintenance.')->group(function (): void {
@@ -130,10 +130,12 @@ Route::prefix('production')
 
             // Work Orders
             Route::post('work-orders/{id}/schedule', [MaintenanceWorkOrderController::class, 'schedule'])->name('work-orders.schedule');
+            Route::post('work-orders/{id}/assignments', [MaintenanceWorkOrderController::class, 'addAssignment'])->name('work-orders.add-assignment');
             Route::post('work-orders/{id}/start', [MaintenanceWorkOrderController::class, 'start'])->name('work-orders.start');
             Route::post('work-orders/{id}/complete', [MaintenanceWorkOrderController::class, 'complete'])->name('work-orders.complete');
             Route::post('work-orders/{id}/cancel', [MaintenanceWorkOrderController::class, 'cancel'])->name('work-orders.cancel');
             Route::post('work-orders/{id}/spares', [MaintenanceWorkOrderController::class, 'addSpare'])->name('work-orders.add-spare');
+            Route::post('work-orders/{id}/logs', [MaintenanceWorkOrderController::class, 'storeDowntimeLog'])->name('work-orders.store-downtime-log');
             Route::post('work-orders/spares/{spareId}/issue', [MaintenanceWorkOrderController::class, 'issueSpare'])->name('work-orders.issue-spare');
             Route::resource('work-orders', MaintenanceWorkOrderController::class);
         });
@@ -236,6 +238,10 @@ Route::prefix('production')
 
         // ── MES / Shop Floor ──────────────────────────────────────────────────
         Route::get('mes', [MesController::class, 'dashboard'])->name('mes.dashboard');
+
+        // Keep the concrete downtime endpoint ahead of the generic operation route so
+        // /production/mes/downtime/start resolves to DowntimeController instead of MesController.
+        Route::post('mes/downtime/start', [DowntimeController::class, 'start'])->name('mes.downtime.start');
         Route::post('mes/{op}/start', [MesController::class, 'start'])->name('mes.start');
         Route::post('mes/{op}/pause', [MesController::class, 'pause'])->name('mes.pause');
         Route::post('mes/{op}/resume', [MesController::class, 'resume'])->name('mes.resume');
@@ -291,7 +297,6 @@ Route::prefix('production')
 
         // ── OEE Foundation routes ─────────────────────────────────────────────
         Route::post('mes/machines/override-state', [MachineStateController::class, 'overrideState'])->name('mes.machines.override-state');
-        Route::post('mes/downtime/start', [DowntimeController::class, 'start'])->name('mes.downtime.start');
         Route::post('mes/downtime/{id}/end', [DowntimeController::class, 'end'])->name('mes.downtime.end');
         Route::get('mes/timeline', [ProductionTimelineController::class, 'index'])->name('mes.timeline.index');
 
@@ -330,6 +335,9 @@ Route::prefix('production')
         Route::post('quality/rework/ops/{id}/start', [ReworkController::class, 'startOp'])->name('quality.rework.ops.start');
         Route::post('quality/rework/ops/{id}/complete', [ReworkController::class, 'completeOp'])->name('quality.rework.ops.complete');
         Route::post('quality/rework/{id}/fail', [ReworkController::class, 'fail'])->name('quality.rework.fail');
+        Route::post('quality/rework/{id}/request-material', [ReworkController::class, 'requestMaterial'])->name('quality.rework.request-material');
+        Route::post('quality/rework/{id}/issue-material', [ReworkController::class, 'issueMaterial'])->name('quality.rework.issue-material');
+        Route::get('quality/rework/{id}', [ReworkController::class, 'show'])->name('quality.rework.show');
         Route::resource('quality/rework', ReworkController::class)->only(['index', 'show']);
 
         Route::post('quality/scrap/{id}/approve', [ScrapController::class, 'approve'])->name('quality.scrap.approve');

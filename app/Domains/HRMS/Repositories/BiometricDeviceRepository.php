@@ -57,9 +57,11 @@ class BiometricDeviceRepository implements BiometricDeviceRepositoryInterface
         $companies = Company::where('status', true)->get();
         $businessUnits = BusinessUnit::where('status', true)->get();
         $branches = Branch::where('status', true)->get();
+        $allDevices = BiometricDevice::where('status', true)->orderBy('name')->get();
 
         return compact(
             'devices',
+            'allDevices',
             'companies',
             'businessUnits',
             'branches',

@@ -35,7 +35,9 @@ class SessionConflictChecker
 
         // --- Check existing Leave requests ---
         $leaveQuery = LeaveRequest::where('employee_id', $employeeId)
-            ->whereIn('status', ['pending', 'approved', 'cancellation_requested']);
+            ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
+            ->where('end_date', '>=', $newStart->toDateString())
+            ->where('start_date', '<=', $newEnd->toDateString());
 
         if ($excludeLeaveId) {
             $leaveQuery->where('id', '!=', $excludeLeaveId);
@@ -57,7 +59,9 @@ class SessionConflictChecker
 
         // --- Check existing WFH requests ---
         $wfhQuery = WfhRequest::where('employee_id', $employeeId)
-            ->whereIn('status', ['pending', 'approved', 'cancellation_requested']);
+            ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
+            ->where('end_date', '>=', $newStart->toDateString())
+            ->where('start_date', '<=', $newEnd->toDateString());
 
         if ($excludeWfhId) {
             $wfhQuery->where('id', '!=', $excludeWfhId);
@@ -155,6 +159,11 @@ class SessionConflictChecker
      */
     private static function sessionsConflict(string $new, string $existing): bool
     {
+        // Multiple hourly leaves on the same date do not conflict (balance limit applies)
+        if ($new === 'hourly' && $existing === 'hourly') {
+            return false;
+        }
+
         // The only non-conflicting combination is first_half ↔ second_half
         if ($new === 'first_half' && $existing === 'second_half') {
             return false;
@@ -170,6 +179,7 @@ class SessionConflictChecker
         return match($session) {
             'first_half'  => 'First Half',
             'second_half' => 'Second Half',
+            'hourly'      => 'Hourly Leave',
             default       => 'Full Day',
         };
     }

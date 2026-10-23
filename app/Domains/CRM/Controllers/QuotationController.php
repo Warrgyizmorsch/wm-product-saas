@@ -65,70 +65,24 @@ class QuotationController extends Controller
         return view('modules.crm.quotations.detail-partial', compact('quotation'));
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): RedirectResponse
     {
         $this->authorize('create', Quotation::class);
-        $tenantId = tenant_id() ?? 1;
 
-        $dealId = $request->input('deal_id');
+        $dealId = $request->input('deal_id') ?? $request->input('crm_deal_id');
+        if ($dealId) {
+            return redirect()->route('crm.deals.show', ['deal' => $dealId, 'create_quotation' => 1]);
+        }
+
         $leadId = $request->input('lead_id');
-        $accountId = $request->input('account_id');
-
-        $selectedDeal = $dealId ? CrmDeal::with(['account', 'contact'])->find($dealId) : null;
-        $selectedLead = $leadId ? Lead::find($leadId) : null;
-        $selectedAccount = $accountId ? CrmAccount::find($accountId) : ($selectedDeal ? $selectedDeal->account : null);
-
-        if (!$selectedLead && $selectedDeal) {
-            $selectedLead = Lead::where('crm_deal_id', $selectedDeal->id)->first();
-            if (!$selectedLead && $selectedDeal->crm_account_id) {
-                $selectedLead = Lead::where('crm_account_id', $selectedDeal->crm_account_id)->latest()->first();
-            }
-        } elseif (!$selectedLead && $selectedAccount) {
-            $selectedLead = Lead::where('crm_account_id', $selectedAccount->id)->latest()->first();
-        }
-
-        $accounts = CrmAccount::where('tenant_id', $tenantId)->orderBy('name')->get();
-        $deals = CrmDeal::where('tenant_id', $tenantId)->orderBy('title')->get();
-        $leads = Lead::where('tenant_id', $tenantId)->orderBy('id', 'desc')->get();
-        $users = User::orderBy('name')->get();
-        $products = Product::sellable()->with('parent')->orderBy('name')->get();
-
-        $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
-
-        $prefilledItems = [];
-        $rawItems = [];
-        if ($selectedDeal) {
-            $rawItems = $selectedDeal->product_items ?: [];
-            if (empty($rawItems) && !empty($selectedDeal->product_ids)) {
-                foreach ($selectedDeal->product_ids as $pid) {
-                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
-                }
-            }
-        }
-        if (empty($rawItems) && $selectedLead) {
-            $rawItems = $selectedLead->product_items ?: [];
-            if (empty($rawItems) && !empty($selectedLead->product_ids)) {
-                foreach ($selectedLead->product_ids as $pid) {
-                    $rawItems[] = ['product_id' => (int)$pid, 'quantity' => 1.0];
-                }
-            }
-        }
-        foreach ($rawItems as $it) {
-            if (empty($it['product_id'])) continue;
-            $productObj = Product::find($it['product_id']);
-            if ($productObj) {
-                $prefilledItems[] = [
-                    'product_id' => $productObj->id,
-                    'quantity'   => floatval($it['quantity'] ?? 1),
-                    'price'      => floatval($productObj->selling_price ?: $productObj->unit_cost ?: 0),
-                    'tax_rate'   => floatval($productObj->gst_rate ?: 18),
-                ];
+        if ($leadId) {
+            $lead = Lead::find($leadId);
+            if ($lead && $lead->crm_deal_id) {
+                return redirect()->route('crm.deals.show', ['deal' => $lead->crm_deal_id, 'create_quotation' => 1]);
             }
         }
 
-        return view('modules.crm.quotations.create', compact(
-            'selectedDeal', 'selectedLead', 'selectedAccount', 'accounts', 'deals', 'leads', 'users', 'products', 'nextQuotationNumber', 'prefilledItems'
-        ));
+        return redirect()->route('crm.deals.index')->with('info', 'Quotations must be created directly from Deals. Please select or open a Deal.');
     }
 
     public function store(Request $request): RedirectResponse
@@ -150,15 +104,21 @@ class QuotationController extends Controller
             'quotation_number'    => ['required', 'string', 'max:255'],
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
+            'tax_mode'            => ['nullable', 'string', 'in:exclusive,inclusive'],
+            'tax_type'            => ['nullable', 'string', 'in:intra_state,inter_state,exempt'],
+            'discount_type'       => ['nullable', 'string', 'in:order_wise,item_wise,none'],
             'discount'            => ['nullable', 'numeric', 'min:0'],
             'status'              => $statusRule,
             'terms_conditions'    => ['nullable', 'string'],
             'notes'               => ['nullable', 'string'],
+            'phone'               => ['nullable', 'string', 'max:50'],
+            'email'               => ['nullable', 'email', 'max:255'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
             'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
+            'items.*.discount'    => ['nullable', 'numeric', 'min:0'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
@@ -235,6 +195,7 @@ class QuotationController extends Controller
         $this->authorize('view', $quotation);
 
         $pdf = Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+        $pdf->setOption('isPhpEnabled', true);
         if (request()->has('preview') || request()->has('stream')) {
             return $pdf->stream("Quotation_{$quotation->quotation_number}.pdf");
         }
@@ -246,6 +207,15 @@ class QuotationController extends Controller
         $quotation = $this->quotationRepo->find($id);
         if (!$quotation) abort(404, 'Quotation not found.');
         $this->authorize('view', $quotation);
+
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        if ($approvalPolicy !== 'auto_approve' && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quotation must be Approved before sending to client.',
+            ], 422);
+        }
 
         $request->validate([
             'to_email'   => 'required|email',
@@ -259,9 +229,26 @@ class QuotationController extends Controller
             $emailService = app(\App\Services\EmailService::class);
             $msgRecord = $emailService->sendQuotationEmail($quotation, $request->all());
 
+            // Synchronize status to 'Quotation Sent' (same action as Mark as Sent)
+            $oldStatus = $quotation->status;
+            if (in_array($oldStatus, ['Draft', 'Approved', 'Pending Approval'])) {
+                $quotation->update(['status' => 'Quotation Sent']);
+                $leadId = $quotation->lead_id ?: ($quotation->crmDeal?->lead_id);
+                if ($leadId && ($lead = Lead::find($leadId))) {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $lead, 'quotation_status_changed', $oldStatus, 'Quotation Sent',
+                        "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Quotation Sent' via Email dispatch"
+                    );
+                }
+                try {
+                    $this->quotationService->handleQuotationStatusChange($quotation, 'Quotation Sent', $leadId);
+                } catch (\Throwable $e) {}
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => "Quotation {$quotation->quotation_number} sent successfully to {$request->input('to_email')} with PDF attached!",
+                'new_status' => 'Quotation Sent',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -277,6 +264,15 @@ class QuotationController extends Controller
         if (!$quotation) abort(404, 'Quotation not found.');
         $this->authorize('view', $quotation);
 
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        if ($approvalPolicy !== 'auto_approve' && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quotation must be Approved before sending to client.',
+            ], 422);
+        }
+
         $request->validate([
             'phone'      => 'required|string',
             'caption'    => 'nullable|string',
@@ -285,7 +281,11 @@ class QuotationController extends Controller
 
         $phone = $request->input('phone');
         if (!empty($phone)) {
-            $quotation->update(['phone' => $phone]);
+            $cleanPhone = preg_replace('/\D/', '', trim($phone));
+            if (strlen($cleanPhone) === 10) {
+                $cleanPhone = '91' . $cleanPhone;
+            }
+            $quotation->update(['phone' => $cleanPhone ?: $phone]);
         }
 
         try {
@@ -299,9 +299,26 @@ class QuotationController extends Controller
             );
 
             if ($result['success']) {
+                // Synchronize status to 'Quotation Sent' (same action as Mark as Sent)
+                $oldStatus = $quotation->status;
+                if (in_array($oldStatus, ['Draft', 'Approved', 'Pending Approval'])) {
+                    $quotation->update(['status' => 'Quotation Sent']);
+                    $leadId = $quotation->lead_id ?: ($quotation->crmDeal?->lead_id);
+                    if ($leadId && ($lead = Lead::find($leadId))) {
+                        \App\Domains\CRM\Models\LeadHistory::logEvent(
+                            $lead, 'quotation_status_changed', $oldStatus, 'Quotation Sent',
+                            "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Quotation Sent' via WhatsApp dispatch"
+                        );
+                    }
+                    try {
+                        $this->quotationService->handleQuotationStatusChange($quotation, 'Quotation Sent', $leadId);
+                    } catch (\Throwable $e) {}
+                }
+
                 return response()->json([
                     'success' => true,
                     'message' => $result['message'],
+                    'new_status' => 'Quotation Sent',
                 ]);
             } else {
                 return response()->json([
@@ -318,7 +335,7 @@ class QuotationController extends Controller
         }
     }
 
-    public function edit(int $id): View|RedirectResponse
+    public function edit(int $id): RedirectResponse
     {
         $quotation = $this->quotationRepo->find($id);
         if (!$quotation) abort(404, 'Quotation not found.');
@@ -328,17 +345,11 @@ class QuotationController extends Controller
             return redirect()->back()->with('error', 'Accepted quotations cannot be edited.');
         }
 
-        $quotation->load(['items.product', 'deal', 'account', 'lead']);
+        if ($quotation->crm_deal_id) {
+            return redirect()->route('crm.deals.show', ['deal' => $quotation->crm_deal_id, 'edit_quotation' => 1, 'quotation_id' => $quotation->id]);
+        }
 
-        $nextRevisionNumber = ($quotation->revision_number ?? 0) + 1;
-        $rawNum = $quotation->getRawOriginal('quotation_number');
-        $baseNum = explode('-R', $rawNum)[0];
-        $newQuotationNumber = $baseNum . '-R' . $nextRevisionNumber;
-
-        $products = Product::sellable()->with('parent')->orderBy('name')->get();
-        $users = User::orderBy('name')->get();
-
-        return view('modules.crm.quotations.edit', compact('quotation', 'nextRevisionNumber', 'newQuotationNumber', 'products', 'users'));
+        return redirect()->route('crm.quotations.show', $quotation->id)->with('info', 'This quotation is not linked to a Deal and can only be viewed.');
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -366,15 +377,21 @@ class QuotationController extends Controller
             'quotation_number'    => ['required', 'string', 'max:255'],
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
+            'tax_mode'            => ['nullable', 'string', 'in:exclusive,inclusive'],
+            'tax_type'            => ['nullable', 'string', 'in:intra_state,inter_state,exempt'],
+            'discount_type'       => ['nullable', 'string', 'in:order_wise,item_wise,none'],
             'discount'            => ['nullable', 'numeric', 'min:0'],
             'status'              => $statusRule,
             'terms_conditions'    => ['nullable', 'string'],
             'notes'               => ['nullable', 'string'],
+            'phone'               => ['nullable', 'string', 'max:50'],
+            'email'               => ['nullable', 'email', 'max:255'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
             'items.*.product_id'  => ['required', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
+            'items.*.discount'    => ['nullable', 'numeric', 'min:0'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 

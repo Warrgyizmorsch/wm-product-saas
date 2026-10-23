@@ -90,8 +90,17 @@ class MilestoneController extends Controller
         $canManageTaskLists = auth()->user()->can('manage', [TaskList::class, $project]);
         $canCreateTasks = auth()->user()->can('create', [Task::class, $project]);
 
-        $taskLists = $this->taskLists->list($project)
+        $allProjectTasks = $this->tasks->list($project);
+        $milestoneTasks = $allProjectTasks
             ->where('milestone_id', $milestone->id)
+            ->values();
+        $tasksByList = $milestoneTasks->groupBy('task_list_id');
+
+        $taskLists = $this->taskLists->list($project)
+            ->filter(function (TaskList $list) use ($milestone, $milestoneTasks) {
+                return $list->milestone_id === $milestone->id 
+                    || $milestoneTasks->contains('task_list_id', $list->id);
+            })
             ->values();
 
         $taskFilters = array_filter(
@@ -99,12 +108,6 @@ class MilestoneController extends Controller
             fn ($value) => trim((string) $value) !== '',
         );
         $hasActiveTaskFilters = $taskFilters !== [];
-
-        $allProjectTasks = $this->tasks->list($project);
-        $milestoneTasks = $allProjectTasks
-            ->where('milestone_id', $milestone->id)
-            ->values();
-        $tasksByList = $milestoneTasks->groupBy('task_list_id');
 
         $filteredTasksByList = $hasActiveTaskFilters
             ? $this->filterTasks($milestoneTasks, $taskFilters)->groupBy('task_list_id')

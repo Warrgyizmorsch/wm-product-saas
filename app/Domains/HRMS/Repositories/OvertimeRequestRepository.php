@@ -41,10 +41,11 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
             app(\App\Domains\HRMS\Services\HrmsScopeService::class)->applyRelatedScope($summaryQuery, $user);
         }
 
-        $overtimeSearch = $inputs['overtime_search'] ?? $inputs['search'] ?? '';
-        $overtimeEmployeeId = $inputs['overtime_employee_id'] ?? $inputs['employee_id'] ?? '';
-        $overtimeStatus = $inputs['overtime_status'] ?? $inputs['status'] ?? '';
-        $overtimeSort = $inputs['overtime_sort'] ?? $inputs['sort'] ?? 'newest';
+        $isOvertimeTab = !isset($inputs['tab']) || in_array($inputs['tab'], ['overtime', 'ot']);
+        $overtimeSearch = $inputs['overtime_search'] ?? ($isOvertimeTab ? ($inputs['search'] ?? '') : '');
+        $overtimeEmployeeId = $inputs['overtime_employee_id'] ?? ($isOvertimeTab ? ($inputs['employee_id'] ?? '') : '');
+        $overtimeStatus = $inputs['overtime_status'] ?? ($isOvertimeTab ? ($inputs['status'] ?? '') : '');
+        $overtimeSort = $inputs['overtime_sort'] ?? ($isOvertimeTab ? ($inputs['sort'] ?? 'newest') : 'newest');
 
         if (!empty($overtimeEmployeeId)) {
             $query->where('employee_id', $overtimeEmployeeId);
@@ -60,9 +61,13 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         }
 
         if (!empty($overtimeSearch)) {
-            $query->whereHas('employee', function ($eq) use ($overtimeSearch) {
-                $eq->where('full_name', 'like', "%{$overtimeSearch}%")
-                    ->orWhere('employee_id', 'like', "%{$overtimeSearch}%");
+            $query->where(function ($q) use ($overtimeSearch) {
+                $q->whereHas('employee', function ($eq) use ($overtimeSearch) {
+                    $eq->where('full_name', 'like', "%{$overtimeSearch}%")
+                        ->orWhere('employee_id', 'like', "%{$overtimeSearch}%");
+                })
+                ->orWhere('reason', 'like', "%{$overtimeSearch}%")
+                ->orWhere('compensation_type', 'like', "%{$overtimeSearch}%");
             });
         }
 
@@ -87,6 +92,9 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
             'auto_overtime_threshold_hours' => 0.0,
             'overtime_rate_multiplier'      => 1.5,
             'min_overtime_request_hours'    => 0.5,
+            'overtime_max_monthly_hours'    => null,
+            'overtime_weekend_multiplier'   => 2.0,
+            'overtime_holiday_multiplier'   => 2.5,
         ];
         if ($user && $user->tenant_id) {
             $tenant = Tenant::find($user->tenant_id);
@@ -94,6 +102,40 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                 $tenantSettings['auto_overtime_threshold_hours'] = $tenant->settings['auto_overtime_threshold_hours'] ?? 0.0;
                 $tenantSettings['overtime_rate_multiplier']      = $tenant->settings['overtime_rate_multiplier'] ?? 1.5;
                 $tenantSettings['min_overtime_request_hours']    = $tenant->settings['min_overtime_request_hours'] ?? 0.5;
+                $tenantSettings['overtime_max_monthly_hours']    = $tenant->settings['overtime_max_monthly_hours'] ?? null;
+                $tenantSettings['overtime_weekend_multiplier']   = $tenant->settings['overtime_weekend_multiplier'] ?? 2.0;
+                $tenantSettings['overtime_holiday_multiplier']   = $tenant->settings['overtime_holiday_multiplier'] ?? 2.5;
+            }
+        }
+
+        $companyId = $employee?->company_id ?? ($user?->company_id ?? null);
+        $otRule = \App\Domains\HRMS\Models\AttendancePenalty::where('rule_type', 'overtime_rules')
+            ->where(function ($q) use ($companyId) {
+                if ($companyId) {
+                    $q->where('company_id', $companyId)->orWhereNull('company_id');
+                } else {
+                    $q->whereNull('company_id');
+                }
+            })
+            ->where('status', true)
+            ->orderByRaw('company_id IS NULL ASC')
+            ->first();
+
+        if ($otRule && is_array($otRule->penalty_tiers)) {
+            if (isset($otRule->penalty_tiers['auto_overtime_threshold_hours'])) {
+                $tenantSettings['auto_overtime_threshold_hours'] = $otRule->penalty_tiers['auto_overtime_threshold_hours'];
+            }
+            if (isset($otRule->penalty_tiers['min_overtime_request_hours'])) {
+                $tenantSettings['min_overtime_request_hours'] = $otRule->penalty_tiers['min_overtime_request_hours'];
+            }
+            if (isset($otRule->penalty_tiers['overtime_max_monthly_hours'])) {
+                $tenantSettings['overtime_max_monthly_hours'] = $otRule->penalty_tiers['overtime_max_monthly_hours'];
+            }
+            if (isset($otRule->penalty_tiers['overtime_weekend_multiplier'])) {
+                $tenantSettings['overtime_weekend_multiplier'] = $otRule->penalty_tiers['overtime_weekend_multiplier'];
+            }
+            if (isset($otRule->penalty_tiers['overtime_holiday_multiplier'])) {
+                $tenantSettings['overtime_holiday_multiplier'] = $otRule->penalty_tiers['overtime_holiday_multiplier'];
             }
         }
 
@@ -118,15 +160,17 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
     {
         $attachmentPath = null;
         if ($request->hasFile('attachment')) {
-            $attachmentPath = $request->file('attachment')->store('overtime_attachments', 'public');
+            $attachmentPath = $request->file('attachment')->storeTenantFile('overtime_attachments', 'public');
         }
 
         $user = auth()->user();
-        $tenantId = $user ? $user->tenant_id : null;
+        $employee = Employee::find($validated['employee_id']);
+        $tenantId = $user?->tenant_id ?? $employee?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1);
+        $companyId = $validated['company_id'] ?? $employee?->company_id ?? $user?->company_id ?? 1;
 
         return OvertimeRequest::create([
             'tenant_id'               => $tenantId,
-            'company_id'              => $validated['company_id'],
+            'company_id'              => $companyId,
             'employee_id'             => $validated['employee_id'],
             'date'                    => $validated['date'],
             'start_time'              => $validated['start_time'],
@@ -154,6 +198,7 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
             $approvalService->authorizeApproval($user, $requestModel->employee, $requestModel);
         }
 
+        $oldStatus = $requestModel->status;
         $finalApprovedHours = $approvedHours ?? $requestModel->duration_hours;
 
         if ($action === 'approved') {
@@ -173,11 +218,19 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                 );
             }
         } elseif ($action === 'rejected') {
+            if ($oldStatus === 'approved') {
+                $this->revertCompOffLeave($requestModel);
+            }
+
             $requestModel->update([
                 'status'           => 'rejected',
                 'rejection_reason' => $comment,
             ]);
         } elseif ($action === 'pending') {
+            if ($oldStatus === 'approved') {
+                $this->revertCompOffLeave($requestModel);
+            }
+
             $requestModel->update([
                 'status'                  => 'pending',
                 'approved_by'             => null,
@@ -187,6 +240,56 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         }
 
         return true;
+    }
+
+    public function revertCompOffLeave(OvertimeRequest $overtime): void
+    {
+        try {
+            if ($overtime->compensation_type !== 'comp_off' || !$overtime->employee_id) {
+                return;
+            }
+
+            $employee = $overtime->employee ?: Employee::find($overtime->employee_id);
+            if (!$employee) {
+                return;
+            }
+
+            $approvedHours = (float) ($overtime->approved_duration_hours ?? $overtime->duration_hours);
+            $creditDays = round($approvedHours / 8, 1);
+            if ($creditDays <= 0) {
+                return;
+            }
+
+            $leavePlanId = $employee->leave_plan_id;
+            $query = LeaveType::query();
+            if ($leavePlanId) {
+                $query->where('leave_plan_id', $leavePlanId);
+            }
+            $leaveType = (clone $query)->where('code', 'COMP_OFF')->first()
+                ?? (clone $query)->whereRaw('LOWER(name) LIKE ?', ['%comp%off%'])->first()
+                ?? LeaveType::where('code', 'COMP_OFF')->first();
+
+            if ($leaveType) {
+                $balance = LeaveBalance::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $leaveType->id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($balance) {
+                    $newAllocated = max(0.0, (float) $balance->allocated - $creditDays);
+                    $balance->update(['allocated' => $newAllocated]);
+                    Log::info('Comp Off reverted', [
+                        'employee_id'   => $employee->id,
+                        'overtime_id'   => $overtime->id,
+                        'reverted_days' => $creditDays,
+                        'new_allocated' => $newAllocated,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to revert Comp Off leave: ' . $e->getMessage(), [
+                'overtime_id' => $overtime->id,
+            ]);
+        }
     }
 
     /**
@@ -301,49 +404,6 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         }
     }
 
-    public function updateGlobalSettings(array $settings): bool
-    {
-        $user = auth()->user();
-        if (!$user || !$user->tenant_id) {
-            return false;
-        }
-
-        $tenant = Tenant::find($user->tenant_id);
-        if ($tenant) {
-            $currentSettings = $tenant->settings ?: [];
-            $currentSettings['auto_overtime_threshold_hours'] = (isset($settings['auto_overtime_threshold_hours']) && $settings['auto_overtime_threshold_hours'] !== '' && $settings['auto_overtime_threshold_hours'] !== null) ? (float) $settings['auto_overtime_threshold_hours'] : null;
-            $currentSettings['min_overtime_request_hours']    = (isset($settings['min_overtime_request_hours']) && $settings['min_overtime_request_hours'] !== '' && $settings['min_overtime_request_hours'] !== null) ? (float) $settings['min_overtime_request_hours'] : null;
-            $currentSettings['overtime_max_monthly_hours']    = (isset($settings['overtime_max_monthly_hours']) && $settings['overtime_max_monthly_hours'] !== '' && $settings['overtime_max_monthly_hours'] !== null) ? (float) $settings['overtime_max_monthly_hours'] : null;
-            $currentSettings['overtime_weekend_multiplier']   = (isset($settings['overtime_weekend_multiplier']) && $settings['overtime_weekend_multiplier'] !== '' && $settings['overtime_weekend_multiplier'] !== null) ? (float) $settings['overtime_weekend_multiplier'] : 2.0;
-            $currentSettings['overtime_holiday_multiplier']   = (isset($settings['overtime_holiday_multiplier']) && $settings['overtime_holiday_multiplier'] !== '' && $settings['overtime_holiday_multiplier'] !== null) ? (float) $settings['overtime_holiday_multiplier'] : 2.5;
-
-            $tiers = [];
-            if (isset($settings['overtime_tiers']) && is_array($settings['overtime_tiers'])) {
-                foreach ($settings['overtime_tiers'] as $tier) {
-                    $min = (isset($tier['min_hours']) && $tier['min_hours'] !== '') ? (float) $tier['min_hours'] : 0.0;
-                    $max = (isset($tier['max_hours']) && $tier['max_hours'] !== '') ? (float) $tier['max_hours'] : null;
-                    $mult = (isset($tier['multiplier']) && $tier['multiplier'] !== '') ? (float) $tier['multiplier'] : 1.0;
-                    $tiers[] = [
-                        'min_hours'  => $min,
-                        'max_hours'  => $max,
-                        'multiplier' => $mult
-                    ];
-                }
-            } else {
-                $tiers = [
-                    ['min_hours' => 0, 'max_hours' => 2, 'multiplier' => 1.5],
-                    ['min_hours' => 2, 'max_hours' => null, 'multiplier' => 2.0]
-                ];
-            }
-            $currentSettings['overtime_tiers'] = $tiers;
-
-            $tenant->update(['settings' => $currentSettings]);
-            return true;
-        }
-
-        return false;
-    }
-
     public function processAutoOvertime(Employee $employee, string $date, float $extraHours): ?OvertimeRequest
     {
         $otRule = \App\Domains\HRMS\Models\AttendancePenalty::where('rule_type', 'overtime_rules')
@@ -384,6 +444,30 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                 ->exists();
             if ($exists) {
                 return null;
+            }
+
+            // Enforce monthly maximum overtime limit if configured
+            $maxMonthlyHours = isset($settings['overtime_max_monthly_hours']) && $settings['overtime_max_monthly_hours'] !== '' && $settings['overtime_max_monthly_hours'] !== null
+                ? (float) $settings['overtime_max_monthly_hours']
+                : null;
+
+            if ($maxMonthlyHours !== null && $maxMonthlyHours > 0) {
+                $reqDate = Carbon::parse($date);
+                $existingMonthlyHours = (float) OvertimeRequest::where('employee_id', $employee->id)
+                    ->whereBetween('date', [$reqDate->copy()->startOfMonth()->toDateString(), $reqDate->copy()->endOfMonth()->toDateString()])
+                    ->whereIn('status', ['pending', 'approved', 'cancellation_requested'])
+                    ->sum('duration_hours');
+
+                if ($existingMonthlyHours >= $maxMonthlyHours) {
+                    return null; // Monthly limit already reached
+                }
+
+                if (($existingMonthlyHours + $extraHours) > $maxMonthlyHours) {
+                    $extraHours = round($maxMonthlyHours - $existingMonthlyHours, 2);
+                    if ($extraHours <= 0) {
+                        return null;
+                    }
+                }
             }
 
             $shift = $employee->resolveShiftForDate($date);

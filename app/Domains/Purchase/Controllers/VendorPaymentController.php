@@ -54,13 +54,34 @@ class VendorPaymentController extends Controller
             $selectedBill = $this->billRepo->findWithDetails($billId);
         }
 
+        $availableAdvance = 0.0;
         $totalAdvancePaid = 0.0;
-        if ($selectedBill && $selectedBill->purchaseOrder) {
-            $totalAdvancePaid = (float)($selectedBill->purchaseOrder->total_advance_paid ?? 0);
+        if ($selectedBill) {
+            $poId = $selectedBill->purchase_order_id ?? $selectedBill->goodsReceiptNote?->purchase_order_id;
+            $availableAdvance = app(\App\Domains\Purchase\Services\VendorBillService::class)
+                ->getAvailableVendorAdvance((int)$selectedBill->vendor_id, $tenantId, $poId);
+            if ($selectedBill->purchaseOrder) {
+                $totalAdvancePaid = (float)($selectedBill->purchaseOrder->total_advance_paid ?? 0);
+            }
         }
 
         $dueAmount = $selectedBill ? (float)($selectedBill->due_amount ?? 0) : 0.0;
-        $suggestedNetPayable = max(0.0, $dueAmount - $totalAdvancePaid);
+        $suggestedNetPayable = max(0.0, $dueAmount - $availableAdvance);
+
+        $vendorId = $request->query('vendor_id');
+        $preselectedVendor = $vendorId ? Vendor::where('tenant_id', $tenantId)->find($vendorId) : null;
+        if (!$selectedBill && $preselectedVendor && (float)$preselectedVendor->opening_balance > 0) {
+            $unallocatedPaid = (float) \App\Domains\Purchase\Models\VendorPayment::where('tenant_id', $tenantId)
+                ->where('vendor_id', $preselectedVendor->id)
+                ->whereIn('payment_type', ['Opening Balance', 'Advance'])
+                ->whereDoesntHave('allocations')
+                ->where('status', '!=', 'cancelled')
+                ->sum('amount');
+            $remainingOpening = max(0.0, (float)$preselectedVendor->opening_balance - $unallocatedPaid);
+            if ($remainingOpening > 0.001) {
+                $suggestedNetPayable = $remainingOpening;
+            }
+        }
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $unpaidBills = $this->billRepo->getPaginatedBills(['status' => 'Unpaid'], 100);
@@ -69,8 +90,10 @@ class VendorPaymentController extends Controller
             'vendors',
             'unpaidBills',
             'selectedBill',
+            'availableAdvance',
             'totalAdvancePaid',
-            'suggestedNetPayable'
+            'suggestedNetPayable',
+            'preselectedVendor'
         ));
     }
 

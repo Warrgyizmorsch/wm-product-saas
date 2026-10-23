@@ -50,6 +50,79 @@
         </div>
     </x-ui.card>
 
+    @if ($asset->capitalization_date)
+        @php
+            $fmt = fn ($value) => $value !== null ? number_format((float) $value, 2) : '—';
+        @endphp
+        <x-ui.card class="mb-4">
+            <x-slot:title>Capitalization</x-slot:title>
+            <div class="row g-4 fs-13">
+                <div class="col-md-3">
+                    <span class="text-muted fs-11 text-uppercase d-block mb-1">Capitalization Date</span>
+                    <span class="fw-bold text-dark">{{ $asset->capitalization_date->format('d M Y') }}</span>
+                </div>
+                <div class="col-md-3">
+                    <span class="text-muted fs-11 text-uppercase d-block mb-1">Depreciation Start Date</span>
+                    <span class="fw-bold text-dark">{{ $asset->depreciation_start_date?->format('d M Y') ?? '—' }}</span>
+                </div>
+                <div class="col-md-6">
+                    <span class="text-muted fs-11 text-uppercase d-block mb-1">Source</span>
+                    @if ($asset->purchaseOrder)
+                        <span class="fw-bold text-dark">Purchase — {{ $asset->purchaseOrder->purchase_order_number ?: ('PO #' . $asset->purchase_order_id) }}</span>
+                    @elseif ($asset->goods_receipt_note_item_id)
+                        <span class="fw-bold text-dark">Purchase (goods receipt)</span>
+                    @else
+                        <span class="fw-bold text-dark">Added manually in the register</span>
+                    @endif
+                </div>
+            </div>
+
+            <div class="mt-3 fs-13">
+                @if ($capitalizationJournal)
+                    <span class="text-muted">Ledger entry:</span>
+                    <a href="{{ route('accounting.journals.show', $capitalizationJournal) }}" class="fw-semibold">{{ $capitalizationJournal->journal_number }}</a>
+                    <span class="text-muted">— Dr Fixed Assets {{ number_format((float) $capitalizationJournal->total_debit, 2) }}</span>
+                @elseif ($needsLedgerEntry)
+                    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0 py-2">
+                        <span><i class="feather-alert-triangle me-1"></i>This asset's cost has not been posted to the ledger, so it does not appear in the Balance Sheet.</span>
+                        @if ($canCapitalize)
+                            <x-ui.button type="button" variant="warning" size="sm" data-bs-toggle="modal" data-bs-target="#capitalizationEntryModal">Post capitalization entry</x-ui.button>
+                        @endif
+                    </div>
+                @else
+                    <span class="text-muted">Ledger entry: posted with the purchase bill.</span>
+                @endif
+            </div>
+
+            <div class="table-responsive mt-4">
+                <table class="table table-sm mb-0 fs-13">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted ps-0">Acquisition Cost</td>
+                            <td class="text-end fw-semibold">{{ $fmt($asset->acquisition_cost) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted ps-0">Directly Attributable Cost <span class="fs-11">(installation, freight, etc.)</span></td>
+                            <td class="text-end fw-semibold">{{ $fmt($asset->directly_attributable_cost) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted ps-0">Non-Recoverable Tax <span class="fs-11">(blocked ITC, added to cost)</span></td>
+                            <td class="text-end fw-semibold">{{ $fmt($asset->non_recoverable_tax) }}</td>
+                        </tr>
+                        <tr class="border-top">
+                            <td class="fw-bold text-dark ps-0">Capitalized Cost</td>
+                            <td class="text-end fw-bold text-dark">{{ $fmt((float) $asset->acquisition_cost + (float) $asset->directly_attributable_cost + (float) $asset->non_recoverable_tax) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted ps-0">Recoverable Tax <span class="fs-11">(input credit, not part of cost)</span></td>
+                            <td class="text-end text-muted">{{ $fmt($asset->recoverable_tax) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </x-ui.card>
+    @endif
+
     <x-ui.card class="mb-4">
         <x-slot:title>Financials</x-slot:title>
         <div class="row g-4 fs-13">
@@ -165,7 +238,7 @@
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Recoverable Tax (GST/ITC)" name="recoverable_tax" id="capRecoverableTax" :value="old('recoverable_tax')" placeholder="0.00" />
-                    <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Tracked for reference only — not part of the capitalized cost.</small>
+                    <small class="form-text text-muted fs-11 d-block mt-n2 mb-2">Claimed as input credit — not part of the capitalized cost.</small>
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="number" label="Non-recoverable Tax" name="non_recoverable_tax" id="capNonRecoverableTax" :value="old('non_recoverable_tax')" placeholder="0.00" />
@@ -190,6 +263,10 @@
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Depreciation Start Date" name="depreciation_start_date" :value="old('depreciation_start_date', now()->toDateString())" />
                 </div>
+
+                @if ($needsLedgerEntry)
+                    @include('modules.accounting.fixed-assets.partials.funding-fields', ['prefix' => 'cap'])
+                @endif
 
                 <div class="col-12">
                     <div class="bg-light rounded px-3 py-3 mt-2">
@@ -219,10 +296,38 @@
             </div>
         </x-ui.modal>
     @endif
+
+    @if ($canCapitalize && $needsLedgerEntry && $asset->capitalization_date && ! $capitalizationJournal)
+        <x-ui.modal id="capitalizationEntryModal" title="Post capitalization entry — {{ $asset->asset_code }}"
+                    :formAction="route('accounting.fixed-assets.capitalization-entry', $asset)" submitText="Post entry">
+            <p class="fs-13 text-muted">
+                Posts Dr Fixed Assets {{ number_format((float) $asset->acquisition_cost + (float) $asset->directly_attributable_cost + (float) $asset->non_recoverable_tax, 2) }}
+                dated {{ $asset->capitalization_date->format('d M Y') }}, so the asset appears in the Balance Sheet.
+            </p>
+            <div class="row g-3 fs-13">
+                @include('modules.accounting.fixed-assets.partials.funding-fields', ['prefix' => 'entry'])
+            </div>
+        </x-ui.modal>
+    @endif
 @endsection
 
 @push('scripts')
     <script>
+        // "Funded by": show and enable only the picker for the chosen source.
+        document.querySelectorAll('[data-funding-fields]').forEach(function (box) {
+            function sync() {
+                const checked = box.querySelector('input[name="funding_source"]:checked');
+                const source = checked ? checked.value : null;
+                box.querySelectorAll('[data-funding-for]').forEach(function (panel) {
+                    const active = panel.getAttribute('data-funding-for') === source;
+                    panel.classList.toggle('d-none', !active);
+                    panel.querySelectorAll('select').forEach(function (select) { select.disabled = !active; });
+                });
+            }
+            box.querySelectorAll('input[name="funding_source"]').forEach(function (radio) { radio.addEventListener('change', sync); });
+            sync();
+        });
+
         $(document).ready(function () {
             function money(n) {
                 return (isFinite(n) ? n : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

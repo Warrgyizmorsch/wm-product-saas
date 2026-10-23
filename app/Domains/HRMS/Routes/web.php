@@ -256,6 +256,7 @@ Route::prefix('hrms')
             Route::get('/', [BiometricDeviceController::class, 'index'])->name('biometric-devices.index');
             Route::post('/', [BiometricDeviceController::class, 'store'])->name('biometric-devices.store');
             Route::post('/simulate-punch', [BiometricDeviceController::class, 'simulatePunch'])->name('biometric-devices.simulate-punch');
+            Route::post('/{biometricDevice}/test-connection', [BiometricDeviceController::class, 'testConnection'])->name('biometric-devices.test-connection');
             Route::put('/{biometricDevice}', [BiometricDeviceController::class, 'update'])->name('biometric-devices.update');
             Route::delete('/{biometricDevice}', [BiometricDeviceController::class, 'destroy'])->name('biometric-devices.destroy');
         });
@@ -265,6 +266,7 @@ Route::prefix('hrms')
 
         // Shift Change Request Management (Actions only)
         Route::prefix('shift-change')->group(function (): void {
+            Route::get('/', [ShiftChangeRequestController::class, 'index'])->name('shift-change.index');
             Route::post('/store', [ShiftChangeRequestController::class, 'store'])->name('shift-change.store');
             Route::post('/{shiftChangeRequest}/approve', [ShiftChangeRequestController::class, 'approve'])->name('shift-change.approve');
             Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestController::class, 'reject'])->name('shift-change.reject');
@@ -280,12 +282,12 @@ Route::prefix('hrms')
 
         // Overtime Request Management (Actions only)
         Route::prefix('overtime')->group(function (): void {
+            Route::get('/', [OvertimeRequestController::class, 'index'])->name('overtime.index');
             Route::post('/store', [OvertimeRequestController::class, 'store'])->name('overtime.store');
             Route::post('/{overtimeRequest}/approve', [OvertimeRequestController::class, 'approve'])->name('overtime.approve');
             Route::post('/{overtimeRequest}/reject', [OvertimeRequestController::class, 'reject'])->name('overtime.reject');
             Route::post('/{overtimeRequest}/update-status', [OvertimeRequestController::class, 'updateStatus'])->name('overtime.update-status');
             Route::delete('/{overtimeRequest}', [OvertimeRequestController::class, 'destroy'])->name('overtime.destroy');
-            Route::post('/settings', [OvertimeRequestController::class, 'updateSettings'])->name('overtime.update-settings');
 
             // Overtime Cancellation / Withdraw flow
             Route::post('/{overtimeRequest}/withdraw', [OvertimeRequestController::class, 'withdraw'])->name('overtime.withdraw');
@@ -365,7 +367,14 @@ Route::prefix('hrms')
         // Documents Registry (All uploaded documents)
         Route::prefix('documents')->group(function (): void {
             Route::get('/', [\App\Domains\HRMS\Controllers\DocumentController::class, 'index'])->name('documents.index');
+            Route::post('/', [\App\Domains\HRMS\Controllers\DocumentController::class, 'store'])->name('documents.store');
+            Route::put('/{document}', [\App\Domains\HRMS\Controllers\DocumentController::class, 'update'])->name('documents.update');
+            Route::patch('/{document}/status', [\App\Domains\HRMS\Controllers\DocumentController::class, 'updateStatus'])->name('documents.status');
+            Route::delete('/{document}', [\App\Domains\HRMS\Controllers\DocumentController::class, 'destroy'])->name('documents.destroy');
             Route::post('/bulk-upload', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkUpload'])->name('documents.bulk-upload');
+            Route::post('/bulk-approve', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkApprove'])->name('documents.bulk-approve');
+            Route::post('/bulk-reject', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkReject'])->name('documents.bulk-reject');
+            Route::post('/bulk-delete', [\App\Domains\HRMS\Controllers\DocumentController::class, 'bulkDelete'])->name('documents.bulk-delete');
         });
 
 
@@ -417,12 +426,14 @@ Route::prefix('hrms')
             Route::post('/travel/store', [TravelExpenseController::class, 'storeTravelRequest'])->name('travel-expense.travel.store');
             Route::post('/travel/{travelRequest}/approve', [TravelExpenseController::class, 'approveTravelRequest'])->name('travel-expense.travel.approve');
             Route::post('/travel/{travelRequest}/reject', [TravelExpenseController::class, 'rejectTravelRequest'])->name('travel-expense.travel.reject');
+            Route::delete('/travel/{travelRequest}', [TravelExpenseController::class, 'destroyTravelRequest'])->name('travel-expense.travel.destroy');
             
             // Cash Advances
             Route::post('/advance/store', [TravelExpenseController::class, 'storeCashAdvance'])->name('travel-expense.advance.store');
             Route::post('/advance/{cashAdvance}/approve', [TravelExpenseController::class, 'approveCashAdvance'])->name('travel-expense.advance.approve');
             Route::post('/advance/{cashAdvance}/disburse', [TravelExpenseController::class, 'disburseCashAdvance'])->name('travel-expense.advance.disburse');
             Route::post('/advance/{cashAdvance}/reject', [TravelExpenseController::class, 'rejectCashAdvance'])->name('travel-expense.advance.reject');
+            Route::delete('/advance/{cashAdvance}', [TravelExpenseController::class, 'destroyCashAdvance'])->name('travel-expense.advance.destroy');
             
             // Expense Reports
             Route::post('/report/store', [TravelExpenseController::class, 'storeExpenseReport'])->name('travel-expense.report.store');
@@ -431,6 +442,7 @@ Route::prefix('hrms')
             Route::post('/report/{expenseReport}/approve', [TravelExpenseController::class, 'approveExpenseReport'])->name('travel-expense.report.approve');
             Route::post('/report/{expenseReport}/reject', [TravelExpenseController::class, 'rejectExpenseReport'])->name('travel-expense.report.reject');
             Route::post('/report/{expenseReport}/pay', [TravelExpenseController::class, 'payExpenseReport'])->name('travel-expense.report.pay');
+            Route::delete('/report/{expenseReport}', [TravelExpenseController::class, 'destroyExpenseReport'])->name('travel-expense.report.destroy');
             Route::get('/employee-policy/{employee}', [TravelExpenseController::class, 'getEmployeePolicy'])->name('travel-expense.employee-policy');
         });
 
@@ -473,6 +485,7 @@ Route::prefix('hrms')
             Route::post('/clearance/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearance.update');
             Route::post('/clearances/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearances.update');
             Route::post('/{exit}/clearances/{department}/batch-update', [EmployeeExitController::class, 'updateDepartmentClearances'])->name('exits.clearances.batch-update');
+            Route::post('/{exit}/clearances/batch-update-all', [EmployeeExitController::class, 'updateAllExitClearances'])->name('exits.clearances.batch-update-all');
             Route::post('/{exit}/clearances/adhoc', [EmployeeExitController::class, 'storeAdhocExitClearance'])->name('exits.clearances.adhoc.store');
             Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitController::class, 'destroyExitClearance'])->name('exits.clearances.adhoc.destroy');
             Route::post('/templates', [EmployeeExitController::class, 'storeClearanceTemplate'])->name('exits.templates.store');
@@ -506,6 +519,7 @@ Route::prefix('hrms')
             Route::delete('/{pip}/objective/{objective}', [PipController::class, 'destroyObjective'])->name('objective.destroy');
 
             Route::post('/{pip}/evaluate', [PipController::class, 'evaluate'])->name('evaluate');
+            Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
 
             // Masters (Categories & Templates)
             Route::post('/category/store', [PipController::class, 'storeCategory'])->name('category.store');
@@ -523,6 +537,7 @@ Route::prefix('hrms')
             Route::post('/tickets/{ticket}/reply', [HelpdeskTicketController::class, 'reply'])->name('tickets.reply');
             Route::post('/tickets/{ticket}/status', [HelpdeskTicketController::class, 'updateStatus'])->name('tickets.status');
             Route::post('/tickets/{ticket}/csat', [HelpdeskTicketController::class, 'submitCsat'])->name('tickets.csat');
+            Route::get('/tickets/{ticket}/attachments/{attachment}', [HelpdeskTicketController::class, 'downloadAttachment'])->name('tickets.attachment');
 
             // Categories Management
             Route::get('/categories', [HelpdeskCategoryController::class, 'index'])->name('categories.index');
@@ -576,6 +591,8 @@ Route::prefix('hrms')
 
             // Offers & Employee Conversion
             Route::post('/application/{application}/offer', [RecruitmentController::class, 'createOffer'])->name('offer.create');
+            Route::post('/offer/{offer}/status', [RecruitmentController::class, 'updateOfferStatus'])->name('offer.status');
+            Route::get('/offer/{offer}/download-pdf', [RecruitmentController::class, 'downloadOfferPdf'])->name('offer.download');
             Route::post('/offer/{offer}/send-email', [RecruitmentController::class, 'sendOfferEmail'])->name('offer.send-email');
             Route::post('/offer/{offer}/convert-to-employee', [RecruitmentController::class, 'convertToEmployee'])->name('offer.convert');
         });
@@ -613,8 +630,6 @@ Route::prefix('hrms')
             // Appraisals & Evaluations
             Route::post('/scorecard/{planId}/self-appraisal', [KraKpiController::class, 'submitSelfAppraisal'])->name('self-appraisal');
             Route::post('/scorecard/{planId}/manager-appraisal', [KraKpiController::class, 'submitManagerAppraisal'])->name('manager-appraisal');
-            Route::post('/scorecard/{planId}/calibrate', [KraKpiController::class, 'calibrateAppraisal'])->name('calibrate');
-            Route::post('/scorecard/{planId}/sign-off', [KraKpiController::class, 'signOffAppraisal'])->name('sign-off');
 
             // 1-Click Bridge to PIP
             Route::post('/scorecard/{planId}/trigger-pip', [KraKpiController::class, 'triggerPip'])->name('trigger-pip');
@@ -623,7 +638,7 @@ Route::prefix('hrms')
         // SOP (Standard Operating Procedure) Management Hub
         Route::prefix('sop')->name('sop.')->group(function (): void {
             Route::get('/', [SopController::class, 'index'])->name('index');
-            Route::get('/my-sops', [SopController::class, 'index'])->name('my-sops');
+            Route::get('/my-sops', [SopController::class, 'mySops'])->name('my-sops');
             Route::post('/store', [SopController::class, 'store'])->name('store');
             Route::get('/{sop}', [SopController::class, 'show'])->name('show');
             Route::put('/{sop}', [SopController::class, 'update'])->name('update');
@@ -650,14 +665,18 @@ Route::prefix('hrms')
         // Goals & OKRs Management Hub
         Route::prefix('goals')->name('goals.')->group(function (): void {
             Route::get('/', [GoalController::class, 'index'])->name('index');
+            Route::get('/alignment-tree', [GoalController::class, 'alignmentTree'])->name('alignment-tree');
+            Route::get('/my-goals', [GoalController::class, 'myGoals'])->name('my-goals');
             Route::post('/store', [GoalController::class, 'store'])->name('store');
             Route::get('/{goal}', [GoalController::class, 'show'])->name('show');
             Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
             Route::delete('/{goal}', [GoalController::class, 'destroy'])->name('destroy');
             Route::post('/{goal}/check-in', [GoalController::class, 'checkIn'])->name('check-in');
+            Route::post('/{goal}/approve', [GoalController::class, 'approve'])->name('approve');
 
             // Cycles & Categories Masters
             Route::post('/cycle/store', [GoalController::class, 'storeCycle'])->name('cycle.store');
+            Route::put('/cycle/{cycle}', [GoalController::class, 'updateCycle'])->name('cycle.update');
             Route::delete('/cycle/{cycle}', [GoalController::class, 'destroyCycle'])->name('cycle.destroy');
             Route::post('/category/store', [GoalController::class, 'storeCategory'])->name('category.store');
             Route::delete('/category/{category}', [GoalController::class, 'destroyCategory'])->name('category.destroy');

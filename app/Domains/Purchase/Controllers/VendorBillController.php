@@ -249,7 +249,8 @@ class VendorBillController extends Controller
         if ($bill) {
             $this->authorize('view', $bill);
         }
-        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId) : 0.0;
+        $poId = $bill ? ($bill->purchase_order_id ?? $bill->goodsReceiptNote?->purchase_order_id) : null;
+        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId, $poId) : 0.0;
         return view('modules.purchase.bills.show', compact('bill', 'availableAdvance'));
     }
 
@@ -373,7 +374,7 @@ class VendorBillController extends Controller
                 $prefilledVendorId = $selectedDispatch->transporter_id;
             }
 
-            $prefilledAmount      = $prefilledAmount      ?: $selectedDispatch->freight_amount;
+            $prefilledAmount      = $prefilledAmount      ?: ($selectedDispatch->freight_amount > 0 ? convert_from_base((float) $selectedDispatch->freight_amount) : null);
             $prefilledInvoice     = $prefilledInvoice     ?: ('LR-' . ($selectedDispatch->lr_number ?: ($selectedDispatch->dispatch_number ?? $selectedDispatch->id)));
             $prefilledNotes       = $prefilledNotes       ?: "Freight Obligation Bill for Dispatch #{$selectedDispatch->dispatch_number} | Customer: " . ($selectedDispatch->customer?->name ?? 'N/A') . " | Vehicle: " . ($selectedDispatch->vehicle_number ?: 'N/A');
             $prefilledServiceHead = $prefilledServiceHead ?: 'Freight & Transport';
@@ -456,7 +457,8 @@ class VendorBillController extends Controller
             'notes'                 => 'nullable|string',
         ]);
 
-        $subtotal   = (float) $validated['amount'];
+        $rawAmount  = (float) $validated['amount'];
+        $subtotal   = convert_to_base($rawAmount);
         $taxRate    = (float) $validated['tax_rate'];
         $gstType    = $validated['gst_type'];
         $isRcm      = in_array($gstType, ['rcm', 'rcm_cgst_sgst', 'rcm_igst']);
@@ -465,9 +467,9 @@ class VendorBillController extends Controller
         $taxAmount  = ($subtotal * $taxRate) / 100;
         $grandTotal = $isRcm ? $subtotal : ($subtotal + $taxAmount);
 
-        $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 2);
-        $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 2);
-        $igstAmount = $isIgst ? round($taxAmount, 2) : 0;
+        $cgstAmount = $isIgst ? 0 : round($taxAmount / 2, 4);
+        $sgstAmount = $isIgst ? 0 : round($taxAmount - $cgstAmount, 4);
+        $igstAmount = $isIgst ? round($taxAmount, 4) : 0;
 
         $billNumber = $this->billRepo->getNextBillNumber($tenantId);
 
@@ -515,7 +517,7 @@ class VendorBillController extends Controller
             'igst_amount'           => $igstAmount,
             'grand_total'           => $grandTotal,
             'paid_amount'           => 0,
-            'due_amount'            => round($grandTotal, 2),
+            'due_amount'            => round($grandTotal, 4),
             'notes'                 => $notes,
             'created_by'            => auth()->id() ?: 1,
         ]);

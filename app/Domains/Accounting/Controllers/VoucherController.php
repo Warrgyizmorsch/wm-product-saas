@@ -80,7 +80,7 @@ class VoucherController extends Controller
             'payment_method' => ['nullable', 'string', 'max:50'],
             'reference_no' => ['nullable', 'string', 'max:100'],
             'items' => ['required', 'array', 'min:2', 'max:20'],
-            'items.*.chart_of_account_id' => ['required', 'integer', 'exists:chart_of_accounts,id'],
+            'items.*.chart_of_account_id' => ['required', 'integer', tenant_exists('chart_of_accounts')],
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],

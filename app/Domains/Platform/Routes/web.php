@@ -93,48 +93,59 @@ Route::prefix('platform')
         Route::patch('currencies/{currency}/status', [CurrencyController::class, 'toggleStatus'])
             ->name('currencies.status');
 
-        Route::post('payment-terms/{paymentTerm}/toggle-status', [\App\Domains\Platform\Controllers\PaymentTermController::class, 'toggleStatus'])
-            ->name('payment-terms.toggle-status');
-        Route::resource('payment-terms', \App\Domains\Platform\Controllers\PaymentTermController::class);
-
         Route::post('transporters/quick-create', [TransporterController::class, 'quickCreate'])
             ->name('transporters.quick-create');
         Route::resource('transporters', TransporterController::class);
 
-        // WhatsApp Bridge Integration Routes
-        Route::get('whatsapp-settings', [\App\Http\Controllers\WhatsAppController::class, 'index'])->name('whatsappSettings.index');
-        Route::post('whatsapp/config', [\App\Http\Controllers\WhatsAppController::class, 'updateConfig'])->name('whatsapp.updateConfig');
+        // WhatsApp used by ordinary staff from CRM/Sales screens (status, send, inbox).
         Route::get('whatsapp/status', [\App\Http\Controllers\WhatsAppController::class, 'status'])->name('whatsapp.status');
         Route::post('whatsapp/connect', [\App\Http\Controllers\WhatsAppController::class, 'connect'])->name('whatsapp.connect');
-        Route::delete('whatsapp/disconnect', [\App\Http\Controllers\WhatsAppController::class, 'disconnect'])->name('whatsapp.disconnect');
         Route::post('whatsapp/send-message', [\App\Http\Controllers\WhatsAppController::class, 'sendMessage'])->name('whatsapp.sendMessage');
         Route::get('whatsapp/messages', [\App\Http\Controllers\WhatsAppController::class, 'messages'])->name('whatsapp.messages');
 
-        // SMTP Email Settings Routes
-        Route::get('email-settings', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'index'])->name('emailSettings.index');
-        Route::post('email-settings/store', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'store'])->name('emailSettings.store');
-        Route::post('email-settings/{id}/test', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'testConnection'])->name('emailSettings.test');
-        Route::post('email-settings/{id}/send-test-email', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'sendTestMail'])->name('emailSettings.sendTestMail');
-        Route::delete('email-settings/{id}', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'destroy'])->name('emailSettings.destroy');
+        // The workspace's own settings and integration credentials: owners/admins only.
+        Route::middleware('permission:tenant.settings.manage')->group(function (): void {
+            Route::post('payment-terms/{paymentTerm}/toggle-status', [\App\Domains\Platform\Controllers\PaymentTermController::class, 'toggleStatus'])
+                ->name('payment-terms.toggle-status');
+            Route::resource('payment-terms', \App\Domains\Platform\Controllers\PaymentTermController::class);
 
-        // GST & E-Invoice / E-Way Bill Settings Routes
-        Route::get('gst-settings', [\App\Domains\Platform\Controllers\GstSettingController::class, 'index'])->name('gstSettings.index');
-        Route::post('gst-settings/store', [\App\Domains\Platform\Controllers\GstSettingController::class, 'store'])->name('gstSettings.store');
-        Route::post('gst-settings/{id}/test', [\App\Domains\Platform\Controllers\GstSettingController::class, 'testConnection'])->name('gstSettings.test');
-        Route::delete('gst-settings/{id}', [\App\Domains\Platform\Controllers\GstSettingController::class, 'destroy'])->name('gstSettings.destroy');
+            // WhatsApp Bridge settings
+            Route::get('whatsapp-settings', [\App\Http\Controllers\WhatsAppController::class, 'index'])->name('whatsappSettings.index');
+            Route::post('whatsapp/config', [\App\Http\Controllers\WhatsAppController::class, 'updateConfig'])->name('whatsapp.updateConfig');
+            Route::delete('whatsapp/disconnect', [\App\Http\Controllers\WhatsAppController::class, 'disconnect'])->name('whatsapp.disconnect');
 
-        // Meta (Facebook & Instagram) Marketing & Lead Setup Routes
-        Route::get('meta-settings', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'index'])->name('metaSettings.index');
-        Route::post('meta-settings/store', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'store'])->name('metaSettings.store');
-        Route::post('meta-settings/test-token', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'testToken'])->name('metaSettings.testToken');
-        Route::post('meta-settings/simulate-test-lead', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'simulateTestLead'])->name('metaSettings.simulateTestLead');
-        Route::delete('meta-settings/{id}', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'destroy'])->name('metaSettings.destroy');
+            // SMTP Email Settings Routes
+            Route::get('email-settings', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'index'])->name('emailSettings.index');
+            Route::post('email-settings/store', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'store'])->name('emailSettings.store');
+            Route::post('email-settings/{id}/test', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'testConnection'])->name('emailSettings.test');
+            Route::post('email-settings/{id}/send-test-email', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'sendTestMail'])->name('emailSettings.sendTestMail');
+            Route::delete('email-settings/{id}', [\App\Domains\Platform\Controllers\EmailSettingController::class, 'destroy'])->name('emailSettings.destroy');
 
-        // Notification Rules Master (Absolute ERP Style)
-        Route::post('notification-rules/{notificationRule}/toggle-status', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'toggleStatus'])
-            ->name('notification-rules.toggle-status');
-        Route::post('notification-rules/{notificationRule}/test-send', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'testSend'])
-            ->name('notification-rules.test-send');
-        Route::resource('notification-rules', \App\Domains\Platform\Controllers\NotificationRuleController::class);
+            // GST & E-Invoice / E-Way Bill Settings Routes
+            Route::get('gst-settings', [\App\Domains\Platform\Controllers\GstSettingController::class, 'index'])->name('gstSettings.index');
+            Route::post('gst-settings/store', [\App\Domains\Platform\Controllers\GstSettingController::class, 'store'])->name('gstSettings.store');
+            Route::post('gst-settings/{id}/test', [\App\Domains\Platform\Controllers\GstSettingController::class, 'testConnection'])->name('gstSettings.test');
+            Route::delete('gst-settings/{id}', [\App\Domains\Platform\Controllers\GstSettingController::class, 'destroy'])->name('gstSettings.destroy');
+
+            // Meta (Facebook & Instagram) Marketing & Lead Setup Routes
+            Route::get('meta-settings', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'index'])->name('metaSettings.index');
+            Route::post('meta-settings/store', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'store'])->name('metaSettings.store');
+            Route::post('meta-settings/test-token', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'testToken'])->name('metaSettings.testToken');
+            Route::post('meta-settings/simulate-test-lead', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'simulateTestLead'])->name('metaSettings.simulateTestLead');
+            Route::delete('meta-settings/{id}', [\App\Domains\Platform\Controllers\MetaSettingController::class, 'destroy'])->name('metaSettings.destroy');
+
+            // Twilio Cloud Telephony & Call Recording Routes
+            Route::get('twilio-settings', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'index'])->name('twilioSettings.index');
+            Route::post('twilio-settings/store', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'store'])->name('twilioSettings.store');
+            Route::post('twilio-settings/test-connection', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'testConnection'])->name('twilioSettings.testConnection');
+            Route::post('twilio-settings/simulate-call', [\App\Domains\Platform\Controllers\TwilioSettingController::class, 'simulateCallLog'])->name('twilioSettings.simulateCallLog');
+
+            // Notification Rules Master (Absolute ERP Style)
+            Route::post('notification-rules/{notificationRule}/toggle-status', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'toggleStatus'])
+                ->name('notification-rules.toggle-status');
+            Route::post('notification-rules/{notificationRule}/test-send', [\App\Domains\Platform\Controllers\NotificationRuleController::class, 'testSend'])
+                ->name('notification-rules.test-send');
+            Route::resource('notification-rules', \App\Domains\Platform\Controllers\NotificationRuleController::class);
+        });
     });
 

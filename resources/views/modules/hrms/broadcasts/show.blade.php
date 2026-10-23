@@ -10,6 +10,9 @@
             Back to Broadcasts
         </x-ui.button>
         @if($isHrAdmin)
+        <x-ui.button variant="primary" icon="feather-edit" data-bs-toggle="modal" data-bs-target="#editBroadcastModal" class="fw-semibold">
+            Edit Broadcast
+        </x-ui.button>
         <x-ui.button variant="danger" icon="feather-trash-2" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete broadcast {{ $broadcast->broadcast_number }}? This will remove all receipts and comments.', function() { document.getElementById('adminDeleteBcForm').submit(); }, { title: 'Delete Broadcast', confirmText: 'Yes, Delete', variant: 'danger' });" class="fw-semibold">
             Delete Broadcast
         </x-ui.button>
@@ -306,4 +309,181 @@
 
     </div>
 </div>
+
+@if($isHrAdmin)
+<!-- EDIT BROADCAST MODAL -->
+<div class="modal fade" id="editBroadcastModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit Broadcast Announcement ({{ $broadcast->broadcast_number }})</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.broadcasts.update', $broadcast->id) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                @method('PUT')
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Announcement Title" name="title" :value="$broadcast->title" :required="true" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Category" name="category" :required="true">
+                                <option value="announcement" @selected($broadcast->category === 'announcement')>General Announcement</option>
+                                <option value="policy_update" @selected($broadcast->category === 'policy_update')>Policy Update</option>
+                                <option value="event" @selected($broadcast->category === 'event')>Company Event</option>
+                                <option value="emergency" @selected($broadcast->category === 'emergency')>Emergency Alert</option>
+                                <option value="news" @selected($broadcast->category === 'news')>News & Newsletter</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Priority Level" name="priority" :required="true">
+                                <option value="normal" @selected($broadcast->priority === 'normal')>Normal Priority</option>
+                                <option value="important" @selected($broadcast->priority === 'important')>Important (High Visibility)</option>
+                                <option value="urgent" @selected($broadcast->priority === 'urgent')>Urgent / Emergency Alert</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Target Audience Scope" name="target_type" id="editTargetTypeSelect" :required="true">
+                                <option value="all" @selected($broadcast->target_type === 'all')>All Active Employees (Company-wide)</option>
+                                <option value="department" @selected($broadcast->target_type === 'department')>By Department</option>
+                                <option value="branch" @selected($broadcast->target_type === 'branch')>By Office Branch</option>
+                                <option value="designation" @selected($broadcast->target_type === 'designation')>By Designation / Role</option>
+                                <option value="specific_employees" @selected($broadcast->target_type === 'specific_employees')>Select Specific Employees</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <!-- Dynamic Target Selection Container -->
+                        <div class="col-12 {{ ($broadcast->target_type === 'all' || empty($broadcast->target_type)) ? 'd-none' : '' }}" id="editTargetSelectionContainer">
+                            <x-ui.odoo-form-ui type="select" label="Select Target Items" name="target_ids[]" id="editTargetIdsSelect" :multiple="true" :searchable="true">
+                                <!-- JS Populated -->
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="textarea" label="Announcement Content" name="content" rows="4" :value="$broadcast->content" :required="true" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="file" label="Replace Attachment (PDF/Doc)" name="attachment" />
+                            @if($broadcast->attachment_path)
+                                <small class="text-muted fs-11 mt-1 d-block">Current: {{ basename($broadcast->attachment_path) }}</small>
+                            @endif
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="file" label="Replace Banner Graphic" name="banner_image" />
+                            @if($broadcast->banner_image_path)
+                                <small class="text-muted fs-11 mt-1 d-block">Current: {{ basename($broadcast->banner_image_path) }}</small>
+                            @endif
+                        </div>
+
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="datetime-local" label="Schedule Release" name="scheduled_at" :value="$broadcast->scheduled_at ? $broadcast->scheduled_at->format('Y-m-d\TH:i') : ''" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expires_at" :value="$broadcast->expires_at ? $broadcast->expires_at->format('Y-m-d') : ''" />
+                        </div>
+
+                        <div class="col-12 border-top pt-3 mt-2">
+                            <h6 class="fw-bold text-dark fs-12 mb-2">Delivery Channels & Interactivity Flags</h6>
+                            <div class="d-flex flex-wrap gap-4">
+                                <x-ui.checkbox label="Require Read Acknowledgement" name="is_acknowledgement_required" :checked="(bool)$broadcast->is_acknowledgement_required" />
+                                <x-ui.checkbox label="Allow Employee Comments & Q&A" name="allow_comments" :checked="(bool)$broadcast->allow_comments" />
+                                <x-ui.checkbox label="Show Dashboard Banner Alert" name="show_banner" :checked="(bool)$broadcast->show_banner" />
+                                <x-ui.checkbox label="Send Email Dispatch" name="send_email" :checked="(bool)$broadcast->send_email" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light py-2.5">
+                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update Broadcast</x-ui.button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
+<x-ui.confirmation-modal />
+
+@if($isHrAdmin)
+@push('scripts')
+<script>
+    $(document).ready(function() {
+        if ($('#editBroadcastModal').parent().get(0) !== document.body) {
+            $('#editBroadcastModal').appendTo(document.body);
+        }
+
+        const departments = @json($departments ?? []);
+        const branches = @json($branches ?? []);
+        const designations = @json($designations ?? []);
+        const employees = @json($employees ?? []);
+        const currentTargetIds = @json(array_map('strval', (array)($broadcast->target_ids ?? [])));
+
+        function updateEditTargetSelection(initialLoad = false) {
+            const val = $('#editTargetTypeSelect').val();
+            const container = $('#editTargetSelectionContainer');
+            const select = $('#editTargetIdsSelect');
+            const labelEl = container.find('.odoo-form-label');
+
+            select.empty();
+
+            if (val === 'all') {
+                container.addClass('d-none');
+            } else {
+                container.removeClass('d-none');
+                let labelText = 'Select Target Items';
+                if (val === 'department') {
+                    labelText = 'Select Departments';
+                    departments.forEach(d => {
+                        const sel = initialLoad && currentTargetIds.includes(String(d.id)) ? 'selected' : '';
+                        select.append(`<option value="${d.id}" ${sel}>${d.name}</option>`);
+                    });
+                } else if (val === 'branch') {
+                    labelText = 'Select Office Branches';
+                    branches.forEach(b => {
+                        const sel = initialLoad && currentTargetIds.includes(String(b.id)) ? 'selected' : '';
+                        select.append(`<option value="${b.id}" ${sel}>${b.name}</option>`);
+                    });
+                } else if (val === 'designation') {
+                    labelText = 'Select Designations';
+                    designations.forEach(ds => {
+                        const sel = initialLoad && currentTargetIds.includes(String(ds.id)) ? 'selected' : '';
+                        select.append(`<option value="${ds.id}" ${sel}>${ds.name}</option>`);
+                    });
+                } else if (val === 'specific_employees') {
+                    labelText = 'Select Targeted Employees';
+                    employees.forEach(e => {
+                        const sel = initialLoad && currentTargetIds.includes(String(e.id)) ? 'selected' : '';
+                        select.append(`<option value="${e.id}" ${sel}>${e.full_name} (${e.employee_id})</option>`);
+                    });
+                }
+
+                if (labelEl.length) {
+                    labelEl.html(labelText + ' <span class="text-danger">*</span>');
+                }
+
+                if ($.fn.select2) {
+                    if (!select.hasClass('select2-hidden-accessible')) {
+                        select.select2({
+                            theme: "bootstrap-5",
+                            width: "100%",
+                            dropdownParent: $('#editBroadcastModal')
+                        });
+                    } else {
+                        select.trigger('change.select2');
+                    }
+                }
+            }
+        }
+
+        updateEditTargetSelection(true);
+        $(document).on('change', '#editTargetTypeSelect', function() {
+            updateEditTargetSelection(false);
+        });
+    });
+</script>
+@endpush
+@endif
 @endsection

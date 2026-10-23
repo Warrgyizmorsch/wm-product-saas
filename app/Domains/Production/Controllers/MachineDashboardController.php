@@ -52,6 +52,19 @@ class MachineDashboardController extends Controller
             ->orderBy('next_due_date')
             ->get();
 
+        // Sync machine maintenance dates from PM schedules or completed work orders if unset or outdated
+        $earliestActivePm = $pmSchedules->where('is_active', true)->whereNotNull('next_due_date')->sortBy('next_due_date')->first();
+        if ($earliestActivePm && (!$machine->next_maintenance_due_date || $machine->next_maintenance_due_date != $earliestActivePm->next_due_date)) {
+            $machine->update(['next_maintenance_due_date' => $earliestActivePm->next_due_date]);
+            $machine->next_maintenance_due_date = $earliestActivePm->next_due_date;
+        }
+
+        $latestCompletedPm = $pmSchedules->whereNotNull('last_completed_date')->sortByDesc('last_completed_date')->first();
+        if ($latestCompletedPm && (!$machine->last_maintenance_date || $machine->last_maintenance_date < $latestCompletedPm->last_completed_date)) {
+            $machine->update(['last_maintenance_date' => $latestCompletedPm->last_completed_date]);
+            $machine->last_maintenance_date = $latestCompletedPm->last_completed_date;
+        }
+
         $totalMaintenanceCost = (float) \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::where('machine_id', $machine->id)
             ->where('status', \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::STATUS_COMPLETED)
             ->sum('total_cost');

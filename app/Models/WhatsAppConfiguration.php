@@ -11,6 +11,9 @@ class WhatsAppConfiguration extends Model
 {
     protected $table = 'whatsapp_configurations';
 
+    /** Never serialised into JSON responses (QA-11). */
+    protected $hidden = ['bridge_token'];
+
     protected $fillable = [
         'tenant_id',
         'company_id',
@@ -50,7 +53,7 @@ class WhatsAppConfiguration extends Model
      */
     public static function getForCurrentContext(): self
     {
-        $tenantId = current_tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $companyId = current_company_id();
         $branchId = current_branch_id();
 
@@ -80,7 +83,7 @@ class WhatsAppConfiguration extends Model
                 'branch_id'    => $branchId,
                 'session_key'  => $sessionKey,
                 'bridge_url'   => 'http://127.0.0.1:3210',
-                'bridge_token' => 'wm_erp_whatsapp_secret_token_2026',
+                'bridge_token' => \Illuminate\Support\Str::random(40),
                 'is_active'    => true,
                 'is_default'   => true,
                 'status'       => 'disconnected',

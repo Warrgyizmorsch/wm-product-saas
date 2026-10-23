@@ -167,7 +167,7 @@
             <div class="text-end">
                 <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('crm.financial_health_status') }}</span>
                 @if(($customerCreditBalance ?? 0) > 0)
-                    <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>Advance Credit</span>
+                    <span class="badge bg-soft-info text-info fs-12 px-3 py-1.5 fw-bold border"><i class="feather-arrow-down-left me-1"></i>Advance Credit: {{ format_currency($customerCreditBalance) }}</span>
                 @elseif($outstandingBalance <= 0)
                     <span class="badge bg-soft-success text-success fs-12 px-3 py-1.5 fw-bold border"><i class="feather-check-circle me-1"></i>All Clear (Zero Balance)</span>
                 @elseif($overdueAmount > 0)
@@ -202,12 +202,24 @@
                 <div class="col-md-3 border-end">
                     <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-alert-circle me-1 text-warning"></i>{{ __('crm.outstanding_receivables') }}</span>
                     <h4 class="fw-bold text-warning mb-0 fs-18">{{ format_currency($outstandingBalance) }}</h4>
-                    <span class="fs-11 text-muted">Total Uncollected</span>
+                    <span class="fs-11 text-muted">
+                        @if(($openingBalance ?? 0) > 0)
+                            Total Uncollected <span class="text-warning-emphasis fw-medium" title="Includes Opening Balance">(incl. {{ format_currency($openingBalance) }} OB)</span>
+                        @else
+                            Total Uncollected
+                        @endif
+                    </span>
                 </div>
                 <div class="col-md-3 border-end">
-                    <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-clock me-1 text-danger"></i>{{ __('crm.overdue_amount') }}</span>
-                    <h4 class="fw-bold text-danger mb-0 fs-18">{{ format_currency($overdueAmount) }}</h4>
-                    <span class="fs-11 text-muted">Due Date Passed</span>
+                    @if(($customerCreditBalance ?? 0) > 0)
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-arrow-down-left me-1 text-info"></i>{{ __('crm.customer_advance_credit') ?? 'Customer Advance Credit' }}</span>
+                        <h4 class="fw-bold text-info mb-0 fs-18">{{ format_currency($customerCreditBalance) }}</h4>
+                        <span class="fs-11 text-success fw-medium"><i class="feather-check-circle me-1"></i>{{ __('crm.available_for_next_order') ?? 'Available for Next Order' }}</span>
+                    @else
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-clock me-1 text-danger"></i>{{ __('crm.overdue_amount') }}</span>
+                        <h4 class="fw-bold text-danger mb-0 fs-18">{{ format_currency($overdueAmount) }}</h4>
+                        <span class="fs-11 text-muted">Due Date Passed</span>
+                    @endif
                 </div>
                 <div class="col-md-3">
                     <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1"><i class="feather-shield me-1 text-success"></i>{{ __('crm.credit_limit') }}</span>
@@ -216,6 +228,21 @@
                 </div>
             </div>
         </div>
+
+        @if(($customerCreditBalance ?? 0) > 0)
+            <div class="alert alert-soft-info border border-info-subtle d-flex align-items-center justify-content-between p-3 rounded-3 mb-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-text avatar-sm bg-info text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0">
+                        <i class="feather-arrow-down-left fs-16"></i>
+                    </div>
+                    <div>
+                        <strong class="text-dark">{{ __('crm.advance_credit_notice') ?? 'Customer Advance Credit Available' }}:</strong>
+                        <span class="text-muted ms-1">An advance payment credit of <strong class="text-info font-monospace">{{ format_currency($customerCreditBalance) }}</strong> is held on account for this customer. This surplus credit will be automatically adjusted in future invoices or orders.</span>
+                    </div>
+                </div>
+                <span class="badge bg-soft-info text-info font-monospace fs-12 px-3 py-1.5 fw-bold border border-info-subtle flex-shrink-0">{{ format_currency($customerCreditBalance) }} Cr</span>
+            </div>
+        @endif
 
         {{-- 3b. DEALS METRICS (shown on Deals tab) --}}
         <div id="deals-metrics" class="bg-light p-3 rounded-3 border mb-4" style="display: none;">
@@ -285,6 +312,19 @@
                                     <div class="zoho-field-label">{{ __('crm.credit_limit') }}</div>
                                     <div class="zoho-field-value text-dark fw-bold">{{ format_currency($account->credit_limit ?: 0) }}</div>
                                 </div>
+                                <div class="col-6">
+                                    <div class="zoho-field-label">{{ __('crm.opening_balance') ?? 'Opening Balance' }}</div>
+                                    <div class="zoho-field-value text-dark fw-bold">{{ format_currency($openingBalance ?? 0) }}</div>
+                                </div>
+                                @if(($customerCreditBalance ?? 0) > 0)
+                                <div class="col-12">
+                                    <div class="zoho-field-label text-info">{{ __('crm.customer_advance_credit') ?? 'Customer Advance Credit' }}</div>
+                                    <div class="zoho-field-value text-info fw-bold font-monospace fs-13">
+                                        <i class="feather-arrow-down-left me-1"></i>{{ format_currency($customerCreditBalance) }}
+                                        <span class="badge bg-soft-info text-info fs-11 ms-2 font-sans fw-normal border border-info-subtle">{{ __('crm.available_for_next_order') ?? 'Available for Next Order' }}</span>
+                                    </div>
+                                </div>
+                                @endif
                             </div>
                         </div>
 
@@ -506,9 +546,15 @@
                                         <td>{{ $inv->due_date ? \Carbon\Carbon::parse($inv->due_date)->format('d/m/Y') : '—' }}</td>
                                         <td class="text-end fw-bold text-dark">{{ format_currency($inv->total_amount) }}</td>
                                         <td class="text-end text-success fw-bold">{{ format_currency($inv->amount_paid ?: 0) }}</td>
-                                        <td class="text-end text-danger fw-bold">{{ format_currency($inv->balance_due ?: ($inv->total_amount - ($inv->amount_paid ?: 0))) }}</td>
+                                        @php
+                                            $isInvCancelled = in_array(strtolower((string)$inv->status), ['cancelled', 'void']);
+                                            $invDue = $isInvCancelled ? 0 : (isset($inv->balance_due) ? (float)$inv->balance_due : max(0, (float)$inv->total_amount - (float)($inv->amount_paid ?: 0)));
+                                        @endphp
+                                        <td class="text-end text-danger fw-bold">{{ format_currency($invDue) }}</td>
                                         <td class="text-center">
-                                            @if(strtolower($inv->status) === 'paid' || $inv->amount_paid >= $inv->total_amount)
+                                            @if($isInvCancelled)
+                                                <x-ui.status-badge status="cancelled" label="Cancelled" size="sm" />
+                                            @elseif(strtolower($inv->status) === 'paid' || $inv->amount_paid >= $inv->total_amount)
                                                 <x-ui.status-badge status="completed" label="Paid" size="sm" />
                                             @elseif(strtolower($inv->status) === 'unpaid')
                                                 <x-ui.status-badge status="blocked" label="Unpaid" size="sm" />
@@ -599,7 +645,11 @@
                                                         @endif
                                                     </div>
                                                 @elseif(!$dealNo)
-                                                    <span class="text-muted fs-12">— {{ __('crm.advance_general_receipt') }} —</span>
+                                                    @if($pay->allocations->whereNotNull('invoice_id')->isEmpty())
+                                                        <span class="badge bg-soft-info text-info border border-info-subtle px-2 py-1"><i class="feather-arrow-down-left me-1"></i>{{ __('crm.unallocated_advance_credit') ?? 'Unallocated (Advance)' }}</span>
+                                                    @else
+                                                        <span class="text-muted fs-12">— {{ __('crm.advance_general_receipt') }} —</span>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </td>
@@ -746,25 +796,69 @@
 
                 @php
                     $ledgerRows = collect();
+                    if (($openingBalance ?? 0) > 0) {
+                        $obDate = $account->customer?->created_at ?: $account->created_at ?: now();
+                        $ledgerRows->push([
+                            'date' => $obDate,
+                            'type' => 'Opening Balance',
+                            'reference' => 'OB-' . str_pad($account->customer?->id ?? $account->id, 4, '0', STR_PAD_LEFT),
+                            'description' => 'Customer Opening Balance',
+                            'deal_no' => null, 'deal_title' => null, 'deal_id' => null,
+                            'so_no' => null,
+                            'debit' => floatval($openingBalance),
+                            'credit' => 0.00,
+                        ]);
+                    }
                     foreach($invoices as $inv) {
+                        if (in_array(strtolower((string)$inv->status), ['draft'])) {
+                            continue;
+                        }
                         $linkedSO = $inv->salesOrder;
                         $linkedDeal = $linkedSO?->quotation?->deal;
                         $soNo = $linkedSO ? ($linkedSO->sales_order_number ?: ($linkedSO->so_number ?: ('SO-' . str_pad($linkedSO->id, 4, '0', STR_PAD_LEFT)))) : null;
                         $dealNo = $linkedDeal ? ($linkedDeal->deal_number ?: ('DL-' . str_pad($linkedDeal->id, 4, '0', STR_PAD_LEFT))) : null;
                         $dealTitle = $linkedDeal ? ($linkedDeal->title ?: $linkedDeal->name) : null;
                         $dealId = $linkedDeal?->id;
+                        $isCancelledInv = in_array(strtolower((string)$inv->status), ['cancelled', 'void']);
                         $ledgerRows->push([
                             'date' => $inv->invoice_date ?: $inv->created_at,
                             'type' => 'Invoice',
                             'reference' => $inv->invoice_number,
-                            'description' => 'Sales Invoice #' . $inv->invoice_number,
+                            'description' => 'Sales Invoice #' . $inv->invoice_number . ($isCancelledInv ? ' (Cancelled)' : ''),
                             'deal_no' => $dealNo, 'deal_title' => $dealTitle, 'deal_id' => $dealId,
                             'so_no' => $soNo,
                             'debit' => floatval($inv->total_amount),
                             'credit' => 0.00,
                         ]);
                     }
+                    foreach($creditNotes ?? [] as $cn) {
+                        $cnAmount = floatval($cn->total_credit ?: $cn->total_debit);
+                        if ($cnAmount > 0) {
+                            $invRef = ($cn->reference_type === 'invoice' && $cn->reference_id) ? $invoices->firstWhere('id', $cn->reference_id) : null;
+                            $linkedSO = $invRef?->salesOrder;
+                            $linkedDeal = $linkedSO?->quotation?->deal;
+                            $soNo = $linkedSO ? ($linkedSO->sales_order_number ?: ($linkedSO->so_number ?: ('SO-' . str_pad($linkedSO->id, 4, '0', STR_PAD_LEFT)))) : null;
+                            $dealNo = $linkedDeal ? ($linkedDeal->deal_number ?: ('DL-' . str_pad($linkedDeal->id, 4, '0', STR_PAD_LEFT))) : null;
+                            $dealTitle = $linkedDeal ? ($linkedDeal->title ?: $linkedDeal->name) : null;
+                            $dealId = $linkedDeal?->id;
+
+                            $ledgerRows->push([
+                                'date' => $cn->journal_date ?: $cn->created_at,
+                                'type' => 'Credit Note',
+                                'reference' => $cn->journal_number,
+                                'description' => $cn->memo ?: ('Financial Credit Note #' . $cn->journal_number . ($invRef ? ' against INV #' . $invRef->invoice_number : '')),
+                                'deal_no' => $dealNo, 'deal_title' => $dealTitle, 'deal_id' => $dealId,
+                                'so_no' => $soNo,
+                                'debit' => 0.00,
+                                'credit' => $cnAmount,
+                            ]);
+                        }
+                    }
                     foreach($salesReturns ?? [] as $ret) {
+                        // Skip if already in $creditNotes
+                        if (isset($creditNotes) && $creditNotes->contains(fn($cn) => $cn->reference_type === 'sales_return' && $cn->reference_id == $ret->id)) {
+                            continue;
+                        }
                         $linkedSO = $ret->salesOrder;
                         $linkedDeal = $linkedSO?->quotation?->deal;
                         $soNo = $linkedSO ? ($linkedSO->sales_order_number ?: ($linkedSO->so_number ?: ('SO-' . str_pad($linkedSO->id, 4, '0', STR_PAD_LEFT)))) : null;
@@ -787,6 +881,9 @@
                         }
                     }
                     foreach($payments as $pay) {
+                        if (in_array(strtolower((string)$pay->status), ['cancelled', 'void', 'draft'])) {
+                            continue;
+                        }
                         $firstAlloc = $pay->allocations->first();
                         $payInv = $firstAlloc?->invoice;
                         $paySO = $firstAlloc?->salesOrder ?: $payInv?->salesOrder;
@@ -795,19 +892,29 @@
                         $dealTitle = $payDeal ? ($payDeal->title ?: $payDeal->name) : null;
                         $dealId = $payDeal?->id;
                         $soNo = $paySO ? ($paySO->sales_order_number ?: ($paySO->so_number ?: ('SO-' . str_pad($paySO->id, 4, '0', STR_PAD_LEFT)))) : null;
+                        $isAdvancePay = $pay->allocations->whereNotNull('invoice_id')->isEmpty();
+                        $payDesc = 'Payment Received (' . ($pay->payment_method ?: 'Bank') . ')';
+                        if ($payInv) {
+                            $payDesc .= ' against INV #' . $payInv->invoice_number;
+                        } elseif ($isAdvancePay) {
+                            $payDesc .= ' (Advance Credit)';
+                        }
                         $ledgerRows->push([
                             'date' => $pay->payment_date ?: $pay->created_at,
                             'type' => 'Payment Receipt',
                             'reference' => $pay->payment_number ?: ('RCP-' . str_pad($pay->id, 4, '0', STR_PAD_LEFT)),
-                            'description' => 'Payment Received (' . ($pay->payment_method ?: 'Bank') . ')' . ($payInv ? ' against INV #' . $payInv->invoice_number : ''),
+                            'description' => $payDesc,
                             'deal_no' => $dealNo, 'deal_title' => $dealTitle, 'deal_id' => $dealId,
                             'so_no' => $soNo,
                             'debit' => 0.00, 'credit' => floatval($pay->amount),
                         ]);
                     }
                     $sortedLedger = $ledgerRows->sortBy(function ($row) {
+                        if ($row['type'] === 'Opening Balance') {
+                            return '000000000000_0';
+                        }
                         $ts = \Carbon\Carbon::parse($row['date'])->timestamp;
-                        $typePriority = match($row['type']) { 'Invoice' => 0, 'Payment Receipt' => 1, 'Credit Note' => 2, default => 4 };
+                        $typePriority = match($row['type']) { 'Invoice' => 1, 'Payment Receipt' => 2, 'Credit Note' => 3, default => 4 };
                         return sprintf('%012d_%d', $ts, $typePriority);
                     })->values();
                 @endphp
@@ -833,7 +940,7 @@
                                     @php $running += ($row['debit'] - $row['credit']); @endphp
                                     <tr>
                                         <td>{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
-                                        <td><span class="badge {{ $row['type'] === 'Invoice' ? 'bg-soft-danger text-danger' : ($row['type'] === 'Credit Note' ? 'bg-soft-info text-info' : 'bg-soft-success text-success') }} fs-11">{{ $row['type'] }}</span></td>
+                                        <td><span class="badge {{ $row['type'] === 'Opening Balance' ? 'bg-soft-warning text-warning border border-warning-subtle' : ($row['type'] === 'Invoice' ? 'bg-soft-danger text-danger' : ($row['type'] === 'Credit Note' ? 'bg-soft-info text-info' : 'bg-soft-success text-success')) }} fs-11">{{ $row['type'] }}</span></td>
                                         <td class="font-monospace text-dark fw-bold">{{ $row['reference'] }}</td>
                                         <td>{{ $row['description'] }}</td>
                                         <td>
@@ -862,7 +969,15 @@
                                         </td>
                                         <td class="text-end text-danger font-monospace">{{ $row['debit'] > 0 ? format_currency($row['debit']) : '—' }}</td>
                                         <td class="text-end text-success font-monospace">{{ $row['credit'] > 0 ? format_currency($row['credit']) : '—' }}</td>
-                                        <td class="text-end font-monospace fw-bold {{ $running > 0 ? 'text-danger' : 'text-success' }}">{{ format_currency($running) }}</td>
+                                        <td class="text-end font-monospace fw-bold {{ $running > 0 ? 'text-danger' : ($running < 0 ? 'text-info' : 'text-success') }}">
+                                            @if($running < 0)
+                                                {{ format_currency(abs($running)) }} <span class="badge bg-soft-info text-info fs-10 ms-1">Cr (Advance)</span>
+                                            @elseif($running > 0)
+                                                {{ format_currency($running) }} <span class="badge bg-soft-danger text-danger fs-10 ms-1">Dr</span>
+                                            @else
+                                                {{ format_currency(0) }}
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -871,7 +986,15 @@
                                     <td colspan="5" class="text-end text-dark">{{ __('crm.closing_balance') }}:</td>
                                     <td class="text-end text-danger">{{ format_currency($sortedLedger->sum('debit')) }}</td>
                                     <td class="text-end text-success">{{ format_currency($sortedLedger->sum('credit')) }}</td>
-                                    <td class="text-end text-primary fs-14">{{ format_currency($running) }}</td>
+                                    <td class="text-end font-monospace fw-bold fs-14 {{ $running > 0 ? 'text-danger' : ($running < 0 ? 'text-info' : 'text-success') }}">
+                                        @if($running < 0)
+                                            {{ format_currency(abs($running)) }} Cr (Advance Credit)
+                                        @elseif($running > 0)
+                                            {{ format_currency($running) }} Dr (Receivable)
+                                        @else
+                                            {{ format_currency(0) }}
+                                        @endif
+                                    </td>
                                 </tr>
                             </tfoot>
                         </x-ui.odoo-form-ui>

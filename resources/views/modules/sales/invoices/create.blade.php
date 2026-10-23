@@ -57,7 +57,7 @@
                 </div>
 
                 <div class="row g-4 mb-4 fs-13 text-dark">
-                    <!-- Column 1: Source Selector & Customer Info -->
+                    <!-- Column 1: Source Selector, Customer & Dates Info -->
                     <div class="col-md-6 border-end pe-md-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-user me-1"></i>{{ __('crm.customer_billing_reference') }}</h6>
 
@@ -77,15 +77,6 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder?->customer?->name ?: '—'" readonly="true" style="font-weight: bold; background-color: transparent;" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="salesOrderPaymentTermsSelect">
-                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
-                                @foreach ($paymentTerms as $pt)
-                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $salesOrder?->payment_terms) == $pt->name)>
-                                        {{ $pt->display_name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-
                         @elseif ($mode === 'dispatch_order')
                             <!-- Mode 2: Dispatch Order Dropdown -->
                             <x-ui.odoo-form-ui type="select" :label="__('crm.dispatch_order_reference')" name="dispatch_order_id" id="dispatchOrderSelect" class="odoo-select2" :required="true">
@@ -102,15 +93,6 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.customer')" name="_customer_display" :value="$salesOrder?->customer?->name ?: ($dispatchOrder?->salesOrder?->customer?->name ?: '—')" readonly="true" style="font-weight: bold; background-color: transparent;" />
 
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="dispatchOrderPaymentTermsSelect">
-                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
-                                @foreach ($paymentTerms as $pt)
-                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms', $salesOrder?->payment_terms ?: $dispatchOrder?->salesOrder?->payment_terms) == $pt->name)>
-                                        {{ $pt->display_name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-
                         @else
                             <!-- Mode 3: Direct Customer Dropdown -->
                             <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="directCustomerSelect" class="odoo-select2" :required="true">
@@ -121,16 +103,25 @@
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
-
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="directPaymentTermsSelect">
-                                <option value="">{{ __('crm.choose_payment_terms') }}</option>
-                                @foreach ($paymentTerms as $pt)
-                                    <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected(old('payment_terms') == $pt->name)>
-                                        {{ $pt->display_name }}
-                                    </option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
                         @endif
+
+                        <x-ui.odoo-form-ui type="input" :label="__('crm.invoice_number')" name="invoice_number" :value="old('invoice_number', $nextInvoiceNumber)" :required="true" style="font-weight: bold; color: #495057;" />
+
+                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.invoice_date')" name="invoice_date" :value="old('invoice_date', date('Y-m-d'))" :required="true" />
+
+                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.due_date')" name="due_date" :value="old('due_date', date('Y-m-d', strtotime('+15 days')))" />
+
+                        @php
+                            $selectedPt = old('payment_terms', $salesOrder?->payment_terms ?: $dispatchOrder?->salesOrder?->payment_terms);
+                        @endphp
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.payment_terms')" name="payment_terms" id="salesOrderPaymentTermsSelect">
+                            <option value="">{{ __('crm.choose_payment_terms') }}</option>
+                            @foreach ($paymentTerms as $pt)
+                                <option value="{{ $pt->name }}" data-due-days="{{ $pt->due_days }}" @selected($selectedPt == $pt->name)>
+                                    {{ $pt->display_name }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
 
                         @if ($advanceAllocations > 0)
                             <div class="alert alert-info border-0 shadow-sm mt-3 py-2 px-3 fs-12 text-info">
@@ -140,15 +131,9 @@
                         @endif
                     </div>
 
-                    <!-- Column 2: Invoice Dates, Tax & Discount Options -->
+                    <!-- Column 2: Tax & Discount Options -->
                     <div class="col-md-6 ps-md-4">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-sliders me-1"></i>{{ __('crm.dates_calculation_options') }}</h6>
-
-                        <x-ui.odoo-form-ui type="input" :label="__('crm.invoice_number')" name="invoice_number" :value="old('invoice_number', $nextInvoiceNumber)" :required="true" style="font-weight: bold; color: #495057;" />
-
-                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.invoice_date')" name="invoice_date" :value="old('invoice_date', date('Y-m-d'))" :required="true" />
-
-                        <x-ui.odoo-form-ui type="input" inputType="date" :label="__('crm.due_date')" name="due_date" :value="old('due_date', date('Y-m-d', strtotime('+15 days')))" />
 
                         <!-- Discount Option -->
                         <x-ui.odoo-form-ui type="select" :label="__('crm.discount_option')" name="discount_type" id="discountTypeSelect" :required="true">
@@ -156,6 +141,17 @@
                             <option value="item_wise" @selected(old('discount_type', $salesOrder?->discount_type ?? 'item_wise') === 'item_wise')>{{ __('crm.item_level_discount') }}</option>
                             <option value="order_wise" @selected(old('discount_type', $salesOrder?->discount_type) === 'order_wise')>{{ __('crm.order_level_discount') }}</option>
                         </x-ui.odoo-form-ui>
+
+                        @php
+                            $defaultTaxMode = old('tax_mode', $salesOrder?->effective_tax_mode ?? ($taxMode ?? 'exclusive'));
+                        @endphp
+                        <!-- Tax Mode Option -->
+                        <div id="taxModeContainer">
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.tax_mode')" name="tax_mode" id="taxModeSelect" :required="true">
+                                <option value="exclusive" @selected($defaultTaxMode === 'exclusive')>{{ __('crm.tax_exclusive') }}</option>
+                                <option value="inclusive" @selected($defaultTaxMode === 'inclusive')>{{ __('crm.tax_inclusive') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
 
                         <!-- Tax Option -->
                         <x-ui.odoo-form-ui type="select" :label="__('crm.tax_option')" name="tax_type" id="taxTypeSelect" :required="true">
@@ -165,10 +161,12 @@
                         </x-ui.odoo-form-ui>
 
                         <!-- GST Option (CGST/SGST vs IGST) -->
-                        <x-ui.odoo-form-ui type="select" :label="__('crm.gst_option')" name="gst_type" id="gstTypeSelect" :required="true">
-                            <option value="cgst_sgst" @selected(old('gst_type', $salesOrder?->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>{{ __('crm.intra_state_gst') }}</option>
-                            <option value="igst" @selected(old('gst_type', $salesOrder?->gst_type) === 'igst')>{{ __('crm.inter_state_gst') }}</option>
-                        </x-ui.odoo-form-ui>
+                        <div id="gstTypeContainer">
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.gst_option')" name="gst_type" id="gstTypeSelect" :required="true">
+                                <option value="cgst_sgst" @selected(old('gst_type', $salesOrder?->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>{{ __('crm.intra_state_gst') }}</option>
+                                <option value="igst" @selected(old('gst_type', $salesOrder?->gst_type) === 'igst')>{{ __('crm.inter_state_gst') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
 
                         <x-ui.odoo-form-ui type="select" :label="__('crm.freight_terms')" name="freight_terms" id="invFreightTermsSelect">
                             <option value="To Pay" @selected(old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? 'To Pay') == 'To Pay')>{{ __('crm.freight_to_pay') }}</option>
@@ -179,7 +177,7 @@
 
                         <div id="freightBillingOptionsContainer" class="row g-2 {{ old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? 'To Pay') === 'To Be Billed' ? '' : 'd-none' }}">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', $dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0)" min="0" step="0.01" />
+                                <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.freight_amount') . ' (' . active_currency_symbol() . ')'" name="freight_amount" id="invFreightAmountInput" :value="old('freight_amount', round(convert_from_base($dispatchOrder?->freight_amount ?? $salesOrder?->freight_amount ?? 0), 2))" min="0" step="0.01" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="select" :label="__('crm.freight_gst_tax_rate')" name="freight_tax_rate" id="invFreightTaxRateSelect">
@@ -230,7 +228,7 @@
                                                 <x-ui.odoo-form-ui type="select" name="items[{{ $index }}][product_id]" class="product-select odoo-select2" :required="true">
                                                     <option value="">{{ __('crm.select_product_ph') }}</option>
                                                     @foreach ($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->selling_price ?? 0 }}" data-name="{{ $p->name }}" @selected($p->id == $item['product_id'])>
+                                                        <option value="{{ $p->id }}" data-cost="{{ round(convert_from_base($p->selling_price ?? 0), 2) }}" data-name="{{ $p->name }}" @selected($p->id == $item['product_id'])>
                                                             {{ $p->name }} {{ $p->sku ? '('.$p->sku.')' : '' }}
                                                         </option>
                                                     @endforeach
@@ -331,7 +329,7 @@
                                 
                                 <!-- 1. Subtotal (Excl. Tax) -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="summarySubtotalRow">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.subtotal_excl_tax') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold" id="summarySubtotalLabel">{{ __('crm.subtotal_excl_tax') }}</span>
                                     <input type="text" id="calcSubtotal" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 </div>
 
@@ -339,12 +337,12 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryDiscountRow">
                                     <span class="text-muted fs-13 fw-semibold" id="summaryDiscountLabel">{{ __('crm.less_item_discounts') }}</span>
                                     <input type="text" id="calcDiscountDisplay" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="-0.00">
-                                    <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('discount_amount', $salesOrder?->discount ?: 0) }}" step="0.01">
+                                    <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold text-danger d-none" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('discount_amount', round(convert_from_base($salesOrder?->discount ?: 0), 2)) }}" step="0.01">
                                 </div>
 
                                 <!-- 3. Items Taxable Value -->
                                 <div class="d-flex justify-content-between align-items-center mb-3" id="calcTaxableRow">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.items_taxable_value') }}</span>
+                                    <span class="text-muted fs-13 fw-semibold" id="calcTaxableLabel">{{ __('crm.items_taxable_value') }}</span>
                                     <input type="text" id="calcTaxableAmount" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 </div>
 
@@ -354,53 +352,36 @@
                                     <input type="number" name="order_tax_rate" id="orderTaxPercent" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('order_tax_rate', $salesOrder?->order_tax_rate ?: 18) }}" min="0" max="100" step="0.01">
                                 </div>
 
-                                <!-- 5. Add: Items GST Tax -->
-                                <div class="d-flex justify-content-between align-items-center mb-3" id="summaryItemsTaxRow">
-                                    <span class="text-muted fs-13 fw-semibold">{{ __('crm.add_items_gst_tax') }}</span>
-                                    <input type="text" id="summaryItemsTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
-                                </div>
-
-                                <!-- 6. Billed Items Total (Incl. GST) -->
-                                <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="calcItemsTotalRow">
-                                    <span class="fs-13">{{ __('crm.billed_items_total') }}</span>
-                                    <input type="text" id="calcItemsTotalInclGst" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="0.00">
-                                </div>
-
-                                <!-- FREIGHT BREAKDOWN SECTION -->
+                                <!-- FREIGHT SECTION -->
                                 <div id="summaryFreightSectionContainer" class="{{ old('freight_terms', $dispatchOrder?->freight_terms ?? $salesOrder?->freight_terms ?? 'To Pay') === 'To Be Billed' ? '' : 'd-none' }}">
-                                    <hr class="my-2 border-slate">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <span class="text-muted fs-13 fw-semibold">{{ __('crm.freight_charges') }}</span>
                                         <input type="text" id="summaryFreightText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="0.00">
                                     </div>
+                                </div>
 
-                                    <div class="d-flex justify-content-between align-items-center mb-3" id="summaryFreightTaxRow">
-                                        <span class="text-muted fs-13 fw-semibold" id="summaryFreightTaxLabel">{{ __('crm.add_freight_gst_tax') }}</span>
-                                        <input type="text" id="summaryFreightTaxText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
-                                    </div>
-
-                                    <div class="d-flex justify-content-between align-items-center mb-3 fw-bold text-dark" id="summaryFreightTotalRow">
-                                        <span class="fs-13">{{ __('crm.total_freight_incl_gst') }}</span>
-                                        <input type="text" id="summaryFreightTotalText" class="form-control form-control-sm text-end fw-bold text-primary" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #eff6ff;" readonly value="0.00">
-                                    </div>
+                                <!-- TOTAL TAXABLE BASE (shown when freight is billed so user sees taxable items + freight) -->
+                                <div class="d-flex justify-content-between align-items-center mb-3 d-none" id="summaryTotalTaxableRow">
+                                    <span class="text-muted fs-13 fw-semibold">Total Taxable Value</span>
+                                    <input type="text" id="summaryTotalTaxableText" class="form-control form-control-sm text-end fw-bold text-dark" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f1f5f9;" readonly value="0.00">
                                 </div>
 
                                 <!-- OVERALL TAX BREAKDOWN -->
-                                <hr class="my-2 border-slate">
+                                <hr class="my-2 border-slate" id="taxDivider">
                                 <div id="cgstSgstRows">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('crm.cgst_central_tax') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summaryCgstLabel">{{ __('crm.cgst_central_tax') }}</span>
                                         <input type="text" id="summaryCgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('crm.sgst_state_tax') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summarySgstLabel">{{ __('crm.sgst_state_tax') }}</span>
                                         <input type="text" id="summarySgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                     </div>
                                 </div>
 
                                 <div id="igstRow" style="display: none;">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">{{ __('crm.igst_integrated_tax') }}</span>
+                                        <span class="text-muted fs-13 fw-semibold" id="summaryIgstLabel">{{ __('crm.igst_integrated_tax') }}</span>
                                         <input type="text" id="summaryIgstText" class="form-control form-control-sm text-end font-monospace text-muted" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc;" readonly value="+0.00">
                                     </div>
                                 </div>
@@ -408,7 +389,7 @@
                                 <!-- 9. Adjustment -->
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="text-muted fs-13 fw-semibold">{{ __('crm.adjustment') }}</span>
-                                    <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('adjustment', $salesOrder?->adjustment ?: 0) }}" step="0.01">
+                                    <input type="number" name="adjustment" id="adjustmentInput" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('adjustment', round(convert_from_base($salesOrder?->adjustment ?: 0), 2)) }}" step="0.01">
                                 </div>
 
                                 <!-- 10. Grand Total -->
@@ -446,14 +427,14 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     @php
-        $productsData = $products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'price' => $p->selling_price ?? 0])->values();
+        $productsData = $products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'price' => round(convert_from_base($p->selling_price ?? 0), 2)])->values();
     @endphp
     <script>
         $(function () {
             const currencySymbol = @json(active_currency_symbol());
             const productsList = @json($productsData);
             let directRowIndex = {{ count($invoiceItems) }};
-            const advanceAllocated = {{ (float)$advanceAllocations }};
+            const advanceAllocated = {{ (float)round(convert_from_base($advanceAllocations), 2) }};
 
             // Initialize Select2
             function initSelect2(context) {
@@ -490,14 +471,17 @@
                     $('.tax-column').removeClass('d-none').show();
                     $('#summaryOrderTaxRow').addClass('d-none').hide();
                     $('#calcTaxableRow').removeClass('d-none').show();
+                    $('#gstTypeContainer').removeClass('d-none').show();
                 } else if (taxType === 'order_wise_tax') {
                     $('.tax-column').addClass('d-none').hide();
                     $('#summaryOrderTaxRow').removeClass('d-none').show();
                     $('#calcTaxableRow').removeClass('d-none').show();
+                    $('#gstTypeContainer').removeClass('d-none').show();
                 } else { // without_tax
                     $('.tax-column').addClass('d-none').hide();
                     $('#summaryOrderTaxRow').addClass('d-none').hide();
                     $('#calcTaxableRow').addClass('d-none').hide();
+                    $('#gstTypeContainer').addClass('d-none').hide();
                 }
 
                 toggleFreightDisplay();
@@ -516,7 +500,7 @@
                 }
             }
 
-            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #orderTaxPercent, #invFreightTermsSelect').on('change input', function() {
+            $('#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #taxModeSelect, #orderTaxPercent, #invFreightTermsSelect').on('change input', function() {
                 toggleTaxAndDiscountDisplay();
             });
 
@@ -658,7 +642,7 @@
                 validateAllInvoiceRows();
             });
 
-            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #invFreightAmountInput, #adjustmentInput, #discountTypeSelect, #taxTypeSelect, #gstTypeSelect', function() {
+            $(document).on('input change', '.qty-input, .rate-input, .disc-input, .tax-input, #summaryDiscount, #orderTaxPercent, #invFreightTermsSelect, #invFreightTaxRateSelect, #invFreightAmountInput, #adjustmentInput, #discountTypeSelect, #taxTypeSelect, #gstTypeSelect, #taxModeSelect', function() {
                 recalculateInvoiceTotals();
             });
 
@@ -674,6 +658,7 @@
                 const discountType = $('#discountTypeSelect').val() || 'item_wise';
                 const taxType      = $('#taxTypeSelect').val() || 'item_wise_tax';
                 const gstType      = $('#gstTypeSelect').val() || 'cgst_sgst';
+                const taxMode      = $('#taxModeSelect').val() || 'exclusive';
 
                 let subtotal = 0;
                 let itemTaxTotal = 0;
@@ -691,9 +676,18 @@
                     }
 
                     const lineAmount = q * p;
-                    const lineTaxable = Math.max(0, lineAmount - d);
-                    const lineTax = lineTaxable * (t / 100);
-                    const lineTotal = lineTaxable + lineTax;
+                    const lineNet = Math.max(0, lineAmount - d);
+                    let lineTax = 0;
+                    let lineTotal = 0;
+
+                    if (taxMode === 'inclusive') {
+                        const lineBase = (t > 0 && taxType === 'item_wise_tax') ? (lineNet / (1 + (t / 100))) : lineNet;
+                        lineTax = (taxType === 'item_wise_tax') ? (lineNet - lineBase) : 0;
+                        lineTotal = lineNet;
+                    } else {
+                        lineTax = (taxType === 'item_wise_tax') ? (lineNet * (t / 100)) : 0;
+                        lineTotal = lineNet + lineTax;
+                    }
 
                     subtotal += lineAmount;
                     itemDiscTotal += d;
@@ -720,7 +714,11 @@
                     totalTax = itemTaxTotal;
                 } else if (taxType === 'order_wise_tax') {
                     const taxPercent = parseFloat($('#orderTaxPercent').val()) || 0;
-                    totalTax = grossBeforeTax * (taxPercent / 100);
+                    if (taxMode === 'inclusive') {
+                        totalTax = taxPercent > 0 ? (grossBeforeTax - (grossBeforeTax / (1 + (taxPercent / 100)))) : 0;
+                    } else {
+                        totalTax = grossBeforeTax * (taxPercent / 100);
+                    }
                 }
 
                 const itemsTaxTotal = totalTax;
@@ -742,49 +740,84 @@
                 }
 
                 const freightTax = (effectiveFreight > 0 && taxType !== 'without_tax') ? Math.round(effectiveFreight * (freightTaxRate / 100) * 100) / 100 : 0;
-                const totalFreightInclGst = effectiveFreight + freightTax;
                 const grandTotalTax = itemsTaxTotal + freightTax;
 
+                let taxableBase = 0;
+                let itemsTotalInclGst = 0;
+
+                if (taxMode === 'inclusive') {
+                    itemsTotalInclGst = grossBeforeTax;
+                    taxableBase = Math.max(0, itemsTotalInclGst - itemsTaxTotal);
+                } else {
+                    taxableBase = grossBeforeTax;
+                    itemsTotalInclGst = taxableBase + itemsTaxTotal;
+                }
+
+                const totalTaxableBase = taxableBase + effectiveFreight;
+
+                // Update labels based on tax mode
+                if (taxMode === 'inclusive') {
+                    $('#summarySubtotalLabel').text("{{ __('crm.subtotal_incl_tax') }}");
+                    $('#calcTaxableLabel').text("{{ __('crm.taxable_value_excl_tax') }}");
+                    $('#summaryCgstLabel').text("{{ __('crm.cgst_central_tax') }} {{ __('crm.tax_included') }}");
+                    $('#summarySgstLabel').text("{{ __('crm.sgst_state_tax') }} {{ __('crm.tax_included') }}");
+                    $('#summaryIgstLabel').text("{{ __('crm.igst_integrated_tax') }} {{ __('crm.tax_included') }}");
+                } else {
+                    $('#summarySubtotalLabel').text("{{ __('crm.subtotal_excl_tax') }}");
+                    $('#calcTaxableLabel').text("{{ __('crm.items_taxable_value') }}");
+                    $('#summaryCgstLabel').text("{{ __('crm.cgst_central_tax') }}");
+                    $('#summarySgstLabel').text("{{ __('crm.sgst_state_tax') }}");
+                    $('#summaryIgstLabel').text("{{ __('crm.igst_integrated_tax') }}");
+                }
+
                 if (freightTerms === 'To Be Billed') {
+                    $('#summaryFreightSectionContainer').removeClass('d-none').show();
                     $('#summaryFreightText').val(currencySymbol + rawFreight.toFixed(2));
-                    $('#summaryFreightTaxText').val('+' + currencySymbol + freightTax.toFixed(2));
-                    $('#summaryFreightTotalText').val(currencySymbol + totalFreightInclGst.toFixed(2));
-                    $('#summaryFreightTaxLabel').text("{{ __('crm.add_freight_gst_tax') }} (" + freightTaxRate + "%)");
-                    $('#summaryFreightSectionContainer').removeClass('opacity-50');
+                    if (rawFreight > 0) {
+                        $('#summaryTotalTaxableRow').removeClass('d-none').show();
+                        $('#summaryTotalTaxableText').val(currencySymbol + totalTaxableBase.toFixed(2));
+                    } else {
+                        $('#summaryTotalTaxableRow').addClass('d-none').hide();
+                    }
                 } else {
                     const statusNote = (freightTerms === 'To Pay') ? ' (To Pay)' : (freightTerms === 'Prepaid' ? ' (Prepaid)' : ' (Pickup)');
-                    $('#summaryFreightText').val(currencySymbol + rawFreight.toFixed(2) + statusNote);
-                    $('#summaryFreightTaxText').val('+' + currencySymbol + '0.00');
-                    $('#summaryFreightTotalText').val(currencySymbol + '0.00');
-                    $('#summaryFreightTaxLabel').text("{{ __('crm.add_freight_gst_tax') }} (Not Billed)");
-                    $('#summaryFreightSectionContainer').addClass('opacity-50');
+                    if (rawFreight > 0) {
+                        $('#summaryFreightSectionContainer').removeClass('d-none').show();
+                        $('#summaryFreightText').val(currencySymbol + rawFreight.toFixed(2) + statusNote);
+                    } else {
+                        $('#summaryFreightSectionContainer').addClass('d-none').hide();
+                    }
+                    $('#summaryTotalTaxableRow').addClass('d-none').hide();
                 }
 
                 if (taxType !== 'without_tax' && grandTotalTax > 0) {
+                    $('#taxDivider').removeClass('d-none').show();
+                    const prefix = (taxMode === 'inclusive') ? '' : '+';
                     if (gstType === 'igst') {
                         $('#cgstSgstRows').addClass('d-none').hide();
                         $('#igstRow').removeClass('d-none').show();
-                        $('#summaryIgstText').val('+' + currencySymbol + grandTotalTax.toFixed(2));
+                        $('#summaryIgstText').val(prefix + currencySymbol + grandTotalTax.toFixed(2));
                     } else {
                         $('#cgstSgstRows').removeClass('d-none').show();
                         $('#igstRow').addClass('d-none').hide();
                         const halfTax = grandTotalTax / 2;
-                        $('#summaryCgstText').val('+' + currencySymbol + halfTax.toFixed(2));
-                        $('#summarySgstText').val('+' + currencySymbol + halfTax.toFixed(2));
+                        $('#summaryCgstText').val(prefix + currencySymbol + halfTax.toFixed(2));
+                        $('#summarySgstText').val(prefix + currencySymbol + halfTax.toFixed(2));
                     }
                 } else {
+                    $('#taxDivider').addClass('d-none').hide();
                     $('#cgstSgstRows').addClass('d-none').hide();
                     $('#igstRow').addClass('d-none').hide();
                 }
 
-                const itemsTotalInclGst = grossBeforeTax + itemsTaxTotal;
                 const adjustment = parseFloat($('#adjustmentInput').val()) || 0;
-                const grandTotal = itemsTotalInclGst + totalFreightInclGst + adjustment;
+                const grandTotal = (taxMode === 'inclusive') 
+                    ? (itemsTotalInclGst + effectiveFreight + adjustment) 
+                    : (totalTaxableBase + grandTotalTax + adjustment);
                 const balanceDue = Math.max(0, grandTotal - advanceAllocated);
 
                 $('#calcSubtotal').val(currencySymbol + subtotal.toFixed(2));
-                $('#calcTaxableAmount').val(currencySymbol + grossBeforeTax.toFixed(2));
-                $('#calcItemsTotalInclGst').val(currencySymbol + itemsTotalInclGst.toFixed(2));
+                $('#calcTaxableAmount').val(currencySymbol + taxableBase.toFixed(2));
                 $('#summaryGrandtotalText').val(currencySymbol + grandTotal.toFixed(2));
                 $('#summaryBalanceDueText').text(currencySymbol + balanceDue.toFixed(2));
 
@@ -798,29 +831,29 @@
                         const t = parseFloat($(this).find('.tax-input').val()) || 0;
 
                         const lineAmount = q * p;
-                        const lineTaxable = Math.max(0, lineAmount - d);
-                        const lineTax = lineTaxable * (t / 100);
+                        const lineNet = Math.max(0, lineAmount - d);
+                        let lineBase = lineNet;
+                        let lineTax = 0;
+                        if (taxMode === 'inclusive') {
+                            lineBase = (t > 0) ? (lineNet / (1 + (t / 100))) : lineNet;
+                            lineTax = lineNet - lineBase;
+                        } else {
+                            lineTax = lineBase * (t / 100);
+                        }
 
                         const key = t.toFixed(2);
                         if (!taxGroups[key]) {
                             taxGroups[key] = { rate: t, taxable: 0, tax: 0 };
                         }
-                        taxGroups[key].taxable += lineTaxable;
+                        taxGroups[key].taxable += lineBase;
                         taxGroups[key].tax += lineTax;
                     });
-
-                    if (effectiveFreight > 0 && freightTax > 0) {
-                        const fKey = freightTaxRate.toFixed(2);
-                        if (!taxGroups[fKey]) {
-                            taxGroups[fKey] = { rate: freightTaxRate, taxable: 0, tax: 0 };
-                        }
-                        taxGroups[fKey].taxable += effectiveFreight;
-                        taxGroups[fKey].tax += freightTax;
-                    }
                 }
 
                 const taxRates = Object.keys(taxGroups).sort((a, b) => parseFloat(a) - parseFloat(b));
-                if (taxType === 'item_wise_tax' && taxRates.length > 0) {
+                const hasFreightTax = (effectiveFreight > 0 && freightTax > 0);
+
+                if (taxType === 'item_wise_tax' && (taxRates.length > 0 || hasFreightTax)) {
                     $('#gstBreakdownContainer').show();
                     $('#gstBreakdownModeBadge').text(gstType === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)');
 
@@ -836,66 +869,113 @@
 
                     if (gstType === 'igst') {
                         headerHtml = `
-                            <th class="py-1">Tax Rate</th>
+                            <th class="py-1 text-start ps-3">Tax Rate / Description</th>
+                            <th class="py-1 text-end">Taxable Value</th>
                             <th class="py-1 text-end">Total Tax</th>
-                            <th class="py-1 text-end">IGST Amt</th>
+                            <th class="py-1 text-end pe-3">IGST Amt</th>
                         `;
 
+                        // 1. Pure Item-wise Tax rows (No freight mixed in)
                         taxRates.forEach(key => {
                             const grp = taxGroups[key];
                             const igstAmt = grp.tax;
+                            totalTaxableVal += grp.taxable;
                             totalIgstVal += igstAmt;
                             totalTaxVal += grp.tax;
 
                             bodyHtml += `
                                 <tr>
-                                    <td class="py-1 fw-bold">GST ${parseFloat(grp.rate)}%</td>
+                                    <td class="py-1 text-start ps-3 fw-bold">GST ${parseFloat(grp.rate)}%</td>
+                                    <td class="py-1 text-end">${currencySymbol}${grp.taxable.toFixed(2)}</td>
                                     <td class="py-1 text-end fw-bold text-dark">${currencySymbol}${grp.tax.toFixed(2)}</td>
-                                    <td class="py-1 text-end">${currencySymbol}${igstAmt.toFixed(2)}</td>
+                                    <td class="py-1 text-end pe-3">${currencySymbol}${igstAmt.toFixed(2)}</td>
                                 </tr>
                             `;
                         });
 
+                        // 2. Dedicated Freight Tax row (Clean and separate)
+                        if (hasFreightTax) {
+                            totalTaxableVal += effectiveFreight;
+                            totalIgstVal += freightTax;
+                            totalTaxVal += freightTax;
+
+                            bodyHtml += `
+                                <tr class="table-light">
+                                    <td class="py-1 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping (${freightTaxRate}%)</td>
+                                    <td class="py-1 text-end text-primary">${currencySymbol}${effectiveFreight.toFixed(2)}</td>
+                                    <td class="py-1 text-end fw-bold text-primary">${currencySymbol}${freightTax.toFixed(2)}</td>
+                                    <td class="py-1 text-end pe-3 text-primary">${currencySymbol}${freightTax.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        }
+
                         footerHtml = `
                             <tr>
-                                <td class="py-1">Total</td>
+                                <td class="py-1 text-start ps-3">Total</td>
+                                <td class="py-1 text-end">${currencySymbol}${totalTaxableVal.toFixed(2)}</td>
                                 <td class="py-1 text-end text-primary">${currencySymbol}${totalTaxVal.toFixed(2)}</td>
-                                <td class="py-1 text-end">${currencySymbol}${totalIgstVal.toFixed(2)}</td>
+                                <td class="py-1 text-end pe-3">${currencySymbol}${totalIgstVal.toFixed(2)}</td>
                             </tr>
                         `;
                     } else {
                         headerHtml = `
-                            <th class="py-1">Tax Rate</th>
+                            <th class="py-1 text-start ps-3">Tax Rate / Description</th>
+                            <th class="py-1 text-end">Taxable Value</th>
                             <th class="py-1 text-end">Total Tax</th>
                             <th class="py-1 text-end">CGST Amt</th>
-                            <th class="py-1 text-end">SGST Amt</th>
+                            <th class="py-1 text-end pe-3">SGST Amt</th>
                         `;
 
+                        // 1. Pure Item-wise Tax rows (No freight mixed in)
                         taxRates.forEach(key => {
                             const grp = taxGroups[key];
                             const cgstAmt = Math.round((grp.tax / 2) * 100) / 100;
                             const sgstAmt = Math.round((grp.tax - cgstAmt) * 100) / 100;
 
+                            totalTaxableVal += grp.taxable;
                             totalCgstVal += cgstAmt;
                             totalSgstVal += sgstAmt;
                             totalTaxVal += grp.tax;
 
                             bodyHtml += `
                                 <tr>
-                                    <td class="py-1 fw-bold">GST ${parseFloat(grp.rate)}%</td>
+                                    <td class="py-1 text-start ps-3 fw-bold">GST ${parseFloat(grp.rate)}%</td>
+                                    <td class="py-1 text-end">${currencySymbol}${grp.taxable.toFixed(2)}</td>
                                     <td class="py-1 text-end fw-bold text-dark">${currencySymbol}${grp.tax.toFixed(2)}</td>
                                     <td class="py-1 text-end">${currencySymbol}${cgstAmt.toFixed(2)}</td>
-                                    <td class="py-1 text-end">${currencySymbol}${sgstAmt.toFixed(2)}</td>
+                                    <td class="py-1 text-end pe-3">${currencySymbol}${sgstAmt.toFixed(2)}</td>
                                 </tr>
                             `;
                         });
 
+                        // 2. Dedicated Freight Tax row (Clean and separate)
+                        if (hasFreightTax) {
+                            const fCgst = Math.round((freightTax / 2) * 100) / 100;
+                            const fSgst = Math.round((freightTax - fCgst) * 100) / 100;
+
+                            totalTaxableVal += effectiveFreight;
+                            totalCgstVal += fCgst;
+                            totalSgstVal += fSgst;
+                            totalTaxVal += freightTax;
+
+                            bodyHtml += `
+                                <tr class="table-light">
+                                    <td class="py-1 text-start ps-3 fw-bold text-primary"><i class="feather-truck me-1"></i>Freight / Shipping (${freightTaxRate}%)</td>
+                                    <td class="py-1 text-end text-primary">${currencySymbol}${effectiveFreight.toFixed(2)}</td>
+                                    <td class="py-1 text-end fw-bold text-primary">${currencySymbol}${freightTax.toFixed(2)}</td>
+                                    <td class="py-1 text-end text-primary">${currencySymbol}${fCgst.toFixed(2)}</td>
+                                    <td class="py-1 text-end pe-3 text-primary">${currencySymbol}${fSgst.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        }
+
                         footerHtml = `
                             <tr>
-                                <td class="py-1">Total</td>
+                                <td class="py-1 text-start ps-3">Total</td>
+                                <td class="py-1 text-end">${currencySymbol}${totalTaxableVal.toFixed(2)}</td>
                                 <td class="py-1 text-end text-primary">${currencySymbol}${totalTaxVal.toFixed(2)}</td>
                                 <td class="py-1 text-end">${currencySymbol}${totalCgstVal.toFixed(2)}</td>
-                                <td class="py-1 text-end">${currencySymbol}${totalSgstVal.toFixed(2)}</td>
+                                <td class="py-1 text-end pe-3">${currencySymbol}${totalSgstVal.toFixed(2)}</td>
                             </tr>
                         `;
                     }

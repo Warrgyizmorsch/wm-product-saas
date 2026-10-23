@@ -53,7 +53,7 @@ class QuotationApiController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $quotation = Quotation::with(['lead', 'crmAccount', 'crmContact', 'deal', 'items.product'])->find($id);
+        $quotation = Quotation::with(['lead', 'crmAccount', 'deal', 'items.product'])->find($id);
 
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
@@ -244,5 +244,178 @@ class QuotationApiController extends Controller
             'success' => true,
             'message' => "Quotation #{$id} deleted successfully.",
         ]);
+    }
+
+    /**
+     * POST /api/crm/quotations/{id}/send-email
+     */
+    public function sendEmail(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'to_email'   => 'required|email',
+            'subject'    => 'required|string|max:255',
+            'body_html'  => 'required|string',
+            'account_id' => 'nullable|exists:email_configurations,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        if ($approvalPolicy !== 'auto_approve' && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quotation must be Approved before sending to client.',
+            ], 422);
+        }
+
+        try {
+            /** @var \App\Services\EmailService $emailService */
+            $emailService = app(\App\Services\EmailService::class);
+            $emailService->sendQuotationEmail($quotation, $request->all());
+
+            // Synchronize status to 'Quotation Sent' (same action as Mark as Sent)
+            $oldStatus = $quotation->status;
+            if (in_array($oldStatus, ['Draft', 'Approved', 'Pending Approval'])) {
+                $quotation->update(['status' => 'Quotation Sent']);
+                $leadId = $quotation->lead_id ?: ($quotation->crmDeal?->lead_id);
+                if ($leadId && ($lead = Lead::find($leadId))) {
+                    \App\Domains\CRM\Models\LeadHistory::logEvent(
+                        $lead, 'quotation_status_changed', $oldStatus, 'Quotation Sent',
+                        "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Quotation Sent' via Email dispatch"
+                    );
+                }
+                try {
+                    app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent', $leadId);
+                } catch (\Throwable $e) {}
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Quotation {$quotation->quotation_number} sent successfully to {$request->input('to_email')} with PDF attached!",
+                'new_status' => 'Quotation Sent',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send Quotation Email: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * POST /api/crm/quotations/{id}/send-whatsapp
+     */
+    public function sendWhatsApp(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
+        $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
+        if ($approvalPolicy !== 'auto_approve' && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Sent', 'Accepted'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Quotation must be Approved before sending to client.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'phone'      => 'required|string',
+            'caption'    => 'nullable|string',
+            'custom_pdf' => 'nullable|file|mimes:pdf|max:10240',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error.',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $phone = $request->input('phone');
+        if (!empty($phone)) {
+            $cleanPhone = preg_replace('/\D/', '', trim($phone));
+            if (strlen($cleanPhone) === 10) {
+                $cleanPhone = '91' . $cleanPhone;
+            }
+            $quotation->update(['phone' => $cleanPhone ?: $phone]);
+        }
+
+        try {
+            /** @var \App\Services\WhatsAppService $waService */
+            $waService = app(\App\Services\WhatsAppService::class);
+            $result = $waService->sendQuotation(
+                quotation: $quotation,
+                mobile: $phone,
+                customCaption: $request->input('caption'),
+                customPdfFile: $request->file('custom_pdf')
+            );
+
+            if ($result['success']) {
+                // Synchronize status to 'Quotation Sent' (same action as Mark as Sent)
+                $oldStatus = $quotation->status;
+                if (in_array($oldStatus, ['Draft', 'Approved', 'Pending Approval'])) {
+                    $quotation->update(['status' => 'Quotation Sent']);
+                    $leadId = $quotation->lead_id ?: ($quotation->crmDeal?->lead_id);
+                    if ($leadId && ($lead = Lead::find($leadId))) {
+                        \App\Domains\CRM\Models\LeadHistory::logEvent(
+                            $lead, 'quotation_status_changed', $oldStatus, 'Quotation Sent',
+                            "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Quotation Sent' via WhatsApp dispatch"
+                        );
+                    }
+                    try {
+                        app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent', $leadId);
+                    } catch (\Throwable $e) {}
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Quotation {$quotation->quotation_number} sent via WhatsApp to {$phone}!",
+                    'data'    => $result,
+                    'new_status' => 'Quotation Sent',
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Failed to send WhatsApp message.',
+                    'status'  => $result['status'] ?? 'error',
+                ], 422);
+            }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send WhatsApp quotation: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * GET /api/crm/quotations/{id}/download
+     */
+    public function downloadPdf(int $id)
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
+        $pdf->setOption('isPhpEnabled', true);
+        return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 }

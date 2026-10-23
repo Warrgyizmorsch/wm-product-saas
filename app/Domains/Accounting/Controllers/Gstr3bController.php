@@ -29,13 +29,13 @@ class Gstr3bController extends Controller
         [$from, $to] = GstReportPeriod::resolve($request);
 
         $outward = ['taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0];
-        foreach (Invoice::whereBetween('invoice_date', [$from, $to])->where('status', '!=', 'Cancelled')->get() as $invoice) {
+        foreach (Invoice::withoutGlobalScope('branch')->whereBetween('invoice_date', [$from, $to])->where('status', '!=', 'Cancelled')->get() as $invoice) {
             $outward['taxable'] += (float) $invoice->subtotal;
             $outward['cgst'] += (float) $invoice->cgst_amount;
             $outward['sgst'] += (float) $invoice->sgst_amount;
             $outward['igst'] += (float) $invoice->igst_amount;
         }
-        foreach (SalesReturn::with('invoice')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get() as $return) {
+        foreach (SalesReturn::withoutGlobalScope('branch')->with('invoice')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get() as $return) {
             $split = GstReportPeriod::splitReturnTax($return, $return->invoice);
             $outward['taxable'] -= $split['taxable'];
             $outward['cgst'] -= $split['cgst'];
@@ -50,7 +50,7 @@ class Gstr3bController extends Controller
         // ordinary ITC as the previous version silently did.
         $itc = ['taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0];
         $inwardRcm = ['taxable' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0];
-        foreach (VendorBill::whereBetween('bill_date', [$from, $to])->where('status', '!=', 'Cancelled')->get() as $bill) {
+        foreach (VendorBill::withoutGlobalScope('branch')->whereBetween('bill_date', [$from, $to])->where('status', '!=', 'Cancelled')->get() as $bill) {
             $bucket = str_starts_with((string) $bill->gst_type, 'rcm') ? 'rcm' : 'itc';
             $target = $bucket === 'rcm' ? $inwardRcm : $itc;
             $target['taxable'] += (float) $bill->subtotal;
@@ -59,7 +59,7 @@ class Gstr3bController extends Controller
             $target['igst'] += (float) $bill->igst_amount;
             ${$bucket === 'rcm' ? 'inwardRcm' : 'itc'} = $target;
         }
-        foreach (PurchaseReturn::with('vendorBill')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get() as $return) {
+        foreach (PurchaseReturn::withoutGlobalScope('branch')->with('vendorBill')->whereBetween('return_date', [$from, $to])->where('status', 'Completed')->get() as $return) {
             $bucket = str_starts_with((string) $return->vendorBill?->gst_type, 'rcm') ? 'rcm' : 'itc';
             $target = $bucket === 'rcm' ? $inwardRcm : $itc;
             $split = GstReportPeriod::splitReturnTax($return, $return->vendorBill);

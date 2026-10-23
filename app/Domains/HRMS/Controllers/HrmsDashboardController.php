@@ -435,13 +435,35 @@ class HrmsDashboardController extends Controller
         // 13. Active Company Broadcasts & Announcements
         app(\App\Domains\HRMS\Services\BroadcastService::class)->processScheduledBroadcasts($tenantId);
 
-        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)
-            ->where('status', 'published')
-            ->count();
+        $user = auth()->user();
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
 
-        $allPublishedBroadcasts = Broadcast::with(['creator', 'receipts', 'comments.employee'])
-            ->where('tenant_id', $tenantId)
+        $broadcastsBaseQuery = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
+
+        if (!$isHrOrAdmin) {
+            if ($currentEmployee) {
+                $broadcastsBaseQuery->where(function ($q) use ($currentEmployee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $currentEmployee->id));
+                });
+            } else {
+                $broadcastsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $totalBroadcastsCount = (clone $broadcastsBaseQuery)->count();
+
+        $allPublishedBroadcasts = (clone $broadcastsBaseQuery)
+            ->with(['creator', 'receipts', 'comments.employee'])
             ->get();
 
         $latestBroadcasts = $allPublishedBroadcasts->sort(function ($a, $b) use ($currentEmployee) {
@@ -470,13 +492,6 @@ class HrmsDashboardController extends Controller
             // 3. Newest published date
             return strtotime($b->published_at ?? $b->created_at) <=> strtotime($a->published_at ?? $a->created_at);
         })->take(3)->values();
-
-        $user = auth()->user();
-        $isHrOrAdmin = $user && (
-            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
-            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
-            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
-        );
         $activeView = $request->input('view', 'overview');
 
         $widgetQuery = array_filter([
@@ -723,14 +738,37 @@ class HrmsDashboardController extends Controller
     {
         $currentEmployee = $this->resolveCurrentEmployee($user, $tenantId);
 
-        $latestBroadcasts = Broadcast::with(['receipts', 'comments.employee'])
-            ->where('tenant_id', $tenantId)
+        $isHrOrAdmin = $user && (
+            app(\App\Services\Access\AccessService::class)->allows($user, 'hrms.employees.view', ['tenant_id' => $tenantId])
+            || app(\App\Services\Access\AccessService::class)->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
+
+        $broadcastsBaseQuery = Broadcast::where('tenant_id', $tenantId)
             ->where('status', 'published')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>=', now());
+            });
+
+        if (!$isHrOrAdmin) {
+            if ($currentEmployee) {
+                $broadcastsBaseQuery->where(function ($q) use ($currentEmployee) {
+                    $q->where('target_type', 'all')
+                      ->orWhereHas('receipts', fn($rq) => $rq->where('employee_id', $currentEmployee->id));
+                });
+            } else {
+                $broadcastsBaseQuery->where('target_type', 'all');
+            }
+        }
+
+        $latestBroadcasts = (clone $broadcastsBaseQuery)
+            ->with(['receipts', 'comments.employee'])
             ->latest()
             ->take(5)
             ->get();
 
-        $totalBroadcastsCount = Broadcast::where('tenant_id', $tenantId)->where('status', 'published')->count();
+        $totalBroadcastsCount = (clone $broadcastsBaseQuery)->count();
 
         return compact('latestBroadcasts', 'totalBroadcastsCount', 'currentEmployee');
     }
@@ -964,6 +1002,31 @@ class HrmsDashboardController extends Controller
                 return redirect()->back()->with('error', 'You have already clocked in today at ' . Carbon::parse($attendance->check_in)->format('h:i A') . '.');
             }
 
+            $inStatus = 'present';
+            $resolvedShift = $employee->resolveShiftForDate($today);
+            if ($resolvedShift) {
+                $shiftStartStr = $resolvedShift->start_time;
+                $shiftStart = Carbon::parse($today . ' ' . $shiftStartStr);
+
+                if ($now->greaterThan($shiftStart)) {
+                    $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
+                            $q->where('company_id', $employee->company_id)
+                              ->orWhereNull('company_id');
+                        })
+                        ->where('rule_type', 'late_arrival')
+                        ->where('status', true)
+                        ->orderByRaw('company_id IS NULL ASC')
+                        ->first();
+
+                    $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : 15;
+                    if ($now->diffInMinutes($shiftStart) > $graceMinutes) {
+                        $inStatus = 'late';
+                    }
+                }
+            } elseif ($now->format('H:i') > '09:45') {
+                $inStatus = 'late';
+            }
+
             if (!$attendance) {
                 $attendance = Attendance::create([
                     'tenant_id' => $tenantId,
@@ -971,13 +1034,13 @@ class HrmsDashboardController extends Controller
                     'date' => $today,
                     'check_in' => $now,
                     'location_type' => $locationType,
-                    'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
+                    'status' => $inStatus,
                 ]);
             } else {
                 $attendance->update([
                     'check_in' => $now,
                     'location_type' => $locationType,
-                    'status' => $now->format('H:i') > '09:45' ? 'late' : 'present',
+                    'status' => $inStatus,
                 ]);
             }
 

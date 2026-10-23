@@ -71,11 +71,23 @@ class ProductionOrderCompletionValidator
         }
 
         // 5. Check for unreconciled company material at vendor
-        if ($order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid') {
+        $hasCompanyMaterialOps = ProductionOrderOperation::where('tenant_id', $tenantId)
+            ->where('production_order_id', $order->id)
+            ->where('is_external', true)
+            ->where(function ($q) {
+                $q->where('material_supply_type', 'company_supplied')
+                  ->orWhereNull('material_supply_type');
+            })
+            ->exists();
+
+        if ($hasCompanyMaterialOps || $order->production_model === 'subcontract_company_material' || $order->production_model === 'hybrid') {
             $externalOps = ProductionOrderOperation::where('tenant_id', $tenantId)
                 ->where('production_order_id', $order->id)
                 ->where('is_external', true)
-                ->where('material_supply_type', 'company_supplied')
+                ->where(function ($q) {
+                    $q->where('material_supply_type', 'company_supplied')
+                      ->orWhereNull('material_supply_type');
+                })
                 ->get();
 
             foreach ($externalOps as $extOp) {

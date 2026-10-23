@@ -383,7 +383,7 @@
                             if (articles.length > 0) {
                                 deflectionList.innerHTML = articles.map(art => `
                                     <li class="mb-1">
-                                        <a href="/hrms/helpdesk/kb/${art.slug}" target="_blank" class="fw-semibold text-primary text-decoration-none">${art.title}</a>
+                                        <a href="{{ url('hrms/helpdesk/kb') }}/${art.slug}" target="_blank" class="fw-semibold text-primary text-decoration-none">${art.title}</a>
                                     </li>
                                 `).join('');
                                 deflectionContainer.classList.remove('d-none');

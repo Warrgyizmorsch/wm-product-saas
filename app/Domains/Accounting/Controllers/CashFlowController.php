@@ -73,8 +73,10 @@ class CashFlowController extends Controller
             $openingDate = Carbon::parse($period->start_date)->subDay()->endOfDay();
             $closingDate = Carbon::parse($period->end_date)->endOfDay();
 
-            $opening = $this->journals->balancesAsOf($tenantId, $openingDate)->keyBy('chart_of_account_id');
-            $closing = $this->journals->balancesAsOf($tenantId, $closingDate)->keyBy('chart_of_account_id');
+            // Without the year-end closing journal: it would zero the year's
+            // profit and show the transfer to Reserves as a financing inflow.
+            $opening = $this->journals->balancesAsOf($tenantId, $openingDate, excludeYearEndClose: true)->keyBy('chart_of_account_id');
+            $closing = $this->journals->balancesAsOf($tenantId, $closingDate, excludeYearEndClose: true)->keyBy('chart_of_account_id');
 
             foreach ($closing as $accountId => $row) {
                 $account = $row->account;

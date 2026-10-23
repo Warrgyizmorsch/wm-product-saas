@@ -24,46 +24,140 @@
         @else
             <div class="row g-3">
                 @foreach($machines as $machine)
+                    @php
+                        $isBreakdown = (
+                            $machine->current_state === 'Breakdown'
+                            || $machine->maintenance_status === 'breakdown'
+                            || ($machine->activeMaintenanceWo && $machine->activeMaintenanceWo->type === \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::TYPE_BREAKDOWN)
+                            || ($machine->activeDowntime && $machine->activeDowntime->category === 'Breakdown')
+                        );
+
+                        $isMaintenance = !$isBreakdown && (
+                            $machine->status === \App\Domains\Production\Models\Machine::STATUS_UNDER_MAINTENANCE
+                            || $machine->current_state === 'Maintenance'
+                            || $machine->activeMaintenanceWo !== null
+                        );
+
+                        $isDecommissioned = (
+                            $machine->status === \App\Domains\Production\Models\Machine::STATUS_DECOMMISSIONED
+                            || $machine->current_state === 'Decommissioned'
+                        );
+
+                        $isRunning = !$isBreakdown && !$isMaintenance && !$isDecommissioned && (
+                            $machine->currentOp !== null
+                            || $machine->current_state === 'Running'
+                        );
+
+                        $isInactive = !$isBreakdown && !$isMaintenance && !$isDecommissioned && !$isRunning && (
+                            $machine->status === \App\Domains\Production\Models\Machine::STATUS_INACTIVE
+                            || $machine->current_state === 'Inactive'
+                        );
+
+                        if ($isBreakdown) {
+                            $avatarClass = 'bg-soft-danger text-danger';
+                            $avatarIcon = 'alert-octagon';
+                        } elseif ($isMaintenance) {
+                            $avatarClass = 'bg-soft-warning text-warning';
+                            $avatarIcon = 'tool';
+                        } elseif ($isDecommissioned) {
+                            $avatarClass = 'bg-soft-secondary text-secondary';
+                            $avatarIcon = 'slash';
+                        } elseif ($isRunning) {
+                            $avatarClass = 'bg-soft-warning text-warning';
+                            $avatarIcon = 'play-circle';
+                        } elseif ($isInactive) {
+                            $avatarClass = 'bg-soft-secondary text-secondary';
+                            $avatarIcon = 'pause-circle';
+                        } else {
+                            $avatarClass = 'bg-soft-success text-success';
+                            $avatarIcon = 'cpu';
+                        }
+                    @endphp
                     <div class="col-md-4">
                         <x-ui.card class="border-0 shadow-sm h-100 touch-card">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div class="d-flex align-items-center gap-2">
-                                    <div class="avatar-text avatar-md {{ $machine->status === 'under_maintenance' ? 'bg-soft-danger text-danger' : ($machine->currentOp ? 'bg-soft-warning text-warning' : 'bg-soft-success text-success') }} rounded">
-                                        <i class="feather-{{ $machine->status === 'under_maintenance' ? 'tool' : 'cpu' }}"></i>
+                                    <div class="avatar-text avatar-md {{ $avatarClass }} rounded">
+                                        <i class="feather-{{ $avatarIcon }}"></i>
                                     </div>
                                     <div>
                                         <h6 class="fw-bold text-dark mb-0">{{ $machine->name }}</h6>
                                         <small class="text-muted">{{ $machine->workCenter->name ?? '—' }} ({{ $machine->code }})</small>
                                     </div>
                                 </div>
-                                @if($machine->status === 'under_maintenance')
+                                @if($isBreakdown)
                                     <span class="badge bg-soft-danger text-danger fw-bold">
-                                        <i class="feather-alert-octagon me-1"></i>{{ $machine->maintenance_status === 'breakdown' ? 'Breakdown' : 'Under Maintenance' }}
+                                        <i class="feather-alert-octagon me-1"></i>Breakdown
                                     </span>
-                                @elseif($machine->currentOp)
-                                    <span class="badge bg-soft-warning text-warning fw-bold">{{ __('production.running') }}</span>
+                                @elseif($isMaintenance)
+                                    <span class="badge bg-soft-warning text-warning fw-bold">
+                                        <i class="feather-tool me-1"></i>Under Maintenance
+                                    </span>
+                                @elseif($isDecommissioned)
+                                    <span class="badge bg-soft-secondary text-secondary fw-bold">
+                                        <i class="feather-slash me-1"></i>Decommissioned
+                                    </span>
+                                @elseif($isRunning)
+                                    <span class="badge bg-soft-warning text-warning fw-bold">
+                                        <i class="feather-play-circle me-1"></i>{{ __('production.running') }}
+                                    </span>
+                                @elseif($isInactive)
+                                    <span class="badge bg-soft-secondary text-secondary fw-bold">
+                                        <i class="feather-pause-circle me-1"></i>Inactive
+                                    </span>
                                 @else
                                     <span class="badge bg-soft-success text-success fw-bold">Active / Ready</span>
                                 @endif
                             </div>
 
-                            @if($machine->status === 'under_maintenance')
+                            @if($isBreakdown)
                                 <div class="border rounded p-2 bg-soft-danger mb-3">
-                                    <div class="fs-12 fw-bold text-danger mb-1">
-                                        <i class="feather-tool me-1"></i>Maintenance Work Order
+                                    <div class="fs-12 fw-bold text-danger mb-1 d-flex justify-content-between align-items-center">
+                                        <span><i class="feather-alert-octagon me-1"></i>Breakdown Event</span>
+                                        @if($machine->activeMaintenanceWo)
+                                            <span class="badge bg-danger text-white text-uppercase" style="font-size: 10px;">{{ $machine->activeMaintenanceWo->status }}</span>
+                                        @endif
                                     </div>
                                     @if($machine->activeMaintenanceWo)
                                         <div class="fs-12 text-dark fw-semibold">
-                                            <a href="{{ route('production.maintenance.work-orders.show', $machine->activeMaintenanceWo->id) }}" class="text-danger fw-bold">
+                                            <a href="{{ route('production.maintenance.work-orders.show', $machine->activeMaintenanceWo->id) }}" class="text-danger fw-bold text-decoration-none">
                                                 {{ $machine->activeMaintenanceWo->work_order_number }}
                                             </a>
                                         </div>
-                                        <div class="fs-11 text-muted">{{ Str::limit($machine->activeMaintenanceWo->problem_description, 60) }}</div>
+                                        <div class="fs-11 text-muted">{{ Str::limit($machine->activeMaintenanceWo->problem_description ?: ($machine->current_state_reason ?: 'Machine reported in breakdown state'), 60) }}</div>
+                                    @elseif($machine->current_state_reason)
+                                        <div class="fs-11 text-danger fw-semibold">{{ Str::limit($machine->current_state_reason, 60) }}</div>
+                                    @else
+                                        <div class="fs-11 text-muted">Machine reported in breakdown state</div>
+                                    @endif
+                                </div>
+                            @elseif($isMaintenance)
+                                <div class="border rounded p-2 bg-soft-warning mb-3">
+                                    <div class="fs-12 fw-bold text-warning mb-1 d-flex justify-content-between align-items-center">
+                                        <span><i class="feather-tool me-1"></i>Maintenance Work Order</span>
+                                        @if($machine->activeMaintenanceWo)
+                                            <span class="badge bg-warning text-dark text-uppercase" style="font-size: 10px;">{{ $machine->activeMaintenanceWo->status }}</span>
+                                        @endif
+                                    </div>
+                                    @if($machine->activeMaintenanceWo)
+                                        <div class="fs-12 text-dark fw-semibold">
+                                            <a href="{{ route('production.maintenance.work-orders.show', $machine->activeMaintenanceWo->id) }}" class="text-warning fw-bold text-decoration-none">
+                                                {{ $machine->activeMaintenanceWo->work_order_number }}
+                                            </a>
+                                        </div>
+                                        <div class="fs-11 text-muted">{{ Str::limit($machine->activeMaintenanceWo->problem_description ?: 'Machine undergoing maintenance', 60) }}</div>
                                     @else
                                         <div class="fs-11 text-muted">Machine undergoing maintenance</div>
                                     @endif
                                 </div>
-                            @elseif($machine->currentOp)
+                            @elseif($isDecommissioned)
+                                <div class="border rounded p-2 bg-soft-secondary mb-3">
+                                    <div class="fs-12 fw-bold text-secondary mb-1">
+                                        <i class="feather-slash me-1"></i>Decommissioned
+                                    </div>
+                                    <div class="fs-11 text-muted">{{ $machine->current_state_reason ?: 'Machine decommissioned / scrapped' }}</div>
+                                </div>
+                            @elseif($isRunning && $machine->currentOp)
                                 <div class="border rounded p-2 bg-soft-warning mb-3">
                                     <div class="fs-12 fw-bold text-warning mb-1">
                                         <i class="feather-play-circle me-1"></i>{{ __('production.current_operation') }}
@@ -75,6 +169,13 @@
                                             Since {{ $machine->currentOp->actual_start->format('H:i') }} · {{ $machine->currentOp->actual_start->diffForHumans(null, true) }} ago
                                         </div>
                                     @endif
+                                </div>
+                            @elseif($isInactive && $machine->current_state_reason)
+                                <div class="border rounded p-2 bg-light mb-3">
+                                    <div class="fs-12 fw-semibold text-muted mb-1">
+                                        <i class="feather-pause-circle me-1"></i>Inactive Reason
+                                    </div>
+                                    <div class="fs-11 text-muted">{{ Str::limit($machine->current_state_reason, 60) }}</div>
                                 </div>
                             @endif
 

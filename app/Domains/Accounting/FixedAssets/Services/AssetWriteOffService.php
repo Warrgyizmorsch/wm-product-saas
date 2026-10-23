@@ -117,8 +117,10 @@ class AssetWriteOffService
                 throw new InvalidArgumentException("Cannot post write-off for asset #{$asset->id}: required accounts are not configured.");
             }
 
-            $accumulatedDepreciation = (float) $asset->accumulated_depreciation;
-            $netBookValue = (float) $writeOff->net_book_value;
+            // Taken from the locked asset, not the request, so depreciation
+            // posted in between cannot unbalance the entry.
+            $accumulatedDepreciation = round((float) $asset->accumulated_depreciation, 2);
+            $netBookValue = round((float) $asset->capitalization_cost - $accumulatedDepreciation, 2);
 
             $lines = [];
 
@@ -157,6 +159,7 @@ class AssetWriteOffService
             ]);
 
             $writeOff->update([
+                'net_book_value' => $netBookValue,
                 'status' => AssetWriteOff::STATUS_POSTED,
                 'journal_id' => $journal->id,
             ]);

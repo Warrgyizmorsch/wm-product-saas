@@ -20,6 +20,46 @@
             .routing-select2-dropdown .select2-results__options {
                 max-height: 260px;
             }
+            /* Hide number input spinners and ensure clear visibility */
+            .routing-operation-row input[type="number"]::-webkit-outer-spin-button,
+            .routing-operation-row input[type="number"]::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+            }
+            .routing-operation-row input[type="number"] {
+                -moz-appearance: textfield !important;
+                appearance: textfield !important;
+            }
+            .routing-operation-row td .odoo-table-input {
+                padding-left: 6px !important;
+                padding-right: 6px !important;
+            }
+            /* Inline sub-inputs for Yield, Queue Threshold, and Parallel */
+            .routing-sub-input {
+                height: 25px !important;
+                min-height: 25px !important;
+                background-color: #ffffff !important;
+                border: 1px solid #ced4da !important;
+                border-radius: 4px !important;
+                font-size: 11px !important;
+                font-weight: 500 !important;
+                color: #1e293b !important;
+                padding: 1px 4px !important;
+                text-align: center !important;
+                box-sizing: border-box !important;
+                transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+            }
+            .routing-sub-input:focus {
+                border-color: var(--bs-primary) !important;
+                box-shadow: 0 0 0 2px color-mix(in srgb, var(--bs-primary) 20%, transparent) !important;
+                outline: none !important;
+            }
+            .routing-sub-input:disabled {
+                background-color: #f1f5f9 !important;
+                border-color: #e2e8f0 !important;
+                color: #94a3b8 !important;
+                cursor: not-allowed !important;
+            }
         </style>
     @endpush
 
@@ -81,12 +121,12 @@
 
                         <x-ui.odoo-form-ui type="radio" :label="__('production.sequence_control')">
                             <div class="form-check me-3">
-                                <input class="form-check-input" type="radio" name="auto_sequence_radio_edit" id="auto_seq_edit_auto" :value="true" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_edit_auto">{{ __('production.auto_manage_sequence') }}</label>
+                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_auto" :value="true" x-model="autoSequence">
+                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_auto">{{ __('production.auto_manage_sequence') }}</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="auto_sequence_radio_edit" id="auto_seq_edit_manual" :value="false" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_edit_manual">Manual Sequence</label>
+                                <input class="form-check-input" type="radio" name="auto_sequence_radio" id="auto_seq_manual" :value="false" x-model="autoSequence">
+                                <label class="form-check-label fw-semibold text-dark fs-12 ms-1 mb-0 c-pointer" for="auto_seq_manual">Manual Sequence</label>
                             </div>
                         </x-ui.odoo-form-ui>
                     </div>
@@ -105,13 +145,13 @@
                             <thead>
                                 <tr>
                                     <th style="width: 45px;" class="text-center">{{ __('production.seq') }}</th>
-                                    <th style="min-width: 310px;">{{ __('production.operation_name_yield') }}</th>
+                                    <th style="min-width: 360px;">{{ __('production.operation_name_yield') }}</th>
                                     <th style="width: 160px;">{{ __('production.work_center') }}</th>
                                     <th style="width: 160px;">{{ __('production.machine') }}</th>
-                                    <th style="width: 60px;" class="text-end">{{ __('production.setup') }} (m)</th>
-                                    <th style="width: 60px;" class="text-end">{{ __('production.run') }} (m)</th>
-                                    <th style="width: 60px;" class="text-end" title="Buffer / wait / cure / cool-down time (minutes) before downstream transfer">Wait (m)</th>
-                                    <th style="width: 75px;" class="text-end" title="Cost per minute. Leave 0 to use Work Center rate">Labor ({{ active_currency_symbol() }}/m)</th>
+                                    <th style="width: 100px; min-width: 100px;" class="text-end">{{ __('production.setup') }} (m)</th>
+                                    <th style="width: 100px; min-width: 100px;" class="text-end">{{ __('production.run') }} (m)</th>
+                                    <th style="width: 100px; min-width: 100px;" class="text-end" title="Buffer / wait / cure / cool-down time (minutes) before downstream transfer">Wait (m)</th>
+                                    <th style="width: 110px; min-width: 110px;" class="text-end" title="Cost per minute. Leave 0 to use Work Center rate">Labor ({{ active_currency_symbol() }}/m)</th>
                                     <th style="width: 40px;" class="text-center">{{ __('production.qc_gate') }}</th>
                                     <th style="width: 110px;" class="text-end">{{ __('production.actions') }}</th>
                                 </tr>
@@ -129,7 +169,7 @@
                                           <td class="align-middle">
                                               <input type="text" x-bind:name="'operations['+index+'][name]'" class="odoo-table-input fw-semibold" placeholder="{{ __('production.operation_placeholder') }}" x-model="operation.name" required />
                                               
-                                              <div class="d-flex align-items-center gap-2 mt-1 fs-11 text-muted text-nowrap flex-nowrap overflow-hidden">
+                                              <div class="d-flex align-items-center gap-2 mt-1 fs-11 text-muted flex-wrap">
                                                   <div class="form-check m-0 p-0 d-inline-flex align-items-center me-1">
                                                       <input type="checkbox" class="form-check-input mt-0 me-1 ms-0" x-model="operation.is_external" @change="if (operation.is_external) { operation.work_center_id = ''; operation.machine_id = ''; }" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_edit_' + operation.uid" value="1">
                                                       <label class="form-check-label fs-11 text-secondary c-pointer mb-0" x-bind:for="'ext_edit_' + operation.uid">{{ __('production.outsourced') }}</label>
@@ -138,8 +178,8 @@
                                                   <span class="text-black-50 me-1">|</span>
 
                                                   <div class="d-inline-flex align-items-center gap-1 me-1">
-                                                      <span class="fs-10 text-muted">{{ __('production.yield') }}%:</span>
-                                                      <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
+                                                      <span class="fs-11 fw-semibold text-secondary">{{ __('production.yield') }}%:</span>
+                                                      <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="routing-sub-input text-center" style="width: 68px; min-width: 68px;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
                                                   </div>
 
                                                   <span class="text-black-50 me-1">|</span>
@@ -158,10 +198,10 @@
                                                        x-transition:leave="transition ease-in duration-200"
                                                        x-transition:leave-start="opacity-100 transform translate-x-0"
                                                        x-transition:leave-end="opacity-0 transform -translate-x-2">
-                                                      <span class="fs-10 text-muted">Qty:</span>
-                                                      <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_batch_quantity" :min="(operation.queue_threshold_enabled == 1 || operation.queue_threshold_enabled === true || operation.overlap_enabled == 1 || operation.overlap_enabled === true) ? '0.0001' : '0'" :disabled="!operation.queue_threshold_enabled && !operation.overlap_enabled" />
-                                                       <span class="fs-10 text-muted ms-1" title="Transit / handling delay before the first transfer batch reaches the downstream operation.">Lag (m):</span>
-                                                       <input type="number" step="1" x-bind:name="'operations['+index+'][transfer_lag_minutes]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 45px; height: 20px; min-height: 20px;" x-model="operation.transfer_lag_minutes" min="0" placeholder="0" title="Transit / handling delay before the first transfer batch reaches the downstream operation." :disabled="!operation.queue_threshold_enabled && !operation.overlap_enabled" />
+                                                      <span class="fs-11 fw-semibold text-secondary">Qty:</span>
+                                                      <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="routing-sub-input text-center" style="width: 72px; min-width: 72px;" x-model="operation.transfer_batch_quantity" :min="(operation.queue_threshold_enabled == 1 || operation.queue_threshold_enabled === true || operation.overlap_enabled == 1 || operation.overlap_enabled === true) ? '0.0001' : '0'" :disabled="!operation.queue_threshold_enabled && !operation.overlap_enabled" />
+                                                      <span class="fs-11 fw-semibold text-secondary ms-1" title="Transit / handling delay before the first transfer batch reaches the downstream operation.">Lag (m):</span>
+                                                      <input type="number" step="1" x-bind:name="'operations['+index+'][transfer_lag_minutes]'" class="routing-sub-input text-center" style="width: 58px; min-width: 58px;" x-model="operation.transfer_lag_minutes" min="0" placeholder="0" title="Transit / handling delay before the first transfer batch reaches the downstream operation." :disabled="!operation.queue_threshold_enabled && !operation.overlap_enabled" />
                                                   </div>
 
                                                   <span class="text-black-50 me-1">|</span>
@@ -174,8 +214,8 @@
                                                   <div class="align-items-center gap-1"
                                                        :class="(operation.is_parallel == 1 || operation.is_parallel === true) ? 'd-inline-flex' : 'd-none'"
                                                        x-show="operation.is_parallel == 1 || operation.is_parallel === true">
-                                                      <span class="fs-10 text-muted">Grp:</span>
-                                                      <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="odoo-table-input text-center py-0 px-1 fs-11" style="width: 50px; height: 20px; min-height: 20px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" :disabled="!operation.is_parallel" />
+                                                      <span class="fs-11 fw-semibold text-secondary">Grp:</span>
+                                                      <input type="text" x-bind:name="'operations['+index+'][parallel_group]'" class="routing-sub-input text-center" style="width: 70px; min-width: 70px;" x-model="operation.parallel_group" placeholder="e.g. A" title="Optional Parallel Group Name" :disabled="!operation.is_parallel" />
                                                   </div>
                                               </div>
 
@@ -238,23 +278,23 @@
                                           </td>
                                           
                                           <!-- Setup Time -->
-                                          <td class="align-middle">
-                                              <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="odoo-table-input text-end" x-model="operation.setup_time_minutes" min="0" required />
+                                          <td class="align-middle" style="width: 100px; min-width: 100px;">
+                                              <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="odoo-table-input text-end px-2" style="width: 100%; min-width: 85px;" x-model="operation.setup_time_minutes" min="0" required />
                                           </td>
                                           
                                           <!-- Process Time -->
-                                          <td class="align-middle">
-                                              <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end" x-model="operation.processing_time_minutes" min="0" required />
+                                          <td class="align-middle" style="width: 100px; min-width: 100px;">
+                                              <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="odoo-table-input text-end px-2" style="width: 100%; min-width: 85px;" x-model="operation.processing_time_minutes" min="0" required />
                                           </td>
                                           
                                           <!-- Wait Time -->
-                                          <td class="align-middle">
-                                              <input type="number" step="any" x-bind:name="'operations['+index+'][wait_time_minutes]'" class="odoo-table-input text-end" x-model="operation.wait_time_minutes" min="0" placeholder="0.0" title="Buffer / wait / cure / cool-down time (minutes) before downstream transfer" />
+                                          <td class="align-middle" style="width: 100px; min-width: 100px;">
+                                              <input type="number" step="any" x-bind:name="'operations['+index+'][wait_time_minutes]'" class="odoo-table-input text-end px-2" style="width: 100%; min-width: 85px;" x-model="operation.wait_time_minutes" min="0" placeholder="0.0" title="Buffer / wait / cure / cool-down time (minutes) before downstream transfer" />
                                           </td>
 
                                           <!-- Labor Cost Rate ($/min) -->
-                                          <td class="align-middle">
-                                              <input type="number" step="0.0001" x-bind:name="'operations['+index+'][labor_cost_rate]'" class="odoo-table-input text-end" x-model="operation.labor_cost_rate" min="0" placeholder="0.00" title="Cost per minute (Leave 0 to use Work Center hourly rate / 60)" />
+                                          <td class="align-middle" style="width: 110px; min-width: 110px;">
+                                              <input type="number" step="0.0001" x-bind:name="'operations['+index+'][labor_cost_rate]'" class="odoo-table-input text-end px-2" style="width: 100%; min-width: 95px;" x-model="operation.labor_cost_rate" min="0" placeholder="0.00" title="Cost per minute (Leave 0 to use Work Center hourly rate / 60)" />
                                           </td>
                                           
                                           <!-- Quality Required -->
@@ -369,7 +409,7 @@
             function routingForm() {
                 return {
                     operations: [],
-                    autoSequence: {{ $routing->auto_sequence ? 'true' : 'false' }},
+                    autoSequence: true,
                     uidCounter: 1,
 
                     init() {
@@ -385,7 +425,7 @@
                                 setup_time_minutes: "{{ number_format($op->setup_time_minutes, 2, '.', '') }}",
                                 processing_time_minutes: "{{ number_format($op->processing_time_minutes, 2, '.', '') }}",
                                 wait_time_minutes: "{{ number_format($op->wait_time_minutes ?? 0, 2, '.', '') }}",
-                                labor_cost_rate: "{{ number_format($op->labor_cost_rate ?? 0, 4, '.', '') }}",
+                                labor_cost_rate: "{{ number_format(convert_from_base($op->labor_cost_rate ?? 0), 4, '.', '') }}",
                                 description: "{{ addslashes($op->description ?? '') }}",
                                 instructions: @js($op->instructions ?? ''),
                                 showSop: {{ !empty($op->instructions) ? 'true' : 'false' }},
@@ -396,7 +436,7 @@
                                 material_supply_type: "{{ $op->material_supply_type ?? 'company_supplied' }}",
                                 subcontract_input_type: "{{ $op->subcontract_input_type ?? 'bom_raw_materials' }}",
                                 subcontract_lead_time_days: {{ (int) ($op->subcontract_lead_time_days ?? 0) }},
-                                subcontract_cost_per_unit: "{{ number_format($op->subcontract_cost_per_unit ?? 0, 2, '.', '') }}",
+                                subcontract_cost_per_unit: "{{ number_format(convert_from_base($op->subcontract_cost_per_unit ?? 0), 2, '.', '') }}",
                                 subcontract_service_product_id: "{{ $op->subcontract_service_product_id ?? '' }}",
                                 dispatch_buffer_days: {{ (int) ($op->dispatch_buffer_days ?? 0) }},
                                 return_buffer_days: {{ (int) ($op->return_buffer_days ?? 0) }},

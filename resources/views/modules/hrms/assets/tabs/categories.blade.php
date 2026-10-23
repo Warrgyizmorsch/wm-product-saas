@@ -1,5 +1,5 @@
 <!-- 2. ASSET CATEGORIES TAB -->
-<div class="tab-pane fade" id="categories-pane" role="tabpanel" aria-labelledby="categories-tab">
+<div class="tab-pane fade {{ request('tab') === 'categories-pane' ? 'show active' : '' }}" id="categories-pane" role="tabpanel" aria-labelledby="categories-pane-tab">
     <div>
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
             <div>
@@ -8,6 +8,7 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <!-- Categories Search & Filter Form -->
                 <form method="GET" action="{{ route('hrms.assets.index') }}" class="d-flex align-items-center gap-2 m-0">
+                    <input type="hidden" name="tab" value="categories-pane">
                     @foreach(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition', 'request_search', 'request_category_id', 'request_company_id', 'request_status'] as $param)
                         @if(request()->filled($param))
                             <input type="hidden" name="{{ $param }}" value="{{ request($param) }}">
@@ -43,16 +44,16 @@
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.assets.index', request()->except(['category_search', 'category_company_id'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                <a href="{{ route('hrms.assets.index', array_merge(request()->except(['category_search', 'category_company_id']), ['tab' => 'categories-pane'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
                                 <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                             </div>
                         </x-ui.filter>
 
-                    @if(request()->anyFilled(['category_search', 'category_company_id']))
-                        <a href="{{ route('hrms.assets.index', request()->except(['category_search', 'category_company_id'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
-                            <i class="feather-x"></i>
-                        </a>
-                    @endif
+                        @if(request()->anyFilled(['category_search', 'category_company_id']))
+                            <a href="{{ route('hrms.assets.index', array_merge(request()->except(['category_search', 'category_company_id']), ['tab' => 'categories-pane'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="{{ __('hrms.common.reset') }}">
+                                <i class="feather-x"></i>
+                            </a>
+                        @endif
                     </div>
                 </form>
             </div>
@@ -65,7 +66,7 @@
                             <th class="text-start px-4" style="width: 35%;">{{ __('hrms.assets.category_name') }} & {{ __('hrms.assets.tbl_description') }}</th>
                             <th style="width: 12%;">{{ __('hrms.assets.total_assets') }}</th>
                             <th style="width: 20%;">{{ __('hrms.assets.org_entity') }}</th>
-                            <th style="width: 13%;">Type</th>
+                            <th style="width: 13%;">{{ __('hrms.common.type') }}</th>
                             <th style="width: 15%;">{{ __('hrms.assets.created_at') }}</th>
                             <th class="text-end px-4" style="width: 110px; white-space: nowrap;">{{ __('hrms.assets.actions') }}</th>
                         </tr>
@@ -87,7 +88,7 @@
                                 <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $category->company->company_name }}</td>
                                 <td>
                                     @if($category->is_production_machinery)
-                                        <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1"><i class="feather-tool fs-10 me-1"></i>Machinery</span>
+                                        <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1"><i class="feather-tool fs-10 me-1"></i>{{ __('hrms.assets.machinery') }}</span>
                                     @else
                                         <span class="text-muted fs-11">—</span>
                                     @endif
@@ -106,7 +107,7 @@
                                              </a>
                                          </li>
                                          <li>
-                                             <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.assets.confirm_delete_category') ?? 'Are you sure you want to delete this asset category? This action cannot be undone.' }}', { title: 'Delete Asset Category', variant: 'danger', confirmButtonText: 'Delete' });">
+                                             <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.assets.confirm_delete_category') }}', { title: '{{ __('hrms.assets.delete_category_title') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.assets.delete') }}' });">
                                                  @csrf
                                                  @method('DELETE')
                                                  <button type="submit" class="dropdown-item text-danger">
@@ -155,7 +156,7 @@
 
 
 
-<div class="modal fade" id="addCategoryModal" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -177,16 +178,16 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.category_name') }}" name="name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.category_name') }}" name="name" placeholder="{{ __('hrms.assets.placeholder_category_name') }}" :required="true" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="Brief details about what items go into this category..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="{{ __('hrms.assets.placeholder_category_desc') }}" />
                         </div>
                         <div class="col-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="is_production_machinery" value="1" id="add_category_is_production_machinery">
                                 <label class="form-check-label fs-12" for="add_category_is_production_machinery">
-                                    Production machinery — purchases in this category will be surfaced in Production for machine registration
+                                    {{ __('hrms.assets.production_machinery_desc') }}
                                 </label>
                             </div>
                         </div>
@@ -202,7 +203,7 @@
 </div>
 
 <!-- MODAL: EDIT CATEGORY -->
-<div class="modal fade" id="editCategoryModal" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
@@ -224,16 +225,16 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.category_name') }}" name="name" id="edit_category_name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.category_name') }}" name="name" id="edit_category_name" placeholder="{{ __('hrms.assets.placeholder_category_name') }}" :required="true" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" id="edit_category_description" placeholder="Brief details about what items go into this category..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" id="edit_category_description" placeholder="{{ __('hrms.assets.placeholder_category_desc') }}" />
                         </div>
                         <div class="col-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="is_production_machinery" value="1" id="edit_category_is_production_machinery">
                                 <label class="form-check-label fs-12" for="edit_category_is_production_machinery">
-                                    Production machinery — purchases in this category will be surfaced in Production for machine registration
+                                    {{ __('hrms.assets.production_machinery_desc') }}
                                 </label>
                             </div>
                         </div>
@@ -247,3 +248,50 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL: IMPORT CATEGORIES -->
+<div class="modal fade" id="importCategoryModal" tabindex="-1" aria-labelledby="importCategoryModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-dark" id="importCategoryModalLabel">
+                    <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.assets.import_categories') }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-body text-start">
+                    <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-info text-primary fs-15"></i>
+                            <span class="fw-bold">{{ __('hrms.assets.import_instructions_title') }}</span>
+                        </div>
+                        <span class="text-muted leading-relaxed">
+                            {{ __('hrms.assets.import_cat_instructions_desc') }}
+                        </span>
+                        <div class="mt-1">
+                            <a href="{{ route('hrms.assets.categories.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
+                                <i class="feather-download me-1.5 fs-12"></i> {{ __('hrms.assets.download_template') }}
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                         <div class="erp-custom-file-upload">
+                             <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="category_import_file">
+                                  <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
+                                  <span class="file-text text-muted" id="category_import_file_text">{{ __('hrms.assets.select_excel_file') }}</span>
+                                  <input type="file" name="file" id="category_import_file" class="d-none" required accept=".xlsx,.csv" onchange="document.getElementById('category_import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.assets.select_excel_file') }}'">
+                             </label>
+                         </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2 gap-2">
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.common.import') }}</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+

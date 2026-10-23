@@ -14,9 +14,9 @@ class BroadcastService
     /**
      * Create a new Broadcast and generate target receipt placeholders.
      */
-    public function createBroadcast(array $data): Broadcast
+    public function createBroadcast(array $data, $attachmentFile = null, $bannerImageFile = null): Broadcast
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $attachmentFile, $bannerImageFile) {
             $tenantId = $data['tenant_id'] ?? tenant_id();
             if (empty($tenantId)) {
                 throw new \RuntimeException('Cannot create a Broadcast without a resolvable tenant_id.');
@@ -24,9 +24,17 @@ class BroadcastService
 
             // Generate Broadcast Number (e.g. BC-2026-0001)
             $year = date('Y');
-            $latestId = Broadcast::where('tenant_id', $tenantId)->max('id') + 1;
+            $latestId = (int) DB::table('broadcasts')->where('tenant_id', $tenantId)->lockForUpdate()->max('id') + 1;
             $data['broadcast_number'] = 'BC-' . $year . '-' . str_pad($latestId, 4, '0', STR_PAD_LEFT);
-            $data['created_by_user_id'] = auth()->id() ?? 1;
+            $data['created_by_user_id'] = $data['created_by_user_id'] ?? auth()->id() ?? 1;
+
+            if ($attachmentFile && is_object($attachmentFile) && method_exists($attachmentFile,('isValid')) && $attachmentFile->isValid()) {
+                $data['attachment_path'] = $attachmentFile->store('broadcasts/attachments', 'public');
+            }
+
+            if ($bannerImageFile && is_object($bannerImageFile) && method_exists($bannerImageFile,('isValid')) && $bannerImageFile->isValid()) {
+                $data['banner_image_path'] = $bannerImageFile->store('broadcasts/banners', 'public');
+            }
 
             if (isset($data['scheduled_at']) && !empty($data['scheduled_at'])) {
                 $schedTime = Carbon::parse($data['scheduled_at']);
@@ -56,6 +64,68 @@ class BroadcastService
     }
 
     /**
+     * Update an existing Broadcast and re-sync target receipts if audience changed.
+     */
+    public function updateBroadcast(Broadcast $broadcast, array $data, $attachmentFile = null, $bannerImageFile = null): Broadcast
+    {
+        return DB::transaction(function () use ($broadcast, $data, $attachmentFile, $bannerImageFile) {
+            if ($attachmentFile && is_object($attachmentFile) && method_exists($attachmentFile,('isValid')) && $attachmentFile->isValid()) {
+                if ($broadcast->attachment_path) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($broadcast->attachment_path);
+                }
+                $data['attachment_path'] = $attachmentFile->store('broadcasts/attachments', 'public');
+            }
+
+            if ($bannerImageFile && is_object($bannerImageFile) && method_exists($bannerImageFile,('isValid')) && $bannerImageFile->isValid()) {
+                if ($broadcast->banner_image_path) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($broadcast->banner_image_path);
+                }
+                $data['banner_image_path'] = $bannerImageFile->store('broadcasts/banners', 'public');
+            }
+
+            $wasPublished = $broadcast->status === 'published';
+            $oldTargetType = $broadcast->target_type;
+            $oldTargetIds = $broadcast->target_ids;
+            $oldSendEmail = (bool) $broadcast->send_email;
+
+            $broadcast->update($data);
+
+            // Re-generate receipts if audience changed and prune stale ones
+            $targetTypeChanged = isset($data['target_type']) && $data['target_type'] !== $oldTargetType;
+            $targetIdsChanged = isset($data['target_ids']) && $data['target_ids'] != $oldTargetIds;
+            if ($targetTypeChanged || $targetIdsChanged) {
+                $this->generateTargetReceipts($broadcast, true);
+            }
+
+            if (!$wasPublished && $broadcast->status === 'published') {
+                $this->publishBroadcast($broadcast);
+            } elseif ($broadcast->status === 'published' && !empty($broadcast->send_email) && !$oldSendEmail) {
+                $this->dispatchBroadcastEmails($broadcast);
+            }
+
+            return $broadcast->fresh();
+        });
+    }
+
+    /**
+     * Delete Broadcast and its related records and files.
+     */
+    public function deleteBroadcast(Broadcast $broadcast): bool
+    {
+        return DB::transaction(function () use ($broadcast) {
+            if ($broadcast->attachment_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($broadcast->attachment_path);
+            }
+            if ($broadcast->banner_image_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($broadcast->banner_image_path);
+            }
+            $broadcast->receipts()->delete();
+            $broadcast->comments()->delete();
+            return (bool) $broadcast->delete();
+        });
+    }
+
+    /**
      * Process and publish all due scheduled broadcasts.
      */
     public function processScheduledBroadcasts(?int $tenantId = null): void
@@ -78,28 +148,42 @@ class BroadcastService
     /**
      * Generate target receipt placeholders for audience.
      */
-    public function generateTargetReceipts(Broadcast $broadcast): void
+    public function generateTargetReceipts(Broadcast $broadcast, bool $pruneOld = false): void
     {
         $tenantId = $broadcast->tenant_id;
+        $targetType = $broadcast->target_type;
+        $targetIds = $broadcast->target_ids ?? [];
+
+        // Guard against accidental blast: if targeting a specific group but target_ids is empty, do NOT select all employees
+        if ($targetType !== 'all' && empty($targetIds)) {
+            if ($pruneOld) {
+                BroadcastReceipt::where('broadcast_id', $broadcast->id)->delete();
+            }
+            return;
+        }
+
         $empQuery = Employee::where('tenant_id', $tenantId)->where(function ($q) {
             $q->where('status', true)->orWhere('status', 1)->orWhereNull('status');
         });
 
-        $targetType = $broadcast->target_type;
-        $targetIds = $broadcast->target_ids ?? [];
-
-        if ($targetType === 'department' && !empty($targetIds)) {
+        if ($targetType === 'department') {
             $empQuery->whereIn('department_id', $targetIds);
-        } elseif ($targetType === 'branch' && !empty($targetIds)) {
+        } elseif ($targetType === 'branch') {
             $empQuery->whereIn('branch_id', $targetIds);
-        } elseif ($targetType === 'designation' && !empty($targetIds)) {
+        } elseif ($targetType === 'designation') {
             $empQuery->whereIn('designation_id', $targetIds);
-        } elseif ($targetType === 'specific_employees' && !empty($targetIds)) {
+        } elseif ($targetType === 'specific_employees') {
             $empQuery->whereIn('id', $targetIds);
         }
 
-        $employeeIds = $empQuery->pluck('id');
+        $employeeIds = $empQuery->pluck('id')->all();
         $deliveredAt = ($broadcast->status === 'published') ? Carbon::now() : null;
+
+        if ($pruneOld && $targetType !== 'all') {
+            BroadcastReceipt::where('broadcast_id', $broadcast->id)
+                ->whereNotIn('employee_id', $employeeIds)
+                ->delete();
+        }
 
         foreach ($employeeIds as $empId) {
             BroadcastReceipt::firstOrCreate([
@@ -253,13 +337,25 @@ class BroadcastService
      */
     public function markRead(Broadcast $broadcast, int $employeeId): void
     {
-        $receipt = BroadcastReceipt::where('broadcast_id', $broadcast->id)
-            ->where('employee_id', $employeeId)
-            ->first();
+        $receipt = BroadcastReceipt::firstOrCreate([
+            'tenant_id'    => $broadcast->tenant_id,
+            'broadcast_id' => $broadcast->id,
+            'employee_id'  => $employeeId,
+        ], [
+            'delivered_at' => $broadcast->published_at ?? Carbon::now(),
+        ]);
 
-        if ($receipt && !$receipt->read_at) {
+        if (!$receipt->read_at) {
             $receipt->update(['read_at' => Carbon::now()]);
         }
+    }
+
+    /**
+     * Alias for marking broadcast read when viewed by employee.
+     */
+    public function markAsViewed(Broadcast $broadcast, Employee $employee): void
+    {
+        $this->markRead($broadcast, $employee->id);
     }
 
     /**
@@ -267,10 +363,19 @@ class BroadcastService
      */
     public function acknowledgeBroadcast(Broadcast $broadcast, int $employeeId, ?string $ipAddress = null, ?string $deviceType = null): BroadcastReceipt
     {
+        $isEligible = $broadcast->target_type === 'all'
+            || BroadcastReceipt::where('broadcast_id', $broadcast->id)->where('employee_id', $employeeId)->exists();
+
+        if (!$isEligible) {
+            throw new \Illuminate\Auth\Access\AuthorizationException('Employee is not an eligible recipient of this announcement.');
+        }
+
         $receipt = BroadcastReceipt::firstOrCreate([
             'tenant_id'    => $broadcast->tenant_id,
             'broadcast_id' => $broadcast->id,
             'employee_id'  => $employeeId,
+        ], [
+            'delivered_at' => Carbon::now(),
         ]);
 
         $now = Carbon::now();
@@ -282,6 +387,19 @@ class BroadcastService
         ]);
 
         return $receipt;
+    }
+
+    /**
+     * Alias for acknowledgeBroadcast using Employee object.
+     */
+    public function acknowledge(Broadcast $broadcast, Employee $employee, ?string $signatureData = null): BroadcastReceipt
+    {
+        return $this->acknowledgeBroadcast(
+            $broadcast,
+            $employee->id,
+            request()->ip(),
+            substr(request()->header('User-Agent') ?? '', 0, 100)
+        );
     }
 
     /**

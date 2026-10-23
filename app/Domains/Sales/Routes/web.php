@@ -18,6 +18,7 @@ Route::prefix('sales')
         Route::delete('orders/{order}', [SalesOrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [SalesOrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/convert-to-project', [SalesOrderController::class, 'convertToProject'])->name('orders.convert-to-project');
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
         // Material Requirements Routes (Alias Redirects to /inventory/material-requirements)
@@ -77,6 +78,7 @@ Route::prefix('sales')
         Route::post('invoices/{invoice}/send-email', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendEmail'])->name('invoices.sendEmail');
         Route::post('invoices/{invoice}/send-whatsapp', [\App\Domains\Sales\Controllers\InvoiceController::class, 'sendWhatsApp'])->name('invoices.sendWhatsApp');
         Route::post('invoices/{invoice}/post', [\App\Domains\Sales\Controllers\InvoiceController::class, 'post'])->name('invoices.post');
+        Route::post('invoices/{invoice}/credit-note', [\App\Domains\Sales\Controllers\InvoiceController::class, 'storeCreditNote'])->name('invoices.credit-note');
         Route::post('invoices/{invoice}/send', [\App\Domains\Sales\Controllers\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/pay', [\App\Domains\Sales\Controllers\InvoiceController::class, 'pay'])->name('invoices.pay');
 
