@@ -103,7 +103,20 @@ class ExternalWorkerPayGradeService
         }
 
         if (isset($data['active'])) {
-            $updateData['active'] = (bool) $data['active'];
+            $newActive = (bool) $data['active'];
+            if (!$newActive && $payGrade->isActive()) {
+                $hasActiveAllocations = DB::table('production_external_worker_allocations')
+                    ->where('tenant_id', $tenantId)
+                    ->where('pay_grade_id', $id)
+                    ->where('active', 1)
+                    ->whereNull('deleted_at')
+                    ->exists();
+
+                if ($hasActiveAllocations) {
+                    throw new InvalidArgumentException("Cannot deactivate pay grade '{$payGrade->name}' because it has active external worker allocations. Deactivate all referencing allocations before deactivating.");
+                }
+            }
+            $updateData['active'] = $newActive;
         }
 
         if (!empty($updateData)) {

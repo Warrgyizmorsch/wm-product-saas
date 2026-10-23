@@ -5,13 +5,11 @@ namespace Tests\Feature\Production;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\Production\Models\ExternalWorkerAllocation;
 use App\Domains\Production\Models\ExternalWorkerPayGrade;
-use App\Domains\Production\Models\InternalWorkerAllocation;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\WorkCenterEmployeeAssignment;
 use App\Domains\Production\Models\WorkCenterSection;
-use App\Domains\Production\Services\InternalWorkerAllocationService;
 use App\Domains\Production\Services\WorkCenterEmployeeService;
 use App\Models\Tenant;
 use App\Models\User;
@@ -115,6 +113,25 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
             'status'    => 'active',
         ]);
 
+        // Baseline active sections with operating shifts so Work Centers have derived shifts
+        WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Assembly Baseline Section',
+            'code'            => 'SEC-BASE-A1',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA2->id,
+            'name'            => 'Packaging Baseline Section',
+            'code'            => 'SEC-BASE-A2',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
         // Work Center for Tenant B
         $this->workCenterB = WorkCenter::create([
             'tenant_id' => $this->tenantB->id,
@@ -164,13 +181,13 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
     public function test_can_update_section_shifts_without_target_headcount(): void
     {
         $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Testing Bay',
-            'code'           => 'SEC-TST',
-            'status'         => 'active',
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Testing Bay',
+            'code'            => 'SEC-TST',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
         ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'active' => true]]);
 
         $response = $this->asTenantA()->put(route('production.work-center-sections.update', $section->id), [
             'work_center_id' => $this->workCenterA1->id,
@@ -188,168 +205,131 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
     }
 
     /**
-     * Requirement 3: Internal Worker Allocation at Section-Shift level with temporary rate 100.
+     * Requirement 3: Section-level Internal Employee Assignment via production.work-center-employees.store
      */
-    public function test_can_allocate_internal_workers_with_temporary_rate_100(): void
+    public function test_can_assign_internal_employee_to_section(): void
     {
+        $employee = $this->createEmployee(['full_name' => 'Section Dedicated Worker']);
         $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Assembly Line 1',
-            'code'           => 'SEC-AL1',
-            'active'         => true,
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Assembly Line 1',
+            'code'            => 'SEC-AL1',
+            'active'          => true,
+            'assigned_shifts' => [$this->shift1->id],
         ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'active' => true]]);
 
-        $response = $this->asTenantA()->post(route('production.internal-worker-allocations.store'), [
-            'section_id' => $section->id,
-            'shift_id'   => $this->shift1->id,
-            'headcount'  => 4,
+        $response = $this->asTenantA()->post(route('production.work-center-employees.store'), [
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $section->id,
+            'employee_id'    => $employee->id,
         ]);
 
         $response->assertRedirect();
         $response->assertSessionHas('success');
 
-        $allocation = InternalWorkerAllocation::where('section_id', $section->id)
-            ->where('shift_id', $this->shift1->id)
+        $assignment = WorkCenterEmployeeAssignment::where('work_center_id', $this->workCenterA1->id)
+            ->where('section_id', $section->id)
+            ->where('employee_id', $employee->id)
             ->first();
 
-        $this->assertNotNull($allocation);
-        $this->assertEquals(4, $allocation->headcount);
-        $this->assertEquals(100.00, (float) $allocation->rate, 'Internal rate must be 100.00');
-        $this->assertTrue($allocation->active);
+        $this->assertNotNull($assignment);
+        $this->assertTrue($assignment->active);
+        $this->assertEquals($section->id, $assignment->section_id);
     }
 
-    public function test_can_update_internal_worker_headcount(): void
+    public function test_can_toggle_and_destroy_section_internal_employee_assignment(): void
     {
+        $employee = $this->createEmployee(['full_name' => 'Toggle Candidate']);
         $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Assembly Line 1',
-            'code'           => 'SEC-AL1',
-            'active'         => true,
-        ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'active' => true]]);
-
-        $allocation = InternalWorkerAllocation::create([
-            'tenant_id'  => $this->tenantA->id,
-            'section_id' => $section->id,
-            'shift_id'   => $this->shift1->id,
-            'headcount'  => 3,
-            'rate'       => 100.00,
-            'active'     => true,
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Assembly Line 1',
+            'code'            => 'SEC-AL1',
+            'active'          => true,
+            'assigned_shifts' => [$this->shift1->id],
         ]);
 
-        $response = $this->asTenantA()->patch(
-            route('production.internal-worker-allocations.headcount', $allocation->id),
-            ['headcount' => 6]
+        $service = app(WorkCenterEmployeeService::class);
+        $assignment = $service->assign(
+            $this->workCenterA1->id,
+            $employee->id,
+            $this->tenantA->id,
+            true,
+            $section->id
         );
-
-        $response->assertRedirect();
-        $response->assertSessionHas('success');
-        $this->assertEquals(6, $allocation->fresh()->headcount);
-    }
-
-    public function test_can_toggle_and_destroy_internal_worker_allocation(): void
-    {
-        $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Assembly Line 1',
-            'code'           => 'SEC-AL1',
-            'active'         => true,
-        ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'active' => true]]);
-
-        $allocation = InternalWorkerAllocation::create([
-            'tenant_id'  => $this->tenantA->id,
-            'section_id' => $section->id,
-            'shift_id'   => $this->shift1->id,
-            'headcount'  => 2,
-            'rate'       => 100.00,
-            'active'     => true,
-        ]);
 
         // Toggle to inactive
         $this->asTenantA()->patch(
-            route('production.internal-worker-allocations.toggle-status', $allocation->id),
+            route('production.work-center-employees.toggle-status', $assignment->id),
             ['active' => 0]
         );
-        $this->assertFalse($allocation->fresh()->active);
+        $this->assertFalse($assignment->fresh()->active);
 
         // Toggle back to active
         $this->asTenantA()->patch(
-            route('production.internal-worker-allocations.toggle-status', $allocation->id),
+            route('production.work-center-employees.toggle-status', $assignment->id),
             ['active' => 1]
         );
-        $this->assertTrue($allocation->fresh()->active);
+        $this->assertTrue($assignment->fresh()->active);
 
         // Destroy (soft-delete)
         $this->asTenantA()->delete(
-            route('production.internal-worker-allocations.destroy', $allocation->id)
+            route('production.work-center-employees.destroy', $assignment->id)
         );
-        $this->assertSoftDeleted('production_internal_worker_allocations', ['id' => $allocation->id]);
+        $this->assertSoftDeleted('production_work_center_employees', ['id' => $assignment->id]);
     }
 
-    public function test_internal_worker_allocation_enforces_tenant_isolation_and_shift_assignment(): void
+    public function test_section_internal_employee_assignment_validates_section_ownership(): void
     {
-        $sectionA = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Assembly Line 1',
-            'code'           => 'SEC-AL1',
-            'active'         => true,
+        $employee = $this->createEmployee(['full_name' => 'Mismatch Worker']);
+        $sectionB = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA2->id,
+            'name'            => 'Other Section',
+            'code'            => 'SEC-OTH',
+            'active'          => true,
+            'assigned_shifts' => [$this->shift1->id],
         ]);
-        // Shift is NOT assigned to sectionA yet
-        $service = app(InternalWorkerAllocationService::class);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('is not assigned to Section');
+        // Attempt to assign employee to workCenterA1 while claiming section belongs to it (it belongs to workCenterA2)
+        $response = $this->asTenantA()->post(route('production.work-center-employees.store'), [
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $sectionB->id,
+            'employee_id'    => $employee->id,
+        ]);
 
-        $service->allocate($sectionA->id, $this->shift1->id, 3, $this->tenantA->id);
+        $response->assertSessionHas('error');
     }
 
     /**
-     * Requirement 3 (External workers): Preserved and works alongside internal workers.
+     * Requirement 3 (External workers): Preserved and allocated per Section + Shift.
      */
-    public function test_can_allocate_external_workers_alongside_internal_workers(): void
+    public function test_can_allocate_external_workers_to_section_shift(): void
     {
         $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Dual Staff Section',
-            'code'           => 'SEC-DUAL',
-            'active'         => true,
-        ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'active' => true]]);
-
-        // Allocate internal
-        $this->asTenantA()->post(route('production.internal-worker-allocations.store'), [
-            'section_id' => $section->id,
-            'shift_id'   => $this->shift1->id,
-            'headcount'  => 5,
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Contract Staff Section',
+            'code'            => 'SEC-CONTR',
+            'active'          => true,
+            'assigned_shifts' => [$this->shift1->id],
         ]);
 
-        // Allocate external
+        // Allocate external workers
         $this->asTenantA()->post(route('production.external-worker-allocations.store'), [
-            'section_id'   => $section->id,
-            'shift_id'     => $this->shift1->id,
-            'pay_grade_id' => $this->payGrade->id,
-            'headcount'    => 2,
-        ]);
-
-        $this->assertDatabaseHas('production_internal_worker_allocations', [
-            'section_id' => $section->id,
-            'shift_id'   => $this->shift1->id,
-            'headcount'  => 5,
-            'rate'       => 100.00,
+            'section_id'                 => $section->id,
+            'shift_id'                   => $this->shift1->id,
+            'pay_grade_id'               => $this->payGrade->id,
+            'number_of_external_workers' => 4,
         ]);
 
         $this->assertDatabaseHas('production_external_worker_allocations', [
-            'section_id'   => $section->id,
-            'shift_id'     => $this->shift1->id,
-            'pay_grade_id' => $this->payGrade->id,
-            'headcount'    => 2,
+            'section_id'                 => $section->id,
+            'shift_id'                   => $this->shift1->id,
+            'pay_grade_id'               => $this->payGrade->id,
+            'number_of_external_workers' => 4,
+            'active'                     => 1,
         ]);
     }
 
@@ -359,6 +339,7 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
             'tenant_id'       => $this->tenantA->id,
             'employee_id'     => 'EMP-' . uniqid(),
             'full_name'       => 'Test Employee',
+            'shift_id'        => $this->shift1->id,
             'status'          => true,
             'job_title'       => 'Operator',
             'gender'          => 'Other',
@@ -443,11 +424,12 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
     {
         $employee = $this->createEmployee(['full_name' => 'Cross Assignment Specialist']);
         $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Welding Section',
-            'code'           => 'SEC-WELD',
-            'status'         => 'active',
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Welding Section',
+            'code'            => 'SEC-WELD',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
         ]);
 
         $service = app(WorkCenterEmployeeService::class);
@@ -467,18 +449,20 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
     {
         $employee = $this->createEmployee(['full_name' => 'Section Dedicated Worker']);
         $section1 = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Milling Section',
-            'code'           => 'SEC-MILL',
-            'status'         => 'active',
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Milling Section',
+            'code'            => 'SEC-MILL',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
         ]);
         $section2 = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Lathe Section',
-            'code'           => 'SEC-LATHE',
-            'status'         => 'active',
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Lathe Section',
+            'code'            => 'SEC-LATHE',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
         ]);
 
         $service = app(WorkCenterEmployeeService::class);
@@ -533,21 +517,440 @@ class SectionShiftRedesignAndWorkerAllocationTest extends TestCase
         $employee = $this->createEmployee(['full_name' => 'Show Tester']);
 
         $section = WorkCenterSection::create([
-            'tenant_id'      => $this->tenantA->id,
-            'work_center_id' => $this->workCenterA1->id,
-            'name'           => 'Show Section',
-            'code'           => 'SEC-SHOW',
-            'active'         => true,
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Show Section',
+            'code'            => 'SEC-SHOW',
+            'active'          => true,
+            'assigned_shifts' => [$this->shift1->id],
         ]);
-        $section->shifts()->sync([$this->shift1->id => ['tenant_id' => $this->tenantA->id, 'active' => true]]);
 
         $response = $this->asTenantA()->get(route('production.work-centers.show', $this->workCenterA1->id));
 
         $response->assertOk();
         $response->assertSee('Assign Internal Employees');
-        $response->assertSee('Assign Workers');
         $response->assertSee('workCenterEmployeesModal');
+        $response->assertSee('sectionEmployeesModal_' . $section->id);
         $response->assertSee('sectionShiftWorkersModal_' . $section->id . '_' . $this->shift1->id);
-        $response->assertSee('₹100.00 / hr');
+    }
+
+    public function test_section_assigned_employee_is_not_displayed_in_work_center_level_assigned_employees(): void
+    {
+        $secEmployee = $this->createEmployee(['full_name' => 'Section Dedicated Worker']);
+        $wcEmployee = $this->createEmployee(['full_name' => 'WorkCenter Floating Worker']);
+
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Machining Bay A',
+            'code'            => 'SEC-MBA',
+            'active'          => true,
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        // Assign secEmployee to Section
+        WorkCenterEmployeeAssignment::create([
+            'tenant_id'      => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $section->id,
+            'employee_id'    => $secEmployee->id,
+            'active'         => true,
+        ]);
+
+        // Assign wcEmployee to Work Center
+        WorkCenterEmployeeAssignment::create([
+            'tenant_id'      => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => null,
+            'employee_id'    => $wcEmployee->id,
+            'active'         => true,
+        ]);
+
+        // 1. WorkCenter model relationship checks
+        $this->workCenterA1->refresh();
+        $wcAssignedEmpIds = $this->workCenterA1->employeeAssignments->pluck('employee_id')->all();
+        $this->assertContains($wcEmployee->id, $wcAssignedEmpIds);
+        $this->assertNotContains($secEmployee->id, $wcAssignedEmpIds);
+
+        // Section model relationship checks
+        $section->refresh();
+        $secAssignedEmpIds = $section->employeeAssignments->pluck('employee_id')->all();
+        $this->assertContains($secEmployee->id, $secAssignedEmpIds);
+        $this->assertNotContains($wcEmployee->id, $secAssignedEmpIds);
+
+        // 2. HTTP View checks
+        $response = $this->asTenantA()->get(route('production.work-centers.show', $this->workCenterA1->id));
+        $response->assertOk();
+
+        $content = $response->getContent();
+        // Inside workCenterEmployeesModal, wcEmployee is listed as assigned
+        $this->assertStringContainsString('WorkCenter Floating Worker', $content);
+        // In the WC dropdown, secEmployee is shown as (Assigned to Section: Machining Bay A)
+        $this->assertStringContainsString('(Assigned to Section: Machining Bay A)', $content);
+    }
+
+    /**
+     * Requirement: Manual Production decoupled modal & worker prerequisite checks.
+     */
+    public function test_section_created_without_manual_production_by_default(): void
+    {
+        $response = $this->asTenantA()->post(route('production.work-center-sections.store'), [
+            'work_center_id' => $this->workCenterA1->id,
+            'name'           => 'Manual Check Section',
+            'code'           => 'SEC-MAN-01',
+            'status'         => 'active',
+            'shifts'         => [$this->shift1->id],
+        ]);
+
+        $response->assertRedirect();
+        $section = WorkCenterSection::where('code', 'SEC-MAN-01')->first();
+        $this->assertNotNull($section);
+        $this->assertFalse($section->supports_manual_production);
+        $this->assertNull($section->manual_capacity_per_hour);
+        $this->assertFalse($section->hasActiveWorkerAssignments());
+    }
+
+    public function test_cannot_enable_manual_production_without_active_section_worker_assignments(): void
+    {
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Gated Section',
+            'code'            => 'SEC-GATE',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        $this->assertFalse($section->hasActiveWorkerAssignments());
+
+        $response = $this->asTenantA()->patch(
+            route('production.work-center-sections.update-manual-production', $section->id),
+            [
+                'supports_manual_production' => 1,
+                'manual_capacity_per_hour'   => 20.0,
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+
+        $section->refresh();
+        $this->assertFalse($section->supports_manual_production);
+        $this->assertNull($section->manual_capacity_per_hour);
+    }
+
+    public function test_work_center_level_worker_assignment_does_not_qualify_for_section_manual_production(): void
+    {
+        $employee = $this->createEmployee(['full_name' => 'WC Only Worker']);
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Unassigned Section',
+            'code'            => 'SEC-UNASGN',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        // Assign employee to work center level (section_id is null)
+        WorkCenterEmployeeAssignment::create([
+            'tenant_id'      => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => null,
+            'employee_id'    => $employee->id,
+            'active'         => true,
+        ]);
+
+        // Section has no section-level workers
+        $this->assertFalse($section->hasActiveWorkerAssignments());
+
+        $response = $this->asTenantA()->patch(
+            route('production.work-center-sections.update-manual-production', $section->id),
+            [
+                'supports_manual_production' => 1,
+                'manual_capacity_per_hour'   => 15.0,
+            ]
+        );
+
+        $response->assertSessionHas('error');
+        $this->assertFalse($section->fresh()->supports_manual_production);
+    }
+
+    public function test_can_enable_manual_production_with_active_internal_employee(): void
+    {
+        $employee = $this->createEmployee(['full_name' => 'Section Dedicated Worker 2']);
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Manual Ready Section',
+            'code'            => 'SEC-MR1',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        // Assign to section
+        WorkCenterEmployeeAssignment::create([
+            'tenant_id'      => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $section->id,
+            'employee_id'    => $employee->id,
+            'active'         => true,
+        ]);
+
+        $this->assertTrue($section->hasActiveWorkerAssignments());
+        $counts = $section->getActiveWorkerCounts();
+        $this->assertEquals(1, $counts['internal']);
+        $this->assertEquals(0, $counts['external']);
+        $this->assertEquals(1, $counts['total']);
+
+        // Enable manual production
+        $response = $this->asTenantA()->patch(
+            route('production.work-center-sections.update-manual-production', $section->id),
+            [
+                'supports_manual_production' => 1,
+                'manual_capacity_per_hour'   => 35.5,
+            ]
+        );
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $section->refresh();
+        $this->assertTrue($section->supports_manual_production);
+        $this->assertEquals(35.5, (float) $section->manual_capacity_per_hour);
+
+        // Can disable manual production
+        $disableResponse = $this->asTenantA()->patch(
+            route('production.work-center-sections.update-manual-production', $section->id),
+            [
+                'supports_manual_production' => 0,
+            ]
+        );
+        $disableResponse->assertSessionHas('success');
+        $this->assertFalse($section->fresh()->supports_manual_production);
+    }
+
+    public function test_can_enable_manual_production_with_active_external_worker(): void
+    {
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'External Worker Section',
+            'code'            => 'SEC-EXT1',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        // Allocate external workers to section
+        ExternalWorkerAllocation::create([
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $section->id,
+            'shift_id'                   => $this->shift1->id,
+            'pay_grade_id'               => $this->payGrade->id,
+            'number_of_external_workers' => 3,
+            'active'                     => true,
+        ]);
+
+        $this->assertTrue($section->hasActiveWorkerAssignments());
+        $counts = $section->getActiveWorkerCounts();
+        $this->assertEquals(0, $counts['internal']);
+        $this->assertEquals(3, $counts['external']);
+        $this->assertEquals(3, $counts['total']);
+
+        $response = $this->asTenantA()->patch(
+            route('production.work-center-sections.update-manual-production', $section->id),
+            [
+                'supports_manual_production' => 1,
+                'manual_capacity_per_hour'   => 40.0,
+            ]
+        );
+
+        $response->assertSessionHas('success');
+        $section->refresh();
+        $this->assertTrue($section->supports_manual_production);
+        $this->assertEquals(40.0, (float) $section->manual_capacity_per_hour);
+    }
+
+    public function test_show_page_renders_manual_production_modals_and_controls(): void
+    {
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Show Page Section',
+            'code'            => 'SEC-SPS',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        $response = $this->asTenantA()->get(route('production.work-centers.show', $this->workCenterA1->id));
+        $response->assertOk();
+
+        $content = $response->getContent();
+        // Check for dedicated manual production modal ID
+        $this->assertStringContainsString('sectionManualProductionModal_' . $section->id, $content);
+        // Check for action dropdown item and pill button
+        $this->assertStringContainsString('Manual Production', $content);
+        // Check that create section modal does not contain manual production input
+        $this->assertStringNotContainsString('id="create_supports_manual_production"', $content);
+        // Check that edit section modal does not contain manual production input
+        $this->assertStringNotContainsString('id="edit_supports_manual_production_' . $section->id . '"', $content);
+    }
+
+    public function test_employee_assigned_to_section_can_be_assigned_to_another_section_after_deactivation(): void
+    {
+        $employee = $this->createEmployee(['full_name' => 'Transfer Worker']);
+        $sectionA = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Section Alpha',
+            'code'            => 'SEC-ALPH',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+        $sectionB = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Section Beta',
+            'code'            => 'SEC-BETA',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        $service = app(WorkCenterEmployeeService::class);
+
+        // 1. Assign to Section A
+        $assignmentA = $service->assign($this->workCenterA1->id, $employee->id, $this->tenantA->id, true, $sectionA->id);
+        $this->assertTrue($assignmentA->active);
+        $this->assertEquals($sectionA->id, $assignmentA->section_id);
+
+        // 2. Deactivate in Section A
+        $service->setActive($assignmentA->id, false, $this->tenantA->id);
+        $this->assertFalse($assignmentA->fresh()->active);
+
+        // 3. Assign to Section B in the SAME Work Center (must not throw SQL duplicate entry 1062)
+        $response = $this->asTenantA()->post(route('production.work-center-employees.store'), [
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $sectionB->id,
+            'employee_id'    => $employee->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $assignmentB = WorkCenterEmployeeAssignment::where('work_center_id', $this->workCenterA1->id)
+            ->where('section_id', $sectionB->id)
+            ->where('employee_id', $employee->id)
+            ->first();
+
+        $this->assertNotNull($assignmentB);
+        $this->assertTrue($assignmentB->active);
+        // Section A record still preserved as inactive
+        $this->assertFalse($assignmentA->fresh()->active);
+    }
+
+    public function test_employee_assigned_to_section_can_be_reassigned_to_same_section_when_inactive(): void
+    {
+        $employee = $this->createEmployee(['full_name' => 'Reactivate Worker']);
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Section Gamma',
+            'code'            => 'SEC-GAM',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        $service = app(WorkCenterEmployeeService::class);
+
+        // 1. Assign to Section
+        $assignment = $service->assign($this->workCenterA1->id, $employee->id, $this->tenantA->id, true, $section->id);
+        $this->assertTrue($assignment->active);
+
+        // 2. Deactivate
+        $service->setActive($assignment->id, false, $this->tenantA->id);
+        $this->assertFalse($assignment->fresh()->active);
+
+        // 3. Re-assign to same section via store endpoint instead of toggle
+        $response = $this->asTenantA()->post(route('production.work-center-employees.store'), [
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $section->id,
+            'employee_id'    => $employee->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $this->assertTrue($assignment->fresh()->active);
+    }
+
+    public function test_soft_deleted_employee_assignment_is_restored_on_reassignment(): void
+    {
+        $employee = $this->createEmployee(['full_name' => 'Restore Worker']);
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Section Delta',
+            'code'            => 'SEC-DELT',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        $service = app(WorkCenterEmployeeService::class);
+
+        // 1. Assign
+        $assignment = $service->assign($this->workCenterA1->id, $employee->id, $this->tenantA->id, true, $section->id);
+
+        // 2. Soft-delete
+        $this->asTenantA()->delete(route('production.work-center-employees.destroy', $assignment->id));
+        $this->assertSoftDeleted('production_work_center_employees', ['id' => $assignment->id]);
+
+        // 3. Re-assign must restore without 1062 duplicate key error
+        $response = $this->asTenantA()->post(route('production.work-center-employees.store'), [
+            'work_center_id' => $this->workCenterA1->id,
+            'section_id'     => $section->id,
+            'employee_id'    => $employee->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $restored = $assignment->fresh();
+        $this->assertNull($restored->deleted_at);
+        $this->assertTrue($restored->active);
+    }
+
+    public function test_show_page_renders_select2_selectors_and_dynamic_quantity_tick_button(): void
+    {
+        $employee = $this->createEmployee(['full_name' => 'Select2 Worker']);
+
+        $section = WorkCenterSection::create([
+            'tenant_id'       => $this->tenantA->id,
+            'work_center_id'  => $this->workCenterA1->id,
+            'name'            => 'Select2 Section',
+            'code'            => 'SEC-SEL2',
+            'status'          => 'active',
+            'assigned_shifts' => [$this->shift1->id],
+        ]);
+
+        $alloc = ExternalWorkerAllocation::create([
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $section->id,
+            'shift_id'                   => $this->shift1->id,
+            'pay_grade_id'               => $this->payGrade->id,
+            'number_of_external_workers' => 5,
+            'active'                     => true,
+        ]);
+
+        $response = $this->asTenantA()->get(route('production.work-centers.show', $this->workCenterA1->id));
+        $response->assertOk();
+
+        $content = $response->getContent();
+
+        // 1. Check Select2 selectors exist
+        $this->assertStringContainsString('data-select2-selector="default"', $content);
+        $this->assertStringContainsString('id="secEmployeeSelect_' . $section->id . '"', $content);
+
+        // 2. Check external worker quantity input has data-initial-value and tick button is hidden by default
+        $this->assertStringContainsString('data-initial-value="5"', $content);
+        $this->assertStringContainsString('ext-worker-qty-btn d-none', $content);
     }
 }
+

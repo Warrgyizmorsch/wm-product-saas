@@ -178,11 +178,9 @@
                                 </span>
                             </td>
                             <td class="text-muted">{{ $wc->location ?? '—' }}</td>
-                            <td class="text-end fw-semibold">
-                                {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : __('production.unlimited') }}
-                            </td>
-                            <td class="text-end text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                            <td class="text-end fw-semibold text-dark">{{ format_currency((float) ($wc->labor_cost_per_hour ?? 0)) }}</td>
+                            <td class="text-end fw-semibold">0</td>
+                            <td class="text-end text-muted">0</td>
+                            <td class="text-end fw-semibold text-dark">0</td>
                             <td class="text-center">
                                 @if($wc->machines_count > 0)
                                     <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"

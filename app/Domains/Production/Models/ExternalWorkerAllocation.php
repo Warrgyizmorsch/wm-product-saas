@@ -20,17 +20,16 @@ class ExternalWorkerAllocation extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'section_shift_id',
         'section_id',
         'shift_id',
         'pay_grade_id',
-        'headcount',
+        'number_of_external_workers',
         'active',
     ];
 
     protected $casts = [
-        'headcount' => 'integer',
-        'active'    => 'boolean',
+        'number_of_external_workers' => 'integer',
+        'active'                     => 'boolean',
     ];
 
     protected static function boot(): void
@@ -38,10 +37,15 @@ class ExternalWorkerAllocation extends BaseModel
         parent::boot();
 
         static::saving(function (self $model): void {
-            // 1. Headcount validation: integer >= 1
-            if ($model->headcount !== null && (int) $model->headcount < 1) {
-                throw new InvalidArgumentException('Allocated headcount must be at least 1.');
+            // Unset obsolete/dropped columns if accidentally present on model attributes
+            unset($model->attributes['section_shift_id']);
+
+            // 1. Worker quantity validation: integer >= 1, default 1
+            $quantity = (int) ($model->attributes['number_of_external_workers'] ?? $model->number_of_external_workers ?? 1);
+            if ($quantity < 1) {
+                throw new InvalidArgumentException('Allocated external worker count must be at least 1.');
             }
+            $model->attributes['number_of_external_workers'] = $quantity;
 
             // 2. Validate required foreign keys
             if (!$model->tenant_id) {
@@ -57,55 +61,50 @@ class ExternalWorkerAllocation extends BaseModel
                 throw new InvalidArgumentException('Pay grade ID is required for external worker allocation.');
             }
 
-            // 3. Cross-tenant validation for Section, Shift, Pay Grade
-            $section = DB::table('production_work_center_sections')
-                ->where('id', $model->section_id)
-                ->first();
+            // 3. Section existence and tenant validation
+            $section = WorkCenterSection::withoutGlobalScopes()->find($model->section_id);
             if (!$section || (int) $section->tenant_id !== (int) $model->tenant_id) {
                 throw new InvalidArgumentException('Section does not exist or does not belong to the allocation tenant.');
             }
 
-            $shift = DB::table('production_shifts')
-                ->where('id', $model->shift_id)
-                ->first();
+            // 4. Shift existence and tenant validation
+            $shift = ProductionShift::withoutGlobalScopes()->find($model->shift_id);
             if (!$shift || (int) $shift->tenant_id !== (int) $model->tenant_id) {
                 throw new InvalidArgumentException('Shift does not exist or does not belong to the allocation tenant.');
             }
 
-            $payGrade = DB::table('production_external_worker_pay_grades')
-                ->where('id', $model->pay_grade_id)
-                ->first();
+            // 5. Pay Grade existence, tenant validation, and soft-delete check
+            $payGrade = ExternalWorkerPayGrade::withoutGlobalScopes()->find($model->pay_grade_id);
             if (!$payGrade || (int) $payGrade->tenant_id !== (int) $model->tenant_id) {
                 throw new InvalidArgumentException('Pay grade does not exist or does not belong to the allocation tenant.');
             }
 
-            // Soft-deleted pay grade check for new allocations or pay grade changes
             if ((!$model->exists || $model->isDirty('pay_grade_id')) && $payGrade->deleted_at !== null) {
                 throw new InvalidArgumentException("Cannot allocate to soft-deleted pay grade '{$payGrade->name}'.");
             }
 
-            // 4. Section–Shift association integrity in production_section_shifts
-            $secShift = DB::table('production_section_shifts')
-                ->where('section_id', $model->section_id)
-                ->where('shift_id', $model->shift_id)
-                ->first();
-
-            if (!$secShift) {
-                throw new InvalidArgumentException("Shift #{$model->shift_id} is not assigned to Section #{$model->section_id}. Allocation requires a configured Section–Shift assignment.");
+            // 6. Section–Shift membership: shift must be assigned to section in assigned_shifts
+            if (!$section->hasShift((int) $model->shift_id)) {
+                throw new InvalidArgumentException("Shift #{$model->shift_id} ('{$shift->name}') is not assigned to Section #{$model->section_id} ('{$section->name}'). Allocation requires a configured Section operating shift.");
             }
 
-            if ((int) $secShift->tenant_id !== (int) $model->tenant_id) {
-                throw new InvalidArgumentException('Cross-tenant Section–Shift assignment is prohibited.');
-            }
-
-            // If section_shift_id was supplied, verify it matches
-            if (!empty($model->section_shift_id)) {
-                if ((int) $model->section_shift_id !== (int) $secShift->id) {
-                    throw new InvalidArgumentException("Supplied section_shift_id #{$model->section_shift_id} does not match Section #{$model->section_id} and Shift #{$model->shift_id} (expected Section-Shift #{$secShift->id}).");
+            // 7. Active allocations validation across create, update, and activation
+            if ((bool) $model->active) {
+                if (!$section->isActive()) {
+                    throw new InvalidArgumentException("Cannot create or activate allocation because Section '{$section->name}' is inactive.");
                 }
-            } else {
-                // Resolve section_shift_id from exact matching pair
-                $model->section_shift_id = $secShift->id;
+
+                if (!$shift->isActive()) {
+                    throw new InvalidArgumentException("Cannot create or activate allocation because Shift '{$shift->name}' is inactive.");
+                }
+
+                if ($payGrade->deleted_at !== null) {
+                    throw new InvalidArgumentException("Cannot create or activate allocation because Pay Grade '{$payGrade->name}' is soft-deleted.");
+                }
+
+                if (!$payGrade->isActive()) {
+                    throw new InvalidArgumentException("Cannot create or activate allocation because Pay Grade '{$payGrade->name}' is inactive.");
+                }
             }
         });
     }
@@ -155,6 +154,16 @@ class ExternalWorkerAllocation extends BaseModel
         }
 
         return $this->workCenter()->first();
+    }
+
+    public function setNumberOfExternalWorkersAttribute($value): void
+    {
+        $this->attributes['number_of_external_workers'] = (int) $value;
+    }
+
+    public function getNumberOfExternalWorkersAttribute(): int
+    {
+        return (int) ($this->attributes['number_of_external_workers'] ?? 1);
     }
 
     // ─── Scopes & Helpers ─────────────────────────────────────────────────────

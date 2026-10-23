@@ -27,29 +27,13 @@ class WorkCenter extends BaseModel
         'work_center_type',  // A4: future FK when master table arrives
         'description',
         'location',
-        'capacity_per_hour',
-        'total_theoretical_capacity',
-        'labor_cost_per_hour',
-        'total_scheduled_labor_cost',
-        'unique_operating_hours',
-        'calculation_details',
-        'efficiency_percentage',
-        'cost_per_hour',
-        'overhead_rate',
+        'overhead_cost',
         'status',
         'production_calendar_id',
     ];
 
     protected $casts = [
-        'capacity_per_hour'          => 'decimal:4',
-        'total_theoretical_capacity' => 'decimal:4',
-        'labor_cost_per_hour'        => 'decimal:4',
-        'total_scheduled_labor_cost' => 'decimal:4',
-        'unique_operating_hours'     => 'decimal:4',
-        'calculation_details'        => 'array',
-        'efficiency_percentage'      => 'float',
-        'cost_per_hour'              => 'float',
-        'overhead_rate'              => 'float',
+        'overhead_cost' => 'decimal:4',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -104,47 +88,30 @@ class WorkCenter extends BaseModel
      */
     public function getEffectiveShifts(bool $onlyActive = true): \Illuminate\Support\Collection
     {
-        if ($this->relationLoaded('sections')) {
-            $sections = $this->sections;
-            if ($onlyActive) {
-                $sections = $sections->filter(fn($sec) => $sec->isActive());
-            }
-
-            $shifts = collect();
-            foreach ($sections as $section) {
-                $secShifts = $section->relationLoaded('shifts')
-                    ? $section->shifts
-                    : $section->shifts()->get();
-
-                if ($onlyActive) {
-                    $secShifts = $secShifts->filter(function ($shift) {
-                        $shiftActive = (bool) ($shift->active ?? true);
-                        $pivotActive = (bool) ($shift->pivot->active ?? true);
-                        return $shiftActive && $pivotActive;
-                    });
-                }
-
-                $shifts = $shifts->merge($secShifts);
-            }
-
-            return $shifts->unique('id')->values();
-        }
-
-        $query = ProductionShift::query()
-            ->join('production_section_shifts as pss', 'pss.shift_id', '=', 'production_shifts.id')
-            ->join('production_work_center_sections as pwcs', 'pwcs.id', '=', 'pss.section_id')
-            ->where('pwcs.work_center_id', $this->id)
-            ->whereNull('pwcs.deleted_at')
-            ->select('production_shifts.*')
-            ->distinct();
+        $sections = $this->relationLoaded('sections')
+            ? $this->sections
+            : $this->sections()->get();
 
         if ($onlyActive) {
-            $query->where('pwcs.status', WorkCenterSection::STATUS_ACTIVE)
-                ->where('pss.active', true)
-                ->where('production_shifts.active', true);
+            $sections = $sections->filter(fn($sec) => $sec->isActive());
         }
 
-        return $query->get();
+        $shifts = collect();
+        foreach ($sections as $section) {
+            $secShifts = $section->shifts;
+
+            if ($onlyActive) {
+                $secShifts = $secShifts->filter(function ($shift) {
+                    $shiftActive = (bool) ($shift->active ?? true);
+                    $pivotActive = (bool) ($shift->pivot->active ?? true);
+                    return $shiftActive && $pivotActive;
+                });
+            }
+
+            $shifts = $shifts->merge($secShifts);
+        }
+
+        return $shifts->unique('id')->values();
     }
 
     /**
@@ -168,6 +135,12 @@ class WorkCenter extends BaseModel
 
     public function employeeAssignments(): HasMany
     {
+        return $this->hasMany(WorkCenterEmployeeAssignment::class, 'work_center_id')
+            ->whereNull('production_work_center_employees.section_id');
+    }
+
+    public function allEmployeeAssignments(): HasMany
+    {
         return $this->hasMany(WorkCenterEmployeeAssignment::class, 'work_center_id');
     }
 
@@ -183,7 +156,7 @@ class WorkCenter extends BaseModel
             'production_work_center_employees',
             'work_center_id',
             'employee_id'
-        )->withPivot('id', 'active', 'tenant_id')->withTimestamps();
+        )->wherePivotNull('section_id')->withPivot('id', 'active', 'tenant_id')->withTimestamps();
     }
 
     // ─── Status Helpers ───────────────────────────────────────────────────────
@@ -222,39 +195,7 @@ class WorkCenter extends BaseModel
      */
     public function hasDeterminedEfficiency(): bool
     {
-        if ($this->efficiency_percentage === null) {
-            return false;
-        }
-
-        $sections = $this->relationLoaded('sections')
-            ? $this->sections
-            : $this->sections()->get();
-
-        if ($sections->isEmpty()) {
-            return false;
-        }
-
-        $hasRelevantData = $sections->contains(function ($section) {
-            $hasMachines = $section->relationLoaded('machines')
-                ? $section->machines->isNotEmpty()
-                : $section->machines()->exists();
-
-            $hasShifts = $section->relationLoaded('shifts')
-                ? $section->shifts->isNotEmpty()
-                : $section->shifts()->exists();
-
-            $hasAllocations = $section->relationLoaded('externalWorkerAllocations')
-                ? $section->externalWorkerAllocations->isNotEmpty()
-                : $section->externalWorkerAllocations()->exists();
-
-            return $hasMachines || $hasShifts || $hasAllocations || (bool) $section->supports_manual_production;
-        });
-
-        if (!$hasRelevantData) {
-            return false;
-        }
-
-        return true;
+        return false;
     }
 
     /**
@@ -263,20 +204,35 @@ class WorkCenter extends BaseModel
      */
     public function effectiveCapacityPerHour(): float
     {
-        if (!$this->hasDeterminedEfficiency() || $this->capacity_per_hour === null) {
-            return 0.0;
-        }
-
-        return (float) $this->capacity_per_hour * ((float) ($this->efficiency_percentage ?? 0) / 100);
+        return 0.0;
     }
 
     public function getCalculationDetails(): array
     {
-        if (is_array($this->calculation_details) && !empty($this->calculation_details)) {
-            return $this->calculation_details;
-        }
-
-        return app(\App\Domains\Production\Services\WorkCenterCalculationService::class)->calculate($this);
+        return [
+            'capacity' => [
+                'capacity_per_hour'          => 0.0,
+                'total_theoretical_capacity' => 0.0,
+                'unique_operating_hours'     => 0.0,
+                'capacity_unit'              => 'units/hr',
+                'sections'                   => [],
+                'windows'                    => [],
+                'timeline_windows'           => [],
+                'gaps'                       => [],
+            ],
+            'labor_cost' => [
+                'labor_cost_per_hour'         => 0.0,
+                'total_scheduled_labor_cost'  => 0.0,
+                'unique_operating_hours'      => 0.0,
+                'cost_unit'                   => 'currency/hr',
+                'has_missing_rates'           => false,
+                'has_overlapping_assignments' => false,
+                'assignments'                 => [],
+                'sections'                    => [],
+                'windows'                     => [],
+                'gaps'                        => [],
+            ],
+        ];
     }
 
     public function hasOverlappingAssignments(): bool

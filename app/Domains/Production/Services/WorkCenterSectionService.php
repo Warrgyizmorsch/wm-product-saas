@@ -3,7 +3,10 @@
 namespace App\Domains\Production\Services;
 
 use App\Domains\Production\DTO\WorkCenterSectionDTO;
+use App\Domains\Production\Models\ExternalWorkerAllocation;
+use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterEmployeeAssignment;
 use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Repositories\WorkCenterSectionRepositoryInterface;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +41,10 @@ class WorkCenterSectionService
 
         return DB::transaction(function () use ($dto, $tenantId, $workCenter) {
             $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
+            if (!array_key_exists('supports_manual_production', $data)) {
+                $data['supports_manual_production'] = false;
+                $data['manual_capacity_per_hour'] = null;
+            }
             $section = $this->repository->create($data);
             $this->repository->syncShifts($section, $dto->shift_ids, $tenantId);
 
@@ -46,7 +53,7 @@ class WorkCenterSectionService
                 $this->repository->syncMachines($section, $dto->machine_ids, $tenantId);
             }
 
-            $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
+            $fresh = $section->fresh(['workCenter', 'machines']);
             $calculated = $this->calculationService->calculateAndSave($fresh);
 
             if ($workCenter) {
@@ -92,7 +99,7 @@ class WorkCenterSectionService
                 $this->repository->syncMachines($updated, $dto->machine_ids, $section->tenant_id);
             }
 
-            $fresh = $updated->fresh(['workCenter', 'machines', 'shifts']);
+            $fresh = $updated->fresh(['workCenter', 'machines']);
             $calculated = $this->calculationService->calculateAndSave($fresh);
 
             if ($workCenter) {
@@ -105,12 +112,51 @@ class WorkCenterSectionService
 
     public function recalculate(WorkCenterSection $section): WorkCenterSection
     {
-        $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
+        $fresh = $section->fresh(['workCenter', 'machines']);
         $calculated = $this->calculationService->calculateAndSave($fresh);
         if ($fresh->workCenter) {
             app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
         }
         return $calculated;
+    }
+
+    public function updateManualProduction(int $id, bool $supportsManual, ?float $capacity): WorkCenterSection
+    {
+        $section = $this->repository->find($id);
+        if (!$section) {
+            throw new InvalidArgumentException('Work center section not found.');
+        }
+
+        if ($supportsManual) {
+            if (!$section->hasActiveWorkerAssignments()) {
+                throw new InvalidArgumentException(
+                    'Cannot enable manual production: Section has no active internal employees or external worker allocations.'
+                );
+            }
+            if ($capacity === null || $capacity <= 0) {
+                throw new InvalidArgumentException(
+                    'Manual capacity per hour must be greater than zero when manual production is enabled.'
+                );
+            }
+        } else {
+            $capacity = null;
+        }
+
+        return DB::transaction(function () use ($id, $supportsManual, $capacity, $section) {
+            $updated = $this->repository->update($id, [
+                'supports_manual_production' => $supportsManual,
+                'manual_capacity_per_hour'   => $capacity,
+            ]);
+
+            $fresh = $updated->fresh(['workCenter', 'machines']);
+            $calculated = $this->calculationService->calculateAndSave($fresh);
+
+            if ($fresh->workCenter) {
+                app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
+            }
+
+            return $calculated;
+        });
     }
 
     public function delete(int $id): bool
@@ -120,21 +166,34 @@ class WorkCenterSectionService
             throw new InvalidArgumentException('Work center section not found.');
         }
 
-        // Prevent deletion if section has assigned machines
-        if ($section->machines()->exists()) {
+        // Rule: Permanent block if section has recorded production or routing history
+        if ($section->hasProductionHistory()) {
             throw new InvalidArgumentException(
-                'Cannot delete a section that has assigned machines. Reassign or remove machines first.'
+                "Cannot delete Section '{$section->name}': This section has recorded production or routing history. Sections with manufacturing history cannot be deleted; deactivate the section instead."
             );
         }
 
         $workCenter = $section->workCenter;
 
-        return DB::transaction(function () use ($id, $workCenter) {
+        return DB::transaction(function () use ($id, $section, $workCenter) {
+            // 1. Unassign all machines so they return to the unassigned machine pool
+            Machine::where('section_id', $section->id)->update(['section_id' => null]);
+
+            // 2. Delete internal employee assignments for this section (soft delete)
+            WorkCenterEmployeeAssignment::where('section_id', $section->id)->delete();
+
+            // 3. Delete external worker allocations for this section (soft delete)
+            ExternalWorkerAllocation::where('section_id', $section->id)->delete();
+
+            // 4. Delete the section (soft delete)
             $deleted = $this->repository->delete($id);
+
+            // 5. Recalculate parent work center
             if ($deleted && $workCenter) {
                 app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
             }
-            return $deleted;
+
+            return (bool) $deleted;
         });
     }
 

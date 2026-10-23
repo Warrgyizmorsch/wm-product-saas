@@ -28,7 +28,7 @@ class UpdateWorkCenterRequest extends FormRequest
             'work_center_type'      => 'nullable|string|max:100',
             'description'           => 'nullable|string',
             'location'              => 'nullable|string|max:255',
-            'overhead_rate'         => 'nullable|numeric|min:0',
+            'overhead_cost'         => 'nullable|numeric|min:0',
             'status'                => 'required|in:active,inactive',
             'production_calendar_id' => [
                 'nullable', 'integer',

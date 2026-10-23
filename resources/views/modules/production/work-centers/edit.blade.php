@@ -58,7 +58,7 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost_rate') . ' (' . active_currency_symbol() . ')'" name="overhead_rate" inputType="number" step="0.01" :value="old('overhead_rate', number_format(convert_from_base($workCenter->overhead_rate ?? 0), 2, '.', ''))" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost') . ' (' . active_currency_symbol() . ')'" name="overhead_cost" inputType="number" step="0.01" :value="old('overhead_cost', number_format(convert_from_base($workCenter->overhead_cost ?? 0), 2, '.', ''))" />
                         
                         <x-ui.odoo-form-ui type="select" label="Production Calendar" name="production_calendar_id">
                             <option value="">-- Default Factory Calendar --</option>

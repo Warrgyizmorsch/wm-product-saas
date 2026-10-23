@@ -11,7 +11,7 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
     public function getAll(array $filters = []): Collection
     {
         $query = WorkCenterSection::query()
-            ->with(['workCenter', 'shifts'])
+            ->with(['workCenter'])
             ->withCount('machines');
 
         if (!empty($filters['work_center_id'])) {
@@ -36,7 +36,7 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
     public function paginateAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = WorkCenterSection::query()
-            ->with(['workCenter', 'shifts'])
+            ->with(['workCenter'])
             ->withCount('machines');
 
         if (!empty($filters['work_center_id'])) {
@@ -60,7 +60,7 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
 
     public function find(int $id): ?WorkCenterSection
     {
-        return WorkCenterSection::with(['workCenter', 'machines', 'shifts'])->find($id);
+        return WorkCenterSection::with(['workCenter', 'machines'])->find($id);
     }
 
     public function create(array $data): WorkCenterSection
@@ -72,7 +72,7 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
     {
         $section = WorkCenterSection::findOrFail($id);
         $section->update($data);
-        return $section->fresh(['workCenter', 'machines', 'shifts']);
+        return $section->fresh(['workCenter', 'machines']);
     }
 
     public function delete(int $id): bool
@@ -98,7 +98,6 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
     public function getByWorkCenter(int $workCenterId, bool $activeOnly = false): Collection
     {
         $query = WorkCenterSection::where('work_center_id', $workCenterId)
-            ->with(['shifts'])
             ->withCount('machines');
 
         if ($activeOnly) {
@@ -110,22 +109,9 @@ class WorkCenterSectionRepository implements WorkCenterSectionRepositoryInterfac
 
     public function syncShifts(WorkCenterSection $section, array $shiftIds, ?int $tenantId = null, array $shiftActive = []): void
     {
-        $tenantId = $tenantId ?? (int) $section->tenant_id;
-        $existingPivotActive = $section->shifts->pluck('pivot.active', 'id')->toArray();
-
-        $syncData = [];
-        foreach ($shiftIds as $shiftId) {
-            $active = isset($shiftActive[$shiftId])
-                ? (bool) $shiftActive[$shiftId]
-                : (bool) ($existingPivotActive[$shiftId] ?? true);
-
-            $syncData[$shiftId] = [
-                'tenant_id' => $tenantId,
-                'active'    => $active,
-            ];
-        }
-
-        $section->shifts()->sync($syncData);
+        $normalizedIds = array_values(array_unique(array_filter(array_map('intval', $shiftIds))));
+        $section->update(['assigned_shifts' => $normalizedIds]);
+        $section->unsetRelation('shifts');
     }
 
     public function syncMachines(WorkCenterSection $section, array $machineIds, int $tenantId): void

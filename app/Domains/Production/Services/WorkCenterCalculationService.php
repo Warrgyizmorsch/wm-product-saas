@@ -58,9 +58,7 @@ class WorkCenterCalculationService
             $capInfo = $sectionCalcService->calculateCapacity($section);
             $sectionCap = (float) ($capInfo['total_capacity'] ?? 0.0);
 
-            $shifts = $section->relationLoaded('shifts')
-                ? $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => ($s->active ?? true) && ($s->pivot->active ?? true))
-                : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->where('production_shifts.active', true)->where('production_section_shifts.active', true)->get();
+            $shifts = $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => (bool) ($s->active ?? true));
 
             $shiftIntervals = [];
             foreach ($shifts as $shift) {
@@ -304,9 +302,7 @@ class WorkCenterCalculationService
         $hasMissingRates = false;
 
         foreach ($sections as $section) {
-            $shifts = $section->relationLoaded('shifts')
-                ? $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => ($s->active ?? true) && ($s->pivot->active ?? true))
-                : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->where('production_shifts.active', true)->where('production_section_shifts.active', true)->get();
+            $shifts = $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => (bool) ($s->active ?? true));
 
             foreach ($shifts as $shift) {
                 $workersRequired = (int) ($shift->pivot->target_headcount ?? $shift->pivot->workers_required ?? 1);
@@ -534,22 +530,11 @@ class WorkCenterCalculationService
     }
 
     /**
-     * Calculate and persist Work Center metrics and calculation_details JSON snapshot.
+     * Calculate and persist Work Center metrics (safely bypassed during schema redesign).
      */
     public function calculateAndSave(WorkCenter $workCenter): WorkCenter
     {
-        $calc = $this->calculate($workCenter);
-
-        $workCenter->update([
-            'capacity_per_hour'          => $calc['capacity']['capacity_per_hour'],
-            'total_theoretical_capacity' => $calc['capacity']['total_theoretical_capacity'],
-            'labor_cost_per_hour'        => $calc['labor_cost']['labor_cost_per_hour'],
-            'total_scheduled_labor_cost' => $calc['labor_cost']['total_scheduled_labor_cost'],
-            'unique_operating_hours'     => $calc['capacity']['unique_operating_hours'] ?: $calc['labor_cost']['unique_operating_hours'],
-            'calculation_details'        => $calc,
-        ]);
-
-        return $workCenter->fresh(['sections.machines', 'sections.shifts']);
+        return $workCenter->fresh(['sections.machines']) ?: $workCenter;
     }
 
     private function parseTimeToMinutes(string $timeStr): int

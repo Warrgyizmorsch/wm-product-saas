@@ -30,6 +30,20 @@ class ExternalWorkerPayGrade extends BaseModel
     {
         parent::boot();
 
+        static::saving(function (self $model): void {
+            if ($model->exists && $model->isDirty('active') && !$model->active) {
+                $hasActive = DB::table('production_external_worker_allocations')
+                    ->where('pay_grade_id', $model->id)
+                    ->where('active', 1)
+                    ->whereNull('deleted_at')
+                    ->exists();
+
+                if ($hasActive) {
+                    throw new InvalidArgumentException("Cannot deactivate pay grade '{$model->name}' because it has active external worker allocations. Deactivate all referencing allocations before deactivating.");
+                }
+            }
+        });
+
         static::deleting(function (self $model): void {
             $hasActive = DB::table('production_external_worker_allocations')
                 ->where('pay_grade_id', $model->id)

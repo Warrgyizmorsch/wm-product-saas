@@ -34,7 +34,7 @@ class StoreExternalWorkerAllocationRequest extends FormRequest
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at'),
             ],
-            'headcount' => [
+            'number_of_external_workers' => [
                 'required',
                 'integer',
                 'min:1',
@@ -53,7 +53,8 @@ class StoreExternalWorkerAllocationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'headcount.min' => 'Allocated headcount must be at least 1.',
+            'number_of_external_workers.required' => 'Number of external workers is required.',
+            'number_of_external_workers.min'      => 'Number of external workers must be at least 1.',
         ];
     }
 }

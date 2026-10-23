@@ -13,12 +13,12 @@ use InvalidArgumentException;
 class ExternalWorkerAllocationService
 {
     /**
-     * Allocate an external worker headcount for a Section, Shift, and Pay Grade.
+     * Allocate an external worker quantity for a Section, Shift, and Pay Grade.
      *
      * @param int $sectionId
      * @param int $shiftId
      * @param int $payGradeId
-     * @param int $headcount
+     * @param int $numberOfExternalWorkers
      * @param int $tenantId
      * @param bool $active
      * @param bool $updateIfExists
@@ -28,13 +28,13 @@ class ExternalWorkerAllocationService
         int $sectionId,
         int $shiftId,
         int $payGradeId,
-        int $headcount,
+        int $numberOfExternalWorkers,
         int $tenantId,
         bool $active = true,
         bool $updateIfExists = false
     ): ExternalWorkerAllocation {
-        if ($headcount < 1) {
-            throw new InvalidArgumentException('Allocated headcount must be at least 1.');
+        if ($numberOfExternalWorkers < 1) {
+            throw new InvalidArgumentException('Allocated external worker count must be at least 1.');
         }
 
         // 1. Validate Section and tenant ownership
@@ -68,22 +68,16 @@ class ExternalWorkerAllocationService
             throw new InvalidArgumentException("Cannot allocate to soft-deleted pay grade '{$payGrade->name}'.");
         }
 
-        // 4. Validate Section–Shift relationship in production_section_shifts
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $tenantId)
-            ->where('section_id', $sectionId)
-            ->where('shift_id', $shiftId)
-            ->first();
-
-        if (!$sectionShift) {
+        // 4. Validate Section–Shift relationship via assigned_shifts JSON
+        if (!$section->hasShift($shiftId)) {
             throw new InvalidArgumentException(
-                "Shift '{$shift->name}' is not assigned to Section '{$section->name}'. Allocation requires an existing Section–Shift assignment."
+                "Shift '{$shift->name}' is not assigned to Section '{$section->name}'. Allocation requires an existing Section operating shift."
             );
         }
 
-        // 5. If allocating as active, all 4 related records must be active
+        // 5. If allocating as active, all related records must be active
         if ($active) {
-            $this->validateActivePrerequisites($section, $shift, $sectionShift, $payGrade);
+            $this->validateActivePrerequisites($section, $shift, $payGrade);
         }
 
         // 6. Uniqueness validation: logical grouping (Section, Shift, Pay Grade)
@@ -97,9 +91,8 @@ class ExternalWorkerAllocationService
         if ($existing) {
             if ($updateIfExists) {
                 $existing->update([
-                    'headcount'        => $headcount,
-                    'active'           => $active,
-                    'section_shift_id' => $sectionShift->id,
+                    'number_of_external_workers' => $numberOfExternalWorkers,
+                    'active'                     => $active,
                 ]);
                 return $existing->fresh(['section', 'shift', 'payGrade']);
             }
@@ -110,23 +103,22 @@ class ExternalWorkerAllocationService
         }
 
         return ExternalWorkerAllocation::create([
-            'tenant_id'        => $tenantId,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $sectionId,
-            'shift_id'         => $shiftId,
-            'pay_grade_id'     => $payGradeId,
-            'headcount'        => $headcount,
-            'active'           => $active,
+            'tenant_id'                  => $tenantId,
+            'section_id'                 => $sectionId,
+            'shift_id'                   => $shiftId,
+            'pay_grade_id'               => $payGradeId,
+            'number_of_external_workers' => $numberOfExternalWorkers,
+            'active'                     => $active,
         ]);
     }
 
     /**
-     * Update the allocated headcount for an existing allocation.
+     * Update the allocated quantity of external workers.
      */
-    public function updateHeadcount(int $id, int $headcount, int $tenantId): ExternalWorkerAllocation
+    public function updateQuantity(int $id, int $quantity, int $tenantId): ExternalWorkerAllocation
     {
-        if ($headcount < 1) {
-            throw new InvalidArgumentException('Allocated headcount must be at least 1.');
+        if ($quantity < 1) {
+            throw new InvalidArgumentException('Allocated external worker count must be at least 1.');
         }
 
         $allocation = ExternalWorkerAllocation::withoutGlobalScopes()
@@ -137,7 +129,23 @@ class ExternalWorkerAllocationService
             throw new InvalidArgumentException("External worker allocation #{$id} not found for this tenant.");
         }
 
-        $allocation->update(['headcount' => $headcount]);
+        if ($allocation->active) {
+            $section = WorkCenterSection::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find($allocation->section_id);
+            $shift = ProductionShift::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find($allocation->shift_id);
+            $payGrade = ExternalWorkerPayGrade::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->find($allocation->pay_grade_id);
+
+            if ($section && $shift && $payGrade) {
+                $this->validateActivePrerequisites($section, $shift, $payGrade);
+            }
+        }
+
+        $allocation->update(['number_of_external_workers' => $quantity]);
 
         return $allocation->fresh(['section', 'shift', 'payGrade']);
     }
@@ -170,15 +178,6 @@ class ExternalWorkerAllocationService
                 throw new InvalidArgumentException("Shift #{$allocation->shift_id} does not exist or does not belong to this tenant.");
             }
 
-            $sectionShift = DB::table('production_section_shifts')
-                ->where('tenant_id', $tenantId)
-                ->where('section_id', $allocation->section_id)
-                ->where('shift_id', $allocation->shift_id)
-                ->first();
-            if (!$sectionShift) {
-                throw new InvalidArgumentException("Shift #{$allocation->shift_id} is not assigned to Section #{$allocation->section_id}.");
-            }
-
             $payGrade = ExternalWorkerPayGrade::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->find($allocation->pay_grade_id);
@@ -186,7 +185,7 @@ class ExternalWorkerAllocationService
                 throw new InvalidArgumentException("Pay grade #{$allocation->pay_grade_id} does not exist or does not belong to this tenant.");
             }
 
-            $this->validateActivePrerequisites($section, $shift, $sectionShift, $payGrade);
+            $this->validateActivePrerequisites($section, $shift, $payGrade);
         }
 
         $allocation->update(['active' => $active]);
@@ -195,12 +194,11 @@ class ExternalWorkerAllocationService
     }
 
     /**
-     * Validate that Section, Shift, Section–Shift assignment, and Pay Grade are active.
+     * Validate that Section, Shift, Section operating shift assignment, and Pay Grade are active.
      */
     private function validateActivePrerequisites(
         WorkCenterSection $section,
         ProductionShift $shift,
-        object $sectionShift,
         ExternalWorkerPayGrade $payGrade
     ): void {
         if (!$section->isActive()) {
@@ -211,8 +209,8 @@ class ExternalWorkerAllocationService
             throw new InvalidArgumentException("Cannot create or activate allocation because Shift '{$shift->name}' is inactive.");
         }
 
-        if (!(bool) $sectionShift->active) {
-            throw new InvalidArgumentException("Cannot create or activate allocation because Section–Shift assignment for Section '{$section->name}' and Shift '{$shift->name}' is inactive.");
+        if (!$section->hasShift($shift->id)) {
+            throw new InvalidArgumentException("Cannot create or activate allocation because Shift '{$shift->name}' is not assigned to Section '{$section->name}'.");
         }
 
         if ($payGrade->deleted_at !== null) {
@@ -280,15 +278,15 @@ class ExternalWorkerAllocationService
     }
 
     /**
-     * Calculate total external worker headcount for a Section–Shift combination.
+     * Calculate total external workers for a Section–Shift combination.
      */
-    public function getTotalHeadcountForSectionShift(int $sectionId, int $shiftId, int $tenantId): int
+    public function getTotalWorkersForSectionShift(int $sectionId, int $shiftId, int $tenantId): int
     {
         return (int) ExternalWorkerAllocation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('section_id', $sectionId)
             ->where('shift_id', $shiftId)
             ->where('active', true)
-            ->sum('headcount');
+            ->sum('number_of_external_workers');
     }
 }

@@ -2225,7 +2225,7 @@ return array (
   'workers' => 'workers',
   'shift_worker_count' => 'Workers',
   'section_operating_hours_assumption_title' => 'Operating Hours Assumption',
-  'section_operating_hours_assumption_body' => 'All machines and enabled manual-production operations assigned to the Section are assumed to run throughout all shifts assigned to that Section. If a resource should not operate during all those shifts, consider creating a separate Section.',
+  'section_operating_hours_assumption_body' => 'All machines assigned to the Section are assumed to run throughout all shifts assigned to that Section. If a resource should not operate during all those shifts, consider creating a separate Section.',
   'capacity_per_hour' => 'Capacity / Hr',
   'labor_cost_per_hour' => 'Labor Cost / Hr',
   'view_calculation_breakdown' => 'View Calculation Breakdown',
@@ -2282,8 +2282,7 @@ return array (
   'active_allocations' => 'Active Allocations',
   'total_allocations' => 'Total Allocations',
   'external_workers' => 'External Workers',
-  'target_headcount' => 'Target Headcount',
-  'external_worker_headcount' => 'External Worker Headcount',
+  'number_of_external_workers' => 'Number of External Workers',
   'allocate_external_worker' => 'Allocate External Worker',
 );
 

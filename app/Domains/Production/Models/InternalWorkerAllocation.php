@@ -112,4 +112,9 @@ class InternalWorkerAllocation extends BaseModel
     {
         return (bool) $this->active;
     }
+
+    public function getNumberOfInternalWorkersAttribute(): int
+    {
+        return (int) ($this->attributes['headcount'] ?? 1);
+    }
 }

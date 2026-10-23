@@ -54,8 +54,8 @@ class WorkCenterController extends Controller
             $tenantId = require_tenant_id();
             $data = $request->validated();
             unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
-            if (isset($data['overhead_rate'])) {
-                $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
+            if (isset($data['overhead_cost'])) {
+                $data['overhead_cost'] = convert_to_base($data['overhead_cost']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->create($dto, $tenantId);
@@ -95,7 +95,7 @@ class WorkCenterController extends Controller
             ->get();
 
         $availableEmployees = class_exists(\App\Domains\HRMS\Models\Employee::class)
-            ? \App\Domains\HRMS\Models\Employee::with(['designation', 'department'])
+            ? \App\Domains\HRMS\Models\Employee::with(['designation', 'department', 'shift'])
                 ->where('tenant_id', $tenantId)
                 ->orderBy('full_name')
                 ->get()
@@ -108,13 +108,21 @@ class WorkCenterController extends Controller
             ->get()
             ->keyBy('employee_id');
 
+        $employeesWithActiveWorkCenter = \App\Domains\Production\Models\WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+            ->whereNull('section_id')
+            ->where('active', true)
+            ->with('workCenter')
+            ->get()
+            ->groupBy('employee_id');
+
         return view('modules.production.work-centers.show', compact(
             'workCenter',
             'eligibleMachines',
             'availableShifts',
             'activePayGrades',
             'availableEmployees',
-            'employeesWithActiveSection'
+            'employeesWithActiveSection',
+            'employeesWithActiveWorkCenter'
         ));
     }
 
@@ -142,8 +150,8 @@ class WorkCenterController extends Controller
             $tenantId = require_tenant_id();
             $data = $request->validated();
             unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
-            if (isset($data['overhead_rate'])) {
-                $data['overhead_rate'] = convert_to_base($data['overhead_rate']);
+            if (isset($data['overhead_cost'])) {
+                $data['overhead_cost'] = convert_to_base($data['overhead_cost']);
             }
             $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->update($id, $dto);

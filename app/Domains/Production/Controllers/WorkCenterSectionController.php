@@ -141,6 +141,63 @@ class WorkCenterSectionController extends Controller
         }
     }
 
+    public function updateManualProduction(Request $request, int $id): RedirectResponse|JsonResponse
+    {
+        $section = $this->repository->find($id);
+        abort_if(!$section, 404, 'Section not found.');
+
+        Gate::authorize('update', $section);
+
+        $supportsManual = filter_var($request->input('supports_manual_production'), FILTER_VALIDATE_BOOLEAN);
+
+        if ($supportsManual) {
+            if (!$section->hasActiveWorkerAssignments()) {
+                $errorMsg = 'Cannot enable manual production: Section has no active internal employees or external worker allocations. Please assign workers to this section first.';
+                if ($request->wantsJson()) {
+                    return response()->json(['error' => $errorMsg], 422);
+                }
+                return redirect()->back()->withInput()->with('error', $errorMsg);
+            }
+
+            $request->validate([
+                'manual_capacity_per_hour' => 'required|numeric|gt:0|max:99999999.9999',
+            ], [
+                'manual_capacity_per_hour.required' => 'Manual capacity per hour is required when manual production is enabled.',
+                'manual_capacity_per_hour.numeric'  => 'Manual capacity per hour must be a valid number.',
+                'manual_capacity_per_hour.gt'       => 'Manual capacity per hour must be greater than zero.',
+            ]);
+
+            $manualCapacity = (float) $request->input('manual_capacity_per_hour');
+        } else {
+            $manualCapacity = null;
+        }
+
+        try {
+            $updated = $this->service->updateManualProduction($id, $supportsManual, $manualCapacity);
+
+            $message = $supportsManual
+                ? "Manual production enabled for section '{$section->name}' at {$manualCapacity} units/hr."
+                : "Manual production disabled for section '{$section->name}'.";
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'data'    => $updated,
+                ]);
+            }
+
+            return redirect()
+                ->route('production.work-centers.show', $section->work_center_id)
+                ->with('success', $message);
+        } catch (\Exception $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+
     public function destroy(int $id): RedirectResponse|JsonResponse
     {
         $section = $this->repository->find($id);

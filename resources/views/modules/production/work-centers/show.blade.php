@@ -111,8 +111,31 @@
             background: transparent;
             font-weight: bold;
         }
-        .modal .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice .select2-selection__choice__remove:hover {
-            color: #ef4444;
+        .modal .select2-container--bootstrap-5 .select2-selection--single {
+            min-height: 38px;
+            height: 38px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 4px 10px;
+            background-color: #fff;
+            display: flex;
+            align-items: center;
+        }
+        .modal .select2-container--bootstrap-5.select2-container--focus .select2-selection--single,
+        .modal .select2-container--bootstrap-5.select2-container--open .select2-selection--single {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            padding-left: 0;
+            color: #1e293b;
+            font-size: 12px;
+            line-height: normal;
+        }
+        .modal .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+            top: 50%;
+            transform: translateY(-50%);
+            right: 8px;
         }
         .modal .select2-container--bootstrap-5 .select2-dropdown {
             z-index: 1065 !important;
@@ -134,11 +157,6 @@
             color: #64748b !important;
         }
     </style>
-@endpush
-
-@push('scripts')
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
 
 @section('content')
@@ -205,33 +223,20 @@
                             </button>
                         </div>
                         <span class="fs-22 fw-bold text-dark font-monospace">
-                            @if($workCenter->capacity_per_hour !== null && (float) $workCenter->capacity_per_hour > 0)
-                                {{ number_format((float) $workCenter->capacity_per_hour, 2) . ' ' . __('production.units_hr') }}
-                            @else
-                                0
-                            @endif
+                            0
                         </span>
-                        @if($workCenter->total_theoretical_capacity !== null)
-                            <small class="text-muted fs-11 d-block mt-0.5">
-                                {{ __('production.total_theoretical_capacity') }}: {{ number_format((float) $workCenter->total_theoretical_capacity, 2) }} units ({{ number_format((float) ($workCenter->unique_operating_hours ?? 0), 2) }} h)
-                            </small>
-                        @endif
                     </div>
                     <div>
                         <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.operational_efficiency') }}</span>
-                        @if(!$workCenter->hasDeterminedEfficiency())
-                            <span class="fs-16 fw-semibold text-muted">Cannot be determined</span>
-                        @else
-                            <span class="fs-22 fw-bold text-dark">{{ number_format($workCenter->efficiency_percentage, 0) }}%</span>
-                            <div class="progress progress-xs mt-2" style="height: 6px;">
-                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $workCenter->efficiency_percentage }}%;" aria-valuenow="{{ $workCenter->efficiency_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
-                            </div>
-                        @endif
+                        <span class="fs-22 fw-bold text-dark">0%</span>
+                        <div class="progress progress-xs mt-2" style="height: 6px;">
+                            <div class="progress-bar bg-primary" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
                     </div>
                     <div>
                         <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.effective_capacity') }}</span>
                         <span class="fs-18 fw-bold text-success">
-                            {{ $workCenter->hasDeterminedEfficiency() && $workCenter->capacity_per_hour !== null && (float) $workCenter->capacity_per_hour > 0 ? number_format($workCenter->effectiveCapacityPerHour(), 2) . ' ' . __('production.units_hr') : '0' }}
+                            0
                         </span>
                     </div>
                     <div class="border-top pt-3">
@@ -251,8 +256,8 @@
             <div class="col-md-4">
                 <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_cost_structure') }}</h5>
                 @php
-                    $laborCost = (float) ($workCenter->labor_cost_per_hour ?? 0);
-                    $overheadCost = (float) ($workCenter->overhead_rate ?? 0);
+                    $laborCost = 0.0;
+                    $overheadCost = (float) ($workCenter->overhead_cost ?? 0);
                     $totalStationCost = $laborCost + $overheadCost;
                 @endphp
                 <div class="d-flex flex-column gap-3 py-1 px-1">
@@ -282,7 +287,7 @@
                     <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center">
                         <div>
                             <span class="text-dark fw-bold fs-12 text-uppercase d-block">Total Station Cost</span>
-                            <small class="text-muted fs-11">Combined Labor + Overhead rate</small>
+                            <small class="text-muted fs-11">Combined Labor + Overhead cost</small>
                         </div>
                         <span class="fs-20 fw-bolder text-primary font-monospace">{{ format_currency($totalStationCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
                     </div>
@@ -291,7 +296,7 @@
                         <h6 class="fw-bold text-dark mb-1 fs-12">{{ __('production.wc_cost_guide') }}</h6>
                         <ul class="fs-11 text-muted ps-3 mb-0">
                             <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => format_currency($laborCost)]) }}</li>
-                            <li class="mb-1">Overhead Rate = <span class="fw-semibold text-dark">{{ format_currency($overheadCost) }}</span> / hr</li>
+                            <li class="mb-1">Overhead Cost = <span class="fw-semibold text-dark">{{ format_currency($overheadCost) }}</span> / hr</li>
                             <li>{{ __('production.wc_cost_guide_text_2') }}</li>
                         </ul>
                     </div>
@@ -383,9 +388,9 @@
                         @forelse ($workCenter->sections as $section)
                             @php
                                 $calc = $section->getCalculationDetails();
-                                $capPerHour = (float) ($section->capacity_per_hour ?? $calc['capacity']['capacity_per_hour'] ?? 0);
+                                $capPerHour = (float) ($calc['capacity']['capacity_per_hour'] ?? 0);
                                 $capUnit = $calc['capacity']['capacity_unit'] ?? __('production.units_per_hour');
-                                $laborCost = (float) ($section->labor_cost_per_hour ?? $calc['labor_cost']['labor_cost_per_hour'] ?? 0);
+                                $laborCost = (float) ($calc['labor_cost']['labor_cost_per_hour'] ?? 0);
                                 $hasOverlaps = (bool) ($calc['labor_cost']['has_overlapping_shifts'] ?? false);
                             @endphp
                             <tr>
@@ -404,15 +409,38 @@
                                     @if($section->description)
                                         <small class="text-muted fs-11 text-truncate d-block" style="max-width: 250px;">{{ $section->description }}</small>
                                     @endif
+                                    <div class="mt-1 d-flex align-items-center gap-1.5 flex-wrap">
+                                        <button type="button" 
+                                                class="btn btn-xs btn-outline-info rounded-pill px-2 py-0.5 fw-semibold d-inline-flex align-items-center gap-1"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#sectionEmployeesModal_{{ $section->id }}"
+                                                title="Assign / View Internal Employees for this Section">
+                                            <i class="feather-user-check fs-10"></i>
+                                            <span>Internal Employees</span>
+                                            @php
+                                                $activeSecEmpCount = $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->count() : 0;
+                                            @endphp
+                                            <span class="badge bg-soft-info text-info rounded-pill px-1.5 py-0 fs-10 ms-0.5 font-monospace">{{ $activeSecEmpCount }}</span>
+                                        </button>
+
+                                        <button type="button" 
+                                                class="btn btn-xs {{ $section->supports_manual_production ? 'btn-soft-warning text-warning border border-warning-subtle' : 'btn-outline-secondary' }} rounded-pill px-2 py-0.5 fw-semibold d-inline-flex align-items-center gap-1"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#sectionManualProductionModal_{{ $section->id }}"
+                                                title="Configure Manual Production for this Section">
+                                            <i class="feather-tool fs-10"></i>
+                                            <span>Manual Production</span>
+                                            @if($section->supports_manual_production)
+                                                <span class="badge bg-warning text-white rounded-pill px-1.5 py-0 fs-10 ms-0.5 font-monospace">{{ number_format((float) $section->manual_capacity_per_hour, 1) }}/hr</span>
+                                            @endif
+                                        </button>
+                                    </div>
                                 </td>
                                 <td class="align-middle">
                                     @forelse ($section->shifts as $shift)
                                         @php
-                                            $intAllocations = $section->internalWorkerAllocations ? $section->internalWorkerAllocations->where('shift_id', $shift->id) : collect();
-                                            $activeIntCount = (int) $intAllocations->where('active', true)->sum('headcount');
                                             $extAllocations = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('shift_id', $shift->id) : collect();
-                                            $activeExtCount = (int) $extAllocations->where('active', true)->sum('headcount');
-                                            $totalStaff = $activeIntCount + $activeExtCount;
+                                            $activeExtCount = (int) $extAllocations->where('active', true)->sum('number_of_external_workers');
                                         @endphp
                                         <div class="d-inline-flex flex-column gap-1 p-2 border rounded bg-white mb-1.5 me-1.5 fs-11 shadow-xs">
                                             <div class="d-flex align-items-center justify-content-between gap-2">
@@ -423,21 +451,16 @@
                                             </div>
                                             <div class="d-flex align-items-center gap-1.5 flex-wrap mt-0.5">
                                                 <button type="button" 
-                                                        class="btn btn-xs {{ $totalStaff > 0 ? 'btn-soft-primary text-primary' : 'btn-outline-secondary' }} rounded-pill px-2.5 py-0.5 fw-semibold d-inline-flex align-items-center gap-1" 
+                                                        class="btn btn-xs {{ $activeExtCount > 0 ? 'btn-soft-primary text-primary' : 'btn-outline-secondary' }} rounded-pill px-2.5 py-0.5 fw-semibold d-inline-flex align-items-center gap-1" 
                                                         data-bs-toggle="modal" 
                                                         data-bs-target="#sectionShiftWorkersModal_{{ $section->id }}_{{ $shift->id }}"
-                                                        title="{{ __('production.assign_workers') }}">
+                                                        title="Allocate External Workers for this shift">
                                                     <i class="feather-users fs-10"></i>
-                                                    <span>{{ __('production.assign_workers') }}</span>
-                                                    @if($totalStaff > 0)
-                                                        <span class="badge bg-primary text-white rounded-pill px-1.5 py-0 fs-10 ms-0.5" title="Internal: {{ $activeIntCount }}, External: {{ $activeExtCount }}">{{ $totalStaff }}</span>
+                                                    <span>External Workers</span>
+                                                    @if($activeExtCount > 0)
+                                                        <span class="badge bg-primary text-white rounded-pill px-1.5 py-0 fs-10 ms-0.5" title="{{ $activeExtCount }} External Workers">{{ $activeExtCount }}</span>
                                                     @endif
                                                 </button>
-                                                @if($totalStaff > 0)
-                                                    <span class="text-muted fs-10 font-monospace">
-                                                        (Int: {{ $activeIntCount }}, Ext: {{ $activeExtCount }})
-                                                    </span>
-                                                @endif
                                             </div>
                                         </div>
                                     @empty
@@ -525,7 +548,24 @@
                                                 <i class="feather-bar-chart-2 me-2 text-primary fs-12"></i>{{ __('production.view_calculation_breakdown') }}
                                             </button>
                                         </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#sectionEmployeesModal_{{ $section->id }}">
+                                                <i class="feather-user-check me-2 text-info fs-12"></i>{{ __('production.assign_internal_employees') }}
+                                            </button>
+                                        </li>
+                                        @can('create', App\Domains\Production\Models\ExternalWorkerAllocation::class)
+                                            <li>
+                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#sectionExternalWorkerModal_{{ $section->id }}">
+                                                    <i class="feather-user-plus me-2 text-primary fs-12"></i>Allocate External Workers
+                                                </button>
+                                            </li>
+                                        @endcan
                                         @can('update', $section)
+                                            <li>
+                                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#sectionManualProductionModal_{{ $section->id }}">
+                                                    <i class="feather-tool me-2 text-warning fs-12"></i>{{ __('production.manual_production') }}
+                                                </button>
+                                            </li>
                                             <li>
                                                 <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editSectionModal_{{ $section->id }}">
                                                     <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_section') }}
@@ -535,11 +575,19 @@
 
                                         @can('delete', $section)
                                             <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal_{{ $section->id }}">
-                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_section') }}
-                                                </button>
-                                            </li>
+                                            @if($section->hasProductionHistory())
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-muted fst-italic" disabled title="Cannot delete section: This section is linked to recorded production history. Deactivate the section instead.">
+                                                        <i class="feather-lock me-2 text-muted fs-12"></i>{{ __('production.delete_section') }} <span class="badge bg-soft-secondary text-secondary ms-1 fs-10">Locked</span>
+                                                    </button>
+                                                </li>
+                                            @else
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteSectionModal_{{ $section->id }}">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete_section') }}
+                                                    </button>
+                                                </li>
+                                            @endif
                                         @endcan
                                     </x-ui.action-dropdown>
                                 </td>
@@ -565,19 +613,19 @@
     @can('create', App\Domains\Production\Models\WorkCenterSection::class)
         <div class="modal fade" id="createSectionModal" tabindex="-1" aria-labelledby="createSectionModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content border-0 shadow-lg rounded-3">
+                <form method="POST" action="{{ route('production.work-center-sections.store') }}" class="modal-content border-0 shadow-lg rounded-3">
+                    @csrf
+                    <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
+                    <input type="hidden" name="_modal" value="createSectionModal">
+
                     <div class="modal-header border-bottom py-3">
                         <h5 class="modal-title fw-bold text-dark fs-15" id="createSectionModalLabel">
                             <i class="feather-plus-circle text-primary me-2"></i>{{ __('production.create_section') }} &mdash; {{ $workCenter->name }}
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <form method="POST" action="{{ route('production.work-center-sections.store') }}">
-                        @csrf
-                        <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
-                        <input type="hidden" name="_modal" value="createSectionModal">
 
-                        <div class="modal-body p-4">
+                    <div class="modal-body p-4">
                             <div class="alert alert-soft-warning border-warning d-flex align-items-start gap-2 mb-3 py-2 px-3 fs-11">
                                 <i class="feather-alert-triangle text-warning fs-14 mt-0.5 flex-shrink-0"></i>
                                 <div>
@@ -618,45 +666,6 @@
                                     @endif
                                 </div>
 
-                                <!-- Manual Production -->
-                                <div class="col-12">
-                                    <div class="p-3 border rounded bg-light">
-                                        <div class="form-check form-switch mb-0">
-                                            <input type="hidden" name="supports_manual_production" value="0">
-                                            <input class="form-check-input manual-production-toggle" type="checkbox" name="supports_manual_production" value="1" 
-                                                   id="create_supports_manual_production" 
-                                                   data-target="#create_manual_capacity_container"
-                                                   @checked(old('_modal') === 'createSectionModal' && (bool) old('supports_manual_production'))>
-                                            <label class="form-check-label fw-bold text-dark fs-12" for="create_supports_manual_production">
-                                                 {{ __('production.manual_production') }}
-                                            </label>
-                                            <div class="form-text fs-11 text-muted">{{ __('production.manual_production_desc') }}</div>
-                                        </div>
-
-                                        <div id="create_manual_capacity_container" class="mt-3 pt-3 border-top @if(!(old('_modal') === 'createSectionModal' && (bool) old('supports_manual_production'))) d-none @endif">
-                                            <div class="row align-items-center">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold fs-12 text-dark" for="create_manual_capacity_per_hour">
-                                                        {{ __('production.manual_capacity_per_hour') }} <span class="text-danger">*</span>
-                                                    </label>
-                                                    <div class="input-group">
-                                                        <input type="number" step="any" min="0.0001" name="manual_capacity_per_hour" id="create_manual_capacity_per_hour" 
-                                                               class="form-control fs-12 manual-capacity-input" 
-                                                               placeholder="e.g. 10.00"
-                                                               value="{{ old('_modal') === 'createSectionModal' ? old('manual_capacity_per_hour') : '' }}"
-                                                               @if(!(old('_modal') === 'createSectionModal' && (bool) old('supports_manual_production'))) disabled @endif>
-                                                        <span class="input-group-text fs-11 text-muted bg-white">{{ __('production.units_per_hour') }}</span>
-                                                    </div>
-                                                    <div class="form-text fs-11 text-muted">{{ __('production.manual_capacity_hint') }}</div>
-                                                    @if(old('_modal') === 'createSectionModal' && $errors->has('manual_capacity_per_hour'))
-                                                        <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('manual_capacity_per_hour') }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
                                 <div class="col-12">
                                     @php
                                         $shiftsPool = $availableShifts ?? \App\Domains\Production\Models\ProductionShift::where('tenant_id', $workCenter->tenant_id)->where('active', true)->orderBy('name')->get();
@@ -683,14 +692,18 @@
                                         <div class="p-2.5 mb-3 bg-light border rounded d-none shift-picker-panel">
                                             <div class="row g-2 align-items-center">
                                                 <div class="col-sm-8">
-                                                    <select class="form-select form-select-sm shift-picker-select">
+                                                    <select class="form-select form-select-sm shift-picker-select" data-select2-selector="default" style="width: 100%;">
                                                         <option value="">-- {{ __('production.add_shift') }} --</option>
                                                         @foreach($shiftsPool as $sh)
+                                                            @php
+                                                                $timeRange = substr($sh->start_time, 0, 5) . '–' . substr($sh->end_time, 0, 5);
+                                                                $hasTime = str_contains($sh->name, substr($sh->start_time, 0, 5));
+                                                            @endphp
                                                             <option value="{{ $sh->id }}" 
                                                                     data-name="{{ $sh->name }}" 
                                                                     data-code="{{ $sh->code }}" 
-                                                                    data-time="{{ substr($sh->start_time, 0, 5) }}–{{ substr($sh->end_time, 0, 5) }}">
-                                                                {{ $sh->code }} &mdash; {{ $sh->name }} ({{ substr($sh->start_time, 0, 5) }}–{{ substr($sh->end_time, 0, 5) }})
+                                                                    data-time="{{ $timeRange }}">
+                                                                {{ $sh->code }} &mdash; {{ $sh->name }}@if(!$hasTime) ({{ $timeRange }})@endif
                                                             </option>
                                                         @endforeach
                                                     </select>
@@ -751,7 +764,7 @@
                                     @endphp
 
                                     @if($eligibleMachines->count() > 0)
-                                        <select name="machine_ids[]" id="create_section_machine_ids" class="form-select section-machine-select" multiple="multiple" data-placeholder="{{ __('production.select_machines') }}">
+                                        <select name="machine_ids[]" id="create_section_machine_ids" class="form-select section-machine-select" multiple="multiple" data-select2-selector="default" data-placeholder="{{ __('production.select_machines') }}" style="width: 100%;">
                                             @foreach($eligibleMachines as $m)
                                                 <option value="{{ $m->id }}" @selected(in_array($m->id, $selectedMachines))>
                                                     [{{ $m->code }}] {{ $m->name }}
@@ -789,28 +802,27 @@
                     </form>
                 </div>
             </div>
-        </div>
-    @endcan
+        @endcan
 
     <!-- Edit and Delete Modals for Each Section -->
     @foreach($workCenter->sections as $section)
         @can('update', $section)
             <div class="modal fade" id="editSectionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="editSectionModalLabel_{{ $section->id }}" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-lg">
-                    <div class="modal-content border-0 shadow-lg rounded-3">
+                    <form method="POST" action="{{ route('production.work-center-sections.update', $section->id) }}" class="modal-content border-0 shadow-lg rounded-3">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
+                        <input type="hidden" name="_modal" value="editSectionModal_{{ $section->id }}">
+
                         <div class="modal-header border-bottom py-3">
                             <h5 class="modal-title fw-bold text-dark fs-15" id="editSectionModalLabel_{{ $section->id }}">
                                 <i class="feather-edit text-primary me-2"></i>{{ __('production.edit_section') }} &mdash; {{ $section->code }}
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="POST" action="{{ route('production.work-center-sections.update', $section->id) }}">
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
-                            <input type="hidden" name="_modal" value="editSectionModal_{{ $section->id }}">
 
-                            <div class="modal-body p-4">
+                        <div class="modal-body p-4">
                                 <div class="alert alert-soft-warning border-warning d-flex align-items-start gap-2 mb-3 py-2 px-3 fs-11">
                                     <i class="feather-alert-triangle text-warning fs-14 mt-0.5 flex-shrink-0"></i>
                                     <div>
@@ -852,53 +864,6 @@
                                         @endif
                                     </div>
 
-                                    <!-- Manual Production -->
-                                    @php
-                                        $isManual = old('_modal') === 'editSectionModal_'.$section->id 
-                                            ? (bool) old('supports_manual_production') 
-                                            : (bool) $section->supports_manual_production;
-                                        $manualCapacity = old('_modal') === 'editSectionModal_'.$section->id 
-                                            ? old('manual_capacity_per_hour') 
-                                            : ($section->manual_capacity_per_hour !== null ? (float) $section->manual_capacity_per_hour : '');
-                                    @endphp
-                                    <div class="col-12">
-                                        <div class="p-3 border rounded bg-light">
-                                            <div class="form-check form-switch mb-0">
-                                                <input type="hidden" name="supports_manual_production" value="0">
-                                                <input class="form-check-input manual-production-toggle" type="checkbox" name="supports_manual_production" value="1" 
-                                                       id="edit_supports_manual_production_{{ $section->id }}" 
-                                                       data-target="#edit_manual_capacity_container_{{ $section->id }}"
-                                                       @checked($isManual)>
-                                                <label class="form-check-label fw-bold text-dark fs-12" for="edit_supports_manual_production_{{ $section->id }}">
-                                                    {{ __('production.manual_production') }}
-                                                </label>
-                                                <div class="form-text fs-11 text-muted">{{ __('production.manual_production_desc') }}</div>
-                                            </div>
-
-                                            <div id="edit_manual_capacity_container_{{ $section->id }}" class="mt-3 pt-3 border-top @if(!$isManual) d-none @endif">
-                                                <div class="row align-items-center">
-                                                    <div class="col-md-6">
-                                                        <label class="form-label fw-bold fs-12 text-dark" for="edit_manual_capacity_per_hour_{{ $section->id }}">
-                                                            {{ __('production.manual_capacity_per_hour') }} <span class="text-danger">*</span>
-                                                        </label>
-                                                        <div class="input-group">
-                                                            <input type="number" step="any" min="0.0001" name="manual_capacity_per_hour" id="edit_manual_capacity_per_hour_{{ $section->id }}" 
-                                                                   class="form-control fs-12 manual-capacity-input" 
-                                                                   placeholder="e.g. 10.00"
-                                                                   value="{{ $manualCapacity }}"
-                                                                   @if(!$isManual) disabled @endif>
-                                                            <span class="input-group-text fs-11 text-muted bg-white">{{ __('production.units_per_hour') }}</span>
-                                                        </div>
-                                                        <div class="form-text fs-11 text-muted">{{ __('production.manual_capacity_hint') }}</div>
-                                                        @if(old('_modal') === 'editSectionModal_'.$section->id && $errors->has('manual_capacity_per_hour'))
-                                                            <div class="text-danger fs-11 mt-1 d-block">{{ $errors->first('manual_capacity_per_hour') }}</div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     <div class="col-12">
                                         <label class="form-label fw-bold fs-12 text-dark d-block">
                                             {{ __('production.section_shifts') }} <span class="text-danger">*</span>
@@ -931,14 +896,18 @@
                                             <div class="p-2.5 mb-3 bg-light border rounded d-none shift-picker-panel">
                                                 <div class="row g-2 align-items-center">
                                                     <div class="col-sm-8">
-                                                        <select class="form-select form-select-sm shift-picker-select">
+                                                        <select class="form-select form-select-sm shift-picker-select" data-select2-selector="default" style="width: 100%;">
                                                             <option value="">-- {{ __('production.add_shift') }} --</option>
                                                             @foreach($shiftsPool as $sh)
+                                                                @php
+                                                                    $timeRange = substr($sh->start_time, 0, 5) . '–' . substr($sh->end_time, 0, 5);
+                                                                    $hasTime = str_contains($sh->name, substr($sh->start_time, 0, 5));
+                                                                @endphp
                                                                 <option value="{{ $sh->id }}" 
                                                                         data-name="{{ $sh->name }}" 
                                                                         data-code="{{ $sh->code }}" 
-                                                                        data-time="{{ substr($sh->start_time, 0, 5) }}–{{ substr($sh->end_time, 0, 5) }}">
-                                                                    {{ $sh->code }} &mdash; {{ $sh->name }} ({{ substr($sh->start_time, 0, 5) }}–{{ substr($sh->end_time, 0, 5) }})
+                                                                        data-time="{{ $timeRange }}">
+                                                                    {{ $sh->code }} &mdash; {{ $sh->name }}@if(!$hasTime) ({{ $timeRange }})@endif
                                                                 </option>
                                                             @endforeach
                                                         </select>
@@ -1002,7 +971,7 @@
                                         @endphp
 
                                         @if($modalMachineOptions->count() > 0)
-                                            <select name="machine_ids[]" id="edit_section_machine_ids_{{ $section->id }}" class="form-select section-machine-select" multiple="multiple" data-placeholder="{{ __('production.select_machines') }}">
+                                            <select name="machine_ids[]" id="edit_section_machine_ids_{{ $section->id }}" class="form-select section-machine-select" multiple="multiple" data-select2-selector="default" data-placeholder="{{ __('production.select_machines') }}" style="width: 100%;">
                                                 @foreach($modalMachineOptions as $m)
                                                     <option value="{{ $m->id }}" @selected(in_array($m->id, $selectedMachines))>
                                                         [{{ $m->code }}] {{ $m->name }} @if($m->section_id === $section->id) ({{ __('production.currently_assigned') }}) @endif
@@ -1040,10 +1009,10 @@
                         </form>
                     </div>
                 </div>
-            </div>
         @endcan
 
         @can('delete', $section)
+            @if(!$section->hasProductionHistory())
             <div class="modal fade" id="deleteSectionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="deleteSectionModalLabel_{{ $section->id }}" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 shadow-lg rounded-3">
@@ -1058,43 +1027,64 @@
                             @method('DELETE')
 
                             <div class="modal-body p-4">
-                                @if($section->machines->count() > 0)
-                                    <div class="alert alert-danger border border-danger d-flex align-items-start gap-2 mb-3">
-                                        <i class="feather-slash fs-18 text-danger mt-1 flex-shrink-0"></i>
-                                        <div>
-                                            <h6 class="fw-bold text-danger mb-1">{{ __('production.cannot_delete_has_machines') }}</h6>
-                                            <p class="fs-12 text-dark mb-0">{{ __('production.delete_section_has_machines_warning') }}</p>
-                                            <div class="mt-2 fw-semibold fs-12 text-dark">
-                                                Assigned Machines ({{ $section->machines->count() }}):
-                                                <span class="text-muted">{{ $section->machines->pluck('name')->join(', ') }}</span>
-                                            </div>
+                                @php
+                                    $assignedMachines = $section->machines;
+                                    $assignedEmployees = $section->employeeAssignments;
+                                    $assignedAllocations = $section->externalWorkerAllocations;
+                                    $hasAnyAssignments = $assignedMachines->isNotEmpty() || $assignedEmployees->isNotEmpty() || $assignedAllocations->isNotEmpty();
+                                @endphp
+
+                                <p class="text-dark fs-13 mb-2">
+                                    Are you sure you want to delete section <strong>{{ $section->name }}</strong> (<span class="font-monospace text-muted">{{ $section->code }}</span>)?
+                                </p>
+
+                                @if($hasAnyAssignments)
+                                    <div class="alert alert-warning border border-warning d-flex align-items-start gap-2 mb-3">
+                                        <i class="feather-alert-circle fs-18 text-warning mt-1 flex-shrink-0"></i>
+                                        <div class="fs-12 text-dark">
+                                            <div class="fw-bold mb-1">Deleting this section will also remove its associated assignments:</div>
+                                            <ul class="mb-0 ps-3">
+                                                @if($assignedMachines->isNotEmpty())
+                                                    <li>
+                                                        <strong>{{ $assignedMachines->count() }} Machine(s)</strong> will become unassigned and returned to the pool:
+                                                        <span class="text-muted">{{ $assignedMachines->pluck('name')->join(', ') }}</span>
+                                                    </li>
+                                                @endif
+                                                @if($assignedEmployees->isNotEmpty())
+                                                    <li>
+                                                        <strong>{{ $assignedEmployees->count() }} Internal Employee Assignment(s)</strong> will be deleted.
+                                                    </li>
+                                                @endif
+                                                @if($assignedAllocations->isNotEmpty())
+                                                    <li>
+                                                        <strong>{{ $assignedAllocations->count() }} External Worker Allocation(s)</strong> will be deleted.
+                                                    </li>
+                                                @endif
+                                            </ul>
                                         </div>
                                     </div>
                                 @else
-                                    <p class="text-dark fs-13 mb-2">{{ __('production.delete_section_confirm') }}</p>
-                                    <div class="p-3 bg-light rounded border">
-                                        <span class="fw-bold text-dark">{{ $section->name }}</span>
-                                        <span class="font-monospace text-muted ms-2">({{ $section->code }})</span>
+                                    <div class="p-3 bg-light rounded border fs-12 text-muted">
+                                        This section currently has 0 machines, internal employees, or external worker allocations assigned.
                                     </div>
                                 @endif
+
+                                <p class="text-danger fs-12 fw-semibold mb-0 mt-2">
+                                    <i class="feather-alert-triangle me-1"></i>This action will remove the section from this Work Center.
+                                </p>
                             </div>
 
                             <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end gap-2">
                                 <button type="button" class="btn btn-light border" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-                                @if($section->machines->count() === 0)
-                                    <button type="submit" class="btn btn-danger">
-                                        <i class="feather-trash-2 me-1"></i>{{ __('production.delete_section') }}
-                                    </button>
-                                @else
-                                    <button type="submit" class="btn btn-danger" disabled title="{{ __('production.cannot_delete_has_machines') }}">
-                                        <i class="feather-slash me-1"></i>{{ __('production.cannot_delete_has_machines') }}
-                                    </button>
-                                @endif
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="feather-trash-2 me-1"></i>{{ __('production.delete_section') }}
+                                </button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
+            @endif
         @endcan
 
         <!-- Calculation Breakdown Modal for Section -->
@@ -1454,11 +1444,11 @@
         $wcCalc = $workCenter->getCalculationDetails();
         $wcCapCalc = $wcCalc['capacity'] ?? [];
         $wcLaborCalc = $wcCalc['labor_cost'] ?? [];
-        $wcCapPerHour = (float) ($workCenter->capacity_per_hour ?? $wcCapCalc['capacity_per_hour'] ?? 0);
-        $wcTotalTheoCap = (float) ($workCenter->total_theoretical_capacity ?? $wcCapCalc['total_theoretical_capacity'] ?? 0);
-        $wcLaborCostPerHour = (float) ($workCenter->labor_cost_per_hour ?? $wcLaborCalc['labor_cost_per_hour'] ?? 0);
-        $wcTotalSchedLabor = (float) ($workCenter->total_scheduled_labor_cost ?? $wcLaborCalc['total_scheduled_labor_cost'] ?? 0);
-        $wcUniqOperatingHours = (float) ($workCenter->unique_operating_hours ?? $wcCapCalc['unique_operating_hours'] ?? $wcLaborCalc['unique_operating_hours'] ?? 0);
+        $wcCapPerHour = (float) ($wcCapCalc['capacity_per_hour'] ?? 0);
+        $wcTotalTheoCap = (float) ($wcCapCalc['total_theoretical_capacity'] ?? 0);
+        $wcLaborCostPerHour = (float) ($wcLaborCalc['labor_cost_per_hour'] ?? 0);
+        $wcTotalSchedLabor = (float) ($wcLaborCalc['total_scheduled_labor_cost'] ?? 0);
+        $wcUniqOperatingHours = (float) ($wcCapCalc['unique_operating_hours'] ?? $wcLaborCalc['unique_operating_hours'] ?? 0);
         $wcCapWindows = $wcCapCalc['windows'] ?? [];
         $wcCapGaps = $wcCapCalc['gaps'] ?? [];
         $wcLaborAssignments = $wcLaborCalc['assignments'] ?? [];
@@ -1937,25 +1927,17 @@
         </div>
     </div>
 
-    <!-- Worker Section-Shift Allocation Modals (Internal & External Workers) -->
+    <!-- Worker Section-Shift External Worker Allocation Modals -->
     @foreach ($workCenter->sections as $section)
         @foreach ($section->shifts as $shift)
             @php
                 $isSectionShiftActive = $section->isActive() && $shift->isActive() && (bool) ($shift->pivot->active ?? true);
 
-                // Internal worker allocations
-                $intAllocations = $section->internalWorkerAllocations ? $section->internalWorkerAllocations->where('shift_id', $shift->id) : collect();
-                $activeIntAllocations = $intAllocations->where('active', true);
-                $inactiveIntAllocations = $intAllocations->where('active', false);
-                $activeIntCount = (int) $activeIntAllocations->sum('headcount');
-
                 // External worker allocations
                 $extAllocations = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('shift_id', $shift->id) : collect();
                 $activeExtAllocations = $extAllocations->where('active', true);
                 $inactiveExtAllocations = $extAllocations->where('active', false);
-                $activeExtCount = (int) $activeExtAllocations->sum('headcount');
-
-                $totalShiftWorkers = $activeIntCount + $activeExtCount;
+                $activeExtCount = (int) $activeExtAllocations->sum('number_of_external_workers');
             @endphp
             <div class="modal fade" id="sectionShiftWorkersModal_{{ $section->id }}_{{ $shift->id }}" tabindex="-1" aria-labelledby="sectionShiftWorkersModalLabel_{{ $section->id }}_{{ $shift->id }}" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
@@ -1963,10 +1945,10 @@
                         <div class="modal-header border-bottom py-3">
                             <div>
                                 <h5 class="modal-title fw-bold text-dark fs-15" id="sectionShiftWorkersModalLabel_{{ $section->id }}_{{ $shift->id }}">
-                                    <i class="feather-users text-primary me-2"></i>{{ __('production.assign_workers') }} &mdash; {{ $section->name }}
+                                    <i class="feather-users text-primary me-2"></i>Allocate External Workers &mdash; {{ $section->name }}
                                 </h5>
                                 <div class="text-muted fs-11 mt-0.5">
-                                    <span class="fw-semibold text-dark">{{ $shift->name }}</span>
+                                    Operating Shift: <span class="fw-semibold text-dark">{{ $shift->name }}</span>
                                     <span class="font-monospace">({{ substr($shift->start_time, 0, 5) }} &ndash; {{ substr($shift->end_time, 0, 5) }})</span>
                                     @if(!$isSectionShiftActive)
                                         <span class="badge bg-soft-warning text-warning ms-2">Section or Shift Inactive</span>
@@ -1977,427 +1959,219 @@
                         </div>
 
                         <div class="modal-body p-4">
-                            <!-- Staffing Overview Metrics -->
-                            <div class="row g-3 mb-4">
-                                <div class="col-sm-4">
-                                    <div class="p-3 rounded bg-soft-info border border-info-subtle h-100">
-                                        <div class="fs-11 text-uppercase fw-semibold mb-1 text-info">
-                                            <i class="feather-user-check me-1"></i>{{ __('production.internal_workers') }}
-                                        </div>
-                                        <div class="fs-22 fw-bold font-monospace text-dark">
-                                            {{ $activeIntCount }} <span class="fs-12 fw-normal text-muted">allocated</span>
-                                        </div>
-                                        <small class="text-muted fs-11 d-block mt-1">Rate: <strong class="text-dark font-monospace">₹100.00 / hr</strong> (Temp rate)</small>
+                            <!-- Staffing Overview Metric Banner -->
+                            <div class="p-3 rounded bg-soft-primary border border-primary-subtle mb-4 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fs-11 text-uppercase fw-semibold mb-0.5 text-primary">
+                                        <i class="feather-users me-1"></i>External Workers for {{ $shift->name }}
                                     </div>
+                                    <small class="text-muted fs-11">Allocated across {{ $activeExtAllocations->count() }} active pay grade(s)</small>
                                 </div>
-                                <div class="col-sm-4">
-                                    <div class="p-3 rounded bg-soft-primary border border-primary-subtle h-100">
-                                        <div class="fs-11 text-uppercase fw-semibold mb-1 text-primary">
-                                            <i class="feather-users me-1"></i>{{ __('production.external_workers') }}
-                                        </div>
-                                        <div class="fs-22 fw-bold font-monospace text-primary">
-                                            {{ $activeExtCount }} <span class="fs-12 fw-normal text-muted">allocated</span>
-                                        </div>
-                                        <small class="text-muted fs-11 d-block mt-1">{{ $activeExtAllocations->count() }} active pay grade(s)</small>
-                                    </div>
-                                </div>
-                                <div class="col-sm-4">
-                                    <div class="p-3 rounded bg-light border text-dark h-100">
-                                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">
-                                            <i class="feather-layers me-1 text-secondary"></i>Total Staff
-                                        </div>
-                                        <div class="fs-22 fw-bold font-monospace text-dark">
-                                            {{ $totalShiftWorkers }} <span class="fs-12 fw-normal text-muted">workers</span>
-                                        </div>
-                                        <small class="text-muted fs-11 d-block mt-1">Combined shift labor capacity</small>
-                                    </div>
+                                <div class="fs-22 fw-bold font-monospace text-primary">
+                                    {{ $activeExtCount }} <span class="fs-12 fw-normal text-muted">workers allocated</span>
                                 </div>
                             </div>
 
-                            <!-- Tabs: Internal vs External Workers -->
-                            <ul class="nav nav-tabs nav-tabs-custom mb-3" id="workerTabs_{{ $section->id }}_{{ $shift->id }}" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
-                                            id="internal-workers-tab_{{ $section->id }}_{{ $shift->id }}" 
-                                            data-bs-toggle="tab" 
-                                            data-bs-target="#internal-workers-pane_{{ $section->id }}_{{ $shift->id }}" 
-                                            type="button" role="tab" aria-selected="true">
-                                        <i class="feather-user-check text-info fs-14"></i>
-                                        {{ __('production.internal_workers') }}
-                                        <span class="badge bg-soft-info text-info ms-1 font-monospace">{{ $activeIntCount }}</span>
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
-                                            id="external-workers-tab_{{ $section->id }}_{{ $shift->id }}" 
-                                            data-bs-toggle="tab" 
-                                            data-bs-target="#external-workers-pane_{{ $section->id }}_{{ $shift->id }}" 
-                                            type="button" role="tab" aria-selected="false">
-                                        <i class="feather-users text-primary fs-14"></i>
-                                        {{ __('production.external_workers') }}
-                                        <span class="badge bg-soft-primary text-primary ms-1 font-monospace">{{ $activeExtCount }}</span>
-                                    </button>
-                                </li>
-                            </ul>
+                            <!-- Active Allocations Table -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold text-dark fs-13 mb-0">Active Pay Grade Allocations</h6>
+                                    <span class="badge bg-soft-success text-success fs-10 px-2 py-0.5 rounded-pill">{{ $activeExtAllocations->count() }} Active</span>
+                                </div>
 
-                            <div class="tab-content" id="workerTabContent_{{ $section->id }}_{{ $shift->id }}">
-                                <!-- TAB 1: INTERNAL WORKERS -->
-                                <div class="tab-pane fade show active" id="internal-workers-pane_{{ $section->id }}_{{ $shift->id }}" role="tabpanel" aria-labelledby="internal-workers-tab_{{ $section->id }}_{{ $shift->id }}">
-                                    <div class="alert alert-info py-2 px-3 fs-11 mb-3">
-                                        <i class="feather-info me-1"></i>
-                                        Allocate internal company worker headcount to this Section and Shift. The temporary rate is fixed at <strong>₹100.00 / hr</strong>.
-                                    </div>
-
-                                    @if($activeIntAllocations->isNotEmpty())
-                                        <div class="table-responsive border rounded mb-3">
-                                            <table class="table table-sm table-hover align-middle mb-0 fs-12">
-                                                <thead class="bg-light">
+                                @if($activeExtAllocations->isNotEmpty())
+                                    <div class="table-responsive border rounded">
+                                        <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th style="width: 30%">Pay Grade</th>
+                                                    <th style="width: 20%">Hourly Rate</th>
+                                                    <th style="width: 25%">Number of External Workers</th>
+                                                    <th style="width: 10%">Status</th>
+                                                    <th style="width: 15%" class="text-end">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($activeExtAllocations as $alloc)
                                                     <tr>
-                                                        <th style="width: 35%">Allocation Type</th>
-                                                        <th style="width: 25%">Hourly Rate</th>
-                                                        <th style="width: 20%">Headcount</th>
-                                                        <th style="width: 10%">Status</th>
-                                                        <th style="width: 10%" class="text-end">Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach($activeIntAllocations as $alloc)
-                                                        <tr>
-                                                            <td>
-                                                                <div class="fw-semibold text-dark">Internal Staff Headcount</div>
-                                                                <small class="text-muted fs-11">Allocated to {{ $section->name }}</small>
-                                                            </td>
-                                                            <td class="font-monospace">
-                                                                ₹{{ number_format((float) $alloc->rate, 2) }} <span class="text-muted fs-10">/ hr</span>
-                                                                <span class="badge bg-soft-secondary text-secondary fs-9 ms-1">Temp Rate</span>
-                                                            </td>
-                                                            <td>
-                                                                <form method="POST" action="{{ route('production.internal-worker-allocations.headcount', $alloc->id) }}" class="d-flex align-items-center gap-1">
+                                                        <td>
+                                                            <div class="fw-semibold text-dark">{{ $alloc->payGrade?->name ?? 'Unknown' }}</div>
+                                                            <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
+                                                        </td>
+                                                        <td class="font-monospace">
+                                                            {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
+                                                        </td>
+                                                        <td>
+                                                            <form method="POST" action="{{ route('production.external-worker-allocations.quantity', $alloc->id) }}" class="d-flex align-items-center gap-1 ext-worker-qty-form">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <input type="number" name="number_of_external_workers" min="1" value="{{ $alloc->number_of_external_workers }}" data-initial-value="{{ $alloc->number_of_external_workers }}" class="form-control form-control-sm font-monospace text-center py-0 px-1 ext-worker-qty-input" style="width: 60px; height: 26px;">
+                                                                <button type="submit" class="btn btn-xs btn-outline-primary ext-worker-qty-btn d-none" title="Update Number of External Workers">
+                                                                    <i class="feather-check"></i>
+                                                                </button>
+                                                            </form>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-soft-success text-success rounded-pill px-2">Active</span>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="d-inline-flex gap-1">
+                                                                <form method="POST" action="{{ route('production.external-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
                                                                     @csrf
                                                                     @method('PATCH')
-                                                                    <input type="number" name="headcount" min="1" value="{{ $alloc->headcount }}" class="form-control form-control-sm font-monospace text-center py-0 px-1" style="width: 60px; height: 26px;">
-                                                                    <button type="submit" class="btn btn-xs btn-outline-primary" title="Update headcount">
-                                                                        <i class="feather-check"></i>
+                                                                    <input type="hidden" name="active" value="0">
+                                                                    <button type="submit" class="btn btn-xs btn-outline-warning" title="Deactivate allocation">
+                                                                        <i class="feather-pause-circle"></i>
                                                                     </button>
                                                                 </form>
-                                                            </td>
-                                                            <td>
-                                                                <span class="badge bg-soft-success text-success rounded-pill px-2">Active</span>
-                                                            </td>
-                                                            <td class="text-end">
-                                                                <div class="d-inline-flex gap-1">
-                                                                    <form method="POST" action="{{ route('production.internal-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
-                                                                        @csrf
-                                                                        @method('PATCH')
-                                                                        <input type="hidden" name="active" value="0">
-                                                                        <button type="submit" class="btn btn-xs btn-outline-warning" title="Deactivate allocation">
-                                                                            <i class="feather-pause-circle"></i>
-                                                                        </button>
-                                                                    </form>
-                                                                    <form method="POST" action="{{ route('production.internal-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this internal worker allocation?');">
-                                                                        @csrf
-                                                                        @method('DELETE')
-                                                                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
-                                                                            <i class="feather-trash-2"></i>
-                                                                        </button>
-                                                                    </form>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
+                                                                <form method="POST" action="{{ route('production.external-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this external worker allocation?');">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
+                                                                        <i class="feather-trash-2"></i>
+                                                                    </button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @else
+                                    <div class="text-center py-3 bg-light rounded border border-dashed text-muted fs-12">
+                                        No active external worker allocations for this shift.
+                                    </div>
+                                @endif
+                            </div>
+
+                            <!-- Inactive / Historical Allocations -->
+                            @if($inactiveExtAllocations->isNotEmpty())
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold text-muted fs-13 mb-0">Inactive / Historical Allocations</h6>
+                                        <span class="badge bg-soft-secondary text-secondary fs-10 px-2 py-0.5 rounded-pill">{{ $inactiveExtAllocations->count() }} Inactive</span>
+                                    </div>
+                                    <div class="table-responsive border rounded">
+                                        <table class="table table-sm table-hover align-middle mb-0 fs-12 opacity-75">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th style="width: 35%">Pay Grade</th>
+                                                    <th style="width: 25%">Hourly Rate</th>
+                                                    <th style="width: 15%">Number of External Workers</th>
+                                                    <th style="width: 10%">Status</th>
+                                                    <th style="width: 15%" class="text-end">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($inactiveExtAllocations as $alloc)
+                                                    <tr>
+                                                        <td>
+                                                            <div class="fw-semibold text-dark">{{ $alloc->payGrade?->name ?? 'Unknown' }}</div>
+                                                            <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
+                                                        </td>
+                                                        <td class="font-monospace">
+                                                            {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
+                                                        </td>
+                                                        <td class="font-monospace fw-bold">{{ $alloc->number_of_external_workers }}</td>
+                                                        <td>
+                                                            <span class="badge bg-soft-secondary text-secondary rounded-pill px-2">Inactive</span>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="d-inline-flex gap-1">
+                                                                <form method="POST" action="{{ route('production.external-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
+                                                                    @csrf
+                                                                    @method('PATCH')
+                                                                    <input type="hidden" name="active" value="1">
+                                                                    <button type="submit" class="btn btn-xs btn-outline-success" title="Reactivate allocation" @disabled(!$isSectionShiftActive || !$alloc->payGrade?->isActive())>
+                                                                        <i class="feather-play-circle me-1"></i>Activate
+                                                                    </button>
+                                                                </form>
+                                                                <form method="POST" action="{{ route('production.external-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this historical allocation?');">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
+                                                                        <i class="feather-trash-2"></i>
+                                                                    </button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            @endif
+
+                            <!-- Add New External Allocation Form -->
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="fw-bold text-dark fs-12 mb-2">
+                                    <i class="feather-plus-circle text-primary me-1"></i>Allocate External Workers
+                                </h6>
+
+                                @if(!$isSectionShiftActive)
+                                    <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
+                                        <i class="feather-alert-triangle me-1"></i>
+                                        Cannot create or activate allocations because this Section, Shift, or Section&ndash;Shift assignment is inactive.
+                                    </div>
+                                @elseif(($activePayGrades ?? collect())->isEmpty())
+                                    <div class="alert alert-info py-2 px-3 fs-11 mb-0">
+                                        <i class="feather-info me-1"></i>
+                                        No active external worker pay grades found. Please create or activate pay grades in 
+                                        <a href="{{ route('production.pay-grades.index') }}" class="fw-bold text-primary">Pay Grade Management</a> first.
+                                    </div>
+                                @else
+                                    <form method="POST" action="{{ route('production.external-worker-allocations.store') }}">
+                                        @csrf
+                                        <input type="hidden" name="section_id" value="{{ $section->id }}">
+
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-md-4">
+                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Operating Shift <span class="text-danger">*</span></label>
+                                                <select name="shift_id" class="form-select form-select-sm" data-select2-selector="default" style="width: 100%;" required>
+                                                    @foreach($section->shifts as $secShift)
+                                                        @php
+                                                            $startTime = substr($secShift->start_time, 0, 5);
+                                                            $endTime = substr($secShift->end_time, 0, 5);
+                                                            $timeStr = $startTime . '–' . $endTime;
+                                                            $hasTime = str_contains($secShift->name, $startTime);
+                                                        @endphp
+                                                        <option value="{{ $secShift->id }}" @selected($secShift->id === $shift->id)>
+                                                            {{ $secShift->name }}{{ $hasTime ? '' : ' (' . $timeStr . ')' }}
+                                                        </option>
                                                     @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    @else
-                                        <div class="text-center py-3 bg-light rounded border border-dashed text-muted fs-12 mb-3">
-                                            No active internal worker headcount allocated for this shift.
-                                        </div>
-                                    @endif
-
-                                    <!-- Inactive Internal Allocations -->
-                                    @if($inactiveIntAllocations->isNotEmpty())
-                                        <div class="mb-3">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <h6 class="fw-bold text-muted fs-12 mb-0">Inactive / Historical Internal Allocations</h6>
-                                                <span class="badge bg-soft-secondary text-secondary fs-10 px-2 py-0.5 rounded-pill">{{ $inactiveIntAllocations->count() }} Inactive</span>
+                                                </select>
                                             </div>
-                                            <div class="table-responsive border rounded">
-                                                <table class="table table-sm table-hover align-middle mb-0 fs-12 opacity-75">
-                                                    <thead class="bg-light">
-                                                        <tr>
-                                                            <th>Headcount</th>
-                                                            <th>Rate</th>
-                                                            <th>Status</th>
-                                                            <th class="text-end">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach($inactiveIntAllocations as $alloc)
-                                                            <tr>
-                                                                <td class="font-monospace fw-bold">{{ $alloc->headcount }} workers</td>
-                                                                <td class="font-monospace">₹{{ number_format((float) $alloc->rate, 2) }} / hr</td>
-                                                                <td><span class="badge bg-soft-secondary text-secondary rounded-pill px-2">Inactive</span></td>
-                                                                <td class="text-end">
-                                                                    <div class="d-inline-flex gap-1">
-                                                                        <form method="POST" action="{{ route('production.internal-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
-                                                                            @csrf
-                                                                            @method('PATCH')
-                                                                            <input type="hidden" name="active" value="1">
-                                                                            <button type="submit" class="btn btn-xs btn-outline-success" title="Reactivate allocation" @disabled(!$isSectionShiftActive)>
-                                                                                <i class="feather-play-circle me-1"></i>Activate
-                                                                            </button>
-                                                                        </form>
-                                                                        <form method="POST" action="{{ route('production.internal-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this historical allocation?');">
-                                                                            @csrf
-                                                                            @method('DELETE')
-                                                                            <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
-                                                                                <i class="feather-trash-2"></i>
-                                                                            </button>
-                                                                        </form>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
+                                            <div class="col-md-4">
+                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Pay Grade <span class="text-danger">*</span></label>
+                                                <select name="pay_grade_id" class="form-select form-select-sm" data-select2-selector="default" style="width: 100%;" required>
+                                                    <option value="">-- Select Active Pay Grade --</option>
+                                                    @foreach($activePayGrades as $pg)
+                                                        <option value="{{ $pg->id }}">
+                                                            {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate) }}/hr
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Workers <span class="text-danger">*</span></label>
+                                                <input type="number" name="number_of_external_workers" class="form-control form-control-sm font-monospace" min="1" value="1" required>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                    <i class="feather-plus me-1"></i>Allocate
+                                                </button>
                                             </div>
                                         </div>
-                                    @endif
-
-                                    <!-- Add Internal Allocation Form -->
-                                    <div class="border rounded p-3 bg-light">
-                                        <h6 class="fw-bold text-dark fs-12 mb-2">
-                                            <i class="feather-plus-circle text-info me-1"></i>Allocate Internal Worker Headcount
-                                        </h6>
-
-                                        @if(!$isSectionShiftActive)
-                                            <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
-                                                <i class="feather-alert-triangle me-1"></i>
-                                                Cannot create or activate allocations because this Section, Shift, or Section&ndash;Shift assignment is inactive.
-                                            </div>
-                                        @else
-                                            <form method="POST" action="{{ route('production.internal-worker-allocations.store') }}">
-                                                @csrf
-                                                <input type="hidden" name="section_id" value="{{ $section->id }}">
-                                                <input type="hidden" name="shift_id" value="{{ $shift->id }}">
-
-                                                <div class="row g-2 align-items-end">
-                                                    <div class="col-md-5">
-                                                        <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Temporary Rate</label>
-                                                        <div class="form-control form-control-sm bg-white font-monospace text-dark fw-bold">
-                                                            ₹100.00 / hr <span class="badge bg-soft-info text-info fs-10 ms-1">Fixed</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Headcount <span class="text-danger">*</span></label>
-                                                        <input type="number" name="headcount" class="form-control form-control-sm font-monospace" min="1" value="1" required>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <button type="submit" class="btn btn-sm btn-info text-white w-100">
-                                                            <i class="feather-plus me-1"></i>Allocate
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div class="form-check mt-2">
-                                                    <input class="form-check-input" type="checkbox" name="update_if_exists" value="1" id="update_int_if_exists_{{ $section->id }}_{{ $shift->id }}" checked>
-                                                    <label class="form-check-label fs-11 text-muted" for="update_int_if_exists_{{ $section->id }}_{{ $shift->id }}">
-                                                        Update headcount if internal allocation already exists for this shift
-                                                    </label>
-                                                </div>
-                                            </form>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <!-- TAB 2: EXTERNAL WORKERS -->
-                                <div class="tab-pane fade" id="external-workers-pane_{{ $section->id }}_{{ $shift->id }}" role="tabpanel" aria-labelledby="external-workers-tab_{{ $section->id }}_{{ $shift->id }}">
-                                    <!-- Active Allocations Table -->
-                                    <div class="mb-4">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h6 class="fw-bold text-dark fs-13 mb-0">Active Pay Grade Allocations</h6>
-                                            <span class="badge bg-soft-success text-success fs-10 px-2 py-0.5 rounded-pill">{{ $activeExtAllocations->count() }} Active</span>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" name="update_if_exists" value="1" id="update_if_exists_{{ $section->id }}_{{ $shift->id }}" checked>
+                                            <label class="form-check-label fs-11 text-muted" for="update_if_exists_{{ $section->id }}_{{ $shift->id }}">
+                                                Update Number of External Workers if allocation already exists for this Pay Grade
+                                            </label>
                                         </div>
-
-                                        @if($activeExtAllocations->isNotEmpty())
-                                            <div class="table-responsive border rounded">
-                                                <table class="table table-sm table-hover align-middle mb-0 fs-12">
-                                                    <thead class="bg-light">
-                                                        <tr>
-                                                            <th style="width: 30%">Pay Grade</th>
-                                                            <th style="width: 20%">Hourly Rate</th>
-                                                            <th style="width: 25%">Headcount</th>
-                                                            <th style="width: 10%">Status</th>
-                                                            <th style="width: 15%" class="text-end">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach($activeExtAllocations as $alloc)
-                                                            <tr>
-                                                                <td>
-                                                                    <div class="fw-semibold text-dark">{{ $alloc->payGrade?->name ?? 'Unknown' }}</div>
-                                                                    <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
-                                                                </td>
-                                                                <td class="font-monospace">
-                                                                    {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
-                                                                </td>
-                                                                <td>
-                                                                    <form method="POST" action="{{ route('production.external-worker-allocations.headcount', $alloc->id) }}" class="d-flex align-items-center gap-1">
-                                                                        @csrf
-                                                                        @method('PATCH')
-                                                                        <input type="number" name="headcount" min="1" value="{{ $alloc->headcount }}" class="form-control form-control-sm font-monospace text-center py-0 px-1" style="width: 60px; height: 26px;">
-                                                                        <button type="submit" class="btn btn-xs btn-outline-primary" title="Update headcount">
-                                                                            <i class="feather-check"></i>
-                                                                        </button>
-                                                                    </form>
-                                                                </td>
-                                                                <td>
-                                                                    <span class="badge bg-soft-success text-success rounded-pill px-2">Active</span>
-                                                                </td>
-                                                                <td class="text-end">
-                                                                    <div class="d-inline-flex gap-1">
-                                                                        <form method="POST" action="{{ route('production.external-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
-                                                                            @csrf
-                                                                            @method('PATCH')
-                                                                            <input type="hidden" name="active" value="0">
-                                                                            <button type="submit" class="btn btn-xs btn-outline-warning" title="Deactivate allocation">
-                                                                                <i class="feather-pause-circle"></i>
-                                                                            </button>
-                                                                        </form>
-                                                                        <form method="POST" action="{{ route('production.external-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this external worker allocation?');">
-                                                                            @csrf
-                                                                            @method('DELETE')
-                                                                            <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
-                                                                                <i class="feather-trash-2"></i>
-                                                                            </button>
-                                                                        </form>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        @else
-                                            <div class="text-center py-3 bg-light rounded border border-dashed text-muted fs-12">
-                                                No active external worker allocations for this shift.
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <!-- Inactive / Historical Allocations -->
-                                    @if($inactiveExtAllocations->isNotEmpty())
-                                        <div class="mb-4">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <h6 class="fw-bold text-muted fs-13 mb-0">Inactive / Historical Allocations</h6>
-                                                <span class="badge bg-soft-secondary text-secondary fs-10 px-2 py-0.5 rounded-pill">{{ $inactiveExtAllocations->count() }} Inactive</span>
-                                            </div>
-                                            <div class="table-responsive border rounded">
-                                                <table class="table table-sm table-hover align-middle mb-0 fs-12 opacity-75">
-                                                    <thead class="bg-light">
-                                                        <tr>
-                                                            <th style="width: 35%">Pay Grade</th>
-                                                            <th style="width: 25%">Hourly Rate</th>
-                                                            <th style="width: 15%">Headcount</th>
-                                                            <th style="width: 10%">Status</th>
-                                                            <th style="width: 15%" class="text-end">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach($inactiveExtAllocations as $alloc)
-                                                            <tr>
-                                                                <td>
-                                                                    <div class="fw-semibold text-dark">{{ $alloc->payGrade?->name ?? 'Unknown' }}</div>
-                                                                    <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
-                                                                </td>
-                                                                <td class="font-monospace">
-                                                                    {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
-                                                                </td>
-                                                                <td class="font-monospace fw-bold">{{ $alloc->headcount }}</td>
-                                                                <td>
-                                                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2">Inactive</span>
-                                                                </td>
-                                                                <td class="text-end">
-                                                                    <div class="d-inline-flex gap-1">
-                                                                        <form method="POST" action="{{ route('production.external-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
-                                                                            @csrf
-                                                                            @method('PATCH')
-                                                                            <input type="hidden" name="active" value="1">
-                                                                            <button type="submit" class="btn btn-xs btn-outline-success" title="Reactivate allocation" @disabled(!$isSectionShiftActive || !$alloc->payGrade?->isActive())>
-                                                                                <i class="feather-play-circle me-1"></i>Activate
-                                                                            </button>
-                                                                        </form>
-                                                                        <form method="POST" action="{{ route('production.external-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this historical allocation?');">
-                                                                            @csrf
-                                                                            @method('DELETE')
-                                                                            <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
-                                                                                <i class="feather-trash-2"></i>
-                                                                            </button>
-                                                                        </form>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    @endif
-
-                                    <!-- Add New External Allocation Form -->
-                                    <div class="border rounded p-3 bg-light">
-                                        <h6 class="fw-bold text-dark fs-12 mb-2">
-                                            <i class="feather-plus-circle text-primary me-1"></i>Allocate External Workers
-                                        </h6>
-
-                                        @if(!$isSectionShiftActive)
-                                            <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
-                                                <i class="feather-alert-triangle me-1"></i>
-                                                Cannot create or activate allocations because this Section, Shift, or Section&ndash;Shift assignment is inactive.
-                                            </div>
-                                        @elseif(($activePayGrades ?? collect())->isEmpty())
-                                            <div class="alert alert-info py-2 px-3 fs-11 mb-0">
-                                                <i class="feather-info me-1"></i>
-                                                No active external worker pay grades found. Please create or activate pay grades in 
-                                                <a href="{{ route('production.pay-grades.index') }}" class="fw-bold text-primary">Pay Grade Management</a> first.
-                                            </div>
-                                        @else
-                                            <form method="POST" action="{{ route('production.external-worker-allocations.store') }}">
-                                                @csrf
-                                                <input type="hidden" name="section_id" value="{{ $section->id }}">
-                                                <input type="hidden" name="shift_id" value="{{ $shift->id }}">
-
-                                                <div class="row g-2 align-items-end">
-                                                    <div class="col-md-6">
-                                                        <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Pay Grade <span class="text-danger">*</span></label>
-                                                        <select name="pay_grade_id" class="form-select form-select-sm" required>
-                                                            <option value="">-- Select Active Pay Grade --</option>
-                                                            @foreach($activePayGrades as $pg)
-                                                                <option value="{{ $pg->id }}">
-                                                                    {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate) }}/hr
-                                                                </option>
-                                                            @endforeach
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Headcount <span class="text-danger">*</span></label>
-                                                        <input type="number" name="headcount" class="form-control form-control-sm font-monospace" min="1" value="1" required>
-                                                    </div>
-                                                    <div class="col-md-3">
-                                                        <button type="submit" class="btn btn-sm btn-primary w-100">
-                                                            <i class="feather-plus me-1"></i>Allocate
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div class="form-check mt-2">
-                                                    <input class="form-check-input" type="checkbox" name="update_if_exists" value="1" id="update_if_exists_{{ $section->id }}_{{ $shift->id }}" checked>
-                                                    <label class="form-check-label fs-11 text-muted" for="update_if_exists_{{ $section->id }}_{{ $shift->id }}">
-                                                        Update headcount if allocation already exists for this Pay Grade
-                                                    </label>
-                                                </div>
-                                            </form>
-                                        @endif
-                                    </div>
-                                </div>
+                                    </form>
+                                @endif
                             </div>
                         </div>
 
@@ -2410,6 +2184,223 @@
                 </div>
             </div>
         @endforeach
+    @endforeach
+
+    <!-- Section-Level External Worker Allocation Modals -->
+    @foreach ($workCenter->sections as $section)
+        <div class="modal fade" id="sectionExternalWorkerModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionExternalWorkerModalLabel_{{ $section->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header border-bottom py-3">
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark fs-15" id="sectionExternalWorkerModalLabel_{{ $section->id }}">
+                                <i class="feather-users text-primary me-2"></i>External Workers &mdash; {{ $section->name }}
+                            </h5>
+                            <div class="text-muted fs-11 mt-0.5">
+                                Section: <span class="font-monospace fw-semibold text-dark">{{ $section->code }}</span>
+                                @if(!$section->isActive())
+                                    <span class="badge bg-soft-warning text-warning ms-2">Section Inactive</span>
+                                @endif
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        @php
+                            $secExtAllocs = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->sortBy('shift_id') : collect();
+                            $secActiveAllocs = $secExtAllocs->where('active', true);
+                            $secInactiveAllocs = $secExtAllocs->where('active', false);
+                            $secTotalActiveWorkers = (int) $secActiveAllocs->sum('number_of_external_workers');
+                        @endphp
+
+                        <!-- Overview Metric -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6">
+                                <div class="p-3 rounded bg-soft-primary border border-primary-subtle h-100">
+                                    <div class="fs-11 text-uppercase fw-semibold mb-1 text-primary">
+                                        <i class="feather-users me-1"></i>Active External Workers
+                                    </div>
+                                    <div class="fs-22 fw-bold font-monospace text-primary">
+                                        {{ $secTotalActiveWorkers }} <span class="fs-12 fw-normal text-muted">workers allocated</span>
+                                    </div>
+                                    <small class="text-muted fs-11 d-block mt-1">{{ $secActiveAllocs->count() }} active allocation record(s)</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="p-3 rounded bg-light border text-dark h-100">
+                                    <div class="text-muted fs-11 text-uppercase fw-semibold mb-1">
+                                        <i class="feather-clock me-1 text-secondary"></i>Configured Section Operating Shifts
+                                    </div>
+                                    <div class="fs-22 fw-bold font-monospace text-dark">
+                                        {{ $section->shifts->count() }} <span class="fs-12 fw-normal text-muted">operating shift(s)</span>
+                                    </div>
+                                    <small class="text-muted fs-11 d-block mt-1">Allocations can only be assigned to these operating shifts</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Active Allocations Table -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark fs-13 mb-0">Active Section External Worker Allocations</h6>
+                                <span class="badge bg-soft-success text-success fs-10 px-2 py-0.5 rounded-pill">{{ $secActiveAllocs->count() }} Active</span>
+                            </div>
+
+                            @if($secActiveAllocs->isNotEmpty())
+                                <div class="table-responsive border rounded">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th style="width: 25%">Shift</th>
+                                                <th style="width: 25%">Pay Grade</th>
+                                                <th style="width: 15%">Hourly Rate</th>
+                                                <th style="width: 20%">Number of External Workers</th>
+                                                <th style="width: 15%" class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($secActiveAllocs as $alloc)
+                                                <tr>
+                                                    <td>
+                                                        <span class="fw-semibold text-dark">{{ $alloc->shift?->name ?? 'Unknown Shift' }}</span>
+                                                        @if($alloc->shift)
+                                                            <small class="text-muted d-block font-monospace fs-10">({{ substr($alloc->shift->start_time, 0, 5) }}&ndash;{{ substr($alloc->shift->end_time, 0, 5) }})</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <div class="fw-semibold text-dark">{{ $alloc->payGrade?->name ?? 'Unknown' }}</div>
+                                                        <span class="font-monospace text-muted fs-11">[{{ $alloc->payGrade?->code ?? 'N/A' }}]</span>
+                                                    </td>
+                                                    <td class="font-monospace">
+                                                        {{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }} <span class="text-muted fs-10">/ hr</span>
+                                                    </td>
+                                                    <td>
+                                                        <form method="POST" action="{{ route('production.external-worker-allocations.quantity', $alloc->id) }}" class="d-flex align-items-center gap-1 ext-worker-qty-form">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <input type="number" name="number_of_external_workers" min="1" value="{{ $alloc->number_of_external_workers }}" data-initial-value="{{ $alloc->number_of_external_workers }}" class="form-control form-control-sm font-monospace text-center py-0 px-1 ext-worker-qty-input" style="width: 60px; height: 26px;">
+                                                            <button type="submit" class="btn btn-xs btn-outline-primary ext-worker-qty-btn d-none" title="Update Number of External Workers">
+                                                                <i class="feather-check"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <div class="d-inline-flex gap-1">
+                                                            <form method="POST" action="{{ route('production.external-worker-allocations.toggle-status', $alloc->id) }}" class="d-inline">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <input type="hidden" name="active" value="0">
+                                                                <button type="submit" class="btn btn-xs btn-outline-warning" title="Deactivate allocation">
+                                                                    <i class="feather-pause-circle"></i>
+                                                                </button>
+                                                            </form>
+                                                            <form method="POST" action="{{ route('production.external-worker-allocations.destroy', $alloc->id) }}" class="d-inline" onsubmit="return confirm('Deallocate this external worker allocation?');">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-xs btn-outline-danger" title="Deallocate">
+                                                                    <i class="feather-trash-2"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="text-center py-3 bg-light rounded border border-dashed text-muted fs-12">
+                                    No active external worker allocations for this Section.
+                                </div>
+                            @endif
+                        </div>
+
+                        <!-- Add External Worker Allocation Form -->
+                        <div class="border rounded p-3 bg-light">
+                            <h6 class="fw-bold text-dark fs-12 mb-2">
+                                <i class="feather-plus-circle text-primary me-1"></i>Allocate External Workers
+                            </h6>
+
+                            @if(!$section->isActive())
+                                <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
+                                    <i class="feather-alert-triangle me-1"></i>
+                                    Cannot create allocations because this Section is inactive.
+                                </div>
+                            @elseif($section->shifts->isEmpty())
+                                <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
+                                    <i class="feather-alert-triangle me-1"></i>
+                                    Cannot allocate external workers because this Section has no operating shifts configured. Please configure shifts in Section settings first.
+                                </div>
+                            @elseif(($activePayGrades ?? collect())->isEmpty())
+                                <div class="alert alert-info py-2 px-3 fs-11 mb-0">
+                                    <i class="feather-info me-1"></i>
+                                    No active external worker pay grades found. Please create or activate pay grades in 
+                                    <a href="{{ route('production.pay-grades.index') }}" class="fw-bold text-primary">Pay Grade Management</a> first.
+                                </div>
+                            @else
+                                <form method="POST" action="{{ route('production.external-worker-allocations.store') }}">
+                                    @csrf
+                                    <input type="hidden" name="section_id" value="{{ $section->id }}">
+
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Operating Shift <span class="text-danger">*</span></label>
+                                            <select name="shift_id" class="form-select form-select-sm" data-select2-selector="default" style="width: 100%;" required>
+                                                <option value="">-- Select Section Shift --</option>
+                                                @foreach($section->shifts as $secShift)
+                                                    @php
+                                                        $startTime = substr($secShift->start_time, 0, 5);
+                                                        $endTime = substr($secShift->end_time, 0, 5);
+                                                        $timeStr = $startTime . '–' . $endTime;
+                                                        $hasTime = str_contains($secShift->name, $startTime);
+                                                    @endphp
+                                                    <option value="{{ $secShift->id }}">
+                                                        {{ $secShift->name }}{{ $hasTime ? '' : ' (' . $timeStr . ')' }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Pay Grade <span class="text-danger">*</span></label>
+                                            <select name="pay_grade_id" class="form-select form-select-sm" data-select2-selector="default" style="width: 100%;" required>
+                                                <option value="">-- Select Active Pay Grade --</option>
+                                                @foreach($activePayGrades as $pg)
+                                                    <option value="{{ $pg->id }}">
+                                                        {{ $pg->name }} [{{ $pg->code }}] &mdash; {{ format_currency((float) $pg->hourly_rate) }}/hr
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Workers <span class="text-danger">*</span></label>
+                                            <input type="number" name="number_of_external_workers" class="form-control form-control-sm font-monospace" min="1" value="1" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                <i class="feather-plus me-1"></i>Allocate
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" name="update_if_exists" value="1" id="update_sec_if_exists_{{ $section->id }}" checked>
+                                        <label class="form-check-label fs-11 text-muted" for="update_sec_if_exists_{{ $section->id }}">
+                                            Update Number of External Workers if allocation already exists for this Shift and Pay Grade
+                                        </label>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     @endforeach
 
     <!-- Work Center-Level Internal Employee Assignment Modal -->
@@ -2441,36 +2432,41 @@
                     </div>
 
                     <!-- Currently Assigned Employees List -->
+                    @php
+                        $wcDirectAssignments = $workCenter->employeeAssignments ? $workCenter->employeeAssignments->whereNull('section_id') : collect();
+                    @endphp
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="fw-bold text-dark fs-13 mb-0">
                                 Assigned Employees
                                 <span class="badge bg-soft-primary text-primary fs-10 px-2 py-0.5 rounded-pill ms-1 font-monospace">
-                                    {{ $workCenter->employeeAssignments->where('active', true)->count() }} Active
+                                    {{ $wcDirectAssignments->where('active', true)->count() }} Active
                                 </span>
                             </h6>
                         </div>
 
-                        @if($workCenter->employeeAssignments->isNotEmpty())
+                        @if($wcDirectAssignments->isNotEmpty())
                             <div class="table-responsive border rounded">
                                 <table class="table table-sm table-hover align-middle mb-0 fs-12">
                                     <thead class="bg-light">
                                         <tr>
-                                            <th style="width: 20%">Employee ID</th>
+                                            <th style="width: 18%">Employee ID</th>
                                             <th style="width: 25%">Name</th>
-                                            <th style="width: 25%">Designation</th>
-                                            <th style="width: 15%">Status</th>
-                                            <th style="width: 15%" class="text-end">Actions</th>
+                                            <th style="width: 22%">Designation</th>
+                                            <th style="width: 20%">Predefined Shift</th>
+                                            <th style="width: 5%">Status</th>
+                                            <th style="width: 10%" class="text-end">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach($workCenter->employeeAssignments as $assignment)
+                                        @foreach($wcDirectAssignments as $assignment)
                                             @php
                                                 $emp = $assignment->employee;
                                                 $empId = $emp?->employee_id ?? ('EMP-' . ($emp?->id ?? $assignment->employee_id));
                                                 $empFullName = $emp?->full_name ?? $emp?->name ?? 'Unknown Employee';
                                                 $desigName = $emp?->designation?->name ?? $emp?->job_title;
                                                 $deptName = $emp?->department?->name;
+                                                $empShift = $emp?->shift;
                                             @endphp
                                             <tr>
                                                 <td class="font-monospace text-dark fw-semibold">
@@ -2486,6 +2482,29 @@
                                                     <span class="text-dark fw-medium">{{ $desigName ?? 'Staff' }}</span>
                                                     @if($deptName)
                                                         <div class="text-muted fs-11">{{ $deptName }}</div>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @php
+                                                        $wcEffectiveShifts = $workCenter->getEffectiveShifts(true);
+                                                        $wcCompatResult = ($emp && $empShift && $wcEffectiveShifts->isNotEmpty())
+                                                            ? app(\App\Domains\Production\Services\WorkCenterEmployeeService::class)->isEmployeeCompatibleWithShifts($emp, $wcEffectiveShifts, false)
+                                                            : false;
+                                                    @endphp
+                                                    @if($empShift)
+                                                        @if($wcCompatResult)
+                                                            <span class="badge bg-soft-success text-success px-2 py-1 font-monospace" title="Shift Compatible: Matches Work Center Operating Hours">
+                                                                <i class="feather-clock me-1"></i>{{ $empShift->name }} ({{ substr($empShift->start_time, 0, 5) }}&ndash;{{ substr($empShift->end_time, 0, 5) }})
+                                                            </span>
+                                                        @else
+                                                            <span class="badge bg-soft-danger text-danger px-2 py-1 font-monospace border border-danger-subtle" title="Shift Mismatch: Incompatible with Work Center Operating Hours">
+                                                                <i class="feather-alert-triangle me-1"></i>{{ $empShift->name }} ({{ substr($empShift->start_time, 0, 5) }}&ndash;{{ substr($empShift->end_time, 0, 5) }}) [Mismatch]
+                                                            </span>
+                                                        @endif
+                                                    @else
+                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 font-monospace">
+                                                            <i class="feather-alert-circle me-1"></i>No shift predefined
+                                                        </span>
                                                     @endif
                                                 </td>
                                                 <td>
@@ -2532,15 +2551,43 @@
                             <i class="feather-user-plus text-primary me-1"></i>Assign New Employee
                         </h6>
 
-                        @if(($availableEmployees ?? collect())->isEmpty())
+                        @php
+                            $activeSections = $workCenter->sections->where('status', 'active');
+                            $hasActiveSections = $activeSections->isNotEmpty();
+                            $effectiveShifts = $workCenter->getEffectiveShifts(true);
+                            $hasEffectiveShifts = $effectiveShifts->isNotEmpty();
+                        @endphp
+
+                        @if(!$hasActiveSections)
+                            <div class="alert alert-warning py-2.5 px-3 fs-12 mb-0 d-flex align-items-center gap-2">
+                                <i class="feather-alert-triangle text-warning fs-18"></i>
+                                <div>
+                                    <strong>Work Center has no active sections.</strong>
+                                    <div class="text-muted fs-11 mt-0.5">
+                                        Internal employees cannot be assigned at the Work Center level until at least one active section with operating shifts is created. Operating shifts for the Work Center are derived from its active sections.
+                                    </div>
+                                </div>
+                            </div>
+                        @elseif(!$hasEffectiveShifts)
+                            <div class="alert alert-warning py-2.5 px-3 fs-12 mb-0 d-flex align-items-center gap-2">
+                                <i class="feather-alert-triangle text-warning fs-18"></i>
+                                <div>
+                                    <strong>No operating shifts found on active sections.</strong>
+                                    <div class="text-muted fs-11 mt-0.5">
+                                        Internal employees cannot be assigned at the Work Center level because none of the active sections have operating shifts assigned.
+                                    </div>
+                                </div>
+                            </div>
+                        @elseif(($availableEmployees ?? collect())->isEmpty())
                             <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
                                 <i class="feather-alert-triangle me-1"></i>
                                 No active employees found in this organization to assign.
                             </div>
                         @else
                             @php
-                                $activeWcEmpIds = $workCenter->employeeAssignments->where('active', true)->pluck('employee_id')->all();
+                                $activeWcEmpIds = $wcDirectAssignments->where('active', true)->pluck('employee_id')->all();
                                 $activeWcEmpMap = array_flip($activeWcEmpIds);
+                                $wcEmpService = app(\App\Domains\Production\Services\WorkCenterEmployeeService::class);
                             @endphp
                             <form method="POST" action="{{ route('production.work-center-employees.store') }}" id="assignEmployeeForm">
                                 @csrf
@@ -2549,14 +2596,17 @@
                                 <div class="row g-2 align-items-end">
                                     <div class="col-md-9">
                                         <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Select Employee <span class="text-danger">*</span></label>
-                                        <select name="employee_id" class="form-select form-select-sm" required id="wcEmployeeSelect">
+                                        <select name="employee_id" class="form-select form-select-sm" data-select2-selector="default" style="width: 100%;" required id="wcEmployeeSelect">
                                             <option value="">-- Choose Employee --</option>
                                             @foreach($availableEmployees as $emp)
                                                 @php
                                                     $isAssignedToThisWc = isset($activeWcEmpMap[$emp->id]);
                                                     $assignedSec = ($employeesWithActiveSection ?? collect())->get($emp->id);
                                                     $isAssignedToSec = $assignedSec !== null;
-                                                    $isDisabled = $isAssignedToThisWc || $isAssignedToSec;
+                                                    $compatStatus = $wcEmpService->getShiftCompatibilityStatus($emp, $effectiveShifts, false);
+                                                    $isShiftIncompatible = !$compatStatus['compatible'];
+
+                                                    $isDisabled = $isAssignedToThisWc || $isAssignedToSec || $isShiftIncompatible;
 
                                                     $empCode = $emp->employee_id ?? ('EMP-' . $emp->id);
                                                     $empName = $emp->full_name ?? $emp->name ?? 'Employee #' . $emp->id;
@@ -2567,6 +2617,8 @@
                                                         $statusLabel = '(Already Assigned)';
                                                     } elseif ($isAssignedToSec) {
                                                         $statusLabel = '(Assigned to Section: ' . ($assignedSec->section?->name ?? ('#' . $assignedSec->section_id)) . ')';
+                                                    } elseif ($isShiftIncompatible) {
+                                                        $statusLabel = '(' . $compatStatus['label'] . ')';
                                                     } else {
                                                         $statusLabel = '';
                                                     }
@@ -2599,232 +2651,632 @@
         </div>
     </div>
 
+    <!-- Section-Level Internal Employee Assignment Modals -->
+    @foreach ($workCenter->sections as $section)
+        <div class="modal fade" id="sectionEmployeesModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionEmployeesModalLabel_{{ $section->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header border-bottom py-3">
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark fs-15" id="sectionEmployeesModalLabel_{{ $section->id }}">
+                                <i class="feather-user-check text-primary me-2"></i>{{ __('production.assign_internal_employees') }} &mdash; {{ $section->name }}
+                            </h5>
+                            <div class="text-muted fs-11 mt-0.5">
+                                Work Center: <span class="font-monospace fw-semibold text-dark">{{ $workCenter->code }}</span>
+                                &bull; Section: <span class="fw-semibold text-dark">{{ $section->name }}</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <!-- Scope & Exclusivity Banner -->
+                        <div class="alert alert-info py-2.5 px-3 fs-12 mb-3 d-flex align-items-start gap-2">
+                            <i class="feather-info text-info fs-16 mt-0.5"></i>
+                            <div>
+                                <strong>Scope of Assignment:</strong> Internal employees assigned here are dedicated directly to <strong>{{ $section->name }}</strong>.
+                                <div class="text-muted fs-11 mt-0.5">
+                                    Employees assigned at the Work Center level automatically have operational coverage across all sections. An employee dedicated to a Section cannot be assigned to another Section or Work Center simultaneously.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Currently Assigned Employees List -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark fs-13 mb-0">
+                                    Assigned Employees
+                                    <span class="badge bg-soft-primary text-primary fs-10 px-2 py-0.5 rounded-pill ms-1 font-monospace">
+                                        {{ $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->count() : 0 }} Active
+                                    </span>
+                                </h6>
+                            </div>
+
+                            @if($section->employeeAssignments && $section->employeeAssignments->isNotEmpty())
+                                <div class="table-responsive border rounded">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th style="width: 18%">Employee ID</th>
+                                                <th style="width: 25%">Name</th>
+                                                <th style="width: 22%">Designation</th>
+                                                <th style="width: 20%">Predefined Shift</th>
+                                                <th style="width: 5%">Status</th>
+                                                <th style="width: 10%" class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($section->employeeAssignments as $assignment)
+                                                @php
+                                                    $emp = $assignment->employee;
+                                                    $empId = $emp?->employee_id ?? ('EMP-' . ($emp?->id ?? $assignment->employee_id));
+                                                    $empFullName = $emp?->full_name ?? $emp?->name ?? 'Unknown Employee';
+                                                    $desigName = $emp?->designation?->name ?? $emp?->job_title;
+                                                    $deptName = $emp?->department?->name;
+                                                    $empShift = $emp?->shift;
+                                                    $secActiveShifts = $section->shifts->filter(fn($s) => (bool) ($s->active ?? true));
+                                                    $secCompatResult = ($emp && $empShift && $secActiveShifts->isNotEmpty())
+                                                        ? app(\App\Domains\Production\Services\WorkCenterEmployeeService::class)->isEmployeeCompatibleWithShifts($emp, $secActiveShifts, true)
+                                                        : false;
+                                                @endphp
+                                                <tr>
+                                                    <td class="font-monospace text-dark fw-semibold">
+                                                        {{ $empId }}
+                                                    </td>
+                                                    <td>
+                                                        <div class="fw-semibold text-dark">{{ $empFullName }}</div>
+                                                        @if($emp?->office_email ?? $emp?->personal_email)
+                                                            <small class="text-muted fs-11">{{ $emp?->office_email ?? $emp?->personal_email }}</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span class="text-dark fw-medium">{{ $desigName ?? 'Staff' }}</span>
+                                                        @if($deptName)
+                                                            <div class="text-muted fs-11">{{ $deptName }}</div>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($empShift)
+                                                            @if($secCompatResult)
+                                                                <span class="badge bg-soft-success text-success px-2 py-1 font-monospace" title="Shift Compatible: Matches Section Operating Hours">
+                                                                    <i class="feather-clock me-1"></i>{{ $empShift->name }} ({{ substr($empShift->start_time, 0, 5) }}&ndash;{{ substr($empShift->end_time, 0, 5) }})
+                                                                </span>
+                                                            @else
+                                                                <span class="badge bg-soft-danger text-danger px-2 py-1 font-monospace border border-danger-subtle" title="Shift Mismatch: Incompatible with Section Operating Hours">
+                                                                    <i class="feather-alert-triangle me-1"></i>{{ $empShift->name }} ({{ substr($empShift->start_time, 0, 5) }}&ndash;{{ substr($empShift->end_time, 0, 5) }}) [Mismatch]
+                                                                </span>
+                                                            @endif
+                                                        @else
+                                                            <span class="badge bg-soft-danger text-danger px-2 py-1 font-monospace">
+                                                                <i class="feather-alert-circle me-1"></i>No shift predefined
+                                                            </span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($assignment->active)
+                                                            <span class="badge bg-soft-success text-success rounded-pill px-2">Active</span>
+                                                        @else
+                                                            <span class="badge bg-soft-secondary text-secondary rounded-pill px-2">Inactive</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <div class="d-inline-flex gap-1">
+                                                            <form method="POST" action="{{ route('production.work-center-employees.toggle-status', $assignment->id) }}" class="d-inline">
+                                                                @csrf
+                                                                @method('PATCH')
+                                                                <input type="hidden" name="active" value="{{ $assignment->active ? 0 : 1 }}">
+                                                                <button type="submit" class="btn btn-xs {{ $assignment->active ? 'btn-outline-warning' : 'btn-outline-success' }}" title="{{ $assignment->active ? 'Deactivate' : 'Activate' }}">
+                                                                    <i class="{{ $assignment->active ? 'feather-pause-circle' : 'feather-play-circle' }}"></i>
+                                                                </button>
+                                                            </form>
+                                                            <form method="POST" action="{{ route('production.work-center-employees.destroy', $assignment->id) }}" class="d-inline" onsubmit="return confirm('Remove {{ $empFullName }} from this Section?');">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-xs btn-outline-danger" title="Remove assignment">
+                                                                    <i class="feather-trash-2"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="text-center py-4 bg-light rounded border border-dashed text-muted fs-12">
+                                    <i class="feather-users fs-18 d-block mb-1 text-muted"></i>
+                                    No internal employees currently assigned directly to this Section.
+                                </div>
+                            @endif
+                        </div>
+
+                        <!-- Assign Section Employee Form -->
+                        <div class="border rounded p-3 bg-light">
+                            <h6 class="fw-bold text-dark fs-12 mb-2">
+                                <i class="feather-user-plus text-primary me-1"></i>Assign New Employee to {{ $section->name }}
+                            </h6>
+
+                            @php
+                                $secActiveShifts = $section->shifts->filter(fn($s) => (bool) ($s->active ?? true));
+                                $hasSecShifts = $secActiveShifts->isNotEmpty();
+                            @endphp
+
+                            @if(!$hasSecShifts)
+                                <div class="alert alert-warning py-2.5 px-3 fs-12 mb-0 d-flex align-items-center gap-2">
+                                    <i class="feather-alert-triangle text-warning fs-18"></i>
+                                    <div>
+                                        <strong>Section has no active operating shifts assigned.</strong>
+                                        <div class="text-muted fs-11 mt-0.5">
+                                            Internal employees cannot be assigned until at least one active operating shift is assigned to this section.
+                                        </div>
+                                    </div>
+                                </div>
+                            @elseif(($availableEmployees ?? collect())->isEmpty())
+                                <div class="alert alert-warning py-2 px-3 fs-11 mb-0">
+                                    <i class="feather-alert-triangle me-1"></i>
+                                    No active employees found in this organization to assign.
+                                </div>
+                            @else
+                                @php
+                                    $activeSecEmpIds = $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->pluck('employee_id')->all() : [];
+                                    $activeSecEmpMap = array_flip($activeSecEmpIds);
+                                    $secEmpService = app(\App\Domains\Production\Services\WorkCenterEmployeeService::class);
+                                @endphp
+                                <form method="POST" action="{{ route('production.work-center-employees.store') }}" id="assignSectionEmployeeForm_{{ $section->id }}">
+                                    @csrf
+                                    <input type="hidden" name="work_center_id" value="{{ $workCenter->id }}">
+                                    <input type="hidden" name="section_id" value="{{ $section->id }}">
+
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-9">
+                                            <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">Select Employee <span class="text-danger">*</span></label>
+                                            <select name="employee_id" class="form-select form-select-sm" data-select2-selector="default" style="width: 100%;" required id="secEmployeeSelect_{{ $section->id }}">
+                                                <option value="">-- Choose Employee --</option>
+                                                @foreach($availableEmployees as $emp)
+                                                    @php
+                                                        $isAssignedToThisSec = isset($activeSecEmpMap[$emp->id]);
+                                                        $assignedWcAssignments = ($employeesWithActiveWorkCenter ?? collect())->get($emp->id);
+                                                        $isAssignedToAnyWc = $assignedWcAssignments !== null && $assignedWcAssignments->isNotEmpty();
+                                                        $assignedOtherSec = ($employeesWithActiveSection ?? collect())->get($emp->id);
+                                                        $isAssignedToOtherSec = $assignedOtherSec !== null && $assignedOtherSec->section_id !== $section->id;
+                                                        $compatStatus = $secEmpService->getShiftCompatibilityStatus($emp, $secActiveShifts, true);
+                                                        $isShiftIncompatible = !$compatStatus['compatible'];
+
+                                                        $isDisabled = $isAssignedToThisSec || $isAssignedToAnyWc || $isAssignedToOtherSec || $isShiftIncompatible;
+
+                                                        $empCode = $emp->employee_id ?? ('EMP-' . $emp->id);
+                                                        $empName = $emp->full_name ?? $emp->name ?? 'Employee #' . $emp->id;
+                                                        $desig = $emp->designation?->name ?? $emp->job_title ?? 'Staff';
+                                                        $dept = $emp->department?->name;
+
+                                                        if ($isAssignedToThisSec) {
+                                                            $statusLabel = '(Already Assigned to this Section)';
+                                                        } elseif ($isAssignedToAnyWc) {
+                                                            $wcNames = $assignedWcAssignments->map(fn($a) => $a->workCenter?->name ?? ('#' . $a->work_center_id))->unique()->implode(', ');
+                                                            $statusLabel = '(Assigned at Work Center level: ' . $wcNames . ')';
+                                                        } elseif ($isAssignedToOtherSec) {
+                                                            $statusLabel = '(Assigned to Section: ' . ($assignedOtherSec->section?->name ?? ('#' . $assignedOtherSec->section_id)) . ')';
+                                                        } elseif ($isShiftIncompatible) {
+                                                            $statusLabel = '(' . $compatStatus['label'] . ')';
+                                                        } else {
+                                                            $statusLabel = '';
+                                                        }
+                                                    @endphp
+                                                    <option value="{{ $emp->id }}"
+                                                            @if($isDisabled) disabled @endif
+                                                            @if($isDisabled) class="text-danger fst-italic" style="color: #dc3545; font-style: italic; background-color: #fff5f5;" @endif>
+                                                        @if($isDisabled)⛔ @endif{{ $empName }} ({{ $empCode }}) &mdash; {{ $desig }}@if($dept) [{{ $dept }}]@endif @if($statusLabel) {{ $statusLabel }}@endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button type="submit" class="btn btn-sm btn-primary w-100">
+                                                <i class="feather-plus me-1"></i>Assign
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endforeach
+
+    <!-- Section-Level Manual Production Modals -->
+    @foreach ($workCenter->sections as $section)
+        @php
+            $hasWorkerAssignments = $section->hasActiveWorkerAssignments();
+            $workerCounts = $section->getActiveWorkerCounts();
+            $isManualProd = (bool) $section->supports_manual_production;
+            $manualCapVal = $section->manual_capacity_per_hour !== null ? (float) $section->manual_capacity_per_hour : '';
+        @endphp
+        <div class="modal fade" id="sectionManualProductionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionManualProductionModalLabel_{{ $section->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header border-bottom py-3">
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark fs-15" id="sectionManualProductionModalLabel_{{ $section->id }}">
+                                <i class="feather-tool text-warning me-2"></i>{{ __('production.manual_production') }} &mdash; {{ $section->name }}
+                            </h5>
+                            <div class="text-muted fs-11 mt-0.5">
+                                Work Center: <span class="font-monospace fw-semibold text-dark">{{ $workCenter->code }}</span>
+                                &bull; Section: <span class="fw-semibold text-dark">{{ $section->name }} ({{ $section->code }})</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    @if(!$hasWorkerAssignments)
+                        <div class="modal-body p-4">
+                            <div class="alert alert-warning d-flex align-items-start gap-2 py-3 px-3 mb-0">
+                                <i class="feather-alert-triangle text-warning fs-18 mt-0.5 flex-shrink-0"></i>
+                                <div>
+                                    <h6 class="alert-heading fw-bold fs-13 mb-1">No Active Worker Assignments</h6>
+                                    <div class="fs-12 text-muted">
+                                        Manual production cannot be configured or enabled because this section has not been assigned any active internal employees or external workers. Manual production operations require human workers.
+                                    </div>
+                                    <div class="mt-3 d-flex gap-2 flex-wrap">
+                                        <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 fw-semibold" data-bs-target="#sectionEmployeesModal_{{ $section->id }}" data-bs-toggle="modal">
+                                            <i class="feather-user-check me-1"></i>Assign Internal Employees
+                                        </button>
+                                        @can('create', App\Domains\Production\Models\ExternalWorkerAllocation::class)
+                                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2.5 py-1 fw-semibold" data-bs-target="#sectionExternalWorkerModal_{{ $section->id }}" data-bs-toggle="modal">
+                                                <i class="feather-user-plus me-1"></i>Allocate External Workers
+                                            </button>
+                                        @endcan
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if($isManualProd)
+                                <div class="mt-3 p-3 bg-light rounded border">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-bold text-dark fs-12">Manual Production Currently Enabled</div>
+                                            <small class="text-muted fs-11">Since there are no active workers, disable manual production to keep section capacity accurate.</small>
+                                        </div>
+                                        <form method="POST" action="{{ route('production.work-center-sections.update-manual-production', $section->id) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="supports_manual_production" value="0">
+                                            <button type="submit" class="btn btn-xs btn-outline-danger">
+                                                Disable Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    @else
+                        <form method="POST" action="{{ route('production.work-center-sections.update-manual-production', $section->id) }}">
+                            @csrf
+                            @method('PATCH')
+                            <div class="modal-body p-4">
+                                <!-- Workforce summary banner -->
+                                <div class="alert alert-info py-2 px-3 fs-12 mb-3 d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <i class="feather-users me-1 text-info"></i>
+                                        <strong>Active Section Workforce:</strong>
+                                        {{ $workerCounts['internal'] }} Internal, {{ $workerCounts['external'] }} External (Total: {{ $workerCounts['total'] }})
+                                    </div>
+                                    <span class="badge bg-soft-success text-success font-monospace">Eligible</span>
+                                </div>
+
+                                <div class="p-3 border rounded bg-light mb-0">
+                                    <div class="form-check form-switch mb-0">
+                                        <input type="hidden" name="supports_manual_production" value="0">
+                                        <input class="form-check-input section-manual-prod-toggle" type="checkbox" name="supports_manual_production" value="1" 
+                                               id="modal_supports_manual_production_{{ $section->id }}" 
+                                               data-target="#modal_manual_capacity_container_{{ $section->id }}"
+                                               @checked($isManualProd)>
+                                        <label class="form-check-label fw-bold text-dark fs-13" for="modal_supports_manual_production_{{ $section->id }}">
+                                            {{ __('production.manual_production') }}
+                                        </label>
+                                        <div class="form-text fs-11 text-muted">{{ __('production.manual_production_desc') }}</div>
+                                    </div>
+
+                                    <div id="modal_manual_capacity_container_{{ $section->id }}" class="mt-3 pt-3 border-top @if(!$isManualProd) d-none @endif">
+                                        <label class="form-label fw-bold fs-12 text-dark" for="modal_manual_capacity_per_hour_{{ $section->id }}">
+                                            {{ __('production.manual_capacity_per_hour') }} <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <input type="number" step="any" min="0.0001" name="manual_capacity_per_hour" id="modal_manual_capacity_per_hour_{{ $section->id }}" 
+                                                   class="form-control fs-12" 
+                                                   placeholder="e.g. 10.00"
+                                                   value="{{ $manualCapVal }}"
+                                                   @if(!$isManualProd) disabled @endif>
+                                            <span class="input-group-text fs-11 text-muted bg-white">{{ __('production.units_per_hour') }}</span>
+                                        </div>
+                                        <div class="form-text fs-11 text-muted">{{ __('production.manual_capacity_hint') }}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="feather-save me-1"></i>Save Configuration
+                                </button>
+                            </div>
+                        </form>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endforeach
+
     @push('scripts')
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
+            $(function() {
+                // Toggle manual capacity per hour input in dedicated modal
+                $(document).on('change', '.section-manual-prod-toggle', function() {
+                    var $target = $($(this).data('target'));
+                    var $input = $target.find('input');
+                    if ($(this).is(':checked')) {
+                        $target.removeClass('d-none');
+                        $input.prop('disabled', false);
+                    } else {
+                        $target.addClass('d-none');
+                        $input.prop('disabled', true);
+                    }
+                });
+
                 // Initialize Bootstrap popovers for machine badges
                 if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
-                    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-                    popoverTriggerList.forEach(function (popoverTriggerEl) {
-                        if (!bootstrap.Popover.getInstance(popoverTriggerEl)) {
-                            new bootstrap.Popover(popoverTriggerEl, {
-                                sanitize: false
-                            });
+                    $('[data-bs-toggle="popover"]').each(function () {
+                        if (!bootstrap.Popover.getInstance(this)) {
+                            new bootstrap.Popover(this, { sanitize: false });
                         }
                     });
                 }
 
-                if (typeof $ !== 'undefined' && $.fn.select2) {
-                    $('.modal').on('shown.bs.modal', function () {
-                        var $modal = $(this);
-                        $modal.find('.section-machine-select').each(function() {
-                            var $select = $(this);
-                            if ($select.hasClass('select2-hidden-accessible')) {
-                                $select.select2('destroy');
-                            }
-                            $select.select2({
-                                theme: 'bootstrap-5',
-                                dropdownParent: $modal.find('.modal-content'),
-                                width: '100%',
-                                placeholder: $select.data('placeholder') || '{{ __('production.select_machines') }}',
-                                closeOnSelect: true
-                            });
-                        });
-                    });
+                // Standard modal Select2 initialization adhering to theme-wide bootstrap-5 standard
+                function initModalSelect2($select, $modal) {
+                    if (!$select || !$select.length || typeof $ === 'undefined' || !$.fn.select2) return;
+                    var $modalEl = ($modal && $modal.length) ? $modal : $select.closest('.modal');
+                    var $dropdownParent = $modalEl.find('.modal-content').length ? $modalEl.find('.modal-content') : ($modalEl.length ? $modalEl : $(document.body));
 
-                    // Auto-close Select2 dropdown when scrolling or hiding modal to prevent floating detached dropdowns
-                    $('.modal').on('hide.bs.modal scroll', function () {
-                        $(this).find('.section-machine-select').each(function() {
-                            if ($(this).data('select2')) {
-                                $(this).select2('close');
-                            }
-                        });
-                    });
+                    if ($select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
 
-                    $('.modal-body').on('scroll', function () {
-                        $(this).find('.section-machine-select').each(function() {
-                            if ($(this).data('select2')) {
-                                $(this).select2('close');
-                            }
-                        });
+                    var isMulti = $select.prop('multiple');
+                    var placeholder = $select.data('placeholder') || $select.find('option:first').text() || 'Select...';
+
+                    $select.select2({
+                        theme: 'bootstrap-5',
+                        dropdownParent: $dropdownParent,
+                        width: '100%',
+                        placeholder: placeholder,
+                        allowClear: false,
+                        closeOnSelect: !isMulti
                     });
                 }
+
+                // Initialize visible modal selects on modal shown
+                $(document).on('shown.bs.modal', '.modal', function () {
+                    var $modal = $(this);
+                    $modal.find('[data-select2-selector]').each(function() {
+                        var $sel = $(this);
+                        if ($sel.closest('.shift-picker-panel.d-none').length === 0) {
+                            initModalSelect2($sel, $modal);
+                        }
+                    });
+                });
+
+                // Auto-close Select2 dropdowns when scrolling modal to prevent detached floating menus
+                $(document).on('scroll', '.modal, .modal-body', function () {
+                    $(this).find('.select2-hidden-accessible').each(function() {
+                        if ($(this).data('select2')) {
+                            $(this).select2('close');
+                        }
+                    });
+                });
+
+                // Modal close cleanup
+                $(document).on('hidden.bs.modal', '.modal', function () {
+                    var $modal = $(this);
+                    $modal.find('.shift-picker-panel').addClass('d-none');
+                    $modal.find('.shift-picker-select').each(function() {
+                        if ($(this).data('select2')) {
+                            $(this).val('').trigger('change.select2');
+                            $(this).select2('close');
+                        } else {
+                            this.value = '';
+                        }
+                    });
+                    $modal.find('.shift-picker-warning').remove();
+
+                    setTimeout(function() {
+                        if (!$('.modal.show').length) {
+                            $('.modal-backdrop').remove();
+                            $('body').removeClass('modal-open').css({'overflow': '', 'padding-right': ''});
+                        }
+                    }, 150);
+                });
 
                 // Handle manual production toggle
-                document.addEventListener('change', function(e) {
-                    if (e.target && e.target.classList.contains('manual-production-toggle')) {
-                        var targetSelector = e.target.getAttribute('data-target');
-                        var targetEl = document.querySelector(targetSelector);
-                        if (targetEl) {
-                            var input = targetEl.querySelector('.manual-capacity-input');
-                            if (e.target.checked) {
-                                targetEl.classList.remove('d-none');
-                                if (input) {
-                                    input.removeAttribute('disabled');
-                                    input.focus();
-                                }
-                            } else {
-                                targetEl.classList.add('d-none');
-                                if (input) {
-                                    input.setAttribute('disabled', 'disabled');
-                                    input.value = '';
-                                }
-                            }
+                $(document).on('change', '.manual-production-toggle', function() {
+                    var targetSelector = $(this).data('target');
+                    var $target = $(targetSelector);
+                    if ($target.length) {
+                        var $input = $target.find('.manual-capacity-input');
+                        if (this.checked) {
+                            $target.removeClass('d-none');
+                            $input.prop('disabled', false).focus();
+                        } else {
+                            $target.addClass('d-none');
+                            $input.prop('disabled', true).val('');
                         }
+                    }
+                });
+
+                // External worker quantity inline edit: reveal tick button only when value changes
+                $(document).on('input change keyup', '.ext-worker-qty-input', function () {
+                    var initialVal = String($(this).data('initial-value') || '').trim();
+                    var currentVal = String($(this).val() || '').trim();
+                    var $btn = $(this).closest('form').find('.ext-worker-qty-btn');
+                    if (currentVal !== '' && currentVal !== initialVal) {
+                        $btn.removeClass('d-none');
+                    } else {
+                        $btn.addClass('d-none');
                     }
                 });
 
                 // ── Add Shift Workflow Interactive Handlers ───────────────────────
                 // 1. Toggle shift picker inline panel
-                document.addEventListener('click', function(e) {
-                    var toggleBtn = e.target.closest('.btn-add-shift-toggle');
-                    if (toggleBtn) {
-                        var box = toggleBtn.closest('.section-shifts-box');
-                        if (box) {
-                            var panel = box.querySelector('.shift-picker-panel');
-                            if (panel) {
-                                panel.classList.toggle('d-none');
-                                var select = panel.querySelector('.shift-picker-select');
-                                if (select && !panel.classList.contains('d-none')) {
-                                    select.focus();
+                $(document).on('click', '.btn-add-shift-toggle', function(e) {
+                    e.preventDefault();
+                    var $box = $(this).closest('.section-shifts-box');
+                    if (!$box.length) return;
+                    var $panel = $box.find('.shift-picker-panel');
+                    if ($panel.length) {
+                        var isHidden = $panel.hasClass('d-none');
+                        if (isHidden) {
+                            $panel.removeClass('d-none');
+                            var $select = $panel.find('.shift-picker-select');
+                            var $modal = $(this).closest('.modal');
+                            initModalSelect2($select, $modal);
+                            setTimeout(function() {
+                                if ($select.data('select2')) {
+                                    $select.select2('open');
+                                } else {
+                                    $select.focus();
                                 }
+                            }, 50);
+                        } else {
+                            $panel.addClass('d-none');
+                            var $select = $panel.find('.shift-picker-select');
+                            if ($select.data('select2')) {
+                                $select.select2('close');
                             }
                         }
                     }
                 });
 
                 // 2. Cancel shift picker panel
-                document.addEventListener('click', function(e) {
-                    var cancelBtn = e.target.closest('.btn-add-shift-cancel');
-                    if (cancelBtn) {
-                        var panel = cancelBtn.closest('.shift-picker-panel');
-                        if (panel) {
-                            panel.classList.add('d-none');
-                            var select = panel.querySelector('.shift-picker-select');
-                            if (select) {
-                                select.value = '';
+                $(document).on('click', '.btn-add-shift-cancel', function(e) {
+                    e.preventDefault();
+                    var $panel = $(this).closest('.shift-picker-panel');
+                    if ($panel.length) {
+                        $panel.addClass('d-none');
+                        var $select = $panel.find('.shift-picker-select');
+                        if ($select.length) {
+                            $select.val('').trigger('change.select2');
+                            if ($select.data('select2')) {
+                                $select.select2('close');
                             }
                         }
+                        $panel.find('.shift-picker-warning').remove();
                     }
                 });
 
                 // 3. Confirm adding shift from selector to assigned list
-                document.addEventListener('click', function(e) {
-                    var confirmBtn = e.target.closest('.btn-add-shift-confirm');
-                    if (confirmBtn) {
-                        var box = confirmBtn.closest('.section-shifts-box');
-                        if (!box) return;
+                $(document).on('click', '.btn-add-shift-confirm', function(e) {
+                    e.preventDefault();
+                    var $box = $(this).closest('.section-shifts-box');
+                    if (!$box.length) return;
 
-                        var panel = box.querySelector('.shift-picker-panel');
-                        var select = panel ? panel.querySelector('.shift-picker-select') : null;
-                        if (!select || !select.value) {
-                            alert('Please select a shift to add.');
-                            return;
+                    var $panel = $box.find('.shift-picker-panel');
+                    var $select = $panel.find('.shift-picker-select');
+                    var selectedVal = $select.val();
+
+                    if (!selectedVal) {
+                        if (typeof window.showAppToast === 'function') {
+                            window.showAppToast('warning', 'Please select a shift from the list.');
+                        } else {
+                            alert('Please select a shift from the list.');
                         }
-
-                        var shiftId = select.value;
-                        var selectedOption = select.options[select.selectedIndex];
-                        var shiftName = selectedOption.getAttribute('data-name') || selectedOption.text;
-                        var shiftCode = selectedOption.getAttribute('data-code') || '';
-                        var shiftTime = selectedOption.getAttribute('data-time') || '';
-
-                        var list = box.querySelector('.assigned-shifts-list');
-                        var emptyState = box.querySelector('.assigned-shifts-empty');
-                        var countBadge = box.querySelector('.shifts-count-badge');
-
-                        // Check duplicate
-                        if (list && list.querySelector('[data-shift-id="' + shiftId + '"]')) {
-                            alert('This shift is already assigned to this Section.');
-                            return;
-                        }
-
-                        // Create shift row item
-                        var row = document.createElement('div');
-                        row.className = 'p-2 border rounded bg-light d-flex justify-content-between align-items-center assigned-shift-row';
-                        row.setAttribute('data-shift-id', shiftId);
-
-                        var hiddenInput = document.createElement('input');
-                        hiddenInput.type = 'hidden';
-                        hiddenInput.name = 'shifts[]';
-                        hiddenInput.value = shiftId;
-                        row.appendChild(hiddenInput);
-
-                        var detailsDiv = document.createElement('div');
-                        detailsDiv.className = 'd-flex align-items-center gap-2';
-
-                        var icon = document.createElement('i');
-                        icon.className = 'feather-clock text-primary fs-12';
-                        detailsDiv.appendChild(icon);
-
-                        if (shiftCode) {
-                            var codeSpan = document.createElement('span');
-                            codeSpan.className = 'fw-bold font-monospace text-dark fs-12';
-                            codeSpan.textContent = '[' + shiftCode + ']';
-                            detailsDiv.appendChild(codeSpan);
-                        }
-
-                        var nameSpan = document.createElement('span');
-                        nameSpan.className = 'text-dark fs-12';
-                        nameSpan.textContent = shiftName;
-                        detailsDiv.appendChild(nameSpan);
-
-                        if (shiftTime) {
-                            var timeSpan = document.createElement('span');
-                            timeSpan.className = 'text-muted fs-11';
-                            timeSpan.textContent = '(' + shiftTime + ')';
-                            detailsDiv.appendChild(timeSpan);
-                        }
-
-                        row.appendChild(detailsDiv);
-
-                        var removeBtn = document.createElement('button');
-                        removeBtn.type = 'button';
-                        removeBtn.className = 'btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 btn-remove-shift';
-                        removeBtn.title = 'Remove shift';
-                        removeBtn.innerHTML = '<i class="feather-trash-2 me-0.5 fs-10"></i>Remove';
-                        row.appendChild(removeBtn);
-
-                        if (list) {
-                            list.appendChild(row);
-                        }
-
-                        // Update empty state
-                        if (emptyState) {
-                            emptyState.classList.add('d-none');
-                        }
-
-                        // Update count badge
-                        if (countBadge && list) {
-                            var count = list.querySelectorAll('.assigned-shift-row').length;
-                            countBadge.textContent = count + ' Shifts';
-                        }
-
-                        // Reset select and close panel
-                        select.value = '';
-                        panel.classList.add('d-none');
+                        return;
                     }
+
+                    var $selectedOpt = $select.find('option:selected');
+                    var shiftId = selectedVal;
+                    var shiftName = $selectedOpt.data('name') || $selectedOpt.text();
+                    var shiftCode = $selectedOpt.data('code') || '';
+                    var shiftTime = $selectedOpt.data('time') || '';
+
+                    var $list = $box.find('.assigned-shifts-list');
+                    var $emptyState = $box.find('.assigned-shifts-empty');
+                    var $countBadge = $box.find('.shifts-count-badge');
+
+                    // Check duplicate
+                    if ($list.find('[data-shift-id="' + shiftId + '"]').length) {
+                        if (typeof window.showAppToast === 'function') {
+                            window.showAppToast('warning', 'This shift is already assigned to this Section.');
+                        } else {
+                            alert('This shift is already assigned to this Section.');
+                        }
+                        return;
+                    }
+
+                    // Build row
+                    var codeBadge = shiftCode ? '<span class="fw-bold font-monospace text-dark fs-12">[' + $('<div>').text(shiftCode).html() + ']</span> ' : '';
+                    var nameSpan = '<span class="text-dark fs-12">' + $('<div>').text(shiftName).html() + '</span> ';
+                    var timeSpan = shiftTime ? '<span class="text-muted fs-11">(' + $('<div>').text(shiftTime).html() + ')</span>' : '';
+
+                    var rowHtml = '<div class="p-2 border rounded bg-light d-flex justify-content-between align-items-center assigned-shift-row" data-shift-id="' + shiftId + '">' +
+                        '<input type="hidden" name="shifts[]" value="' + shiftId + '">' +
+                        '<div class="d-flex align-items-center gap-2">' +
+                            '<i class="feather-clock text-primary fs-12"></i>' +
+                            codeBadge +
+                            nameSpan +
+                            timeSpan +
+                        '</div>' +
+                        '<button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 btn-remove-shift" title="Remove shift">' +
+                            '<i class="feather-trash-2 me-0.5 fs-10"></i>Remove' +
+                        '</button>' +
+                    '</div>';
+
+                    $list.append(rowHtml);
+
+                    if ($emptyState.length) {
+                        $emptyState.addClass('d-none');
+                    }
+
+                    if ($countBadge.length) {
+                        var count = $list.find('.assigned-shift-row').length;
+                        $countBadge.text(count + ' Shifts');
+                    }
+
+                    // Reset select and close panel
+                    $select.val('').trigger('change.select2');
+                    if ($select.data('select2')) {
+                        $select.select2('close');
+                    }
+                    $panel.addClass('d-none');
+                    $panel.find('.shift-picker-warning').remove();
                 });
 
                 // 4. Remove shift from assigned list
-                document.addEventListener('click', function(e) {
-                    var removeBtn = e.target.closest('.btn-remove-shift');
-                    if (removeBtn) {
-                        var box = removeBtn.closest('.section-shifts-box');
-                        var row = removeBtn.closest('.assigned-shift-row');
-                        if (row) {
-                            row.remove();
+                $(document).on('click', '.btn-remove-shift', function(e) {
+                    e.preventDefault();
+                    var $row = $(this).closest('.assigned-shift-row');
+                    var $box = $(this).closest('.section-shifts-box');
+                    $row.remove();
+                    if ($box.length) {
+                        var $list = $box.find('.assigned-shifts-list');
+                        var $emptyState = $box.find('.assigned-shifts-empty');
+                        var $countBadge = $box.find('.shifts-count-badge');
+                        var count = $list.find('.assigned-shift-row').length;
+                        if ($countBadge.length) {
+                            $countBadge.text(count + ' Shifts');
                         }
-                        if (box) {
-                            var list = box.querySelector('.assigned-shifts-list');
-                            var emptyState = box.querySelector('.assigned-shifts-empty');
-                            var countBadge = box.querySelector('.shifts-count-badge');
-                            var count = list ? list.querySelectorAll('.assigned-shift-row').length : 0;
-                            if (countBadge) {
-                                countBadge.textContent = count + ' Shifts';
-                            }
-                            if (count === 0 && emptyState) {
-                                emptyState.classList.remove('d-none');
-                            }
+                        if (count === 0 && $emptyState.length) {
+                            $emptyState.removeClass('d-none');
                         }
                     }
                 });
@@ -2835,7 +3287,7 @@
     @if($errors->any() && old('_modal'))
         @push('scripts')
             <script>
-                document.addEventListener('DOMContentLoaded', function() {
+                $(function() {
                     var modalId = "{{ old('_modal') }}";
                     var modalEl = document.getElementById(modalId);
                     if (modalEl && typeof bootstrap !== 'undefined') {

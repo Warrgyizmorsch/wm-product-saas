@@ -64,9 +64,7 @@ class SectionCalculationService
     {
         $tenantId = (int) $section->tenant_id;
 
-        $shifts = $section->relationLoaded('shifts')
-            ? $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => ($s->active ?? true) && ($s->pivot->active ?? true))
-            : $section->shifts()->where('production_shifts.tenant_id', $tenantId)->where('production_shifts.active', true)->where('production_section_shifts.active', true)->get();
+        $shifts = $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => (bool) ($s->active ?? true));
 
         if ($shifts->isEmpty()) {
             return [
@@ -251,27 +249,17 @@ class SectionCalculationService
     }
 
     /**
-     * Calculate and persist Section calculated metrics and calculation_details JSON snapshot.
+     * Calculate and persist Section calculated metrics (safely bypassed during schema redesign).
      */
     public function calculateAndSave(WorkCenterSection $section): WorkCenterSection
     {
-        $calc = $this->calculate($section);
-
-        $section->update([
-            'capacity_per_hour'          => $calc['capacity']['total_capacity'],
-            'labor_cost_per_hour'        => $calc['labor_cost']['labor_cost_per_hour'],
-            'total_scheduled_labor_cost' => $calc['labor_cost']['total_scheduled_labor_cost'],
-            'unique_operating_hours'     => $calc['labor_cost']['unique_operating_hours'],
-            'calculation_details'        => $calc,
-        ]);
-
-        $fresh = $section->fresh(['workCenter', 'machines', 'shifts']);
+        $fresh = $section->fresh(['workCenter', 'machines']);
 
         if ($fresh && $fresh->workCenter) {
             app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
         }
 
-        return $fresh;
+        return $fresh ?: $section;
     }
 
     private function parseTimeToMinutes(string $timeStr): int

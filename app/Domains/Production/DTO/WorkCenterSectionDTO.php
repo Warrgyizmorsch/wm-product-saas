@@ -14,7 +14,7 @@ class WorkCenterSectionDTO
         public readonly array   $shift_ids = [],
         public readonly array   $shift_workers = [],
         public readonly ?array  $machine_ids = null,
-        public readonly bool    $supports_manual_production = false,
+        public readonly ?bool   $supports_manual_production = null,
         public readonly ?float  $manual_capacity_per_hour = null,
     ) {}
 
@@ -27,10 +27,20 @@ class WorkCenterSectionDTO
                 : [];
         }
 
-        $supportsManual = filter_var($data['supports_manual_production'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        $manualCapacity = ($supportsManual && isset($data['manual_capacity_per_hour']) && is_numeric($data['manual_capacity_per_hour']))
-            ? (float) $data['manual_capacity_per_hour']
+        $supportsManual = array_key_exists('supports_manual_production', $data)
+            ? filter_var($data['supports_manual_production'], FILTER_VALIDATE_BOOLEAN)
             : null;
+
+        $manualCapacity = null;
+        if ($supportsManual === true) {
+            $manualCapacity = (isset($data['manual_capacity_per_hour']) && is_numeric($data['manual_capacity_per_hour']))
+                ? (float) $data['manual_capacity_per_hour']
+                : null;
+        } elseif ($supportsManual === false) {
+            $manualCapacity = null;
+        } elseif (array_key_exists('manual_capacity_per_hour', $data) && is_numeric($data['manual_capacity_per_hour'])) {
+            $manualCapacity = (float) $data['manual_capacity_per_hour'];
+        }
 
         $shiftIds = [];
 
@@ -66,15 +76,20 @@ class WorkCenterSectionDTO
 
     public function toArray(): array
     {
-        return [
-            'work_center_id'             => $this->work_center_id,
-            'name'                       => $this->name,
-            'code'                       => $this->code,
-            'workers_required'           => $this->workers_required,
-            'supports_manual_production' => $this->supports_manual_production,
-            'manual_capacity_per_hour'   => $this->manual_capacity_per_hour,
-            'description'                => $this->description,
-            'status'                     => $this->status,
+        $arr = [
+            'work_center_id'  => $this->work_center_id,
+            'name'            => $this->name,
+            'code'            => $this->code,
+            'assigned_shifts' => $this->shift_ids,
+            'description'     => $this->description,
+            'status'          => $this->status,
         ];
+
+        if ($this->supports_manual_production !== null) {
+            $arr['supports_manual_production'] = $this->supports_manual_production;
+            $arr['manual_capacity_per_hour']   = $this->manual_capacity_per_hour;
+        }
+
+        return $arr;
     }
 }

@@ -4,7 +4,7 @@ namespace App\Domains\Production\Controllers;
 
 use App\Domains\Production\Models\ExternalWorkerAllocation;
 use App\Domains\Production\Requests\StoreExternalWorkerAllocationRequest;
-use App\Domains\Production\Requests\UpdateExternalWorkerAllocationHeadcountRequest;
+use App\Domains\Production\Requests\UpdateExternalWorkerAllocationQuantityRequest;
 use App\Domains\Production\Services\ExternalWorkerAllocationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +29,7 @@ class ExternalWorkerAllocationController extends Controller
             $sectionId = (int) $data['section_id'];
             $shiftId = (int) $data['shift_id'];
             $payGradeId = (int) $data['pay_grade_id'];
-            $headcount = (int) $data['headcount'];
+            $numberOfExternalWorkers = (int) ($data['number_of_external_workers'] ?? 1);
             $active = $request->boolean('active', true);
             $updateIfExists = $request->boolean('update_if_exists', false);
 
@@ -37,7 +37,7 @@ class ExternalWorkerAllocationController extends Controller
                 $sectionId,
                 $shiftId,
                 $payGradeId,
-                $headcount,
+                $numberOfExternalWorkers,
                 $tenantId,
                 $active,
                 $updateIfExists
@@ -51,7 +51,7 @@ class ExternalWorkerAllocationController extends Controller
         }
     }
 
-    public function updateHeadcount(UpdateExternalWorkerAllocationHeadcountRequest $request, int $id): RedirectResponse
+    public function updateQuantity(UpdateExternalWorkerAllocationQuantityRequest $request, int $id): RedirectResponse
     {
         $tenantId = require_tenant_id();
         $allocation = ExternalWorkerAllocation::withoutGlobalScopes()
@@ -63,14 +63,14 @@ class ExternalWorkerAllocationController extends Controller
         Gate::authorize('update', $allocation);
 
         try {
-            $headcount = (int) $request->validated('headcount');
-            $this->service->updateHeadcount($id, $headcount, $tenantId);
+            $quantity = (int) $request->validated('number_of_external_workers');
+            $this->service->updateQuantity($id, $quantity, $tenantId);
 
-            return redirect()->back()->with('success', 'External worker headcount updated successfully.');
+            return redirect()->back()->with('success', 'Number of external workers updated successfully.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
-            return redirect()->back()->withInput()->with('error', 'An error occurred while updating headcount: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'An error occurred while updating allocation: ' . $e->getMessage());
         }
     }
 

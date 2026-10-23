@@ -102,15 +102,7 @@ class ExternalWorkerUiTest extends TestCase
             'active'     => true,
         ]);
 
-        DB::table('production_section_shifts')->insert([
-            'tenant_id'        => $this->tenantA->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'target_headcount' => 5,
-            'active'           => 1,
-            'created_at'       => now(),
-            'updated_at'       => now(),
-        ]);
+        $this->sectionA->update(['assigned_shifts' => [$this->shiftA->id]]);
 
         $this->payGradeA = ExternalWorkerPayGrade::create([
             'tenant_id'   => $this->tenantA->id,
@@ -200,21 +192,19 @@ class ExternalWorkerUiTest extends TestCase
     /**
      * Requirement 3: Pay Grade deletion is rejected while active allocations exist.
      */
+    /**
+     * Requirement 3: Pay Grade deletion is rejected while active allocations exist.
+     */
     public function test_pay_grade_deletion_is_rejected_while_active_allocations_exist(): void
     {
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $this->tenantA->id)
-            ->first();
-
         // Active allocation referencing payGradeA
         ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $this->payGradeA->id,
-            'headcount'        => 3,
-            'active'           => true,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 3,
+            'active'                     => true,
         ]);
 
         $response = $this->actingAs($this->userA)
@@ -233,18 +223,13 @@ class ExternalWorkerUiTest extends TestCase
      */
     public function test_pay_grade_deletion_is_permitted_after_allocations_are_deactivated_with_history_retained(): void
     {
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $this->tenantA->id)
-            ->first();
-
         $allocation = ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $this->payGradeA->id,
-            'headcount'        => 2,
-            'active'           => false, // Deactivated allocation
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 2,
+            'active'                     => false, // Deactivated allocation
         ]);
 
         $response = $this->actingAs($this->userA)
@@ -290,10 +275,10 @@ class ExternalWorkerUiTest extends TestCase
         $allocResponse = $this->actingAs($this->userB)
             ->withHeader('X-Tenant', 'tenant-b')
             ->post(route('production.external-worker-allocations.store'), [
-                'section_id'   => $this->sectionA->id,
-                'shift_id'     => $this->shiftA->id,
-                'pay_grade_id' => $this->payGradeA->id,
-                'headcount'    => 2,
+                'section_id'                 => $this->sectionA->id,
+                'shift_id'                   => $this->shiftA->id,
+                'pay_grade_id'               => $this->payGradeA->id,
+                'number_of_external_workers' => 2,
             ]);
 
         $allocResponse->assertSessionHasErrors(['section_id', 'shift_id', 'pay_grade_id']);
@@ -307,21 +292,21 @@ class ExternalWorkerUiTest extends TestCase
         $response = $this->actingAs($this->userA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.external-worker-allocations.store'), [
-                'section_id'   => $this->sectionA->id,
-                'shift_id'     => $this->shiftA->id,
-                'pay_grade_id' => $this->payGradeA->id,
-                'headcount'    => 4,
+                'section_id'                 => $this->sectionA->id,
+                'shift_id'                   => $this->shiftA->id,
+                'pay_grade_id'               => $this->payGradeA->id,
+                'number_of_external_workers' => 4,
             ]);
 
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('production_external_worker_allocations', [
-            'tenant_id'    => $this->tenantA->id,
-            'section_id'   => $this->sectionA->id,
-            'shift_id'     => $this->shiftA->id,
-            'pay_grade_id' => $this->payGradeA->id,
-            'headcount'    => 4,
-            'active'       => 1,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 4,
+            'active'                     => 1,
         ]);
 
         // Verify displayed on Work Center details page
@@ -331,54 +316,50 @@ class ExternalWorkerUiTest extends TestCase
 
         $showResponse->assertOk();
         $showResponse->assertSee('Ext: 4');
-        $showResponse->assertSee('Target: 5');
         $showResponse->assertSee('Assembler Grade 1');
+        $showResponse->assertSee('Allocate External Workers');
+        $showResponse->assertSee('Number of External Workers');
     }
 
     /**
-     * Requirement 7: Headcount updates work without creating duplicate logical allocations.
+     * Requirement 7: Quantity updates work without creating duplicate logical allocations.
      */
-    public function test_headcount_updates_work_without_creating_duplicate_logical_allocations(): void
+    public function test_quantity_updates_work_without_creating_duplicate_logical_allocations(): void
     {
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $this->tenantA->id)
-            ->first();
-
         $alloc = ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $this->payGradeA->id,
-            'headcount'        => 2,
-            'active'           => true,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 2,
+            'active'                     => true,
         ]);
 
-        // Update headcount via endpoint
+        // Update quantity via endpoint
         $patchResponse = $this->actingAs($this->userA)
             ->withHeader('X-Tenant', 'tenant-a')
-            ->patch(route('production.external-worker-allocations.headcount', $alloc->id), [
-                'headcount' => 6,
+            ->patch(route('production.external-worker-allocations.quantity', $alloc->id), [
+                'number_of_external_workers' => 6,
             ]);
 
         $patchResponse->assertSessionHas('success');
 
-        $this->assertEquals(6, $alloc->fresh()->headcount);
+        $this->assertEquals(6, $alloc->fresh()->number_of_external_workers);
         $this->assertEquals(1, ExternalWorkerAllocation::where('section_id', $this->sectionA->id)->count());
 
         // Update-in-place via store endpoint with update_if_exists = 1
         $storeResponse = $this->actingAs($this->userA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.external-worker-allocations.store'), [
-                'section_id'       => $this->sectionA->id,
-                'shift_id'         => $this->shiftA->id,
-                'pay_grade_id'     => $this->payGradeA->id,
-                'headcount'        => 8,
-                'update_if_exists' => '1',
+                'section_id'                 => $this->sectionA->id,
+                'shift_id'                   => $this->shiftA->id,
+                'pay_grade_id'               => $this->payGradeA->id,
+                'number_of_external_workers' => 8,
+                'update_if_exists'           => '1',
             ]);
 
         $storeResponse->assertSessionHas('success');
-        $this->assertEquals(8, $alloc->fresh()->headcount);
+        $this->assertEquals(8, $alloc->fresh()->number_of_external_workers);
         $this->assertEquals(1, ExternalWorkerAllocation::where('section_id', $this->sectionA->id)->count());
     }
 
@@ -387,18 +368,13 @@ class ExternalWorkerUiTest extends TestCase
      */
     public function test_activation_is_rejected_when_any_required_related_record_is_inactive(): void
     {
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $this->tenantA->id)
-            ->first();
-
         $alloc = ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $this->payGradeA->id,
-            'headcount'        => 2,
-            'active'           => false,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 2,
+            'active'                     => false,
         ]);
 
         // Deactivate Section
@@ -419,18 +395,13 @@ class ExternalWorkerUiTest extends TestCase
      */
     public function test_deactivation_preserves_the_allocation_record(): void
     {
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $this->tenantA->id)
-            ->first();
-
         $alloc = ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $this->payGradeA->id,
-            'headcount'        => 3,
-            'active'           => true,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 3,
+            'active'                     => true,
         ]);
 
         $response = $this->actingAs($this->userA)
@@ -446,14 +417,10 @@ class ExternalWorkerUiTest extends TestCase
     }
 
     /**
-     * Requirement 10: The displayed external headcount includes active allocations only and remains separate from target_headcount.
+     * Requirement 10: The displayed external workers includes active allocations only.
      */
-    public function test_displayed_external_headcount_includes_active_allocations_only_and_remains_separate_from_target_headcount(): void
+    public function test_displayed_external_workers_includes_active_allocations_only(): void
     {
-        $sectionShift = DB::table('production_section_shifts')
-            ->where('tenant_id', $this->tenantA->id)
-            ->first();
-
         $payGrade2 = ExternalWorkerPayGrade::create([
             'tenant_id'   => $this->tenantA->id,
             'name'        => 'Assembler Grade 2',
@@ -462,26 +429,24 @@ class ExternalWorkerUiTest extends TestCase
             'active'      => true,
         ]);
 
-        // Active allocation: headcount 3
+        // Active allocation: quantity 3
         ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $this->payGradeA->id,
-            'headcount'        => 3,
-            'active'           => true,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $this->payGradeA->id,
+            'number_of_external_workers' => 3,
+            'active'                     => true,
         ]);
 
-        // Inactive allocation: headcount 4
+        // Inactive allocation: quantity 4
         ExternalWorkerAllocation::create([
-            'tenant_id'        => $this->tenantA->id,
-            'section_shift_id' => $sectionShift->id,
-            'section_id'       => $this->sectionA->id,
-            'shift_id'         => $this->shiftA->id,
-            'pay_grade_id'     => $payGrade2->id,
-            'headcount'        => 4,
-            'active'           => false,
+            'tenant_id'                  => $this->tenantA->id,
+            'section_id'                 => $this->sectionA->id,
+            'shift_id'                   => $this->shiftA->id,
+            'pay_grade_id'               => $payGrade2->id,
+            'number_of_external_workers' => 4,
+            'active'                     => false,
         ]);
 
         $response = $this->actingAs($this->userA)
@@ -489,12 +454,10 @@ class ExternalWorkerUiTest extends TestCase
             ->get(route('production.work-centers.show', $this->workCenterA->id));
 
         $response->assertOk();
-        // Target headcount must remain 5
-        $response->assertSee('Target: 5');
-        // External headcount must be exactly 3 (active), NOT 7 (which would include the inactive 4)
+        // External worker count must be exactly 3 (active), NOT 7 (which would include the inactive 4)
         $response->assertSee('Ext: 3');
 
-        // Confirm database target_headcount in production_section_shifts was NOT modified
-        $this->assertEquals(5, DB::table('production_section_shifts')->where('id', $sectionShift->id)->value('target_headcount'));
+        $this->assertEquals(3, $this->sectionA->fresh()->getTotalExternalWorkers($this->shiftA->id));
+        $this->assertEquals(3, $this->sectionA->fresh()->getTotalExternalWorkers());
     }
 }

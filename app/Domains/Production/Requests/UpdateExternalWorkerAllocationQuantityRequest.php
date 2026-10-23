@@ -4,7 +4,7 @@ namespace App\Domains\Production\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateExternalWorkerAllocationHeadcountRequest extends FormRequest
+class UpdateExternalWorkerAllocationQuantityRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,7 +14,7 @@ class UpdateExternalWorkerAllocationHeadcountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'headcount' => [
+            'number_of_external_workers' => [
                 'required',
                 'integer',
                 'min:1',
@@ -25,7 +25,9 @@ class UpdateExternalWorkerAllocationHeadcountRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'headcount.min' => 'Allocated headcount must be at least 1.',
+            'number_of_external_workers.required' => 'Number of external workers is required.',
+            'number_of_external_workers.integer'  => 'Number of external workers must be an integer.',
+            'number_of_external_workers.min'      => 'Number of external workers must be at least 1.',
         ];
     }
 }

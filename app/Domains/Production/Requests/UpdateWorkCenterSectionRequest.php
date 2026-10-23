@@ -15,16 +15,18 @@ class UpdateWorkCenterSectionRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $supportsManual = filter_var($this->input('supports_manual_production'), FILTER_VALIDATE_BOOLEAN);
-        if (!$supportsManual) {
-            $this->merge([
-                'supports_manual_production' => false,
-                'manual_capacity_per_hour'   => null,
-            ]);
-        } else {
-            $this->merge([
-                'supports_manual_production' => true,
-            ]);
+        if ($this->has('supports_manual_production')) {
+            $supportsManual = filter_var($this->input('supports_manual_production'), FILTER_VALIDATE_BOOLEAN);
+            if (!$supportsManual) {
+                $this->merge([
+                    'supports_manual_production' => false,
+                    'manual_capacity_per_hour'   => null,
+                ]);
+            } else {
+                $this->merge([
+                    'supports_manual_production' => true,
+                ]);
+            }
         }
 
         $shifts = $this->input('shifts');

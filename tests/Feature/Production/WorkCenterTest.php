@@ -343,7 +343,7 @@ class WorkCenterTest extends TestCase
         $createResponse->assertDontSee('name="capacity_per_hour"', false);
         $createResponse->assertDontSee('name="efficiency_percentage"', false);
         $createResponse->assertDontSee('name="cost_per_hour"', false);
-        $createResponse->assertSee('name="overhead_rate"', false);
+        $createResponse->assertSee('name="overhead_cost"', false);
 
         // Check Edit form
         $editResponse = $this->actingAs($this->engineerA)
@@ -354,7 +354,7 @@ class WorkCenterTest extends TestCase
         $editResponse->assertDontSee('name="capacity_per_hour"', false);
         $editResponse->assertDontSee('name="efficiency_percentage"', false);
         $editResponse->assertDontSee('name="cost_per_hour"', false);
-        $editResponse->assertSee('name="overhead_rate"', false);
+        $editResponse->assertSee('name="overhead_cost"', false);
     }
 
     public function test_manual_values_cannot_override_work_center_fields(): void
@@ -442,6 +442,73 @@ class WorkCenterTest extends TestCase
             ->get(route('production.work-centers.index'));
         $indexResponse->assertStatus(200);
         $indexResponse->assertSee(__('production.wc_labor_cost_per_hour'));
+    }
+
+    public function test_create_work_center_with_overhead_cost(): void
+    {
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.work-centers.store'), [
+                'name' => 'Assembly Station A',
+                'code' => 'WC-ASSY-A',
+                'work_center_type' => 'assembly',
+                'status' => 'active',
+                'overhead_cost' => 45.50,
+            ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('production_work_centers', [
+            'tenant_id' => $this->tenantA->id,
+            'code' => 'WC-ASSY-A',
+            'overhead_cost' => 45.50,
+        ]);
+    }
+
+    public function test_edit_work_center_persists_overhead_cost(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Initial Name',
+            'code' => 'WC-EDIT-TEST',
+            'status' => 'active',
+            'overhead_cost' => 20.00,
+        ]);
+
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->put(route('production.work-centers.update', $wc->id), [
+                'name' => 'Updated Name',
+                'code' => 'WC-EDIT-TEST',
+                'status' => 'active',
+                'overhead_cost' => 75.25,
+            ]);
+
+        $response->assertRedirect();
+        $wc->refresh();
+        $this->assertEquals('Updated Name', $wc->name);
+        $this->assertEquals(75.25, (float) $wc->overhead_cost);
+    }
+
+    public function test_work_center_list_displays_zero_values_for_capacity_efficiency_and_labor_cost(): void
+    {
+        WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Zero Display Station',
+            'code' => 'WC-ZERO-TEST',
+            'status' => 'active',
+            'overhead_cost' => 30.00,
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.work-centers.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Zero Display Station');
+        $response->assertSee('WC-ZERO-TEST');
+        $response->assertSee('<td class="text-end fw-semibold">0</td>', false);
+        $response->assertSee('<td class="text-end text-muted">0</td>', false);
+        $response->assertSee('<td class="text-end fw-semibold text-dark">0</td>', false);
     }
 }
 

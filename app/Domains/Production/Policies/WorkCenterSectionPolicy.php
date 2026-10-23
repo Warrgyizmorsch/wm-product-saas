@@ -29,10 +29,6 @@ class WorkCenterSectionPolicy
 
     public function delete(User $user, WorkCenterSection $section): bool
     {
-        if (!$user->hasProductionPermission('production.work_center.manage', $section->tenant_id)) {
-            return false;
-        }
-
-        return !$section->machines()->exists();
+        return $user->hasProductionPermission('production.work_center.manage', $section->tenant_id);
     }
 }
