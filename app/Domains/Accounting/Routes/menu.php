@@ -14,7 +14,7 @@ return [
             // Fixed Asset Register is gated by the HRMS asset-custody permission
             // server-side (AssetRegisterController uses HRMS's AssetPolicy), not a
             // fixed_assets.* permission — mirrors the actual authorize() check.
-            ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index', 'permission' => 'hrms.assets.view'],
+            ['label' => 'Fixed Asset Register', 'route' => 'accounting.fixed-assets.index', 'permission' => ['fixed_assets.assets.view', 'hrms.assets.view']],
             ['label' => 'Asset Categories', 'route' => 'accounting.fixed-assets.categories.index', 'permission' => 'fixed_assets.categories.view'],
             ['label' => 'Depreciation', 'route' => 'accounting.fixed-assets.depreciation.index', 'permission' => 'fixed_assets.depreciation.view'],
             ['label' => 'Asset Disposals', 'route' => 'accounting.fixed-assets.disposals.index', 'permission' => 'fixed_assets.disposal.view'],
