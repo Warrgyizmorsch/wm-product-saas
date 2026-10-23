@@ -169,6 +169,7 @@ final class SystemAccount
         'packing_material_expense' => '5032',
         'power_and_fuel_production' => '5033',
         'salary_and_wages_staff' => '5100',
+        'employer_statutory_contribution' => '5110',
         'staff_welfare_expenses' => '5500',
         'rent_expense' => '5200',
         'electricity_expense' => '5300',

@@ -68,6 +68,7 @@ class AssetDisposalController extends Controller
             'disposal_date' => ['required', 'date'],
             'sale_proceeds' => ['nullable', 'numeric', 'min:0'],
             'tax_amount' => ['nullable', 'numeric', 'min:0'],
+            'gst_type' => ['nullable', 'in:cgst_sgst,igst'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ]);
 

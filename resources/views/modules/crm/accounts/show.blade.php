@@ -796,17 +796,22 @@
 
                 @php
                     $ledgerRows = collect();
-                    if (($openingBalance ?? 0) > 0) {
-                        $obDate = $account->customer?->created_at ?: $account->created_at ?: now();
+                    // Signed: a credit opening is an advance received and must show too.
+                    if (($openingBalance ?? 0) != 0) {
+                        try {
+                            $obDate = app(\App\Domains\Accounting\Services\OpeningBalanceService::class)->openingDate();
+                        } catch (\InvalidArgumentException) {
+                            $obDate = $account->customer?->created_at ?: $account->created_at ?: now();
+                        }
                         $ledgerRows->push([
                             'date' => $obDate,
                             'type' => 'Opening Balance',
                             'reference' => 'OB-' . str_pad($account->customer?->id ?? $account->id, 4, '0', STR_PAD_LEFT),
-                            'description' => 'Customer Opening Balance',
+                            'description' => $openingBalance < 0 ? 'Customer Opening Advance' : 'Customer Opening Balance',
                             'deal_no' => null, 'deal_title' => null, 'deal_id' => null,
                             'so_no' => null,
-                            'debit' => floatval($openingBalance),
-                            'credit' => 0.00,
+                            'debit' => max(0, floatval($openingBalance)),
+                            'credit' => max(0, -floatval($openingBalance)),
                         ]);
                     }
                     foreach($invoices as $inv) {

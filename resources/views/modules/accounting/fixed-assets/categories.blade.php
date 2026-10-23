@@ -149,7 +149,7 @@
                                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Brief details about what items go into this category..." />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $assetAccountOptions" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" :options="['' => 'Use default (matching ledger by name, else 1500)'] + $assetAccountOptions" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $assetAccountOptions" />
@@ -207,7 +207,7 @@
                                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_category_description" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" id="edit_category_fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $assetAccountOptions" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" id="edit_category_fixed_asset_account_id" :options="['' => 'Use default (matching ledger by name, else 1500)'] + $assetAccountOptions" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" id="edit_category_accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $assetAccountOptions" />

@@ -42,7 +42,7 @@ interface JournalRepositoryInterface
      */
     public function activeForReference(int $tenantId, string $referenceType, int $referenceId): ?Journal;
 
-    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL'): string;
+    public function nextJournalNumber(int $tenantId, string $prefix = 'JNL', ?\DateTimeInterface $journalDate = null): string;
 
     public function create(array $data): Journal;
 
@@ -56,6 +56,20 @@ interface JournalRepositoryInterface
      * @return Collection<int, object{chart_of_account_id: int, debit: float, credit: float}>
      */
     public function trialBalance(int $periodId, ?int $costCenterId = null, ?int $projectId = null): Collection;
+
+    /**
+     * Same shape as trialBalance(), but every posted/reversed movement since
+     * inception up to and including $asOfDate: closing balances.
+     */
+    public function trialBalanceUpTo(\DateTimeInterface $asOfDate, ?int $costCenterId = null, ?int $projectId = null): Collection;
+
+    /**
+     * Each party's net balance (debit minus credit) on one control account up
+     * to $asOfDate, e.g. to show customers in credit as advances received.
+     *
+     * @return Collection<int, object{party_type: string, party_id: int, balance: float}>
+     */
+    public function partyBalancesUpTo(int $tenantId, int $chartOfAccountId, \DateTimeInterface $asOfDate): Collection;
 
     /**
      * Every posted JournalEntry for one account within one period, for a

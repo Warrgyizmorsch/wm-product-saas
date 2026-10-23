@@ -198,6 +198,30 @@ class OpeningBalanceService
         ]);
     }
 
+    /**
+     * What is left on Opening Balance Difference (credit positive). Zero once
+     * every opening is in and they agree; anything else means the openings do
+     * not balance and the difference is sitting in capital.
+     */
+    public function differenceBalance(int $tenantId, ?\DateTimeInterface $asOf = null): float
+    {
+        $account = $this->systemAccounts->get(SystemAccount::OPENING_BALANCE_DIFFERENCE, $tenantId);
+        if ($account === null) {
+            return 0.0;
+        }
+
+        $balance = JournalEntry::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('chart_of_account_id', $account->id)
+            ->whereHas('journal', fn ($q) => $q->withoutGlobalScopes()
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->when($asOf, fn ($w) => $w->whereDate('journal_date', '<=', $asOf)))
+            ->selectRaw('COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) as balance')
+            ->value('balance');
+
+        return round((float) $balance, 2);
+    }
+
     /** Accounts Receivable / Payable for a party opening, by party type. */
     public function controlAccount(string $partyType, int $tenantId): ChartOfAccount
     {

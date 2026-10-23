@@ -35,10 +35,16 @@
                     <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="customerSelect" :required="true">
                         <option value="">{{ __('crm.select_customer') }}</option>
                         <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="customer">{{ __('crm.add_new_customer') }}</option>
+                        @php
+                            $gstSupply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class);
+                            $gstSeller = $gstSupply->seller();
+                        @endphp
                         @foreach ($customers as $c)
+                            @php $supply = $gstSupply->supplyFor($c, $gstSeller); @endphp
                             <option value="{{ $c->id }}"
                                 data-billing="{{ $c->billing_address ?? '' }}"
                                 data-shipping="{{ $c->shipping_address ?? '' }}"
+                                data-gst-type="{{ $supply['inter'] === null ? '' : ($supply['inter'] ? 'igst' : 'cgst_sgst') }}"
                                 @selected(old('customer_id', $prefillQuotation?->customer_id ?? request('customer_id')) == $c->id)>
                                 {{ $c->name }} ({{ $c->email ?: $c->phone ?: 'No Contact' }})
                             </option>
@@ -685,6 +691,8 @@
             $('#freightTermsSelect, #freightAmountInput, #discountInput, #adjustmentInput').on('input change', calculateTotals);
 
             // Customer select address prefill
+            let gstTypeChosenByUser = {{ old('gst_type') ? 'true' : 'false' }};
+            $('#gstTypeSelect').on('change', function (e) { if (e.originalEvent) gstTypeChosenByUser = true; });
             $('#customerSelect').on('change', function() {
                 const selected = $(this).find('option:selected');
                 const billing = selected.attr('data-billing') || '';
@@ -694,6 +702,11 @@
                 }
                 if (shipping && !$('textarea[name="shipping_address"]').val()) {
                     $('textarea[name="shipping_address"]').val(shipping);
+                }
+                // Customer in another state (by GSTIN / address) => IGST; same state => CGST+SGST.
+                const gstType = selected.attr('data-gst-type');
+                if (gstType && !gstTypeChosenByUser && $('#gstTypeSelect').val() !== gstType) {
+                    $('#gstTypeSelect').val(gstType).trigger('change');
                 }
             }).trigger('change');
 

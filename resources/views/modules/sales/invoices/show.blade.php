@@ -766,7 +766,8 @@
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                                 <span class="text-muted">{{ __('crm.place_of_supply') }}</span>
-                                <span class="fw-semibold text-dark">Rajasthan (08)</span>
+                                @php $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer); @endphp
+                                <span class="fw-semibold text-dark">{{ $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : '—' }}</span>
                             </div>
 
                             <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">

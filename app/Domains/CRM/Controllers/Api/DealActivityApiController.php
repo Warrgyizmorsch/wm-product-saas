@@ -105,6 +105,42 @@ class DealActivityApiController extends Controller
         $actionMode = $validated['action_mode'] ?? 'schedule';
         $targetStatus = ($actionMode === 'schedule') ? 'Pending' : ($validated['status'] ?? 'Completed');
         $activityType = $validated['type'] ?? 'Meeting';
+        $isMeeting = strcasecmp((string)$activityType, 'Meeting') === 0;
+
+        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
+        $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
+        $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
+        $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
+
+        $hasGeoData = $request->filled('latitude')
+            || $request->filled('longitude')
+            || $request->filled('location_address')
+            || $request->hasFile('selfie')
+            || $request->filled('selfie_base64');
+
+        if (!$isMeeting && $hasGeoData) {
+            return response()->json([
+                'success' => false,
+                'message' => "Geo-verification (latitude, longitude, selfie) is only allowed for 'Meeting' activity type. For {$activityType}, GPS coordinates cannot be submitted.",
+                'errors'  => [
+                    'type' => [
+                        "Activity type '{$activityType}' does not support geo-verification. Only 'Meeting' activities can have GPS and selfie verification."
+                    ],
+                ],
+            ], 422);
+        }
+
+        if (!$isGeoVerificationEnabled && $hasGeoData) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Geo-verification is disabled in CRM settings. Latitude, longitude, and selfie cannot be submitted. Only status and notes can be updated.',
+                'errors'  => [
+                    'geo_verification' => [
+                        'Field visit geo-verification is disabled in CRM settings for this tenant. Only status and notes can be updated.'
+                    ],
+                ],
+            ], 422);
+        }
 
         if ($actionMode === 'log_note' && $this->followupService->isGeoVerificationRequired($targetStatus, $activityType)) {
             $errors = [];

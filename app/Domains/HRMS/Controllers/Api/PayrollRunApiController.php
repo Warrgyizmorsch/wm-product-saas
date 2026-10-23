@@ -633,117 +633,24 @@ class PayrollRunApiController extends Controller
     /**
      * POST /api/hrms/payroll/{run}/release
      */
-    public function releasePayouts(PayrollRun $run): JsonResponse
+    public function releasePayouts(Request $request, PayrollRun $run): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $run->update(['status' => 'paid']);
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payout_date' => ['nullable', 'date'],
+        ]);
 
-        $excludeEmployeeIds = [];
-        if (empty($run->employee_ids)) {
-            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->get();
-
-            foreach ($otherRuns as $or) {
-                if ($or->employee_ids && count($or->employee_ids) > 0) {
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                } else {
-                    $allEmpIds = Employee::pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $allEmpIds);
-                }
-            }
-            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-        }
-
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            $employees = Employee::whereIn('id', $run->employee_ids)
-                ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->get();
-        } else {
-            $employeesQuery = Employee::where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->whereNotIn('id', $excludeEmployeeIds);
-
-            if ($run->pay_group_id) {
-                $employeesQuery->where('pay_group_id', $run->pay_group_id);
-            } else {
-                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
-                    ->where('id', '!=', $run->id)
-                    ->whereNotNull('pay_group_id')
-                    ->pluck('pay_group_id')
-                    ->toArray();
-                if (!empty($otherProcessedPayGroupIds)) {
-                    $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
-                        $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
-                            ->orWhereNull('pay_group_id');
-                    });
-                }
-            }
-            $employees = $employeesQuery->get();
-        }
-
-        $processedEmployeeIds = $employees->pluck('id')->toArray();
-
-        if (!empty($processedEmployeeIds)) {
-            DB::table('payroll_retroactive_adjustments')
-                ->whereIn('employee_id', $processedEmployeeIds)
-                ->where('target_payroll_month', $run->payroll_month)
-                ->where('status', 'pending')
-                ->update(['status' => 'processed']);
-
-            DB::table('employee_adhoc_components')
-                ->whereIn('employee_id', $processedEmployeeIds)
-                ->where('payroll_month', $run->payroll_month)
-                ->where('status', 'pending')
-                ->update(['status' => 'processed']);
-        }
-
-        $allOtIds = [];
-        $allEncashIds = [];
-        foreach ($employees as $employee) {
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
-            if (!empty($calc['summary']['processed_ot_ids'])) {
-                $allOtIds = array_merge($allOtIds, $calc['summary']['processed_ot_ids']);
-            }
-            if (!empty($calc['summary']['processed_encash_ids'])) {
-                $allEncashIds = array_merge($allEncashIds, $calc['summary']['processed_encash_ids']);
-            }
-        }
-
-        if (!empty($allOtIds)) {
-            DB::table('overtime_requests')
-                ->whereIn('id', $allOtIds)
-                ->update(['status' => 'processed']);
-        }
-
-        if (!empty($allEncashIds)) {
-            DB::table('leave_encashments')
-                ->whereIn('id', $allEncashIds)
-                ->update(['status' => 'processed']);
-        }
-
-        // Integrate with Accounting (Dynamic Double-Entry Journal Posting via Domain Service)
+        // Same path as the web screen: books first, then marked paid; a refusal
+        // (no open period, not enough cash) changes nothing and is reported.
         try {
-            $payrollAccountingService = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
-            $payrollAccountingService->postPayrollRunJournal($run);
-            $payrollAccountingService->postPayrollPayoutJournal($run);
-        } catch (\Throwable $e) {
-            Log::error("Failed to post payroll journal entry in API: " . $e->getMessage(), [
-                'run_id' => $run->id,
-                'trace' => $e->getTraceAsString()
-            ]);
+            app(\App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface::class)
+                ->releasePayouts($run, $validated['bank_account_id'] ?? null, $validated['payout_date'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => 'Payouts not released — ' . $e->getMessage()], 422);
         }
 
         return $this->sendSuccess($this->transformPayrollRun($run->fresh()), 'Payroll payouts released successfully.');

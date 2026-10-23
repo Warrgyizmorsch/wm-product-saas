@@ -149,6 +149,7 @@ class AssetRegisterController extends Controller
             'acquisition_cost' => ['nullable', 'numeric', 'min:0'],
             'directly_attributable_cost' => ['nullable', 'numeric', 'min:0'],
             'recoverable_tax' => ['nullable', 'numeric', 'min:0'],
+            'recoverable_tax_gst_type' => ['nullable', 'in:cgst_sgst,igst'],
             'non_recoverable_tax' => ['nullable', 'numeric', 'min:0'],
             'residual_value' => ['nullable', 'numeric', 'min:0'],
             'useful_life_months' => ['nullable', 'integer', 'min:1'],
