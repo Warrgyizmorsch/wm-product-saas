@@ -245,6 +245,7 @@ class CrmAccountController extends Controller
             $paymentsWithoutAlloc = (float) $postedPayments->filter(fn($p) => $p->allocations->isEmpty())->sum('amount');
             $totalAdvanceHold = $unallocatedAdvance + $paymentsWithoutAlloc;
 
+            // Signed: a credit opening (advance received) reduces what's owed.
             $openingBalance = $customer->signedOpeningBalance();
 
             $netOutstanding = ($openingBalance + $invoiceOutstanding) - $totalAdvanceHold;

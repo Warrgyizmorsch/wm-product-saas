@@ -906,6 +906,7 @@ return array (
   'debit_settlement' => 'Дебит (Уреждане)',
   'credit_bill_payable' => 'Кредит (Задължение)',
   'running_payable_balance' => 'Текущ баланс на задълженията',
+  'opening_advance_paid' => 'Opening Advance Paid to Supplier',
   'initial_supplier_opening_dues' => 'Първоначално начално салдо на доставчик',
   'no_ledger_transactions' => 'Все още няма записани транзакции в сметката.',
   'standard_net_30_days' => 'Стандартно 30 дни нето',

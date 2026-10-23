@@ -2,107 +2,73 @@
 
 namespace App\Domains\Accounting\Services;
 
-use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\ChartOfAccount;
-use App\Domains\Accounting\Models\FiscalYear;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
+use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\PayrollHold;
 use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\SalaryComponent;
 use App\Domains\HRMS\Services\PayrollCalculationService;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
+/**
+ * Payroll in the ledger, in three steps:
+ *
+ * 1. Accrual, dated the last day of the payroll month:
+ *      Dr Salary & Wages (earned gross)       Cr PF / ESI / PT / TDS Payable (employee deductions)
+ *      Dr Employer Contribution to PF & ESI   Cr PF / ESI Payable (employer share + PF charges)
+ *                                             Cr Salary Payable (net pay)
+ * 2. Payout, from the bank/cash ledger chosen at release:
+ *      Dr Salary Payable (net pay booked in step 1, less held payslips)   Cr Bank
+ * 3. Statutory dues, when the challan is paid:
+ *      Dr PF / ESI / PT / TDS Payable   Cr Bank
+ *
+ * Every failure throws, so the payroll screen can say why instead of the run
+ * being marked paid with nothing in the books.
+ */
 class PayrollAccountingService
 {
+    public const ACCRUAL_REFERENCE = 'PayrollRun';
+    public const PAYOUT_REFERENCE = 'PayrollRunPayout';
+    public const STATUTORY_REFERENCE = 'payroll_statutory_payment';
+
+    /** Liabilities a payroll leaves behind and that are paid by challan. */
+    public const STATUTORY_DUES = [
+        'pf_payable' => 'Provident Fund (EPF)',
+        'esi_payable' => 'Employee State Insurance (ESI)',
+        'professional_tax_payable' => 'Professional Tax',
+        'tds_payable' => 'TDS on Salary',
+        'statutory_dues_payable' => 'Other Statutory Dues',
+    ];
+
     public function __construct(
         private readonly JournalService $journalService,
-        private readonly PayrollCalculationService $payrollCalculationService
+        private readonly PayrollCalculationService $payrollCalculationService,
+        private readonly SystemAccountService $systemAccounts,
     ) {}
 
     /**
      * Post balanced Double-Entry Accounting Journal for a completed Payroll Run.
-     *
-     * @param PayrollRun $run
-     * @return Journal|null
      */
     public function postPayrollRunJournal(PayrollRun $run): ?Journal
     {
         // Fail closed rather than silently posting into tenant 1's ledger if
         // both the run's own tenant_id and the bound request context are
         // somehow unresolvable.
-        $tenantId = $run->tenant_id ?? current_tenant_id() ?? require_tenant_id();
+        $tenantId = (int) ($run->tenant_id ?? current_tenant_id() ?? require_tenant_id());
 
         // Check if journal already posted for this payroll run to prevent duplicate entries
-        $existingJournal = $this->journalService->activePosting((int) $tenantId, 'PayrollRun', $run->id);
+        $existingJournal = $this->journalService->activePosting($tenantId, self::ACCRUAL_REFERENCE, $run->id);
 
         if ($existingJournal) {
             return $existingJournal;
         }
 
-        // Exclude employees already processed in other runs for the same month
-        $excludeEmployeeIds = [];
-        if (empty($run->employee_ids)) {
-            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->get();
-
-            foreach ($otherRuns as $or) {
-                if ($or->employee_ids && count($or->employee_ids) > 0) {
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                } else {
-                    $genEmpIds = Employee::where('status', true)
-                        ->where(function($q) {
-                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                        })
-                        ->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
-                }
-            }
-            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-        }
-
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            $employees = Employee::whereIn('id', $run->employee_ids)
-                ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->get();
-        } else {
-            $employeesQuery = Employee::where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->where(function($q) use ($run) {
-                    $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
-                })
-                ->whereNotIn('id', $excludeEmployeeIds);
-
-            if ($run->pay_group_id) {
-                $employeesQuery->where('pay_group_id', $run->pay_group_id);
-            } else {
-                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
-                    ->where('id', '!=', $run->id)
-                    ->whereNotNull('pay_group_id')
-                    ->pluck('pay_group_id')
-                    ->toArray();
-
-                if (!empty($otherProcessedPayGroupIds)) {
-                    $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
-                        $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
-                            ->orWhereNull('pay_group_id');
-                    });
-                }
-            }
-
-            $employees = $employeesQuery->get();
-        }
+        $employees = $this->runEmployees($run);
 
         if ($employees->isEmpty()) {
             return null;
@@ -111,6 +77,7 @@ class PayrollAccountingService
         // Auto-resolve or create default fallback COA accounts by code
         $defaultAccounts = [
             '5100' => $this->getOrCreateAccount($tenantId, '5100', 'Salary & Wages - Staff', ChartOfAccount::TYPE_EXPENSE, ChartOfAccount::BALANCE_DEBIT, ChartOfAccount::SUBTYPE_INDIRECT_EXPENSE),
+            '5110' => $this->getOrCreateAccount($tenantId, '5110', 'Employer Contribution to PF & ESI', ChartOfAccount::TYPE_EXPENSE, ChartOfAccount::BALANCE_DEBIT, ChartOfAccount::SUBTYPE_INDIRECT_EXPENSE),
             '2030' => $this->getOrCreateAccount($tenantId, '2030', 'Salary Payable', ChartOfAccount::TYPE_LIABILITY, ChartOfAccount::BALANCE_CREDIT, ChartOfAccount::SUBTYPE_CURRENT_LIABILITY),
             '2160' => $this->getOrCreateAccount($tenantId, '2160', 'PF Payable', ChartOfAccount::TYPE_LIABILITY, ChartOfAccount::BALANCE_CREDIT, ChartOfAccount::SUBTYPE_DUTIES_TAXES),
             '2170' => $this->getOrCreateAccount($tenantId, '2170', 'ESI Payable', ChartOfAccount::TYPE_LIABILITY, ChartOfAccount::BALANCE_CREDIT, ChartOfAccount::SUBTYPE_DUTIES_TAXES),
@@ -161,8 +128,6 @@ class PayrollAccountingService
                     }
 
                     // Statutory & other deductions (PF, ESI, TDS, PT, Advance, etc.)
-                    $accId = null;
-
                     if (str_contains($codeUpper, 'PF') || str_contains($codeUpper, 'PROVIDENT') || str_contains($nameUpper, 'PROVIDENT') || str_contains($nameUpper, 'PF')) {
                         $accId = $defaultAccounts['2160']->id;
                     } elseif (str_contains($codeUpper, 'ESI') || str_contains($nameUpper, 'ESI') || str_contains($nameUpper, 'STATE INSURANCE')) {
@@ -178,9 +143,7 @@ class PayrollAccountingService
                         $accId = $defaultAccounts['2080']->id;
                     }
 
-                    if ($accId) {
-                        $creditGroup[$accId] = ($creditGroup[$accId] ?? 0.00) + $val;
-                    }
+                    $creditGroup[$accId] = ($creditGroup[$accId] ?? 0.00) + $val;
                 }
             }
 
@@ -251,23 +214,28 @@ class PayrollAccountingService
             unset($line);
         }
 
-        $journalDate = $run->payroll_month . '-28';
-        try {
-            $journalDate = Carbon::parse($journalDate)->format('Y-m-d');
-        } catch (\Throwable $e) {
-            $journalDate = now()->format('Y-m-d');
-        }
+        // The employer's own PF / ESI on top of what employees paid: a cost of
+        // the company, owed to the same funds. Balanced on its own.
+        array_push($lines, ...$this->employerContributionLines(
+            round((float) ($creditGroup[$defaultAccounts['2160']->id] ?? 0), 2),
+            round((float) ($creditGroup[$defaultAccounts['2170']->id] ?? 0), 2),
+            $defaultAccounts['5110'],
+            $defaultAccounts['2160'],
+            $defaultAccounts['2170'],
+            $run->payroll_month,
+        ));
 
-        $this->ensureOpenPeriodForDate($tenantId, $journalDate);
-
+        // Salary is an expense of the month it was earned in: its last day.
+        // No period for it means the financial year hasn't been set up; posting
+        // fails with that message rather than inventing a calendar-year FY.
         $meta = [
             'tenant_id'             => $tenantId,
             'company_id'            => $run->company_id ?? require_company_id(),
-            'journal_date'          => $journalDate,
+            'journal_date'          => $this->monthEnd($run),
             'source'                => 'payroll',
             'voucher_type'          => 'payroll',
             'journal_number_prefix' => 'PAY',
-            'reference_type'        => 'PayrollRun',
+            'reference_type'        => self::ACCRUAL_REFERENCE,
             'reference_id'          => $run->id,
             'memo'                  => "Payroll Journal entry for month {$run->payroll_month} (Run ID: {$run->id})",
             // Null when run without a signed-in user (queue/console) — shown as "System",
@@ -279,112 +247,80 @@ class PayrollAccountingService
     }
 
     /**
-     * Post Cash/Bank payout journal entry when payroll payout is released.
+     * Employer PF (matching the employee's 12%) plus EDLI/admin charges, and
+     * employer ESI (3.25% against the employee's 0.75%). Rates: config/payroll.php.
+     *
+     * @return list<array<string, mixed>>
      */
-    public function postPayrollPayoutJournal(PayrollRun $run): ?Journal
+    public function employerContributionLines(float $employeePf, float $employeeEsi, ChartOfAccount $expense, ChartOfAccount $pfPayable, ChartOfAccount $esiPayable, string $month): array
+    {
+        $rates = config('payroll.employer_contributions');
+        $lines = [];
+
+        if ($employeePf > 0 && ($rates['employer_pf_matches_employee'] ?? true)) {
+            $pfWages = $employeePf / ((float) ($rates['employee_pf_percent'] ?? 12) / 100);
+            $employerPf = round($employeePf + $pfWages * (float) ($rates['pf_charges_percent'] ?? 1.0) / 100, 2);
+
+            $lines[] = ['chart_of_account_id' => $expense->id, 'debit' => $employerPf, 'credit' => 0.00, 'description' => "Employer PF + EDLI/admin charges for month {$month}"];
+            $lines[] = ['chart_of_account_id' => $pfPayable->id, 'debit' => 0.00, 'credit' => $employerPf, 'description' => "Employer PF contribution for month {$month}"];
+        }
+
+        if ($employeeEsi > 0) {
+            $employerEsi = round($employeeEsi * (float) ($rates['employer_esi_percent'] ?? 3.25) / (float) ($rates['employee_esi_percent'] ?? 0.75), 2);
+
+            $lines[] = ['chart_of_account_id' => $expense->id, 'debit' => $employerEsi, 'credit' => 0.00, 'description' => "Employer ESI for month {$month}"];
+            $lines[] = ['chart_of_account_id' => $esiPayable->id, 'debit' => 0.00, 'credit' => $employerEsi, 'description' => "Employer ESI contribution for month {$month}"];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Post Cash/Bank payout journal entry when payroll payout is released.
+     *
+     * Pays exactly the net salary booked by this run's accrual (less held
+     * payslips) out of the chosen cash/bank ledger; refuses a cash payment
+     * larger than the cash actually on hand.
+     */
+    public function postPayrollPayoutJournal(PayrollRun $run, ?int $bankAccountId = null, ?string $payoutDate = null): ?Journal
     {
         // Fail closed rather than silently posting into tenant 1's ledger if
         // both the run's own tenant_id and the bound request context are
         // somehow unresolvable.
-        $tenantId = $run->tenant_id ?? current_tenant_id() ?? require_tenant_id();
+        $tenantId = (int) ($run->tenant_id ?? current_tenant_id() ?? require_tenant_id());
 
         // Standing posting only: once reversed, the document can post again.
-        $existingJournal = $this->journalService->activePosting((int) $tenantId, 'PayrollRunPayout', $run->id);
+        $existingJournal = $this->journalService->activePosting($tenantId, self::PAYOUT_REFERENCE, $run->id);
 
         if ($existingJournal) {
             return $existingJournal;
         }
 
-        // Find Salary Payable account (2030) and Bank Account (1020)
+        $accrual = $this->journalService->activePosting($tenantId, self::ACCRUAL_REFERENCE, $run->id)
+            ?? $this->postPayrollRunJournal($run);
+
+        if ($accrual === null) {
+            return null;
+        }
+
         $salaryPayableAccount = $this->getOrCreateAccount($tenantId, '2030', 'Salary Payable', ChartOfAccount::TYPE_LIABILITY, ChartOfAccount::BALANCE_CREDIT, ChartOfAccount::SUBTYPE_CURRENT_LIABILITY);
-        $bankAccount = ChartOfAccount::where('tenant_id', $tenantId)->where('is_cash_or_bank', true)->first()
-            ?? $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', ChartOfAccount::TYPE_ASSET, ChartOfAccount::BALANCE_DEBIT, ChartOfAccount::SUBTYPE_CURRENT_ASSET);
 
-        // Calculate total net payout for run
-        $totalNetPayout = 0.00;
-        $excludeEmployeeIds = [];
-        if (empty($run->employee_ids)) {
-            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->get();
-            foreach ($otherRuns as $or) {
-                if ($or->employee_ids && count($or->employee_ids) > 0) {
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                } else {
-                    $genEmpIds = Employee::where('status', true)
-                        ->where(function($q) {
-                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                        })
-                        ->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
-                }
-            }
-            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-        }
+        // What the accrual actually owes staff, not a fresh recalculation that
+        // could differ if attendance or salary changed since.
+        $booked = round((float) JournalEntry::withoutGlobalScopes()
+            ->where('journal_id', $accrual->id)
+            ->where('chart_of_account_id', $salaryPayableAccount->id)
+            ->sum('credit'), 2);
 
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            $employees = Employee::whereIn('id', $run->employee_ids)
-                ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->get();
-        } else {
-            $employeesQuery = Employee::where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->where(function($q) use ($run) {
-                    $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
-                })
-                ->whereNotIn('id', $excludeEmployeeIds);
-
-            if ($run->pay_group_id) {
-                $employeesQuery->where('pay_group_id', $run->pay_group_id);
-            } else {
-                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
-                    ->where('id', '!=', $run->id)
-                    ->whereNotNull('pay_group_id')
-                    ->pluck('pay_group_id')
-                    ->toArray();
-
-                if (!empty($otherProcessedPayGroupIds)) {
-                    $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
-                        $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
-                            ->orWhereNull('pay_group_id');
-                    });
-                }
-            }
-
-            $employees = $employeesQuery->get();
-        }
-
-        foreach ($employees as $employee) {
-            // Exclude employees with held payouts from the payout journal
-            $isHeld = \App\Domains\HRMS\Models\PayrollHold::where('employee_id', $employee->id)
-                ->where('payroll_month', $run->payroll_month)
-                ->where('status', 'on_hold')
-                ->exists();
-
-            if ($isHeld) {
-                continue;
-            }
-
-            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
-            $payout = (float) ($calc['summary']['net_payout'] ?? 0.00);
-            if ($payout > 0) {
-                $totalNetPayout += $payout;
-            }
-        }
-
-        $totalNetPayout = round($totalNetPayout, 2);
+        $totalNetPayout = round($booked - $this->heldNetPay($run), 2);
         if ($totalNetPayout <= 0) {
             return null;
         }
+
+        $bankAccount = $this->payingLedger($tenantId, $bankAccountId);
+        $payoutDate = Carbon::parse($payoutDate ?? now())->toDateString();
+
+        $this->assertCashCovers($bankAccount, $totalNetPayout, $payoutDate);
 
         $lines = [
             [
@@ -397,12 +333,9 @@ class PayrollAccountingService
                 'chart_of_account_id' => $bankAccount->id,
                 'debit'               => 0.00,
                 'credit'              => $totalNetPayout,
-                'description'         => "Bank transfer disbursement for month {$run->payroll_month}",
-            ]
+                'description'         => "Salary disbursement for month {$run->payroll_month} from {$bankAccount->name}",
+            ],
         ];
-
-        $payoutDate = now()->format('Y-m-d');
-        $this->ensureOpenPeriodForDate($tenantId, $payoutDate);
 
         $meta = [
             'tenant_id'             => $tenantId,
@@ -411,9 +344,9 @@ class PayrollAccountingService
             'source'                => 'payroll',
             'voucher_type'          => 'payment',
             'journal_number_prefix' => 'PAY-DISB',
-            'reference_type'        => 'PayrollRunPayout',
+            'reference_type'        => self::PAYOUT_REFERENCE,
             'reference_id'          => $run->id,
-            'memo'                  => "Bank salary disbursement for month {$run->payroll_month} (Run ID: {$run->id})",
+            'memo'                  => "Salary disbursement for month {$run->payroll_month} (Run ID: {$run->id}) from {$bankAccount->code} {$bankAccount->name}",
             'posted_by'             => auth()->id(),
         ];
 
@@ -421,42 +354,236 @@ class PayrollAccountingService
     }
 
     /**
-     * Helper method to ensure an open accounting period exists for a given date.
+     * What is still owed on each statutory liability (credit balance).
+     *
+     * @return array<string, array{label: string, account: ChartOfAccount, balance: float}>
      */
-    private function ensureOpenPeriodForDate(int $tenantId, string $dateStr): void
+    public function statutoryDues(int $tenantId): array
     {
-        $date = Carbon::parse($dateStr);
-        $period = AccountingPeriod::query()
-            ->whereDate('start_date', '<=', $date)
-            ->whereDate('end_date', '>=', $date)
+        $dues = [];
+
+        foreach (self::STATUTORY_DUES as $key => $label) {
+            $account = $this->systemAccounts->get($key, $tenantId);
+            if ($account === null) {
+                continue;
+            }
+
+            $dues[$key] = ['label' => $label, 'account' => $account, 'balance' => $this->balance($account, null, credit: true)];
+        }
+
+        return $dues;
+    }
+
+    /**
+     * Pay a statutory due (PF / ESI / PT / TDS challan): Dr the payable,
+     * Cr the bank. Never more than is owed, never more cash than is on hand.
+     */
+    public function postStatutoryPayment(int $tenantId, string $dueKey, float $amount, int $bankAccountId, string $paymentDate, ?string $reference = null): Journal
+    {
+        if (! array_key_exists($dueKey, self::STATUTORY_DUES)) {
+            throw new InvalidArgumentException("Unknown statutory due '{$dueKey}'.");
+        }
+
+        $amount = round($amount, 2);
+        if ($amount <= 0) {
+            throw new InvalidArgumentException('Enter the amount paid.');
+        }
+
+        $payable = $this->systemAccounts->require($dueKey, $tenantId);
+        $owed = $this->balance($payable, null, credit: true);
+        if ($amount - $owed > 0.009) {
+            throw new InvalidArgumentException(sprintf('%s owed is only %s; you cannot pay %s against it.', self::STATUTORY_DUES[$dueKey], number_format($owed, 2), number_format($amount, 2)));
+        }
+
+        $bank = $this->payingLedger($tenantId, $bankAccountId);
+        $this->assertCashCovers($bank, $amount, $paymentDate);
+
+        $label = self::STATUTORY_DUES[$dueKey];
+        $memo = trim("{$label} paid" . ($reference ? " - challan {$reference}" : ''));
+
+        return $this->journalService->post([
+            ['chart_of_account_id' => $payable->id, 'debit' => $amount, 'credit' => 0.00, 'description' => $memo],
+            ['chart_of_account_id' => $bank->id, 'debit' => 0.00, 'credit' => $amount, 'description' => $memo],
+        ], [
+            'tenant_id' => $tenantId,
+            'journal_date' => Carbon::parse($paymentDate)->toDateString(),
+            'source' => 'payroll',
+            'voucher_type' => 'payment',
+            'journal_number_prefix' => 'PAY-STAT',
+            'reference_type' => self::STATUTORY_REFERENCE,
+            'reference_id' => $payable->id,
+            'memo' => $memo,
+            'posted_by' => auth()->id(),
+        ]);
+    }
+
+    /** Cash and bank ledgers a payment can go out of. */
+    public function payingLedgers(): Collection
+    {
+        return ChartOfAccount::query()->where('is_cash_or_bank', true)->where('is_active', true)->orderBy('code')->get();
+    }
+
+    /** Debit-positive balance of a ledger up to a date (credit-positive when $credit). */
+    public function balance(ChartOfAccount $account, ?string $asOf = null, bool $credit = false): float
+    {
+        $totals = JournalEntry::withoutGlobalScopes()
+            ->where('tenant_id', $account->tenant_id)
+            ->where('chart_of_account_id', $account->id)
+            ->whereHas('journal', fn ($q) => $q->withoutGlobalScopes()
+                ->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])
+                ->when($asOf, fn ($w) => $w->whereDate('journal_date', '<=', $asOf)))
+            ->selectRaw('COALESCE(SUM(debit), 0) as d, COALESCE(SUM(credit), 0) as c')
             ->first();
 
-        if (!$period) {
-            $yearStart = $date->copy()->startOfYear();
-            $yearEnd = $date->copy()->endOfYear();
+        $balance = round((float) $totals->d - (float) $totals->c, 2);
 
-            $fiscalYear = FiscalYear::firstOrCreate(
-                ['tenant_id' => $tenantId, 'name' => 'FY ' . $yearStart->format('Y')],
-                [
-                    'start_date' => $yearStart->format('Y-m-d'),
-                    'end_date'   => $yearEnd->format('Y-m-d'),
-                    'status'     => FiscalYear::STATUS_OPEN,
-                ]
-            );
+        return $credit ? -$balance : $balance;
+    }
 
-            AccountingPeriod::firstOrCreate(
-                [
-                    'tenant_id'  => $tenantId,
-                    'start_date' => $date->copy()->startOfMonth()->format('Y-m-d'),
-                ],
-                [
-                    'fiscal_year_id' => $fiscalYear->id,
-                    'name'           => $date->format('F Y'),
-                    'end_date'       => $date->copy()->endOfMonth()->format('Y-m-d'),
-                    'status'         => AccountingPeriod::STATUS_OPEN,
-                ]
-            );
+    private function payingLedger(int $tenantId, ?int $accountId): ChartOfAccount
+    {
+        if ($accountId) {
+            $account = ChartOfAccount::query()->where('tenant_id', $tenantId)->whereKey($accountId)->first();
+            if ($account === null || ! $account->is_cash_or_bank) {
+                throw new InvalidArgumentException('Choose the cash or bank account the money is paid from.');
+            }
+
+            return $account;
         }
+
+        // Salaries go out by bank transfer by default: the Bank Account ledger,
+        // never "the first cash/bank ledger" (that was Cash-in-Hand).
+        return $this->systemAccounts->get(SystemAccount::BANK, $tenantId)
+            ?? $this->getOrCreateAccount($tenantId, '1020', 'Bank Account', ChartOfAccount::TYPE_ASSET, ChartOfAccount::BALANCE_DEBIT, ChartOfAccount::SUBTYPE_CURRENT_ASSET);
+    }
+
+    /**
+     * Physical cash can't go below zero. Bank ledgers may (an overdraft or
+     * cash credit limit is normal), so only cash ledgers are checked.
+     */
+    private function assertCashCovers(ChartOfAccount $account, float $amount, string $date): void
+    {
+        if (! $this->isCashLedger($account)) {
+            return;
+        }
+
+        $available = $this->balance($account, $date);
+
+        if ($amount - $available > 0.009) {
+            throw new InvalidArgumentException(sprintf(
+                '%s %s has only %s on %s; it cannot pay %s. Pay from a bank account, or record the cash received first.',
+                $account->code, $account->name, number_format(max($available, 0), 2), Carbon::parse($date)->format('d M Y'), number_format($amount, 2),
+            ));
+        }
+    }
+
+    private function isCashLedger(ChartOfAccount $account): bool
+    {
+        if ($account->system_key === SystemAccount::CASH || $account->code === SystemAccount::templateCode(SystemAccount::CASH)) {
+            return true;
+        }
+
+        $name = strtolower((string) $account->name);
+
+        return str_contains($name, 'cash') && ! str_contains($name, 'bank') && ! str_contains($name, 'credit');
+    }
+
+    /** Net pay of payslips on hold for this run's month: not paid out yet. */
+    private function heldNetPay(PayrollRun $run): float
+    {
+        $held = 0.00;
+
+        foreach ($this->runEmployees($run) as $employee) {
+            $isHeld = PayrollHold::where('employee_id', $employee->id)
+                ->where('payroll_month', $run->payroll_month)
+                ->where('status', 'on_hold')
+                ->exists();
+
+            if ($isHeld) {
+                $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
+                $held += max(0.0, (float) ($calc['summary']['net_payout'] ?? 0.00));
+            }
+        }
+
+        return round($held, 2);
+    }
+
+    private function monthEnd(PayrollRun $run): string
+    {
+        try {
+            return Carbon::createFromFormat('Y-m', (string) $run->payroll_month)->endOfMonth()->toDateString();
+        } catch (\Throwable) {
+            return Carbon::parse($run->end_date ?? now())->toDateString();
+        }
+    }
+
+    /**
+     * Employees this run pays: its own list, else its pay group / everyone on
+     * a salary structure, minus those already paid by another run this month.
+     */
+    private function runEmployees(PayrollRun $run): Collection
+    {
+        $excludeEmployeeIds = [];
+        if (empty($run->employee_ids)) {
+            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
+                ->where('id', '!=', $run->id)
+                ->get();
+
+            foreach ($otherRuns as $or) {
+                if ($or->employee_ids && count($or->employee_ids) > 0) {
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
+                } elseif ($or->pay_group_id) {
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
+                } else {
+                    $genEmpIds = Employee::where('status', true)
+                        ->where(function ($q) {
+                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                        })
+                        ->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
+                }
+            }
+            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
+        }
+
+        if ($run->employee_ids && count($run->employee_ids) > 0) {
+            return Employee::whereIn('id', $run->employee_ids)
+                ->whereNotIn('id', $excludeEmployeeIds)
+                ->where('status', true)
+                ->where(function ($q) {
+                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                })
+                ->get();
+        }
+
+        $employeesQuery = Employee::where('status', true)
+            ->where(function ($q) {
+                $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+            })
+            ->where(function ($q) use ($run) {
+                $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
+            })
+            ->whereNotIn('id', $excludeEmployeeIds);
+
+        if ($run->pay_group_id) {
+            $employeesQuery->where('pay_group_id', $run->pay_group_id);
+        } else {
+            $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
+                ->where('id', '!=', $run->id)
+                ->whereNotNull('pay_group_id')
+                ->pluck('pay_group_id')
+                ->toArray();
+
+            if (!empty($otherProcessedPayGroupIds)) {
+                $employeesQuery->where(function ($sub) use ($otherProcessedPayGroupIds) {
+                    $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
+                        ->orWhereNull('pay_group_id');
+                });
+            }
+        }
+
+        return $employeesQuery->get();
     }
 
     /**
@@ -468,6 +595,7 @@ class PayrollAccountingService
             ?? ChartOfAccount::create([
                 'tenant_id'      => $tenantId,
                 'code'           => $code,
+                'system_key'     => SystemAccount::keyForTemplateCode($code),
                 'name'           => $name,
                 'type'           => $type,
                 'subtype'        => $subtype,

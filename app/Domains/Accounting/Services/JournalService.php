@@ -333,7 +333,7 @@ class JournalService
             $totalDebit = array_sum(array_column($lines, 'debit'));
             $totalCredit = array_sum(array_column($lines, 'credit'));
 
-            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL');
+            $journalNumber = $this->journals->nextJournalNumber($tenantId, $meta['journal_number_prefix'] ?? 'JNL', $journalDate);
 
             $journal = $this->journals->createWithEntries([
                 'tenant_id' => $tenantId,
@@ -492,6 +492,27 @@ class JournalService
     public function trialBalance(AccountingPeriod $period, ?int $costCenterId = null, ?int $projectId = null): Collection
     {
         return $this->journals->trialBalance($period->id, $costCenterId, $projectId);
+    }
+
+    /**
+     * Total of the parties on one control account that sit on the "wrong"
+     * side as at $asOfDate: customers in credit on Receivable, suppliers in
+     * debit on Payable. Returned positive.
+     */
+    public function oppositeSidePartyTotal(int $tenantId, int $controlAccountId, \DateTimeInterface $asOfDate, bool $debitNormal): float
+    {
+        $total = $this->journals->partyBalancesUpTo($tenantId, $controlAccountId, $asOfDate)
+            ->map(fn ($row) => (float) $row->balance)
+            ->filter(fn ($balance) => $debitNormal ? $balance < 0 : $balance > 0)
+            ->sum();
+
+        return round(abs($total), 2);
+    }
+
+    /** Closing balance of every account at the end of $period (cumulative). */
+    public function trialBalanceAsAt(AccountingPeriod $period, ?int $costCenterId = null, ?int $projectId = null): Collection
+    {
+        return $this->journals->trialBalanceUpTo(Carbon::parse($period->end_date)->endOfDay(), $costCenterId, $projectId);
     }
 
     /**

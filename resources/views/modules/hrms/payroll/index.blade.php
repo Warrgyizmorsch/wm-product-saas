@@ -135,12 +135,9 @@
                                 @endif
                             @elseif($selectedRun->status === 'locked')
                                 @if($canApprovePayroll)
-                                    <form action="{{ route('hrms.payroll.run.release', $selectedRun->id) }}" method="POST" class="d-inline m-0">
-                                        @csrf
-                                        <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="fw-bold">
-                                            {{ __('hrms.payroll.btn_release_payouts') }}
-                                        </x-ui.button>
-                                    </form>
+                                    <x-ui.button type="button" variant="success" icon="feather-check-circle" class="fw-bold" data-bs-toggle="modal" data-bs-target="#releasePayoutsModal">
+                                        {{ __('hrms.payroll.btn_release_payouts') }}
+                                    </x-ui.button>
                                 @else
                                     <span class="badge bg-soft-primary text-primary px-3 py-2 fw-bold fs-12"><i class="feather-lock me-1"></i>{{ __('hrms.payroll.awaiting_release') }}</span>
                                 @endif
@@ -149,8 +146,87 @@
                                     {{ __('hrms.payroll.payout_completed') }}
                                 </x-ui.button>
                             @endif
+                            @if($canApprovePayroll)
+                                <x-ui.button type="button" variant="light" class="border fw-bold" icon="feather-file-text" data-bs-toggle="modal" data-bs-target="#statutoryDuesModal">
+                                    Statutory Dues
+                                </x-ui.button>
+                            @endif
                         </div>
                     </div>
+
+                    @if($canApprovePayroll)
+                        @php
+                            $payrollBooks = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+                            $payingLedgers = $payrollBooks->payingLedgers();
+                            $ledgerBalances = $payingLedgers->mapWithKeys(fn ($ledger) => [$ledger->id => $payrollBooks->balance($ledger)]);
+                            $defaultPayingLedger = $payingLedgers->firstWhere('system_key', \App\Domains\Accounting\Support\SystemAccount::BANK) ?? $payingLedgers->first();
+                            $statutoryDues = $payrollBooks->statutoryDues((int) (tenant_id() ?? auth()->user()->tenant_id));
+                        @endphp
+
+                        {{-- Release: which bank/cash ledger the salaries leave from. --}}
+                        <x-ui.modal id="releasePayoutsModal" title="Release Payouts" :formAction="route('hrms.payroll.run.release', $selectedRun->id)" submitText="Release Payouts">
+                            <p class="fs-13 text-muted mb-3">
+                                Posts the net salary booked for {{ Carbon\Carbon::parse($selectedRun->payroll_month . '-01')->format('F Y') }} out of the account below
+                                (Dr Salary Payable / Cr the account). Payslips on hold are not paid.
+                            </p>
+                            <label class="form-label fw-semibold fs-13">Paid From <span class="text-danger">*</span></label>
+                            <select name="bank_account_id" class="form-select mb-3" required>
+                                @foreach($payingLedgers as $ledger)
+                                    <option value="{{ $ledger->id }}" @selected($defaultPayingLedger?->id === $ledger->id)>
+                                        {{ $ledger->code }} — {{ $ledger->name }} (balance {{ number_format($ledgerBalances[$ledger->id], 2) }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <label class="form-label fw-semibold fs-13">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" name="payout_date" class="form-control" value="{{ now()->toDateString() }}" required>
+                            <div class="form-text fs-11">Cash-in-Hand can't pay more than the cash it holds.</div>
+                        </x-ui.modal>
+
+                        {{-- Statutory dues: what payroll left owing, and paying a challan. --}}
+                        <x-ui.modal id="statutoryDuesModal" title="Statutory Dues" :formAction="route('hrms.payroll.statutory.pay')" submitText="Record Payment">
+                            <table class="table table-sm fs-13 mb-3">
+                                <thead><tr><th>Due</th><th class="text-end">Owed</th></tr></thead>
+                                <tbody>
+                                    @foreach($statutoryDues as $dueKey => $due)
+                                        <tr>
+                                            <td>{{ $due['label'] }} <span class="text-muted">({{ $due['account']->code }})</span></td>
+                                            <td class="text-end fw-semibold">{{ number_format($due['balance'], 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold fs-13">Pay <span class="text-danger">*</span></label>
+                                    <select name="due" class="form-select" required>
+                                        @foreach($statutoryDues as $dueKey => $due)
+                                            <option value="{{ $dueKey }}" @disabled($due['balance'] <= 0)>{{ $due['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold fs-13">Amount <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold fs-13">Paid From <span class="text-danger">*</span></label>
+                                    <select name="bank_account_id" class="form-select" required>
+                                        @foreach($payingLedgers as $ledger)
+                                            <option value="{{ $ledger->id }}" @selected($defaultPayingLedger?->id === $ledger->id)>{{ $ledger->code }} — {{ $ledger->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold fs-13">Payment Date <span class="text-danger">*</span></label>
+                                    <input type="date" name="payment_date" class="form-control" value="{{ now()->toDateString() }}" required>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold fs-13">Challan / Reference No.</label>
+                                    <input type="text" name="reference" maxlength="100" class="form-control" placeholder="e.g. EPF TRRN, ESIC challan, CIN">
+                                </div>
+                            </div>
+                        </x-ui.modal>
+                    @endif
 
                     <!-- Search, Sort, Filter Bar -->
                     <div class="d-flex justify-content-end align-items-center mb-3 pb-3 border-bottom gap-2 w-100 flex-wrap" id="payrollRegisterFiltersBar">

@@ -5,6 +5,7 @@ namespace App\Domains\Accounting\FixedAssets\Services;
 use App\Domains\Accounting\FixedAssets\Events\AssetRevalued;
 use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetRevaluation;
+use App\Domains\Accounting\FixedAssets\Support\AssetLedgers;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
@@ -164,7 +165,7 @@ class AssetRevaluationService
                 'accumulated_depreciation' => 0,
                 'book_value' => $revaluedAmount,
                 'useful_life_months' => $revaluation->revised_useful_life_months
-                    ?? $this->remainingLifeMonths($asset, $revaluationDate),
+                    ?? $this->remainingLifeMonths($asset, $revaluationDate, $revaluation->id),
             ];
 
             if ($revaluation->revised_residual_value !== null) {
@@ -207,10 +208,8 @@ class AssetRevaluationService
         $code = $asset->asset_code;
         $lines = [];
 
-        $fixedAssetAccount = $category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
-        if ($fixedAssetAccount === null) {
-            throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: no fixed asset account configured.");
-        }
+        // The ledger the asset's cost actually sits in.
+        $fixedAssetAccount = app(AssetLedgers::class)->holding($asset);
 
         if ($accumulatedDepreciation > 0) {
             $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
@@ -302,11 +301,14 @@ class AssetRevaluationService
      * useful_life_months was already "remaining from then") or otherwise from
      * the depreciation start date.
      */
-    private function remainingLifeMonths(Asset $asset, Carbon $revaluationDate): int
+    private function remainingLifeMonths(Asset $asset, Carbon $revaluationDate, int $currentRevaluationId): int
     {
+        // The revaluation being posted is already marked posted by now; counting
+        // from its own date would leave the full original life in place.
         $lastRevaluationDate = AssetRevaluation::query()
             ->where('asset_id', $asset->id)
             ->where('status', AssetRevaluation::STATUS_POSTED)
+            ->whereKeyNot($currentRevaluationId)
             ->where('revaluation_date', '<=', $revaluationDate->toDateString())
             ->max('revaluation_date');
 

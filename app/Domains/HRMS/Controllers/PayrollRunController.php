@@ -82,13 +82,53 @@ class PayrollRunController extends Controller
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', $result['message']);
     }
 
-    public function releasePayouts(PayrollRun $run)
+    public function releasePayouts(Request $request, PayrollRun $run)
     {
         $this->authorize('process', $run);
 
-        $this->payrollRunRepository->releasePayouts($run);
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payout_date' => ['nullable', 'date'],
+        ]);
+
+        try {
+            $this->payrollRunRepository->releasePayouts($run, $validated['bank_account_id'] ?? null, $validated['payout_date'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            // Nothing was marked paid: the books refused (no open period, not enough cash ...).
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
+                ->with('error', 'Payouts not released — ' . $e->getMessage());
+        }
 
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');
+    }
+
+    /** Pay a PF / ESI / PT / TDS challan out of the chosen bank account. */
+    public function payStatutoryDue(Request $request)
+    {
+        $this->authorize('process', PayrollRun::class);
+
+        $validated = $request->validate([
+            'due' => ['required', 'string', 'in:' . implode(',', array_keys(\App\Domains\Accounting\Services\PayrollAccountingService::STATUTORY_DUES))],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'bank_account_id' => ['required', 'integer'],
+            'payment_date' => ['required', 'date'],
+            'reference' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        try {
+            $journal = app(\App\Domains\Accounting\Services\PayrollAccountingService::class)->postStatutoryPayment(
+                (int) (tenant_id() ?? auth()->user()->tenant_id),
+                $validated['due'],
+                (float) $validated['amount'],
+                (int) $validated['bank_account_id'],
+                $validated['payment_date'],
+                $validated['reference'] ?? null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', 'Payment not recorded — ' . $e->getMessage());
+        }
+
+        return back()->with('success', "Statutory payment recorded as {$journal->journal_number}.");
     }
 
     public function toggleHold(Request $request, Employee $employee, string $month)
