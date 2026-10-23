@@ -120,11 +120,24 @@ Route::prefix('api/crm')
                 Route::post('/{deal}/documents', [CrmDealApiController::class, 'uploadDocuments'])->whereNumber('deal')->name('documents.upload');
             });
 
-        // Standalone followups & documents delete/patch
+        // ==========================================
+        // 4b. USER MEETINGS & FOLLOWUPS SUITE
+        // ==========================================
+        Route::get('/my-meetings', [LeadFollowupApiController::class, 'myMeetings'])->name('my-meetings');
+        Route::get('/meetings', [LeadFollowupApiController::class, 'myMeetings'])->name('meetings.index');
+
+        // Standalone followups & documents
+        Route::get('followups/{followup}', [LeadFollowupApiController::class, 'show'])->whereNumber('followup')->name('followups.show');
         Route::match(['put', 'patch', 'post'], 'followups/{followup}', [LeadFollowupApiController::class, 'update'])->whereNumber('followup')->name('followups.update');
-        Route::patch('followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('followup')->name('followups.status');
+        Route::match(['put', 'patch', 'post'], 'followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('followup')->name('followups.status');
         Route::delete('followups/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('followup')->name('followups.destroy');
         Route::delete('documents/{document}', [LeadApiController::class, 'deleteDocument'])->whereNumber('document')->name('documents.destroy');
+
+        // Nested lead followups routes
+        Route::get('leads/{lead}/followups/{followup}', [LeadFollowupApiController::class, 'show'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.show');
+        Route::match(['put', 'patch', 'post'], 'leads/{lead}/followups/{followup}', [LeadFollowupApiController::class, 'update'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.update');
+        Route::match(['put', 'patch', 'post'], 'leads/{lead}/followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.status');
+        Route::delete('leads/{lead}/followups/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.destroy');
 
         // ==========================================
         // 5. GOOGLE CALENDAR & GOOGLE MEET INTEGRATION

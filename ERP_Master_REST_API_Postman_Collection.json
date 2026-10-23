@@ -91,6 +91,261 @@
             ]
         },
         {
+            "name": "⭐ Mobile App CRM - Meetings & Followup Status Suite",
+            "description": "Targeted Mobile CRM Suite: (1) Fetch meetings by User ID or Lead ID categorized into Today, Planned, Overdue, and Activity Logs with Customer & Lead Details. (2) Update meeting status to Connected, Not Connected, Rescheduled, or Cancelled with Geo-Verification.",
+            "item": [
+                {
+                    "name": "1. Get Meetings by User ID / Lead ID (Today, Planned, Overdue, Activity Logs)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/my-meetings?user_id=1&type=Meeting",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "my-meetings"
+                            ],
+                            "query": [
+                                {
+                                    "key": "user_id",
+                                    "value": "1",
+                                    "description": "User ID filter: fetches meetings belonging to this user"
+                                },
+                                {
+                                    "key": "type",
+                                    "value": "Meeting",
+                                    "disabled": true,
+                                    "description": "Optional: Filter by 'Meeting', 'Call', or omit to get all scheduled activities"
+                                },
+                                {
+                                    "key": "lead_id",
+                                    "value": "1",
+                                    "disabled": true,
+                                    "description": "Optional: filter meetings for a specific lead ID"
+                                },
+                                {
+                                    "key": "deal_id",
+                                    "value": "1",
+                                    "disabled": true,
+                                    "description": "Optional: filter meetings for a specific deal ID"
+                                }
+                            ]
+                        },
+                        "description": "Send user_id (and optionally lead_id) to receive categorized meetings: Today (due today), Planned (future scheduled), Overdue (missed past due), and Activity Logs (completed history with selfie/GPS). Each meeting includes complete customer/lead information."
+                    }
+                },
+                {
+                    "name": "2. Get Single Meeting / Followup Details by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/followups/7",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "followups",
+                                "7"
+                            ]
+                        },
+                        "description": "Universal Route: Fetch a single meeting or followup detail by Followup ID. Supports both Lead & Deal meetings. (Also supports nested: /api/crm/leads/{lead}/followups/{id} and /api/crm/deals/{deal}/followups/{id})"
+                    }
+                },
+                {
+                    "name": "3. Update Meeting Status to Connected (Universal - Lead & Deal)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": \"Connected\",\n    \"outcome\": \"Connected\",\n    \"notes\": \"Conducted in-person meeting with customer. Requirements verified.\",\n    \"latitude\": 24.601,\n    \"longitude\": 73.712,\n    \"location_address\": \"Bangalore Tech Center, Client Premise\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/followups/7/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "followups",
+                                "7",
+                                "status"
+                            ]
+                        },
+                        "description": "Universal Route: Mark a scheduled meeting as Connected for either a Lead or a Deal. Supports: (1) Universal: /api/crm/followups/{id}/status (2) Lead: /api/crm/leads/{lead}/followups/{id}/status (3) Deal: /api/crm/deals/{deal}/followups/{id}/status."
+                    }
+                },
+                {
+                    "name": "4. Update Meeting Status to Not Connected (Universal - Lead & Deal)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": \"Not Connected\",\n    \"outcome\": \"Not Connected\",\n    \"notes\": \"Visited client premise but contact person was unavailable.\",\n    \"latitude\": 24.601,\n    \"longitude\": 73.712,\n    \"location_address\": \"Bangalore Tech Center, Client Premise\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/followups/7/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "followups",
+                                "7",
+                                "status"
+                            ]
+                        },
+                        "description": "Universal Route: Mark a scheduled meeting as Not Connected for Lead or Deal. Requires live GPS and selfie if Geo-Verification is enabled."
+                    }
+                },
+                {
+                    "name": "5. Reschedule Meeting (Universal - Lead & Deal)",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"is_reschedule\": true,\n    \"followup_date\": \"2026-10-28 15:00:00\",\n    \"notes\": \"Rescheduled meeting per client request to next week.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/followups/7",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "followups",
+                                "7"
+                            ]
+                        },
+                        "description": "Universal Route: Reschedule meeting to a new date and time for either a Lead or Deal."
+                    }
+                },
+                {
+                    "name": "6. Cancel Scheduled Meeting (Universal - Lead & Deal)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": \"Cancelled\",\n    \"outcome\": \"Cancelled\",\n    \"notes\": \"Client requested cancellation due to internal budget freeze.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/followups/7/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "followups",
+                                "7",
+                                "status"
+                            ]
+                        },
+                        "description": "Universal Route: Cancel a scheduled meeting for Lead or Deal."
+                    }
+                }
+            ]
+        },
+        {
             "name": "CRM Module (Complete REST Suite)",
             "item": [
                 {
