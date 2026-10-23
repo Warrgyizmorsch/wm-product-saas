@@ -342,8 +342,8 @@ class LeadFollowupApiController extends Controller
                 'taggedUser:id,name,email',
             ]);
 
-        // Filter by activity type: defaults to 'Meeting', or 'all'
-        $type = $request->input('type', 'Meeting');
+        // Filter by activity type: optional ('Meeting', 'Call', etc.). If omitted or 'all', returns all activities
+        $type = $request->input('type');
         if ($type && strtolower($type) !== 'all') {
             $query->where('type', $type);
         }
