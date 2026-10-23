@@ -23,6 +23,7 @@ class JournalService
         private readonly AccountingAuditLogService $auditLog,
         private readonly JournalApprovalSettings $approvalSettings,
         private readonly AccessService $access,
+        private readonly BillWise\BillAllocationService $bills,
     ) {
     }
 
@@ -117,6 +118,9 @@ class JournalService
                 "Journal {$journal->journal_number} approved and posted",
                 ['total_debit' => $journal->total_debit, 'maker_id' => $journal->posted_by, 'approver_id' => $approverId]
             );
+
+            // Now on the ledger, so now in the bill-wise register (On Account).
+            $this->bills->allocateJournal($journal);
 
             return $journal->fresh(['entries']);
         });
@@ -294,6 +298,13 @@ class JournalService
                 ]
             );
 
+            // Receivable / Payable party lines into the bill-wise register:
+            // the poster's hints (New Ref invoice, Agst Ref bill ...), the rest
+            // On Account. A reversal mirrors its original instead.
+            if (empty($meta['is_reversal'])) {
+                $this->bills->allocateJournal($journal, $meta['bill_allocations'] ?? []);
+            }
+
             return $journal;
         });
     }
@@ -452,6 +463,8 @@ class JournalService
                 'idempotency_key' => null,
             ]);
 
+            $this->bills->mirrorReversal($original, $reversal);
+
             $this->auditLog->record(
                 $original,
                 'journal.reversed',
@@ -583,12 +596,25 @@ class JournalService
         $opening = round($seedOpeningBalance + $sign * ($openingTotals['debit'] - $openingTotals['credit']), 2);
 
         $running = $opening;
-        $entries = $this->journals->partyLedgerEntries($partyType, $partyId, $from, $to)->map(function ($entry) use ($sign, &$running) {
+        $lines = $this->journals->partyLedgerEntries($partyType, $partyId, $from, $to);
+
+        // Each line's bill-wise allocation (New Ref INV-1, Agst INV-1, On Account).
+        $refs = BillWise\BillAllocationService::enabled()
+            ? \App\Domains\Accounting\Models\BillAllocation::with('bill')->whereIn('journal_entry_id', $lines->pluck('id'))->get()->groupBy('journal_entry_id')
+            : collect();
+
+        $entries = $lines->map(function ($entry) use ($sign, &$running, $refs) {
             $running = round($running + $sign * ($entry->debit - $entry->credit), 2);
 
             return [
                 'entry' => $entry,
                 'running_balance' => $running,
+                'bill_refs' => ($refs[$entry->id] ?? collect())->map(fn ($a) => match ($a->ref_type) {
+                    \App\Domains\Accounting\Models\BillAllocation::NEW_REF => 'New Ref ' . $a->bill?->ref_number,
+                    \App\Domains\Accounting\Models\BillAllocation::AGAINST_REF => 'Agst ' . $a->bill?->ref_number . ' ' . number_format(abs((float) $a->amount), 2),
+                    \App\Domains\Accounting\Models\BillAllocation::ADVANCE => 'Advance ' . number_format(abs((float) $a->amount), 2),
+                    default => 'On Account ' . number_format(abs((float) $a->amount), 2),
+                })->values()->all(),
             ];
         });
 

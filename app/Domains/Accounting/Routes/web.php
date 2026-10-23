@@ -152,6 +152,7 @@ Route::prefix('accounting')
         Route::get('reports/balance-sheet/pdf', [BalanceSheetController::class, 'downloadPdf'])->name('reports.balance-sheet.pdf');
         Route::get('reports/profit-loss', [ProfitLossController::class, 'index'])->name('reports.profit-loss');
         Route::get('reports/ar-aging', [ArAgingController::class, 'index'])->name('reports.ar-aging');
+        Route::get('reports/bills-outstanding', [\App\Domains\Accounting\Controllers\BillsOutstandingController::class, 'index'])->name('reports.bills-outstanding');
         Route::get('reports/ap-aging', [ApAgingController::class, 'index'])->name('reports.ap-aging');
         Route::get('reports/cash-flow', [CashFlowController::class, 'index'])->name('reports.cash-flow');
         Route::get('reports/gst-summary', [GstSummaryController::class, 'index'])->name('reports.gst-summary');

@@ -67,6 +67,7 @@
                         <th class="ps-4">Date</th>
                         <th>Journal #</th>
                         <th>Description</th>
+                        <th>Bill-wise</th>
                         <th class="text-end">Debit</th>
                         <th class="text-end">Credit</th>
                         <th class="text-end pe-4">Balance</th>
@@ -74,7 +75,7 @@
                 </thead>
                 <tbody class="fs-13 text-dark">
                     <tr class="bg-light">
-                        <td class="ps-4 fw-bold" colspan="5">Opening Balance</td>
+                        <td class="ps-4 fw-bold" colspan="6">Opening Balance</td>
                         <td class="text-end pe-4 fw-bold">{{ number_format($ledger['opening'], 2) }}</td>
                     </tr>
                     @forelse ($ledger['entries'] as $row)
@@ -87,19 +88,20 @@
                                 </a>
                             </td>
                             <td class="text-muted">{{ $entry->description ?: $entry->journal->memo ?: '—' }}</td>
+                            <td class="fs-12">{{ implode(', ', $row['bill_refs'] ?? []) ?: '—' }}</td>
                             <td class="text-end">{{ $entry->debit > 0 ? number_format($entry->debit, 2) : '—' }}</td>
                             <td class="text-end">{{ $entry->credit > 0 ? number_format($entry->credit, 2) : '—' }}</td>
                             <td class="text-end pe-4">{{ number_format($row['running_balance'], 2) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">No posted activity for this party in this date range.</td>
+                            <td colspan="7" class="text-center py-4 text-muted">No posted activity for this party in this date range.</td>
                         </tr>
                     @endforelse
                 </tbody>
                 <tfoot>
                     <tr class="fw-bold fs-13 bg-light">
-                        <td class="ps-4" colspan="5">Closing Balance</td>
+                        <td class="ps-4" colspan="6">Closing Balance</td>
                         <td class="text-end pe-4">{{ number_format($ledger['closing'], 2) }}</td>
                     </tr>
                 </tfoot>

@@ -372,6 +372,10 @@ class PostPurchaseBillJournal
                 'reference_type' => 'vendor_bill',
                 'reference_id'   => $bill->id,
                 'memo'           => "Vendor Bill {$bill->bill_number} ({$bill->vendor?->name})",
+                // The vendor bill opens its own bill in the bill-wise register.
+                'bill_allocations' => [\App\Domains\Accounting\Services\BillWise\BillAllocationService::newRef(
+                    'payable', (string) $bill->bill_number, $bill->bill_date, $bill->due_date, 'vendor_bill', (int) $bill->id,
+                )],
             ]);
 
             Log::info("PostPurchaseBillJournal: Successfully posted GL entry for Bill {$bill->bill_number}", ['bill_id' => $bill->id]);

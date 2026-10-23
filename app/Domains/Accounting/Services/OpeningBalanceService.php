@@ -124,8 +124,36 @@ class OpeningBalanceService
                 'reference_type' => $target['reference_type'],
                 'reference_id' => (int) $target['reference_id'],
                 'memo' => "Opening balance - {$target['label']}",
+                'bill_allocations' => $this->openingBillHints($target, $isDebit),
             ]);
         });
+    }
+
+    /**
+     * A party's opening due becomes one "Opening Balance" bill dated the books'
+     * start (it can be broken into the old bills later). An opening on the
+     * other side — a customer's advance, a supplier we paid ahead — is an
+     * Advance, not a bill.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function openingBillHints(array $target, bool $isDebit): array
+    {
+        $partyType = $target['party_type'] ?? null;
+        if (! in_array($partyType, [JournalEntry::PARTY_CUSTOMER, JournalEntry::PARTY_VENDOR], true)) {
+            return [];
+        }
+
+        $ledger = $partyType === JournalEntry::PARTY_CUSTOMER ? 'receivable' : 'payable';
+        $isDue = $partyType === JournalEntry::PARTY_CUSTOMER ? $isDebit : ! $isDebit;
+
+        if (! $isDue) {
+            return [['ref_type' => \App\Domains\Accounting\Models\BillAllocation::ADVANCE, 'ledger' => $ledger]];
+        }
+
+        $date = $this->openingDate();
+
+        return [BillWise\BillAllocationService::newRef($ledger, 'Opening Balance', $date, $date, (string) $target['reference_type'], (int) $target['reference_id'])];
     }
 
     /**
