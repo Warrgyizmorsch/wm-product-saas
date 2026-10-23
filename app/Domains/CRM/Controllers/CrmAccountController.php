@@ -75,7 +75,10 @@ class CrmAccountController extends Controller
 
         if ($customer) {
             if ($openingBalance > 0 && (float)($customer->opening_balance ?? 0) == 0) {
-                $customer->update(['opening_balance' => $openingBalance]);
+                $customer->update([
+                    'opening_balance' => $openingBalance,
+                    'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
+                ]);
             }
         }
 
@@ -89,13 +92,17 @@ class CrmAccountController extends Controller
                 'gstin'     => $validated['gstin'] ?? null,
                 'billing_address' => $validated['street'] ?? null,
                 'opening_balance' => $openingBalance,
+                'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
                 'status'    => 'active',
             ]);
             Customer::$skipAccountAutoCreate = false;
         }
 
-        if ($customer) {
-            app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
+        $openingWarning = $customer
+            ? app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer)
+            : null;
+        if ($openingWarning) {
+            session()->flash('warning', $openingWarning);
         }
 
         // 2. Create CRM Account
@@ -199,6 +206,21 @@ class CrmAccountController extends Controller
                 ->with(['salesOrder.quotation.deal', 'items'])
                 ->latest()->get();
 
+            $invoiceCount = $invoices->count();
+            $totalBilled = $invoices->where('status', '!=', 'cancelled')->sum('total_amount');
+            $totalPaid = $invoices->where('status', '!=', 'cancelled')->sum('amount_paid');
+            if ($totalPaid == 0 && $payments->isNotEmpty()) {
+                $totalPaid = $payments->where('status', 'completed')->sum('amount');
+            }
+            $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function($r) {
+                return floatval($r->total_amount ?: $r->total_refund_amount);
+            });
+            $openingBalance = $customer->signedOpeningBalance();
+            $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
+            $outstandingBalance = max(0, $netOutstanding);
+            $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
+            $overdueAmount = $invoices->where('status', 'unpaid')
+                ->filter(fn($inv) => $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast())
             $tenantId = $customer->tenant_id ?? (tenant_id() ?? 1);
             $creditNotes = \App\Domains\Accounting\Models\Journal::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
@@ -347,6 +369,9 @@ class CrmAccountController extends Controller
                     ? convert_to_base((float) $validated['opening_balance'])
                     : 0.00;
             }
+            if (! empty($validated['opening_balance_type'])) {
+                $customerUpdate['opening_balance_type'] = $validated['opening_balance_type'];
+            }
             $customer = Customer::where('id', $account->customer_id)->first();
             if ($customer) {
                 // If another customer already has this email, avoid breaking customers table unique constraint
@@ -358,7 +383,9 @@ class CrmAccountController extends Controller
                     unset($customerUpdate['email']);
                 }
                 $customer->update($customerUpdate);
-                app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
+                if ($openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer)) {
+                    session()->flash('warning', $openingWarning);
+                }
             }
         }
 
@@ -591,6 +618,7 @@ class CrmAccountController extends Controller
             'industry_type' => 'nullable|string|max:255',
             'credit_limit'  => 'nullable|numeric|min:0',
             'opening_balance' => 'nullable|numeric|min:0',
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'owner_id'      => 'nullable|exists:users,id',
             'street'        => 'nullable|string|max:255',
             'city'          => 'nullable|string|max:100',

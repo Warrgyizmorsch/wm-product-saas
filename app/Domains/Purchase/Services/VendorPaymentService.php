@@ -26,7 +26,8 @@ class VendorPaymentService
         } else {
             // Check if vendor has unsettled Opening Balance
             $vendor = \App\Domains\Inventory\Models\Vendor::find($validated['vendor_id']);
-            $openingBal = (float) ($vendor?->opening_balance ?? 0);
+            // Only an amount owed to the vendor can be settled; an advance opening is not.
+            $openingBal = (float) ($vendor?->signedOpeningBalance() ?? 0);
             if ($openingBal > 0) {
                 $unallocatedPaid = (float) VendorPayment::where('tenant_id', $tenantId)
                     ->where('vendor_id', $validated['vendor_id'])

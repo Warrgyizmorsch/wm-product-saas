@@ -136,6 +136,7 @@ class VendorController extends Controller
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
         ], [
             'email.email'          => 'The email field must be a valid email address.',
@@ -166,11 +167,12 @@ class VendorController extends Controller
 
         $vendor = Vendor::create($validated);
 
-        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' created successfully.");
+            ->with('success', "Vendor '{$vendor->name}' created successfully.")
+            ->with('warning', $openingWarning);
     }
 
     public function quickCreate(Request $request): JsonResponse
@@ -254,7 +256,7 @@ class VendorController extends Controller
             ->latest()
             ->get();
 
-        $openingBalance = (float) ($vendor->opening_balance ?? 0.00);
+        $openingBalance = $vendor->signedOpeningBalance();
 
         $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->total_amount);
         $totalPaid = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->amount_paid);
@@ -303,7 +305,7 @@ class VendorController extends Controller
         $ledgerEntries = $ledgerEntries->sortBy('date')->values();
 
         // Compute Running Payable Balance
-        $runningBalance = (float)($vendor->opening_balance ?? 0.00);
+        $runningBalance = $vendor->signedOpeningBalance();
         $ledgerWithBalance = $ledgerEntries->map(function ($entry) use (&$runningBalance) {
             $runningBalance += ($entry['credit'] - $entry['debit']);
             $entry['running_balance'] = $runningBalance;
@@ -373,6 +375,7 @@ class VendorController extends Controller
             'ifsc_code' => ['nullable', 'string', 'max:30'],
             'payment_terms' => ['nullable', 'string', 'max:100'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
         ], [
             'email.email'          => 'The email field must be a valid email address.',
@@ -389,11 +392,12 @@ class VendorController extends Controller
         }
         $vendor->update($validated);
 
-        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
+        $openingWarning = app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->trySync($vendor);
 
         return redirect()
             ->route('purchase.vendors.show', $vendor->id)
-            ->with('success', "Vendor '{$vendor->name}' updated successfully.");
+            ->with('success', "Vendor '{$vendor->name}' updated successfully.")
+            ->with('warning', $openingWarning);
     }
 
     public function toggleStatus(Request $request, Vendor $vendor): RedirectResponse

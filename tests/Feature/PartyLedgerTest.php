@@ -92,6 +92,8 @@ class PartyLedgerTest extends TestCase
             'name' => 'Acme Retail',
             'opening_balance' => 500,
         ]);
+        // Opening balances reach the statement through the ledger, not the master field.
+        app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
 
         $journal = app(JournalService::class)->post([
             [
@@ -130,6 +132,7 @@ class PartyLedgerTest extends TestCase
             'name' => 'Bolt Supplies',
             'opening_balance' => 100,
         ]);
+        app(\App\Domains\Purchase\Services\VendorOpeningBalanceService::class)->syncVendorOpeningBalance($vendor);
 
         app(JournalService::class)->post([
             ['chart_of_account_id' => ChartOfAccount::create([

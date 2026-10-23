@@ -33,6 +33,7 @@ class Vendor extends BaseModel
         'ifsc_code',
         'payment_terms',
         'opening_balance',
+        'opening_balance_type',
         'status',
     ];
 
@@ -54,5 +55,15 @@ class Vendor extends BaseModel
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(\App\Domains\Purchase\Models\PurchaseOrder::class, 'vendor_id');
+    }
+
+    /**
+     * Opening balance as this party's statements show it: an amount owed to the vendor (credit) is positive; an advance paid (debit) is negative.
+     */
+    public function signedOpeningBalance(): float
+    {
+        $amount = (float) ($this->opening_balance ?? 0);
+
+        return ($this->opening_balance_type ?: 'credit') === 'credit' ? $amount : -$amount;
     }
 }

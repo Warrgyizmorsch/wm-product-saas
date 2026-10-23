@@ -49,6 +49,7 @@
                     <x-ui.odoo-form-ui type="input" inputType="number" :label="__('crm.credit_limit') . ' (' . active_currency_symbol() . ')'" name="credit_limit" :value="old('credit_limit', $account->credit_limit ? round(convert_from_base((float)$account->credit_limit), 2) : '0.00')" step="0.01" placeholder="0.00" :errorText="$errors->first('credit_limit')" />
 
                     <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Opening Balance ({{ active_currency_symbol() }})" name="opening_balance" id="opening_balance" :value="old('opening_balance', $account->customer?->opening_balance ? number_format(convert_from_base((float)$account->customer->opening_balance), 2, '.', '') : '0.00')" placeholder="0.00" :error-text="$errors->first('opening_balance')" />
+                    @include('modules.accounting.partials.opening-balance-side', ['party' => 'customer', 'selected' => $account->customer?->opening_balance_type])
 
                     <x-ui.odoo-form-ui type="select" :label="__('crm.account_manager_owner')" name="owner_id" :errorText="$errors->first('owner_id')">
                         <option value="">Select Account Manager...</option>

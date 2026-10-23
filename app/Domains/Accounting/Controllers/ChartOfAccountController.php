@@ -76,10 +76,13 @@ class ChartOfAccountController extends Controller
         $validated['created_by'] = auth()->id();
 
         try {
-            $account = $this->accounts->create($validated);
-            $this->accounts->syncOpeningBalance($account);
+            // One transaction: a ledger whose opening balance cannot be posted is not saved.
+            \Illuminate\Support\Facades\DB::transaction(function () use ($validated) {
+                $account = $this->accounts->create($validated);
+                $this->accounts->syncOpeningBalance($account);
+            });
         } catch (InvalidArgumentException $e) {
-            return back()->withErrors(['code' => $e->getMessage()])->withInput();
+            return back()->withErrors([$this->errorField($e) => $e->getMessage()])->withInput();
         }
 
         return redirect()->route('accounting.chart-of-accounts.index')
@@ -111,10 +114,12 @@ class ChartOfAccountController extends Controller
         $validated['opening_balance_type'] = $validated['opening_balance_type'] ?? $validated['normal_balance'];
 
         try {
-            $updated = $this->accounts->update($account->id, $validated);
-            $this->accounts->syncOpeningBalance($updated);
+            \Illuminate\Support\Facades\DB::transaction(function () use ($account, $validated) {
+                $updated = $this->accounts->update($account->id, $validated);
+                $this->accounts->syncOpeningBalance($updated);
+            });
         } catch (InvalidArgumentException $e) {
-            return back()->withErrors(['code' => $e->getMessage()])->withInput();
+            return back()->withErrors([$this->errorField($e) => $e->getMessage()])->withInput();
         }
 
         return redirect()->route('accounting.chart-of-accounts.index')
@@ -151,5 +156,15 @@ class ChartOfAccountController extends Controller
             ])
             ->values()
             ->all();
+    }
+
+    /** Opening-balance failures are shown against the opening balance field. */
+    private function errorField(InvalidArgumentException $e): string
+    {
+        return str_contains(strtolower($e->getMessage()), 'opening balance')
+            || str_contains(strtolower($e->getMessage()), 'financial year')
+            || str_contains(strtolower($e->getMessage()), 'accounting period')
+            ? 'opening_balance'
+            : 'code';
     }
 }

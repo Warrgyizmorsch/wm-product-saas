@@ -78,6 +78,7 @@ class CustomerController extends Controller
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive'],
         ], [
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
@@ -91,11 +92,12 @@ class CustomerController extends Controller
 
         $customer = $this->customers->create($validated);
 
-        app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->syncCustomerOpeningBalance($customer);
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer);
 
         return redirect()
             ->route('crm.customers.index')
-            ->with('success', 'Customer created successfully.');
+            ->with('success', 'Customer created successfully.')
+            ->with('warning', $openingWarning);
     }
 
     public function quickCreate(Request $request): JsonResponse
@@ -153,7 +155,7 @@ class CustomerController extends Controller
             return floatval($r->total_amount ?: $r->total_refund_amount);
         });
 
-        $openingBalance = floatval($customer->opening_balance ?? 0);
+        $openingBalance = $customer->signedOpeningBalance();
         $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
         $outstandingBalance = max(0, $netOutstanding);
         $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;

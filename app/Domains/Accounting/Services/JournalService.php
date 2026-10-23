@@ -360,6 +360,21 @@ class JournalService
     }
 
     /**
+     * Reverse a journal on its own date rather than today — for entries that
+     * belong to a fixed date, like opening balances. The original's period must
+     * still be open.
+     */
+    public function reverseOnOriginalDate(int $journalId, ?string $reason = null, ?int $postedBy = null): Journal
+    {
+        $original = $this->journals->findWithEntries($journalId)
+            ?? throw new InvalidArgumentException('Journal not found.');
+
+        $period = $this->periods->assertOpenPeriodForDate(Carbon::parse($original->journal_date));
+
+        return $this->reverseJournal($journalId, $reason, $postedBy, $period);
+    }
+
+    /**
      * Create the mirror-image journal that cancels out an already-posted one,
      * rather than mutating or deleting it — journals are an immutable audit trail.
      */

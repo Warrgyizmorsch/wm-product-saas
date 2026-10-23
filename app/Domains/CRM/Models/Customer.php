@@ -35,6 +35,7 @@ class Customer extends BaseModel
         'billing_address',
         'shipping_address',
         'opening_balance',
+        'opening_balance_type',
     ];
 
     protected $casts = [
@@ -92,5 +93,15 @@ class Customer extends BaseModel
     public function payments()
     {
         return $this->hasMany(CustomerPayment::class, 'customer_id');
+    }
+
+    /**
+     * Opening balance as this party's statements show it: an amount owed by the customer (debit) is positive; an advance received (credit) is negative.
+     */
+    public function signedOpeningBalance(): float
+    {
+        $amount = (float) ($this->opening_balance ?? 0);
+
+        return ($this->opening_balance_type ?: 'debit') === 'debit' ? $amount : -$amount;
     }
 }
