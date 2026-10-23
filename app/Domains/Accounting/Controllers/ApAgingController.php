@@ -2,7 +2,7 @@
 
 namespace App\Domains\Accounting\Controllers;
 
-use App\Domains\Purchase\Models\VendorBill;
+use App\Domains\Accounting\Support\BillAgeing;
 use App\Http\Controllers\Controller;
 use App\Services\Access\AccessService;
 use Illuminate\Http\Request;
@@ -11,19 +11,17 @@ use Illuminate\View\View;
 
 class ApAgingController extends Controller
 {
-    /**
-     * Statuses that still carry an open payable balance. VendorBill never
-     * actually uses 'Posted' (see VendorBillService — bills are created as
-     * 'Unpaid' and move to 'Partially Paid'/'Paid'); Cancelled has nothing
-     * outstanding.
-     */
-    private const OPEN_STATUSES = ['Unpaid', 'Partially Paid'];
-
     public function __construct(
         private readonly AccessService $access,
+        private readonly BillAgeing $ageing,
     ) {
     }
 
+    /**
+     * Payables by age from the bill-wise register: every open vendor bill and
+     * opening due plus money paid On Account, so each supplier's total is
+     * their ledger balance.
+     */
     public function index(Request $request): View
     {
         abort_unless($this->access->allows(auth()->user(), 'accounting.reports.view', [
@@ -31,113 +29,17 @@ class ApAgingController extends Controller
         ]), 403);
 
         $asOf = $request->filled('as_of') ? Carbon::parse($request->string('as_of')) : Carbon::today();
+        $basis = $request->input('basis') === BillAgeing::BASIS_BILL ? BillAgeing::BASIS_BILL : BillAgeing::BASIS_DUE;
 
-        $bills = VendorBill::withoutGlobalScope('branch')->with('vendor')
-            ->whereIn('status', self::OPEN_STATUSES)
-            ->where('due_amount', '>', 0)
-            ->orderBy('due_date')
-            ->get();
-
-        $buckets = ['not_due' => 0.0, '0_30' => 0.0, '31_60' => 0.0, '61_90' => 0.0, '90_plus' => 0.0];
-        $vendors = [];
-
-        foreach ($bills as $bill) {
-            $vendorId = $bill->vendor_id;
-            $vendorName = $bill->vendor?->name ?? 'Unknown Vendor';
-
-            $dueDate = $bill->due_date ? Carbon::parse($bill->due_date) : null;
-            // Carbon 3's diffInDays() is signed (not absolute) by default, so
-            // asOf->diffInDays(pastDate) returns a negative number — abs() it
-            // or every overdue bill falls into the "not_due" bucket.
-            $daysOverdue = ($dueDate && $dueDate->lt($asOf)) ? abs($asOf->diffInDays($dueDate)) : 0;
-            $bucket = $this->bucketFor($daysOverdue);
-
-            $balance = (float) $bill->due_amount;
-
-            $vendors[$vendorId] ??= [
-                'vendor_id' => $vendorId,
-                'name' => $vendorName,
-                'buckets' => $buckets,
-                'total' => 0.0,
-                'bills' => [],
-            ];
-
-            $vendors[$vendorId]['buckets'][$bucket] += $balance;
-            $vendors[$vendorId]['total'] += $balance;
-            $vendors[$vendorId]['bills'][] = [
-                'bill' => $bill,
-                'due_date' => $dueDate,
-                'days_overdue' => $daysOverdue,
-                'bucket' => $bucket,
-                'balance' => $balance,
-            ];
-
-            $buckets[$bucket] += $balance;
-        }
-
-        // Include vendors with unsettled Opening Balances (historical dues bucketed into 90_plus)
-        $vendorsWithOpening = \App\Domains\Inventory\Models\Vendor::where('tenant_id', auth()->user()->tenant_id)
-            ->where('opening_balance', '>', 0)
-            ->get();
-
-        foreach ($vendorsWithOpening as $vendor) {
-            $unallocatedPaid = (float) \App\Domains\Purchase\Models\VendorPayment::where('tenant_id', auth()->user()->tenant_id)
-                ->where('vendor_id', $vendor->id)
-                ->whereIn('payment_type', ['Opening Balance', 'Advance'])
-                ->whereDoesntHave('allocations')
-                ->where('status', '!=', 'cancelled')
-                ->sum('amount');
-
-            $remainingOpening = max(0.0, (float) $vendor->opening_balance - $unallocatedPaid);
-
-            if ($remainingOpening > 0.001) {
-                $vendorId = $vendor->id;
-                $vendorName = $vendor->name ?? 'Unknown Vendor';
-
-                $vendors[$vendorId] ??= [
-                    'vendor_id' => $vendorId,
-                    'name' => $vendorName,
-                    'buckets' => $buckets,
-                    'total' => 0.0,
-                    'bills' => [],
-                ];
-
-                $vendors[$vendorId]['buckets']['90_plus'] += $remainingOpening;
-                $vendors[$vendorId]['total'] += $remainingOpening;
-                $vendors[$vendorId]['bills'][] = [
-                    'bill' => (object)[
-                        'bill_number' => 'OPENING-BAL',
-                    ],
-                    'due_date' => null,
-                    'days_overdue' => 90,
-                    'bucket' => '90_plus',
-                    'balance' => $remainingOpening,
-                ];
-
-                $buckets['90_plus'] += $remainingOpening;
-            }
-        }
-
-        $grandTotal = array_sum($buckets);
-
-        usort($vendors, fn ($a, $b) => $b['total'] <=> $a['total']);
+        $report = $this->ageing->build('payable', $asOf, $basis);
 
         return view('modules.accounting.reports.ap-aging', [
             'asOf' => $asOf,
-            'vendors' => $vendors,
-            'buckets' => $buckets,
-            'grandTotal' => $grandTotal,
+            'basis' => $basis,
+            'vendors' => array_map(fn ($p) => $p + ['bills' => $p['documents']], $report['parties']),
+            'buckets' => $report['buckets'],
+            'onAccount' => $report['onAccount'],
+            'grandTotal' => $report['grandTotal'],
         ]);
-    }
-
-    private function bucketFor(int $daysOverdue): string
-    {
-        return match (true) {
-            $daysOverdue <= 0 => 'not_due',
-            $daysOverdue <= 30 => '0_30',
-            $daysOverdue <= 60 => '31_60',
-            $daysOverdue <= 90 => '61_90',
-            default => '90_plus',
-        };
     }
 }

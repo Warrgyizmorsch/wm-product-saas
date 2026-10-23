@@ -81,6 +81,13 @@ class PostCustomerPaymentJournal
                 'reference_type' => 'customer_payment',
                 'reference_id' => $payment->id,
                 'memo' => "Customer payment {$payment->payment_number}",
+                // Agst Ref each invoice it pays (or the opening due, for a receipt
+                // taken "against opening balance"); the rest stays On Account.
+                'bill_allocations' => str_starts_with((string) $payment->notes, 'Against opening balance')
+                    ? [\App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('receivable', 'customer_opening_balance', (int) $payment->customer_id)]
+                    : $allocations->filter(fn ($a) => $a->invoice_id !== null)
+                        ->map(fn ($a) => \App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('receivable', 'Invoice', (int) $a->invoice_id, (float) $a->allocated_amount))
+                        ->values()->all(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('PostCustomerPaymentJournal: failed to auto-post journal', [

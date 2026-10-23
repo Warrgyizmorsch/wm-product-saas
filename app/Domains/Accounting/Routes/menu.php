@@ -51,6 +51,7 @@ return [
             ['label' => 'Profit & Loss', 'route' => 'accounting.reports.profit-loss', 'permission' => 'accounting.reports.view'],
             ['label' => 'AR Aging', 'route' => 'accounting.reports.ar-aging', 'permission' => 'accounting.reports.view'],
             ['label' => 'AP Aging', 'route' => 'accounting.reports.ap-aging', 'permission' => 'accounting.reports.view'],
+            ['label' => 'Bills Outstanding', 'route' => 'accounting.reports.bills-outstanding', 'permission' => 'accounting.reports.view'],
             ['label' => 'Cash Flow', 'route' => 'accounting.reports.cash-flow', 'permission' => 'accounting.reports.view'],
             ['label' => 'GST Summary', 'route' => 'accounting.reports.gst-summary', 'permission' => 'accounting.reports.view'],
             ['label' => 'GSTR-1', 'route' => 'accounting.reports.gstr1', 'permission' => 'accounting.reports.view'],
