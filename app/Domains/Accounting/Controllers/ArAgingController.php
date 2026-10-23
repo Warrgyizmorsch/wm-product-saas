@@ -31,14 +31,18 @@ class ArAgingController extends Controller
         $asOf = $request->filled('as_of') ? Carbon::parse($request->string('as_of')) : Carbon::today();
         $basis = $request->input('basis') === BillAgeing::BASIS_BILL ? BillAgeing::BASIS_BILL : BillAgeing::BASIS_DUE;
 
-        $report = $this->ageing->build('receivable', $asOf, $basis);
+        // Customers on Accounts Receivable only (other bill-wise ledgers such as
+        // advances to employees are in Bills Outstanding).
+        $ledgerId = app(\App\Domains\Accounting\Services\SystemAccountService::class)->get(\App\Domains\Accounting\Support\SystemAccount::AR, (int) (tenant_id() ?? auth()->user()->tenant_id))?->id;
+        $report = $this->ageing->build('receivable', $asOf, $basis, $ledgerId);
 
         return view('modules.accounting.reports.ar-aging', [
             'asOf' => $asOf,
             'basis' => $basis,
-            'customers' => array_map(fn ($p) => $p + ['invoices' => $p['documents']], $report['parties']),
+            // Advances are shown with On Account here (one column).
+            'customers' => array_map(fn ($p) => ['invoices' => $p['documents'], 'on_account' => $p['on_account'] + $p['advance']] + $p, $report['parties']),
             'buckets' => $report['buckets'],
-            'onAccount' => $report['onAccount'],
+            'onAccount' => $report['onAccount'] + $report['advance'],
             'grandTotal' => $report['grandTotal'],
         ]);
     }

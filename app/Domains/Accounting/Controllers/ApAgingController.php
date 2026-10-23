@@ -31,14 +31,18 @@ class ApAgingController extends Controller
         $asOf = $request->filled('as_of') ? Carbon::parse($request->string('as_of')) : Carbon::today();
         $basis = $request->input('basis') === BillAgeing::BASIS_BILL ? BillAgeing::BASIS_BILL : BillAgeing::BASIS_DUE;
 
-        $report = $this->ageing->build('payable', $asOf, $basis);
+        // Suppliers on Accounts Payable only (other bill-wise ledgers such as
+        // advances to employees are in Bills Outstanding).
+        $ledgerId = app(\App\Domains\Accounting\Services\SystemAccountService::class)->get(\App\Domains\Accounting\Support\SystemAccount::AP, (int) (tenant_id() ?? auth()->user()->tenant_id))?->id;
+        $report = $this->ageing->build('payable', $asOf, $basis, $ledgerId);
 
         return view('modules.accounting.reports.ap-aging', [
             'asOf' => $asOf,
             'basis' => $basis,
-            'vendors' => array_map(fn ($p) => $p + ['bills' => $p['documents']], $report['parties']),
+            // Advances are shown with On Account here (one column).
+            'vendors' => array_map(fn ($p) => ['bills' => $p['documents'], 'on_account' => $p['on_account'] + $p['advance']] + $p, $report['parties']),
             'buckets' => $report['buckets'],
-            'onAccount' => $report['onAccount'],
+            'onAccount' => $report['onAccount'] + $report['advance'],
             'grandTotal' => $report['grandTotal'],
         ]);
     }

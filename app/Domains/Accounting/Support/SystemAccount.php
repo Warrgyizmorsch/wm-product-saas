@@ -204,6 +204,20 @@ final class SystemAccount
     ];
 
     /** The code an account was provisioned with, or null for an unknown key. */
+    /**
+     * Party ledgers kept bill-by-bill by default (Tally's "Maintain balances
+     * bill-by-bill"); any other ledger can be switched on in the chart.
+     */
+    public const BILL_WISE_DEFAULTS = [
+        self::AR,
+        self::AP,
+        'creditors_for_expenses',
+        self::ADVANCE_FROM_CUSTOMERS,
+        self::ADVANCE_TO_SUPPLIERS,
+        self::ADVANCE_TO_EMPLOYEES,
+        'salary_payable',
+    ];
+
     public static function templateCode(string $key): ?string
     {
         return self::TEMPLATE[$key] ?? null;

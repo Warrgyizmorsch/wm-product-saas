@@ -31,7 +31,7 @@ class PartyLedgerController extends Controller
 
         $partyType = $request->string('party_type')->value();
         $partyId = $request->integer('party_id') ?: null;
-        $partyType = in_array($partyType, [JournalEntry::PARTY_CUSTOMER, JournalEntry::PARTY_VENDOR], true) ? $partyType : null;
+        $partyType = \App\Domains\Accounting\Support\PartyDirectory::isType($partyType) ? $partyType : null;
 
         $defaultFrom = $this->periods->periodForDate(now())?->fiscalYear?->start_date ?? now()->startOfYear();
 
@@ -41,10 +41,10 @@ class PartyLedgerController extends Controller
         $party = null;
         $ledger = null;
 
-        if ($partyType && $partyId) {
-            $party = $partyType === JournalEntry::PARTY_CUSTOMER
-                ? Customer::find($partyId)
-                : Vendor::find($partyId);
+        $directory = app(\App\Domains\Accounting\Support\PartyDirectory::class);
+
+        if ($partyType && $partyId && $directory->exists($partyType, $partyId)) {
+            $party = (object) ['name' => $directory->name($partyType, $partyId)];
         }
 
         if ($party) {
@@ -59,7 +59,8 @@ class PartyLedgerController extends Controller
         return view('modules.accounting.reports.party-ledger', [
             'customers' => Customer::orderBy('name')->get(['id', 'name']),
             'vendors' => Vendor::orderBy('name')->get(['id', 'name']),
-            'transporters' => Transporter::whereNotNull('vendor_id')->orderBy('name')->get(['id', 'name', 'vendor_id']),
+            'transporters' => Transporter::where('tenant_id', tenant_id())->orderBy('name')->get(['id', 'name', 'vendor_id']),
+            'employees' => \App\Domains\HRMS\Models\Employee::orderBy('full_name')->get(['id', 'full_name']),
             'partyType' => $partyType,
             'partyId' => $partyId,
             'party' => $party,

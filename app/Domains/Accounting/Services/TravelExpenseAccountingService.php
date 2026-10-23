@@ -39,8 +39,7 @@ class TravelExpenseAccountingService
                 'is_active'      => true,
             ]);
 
-        $bankAccount = ChartOfAccount::where('tenant_id', $tenantId)->where('is_cash_or_bank', true)->first()
-            ?? ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1020')->first()
+        $bankAccount = ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1020')->first()
             ?? ChartOfAccount::create([
                 'tenant_id'      => $tenantId,
                 'code'           => '1020',
@@ -61,6 +60,8 @@ class TravelExpenseAccountingService
                 'chart_of_account_id' => $advancesAccount->id,
                 'debit'               => $amount,
                 'credit'              => 0.00,
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                'party_id'            => $cashAdvance->employee_id,
                 'description'         => "Disbursement of Advance: " . $cashAdvance->purpose,
             ],
             [
@@ -80,6 +81,10 @@ class TravelExpenseAccountingService
                 'reference_id'   => $cashAdvance->id,
                 'memo'           => "Disbursed Cash Advance: " . $cashAdvance->purpose,
                 'posted_by'      => auth()->id(),
+                // The advance is a bill the employee owes back (or settles with a claim).
+                'bill_allocations' => $cashAdvance->employee_id
+                    ? [BillWise\BillAllocationService::newRef('receivable', 'ADV-' . $cashAdvance->id, now(), now(), 'CashAdvance', (int) $cashAdvance->id)]
+                    : [],
             ]);
         } catch (\Throwable $e) {
             Log::error("Disbursement Journal Posting Failed: " . $e->getMessage(), [
@@ -128,8 +133,7 @@ class TravelExpenseAccountingService
                 'is_active'      => true,
             ]);
 
-        $bankAccount = ChartOfAccount::where('tenant_id', $tenantId)->where('is_cash_or_bank', true)->first()
-            ?? ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1020')->first()
+        $bankAccount = ChartOfAccount::where('tenant_id', $tenantId)->where('code', '1020')->first()
             ?? ChartOfAccount::create([
                 'tenant_id'      => $tenantId,
                 'code'           => '1020',
@@ -160,6 +164,8 @@ class TravelExpenseAccountingService
                 'chart_of_account_id' => $advancesAccount->id,
                 'debit'               => 0.00,
                 'credit'              => $advanceAdjusted,
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                'party_id'            => $expenseReport->employee_id,
                 'description'         => "Clear Advance for Claim: " . $expenseReport->title,
             ];
         }

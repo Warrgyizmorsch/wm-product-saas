@@ -92,7 +92,9 @@ class BillAllocationService
         }
 
         $controls = $this->controlAccounts((int) $journal->tenant_id);
-        $lines = $journal->entries()->orderBy('id')->get()
+        $all = $journal->entries()->orderBy('id')->get()->values();
+        $positions = $all->mapWithKeys(fn (JournalEntry $e, int $i) => [$e->id => $i])->all();
+        $lines = $all
             ->filter(fn (JournalEntry $e) => isset($controls[$e->chart_of_account_id]) && $e->party_id !== null && $e->party_type !== null)
             ->values();
 
@@ -105,7 +107,7 @@ class BillAllocationService
 
         foreach ($hints as $hint) {
             foreach ($lines as $line) {
-                if ($remaining[$line->id] == 0.0 || ! $this->hintMatches($hint, $line, $controls)) {
+                if ($remaining[$line->id] == 0.0 || ! $this->hintMatches($hint, $line, $controls, $positions)) {
                     continue;
                 }
 
@@ -172,9 +174,9 @@ class BillAllocationService
      *
      * @return Collection<int, object{bill: BillReference, outstanding: float}>
      */
-    public function openBills(string $ledger, ?string $asOf = null, ?string $partyType = null, ?int $partyId = null): Collection
+    public function openBills(string $ledger, ?string $asOf = null, ?string $partyType = null, ?int $partyId = null, ?int $ledgerId = null): Collection
     {
-        $controlIds = $this->controlIdsFor($ledger);
+        $controlIds = $ledgerId ? [$ledgerId] : $this->controlIdsFor($ledger);
 
         $totals = BillAllocation::query()
             ->whereIn('control_account_id', $controlIds)
@@ -199,11 +201,12 @@ class BillAllocationService
      *
      * @return Collection<string, float> "party_type:party_id" => signed amount
      */
-    public function onAccount(string $ledger, ?string $asOf = null): Collection
+    public function onAccount(string $ledger, ?string $asOf = null, ?int $ledgerId = null, ?string $refType = null): Collection
     {
         return BillAllocation::query()
-            ->whereIn('control_account_id', $this->controlIdsFor($ledger))
+            ->whereIn('control_account_id', $ledgerId ? [$ledgerId] : $this->controlIdsFor($ledger))
             ->whereNull('bill_reference_id')
+            ->when($refType, fn ($q) => $q->where('ref_type', $refType))
             ->when($asOf, fn ($q) => $q->whereDate('allocated_on', '<=', $asOf))
             ->groupBy('party_type', 'party_id')
             ->selectRaw("party_type, party_id, SUM(amount) as balance")
@@ -232,25 +235,64 @@ class BillAllocationService
         return array_keys(array_filter($this->controlAccounts($tenantId), fn ($kind) => $kind === $ledger));
     }
 
-    /** @return array<int, string> control account id => 'receivable'|'payable' */
+    /**
+     * Every ledger kept bill-by-bill: 'receivable' for debit-normal ledgers
+     * (customers, advances paid), 'payable' for credit-normal ones (suppliers,
+     * salary payable, advances received).
+     *
+     * @return array<int, string> ledger id => 'receivable'|'payable'
+     */
     public function controlAccounts(int $tenantId): array
     {
         if (! isset($this->controls[$tenantId])) {
             $map = [];
+
+            $query = \App\Domains\Accounting\Models\ChartOfAccount::query()->withoutGlobalScopes()->where('tenant_id', $tenantId);
+            $ledgers = Schema::hasColumn('chart_of_accounts', 'bill_wise')
+                ? $query->where('bill_wise', true)->get(['id', 'normal_balance'])
+                : collect();
+
+            foreach ($ledgers as $ledger) {
+                $map[$ledger->id] = $ledger->normal_balance === \App\Domains\Accounting\Models\ChartOfAccount::BALANCE_CREDIT ? 'payable' : 'receivable';
+            }
+
+            // Receivable / Payable are always bill-wise, whatever the flag says.
             foreach ([SystemAccount::AR => 'receivable', SystemAccount::AP => 'payable'] as $key => $kind) {
                 if ($account = $this->systemAccounts->get($key, $tenantId)) {
                     $map[$account->id] = $kind;
                 }
             }
+
             $this->controls[$tenantId] = $map;
         }
 
         return $this->controls[$tenantId];
     }
 
-    /** @param array<int, string> $controls */
-    private function hintMatches(array $hint, JournalEntry $line, array $controls): bool
+    /** Forget cached ledgers, e.g. after a ledger's bill-wise switch changed. */
+    public function forgetControls(?int $tenantId = null): void
     {
+        if ($tenantId === null) {
+            $this->controls = [];
+        } else {
+            unset($this->controls[$tenantId]);
+        }
+    }
+
+    /**
+     * @param array<int, string> $controls
+     * @param array<int, int> $positions journal line id => its 0-based position in the journal
+     */
+    private function hintMatches(array $hint, JournalEntry $line, array $controls, array $positions = []): bool
+    {
+        if (isset($hint['line_index']) && ($positions[$line->id] ?? -1) !== (int) $hint['line_index']) {
+            return false;
+        }
+
+        if (isset($hint['account_id']) && (int) $hint['account_id'] !== (int) $line->chart_of_account_id) {
+            return false;
+        }
+
         if (isset($hint['party_type']) && ($hint['party_type'] !== $line->party_type || (int) $hint['party_id'] !== (int) $line->party_id)) {
             return false;
         }
@@ -285,22 +327,28 @@ class BillAllocationService
         }
 
         if ($type === BillAllocation::AGAINST_REF) {
-            $bill = $this->findBill($line, $hint);
-            if ($bill === null) {
-                return 0.0;
+            // One bill, or (an opening broken into old bills) several, oldest due first.
+            $used = 0.0;
+
+            foreach ($this->findBills($line, $hint) as $bill) {
+                $left = round($signed - $used, 2);
+                if (abs($left) < 0.005) {
+                    break;
+                }
+
+                // Only settle what is open on the bill, on its opposite side.
+                $open = $this->billOutstanding($bill);
+                if ($open == 0.0 || ($open > 0) === ($left > 0)) {
+                    continue;
+                }
+
+                $settle = min(abs($left), abs($open));
+                $settleSigned = $left > 0 ? $settle : -$settle;
+                $this->record($line, BillAllocation::AGAINST_REF, $settleSigned, $date, $bill->id);
+                $used = round($used + $settleSigned, 2);
             }
 
-            // Only settle what is open on the bill, on its opposite side.
-            $open = $this->billOutstanding($bill);
-            if ($open == 0.0 || ($open > 0) === ($signed > 0)) {
-                return 0.0;
-            }
-
-            $settle = min(abs($signed), abs($open));
-            $settleSigned = $signed > 0 ? $settle : -$settle;
-            $this->record($line, BillAllocation::AGAINST_REF, $settleSigned, $date, $bill->id);
-
-            return $settleSigned;
+            return $used;
         }
 
         $this->record($line, in_array($type, [BillAllocation::ADVANCE, BillAllocation::ON_ACCOUNT], true) ? $type : BillAllocation::ON_ACCOUNT, $signed, $date);
@@ -308,7 +356,8 @@ class BillAllocationService
         return $signed;
     }
 
-    private function findBill(JournalEntry $line, array $hint): ?BillReference
+    /** @return Collection<int, BillReference> */
+    private function findBills(JournalEntry $line, array $hint): Collection
     {
         $query = BillReference::query()
             ->where('party_type', $line->party_type)
@@ -316,17 +365,18 @@ class BillAllocationService
             ->where('control_account_id', $line->chart_of_account_id);
 
         if (! empty($hint['bill_reference_id'])) {
-            return (clone $query)->whereKey($hint['bill_reference_id'])->first();
+            return (clone $query)->whereKey($hint['bill_reference_id'])->get();
         }
 
         if (! empty($hint['source_type']) && ! empty($hint['source_id'])) {
-            $bill = (clone $query)->where('source_type', $hint['source_type'])->where('source_id', $hint['source_id'])->first();
-            if ($bill !== null) {
-                return $bill;
+            $bills = (clone $query)->where('source_type', $hint['source_type'])->where('source_id', $hint['source_id'])
+                ->orderBy('due_date')->orderBy('bill_date')->orderBy('id')->get();
+            if ($bills->isNotEmpty()) {
+                return $bills;
             }
         }
 
-        return ! empty($hint['ref_number']) ? (clone $query)->where('ref_number', $hint['ref_number'])->first() : null;
+        return ! empty($hint['ref_number']) ? (clone $query)->where('ref_number', $hint['ref_number'])->get() : collect();
     }
 
     private function record(JournalEntry $line, string $type, float $signed, string $date, ?int $billId = null): void

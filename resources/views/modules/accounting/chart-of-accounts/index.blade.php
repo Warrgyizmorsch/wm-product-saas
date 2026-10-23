@@ -95,7 +95,8 @@
                                     data-opening-balance-type="{{ $account->opening_balance_type }}"
                                     data-is-active="{{ $account->is_active ? '1' : '0' }}"
                                     data-is-system="{{ $account->is_system ? '1' : '0' }}"
-                                    data-is-cash-or-bank="{{ $account->is_cash_or_bank ? '1' : '0' }}" />
+                                    data-is-cash-or-bank="{{ $account->is_cash_or_bank ? '1' : '0' }}"
+                                    data-bill-wise="{{ $account->bill_wise ? '1' : '0' }}" />
                             @can('delete', $account)
                                 <form action="{{ route('accounting.chart-of-accounts.destroy', $account) }}" method="POST" class="d-inline">
                                     @csrf
@@ -205,6 +206,11 @@
                 <input type="hidden" name="is_cash_or_bank" value="0">
                 <x-ui.checkbox label="Cash / Bank Account" name="is_cash_or_bank" id="coaIsCashOrBank" :checked="old('is_cash_or_bank', $editingAccount?->is_cash_or_bank ?? false)" />
             </div>
+            <div class="col-md-6">
+                <input type="hidden" name="bill_wise" value="0">
+                <x-ui.checkbox label="Track bill-by-bill" name="bill_wise" id="coaBillWise" :checked="old('bill_wise', $editingAccount?->bill_wise ?? false)" />
+                <small class="form-text text-muted fs-11 d-block">Each entry is matched to a party's bill (New Ref / Agst Ref / On Account), like Tally.</small>
+            </div>
         </div>
     </x-ui.modal>
 
@@ -273,6 +279,7 @@
                 openingSideChosen = hasOpening;
                 $('#coaIsActive').prop('checked', data.isActive === '1');
                 $('#coaIsCashOrBank').prop('checked', data.isCashOrBank === '1');
+                $('#coaBillWise').prop('checked', data.billWise === '1');
                 $('#coaSystemNotice').toggle(data.isSystem === '1');
                 $('#coaCode').prop('readonly', data.isSystem === '1');
             });

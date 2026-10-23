@@ -31,7 +31,19 @@
                     @if (count($transporters))
                         <optgroup label="Transporters">
                             @foreach ($transporters as $transporter)
-                                <option value="vendor:{{ $transporter->vendor_id }}" @selected($partyType === 'vendor' && $partyId == $transporter->vendor_id)>{{ $transporter->name }} (via Vendor Ledger)</option>
+                                {{-- A transporter linked to a vendor shares that vendor's ledger. --}}
+                                @if ($transporter->vendor_id)
+                                    <option value="vendor:{{ $transporter->vendor_id }}" @selected($partyType === 'vendor' && $partyId == $transporter->vendor_id)>{{ $transporter->name }} (via Vendor Ledger)</option>
+                                @else
+                                    <option value="transporter:{{ $transporter->id }}" @selected($partyType === 'transporter' && $partyId == $transporter->id)>{{ $transporter->name }}</option>
+                                @endif
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    @if (count($employees))
+                        <optgroup label="Employees">
+                            @foreach ($employees as $employee)
+                                <option value="employee:{{ $employee->id }}" @selected($partyType === 'employee' && $partyId == $employee->id)>{{ $employee->full_name }}</option>
                             @endforeach
                         </optgroup>
                     @endif

@@ -135,6 +135,9 @@
             <button type="button" class="btn btn-light-brand btn-sm mt-2 addLineBtn" data-voucher-type="{{ $type }}">
                 <i class="feather-plus me-1"></i>Add Line
             </button>
+            @unless ($type === 'contra')
+                @include('modules.accounting.bill-wise._line-panel', ['formKey' => $type, 'accounts' => $accounts])
+            @endunless
             @if ($type === 'contra')
                 <p class="fs-11 text-muted mt-2 mb-0"><i class="feather-info"></i> Every line of a Contra voucher must be a Cash or Bank account.</p>
             @endif
@@ -201,6 +204,7 @@
                                 <select name="" class="form-select odoo-table-select odoo-select2 account-select" required data-placeholder="${escapeHtmlVoucherLine(rowLabel)}">
                                     ${opts}
                                 </select>
+                                ${window.BillWiseBox ? BillWiseBox.rowFields() : ''}
                             </td>
                             <td>
                                 <input type="text" name="" class="odoo-table-input description-input" placeholder="Line description..." value="${escapeHtmlVoucherLine(values.description || '')}">
@@ -231,6 +235,7 @@
                         $(this).find('.description-input').attr('name', `items[${index}][description]`);
                         $(this).find('.debit-input').attr('name', `items[${index}][debit]`);
                         $(this).find('.credit-input').attr('name', `items[${index}][credit]`);
+                        if (window.BillWiseBox) BillWiseBox.rename($(this), index);
                     });
 
                     const rowCount = $table.find('tbody .item-row').length;
@@ -246,6 +251,7 @@
                     }
 
                     reindexRows();
+                    if (window.BillWiseBox) BillWiseBox.refresh(newRow);
 
                     return newRow;
                 }
@@ -314,6 +320,8 @@
                     reindexRows();
                     calculateTotals();
                 });
+
+                if (window.BillWiseBox) BillWiseBox.attach(type, $table);
 
                 // Reset to the two fixed rows and re-init whenever the form becomes
                 // visible (drawer opened) so a previous fill doesn't linger.

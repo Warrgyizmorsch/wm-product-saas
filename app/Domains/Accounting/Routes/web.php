@@ -132,6 +132,14 @@ Route::prefix('accounting')
         Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
 
+        // Bill-wise box on vouchers / journals, and adjusting bills against On Account money.
+        Route::get('bill-wise/parties', [\App\Domains\Accounting\Controllers\BillWiseController::class, 'parties'])->name('bill-wise.parties');
+        Route::get('bill-wise/open-bills', [\App\Domains\Accounting\Controllers\BillWiseController::class, 'openBills'])->name('bill-wise.open-bills');
+        Route::get('bill-wise/settlement', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'index'])->name('bill-wise.settlement');
+        Route::post('bill-wise/settlement', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'store'])->name('bill-wise.settlement.store');
+        Route::post('bill-wise/opening-breakup', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'openingBreakup'])->name('bill-wise.opening-breakup');
+        Route::delete('bill-wise/settlement/{settlement}', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'destroy'])->name('bill-wise.settlement.destroy');
+
         // Maker-checker queue for manual journals and vouchers.
         Route::get('approvals', [JournalApprovalController::class, 'index'])->name('approvals.index');
         Route::post('approvals/{journal}/approve', [JournalApprovalController::class, 'approve'])->name('approvals.approve');

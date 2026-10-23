@@ -200,9 +200,10 @@ class BuildBillRegister extends Command
 
         return $openings->openingBillHints([
             'party_type' => $line->party_type,
+            'party_id' => (int) $line->party_id,
             'reference_type' => $journal->reference_type,
             'reference_id' => (int) $journal->reference_id,
-        ], (float) $line->debit > 0);
+        ], (float) $line->debit > 0, abs((float) $line->debit - (float) $line->credit));
     }
 
     /** Invoices carrying a sales-order advance whose adjustment journal is missing. */

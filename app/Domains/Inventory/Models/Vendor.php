@@ -34,7 +34,12 @@ class Vendor extends BaseModel
         'payment_terms',
         'opening_balance',
         'opening_balance_type',
+        'opening_bills',
         'status',
+    ];
+
+    protected $casts = [
+        'opening_bills' => 'array',
     ];
 
     public function operations(): HasMany

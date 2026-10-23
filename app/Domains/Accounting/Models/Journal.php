@@ -78,9 +78,11 @@ class Journal extends BaseModel
         'rejected_by',
         'rejected_at',
         'rejection_reason',
+        'bill_allocation_hints',
     ];
 
     protected $casts = [
+        'bill_allocation_hints' => 'array',
         'journal_date' => 'date',
         'total_debit' => 'float',
         'total_credit' => 'float',

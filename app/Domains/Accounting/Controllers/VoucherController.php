@@ -8,6 +8,7 @@ use App\Domains\Accounting\Policies\VoucherPolicy;
 use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\VoucherService;
+use App\Domains\Accounting\Support\BillWiseInput;
 use App\Domains\Accounting\Support\VoucherType;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class VoucherController extends Controller
         private readonly ChartOfAccountsService $accounts,
         private readonly VoucherPolicy $voucherPolicy,
         private readonly JournalService $journals,
+        private readonly BillWiseInput $billWise,
     ) {
     }
 
@@ -84,17 +86,29 @@ class VoucherController extends Controller
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
+            ...BillWiseInput::rules(),
         ]);
+
+        // Party per line and the bills it settles / opens (the bill-wise box).
+        [$lines, $billHints] = $this->billWise->apply($validated['items']);
+        $firstParty = collect($lines)->first(fn ($line) => ! empty($line['party_id']));
+        $partyName = $validated['party_name'] ?? null;
+        if ($firstParty && $partyName === null) {
+            $partyName = $this->billWise->partyName($firstParty['party_type'], (int) $firstParty['party_id']);
+        }
 
         try {
             if ($type === VoucherType::CONTRA) {
-                $this->assertBothLinesAreCashOrBank($validated['items']);
+                $this->assertBothLinesAreCashOrBank($lines);
             }
 
-            $journal = $this->vouchers->post($type, $validated['items'], [
+            $journal = $this->vouchers->post($type, $lines, [
                 'journal_date' => $validated['voucher_date'],
                 'memo' => $validated['memo'] ?? null,
-                'party_name' => $validated['party_name'] ?? null,
+                'party_type' => $firstParty['party_type'] ?? null,
+                'party_id' => $firstParty['party_id'] ?? null,
+                'party_name' => $partyName,
+                'bill_allocations' => $billHints,
                 'payment_method' => $validated['payment_method'] ?? null,
                 'reference_no' => $validated['reference_no'] ?? null,
                 'posted_by' => auth()->id(),

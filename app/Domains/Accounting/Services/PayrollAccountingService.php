@@ -95,6 +95,8 @@ class PayrollAccountingService
         $debitGroup = [];   // Account ID => Amount (Debits for actual earned salary expenses)
         $creditGroup = [];  // Account ID => Amount (Credits for statutory & other deductions)
         $totalNetPayout = 0.00;
+        $netByEmployee = [];      // employee id => net pay (one Salary Payable line each)
+        $recoveryByEmployee = []; // employee id => advance / loan recovered this month
 
         foreach ($employees as $employee) {
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
@@ -143,6 +145,12 @@ class PayrollAccountingService
                         $accId = $defaultAccounts['2080']->id;
                     }
 
+                    // Advance / loan recovery reduces that employee's own advance.
+                    if ($accId === $defaultAccounts['1420']->id) {
+                        $recoveryByEmployee[$employee->id] = ($recoveryByEmployee[$employee->id] ?? 0.00) + $val;
+                        continue;
+                    }
+
                     $creditGroup[$accId] = ($creditGroup[$accId] ?? 0.00) + $val;
                 }
             }
@@ -160,12 +168,11 @@ class PayrollAccountingService
                 }
             }
 
-            $totalNetPayout += (float) ($calc['summary']['net_payout'] ?? 0.00);
-        }
-
-        // Add Net Salary Payable liability credit
-        if ($totalNetPayout > 0) {
-            $creditGroup[$salaryPayableAccount->id] = ($creditGroup[$salaryPayableAccount->id] ?? 0.00) + $totalNetPayout;
+            $net = (float) ($calc['summary']['net_payout'] ?? 0.00);
+            $totalNetPayout += $net;
+            if ($net > 0) {
+                $netByEmployee[$employee->id] = ($netByEmployee[$employee->id] ?? 0.00) + $net;
+            }
         }
 
         // Build Journal Entry Lines
@@ -194,6 +201,36 @@ class PayrollAccountingService
                     'debit'               => 0.00,
                     'credit'              => $creditVal,
                     'description'         => "{$accountName} deduction for month {$run->payroll_month}",
+                ];
+            }
+        }
+
+        // Net pay owed to each employee on their own Salary Payable line, so
+        // the bill-wise register knows who is still unpaid (Tally payroll).
+        $monthEnd = $this->monthEnd($run);
+        $billHints = [];
+        foreach ($netByEmployee as $employeeId => $net) {
+            $lines[] = [
+                'chart_of_account_id' => $salaryPayableAccount->id,
+                'debit'               => 0.00,
+                'credit'              => round($net, 2),
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                'party_id'            => $employeeId,
+                'description'         => "Net salary payable for month {$run->payroll_month}",
+            ];
+            $billHints[] = BillWise\BillAllocationService::newRef('payable', "SAL-{$run->payroll_month}", $monthEnd, $monthEnd, 'payroll_salary', (int) $run->id)
+                + ['party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE, 'party_id' => $employeeId, 'account_id' => $salaryPayableAccount->id];
+        }
+
+        foreach ($recoveryByEmployee as $employeeId => $recovered) {
+            if (round($recovered, 2) > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $defaultAccounts['1420']->id,
+                    'debit'               => 0.00,
+                    'credit'              => round($recovered, 2),
+                    'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                    'party_id'            => $employeeId,
+                    'description'         => "Advance / loan recovered for month {$run->payroll_month}",
                 ];
             }
         }
@@ -238,6 +275,7 @@ class PayrollAccountingService
             'reference_type'        => self::ACCRUAL_REFERENCE,
             'reference_id'          => $run->id,
             'memo'                  => "Payroll Journal entry for month {$run->payroll_month} (Run ID: {$run->id})",
+            'bill_allocations'      => $billHints,
             // Null when run without a signed-in user (queue/console) — shown as "System",
             // rather than crediting user #1, who may not even belong to this tenant.
             'posted_by'             => auth()->id(),
@@ -307,12 +345,48 @@ class PayrollAccountingService
 
         // What the accrual actually owes staff, not a fresh recalculation that
         // could differ if attendance or salary changed since.
-        $booked = round((float) JournalEntry::withoutGlobalScopes()
+        $bookedLines = JournalEntry::withoutGlobalScopes()
             ->where('journal_id', $accrual->id)
             ->where('chart_of_account_id', $salaryPayableAccount->id)
-            ->sum('credit'), 2);
+            ->where('credit', '>', 0)
+            ->get(['party_type', 'party_id', 'credit']);
 
-        $totalNetPayout = round($booked - $this->heldNetPay($run), 2);
+        $lines = [];
+        $billHints = [];
+        $employeeLines = $bookedLines->where('party_type', JournalEntry::PARTY_EMPLOYEE);
+
+        if ($employeeLines->isNotEmpty()) {
+            // One line per employee; a payslip on hold stays owed (its SAL bill open).
+            $held = $this->heldEmployeeIds($run);
+            foreach ($employeeLines as $booked) {
+                if (in_array((int) $booked->party_id, $held, true)) {
+                    continue;
+                }
+                $lines[] = [
+                    'chart_of_account_id' => $salaryPayableAccount->id,
+                    'debit'               => round((float) $booked->credit, 2),
+                    'credit'              => 0.00,
+                    'party_type'          => JournalEntry::PARTY_EMPLOYEE,
+                    'party_id'            => (int) $booked->party_id,
+                    'description'         => "Net salary paid for month {$run->payroll_month}",
+                ];
+                $billHints[] = BillWise\BillAllocationService::againstRef('payable', 'payroll_salary', (int) $run->id)
+                    + ['party_type' => JournalEntry::PARTY_EMPLOYEE, 'party_id' => (int) $booked->party_id, 'account_id' => $salaryPayableAccount->id];
+            }
+        } else {
+            // Salary entries posted before per-employee lines: one lump line.
+            $lump = round((float) $bookedLines->sum('credit') - $this->heldNetPay($run), 2);
+            if ($lump > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $salaryPayableAccount->id,
+                    'debit'               => $lump,
+                    'credit'              => 0.00,
+                    'description'         => "Net salary payout release for month {$run->payroll_month}",
+                ];
+            }
+        }
+
+        $totalNetPayout = round(array_sum(array_column($lines, 'debit')), 2);
         if ($totalNetPayout <= 0) {
             return null;
         }
@@ -322,19 +396,11 @@ class PayrollAccountingService
 
         $this->assertCashCovers($bankAccount, $totalNetPayout, $payoutDate);
 
-        $lines = [
-            [
-                'chart_of_account_id' => $salaryPayableAccount->id,
-                'debit'               => $totalNetPayout,
-                'credit'              => 0.00,
-                'description'         => "Net salary payout release for month {$run->payroll_month}",
-            ],
-            [
-                'chart_of_account_id' => $bankAccount->id,
-                'debit'               => 0.00,
-                'credit'              => $totalNetPayout,
-                'description'         => "Salary disbursement for month {$run->payroll_month} from {$bankAccount->name}",
-            ],
+        $lines[] = [
+            'chart_of_account_id' => $bankAccount->id,
+            'debit'               => 0.00,
+            'credit'              => $totalNetPayout,
+            'description'         => "Salary disbursement for month {$run->payroll_month} from {$bankAccount->name}",
         ];
 
         $meta = [
@@ -348,6 +414,7 @@ class PayrollAccountingService
             'reference_id'          => $run->id,
             'memo'                  => "Salary disbursement for month {$run->payroll_month} (Run ID: {$run->id}) from {$bankAccount->code} {$bankAccount->name}",
             'posted_by'             => auth()->id(),
+            'bill_allocations'      => $billHints,
         ];
 
         return $this->journalService->postOnce($lines, $meta);
@@ -486,6 +553,14 @@ class PayrollAccountingService
         $name = strtolower((string) $account->name);
 
         return str_contains($name, 'cash') && ! str_contains($name, 'bank') && ! str_contains($name, 'credit');
+    }
+
+    /** @return list<int> employees whose payslip for this run's month is on hold */
+    private function heldEmployeeIds(PayrollRun $run): array
+    {
+        return PayrollHold::where('payroll_month', $run->payroll_month)
+            ->where('status', 'on_hold')
+            ->pluck('employee_id')->map(fn ($id) => (int) $id)->all();
     }
 
     /** Net pay of payslips on hold for this run's month: not paid out yet. */

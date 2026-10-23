@@ -32,6 +32,7 @@ return [
             ['label' => 'Debit Notes', 'route' => 'accounting.vouchers.debit_note.index', 'permission' => 'accounting.vouchers.debit_note.view'],
             ['label' => 'Purchase Vouchers', 'route' => 'accounting.vouchers.purchase.index', 'permission' => 'accounting.vouchers.purchase.view'],
             ['label' => 'Sales Vouchers', 'route' => 'accounting.vouchers.sales.index', 'permission' => 'accounting.vouchers.sales.view'],
+            ['label' => 'Bill Settlement', 'route' => 'accounting.bill-wise.settlement', 'permission' => 'accounting.journals.view'],
             ['label' => 'Bank Reconciliation', 'route' => 'accounting.bank-reconciliation.index', 'permission' => 'accounting.bank_reconciliation.view'],
             ['label' => 'Bank Rules', 'route' => 'accounting.bank-rules.index', 'permission' => 'accounting.bank_reconciliation.view'],
             ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index', 'permission' => 'accounting.fiscal_years.view'],
