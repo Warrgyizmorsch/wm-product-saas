@@ -26,8 +26,47 @@ use Illuminate\Support\Str;
 
 class RecruitmentRepository implements RecruitmentRepositoryInterface
 {
+    private function resolveTenantId(?int $tenantId = null): int
+    {
+        $contextTenant = tenant_id()
+            ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+            ?? auth()->user()?->tenant_id;
+
+        if ($contextTenant) {
+            if ($tenantId && (int) $tenantId !== (int) $contextTenant) {
+                abort(403, 'Tenant context mismatch.');
+            }
+            return (int) $contextTenant;
+        }
+
+        $resolved = $tenantId;
+
+        if (!$resolved) {
+            abort(403, 'Tenant context is required.');
+        }
+
+        return (int) $resolved;
+    }
+
+    private function verifyModelTenant(mixed $model, ?int $tenantId = null): int
+    {
+        $resolvedTenantId = $this->resolveTenantId($tenantId);
+
+        $modelTenantId = $model->tenant_id
+            ?? $model->application?->tenant_id
+            ?? $model->requisition?->tenant_id;
+
+        if ($modelTenantId && (int) $modelTenantId !== $resolvedTenantId) {
+            abort(403, 'Unauthorized tenant access to this recruitment record.');
+        }
+
+        return $resolvedTenantId;
+    }
+
     public function getRequisitionsData(array $inputs, ?int $tenantId): array
     {
+        $tenantId = $this->resolveTenantId($tenantId);
+
         $filters = [
             'search'        => $inputs['search'] ?? '',
             'department_id' => $inputs['department_id'] ?? '',
@@ -36,7 +75,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         ];
 
         $query = JobRequisition::with(['department', 'designation', 'requestedBy', 'applications'])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
@@ -74,11 +113,11 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         }
 
         $requisitions = $query->paginate(10)->appends($filters);
-        $departments = Department::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
-        $designations = Designation::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
-        $employees = Employee::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
+        $departments = Department::where('tenant_id', $tenantId)->get();
+        $designations = Designation::where('tenant_id', $tenantId)->get();
+        $employees = Employee::where('tenant_id', $tenantId)->get();
 
-        $interviewsQuery = CandidateInterview::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+        $interviewsQuery = CandidateInterview::where('tenant_id', $tenantId)
             ->where('status', 'scheduled');
         $upcomingInterviews = $interviewsQuery->with(['application.candidate', 'application.requisition', 'interviewer'])
             ->orderBy('scheduled_at', 'asc')
@@ -90,10 +129,12 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function storeRequisition(array $validated, ?int $tenantId, ?int $employeeId, ?int $userId): JobRequisition
     {
+        $tenantId = $this->resolveTenantId($tenantId);
+
         return DB::transaction(function () use ($validated, $tenantId, $employeeId, $userId) {
             $year = date('Y');
             $latest = JobRequisition::where('requisition_code', 'like', "REQ-{$year}-%")
-                ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+                ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
@@ -104,7 +145,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             }
 
             $code = 'REQ-' . $year . '-' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
-            while (JobRequisition::where('requisition_code', $code)->exists()) {
+            while (JobRequisition::where('tenant_id', $tenantId)->where('requisition_code', $code)->exists()) {
                 $nextNum++;
                 $code = 'REQ-' . $year . '-' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
             }
@@ -151,6 +192,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function updateRequisitionStatus(JobRequisition $requisition, string $status, ?int $userId): bool
     {
+        $this->verifyModelTenant($requisition);
+
         $updateData = ['status' => $status];
         if ($status === 'approved') {
             $updateData['approved_by_user_id'] = $userId;
@@ -165,6 +208,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function getCandidatesData(array $inputs, ?int $tenantId): array
     {
+        $tenantId = $this->resolveTenantId($tenantId);
+
         $filters = [
             'search' => $inputs['search'] ?? '',
             'status' => $inputs['status'] ?? '',
@@ -173,7 +218,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         ];
 
         $query = Candidate::with(['applications.requisition', 'applications.interviews'])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
@@ -213,7 +258,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         }
 
         $candidates = $query->paginate(12)->appends($filters);
-        $requisitions = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+        $requisitions = JobRequisition::where('tenant_id', $tenantId)
             ->whereIn('status', ['approved', 'published'])
             ->get();
 
@@ -222,10 +267,12 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function storeCandidate(array $validated, Request $request, ?int $tenantId): Candidate
     {
+        $tenantId = $this->resolveTenantId($tenantId);
+
         return DB::transaction(function () use ($validated, $request, $tenantId) {
             $year = date('Y');
             $latest = Candidate::where('candidate_code', 'like', "CND-{$year}-%")
-                ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+                ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
@@ -234,40 +281,16 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             if ($latest && preg_match('/CND-\d+-(\d+)/', $latest->candidate_code, $matches)) {
                 $nextNum = ((int) $matches[1]) + 1;
             }
-        $cndCount = Candidate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count() + 1;
-        $code = 'CND-' . date('Y') . '-' . str_pad($cndCount, 4, '0', STR_PAD_LEFT);
-
-        $resumePath = null;
-        if ($request->hasFile('resume')) {
-            $resumePath = $request->file('resume')->storeTenantFile('recruitment/resumes', 'local');
-        }
-
-        $candidate = Candidate::create([
-            'tenant_id'             => $tenantId,
-            'candidate_code'        => $code,
-            'first_name'            => $validated['first_name'],
-            'last_name'             => $validated['last_name'] ?? null,
-            'email'                 => $validated['email'],
-            'phone'                 => $validated['phone'] ?? null,
-            'current_location'      => $validated['current_location'] ?? null,
-            'current_company'       => $validated['current_company'] ?? null,
-            'current_designation'   => $validated['current_designation'] ?? null,
-            'total_experience_years'=> $validated['total_experience_years'],
-            'notice_period_days'    => $validated['notice_period_days'] ?? 30,
-            'resume_path'           => $resumePath,
-            'source'                => $validated['source'],
-            'status'                => 'active',
-        ]);
 
             $code = 'CND-' . $year . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
-            while (Candidate::where('candidate_code', $code)->exists()) {
+            while (Candidate::where('tenant_id', $tenantId)->where('candidate_code', $code)->exists()) {
                 $nextNum++;
                 $code = 'CND-' . $year . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
             }
 
             $resumePath = null;
             if ($request->hasFile('resume')) {
-                $resumePath = $request->file('resume')->store('recruitment/resumes', 'local');
+                $resumePath = $request->file('resume')->storeTenantFile('recruitment/resumes', 'local');
             }
 
             $candidate = Candidate::create([
@@ -301,18 +324,21 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function getPipelineData(int $requisitionId, ?int $tenantId): array
     {
-        $requisition = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+        $tenantId = $this->resolveTenantId($tenantId);
+
+        $requisition = JobRequisition::where('tenant_id', $tenantId)
             ->with(['department', 'designation'])
             ->findOrFail($requisitionId);
 
-        $applications = CandidateApplication::where('job_requisition_id', $requisitionId)
+        $applications = CandidateApplication::where('tenant_id', $tenantId)
+            ->where('job_requisition_id', $requisitionId)
             ->with(['candidate', 'interviews.scorecard', 'offer'])
             ->get();
 
-        $employees = Employee::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
-        $departments = Department::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
-        $designations = Designation::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->get();
-        $templates = DocumentTemplate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+        $employees = Employee::where('tenant_id', $tenantId)->get();
+        $departments = Department::where('tenant_id', $tenantId)->get();
+        $designations = Designation::where('tenant_id', $tenantId)->get();
+        $templates = DocumentTemplate::where('tenant_id', $tenantId)
             ->where('status', 'active')
             ->get();
 
@@ -330,6 +356,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function updateStage(CandidateApplication $application, string $newStage, ?string $rejectionReason): array
     {
+        $this->verifyModelTenant($application);
+
         $oldStage = $application->current_stage;
 
         $stageHierarchy = [
@@ -382,6 +410,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function scheduleInterview(CandidateApplication $application, array $validated, ?int $tenantId): CandidateInterview
     {
+        $tenantId = $this->verifyModelTenant($application, $tenantId);
+
         $interview = CandidateInterview::create([
             'tenant_id'               => $tenantId,
             'application_id'          => $application->id,
@@ -412,7 +442,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             $pipelineUrl = route('hrms.recruitment.pipeline', $application->requisition_id ?? 1);
 
             if (!empty($validated['interviewer_employee_id'])) {
-                $interviewer = Employee::find($validated['interviewer_employee_id']);
+                $interviewer = Employee::where('tenant_id', $tenantId)->find($validated['interviewer_employee_id']);
                 if ($interviewer) {
                     NotificationService::sendToEmployee(
                         $interviewer,
@@ -442,6 +472,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function submitScorecard(CandidateInterview $interview, array $validated, ?int $userId, ?int $tenantId): InterviewScorecard
     {
+        $tenantId = $this->verifyModelTenant($interview, $tenantId);
+
         $scorecard = InterviewScorecard::updateOrCreate(
             ['interview_id' => $interview->id],
             [
@@ -488,13 +520,15 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function createOffer(CandidateApplication $application, array $validated, Request $request, ?int $tenantId): JobOffer
     {
-        $existingOffer = JobOffer::where('application_id', $application->id)->first();
+        $tenantId = $this->verifyModelTenant($application, $tenantId);
+
+        $existingOffer = JobOffer::where('tenant_id', $tenantId)->where('application_id', $application->id)->first();
         if ($existingOffer && $existingOffer->offer_code) {
             $code = $existingOffer->offer_code;
         } else {
             $year = date('Y');
             $latest = JobOffer::where('offer_code', 'like', "OFR-{$year}-%")
-                ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+                ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->first();
@@ -505,7 +539,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             }
 
             $code = 'OFR-' . $year . '-' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
-            while (JobOffer::where('offer_code', $code)->exists()) {
+            while (JobOffer::where('tenant_id', $tenantId)->where('offer_code', $code)->exists()) {
                 $nextNum++;
                 $code = 'OFR-' . $year . '-' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
             }
@@ -513,12 +547,12 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
         $offerLetterContent = null;
         if (!empty($validated['document_template_id'])) {
-            $template = DocumentTemplate::find($validated['document_template_id']);
+            $template = DocumentTemplate::where('tenant_id', $tenantId)->find($validated['document_template_id']);
             if ($template) {
                 $candidate = $application->candidate;
-                $department = Department::find($validated['offered_department_id']);
-                $designation = Designation::find($validated['offered_designation_id']);
-                $company = $department?->company ?? \App\Domains\HRMS\Models\Company::first();
+                $department = Department::where('tenant_id', $tenantId)->find($validated['offered_department_id']);
+                $designation = Designation::where('tenant_id', $tenantId)->find($validated['offered_designation_id']);
+                $company = $department?->company ?? \App\Domains\HRMS\Models\Company::where('tenant_id', $tenantId)->first();
 
                 $hrName = $validated['hr_name'] ?? auth()->user()?->name ?? 'HR Manager';
                 $hrDesignation = $validated['hr_designation'] ?? 'HR Manager';
@@ -639,6 +673,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function sendOfferEmail(JobOffer $offer, array $validated, ?int $tenantId): array
     {
+        $tenantId = $this->verifyModelTenant($offer, $tenantId);
+
         $application = $offer->application;
         $candidate = $application?->candidate;
 
@@ -781,6 +817,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function updateOfferStatus(JobOffer $offer, string $status, ?string $reason = null, ?int $tenantId = null): array
     {
+        $tenantId = $this->verifyModelTenant($offer, $tenantId);
+
         if (!in_array($status, ['accepted', 'declined'])) {
             return ['success' => false, 'message' => "Invalid offer status: {$status}"];
         }
@@ -826,6 +864,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function convertToEmployee(JobOffer $offer, ?int $tenantId, ?string $specifiedPassword = null): array
     {
+        $tenantId = $this->verifyModelTenant($offer, $tenantId);
+
         if ($offer->converted_employee_id) {
             return ['success' => false, 'message' => "Candidate has already been converted to an Employee!"];
         }
@@ -841,7 +881,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             return ['success' => false, 'message' => "Candidate information not found."];
         }
 
-        $user = User::where('email', $candidate->email)->first();
+        $user = User::where('tenant_id', $tenantId)->where('email', $candidate->email)->first();
 
         // Secure password generation instead of hardcoded default
         $initialPassword = $specifiedPassword ?: Str::password(16, symbols: true);
@@ -895,6 +935,8 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
 
     public function downloadOfferPdf(JobOffer $offer)
     {
+        $this->verifyModelTenant($offer);
+
         $application = $offer->application;
         $candidate = $application?->candidate;
 

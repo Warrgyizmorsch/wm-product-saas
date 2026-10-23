@@ -16,6 +16,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class KraKpiApiController extends Controller
 {
@@ -323,13 +324,13 @@ class KraKpiApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'kra_category_id' => 'required|exists:kra_categories,id',
+            'kra_category_id' => ['required', Rule::exists('kra_categories', 'id')->where('tenant_id', $tenantId)],
             'name' => 'required|string|max:255',
             'code' => 'nullable|string|max:50',
             'unit' => 'required|in:percentage,currency,number,rating,boolean',
             'calculation_type' => 'required|in:higher_is_better,lower_is_better,milestone',
-            'default_target' => 'required|numeric',
-            'default_weightage' => 'required|numeric|min:1|max:100',
+            'default_target' => 'nullable|numeric',
+            'default_weightage' => 'nullable|numeric|min:0|max:100',
             'description' => 'nullable|string',
         ]);
 
@@ -338,7 +339,11 @@ class KraKpiApiController extends Controller
         }
 
         try {
-            $kpi = $this->kraKpiRepository->storeKpiMaster($validator->validated(), $tenantId);
+            $data = $validator->validated();
+            $data['default_target'] = $data['default_target'] ?? 100.00;
+            $data['default_weightage'] = $data['default_weightage'] ?? 20.00;
+
+            $kpi = $this->kraKpiRepository->storeKpiMaster($data, $tenantId);
             $kpi->load('kraCategory');
             return $this->sendSuccess($kpi, 'KPI Metric created successfully.', 201);
         } catch (Exception $e) {
@@ -398,7 +403,9 @@ class KraKpiApiController extends Controller
         }
 
         if ($request->has('items') && is_array($request->input('items'))) {
-            $items = $request->input('items');
+            $items = array_values(array_filter($request->input('items'), function ($item) {
+                return !empty(trim($item['title'] ?? ''));
+            }));
             foreach ($items as $k => $item) {
                 if (isset($item['kra_category_id'])) {
                     $items[$k]['kra_category_id'] = $this->kraKpiRepository->resolveKraCategoryId($item['kra_category_id'], $tenantId);
@@ -409,24 +416,40 @@ class KraKpiApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'department_id' => 'nullable|exists:departments,id',
-            'designation_id' => 'nullable|exists:designations,id',
+            'department_id' => ['nullable', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
+            'designation_id' => ['nullable', Rule::exists('designations', 'id')->where('tenant_id', $tenantId)],
             'description' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.title' => 'required|string|max:255',
-            'items.*.kra_category_id' => 'nullable|exists:kra_categories,id',
+            'items.*.kra_category_id' => ['nullable', Rule::exists('kra_categories', 'id')->where('tenant_id', $tenantId)],
             'items.*.unit' => 'required|in:percentage,currency,number,rating,boolean',
             'items.*.calculation_type' => 'required|in:higher_is_better,lower_is_better,milestone',
             'items.*.target' => 'required|numeric',
-            'items.*.weightage' => 'required|numeric|min:1|max:100',
+            'items.*.weightage' => 'required|numeric|min:0.01|max:100',
+        ], [
+            'items.required' => 'Please add at least one KPI goal to the template.',
+            'items.min' => 'Please add at least one KPI goal to the template.',
+            'items.*.title.required' => 'Every KPI goal row requires a title or standard KPI metric.',
+            'items.*.target.required' => 'Every KPI goal row requires a numerical target.',
+            'items.*.weightage.required' => 'Every KPI goal row requires a weightage percentage.',
         ]);
 
         if ($validator->fails()) {
             return $this->sendError('Validation failed.', 422, $validator->errors());
         }
 
+        $validated = $validator->validated();
+        $totalWeight = (float) array_sum(array_column($validated['items'] ?? [], 'weightage'));
+        if (abs($totalWeight - 100.0) > 0.01) {
+            return $this->sendError(
+                sprintf('Total KPI weightage must equal exactly 100%% to save the template. Current total: %.2f%% (it cannot be less than or exceed 100%%).', $totalWeight),
+                422,
+                ['items' => [sprintf('Total KPI weightage must equal exactly 100%%. Current total: %.2f%%.', $totalWeight)]]
+            );
+        }
+
         try {
-            $template = $this->kraKpiRepository->storeTemplate($validator->validated(), $tenantId);
+            $template = $this->kraKpiRepository->storeTemplate($validated, $tenantId);
             $template->load(['department', 'designation', 'items.kraCategory']);
             return $this->sendSuccess($template, 'Role KPI Template created successfully.', 201);
         } catch (Exception $e) {
@@ -464,7 +487,9 @@ class KraKpiApiController extends Controller
         }
 
         if ($request->has('items') && is_array($request->input('items'))) {
-            $items = $request->input('items');
+            $items = array_values(array_filter($request->input('items'), function ($item) {
+                return !empty(trim($item['title'] ?? ''));
+            }));
             foreach ($items as $k => $item) {
                 if (isset($item['kra_category_id'])) {
                     $items[$k]['kra_category_id'] = $this->kraKpiRepository->resolveKraCategoryId($item['kra_category_id'], $tenantId);
@@ -475,24 +500,40 @@ class KraKpiApiController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'department_id' => 'nullable|exists:departments,id',
-            'designation_id' => 'nullable|exists:designations,id',
+            'department_id' => ['nullable', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
+            'designation_id' => ['nullable', Rule::exists('designations', 'id')->where('tenant_id', $tenantId)],
             'description' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.title' => 'required|string|max:255',
-            'items.*.kra_category_id' => 'nullable|exists:kra_categories,id',
+            'items.*.kra_category_id' => ['nullable', Rule::exists('kra_categories', 'id')->where('tenant_id', $tenantId)],
             'items.*.unit' => 'required|in:percentage,currency,number,rating,boolean',
             'items.*.calculation_type' => 'required|in:higher_is_better,lower_is_better,milestone',
             'items.*.target' => 'required|numeric',
-            'items.*.weightage' => 'required|numeric|min:1|max:100',
+            'items.*.weightage' => 'required|numeric|min:0.01|max:100',
+        ], [
+            'items.required' => 'Please add at least one KPI goal to the template.',
+            'items.min' => 'Please add at least one KPI goal to the template.',
+            'items.*.title.required' => 'Every KPI goal row requires a title or standard KPI metric.',
+            'items.*.target.required' => 'Every KPI goal row requires a numerical target.',
+            'items.*.weightage.required' => 'Every KPI goal row requires a weightage percentage.',
         ]);
 
         if ($validator->fails()) {
             return $this->sendError('Validation failed.', 422, $validator->errors());
         }
 
+        $validated = $validator->validated();
+        $totalWeight = (float) array_sum(array_column($validated['items'] ?? [], 'weightage'));
+        if (abs($totalWeight - 100.0) > 0.01) {
+            return $this->sendError(
+                sprintf('Total KPI weightage must equal exactly 100%% to save the template. Current total: %.2f%% (it cannot be less than or exceed 100%%).', $totalWeight),
+                422,
+                ['items' => [sprintf('Total KPI weightage must equal exactly 100%%. Current total: %.2f%%.', $totalWeight)]]
+            );
+        }
+
         try {
-            $template = $this->kraKpiRepository->updateTemplate($id, $validator->validated(), $tenantId);
+            $template = $this->kraKpiRepository->updateTemplate($id, $validated, $tenantId);
             $template->load(['department', 'designation', 'items.kraCategory']);
             return $this->sendSuccess($template, 'Role KPI Template updated successfully.');
         } catch (Exception $e) {
@@ -532,11 +573,11 @@ class KraKpiApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'appraisal_cycle_id' => 'required|exists:appraisal_cycles,id',
-            'kpi_template_id' => 'nullable|exists:kpi_templates,id',
+            'appraisal_cycle_id' => ['required', Rule::exists('appraisal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'kpi_template_id' => ['nullable', Rule::exists('kpi_templates', 'id')->where('tenant_id', $tenantId)],
             'target_type' => 'required|in:individual,department,all',
-            'employee_id' => 'nullable|exists:employees,id',
-            'department_id' => 'nullable|exists:departments,id',
+            'employee_id' => ['nullable', Rule::exists('employees', 'id')->where('tenant_id', $tenantId)],
+            'department_id' => ['nullable', Rule::exists('departments', 'id')->where('tenant_id', $tenantId)],
         ]);
 
         if ($validator->fails()) {
@@ -610,8 +651,6 @@ class KraKpiApiController extends Controller
                 'can_view'             => true,
                 'can_self_appraise'    => $isOwner && in_array($sc->status, ['draft', 'goal_setting', 'self_review', 'active']),
                 'can_manager_appraise' => ($isManager || $isHrOrAdmin) && in_array($sc->status, ['submitted', 'manager_review', 'in_review']),
-                'can_calibrate'        => $isHrOrAdmin && in_array($sc->status, ['manager_reviewed', 'calibration', 'in_review']),
-                'can_sign_off'         => ($isOwner || $isManager || $isHrOrAdmin) && in_array($sc->status, ['calibrated', 'completed']),
                 'can_edit'             => $isHrOrAdmin || ($isOwner && in_array($sc->status, ['draft', 'goal_setting'])),
                 'can_delete'           => $isHrOrAdmin,
             ];
@@ -658,24 +697,75 @@ class KraKpiApiController extends Controller
 
     /**
      * POST /api/hrms/kra-kpi/scorecards/{id}/items
-     * Add single KPI Goal item to Scorecard.
+     * Add single KPI Goal item or batch items to Scorecard.
      */
     public function addGoalItem(Request $request, int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $plan = EmployeeGoalPlan::with(['employee', 'manager'])->where('tenant_id', $tenantId)->find($id);
+        if (!$plan) {
+            return $this->sendError('Employee Scorecard not found.', 404);
+        }
+
+        $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
+        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
+            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+
+        $canModify = $isHrOrAdmin || $isManager || ($isOwner && in_array($plan->status, ['draft', 'submitted']));
+        if (!$canModify) {
+            return $this->sendError('You are not authorized to add or modify KPI goals on this goal sheet.', 403);
+        }
+
+        // Multi-item batch support
+        if ($request->has('items') && is_array($request->input('items'))) {
+            $itemsData = $request->input('items');
+            $createdItems = [];
+            foreach ($itemsData as $row) {
+                if (empty($row['title']) || trim($row['title']) === '') {
+                    continue;
+                }
+                $rawUnit = $row['unit'] ?? 'percentage';
+                $unit = match($rawUnit) {
+                    '%', 'percentage' => 'percentage',
+                    '₹', '$', 'currency' => 'currency',
+                    'number', 'qty' => 'number',
+                    'rating' => 'rating',
+                    'boolean', 'milestone' => 'boolean',
+                    default => 'percentage',
+                };
+                $calc = in_array($row['calculation_type'] ?? '', ['higher_is_better', 'lower_is_better', 'milestone'])
+                    ? $row['calculation_type']
+                    : 'higher_is_better';
+                $kraId = !empty($row['kra_category_id'])
+                    ? $this->kraKpiRepository->resolveKraCategoryId($row['kra_category_id'], $tenantId)
+                    : null;
+                $itemPayload = [
+                    'title' => trim($row['title']),
+                    'kra_category_id' => $kraId,
+                    'calculation_type' => $calc,
+                    'unit' => $unit,
+                    'target' => is_numeric($row['target'] ?? null) ? (float) $row['target'] : 100.0,
+                    'weightage' => is_numeric($row['weightage'] ?? null) ? (float) $row['weightage'] : 20.0,
+                    'description' => $row['description'] ?? null,
+                ];
+                $createdItems[] = $this->kraKpiRepository->addGoalItem($id, $itemPayload, $tenantId);
+            }
+            return $this->sendSuccess($createdItems, sprintf('%d KPI Goal(s) added to scorecard.', count($createdItems)), 201);
+        }
 
         if ($request->has('kra_category_id')) {
             $request->merge(['kra_category_id' => $this->kraKpiRepository->resolveKraCategoryId($request->input('kra_category_id'), $tenantId)]);
         }
 
         $validator = Validator::make($request->all(), [
-            'kra_category_id' => 'nullable|exists:kra_categories,id',
+            'kra_category_id' => ['nullable', Rule::exists('kra_categories', 'id')->where('tenant_id', $tenantId)],
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'unit' => 'required|in:percentage,currency,number,rating,boolean',
             'calculation_type' => 'required|in:higher_is_better,lower_is_better,milestone',
             'target' => 'required|numeric',
-            'weightage' => 'required|numeric|min:1|max:100',
+            'weightage' => 'required|numeric|min:0.01|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -697,7 +787,22 @@ class KraKpiApiController extends Controller
      */
     public function destroyGoalItem(int $itemId): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $item = EmployeeGoalItem::with('goalPlan.employee', 'goalPlan.manager')->where('tenant_id', $tenantId)->find($itemId);
+        if (!$item) {
+            return $this->sendError('KPI Goal item not found.', 404);
+        }
+
+        $plan = $item->goalPlan;
+        $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
+        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
+            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+
+        $canDelete = $isHrOrAdmin || $isManager || ($isOwner && in_array($plan->status, ['draft', 'submitted']));
+        if (!$canDelete) {
+            return $this->sendError('You are not authorized to remove KPI goals from this goal sheet.', 403);
+        }
 
         try {
             $this->kraKpiRepository->deleteGoalItem($itemId, $tenantId);
@@ -713,7 +818,21 @@ class KraKpiApiController extends Controller
      */
     public function logProgress(Request $request, int $itemId): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $item = EmployeeGoalItem::with('goalPlan.employee', 'goalPlan.manager')->where('tenant_id', $tenantId)->find($itemId);
+        if (!$item) {
+            return $this->sendError('KPI Goal item not found.', 404);
+        }
+
+        $plan = $item->goalPlan;
+        $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
+        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
+            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+
+        if (!$isOwner && !$isManager && !$isHrOrAdmin) {
+            return $this->sendError('Unauthorized to log progress on this goal item.', 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'current_value' => 'required|numeric',
@@ -738,7 +857,17 @@ class KraKpiApiController extends Controller
      */
     public function submitGoals(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $plan = EmployeeGoalPlan::with('employee')->where('tenant_id', $tenantId)->find($id);
+        if (!$plan) {
+            return $this->sendError('Employee Scorecard not found.', 404);
+        }
+
+        $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
+        if (!$isOwner && !$isHrOrAdmin) {
+            return $this->sendError('Only the assigned employee or HR can submit goals for approval.', 403);
+        }
 
         try {
             $plan = $this->kraKpiRepository->submitGoals($id, $tenantId);
@@ -754,7 +883,19 @@ class KraKpiApiController extends Controller
      */
     public function approveGoals(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $plan = EmployeeGoalPlan::with('employee', 'manager')->where('tenant_id', $tenantId)->find($id);
+        if (!$plan) {
+            return $this->sendError('Employee Scorecard not found.', 404);
+        }
+
+        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
+            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+
+        if (!$isManager && !$isHrOrAdmin) {
+            return $this->sendError('Only the reporting manager or HR can approve goals.', 403);
+        }
 
         try {
             $plan = $this->kraKpiRepository->approveGoals($id, $tenantId);
@@ -770,7 +911,17 @@ class KraKpiApiController extends Controller
      */
     public function submitSelfAppraisal(Request $request, int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $plan = EmployeeGoalPlan::with('employee')->where('tenant_id', $tenantId)->find($id);
+        if (!$plan) {
+            return $this->sendError('Employee Scorecard not found.', 404);
+        }
+
+        $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
+        if (!$isOwner && !$isHrOrAdmin) {
+            return $this->sendError('Only the assigned employee can submit self-appraisal.', 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'items' => 'required|array',
@@ -797,7 +948,19 @@ class KraKpiApiController extends Controller
      */
     public function submitManagerAppraisal(Request $request, int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user, $currentEmployee, $isHrOrAdmin] = $this->resolveContext();
+
+        $plan = EmployeeGoalPlan::with('employee', 'manager')->where('tenant_id', $tenantId)->find($id);
+        if (!$plan) {
+            return $this->sendError('Employee Scorecard not found.', 404);
+        }
+
+        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
+            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+
+        if (!$isManager && !$isHrOrAdmin) {
+            return $this->sendError('Only the reporting manager or HR can submit manager appraisal.', 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'items' => 'required|array',
@@ -825,51 +988,7 @@ class KraKpiApiController extends Controller
         }
     }
 
-    /**
-     * POST /api/hrms/kra-kpi/scorecards/{id}/calibrate
-     * HR / Committee Calibration & Normalization.
-     */
-    public function calibrateAppraisal(Request $request, int $id): JsonResponse
-    {
-        [$tenantId, , , $isHrOrAdmin] = $this->resolveContext();
 
-        if (!$isHrOrAdmin) {
-            return $this->sendError('Unauthorized to calibrate appraisal scores.', 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'normalized_score' => 'required|numeric|min:0|max:150',
-            'final_grade' => 'required|string|max:100',
-            'hr_comments' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return $this->sendError('Validation failed.', 422, $validator->errors());
-        }
-
-        try {
-            $plan = $this->kraKpiRepository->calibrateAppraisal($id, $validator->validated(), $tenantId);
-            return $this->sendSuccess($plan, 'Score calibrated and normalized successfully.');
-        } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 400);
-        }
-    }
-
-    /**
-     * POST /api/hrms/kra-kpi/scorecards/{id}/sign-off
-     * Employee final acknowledgement & sign-off.
-     */
-    public function signOffAppraisal(int $id): JsonResponse
-    {
-        [$tenantId] = $this->resolveContext();
-
-        try {
-            $plan = $this->kraKpiRepository->signOffAppraisal($id, $tenantId);
-            return $this->sendSuccess($plan, 'Appraisal signed off and completed.');
-        } catch (Exception $e) {
-            return $this->sendError($e->getMessage(), 400);
-        }
-    }
 
     /**
      * POST /api/hrms/kra-kpi/scorecards/{id}/trigger-pip

@@ -46,9 +46,19 @@ interface GoalRepositoryInterface
     public function storeCycle(array $data, int $tenantId, ?User $user = null): GoalCycle;
 
     /**
+     * Update an existing Goal Cycle.
+     */
+    public function updateCycle(int $id, array $data, int $tenantId, ?User $user = null): GoalCycle;
+
+    /**
      * Delete a Goal Cycle.
      */
     public function deleteCycle(int $id, int $tenantId): bool;
+
+    /**
+     * Approve a goal / objective.
+     */
+    public function approveGoal(int $id, int $tenantId, ?User $user = null): Goal;
 
     /**
      * Store a new Strategic Pillar / Category.
@@ -64,4 +74,30 @@ interface GoalRepositoryInterface
      * Get cascading hierarchy tree of goals for a cycle.
      */
     public function getCascadingTree(int $tenantId, ?int $cycleId = null): array;
+
+    /**
+     * Determine whether the user has general HR/Admin management capabilities.
+     */
+    public function isHrAdmin(?User $user): bool;
+
+    /**
+     * Determine whether the user has master management rights over goals/cycles/pillars.
+     */
+    public function canManageGoals(?User $user): bool;
+
+    /**
+     * Determine whether the user is authorized to edit/update a specific goal.
+     */
+    public function canUpdateGoal(?User $user, Goal $goal): bool;
+
+    /**
+     * Determine whether the user is authorized to delete a specific goal.
+     */
+    public function canDeleteGoal(?User $user, Goal $goal): bool;
+
+    /**
+     * Determine whether the user is authorized to log a progress check-in on a specific goal.
+     */
+    public function canCheckInGoal(?User $user, Goal $goal): bool;
 }
+

@@ -148,11 +148,14 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $totalPlansCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->count();
         $pendingSelfReviewCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->where('status', 'approved')->count();
         $pendingManagerReviewCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->where('status', 'self_reviewed')->count();
-        $calibratedCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->whereIn('status', ['calibrated', 'signed_off'])->count();
+        $completedAppraisalsCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->where('status', 'manager_reviewed')->count();
         $highPerformersCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->where('final_score', '>=', 90)->count();
         $underperformersCount = EmployeeGoalPlan::where('tenant_id', $tenantId)->where('final_score', '<', 60)->whereNotNull('final_score')->count();
 
-        $activeTab = $inputs['active_tab'] ?? 'plans';
+        $activeTab = $inputs['active_tab'] ?? null;
+        if (!$activeTab) {
+            $activeTab = $isHrOrAdmin ? 'plans' : ($teamPlans->isNotEmpty() ? 'team' : ($myPlan ? 'myplan' : 'plans'));
+        }
 
         return compact(
             'activeTab',
@@ -172,7 +175,7 @@ class KraKpiRepository implements KraKpiRepositoryInterface
             'totalPlansCount',
             'pendingSelfReviewCount',
             'pendingManagerReviewCount',
-            'calibratedCount',
+            'completedAppraisalsCount',
             'highPerformersCount',
             'underperformersCount'
         );
@@ -196,19 +199,21 @@ class KraKpiRepository implements KraKpiRepositoryInterface
             'reviews.reviewer',
         ])->where('tenant_id', $tenantId)->findOrFail($id);
 
-        $kraCategories = KraCategory::where('tenant_id', $tenantId)->get();
-        $kpiMasters = KpiMaster::where('tenant_id', $tenantId)->get();
+        $kraCategories = KraCategory::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $kpiMasters = KpiMaster::with('kraCategory')->where('tenant_id', $tenantId)->orderBy('name')->get();
 
-        $isOwner = $currentEmployee && $currentEmployee->id === $plan->employee_id;
-        $isManager = $currentEmployee && $currentEmployee->id === $plan->manager_id;
+        $authUserId = auth()->id();
+        $isOwner = ($currentEmployee && $currentEmployee->id === $plan->employee_id)
+            || ($authUserId && $plan->employee?->user_id === $authUserId);
+
+        $isManager = ($currentEmployee && ($currentEmployee->id === $plan->manager_id || $currentEmployee->id === $plan->employee?->reporting_manager_id))
+            || ($authUserId && ($plan->manager?->user_id === $authUserId || $plan->employee?->reportingManager?->user_id === $authUserId));
 
         $plan->capabilities = [
             'can_view'             => true,
-            'can_self_appraise'    => $isOwner && in_array($plan->status, ['draft', 'goal_setting', 'self_review', 'active']),
-            'can_manager_appraise' => ($isManager || $isHrOrAdmin) && in_array($plan->status, ['submitted', 'manager_review', 'in_review']),
-            'can_calibrate'        => $isHrOrAdmin && in_array($plan->status, ['manager_reviewed', 'calibration', 'in_review']),
-            'can_sign_off'         => ($isOwner || $isManager || $isHrOrAdmin) && in_array($plan->status, ['calibrated', 'completed']),
-            'can_edit'             => $isHrOrAdmin || ($isOwner && in_array($plan->status, ['draft', 'goal_setting'])),
+            'can_self_appraise'    => ($isOwner || $isHrOrAdmin) && in_array($plan->status, ['approved', 'in_progress']),
+            'can_manager_appraise' => ($isManager || $isHrOrAdmin) && in_array($plan->status, ['self_reviewed', 'approved']),
+            'can_edit'             => $isHrOrAdmin || ($isOwner && in_array($plan->status, ['draft', 'submitted'])),
             'can_delete'           => $isHrOrAdmin,
         ];
 
@@ -238,8 +243,8 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     public function storeCycle(array $validated, int $tenantId): AppraisalCycle
     {
         $validated['tenant_id'] = $tenantId;
-        $validated['goal_weightage_percent'] = $validated['goal_weightage_percent'] ?? 70.0;
-        $validated['competency_weightage_percent'] = $validated['competency_weightage_percent'] ?? 30.0;
+        $validated['goal_weightage_percent'] = $validated['goal_weightage_percent'] ?? 100.0;
+        $validated['competency_weightage_percent'] = $validated['competency_weightage_percent'] ?? 0.0;
 
         return AppraisalCycle::create($validated);
     }
@@ -291,6 +296,7 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     public function storeKpiMaster(array $validated, int $tenantId): KpiMaster
     {
         $validated['tenant_id'] = $tenantId;
+        $validated['default_weightage'] = $validated['default_weightage'] ?? 20.00;
         $kpi = KpiMaster::create($validated);
         $kpi->load('kraCategory');
 
@@ -445,6 +451,76 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     }
 
     /**
+     * Batch add multiple KPI goal items to an employee scorecard.
+     */
+    public function addGoalItems(int $planId, array $items, int $tenantId): int
+    {
+        $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
+        $count = 0;
+
+        DB::transaction(function () use ($plan, $items, $tenantId, &$count) {
+            foreach ($items as $data) {
+                $data['tenant_id'] = $tenantId;
+                $data['employee_goal_plan_id'] = $plan->id;
+                $data['status'] = 'pending';
+                EmployeeGoalItem::create($data);
+                $count++;
+            }
+            $this->kraKpiService->recalculatePlanScore($plan);
+        });
+
+        return $count;
+    }
+
+    /**
+     * Batch sync (create, update, delete) KPI goal items for an employee scorecard.
+     */
+    public function syncGoalItems(int $planId, array $items, int $tenantId): int
+    {
+        $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
+        $count = 0;
+
+        DB::transaction(function () use ($plan, $items, $tenantId, &$count) {
+            $submittedIds = [];
+
+            foreach ($items as $data) {
+                $itemId = !empty($data['id']) ? (int) $data['id'] : null;
+                unset($data['id']);
+
+                $data['tenant_id'] = $tenantId;
+                $data['employee_goal_plan_id'] = $plan->id;
+
+                if ($itemId) {
+                    $existing = EmployeeGoalItem::where('tenant_id', $tenantId)
+                        ->where('employee_goal_plan_id', $plan->id)
+                        ->find($itemId);
+                    if ($existing) {
+                        $existing->update($data);
+                        $submittedIds[] = $existing->id;
+                        $count++;
+                        continue;
+                    }
+                }
+
+                $data['status'] = 'pending';
+                $newItem = EmployeeGoalItem::create($data);
+                $submittedIds[] = $newItem->id;
+                $count++;
+            }
+
+            // Delete items that were removed from the scorecard editor
+            EmployeeGoalItem::where('tenant_id', $tenantId)
+                ->where('employee_goal_plan_id', $plan->id)
+                ->whereNotIn('id', $submittedIds)
+                ->delete();
+
+            $this->kraKpiService->recalculatePlanScore($plan);
+        });
+
+        return $count;
+    }
+
+    /**
      * Delete single KPI goal item from scorecard and recalculate score.
      */
     public function deleteGoalItem(int $itemId, int $tenantId): bool
@@ -465,6 +541,24 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     {
         $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
 
+        if ($plan->status !== 'draft') {
+            throw new \InvalidArgumentException("Cannot submit goals: Scorecard must be in 'draft' status (current status: {$plan->status}).");
+        }
+
+        $itemsCount = $plan->items()->count();
+        if ($itemsCount === 0) {
+            throw new \InvalidArgumentException('Cannot submit empty goal sheet. Please assign at least one KPI goal.');
+        }
+
+        $totalWeight = (float) $plan->items()->sum('weightage');
+        if (abs($totalWeight - 100.0) > 0.01) {
+            $diff = round(abs(100.0 - $totalWeight), 2);
+            $msg = $totalWeight < 100.0
+                ? "Cannot submit goals: Total weightage is currently {$totalWeight}%. You still have {$diff}% unallocated. Total weight must equal exactly 100% before submission."
+                : "Cannot submit goals: Total weightage is currently {$totalWeight}%, which exceeds 100% by {$diff}%. Total weight must equal exactly 100% before submission.";
+            throw new \InvalidArgumentException($msg);
+        }
+
         $this->kraKpiService->recalculatePlanScore($plan);
 
         $plan->status = 'submitted';
@@ -480,6 +574,24 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     public function approveGoals(int $planId, int $tenantId): EmployeeGoalPlan
     {
         $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
+
+        if (!in_array($plan->status, ['draft', 'submitted'])) {
+            throw new \InvalidArgumentException("Cannot approve goal sheet: Scorecard must be in 'draft' or 'submitted' status (current status: {$plan->status}).");
+        }
+
+        $itemsCount = $plan->items()->count();
+        if ($itemsCount === 0) {
+            throw new \InvalidArgumentException('Cannot approve empty goal sheet. Please assign at least one KPI goal.');
+        }
+
+        $totalWeight = (float) $plan->items()->sum('weightage');
+        if (abs($totalWeight - 100.0) > 0.01) {
+            $diff = round(abs(100.0 - $totalWeight), 2);
+            $msg = $totalWeight < 100.0
+                ? "Cannot approve goal sheet: Total weightage is currently {$totalWeight}%. You still have {$diff}% unallocated. Total weight must equal exactly 100% before approval."
+                : "Cannot approve goal sheet: Total weightage is currently {$totalWeight}%, which exceeds 100% by {$diff}%. Total weight must equal exactly 100% before approval.";
+            throw new \InvalidArgumentException($msg);
+        }
 
         $plan->status = 'approved';
         $plan->approved_at = Carbon::now();
@@ -521,6 +633,10 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     public function submitSelfAppraisal(int $planId, array $validated, int $tenantId): EmployeeGoalPlan
     {
         $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
+
+        if (!in_array($plan->status, ['approved', 'in_progress'])) {
+            throw new \InvalidArgumentException("Cannot submit self-appraisal: Scorecard goals must be approved before appraisal (current status: {$plan->status}).");
+        }
 
         foreach ($validated['items'] as $itemId => $data) {
             $item = EmployeeGoalItem::where('tenant_id', $tenantId)
@@ -565,6 +681,10 @@ class KraKpiRepository implements KraKpiRepositoryInterface
     {
         $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
 
+        if (!in_array($plan->status, ['self_reviewed', 'approved'])) {
+            throw new \InvalidArgumentException("Cannot submit manager appraisal: Employee must submit self-appraisal or scorecard must be approved (current status: {$plan->status}).");
+        }
+
         foreach ($validated['items'] as $itemId => $data) {
             $item = EmployeeGoalItem::where('tenant_id', $tenantId)
                 ->where('employee_goal_plan_id', $plan->id)
@@ -586,12 +706,12 @@ class KraKpiRepository implements KraKpiRepositoryInterface
 
         $this->kraKpiService->recalculatePlanScore($plan);
 
-        // Notify Employee and HR Committee
+        // Notify Employee and HR
         if ($plan->employee_id) {
             NotificationService::sendToEmployee(
                 employee: $plan->employee_id,
                 title: 'Manager Appraisal Completed',
-                message: "Your manager completed evaluation and competency scoring for {$plan->appraisalCycle?->name}.",
+                message: "Your manager completed evaluation and competency scoring for {$plan->appraisalCycle?->name}. Your review is finalized.",
                 actionUrl: route('hrms.kra-kpi.show', $plan->id),
                 module: 'hrms',
                 type: 'performance',
@@ -600,81 +720,17 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         }
 
         NotificationService::sendToHrAdmins(
-            title: 'Appraisal Ready for Calibration',
-            message: "Manager evaluation completed for {$plan->employee?->full_name} ({$plan->plan_number}). Ready for score normalization.",
+            title: 'Manager Evaluation Completed',
+            message: "Final manager evaluation completed for {$plan->employee?->full_name} ({$plan->plan_number}). Final Score: {$plan->final_score}% ({$plan->final_grade}).",
             actionUrl: route('hrms.kra-kpi.show', $plan->id),
             type: 'performance',
-            iconClass: 'feather-sliders'
+            iconClass: 'feather-award'
         );
 
         return $plan;
     }
 
-    /**
-     * HR / Committee Calibration & Normalization.
-     */
-    public function calibrateAppraisal(int $planId, array $validated, int $tenantId): EmployeeGoalPlan
-    {
-        $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
 
-        $plan->normalized_score = $validated['normalized_score'];
-        $plan->final_grade = $validated['final_grade'];
-        $plan->hr_comments = $validated['hr_comments'] ?? null;
-        $plan->status = 'calibrated';
-        $plan->calibrated_at = Carbon::now();
-        $plan->save();
-
-        // Notify Employee to review calibrated score and sign off
-        if ($plan->employee_id) {
-            NotificationService::sendToEmployee(
-                employee: $plan->employee_id,
-                title: 'Appraisal Calibrated — Sign-Off Required',
-                message: "Your final appraisal score ({$plan->final_score}%) and grade ({$plan->final_grade}) are published. Please review and sign off.",
-                actionUrl: route('hrms.kra-kpi.show', $plan->id),
-                module: 'hrms',
-                type: 'performance',
-                iconClass: 'feather-check-square'
-            );
-        }
-
-        return $plan;
-    }
-
-    /**
-     * Employee final sign-off.
-     */
-    public function signOffAppraisal(int $planId, int $tenantId): EmployeeGoalPlan
-    {
-        $plan = EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
-
-        $plan->status = 'signed_off';
-        $plan->signed_off_at = Carbon::now();
-        $plan->save();
-
-        // Notify Manager and HR of completed appraisal
-        $manager = $plan->manager ?? $plan->employee?->reportingManager;
-        if ($manager) {
-            NotificationService::sendToEmployee(
-                employee: $manager,
-                title: 'Appraisal Signed Off & Completed',
-                message: "{$plan->employee?->full_name} has digitally acknowledged and signed off their appraisal for {$plan->appraisalCycle?->name}.",
-                actionUrl: route('hrms.kra-kpi.show', $plan->id),
-                module: 'hrms',
-                type: 'performance',
-                iconClass: 'feather-check-circle'
-            );
-        }
-
-        NotificationService::sendToHrAdmins(
-            title: 'Appraisal Completed & Signed Off',
-            message: "{$plan->employee?->full_name} completed and signed off scorecard #{$plan->plan_number}.",
-            actionUrl: route('hrms.kra-kpi.show', $plan->id),
-            type: 'performance',
-            iconClass: 'feather-check-circle'
-        );
-
-        return $plan;
-    }
 
     /**
      * Trigger PIP from low appraisal score.

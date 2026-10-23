@@ -623,21 +623,34 @@ class Employee extends BaseModel
     /**
      * Multi-tier resolution of Employee profile for a given User model.
      */
-    public static function resolveForUser(?\App\Models\User $user): ?self
+    public static function resolveForUser(?\App\Models\User $user, ?int $tenantId = null): ?self
     {
         if (!$user) {
             return null;
         }
 
+        $tenantId = $tenantId
+            ?? (function_exists('tenant_id') ? tenant_id() : null)
+            ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+            ?? $user->tenant_id;
+
+        $scoped = function () use ($tenantId) {
+            $q = static::query();
+            if ($tenantId) {
+                $q->where('tenant_id', $tenantId);
+            }
+            return $q;
+        };
+
         // 1. Primary check: by user_id link
-        $employee = static::where('user_id', $user->id)->first();
+        $employee = $scoped()->where('user_id', $user->id)->first();
         if ($employee) {
             return $employee;
         }
 
         // 2. Secondary check: case-insensitive email match (office_email or personal_email)
         if (!empty($user->email)) {
-            $employee = static::where(function ($q) use ($user) {
+            $employee = $scoped()->where(function ($q) use ($user) {
                 $q->whereRaw('LOWER(office_email) = ?', [strtolower($user->email)])
                   ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($user->email)]);
             })->first();
@@ -653,7 +666,7 @@ class Employee extends BaseModel
 
         // 3. Tertiary check: match full_name with user name if available
         if (!empty($user->name)) {
-            $employee = static::whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
+            $employee = $scoped()->whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
             if ($employee) {
                 if (!$employee->user_id) {
                     $employee->updateQuietly(['user_id' => $user->id]);

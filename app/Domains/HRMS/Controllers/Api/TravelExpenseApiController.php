@@ -77,11 +77,8 @@ class TravelExpenseApiController extends Controller
         $user = auth()->user();
         $employee = null;
         if ($user) {
-            $employee = Employee::where('user_id', $user->id)->first()
-                ?? Employee::where(function ($q) use ($user) {
-                    $q->where('office_email', $user->email)
-                      ->orWhere('personal_email', $user->email);
-                })->first();
+            $tenantId = current_tenant_id() ?? tenant_id() ?? $user->tenant_id;
+            $employee = Employee::resolveForUser($user, $tenantId);
         }
 
         $isAdmin = (bool) ($user && (
@@ -800,7 +797,10 @@ class TravelExpenseApiController extends Controller
         $validated['tenant_id'] = $tenantId;
         $validated['status'] = 'pending';
 
-        $emp = Employee::find($validated['employee_id']);
+        $emp = Employee::where('tenant_id', $tenantId)->find($validated['employee_id']);
+        if (!$emp) {
+            return $this->sendError('Employee not found in this organization.', 404);
+        }
         $travelRes = $this->resolveApprovalLevels($emp, floatval($validated['estimated_budget']), $tenantId);
 
         $travelRequest = DB::transaction(function () use ($validated, $request, $emp, $travelRes, $tenantId) {
@@ -851,13 +851,22 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $travelRequest = TravelRequest::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $travelRequest = TravelRequest::where('tenant_id', $tenantId)->find($id);
         if (!$travelRequest) {
             return $this->sendError("Travel request with ID '{$id}' not found.", 404);
         }
 
         $user = $request->user();
+        $isHrAdmin = (bool) ($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve')));
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $isHrAdmin || ($travelRequest->employee && $workflowService->canApprove($user, $travelRequest->employee, $travelRequest, 'hrms.travel_expenses.approve'));
+
+        if (!$canApprove) {
+            return $this->sendError('Unauthorized access to approve this travel request.', 403);
+        }
+
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $travelRequest->employee_id) {
             if (!$workflowService->allowsSelfApproval($user, $travelRequest, 'hrms.travel_expenses.approve')) {
@@ -910,15 +919,26 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/travel/{travelRequest}/reject
      */
-    public function rejectTravelRequest(mixed $id): JsonResponse
+    public function rejectTravelRequest(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $travelRequest = TravelRequest::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $travelRequest = TravelRequest::where('tenant_id', $tenantId)->find($id);
         if (!$travelRequest) {
             return $this->sendError("Travel request with ID '{$id}' not found.", 404);
+        }
+
+        $user = $request->user() ?? auth()->user();
+        $isHrAdmin = (bool) ($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve')));
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $isHrAdmin || ($travelRequest->employee && $workflowService->canApprove($user, $travelRequest->employee, $travelRequest, 'hrms.travel_expenses.approve'));
+
+        if (!$canApprove) {
+            return $this->sendError('Unauthorized access to reject this travel request.', 403);
         }
 
         $travelRequest->update(['status' => 'rejected']);
@@ -936,7 +956,9 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $travelRequest = TravelRequest::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $travelRequest = TravelRequest::where('tenant_id', $tenantId)->find($id);
         if (!$travelRequest) {
             return $this->sendError("Travel request with ID '{$id}' not found.", 404);
         }
@@ -996,7 +1018,10 @@ class TravelExpenseApiController extends Controller
             }
         }
 
-        $emp = Employee::find($validated['employee_id']);
+        $emp = Employee::where('tenant_id', $tenantId)->find($validated['employee_id']);
+        if (!$emp) {
+            return $this->sendError('Employee not found in this organization.', 404);
+        }
         $advRes = $this->resolveApprovalLevels($emp, floatval($validated['amount']), $tenantId);
 
         $validated['tenant_id'] = $tenantId;
@@ -1018,13 +1043,22 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $cashAdvance = CashAdvance::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $cashAdvance = CashAdvance::where('tenant_id', $tenantId)->find($id);
         if (!$cashAdvance) {
             return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
 
         $user = $request->user();
+        $isHrAdmin = (bool) ($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve')));
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $isHrAdmin || ($cashAdvance->employee && $workflowService->canApprove($user, $cashAdvance->employee, $cashAdvance, 'hrms.travel_expenses.approve'));
+
+        if (!$canApprove) {
+            return $this->sendError('Unauthorized access to approve this cash advance.', 403);
+        }
+
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $cashAdvance->employee_id) {
             if (!$workflowService->allowsSelfApproval($user, $cashAdvance, 'hrms.travel_expenses.approve')) {
@@ -1069,12 +1103,18 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $cashAdvance = CashAdvance::find($id);
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            return $this->sendError('Unauthorized. Only HR/Finance administrators can disburse cash advances.', 403);
+        }
+
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $cashAdvance = CashAdvance::where('tenant_id', $tenantId)->find($id);
         if (!$cashAdvance) {
             return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $cashAdvance->update(['status' => 'disbursed']);
 
         try {
@@ -1090,15 +1130,26 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/advance/{cashAdvance}/reject
      */
-    public function rejectCashAdvance(mixed $id): JsonResponse
+    public function rejectCashAdvance(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $cashAdvance = CashAdvance::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $cashAdvance = CashAdvance::where('tenant_id', $tenantId)->find($id);
         if (!$cashAdvance) {
             return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
+        }
+
+        $user = $request->user() ?? auth()->user();
+        $isHrAdmin = (bool) ($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve')));
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $isHrAdmin || ($cashAdvance->employee && $workflowService->canApprove($user, $cashAdvance->employee, $cashAdvance, 'hrms.travel_expenses.approve'));
+
+        if (!$canApprove) {
+            return $this->sendError('Unauthorized access to reject this cash advance.', 403);
         }
 
         $cashAdvance->update(['status' => 'rejected']);
@@ -1114,7 +1165,9 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $cashAdvance = CashAdvance::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $cashAdvance = CashAdvance::where('tenant_id', $tenantId)->find($id);
         if (!$cashAdvance) {
             return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
@@ -1174,7 +1227,10 @@ class TravelExpenseApiController extends Controller
             return $this->sendError('employee_id is required for HR administrators.', 422);
         }
 
-        $employee = Employee::find($validated['employee_id']);
+        $employee = Employee::where('tenant_id', $tenantId)->find($validated['employee_id']);
+        if (!$employee) {
+            return $this->sendError('Employee not found in this organization.', 404);
+        }
         if ($employee) {
             $policy = ExpensePolicy::where('tenant_id', $tenantId)
                 ->where('status', true)
@@ -1267,9 +1323,10 @@ class TravelExpenseApiController extends Controller
             $advance = null;
             $cashAdvanceId = $validated['cash_advance_id'] ?? null;
             if ($cashAdvanceId) {
-                $advance = CashAdvance::find($cashAdvanceId);
+                $advance = CashAdvance::where('tenant_id', $tenantId)->find($cashAdvanceId);
             } elseif (!empty($validated['travel_request_id'])) {
-                $advance = CashAdvance::where('travel_request_id', $validated['travel_request_id'])
+                $advance = CashAdvance::where('tenant_id', $tenantId)
+                    ->where('travel_request_id', $validated['travel_request_id'])
                     ->whereIn('status', ['approved', 'disbursed', 'settled'])
                     ->first();
             }
@@ -1304,14 +1361,14 @@ class TravelExpenseApiController extends Controller
                 $storedPaths = [];
                 $fileKeySingle = "claims.{$index}.receipt";
                 if ($request->hasFile($fileKeySingle)) {
-                    $storedPaths[] = $request->file($fileKeySingle)->store('expense_receipts', 'public');
+                    $storedPaths[] = $request->file($fileKeySingle)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 $fileKeyMulti = "claims.{$index}.receipts";
                 if ($request->hasFile($fileKeyMulti)) {
                     foreach ($request->file($fileKeyMulti) as $f) {
                         if ($f && $f->isValid()) {
-                            $storedPaths[] = $f->store('expense_receipts', 'public');
+                            $storedPaths[] = $f->storeTenantFile('expense_receipts', 'public');
                         }
                     }
                 }
@@ -1321,9 +1378,6 @@ class TravelExpenseApiController extends Controller
                     $receiptPath = $storedPaths[0];
                 } elseif (count($storedPaths) > 1) {
                     $receiptPath = json_encode(array_values(array_unique($storedPaths)));
-                $fileKey = "claims.{$index}.receipt";
-                if ($request->hasFile($fileKey)) {
-                    $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 ExpenseClaim::create([
@@ -1358,12 +1412,18 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $expenseReport = ExpenseReport::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)->find($id);
         if (!$expenseReport) {
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $authEmployee && (int)$expenseReport->employee_id === (int)$authEmployee->id;
+        if (!$isAdmin && !$isOwner) {
+            return $this->sendError('Unauthorized access to edit this expense report.', 403);
+        }
 
         if (!in_array($expenseReport->status, ['draft', 'partially_approved', 'rejected'])) {
             return $this->sendError('Only draft, partially approved, or rejected expense reports can be edited.', 400);
@@ -1405,7 +1465,10 @@ class TravelExpenseApiController extends Controller
             return $this->sendError('employee_id is required for HR administrators.', 422);
         }
 
-        $employee = Employee::find($validated['employee_id']);
+        $employee = Employee::where('tenant_id', $tenantId)->find($validated['employee_id']);
+        if (!$employee) {
+            return $this->sendError('Employee not found in this organization.', 404);
+        }
         if ($employee) {
             $policy = ExpensePolicy::where('tenant_id', $tenantId)
                 ->where('status', true)
@@ -1490,9 +1553,10 @@ class TravelExpenseApiController extends Controller
             $advance = null;
             $cashAdvanceId = $validated['cash_advance_id'] ?? null;
             if ($cashAdvanceId) {
-                $advance = CashAdvance::find($cashAdvanceId);
+                $advance = CashAdvance::where('tenant_id', $tenantId)->find($cashAdvanceId);
             } elseif (!empty($validated['travel_request_id'])) {
-                $advance = CashAdvance::where('travel_request_id', $validated['travel_request_id'])
+                $advance = CashAdvance::where('tenant_id', $tenantId)
+                    ->where('travel_request_id', $validated['travel_request_id'])
                     ->whereIn('status', ['approved', 'disbursed', 'settled'])
                     ->first();
             }
@@ -1538,13 +1602,13 @@ class TravelExpenseApiController extends Controller
                 }
 
                 if ($request->hasFile("claims.{$index}.receipt")) {
-                    $storedPaths[] = $request->file("claims.{$index}.receipt")->store('expense_receipts', 'public');
+                    $storedPaths[] = $request->file("claims.{$index}.receipt")->storeTenantFile('expense_receipts', 'public');
                 }
 
                 if ($request->hasFile("claims.{$index}.receipts")) {
                     foreach ($request->file("claims.{$index}.receipts") as $uploadedFile) {
                         if ($uploadedFile && $uploadedFile->isValid()) {
-                            $storedPaths[] = $uploadedFile->store('expense_receipts', 'public');
+                            $storedPaths[] = $uploadedFile->storeTenantFile('expense_receipts', 'public');
                         }
                     }
                 }
@@ -1569,10 +1633,6 @@ class TravelExpenseApiController extends Controller
                         $claimStatus = 'approved';
                         $approvedAmount = floatval($c['approved_amount'] ?? $existingClaim->approved_amount ?? $c['amount']);
                     }
-                $receiptPath = $c['existing_receipt'] ?? null;
-                $fileKey = "claims.{$index}.receipt";
-                if ($request->hasFile($fileKey)) {
-                    $receiptPath = $request->file($fileKey)->storeTenantFile('expense_receipts', 'public');
                 }
 
                 ExpenseClaim::create([
@@ -1602,9 +1662,17 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $expenseReport = ExpenseReport::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)->find($id);
         if (!$expenseReport) {
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
+        }
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        $isOwner = $authEmployee && (int)$expenseReport->employee_id === (int)$authEmployee->id;
+        if (!$isAdmin && !$isOwner) {
+            return $this->sendError('Unauthorized access to submit this expense report.', 403);
         }
 
         $expenseReport->update(['status' => 'submitted']);
@@ -1621,13 +1689,22 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $expenseReport = ExpenseReport::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)->find($id);
         if (!$expenseReport) {
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
         $user = $request->user();
+        $isHrAdmin = (bool) ($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve')));
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $isHrAdmin || ($expenseReport->employee && $workflowService->canApprove($user, $expenseReport->employee, $expenseReport, 'hrms.travel_expenses.approve'));
+
+        if (!$canApprove) {
+            return $this->sendError('Unauthorized access to approve this expense report.', 403);
+        }
+
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $expenseReport->employee_id) {
             if (!$workflowService->allowsSelfApproval($user, $expenseReport, 'hrms.travel_expenses.approve')) {
@@ -1808,15 +1885,26 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/reject
      */
-    public function rejectExpenseReport(mixed $id): JsonResponse
+    public function rejectExpenseReport(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
 
-        $expenseReport = ExpenseReport::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)->find($id);
         if (!$expenseReport) {
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
+        }
+
+        $user = $request->user() ?? auth()->user();
+        $isHrAdmin = (bool) ($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.travel_expenses.approve')));
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $isHrAdmin || ($expenseReport->employee && $workflowService->canApprove($user, $expenseReport->employee, $expenseReport, 'hrms.travel_expenses.approve'));
+
+        if (!$canApprove) {
+            return $this->sendError('Unauthorized access to reject this expense report.', 403);
         }
 
         $expenseReport->update(['status' => 'rejected']);
@@ -1834,12 +1922,17 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $expenseReport = ExpenseReport::find($id);
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            return $this->sendError('Unauthorized. Only HR/Finance administrators can process payouts for expense reports.', 403);
+        }
+
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)->find($id);
         if (!$expenseReport) {
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
-
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         DB::transaction(function () use ($expenseReport, $tenantId) {
             $expenseReport->update(['status' => 'paid']);
@@ -1847,7 +1940,8 @@ class TravelExpenseApiController extends Controller
 
             $advance = $expenseReport->cashAdvance;
             if (!$advance && $expenseReport->travel_request_id) {
-                $advance = CashAdvance::where('travel_request_id', $expenseReport->travel_request_id)
+                $advance = CashAdvance::where('tenant_id', $tenantId)
+                    ->where('travel_request_id', $expenseReport->travel_request_id)
                     ->whereIn('status', ['approved', 'disbursed'])
                     ->first();
             }
@@ -1881,7 +1975,9 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $expenseReport = ExpenseReport::find($id);
+        $tenantId = current_tenant_id() ?? tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
+
+        $expenseReport = ExpenseReport::where('tenant_id', $tenantId)->find($id);
         if (!$expenseReport) {
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
@@ -1924,12 +2020,12 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
-        $employee = Employee::find($id);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        $employee = Employee::where('tenant_id', $tenantId)->find($id);
         if (!$employee) {
             return $this->sendError("Employee with ID '{$id}' not found.", 404);
         }
-
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         
         $policy = ExpensePolicy::where('tenant_id', $tenantId)
             ->where('status', true)
@@ -2016,6 +2112,11 @@ class TravelExpenseApiController extends Controller
             return $authError;
         }
 
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            return $this->sendError('Unauthorized. Only HR administrators can manage expense categories.', 403);
+        }
+
         $tenantId = current_tenant_id() ?? require_tenant_id();
 
         $validated = $request->validate([
@@ -2042,6 +2143,11 @@ class TravelExpenseApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            return $this->sendError('Unauthorized. Only HR administrators can manage expense categories.', 403);
         }
 
         $tenantId = current_tenant_id() ?? require_tenant_id();
@@ -2078,6 +2184,11 @@ class TravelExpenseApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
+        if (!$isAdmin) {
+            return $this->sendError('Unauthorized. Only HR administrators can manage expense categories.', 403);
         }
 
         $tenantId = current_tenant_id() ?? require_tenant_id();
