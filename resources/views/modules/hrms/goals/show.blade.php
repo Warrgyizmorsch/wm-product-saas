@@ -9,10 +9,20 @@
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.goals.index', ['active_tab' => request('from_tab', ($isHrAdmin ? 'company_goals' : 'my_team_goals'))]) }}" class="border fw-semibold">
             Back to Goals
         </x-ui.button>
+        @if($goal->status === 'draft' && ($canEdit ?? $isHrAdmin))
+        <form method="POST" action="{{ route('hrms.goals.approve', $goal->id) }}" class="d-inline" id="approveGoalForm">
+            @csrf
+            <x-ui.button type="button" variant="success" icon="feather-check-circle" class="fw-bold" onclick="confirmAction({ title: 'Approve Goal', message: 'Approve this objective and make it active for progress check-ins?', variant: 'success', confirmText: 'Approve & Activate' }, function() { document.getElementById('approveGoalForm').submit(); })">
+                Approve Goal
+            </x-ui.button>
+        </form>
+        @endif
+        @if($canCheckIn ?? ($isHrAdmin || ($currentEmployee && ($goal->employee_id === $currentEmployee->id || $goal->employees->contains('id', $currentEmployee->id)))))
         <x-ui.button variant="primary" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" class="fw-bold">
             Log Check-in
         </x-ui.button>
-        @if($isHrAdmin)
+        @endif
+        @if($canEdit ?? $isHrAdmin)
         <x-ui.button variant="light" icon="feather-edit-2" data-bs-toggle="modal" data-bs-target="#editGoalModal" class="border">
             Edit
         </x-ui.button>
@@ -447,13 +457,14 @@
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="New Value" name="new_value" placeholder="New current value" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" step="any" label="New Value" name="new_value" placeholder="New current value" :required="true" />
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Health Status" name="health_status" :required="true">
                         <option value="on_track" {{ $goal->health_status === 'on_track' ? 'selected' : '' }}>🟢 On Track</option>
                         <option value="at_risk" {{ $goal->health_status === 'at_risk' ? 'selected' : '' }}>🟡 At Risk</option>
                         <option value="behind" {{ $goal->health_status === 'behind' ? 'selected' : '' }}>🔴 Behind</option>
+                        <option value="completed" {{ $goal->health_status === 'completed' ? 'selected' : '' }}>🔵 Completed</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-12">
@@ -474,7 +485,7 @@
 <!-- ========================================================================= -->
 <!-- MODAL: EDIT GOAL -->
 <!-- ========================================================================= -->
-@if($isHrAdmin)
+@if($canEdit ?? $isHrAdmin)
 <x-ui.modal id="editGoalModal" title="<i class='feather-edit text-primary me-2'></i> Edit Objective" size="xl" :showFooter="false" :centered="true">
     <form method="POST" action="{{ route('hrms.goals.update', $goal->id) }}">
         @csrf
@@ -528,24 +539,39 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="Scope" name="owner_type">
+                    <x-ui.odoo-form-ui type="select" label="Scope" name="owner_type" id="editOwnerTypeSelect" onchange="handleEditOwnerTypeChange(this.value)">
+                        @if($isHrAdmin || $goal->owner_type === 'company')
                         <option value="company" {{ $goal->owner_type === 'company' ? 'selected' : '' }}>Organization-Wide</option>
+                        @endif
                         <option value="department" {{ $goal->owner_type === 'department' ? 'selected' : '' }}>Department</option>
                         <option value="employee" {{ $goal->owner_type === 'employee' ? 'selected' : '' }}>Individual Employee</option>
                     </x-ui.odoo-form-ui>
+
+                    <div id="editDeptSelectCol" style="{{ $goal->owner_type === 'department' ? '' : 'display: none;' }}">
+                        <x-ui.odoo-form-ui type="select" label="Department" name="department_id">
+                            <option value="">Choose Department...</option>
+                            @foreach($departments as $dept)
+                                <option value="{{ $dept->id }}" {{ $goal->department_id == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
                     @php
                         $selectedEmpIds = $goal->employees->pluck('id')->toArray();
                         if (empty($selectedEmpIds) && $goal->employee_id) {
                             $selectedEmpIds = [$goal->employee_id];
                         }
                     @endphp
-                    <x-ui.odoo-form-ui type="select" label="Assigned Employees" name="employee_ids[]" :multiple="true" select2Selector="select2">
-                        @foreach($employees as $emp)
-                            <option value="{{ $emp->id }}" {{ in_array($emp->id, $selectedEmpIds) ? 'selected' : '' }}>
-                                {{ $emp->full_name }} ({{ $emp->employee_id }})
-                            </option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
+                    <div id="editEmpSelectCol" style="{{ $goal->owner_type === 'employee' ? '' : 'display: none;' }}">
+                        <x-ui.odoo-form-ui type="select" label="Assigned Employees" name="employee_ids[]" :multiple="true" select2Selector="select2">
+                            @foreach($employees as $emp)
+                                <option value="{{ $emp->id }}" {{ in_array($emp->id, $selectedEmpIds) ? 'selected' : '' }}>
+                                    {{ $emp->full_name }} ({{ $emp->employee_id }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
                     <x-ui.odoo-form-ui type="select" label="Parent Goal" name="parent_goal_id">
                         <option value="">None (Top-Level)</option>
                         @foreach($parentGoalOptions as $pg)
@@ -661,6 +687,22 @@
         }
     };
 
+    window.handleEditOwnerTypeChange = function(type) {
+        var deptCol = document.getElementById('editDeptSelectCol');
+        var empCol = document.getElementById('editEmpSelectCol');
+        if (!deptCol || !empCol) return;
+        if (type === 'company') {
+            deptCol.style.display = 'none';
+            empCol.style.display = 'none';
+        } else if (type === 'department') {
+            deptCol.style.display = 'block';
+            empCol.style.display = 'none';
+        } else {
+            deptCol.style.display = 'none';
+            empCol.style.display = 'block';
+        }
+    };
+
     if (window.jQuery) {
         $('#editGoalModal').on('shown.bs.modal', function() {
             const $modal = $(this);
@@ -673,6 +715,11 @@
                     });
                 }
             });
+            handleEditOwnerTypeChange($('#editOwnerTypeSelect').val());
+        });
+
+        $(document).on('change change.select2 select2:select', '#editOwnerTypeSelect', function() {
+            handleEditOwnerTypeChange(this.value);
         });
 
         $(document).on('change change.select2 select2:select', '#editGoalModal .goal-cycle-select', function() {

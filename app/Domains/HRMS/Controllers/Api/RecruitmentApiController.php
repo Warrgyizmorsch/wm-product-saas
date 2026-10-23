@@ -69,9 +69,17 @@ class RecruitmentApiController extends Controller
             || $access->allows($user, 'hrms.recruitment.manage', $context);
     }
 
-    private function getTenantId(): ?int
+    private function getTenantId(): int
     {
-        return tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id()
+            ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+            ?? auth()->user()?->tenant_id;
+
+        if (!$tenantId) {
+            abort(403, 'Tenant context is required.');
+        }
+
+        return (int) $tenantId;
     }
 
     // =========================================================================
@@ -91,19 +99,19 @@ class RecruitmentApiController extends Controller
         $tenantId = $this->getTenantId();
 
         try {
-            $totalRequisitions = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count();
-            $openRequisitions = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            $totalRequisitions = JobRequisition::where('tenant_id', $tenantId)->count();
+            $openRequisitions = JobRequisition::where('tenant_id', $tenantId)
                 ->whereIn('status', ['approved', 'published'])->count();
-            $totalVacancies = (int) JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            $totalVacancies = (int) JobRequisition::where('tenant_id', $tenantId)
                 ->whereIn('status', ['approved', 'published'])->sum('vacancies');
 
-            $totalCandidates = Candidate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count();
-            $inInterviewCount = CandidateApplication::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            $totalCandidates = Candidate::where('tenant_id', $tenantId)->count();
+            $inInterviewCount = CandidateApplication::where('tenant_id', $tenantId)
                 ->whereIn('current_stage', ['interview', 'interview_round_1', 'interview_round_2', 'interview_round_3', 'final_hr'])->count();
-            $offersCount = JobOffer::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->count();
-            $hiredCount = Candidate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->where('status', 'hired')->count();
+            $offersCount = JobOffer::where('tenant_id', $tenantId)->count();
+            $hiredCount = Candidate::where('tenant_id', $tenantId)->where('status', 'hired')->count();
 
-            $upcomingInterviews = CandidateInterview::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            $upcomingInterviews = CandidateInterview::where('tenant_id', $tenantId)
                 ->where('status', 'scheduled')
                 ->with(['application.candidate', 'application.requisition:id,job_title,requisition_code', 'interviewer:id,full_name,employee_id'])
                 ->orderBy('scheduled_at', 'asc')
@@ -144,7 +152,7 @@ class RecruitmentApiController extends Controller
 
         $query = JobRequisition::with(['department:id,name', 'designation:id,name', 'requestedBy:id,full_name,employee_id'])
             ->withCount('applications')
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         if ($request->filled('search')) {
             $search = '%' . trim($request->search) . '%';
@@ -251,7 +259,7 @@ class RecruitmentApiController extends Controller
         $tenantId = $this->getTenantId();
 
         $requisition = JobRequisition::with(['department', 'designation', 'requestedBy', 'applications.candidate'])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->find($id);
 
         if (!$requisition) {
@@ -279,7 +287,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $requisition = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $requisition = JobRequisition::where('tenant_id', $tenantId)->find($id);
 
         if (!$requisition) {
             return $this->sendError('Job Requisition not found.', 404);
@@ -334,7 +342,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $requisition = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $requisition = JobRequisition::where('tenant_id', $tenantId)->find($id);
 
         if (!$requisition) {
             return $this->sendError('Job Requisition not found.', 404);
@@ -361,7 +369,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $requisition = JobRequisition::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $requisition = JobRequisition::where('tenant_id', $tenantId)->find($id);
 
         if (!$requisition) {
             return $this->sendError('Job Requisition not found.', 404);
@@ -391,7 +399,7 @@ class RecruitmentApiController extends Controller
         $tenantId = $this->getTenantId();
 
         $query = Candidate::with(['applications.requisition:id,job_title,requisition_code', 'applications.interviews:id,application_id,round_name,status,scheduled_at'])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         if ($request->filled('search')) {
             $search = '%' . trim($request->search) . '%';
@@ -502,7 +510,7 @@ class RecruitmentApiController extends Controller
             'applications.interviews.scorecard',
             'applications.offer',
         ])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->find($id);
 
         if (!$candidate) {
@@ -535,7 +543,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $candidate = Candidate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $candidate = Candidate::where('tenant_id', $tenantId)->find($id);
 
         if (!$candidate) {
             return $this->sendError('Candidate not found.', 404);
@@ -577,7 +585,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $candidate = Candidate::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $candidate = Candidate::where('tenant_id', $tenantId)->find($id);
 
         if (!$candidate) {
             return $this->sendError('Candidate not found.', 404);
@@ -633,7 +641,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $application = CandidateApplication::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $application = CandidateApplication::where('tenant_id', $tenantId)->find($id);
 
         if (!$application) {
             return $this->sendError('Application not found.', 404);
@@ -680,7 +688,7 @@ class RecruitmentApiController extends Controller
             'interviewer:id,full_name,employee_id',
             'scorecard',
         ])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -725,7 +733,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $application = CandidateApplication::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $application = CandidateApplication::where('tenant_id', $tenantId)->find($id);
 
         if (!$application) {
             return $this->sendError('Application not found.', 404);
@@ -765,7 +773,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $interview = CandidateInterview::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $interview = CandidateInterview::where('tenant_id', $tenantId)->find($id);
 
         if (!$interview) {
             return $this->sendError('Interview not found.', 404);
@@ -800,7 +808,7 @@ class RecruitmentApiController extends Controller
             'designation:id,name',
             'department:id,name',
         ])
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -840,7 +848,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $application = CandidateApplication::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $application = CandidateApplication::where('tenant_id', $tenantId)->find($id);
 
         if (!$application) {
             return $this->sendError('Application not found.', 404);
@@ -867,7 +875,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $offer = JobOffer::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $offer = JobOffer::where('tenant_id', $tenantId)->find($id);
 
         if (!$offer) {
             return $this->sendError('Job Offer not found.', 404);
@@ -907,7 +915,7 @@ class RecruitmentApiController extends Controller
         }
 
         $tenantId = $this->getTenantId();
-        $offer = JobOffer::when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))->find($id);
+        $offer = JobOffer::where('tenant_id', $tenantId)->find($id);
 
         if (!$offer) {
             return $this->sendError('Job Offer not found.', 404);

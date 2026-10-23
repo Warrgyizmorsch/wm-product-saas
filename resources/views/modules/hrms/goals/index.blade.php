@@ -361,13 +361,19 @@
                                     <td class="align-top py-3 text-end pe-3" style="white-space: nowrap;">
                                         <div class="d-flex align-items-center justify-content-end gap-1">
                                             <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'company_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Objective" />
-                                            <button type="button" class="btn btn-sm btn-light border text-primary" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" onclick="prepareCheckIn({{ $g->id }}, '{{ addslashes($g->title) }}', {{ json_encode($g->keyResults) }})" title="Quick Check-in">
+                                            @php
+                                                $canCheckInThis = $isHrAdmin || ($currentEmployee && ($g->employee_id === $currentEmployee->id || $g->employees->contains('id', $currentEmployee->id) || ($g->owner_type === 'department' && $g->department_id === $currentEmployee->department_id)));
+                                            @endphp
+                                            @if($canCheckInThis)
+                                            <button type="button" class="btn btn-sm btn-light border text-primary btn-quick-check-in" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" data-goal-id="{{ $g->id }}" data-goal-title="{{ $g->title }}" data-goal-krs="{{ htmlspecialchars(json_encode($g->keyResults), ENT_QUOTES, 'UTF-8') }}" title="Quick Check-in">
                                                 <i class="feather-check-square fs-13"></i>
                                             </button>
+                                            @endif
                                             @if($isHrAdmin)
                                             <form method="POST" action="{{ route('hrms.goals.destroy', $g->id) }}" class="d-inline m-0 p-0" onsubmit="return confirm('Are you sure you want to delete this goal?')">
                                                 @csrf
                                                 @method('DELETE')
+                                                <input type="hidden" name="active_tab" value="company_goals">
                                                 <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Goal" />
                                             </form>
                                             @endif
@@ -495,141 +501,157 @@
                         <p class="text-muted fs-13 mb-0">Create goals aligned with strategic company pillars to track and report your progress.</p>
                     </div>
                 @else
-                    <div class="row g-3" id="myTeamGoalsGrid">
-                        @foreach($myTeamGoals as $g)
-                        <div class="col-md-6 col-lg-4 my-team-goal-card">
-                            <div class="card rounded-3 h-100 bg-white hover-shadow transition-all" style="border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05);">
-                                <div class="card-body p-3.5 d-flex flex-column justify-content-between">
-                                    <div>
-                                        <!-- Header Pills -->
-                                        <div class="d-flex justify-content-between align-items-start mb-3">
-                                            <div class="d-flex flex-column gap-2 align-items-start">
-                                                <span class="badge bg-light text-muted border fs-10 fw-bold px-2 py-1">{{ $g->code }}</span>
-                                                @if($g->category)
-                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-10 fw-semibold d-inline-flex align-items-center gap-1.5 py-1 px-2 text-wrap text-start">
-                                                        <i class="feather-target" style="font-size: 11px; line-height: 1;"></i>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="myTeamGoalsTable">
+                            <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
+                                <tr>
+                                    <th style="width: 140px;">Code / Horizon</th>
+                                    <th>Objective & Strategic Pillar</th>
+                                    <th style="width: 180px;">Owner / Scope</th>
+                                    <th style="width: 140px;">Key Results</th>
+                                    <th style="width: 160px;">Progress & Health</th>
+                                    <th style="width: 120px;" class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="myTeamGoalsTableBody">
+                                @foreach($myTeamGoals as $g)
+                                <tr class="my-team-goal-row">
+                                    <td class="align-top py-3">
+                                        <div class="fw-bold text-dark fs-12">{{ $g->code }}</div>
+                                        <div class="text-muted fs-11 mt-1 text-wrap" style="max-width: 130px; word-break: break-word; line-height: 1.35;">
+                                            {{ $g->cycle?->name ?? 'General' }}
+                                        </div>
+                                    </td>
+                                    <td class="align-top py-3">
+                                        <div class="d-flex flex-column gap-1">
+                                            <div>
+                                                <a href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" class="fw-bold text-primary text-decoration-none fs-13 d-block text-wrap" style="line-height: 1.35; word-break: break-word;">
+                                                    {{ $g->title }}
+                                                </a>
+                                            </div>
+                                            @if($g->category)
+                                                <div class="mt-0.5">
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11 fw-semibold d-inline-flex align-items-center gap-1.5 py-1 px-2.5 text-wrap text-start">
+                                                        <i class="feather-target" style="font-size: 13px; line-height: 1; flex-shrink: 0;"></i>
                                                         <span>{{ $g->category->name }}</span>
                                                     </span>
-                                                @endif
-                                            </div>
-                                            <div>
-                                                @if($g->health_status === 'on_track')
-                                                    <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 On Track</span>
-                                                @elseif($g->health_status === 'at_risk')
-                                                    <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 At Risk</span>
-                                                @elseif($g->health_status === 'behind')
-                                                    <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 Behind</span>
-                                                @else
-                                                    <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 Completed</span>
-                                                @endif
-                                            </div>
-                                        </div>
-
-                                        <!-- Title -->
-                                        <a href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" class="fw-bold text-dark text-decoration-none fs-14 mb-3 d-block text-truncate-2" style="line-height: 1.4;">
-                                            {{ $g->title }}
-                                        </a>
-
-                                        <!-- Parent Alignment Badge -->
-                                        @if($g->parentGoal)
-                                            <div class="mb-3">
-                                                <small class="text-muted fs-11">
-                                                    <i class="feather-corner-down-right text-primary me-1"></i>
-                                                    Aligned to: <span class="fw-semibold text-dark">{{ Str::limit($g->parentGoal->title, 32) }}</span>
-                                                </small>
-                                            </div>
-                                        @endif
-
-                                        <!-- Key Results Summary List -->
-                                        @if($g->keyResults->isNotEmpty())
-                                            <div class="bg-light p-3 rounded-3 my-3 border border-light-subtle">
-                                                <div class="text-muted fw-bold text-uppercase fs-10 mb-2" style="letter-spacing: 0.04em;">
-                                                    <i class="feather-list text-primary me-1"></i>Key Results ({{ $g->keyResults->count() }})
                                                 </div>
-                                                <div class="d-flex flex-column gap-2">
-                                                    @foreach($g->keyResults->take(2) as $kr)
-                                                        <div class="d-flex justify-content-between align-items-center fs-11">
-                                                            <span class="text-dark text-truncate me-2" style="max-width: 170px;" title="{{ $kr->title }}">{{ $kr->title }}</span>
-                                                            <span class="fw-bold text-primary font-monospace flex-shrink-0">{{ number_format($kr->current_value, 0) }} / {{ number_format($kr->target_value, 0) }} {{ $kr->unit }}</span>
-                                                        </div>
-                                                    @endforeach
-                                                    @if($g->keyResults->count() > 2)
-                                                        <div class="text-muted fs-10 pt-1 border-top border-light-subtle">+ {{ $g->keyResults->count() - 2 }} more results</div>
-                                                    @endif
+                                            @endif
+                                            @if($g->parentGoal)
+                                                <div class="mt-1">
+                                                    <span class="text-muted fs-11">
+                                                        <i class="feather-corner-down-right text-primary me-1"></i>
+                                                        Aligned to: <span class="fw-semibold text-dark">{{ $g->parentGoal->title }}</span>
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <!-- Bottom Meta & Actions -->
-                                    <div>
-                                        <div class="d-flex justify-content-between align-items-center mb-1 fs-12">
-                                            <span class="text-muted">Progress</span>
-                                            <span class="fw-extrabold text-dark">{{ number_format($g->progress_percentage, 0) }}%</span>
+                                            @endif
+                                            @if($g->description)
+                                                <div class="text-muted fs-11 mt-1 text-wrap" style="line-height: 1.4; word-break: break-word;">
+                                                    {{ $g->description }}
+                                                </div>
+                                            @endif
                                         </div>
-                                        <div class="progress mb-3" style="height: 6px;">
-                                            <div class="progress-bar {{ $g->health_status === 'behind' ? 'bg-danger' : ($g->health_status === 'at_risk' ? 'bg-warning' : 'bg-primary') }}" 
-                                                 role="progressbar" style="width: {{ min(100, max(0, $g->progress_percentage)) }}%"></div>
-                                        </div>
-
-                                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                    </td>
+                                    <td class="align-top py-3">
+                                        @if($g->owner_type === 'company')
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">
+                                                <i class="feather-globe me-1"></i> Organization-Wide
+                                            </span>
+                                        @elseif($g->owner_type === 'department')
+                                            <span class="badge bg-light text-dark border fs-11 text-wrap text-start">
+                                                <i class="feather-users me-1"></i> {{ $g->department?->name ?? 'Dept Goal' }}
+                                            </span>
+                                        @else
                                             @php
-                                                $assignedEmployees = $g->employees->isNotEmpty() ? $g->employees : ($g->employee ? collect([$g->employee]) : collect());
+                                                $assignedEmps = $g->employees->isNotEmpty() ? $g->employees : ($g->employee ? collect([$g->employee]) : collect());
                                             @endphp
-
-                                            @if($assignedEmployees->count() > 1)
-                                                <div class="d-flex align-items-center gap-1.5" title="{{ $assignedEmployees->pluck('full_name')->join(', ') }}">
+                                            @if($assignedEmps->count() > 1)
+                                                <div class="d-flex align-items-center gap-1.5" title="{{ $assignedEmps->pluck('full_name')->join(', ') }}">
                                                     <div class="d-flex align-items-center">
-                                                        @foreach($assignedEmployees->take(3) as $idx => $emp)
+                                                        @foreach($assignedEmps->take(3) as $idx => $emp)
                                                             <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs" 
                                                                  style="width: 26px; height: 26px; font-size: 10px; margin-left: {{ $idx > 0 ? '-8px' : '0' }}; z-index: {{ 10 - $idx }};" 
                                                                  title="{{ $emp->full_name }}">
                                                                 {{ strtoupper(substr($emp->full_name, 0, 1)) }}
                                                             </div>
                                                         @endforeach
-                                                        @if($assignedEmployees->count() > 3)
+                                                        @if($assignedEmps->count() > 3)
                                                             <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs bg-light text-muted" 
                                                                  style="width: 26px; height: 26px; font-size: 10px; margin-left: -8px; z-index: 5;"
-                                                                 title="+{{ $assignedEmployees->count() - 3 }} more">
-                                                                +{{ $assignedEmployees->count() - 3 }}
+                                                                 title="+{{ $assignedEmps->count() - 3 }} more">
+                                                                +{{ $assignedEmps->count() - 3 }}
                                                             </div>
                                                         @endif
                                                     </div>
-                                                    <small class="text-muted fs-11 fw-semibold text-truncate" style="max-width: 110px;">
-                                                        {{ $assignedEmployees->first()->full_name }}
-                                                    </small>
-                                                    <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5" style="font-size: 9px;">+{{ $assignedEmployees->count() - 1 }}</span>
+                                                    <span class="text-dark fs-12 fw-semibold text-truncate" style="max-width: 95px;">
+                                                        {{ $assignedEmps->first()->full_name }}
+                                                    </span>
+                                                    <span class="badge bg-primary text-white rounded-pill px-1.5 py-0.5" style="font-size: 9px;">+{{ $assignedEmps->count() - 1 }}</span>
                                                 </div>
-                                            @elseif($assignedEmployees->count() === 1)
-                                                <div class="d-flex align-items-center gap-1.5" title="{{ $assignedEmployees->first()->full_name }}">
-                                                    <div class="avatar-initials" style="width: 26px; height: 26px; font-size: 10px;">
-                                                        {{ strtoupper(substr($assignedEmployees->first()->full_name, 0, 1)) }}
+                                            @elseif($assignedEmps->count() === 1)
+                                                <div class="d-flex align-items-center gap-1.5" title="{{ $assignedEmps->first()->full_name }}">
+                                                    <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs" style="width: 26px; height: 26px; font-size: 10px;">
+                                                        {{ strtoupper(substr($assignedEmps->first()->full_name, 0, 1)) }}
                                                     </div>
-                                                    <small class="text-muted fs-11 fw-semibold text-truncate" style="max-width: 140px;">
-                                                        {{ $assignedEmployees->first()->full_name }}
-                                                    </small>
+                                                    <span class="text-dark fs-12 fw-semibold text-truncate" style="max-width: 120px;">
+                                                        {{ $assignedEmps->first()->full_name }}
+                                                    </span>
                                                 </div>
-                                            @else
+                                            @elseif($g->department)
                                                 <div class="d-flex align-items-center gap-1.5">
                                                     <div class="avatar-initials" style="width: 26px; height: 26px; font-size: 10px;">
-                                                        {{ strtoupper(substr($g->department?->name ?? 'O', 0, 1)) }}
+                                                        {{ strtoupper(substr($g->department->name, 0, 1)) }}
                                                     </div>
-                                                    <small class="text-muted fs-11 fw-semibold">{{ $g->department?->name ?? 'Organization' }}</small>
+                                                    <small class="text-muted fs-11 fw-semibold">{{ $g->department->name }}</small>
                                                 </div>
+                                            @else
+                                                <span class="badge bg-light text-muted border fs-11">Individual</span>
                                             @endif
-
-                                            <div class="d-flex align-items-center gap-1">
-                                                <button type="button" class="btn btn-xs btn-light border fw-semibold text-dark shadow-none py-1 px-2 fs-11" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" onclick="prepareCheckIn({{ $g->id }}, '{{ addslashes($g->title) }}', {{ json_encode($g->keyResults) }})">
-                                                    <i class="feather-plus text-primary me-1"></i> Check-in
-                                                </button>
-                                                <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" icon="feather-arrow-right" variant="soft-primary" size="sm" title="View Objective" />
-                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="align-top py-3">
+                                        <span class="badge bg-light text-dark border fs-11">
+                                            <i class="feather-list me-1 text-primary"></i> {{ $g->keyResults->count() }} Key Results
+                                        </span>
+                                    </td>
+                                    <td class="align-top py-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold fs-12 text-dark">{{ number_format($g->progress_percentage, 0) }}%</span>
+                                            @if($g->health_status === 'on_track')
+                                                <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 On Track</span>
+                                            @elseif($g->health_status === 'at_risk')
+                                                <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 At Risk</span>
+                                            @elseif($g->health_status === 'behind')
+                                                <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 Behind</span>
+                                            @else
+                                                <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 Completed</span>
+                                            @endif
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        @endforeach
+                                        <div class="progress" style="height: 5px;">
+                                            <div class="progress-bar {{ $g->health_status === 'behind' ? 'bg-danger' : ($g->health_status === 'at_risk' ? 'bg-warning' : 'bg-success') }}" 
+                                                 role="progressbar" style="width: {{ min(100, max(0, $g->progress_percentage)) }}%"></div>
+                                        </div>
+                                    </td>
+                                    <td class="align-top py-3 text-end pe-3" style="white-space: nowrap;">
+                                        <div class="d-flex align-items-center justify-content-end gap-1">
+                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Objective" />
+                                            <button type="button" class="btn btn-sm btn-light border text-primary btn-quick-check-in" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" data-goal-id="{{ $g->id }}" data-goal-title="{{ $g->title }}" data-goal-krs="{{ htmlspecialchars(json_encode($g->keyResults), ENT_QUOTES, 'UTF-8') }}" title="Quick Check-in">
+                                                <i class="feather-check-square fs-13"></i>
+                                            </button>
+                                            @if($isHrAdmin)
+                                            <form method="POST" action="{{ route('hrms.goals.destroy', $g->id) }}" class="d-inline m-0 p-0" onsubmit="return confirm('Are you sure you want to delete this goal?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="active_tab" value="my_team_goals">
+                                                <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Goal" />
+                                            </form>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 @endif
             </div>
@@ -921,7 +943,9 @@
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Scope" name="owner_type" id="ownerTypeSelect" onchange="handleOwnerTypeChange(this.value)">
+                        @if($isHrAdmin)
                         <option value="company">Organization-Wide</option>
+                        @endif
                         <option value="department">Department</option>
                         <option value="employee" selected>Individual Employee</option>
                     </x-ui.odoo-form-ui>
@@ -1046,13 +1070,14 @@
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="New Value" name="new_value" id="checkInNewValue" placeholder="Updated current value" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" step="any" label="New Value" name="new_value" id="checkInNewValue" placeholder="Updated current value" :required="true" />
                 </div>
                 <div class="col-md-6">
                     <x-ui.odoo-form-ui type="select" label="Health Status" name="health_status" :required="true">
                         <option value="on_track" selected>🟢 On Track</option>
                         <option value="at_risk">🟡 At Risk</option>
                         <option value="behind">🔴 Behind</option>
+                        <option value="completed">🔵 Completed</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-12">
@@ -1255,6 +1280,9 @@
 
         var krSelect = document.getElementById('checkInKrSelect');
         krSelect.innerHTML = '<option value="">Objective Overall Progress (%)</option>';
+        if (typeof keyResults === 'string') {
+            try { keyResults = JSON.parse(keyResults); } catch (e) { keyResults = []; }
+        }
         if (keyResults && keyResults.length > 0) {
             keyResults.forEach(function(kr) {
                 var opt = document.createElement('option');
@@ -1443,6 +1471,18 @@
                     });
                 }
             });
+            handleOwnerTypeChange($('#ownerTypeSelect').val() || 'employee');
+        });
+
+        $(document).on('change change.select2 select2:select', '#ownerTypeSelect', function() {
+            handleOwnerTypeChange(this.value);
+        });
+
+        $(document).on('click', '.btn-quick-check-in', function() {
+            var goalId = $(this).data('goal-id');
+            var title = $(this).data('goal-title');
+            var keyResults = $(this).data('goal-krs');
+            prepareCheckIn(goalId, title, keyResults);
         });
 
         $(document).on('change change.select2 select2:select', '.goal-cycle-select', function() {

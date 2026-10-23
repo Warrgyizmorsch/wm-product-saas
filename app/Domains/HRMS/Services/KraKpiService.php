@@ -269,14 +269,19 @@ class KraKpiService
         }
 
         $cycle = $plan->appraisalCycle;
-        $goalWeightPercent = $cycle ? floatval($cycle->goal_weightage_percent) : 70.0;
-        $compWeightPercent = $cycle ? floatval($cycle->competency_weightage_percent) : 30.0;
+        $goalWeightPercent = $cycle ? floatval($cycle->goal_weightage_percent) : 100.0;
+        $compWeightPercent = $cycle ? floatval($cycle->competency_weightage_percent) : 0.0;
         $totalCycleWeight = ($goalWeightPercent + $compWeightPercent) ?: 100.0;
 
         $goalScore = round($weightedGoalScore, 2);
-        $competencyScore = $plan->competency_score !== null ? floatval($plan->competency_score) : $goalScore;
 
-        $finalScore = round((($goalScore * $goalWeightPercent) + ($competencyScore * $compWeightPercent)) / $totalCycleWeight, 2);
+        // If competency weight is 0, final score is 100% determined by KPI goals
+        if ($compWeightPercent <= 0) {
+            $finalScore = $goalScore;
+        } else {
+            $competencyScore = $plan->competency_score !== null ? floatval($plan->competency_score) : $goalScore;
+            $finalScore = round((($goalScore * $goalWeightPercent) + ($competencyScore * $compWeightPercent)) / $totalCycleWeight, 2);
+        }
 
         // Grade Scale (O, A, B, C, D)
         $grade = 'Meets Expectations (B)';
@@ -294,7 +299,7 @@ class KraKpiService
 
         $hasAnyEvaluations = $items->contains(function ($item) {
             return $item->actual !== null || $item->manager_rating !== null || $item->self_rating !== null;
-        }) || in_array($plan->status, ['self_reviewed', 'manager_reviewed', 'calibrated', 'signed_off']);
+        }) || in_array($plan->status, ['self_reviewed', 'manager_reviewed']);
 
         if (!$hasAnyEvaluations && in_array($plan->status, ['draft', 'submitted', 'approved', 'in_progress'])) {
             $plan->total_weightage = round($totalWeightage, 2);
@@ -420,6 +425,9 @@ class KraKpiService
                             'status' => 'pending',
                         ]);
                     }
+                    $plan->status = 'approved';
+                    $plan->approved_at = \Carbon\Carbon::now();
+                    $plan->save();
                 }
             }
 

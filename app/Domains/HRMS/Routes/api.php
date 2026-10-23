@@ -820,11 +820,9 @@ Route::prefix('api/hrms/kra-kpi')
         Route::post('/scorecards/{id}/submit-goals', [KraKpiApiController::class, 'submitGoals'])->name('scorecards.submit-goals');
         Route::post('/scorecards/{id}/approve-goals', [KraKpiApiController::class, 'approveGoals'])->name('scorecards.approve-goals');
 
-        // Appraisal Review Phases: Self, Manager, Calibration, Sign-off & PIP
+        // Appraisal Review Phases: Self, Manager & PIP
         Route::post('/scorecards/{id}/self-appraisal', [KraKpiApiController::class, 'submitSelfAppraisal'])->name('scorecards.self-appraisal');
         Route::post('/scorecards/{id}/manager-appraisal', [KraKpiApiController::class, 'submitManagerAppraisal'])->name('scorecards.manager-appraisal');
-        Route::post('/scorecards/{id}/calibrate', [KraKpiApiController::class, 'calibrateAppraisal'])->name('scorecards.calibrate');
-        Route::post('/scorecards/{id}/sign-off', [KraKpiApiController::class, 'signOffAppraisal'])->name('scorecards.sign-off');
         Route::post('/scorecards/{id}/trigger-pip', [KraKpiApiController::class, 'triggerPip'])->name('scorecards.trigger-pip');
     });
 
@@ -923,6 +921,7 @@ Route::prefix('api/hrms/goals')
         // Goal Cycles Master (must be before /{id} wildcard)
         Route::get('/cycles', [GoalApiController::class, 'indexCycles'])->name('cycles.index');
         Route::post('/cycles', [GoalApiController::class, 'storeCycle'])->name('cycles.store');
+        Route::put('/cycles/{id}', [GoalApiController::class, 'updateCycle'])->name('cycles.update')->whereNumber('id');
         Route::delete('/cycles/{id}', [GoalApiController::class, 'destroyCycle'])->name('cycles.destroy')->whereNumber('id');
 
         // Goal Strategic Categories / Pillars Master (must be before /{id} wildcard)
@@ -938,6 +937,7 @@ Route::prefix('api/hrms/goals')
         Route::get('/', [GoalApiController::class, 'index'])->name('index');
         Route::post('/', [GoalApiController::class, 'store'])->name('store');
         Route::post('/{id}/check-in', [GoalApiController::class, 'checkIn'])->name('check-in')->whereNumber('id');
+        Route::post('/{id}/approve', [GoalApiController::class, 'approve'])->name('approve')->whereNumber('id');
         Route::get('/{id}', [GoalApiController::class, 'show'])->name('show')->whereNumber('id');
         Route::put('/{id}', [GoalApiController::class, 'update'])->name('update')->whereNumber('id');
         Route::delete('/{id}', [GoalApiController::class, 'destroy'])->name('destroy')->whereNumber('id');

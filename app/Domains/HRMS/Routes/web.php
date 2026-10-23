@@ -630,8 +630,6 @@ Route::prefix('hrms')
             // Appraisals & Evaluations
             Route::post('/scorecard/{planId}/self-appraisal', [KraKpiController::class, 'submitSelfAppraisal'])->name('self-appraisal');
             Route::post('/scorecard/{planId}/manager-appraisal', [KraKpiController::class, 'submitManagerAppraisal'])->name('manager-appraisal');
-            Route::post('/scorecard/{planId}/calibrate', [KraKpiController::class, 'calibrateAppraisal'])->name('calibrate');
-            Route::post('/scorecard/{planId}/sign-off', [KraKpiController::class, 'signOffAppraisal'])->name('sign-off');
 
             // 1-Click Bridge to PIP
             Route::post('/scorecard/{planId}/trigger-pip', [KraKpiController::class, 'triggerPip'])->name('trigger-pip');
@@ -640,7 +638,7 @@ Route::prefix('hrms')
         // SOP (Standard Operating Procedure) Management Hub
         Route::prefix('sop')->name('sop.')->group(function (): void {
             Route::get('/', [SopController::class, 'index'])->name('index');
-            Route::get('/my-sops', [SopController::class, 'index'])->name('my-sops');
+            Route::get('/my-sops', [SopController::class, 'mySops'])->name('my-sops');
             Route::post('/store', [SopController::class, 'store'])->name('store');
             Route::get('/{sop}', [SopController::class, 'show'])->name('show');
             Route::put('/{sop}', [SopController::class, 'update'])->name('update');
@@ -667,14 +665,18 @@ Route::prefix('hrms')
         // Goals & OKRs Management Hub
         Route::prefix('goals')->name('goals.')->group(function (): void {
             Route::get('/', [GoalController::class, 'index'])->name('index');
+            Route::get('/alignment-tree', [GoalController::class, 'alignmentTree'])->name('alignment-tree');
+            Route::get('/my-goals', [GoalController::class, 'myGoals'])->name('my-goals');
             Route::post('/store', [GoalController::class, 'store'])->name('store');
             Route::get('/{goal}', [GoalController::class, 'show'])->name('show');
             Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
             Route::delete('/{goal}', [GoalController::class, 'destroy'])->name('destroy');
             Route::post('/{goal}/check-in', [GoalController::class, 'checkIn'])->name('check-in');
+            Route::post('/{goal}/approve', [GoalController::class, 'approve'])->name('approve');
 
             // Cycles & Categories Masters
             Route::post('/cycle/store', [GoalController::class, 'storeCycle'])->name('cycle.store');
+            Route::put('/cycle/{cycle}', [GoalController::class, 'updateCycle'])->name('cycle.update');
             Route::delete('/cycle/{cycle}', [GoalController::class, 'destroyCycle'])->name('cycle.destroy');
             Route::post('/category/store', [GoalController::class, 'storeCategory'])->name('category.store');
             Route::delete('/category/{category}', [GoalController::class, 'destroyCategory'])->name('category.destroy');

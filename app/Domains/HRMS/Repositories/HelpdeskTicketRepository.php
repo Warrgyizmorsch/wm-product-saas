@@ -11,7 +11,6 @@ use App\Domains\HRMS\Models\HelpdeskTicketAttachment;
 use App\Domains\HRMS\Models\HelpdeskTicketReply;
 use App\Services\Access\AccessService;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -24,13 +23,31 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
     public function ensureTablesExist(): void
     {
-        try {
-            if (!Schema::hasTable('helpdesk_tickets')) {
-                Artisan::call('migrate', ['--force' => true]);
-            }
-        } catch (\Exception $e) {
-            // Silently fallback if migration CLI unavailable
+        if (!Schema::hasTable('helpdesk_tickets')) {
+            throw new \RuntimeException("Database table 'helpdesk_tickets' does not exist. Please run database migrations.");
         }
+    }
+
+    private function resolveTenantId(): int
+    {
+        $tenantId = tenant_id()
+            ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
+            ?? auth()->user()?->tenant_id;
+
+        if (!$tenantId) {
+            abort(403, 'Tenant context is required.');
+        }
+
+        return (int) $tenantId;
+    }
+
+    private function verifyTicketTenant(HelpdeskTicket $ticket): int
+    {
+        $tenantId = $this->resolveTenantId();
+        if ((int) $ticket->tenant_id !== $tenantId) {
+            abort(403, 'Unauthorized tenant access to this helpdesk ticket.');
+        }
+        return $tenantId;
     }
 
     public function getIndexData(array $inputs): array
@@ -38,8 +55,8 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
         $this->ensureTablesExist();
 
         $user = auth()->user();
-        $tenantId = tenant_id();
-        $employee = Employee::resolveForUser($user);
+        $tenantId = $this->resolveTenantId();
+        $employee = Employee::resolveForUser($user, $tenantId);
 
         $canManage = $user && ($user->is_admin
             || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
@@ -170,9 +187,9 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
     public function createTicket(array $data, ?array $files = null): HelpdeskTicket
     {
-        $tenantId = tenant_id();
+        $tenantId = $this->resolveTenantId();
         $user = auth()->user();
-        $employee = Employee::resolveForUser($user);
+        $employee = Employee::resolveForUser($user, $tenantId);
         if (!$employee && $user) {
             $employee = Employee::where('tenant_id', $tenantId)->where('user_id', $user->id)->first();
         }
@@ -224,21 +241,11 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
             if (!$ticket) {
                 throw new \RuntimeException('Failed to generate unique ticket number after multiple attempts.');
-        if ($files) {
-            foreach ($files as $file) {
-                $path = $file->storeTenantFile("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
-                HelpdeskTicketAttachment::create([
-                    'ticket_id' => $ticket->id,
-                    'file_path' => $path,
-                    'file_name' => $file->getClientOriginalName(),
-                    'file_type' => $file->getClientMimeType(),
-                    'file_size' => $file->getSize(),
-                ]);
             }
 
             if ($files) {
                 foreach ($files as $file) {
-                    $path = $file->store("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
+                    $path = $file->storeTenantFile("helpdesk/{$tenantId}/tickets/{$ticket->id}", 'public');
                     HelpdeskTicketAttachment::create([
                         'ticket_id' => $ticket->id,
                         'file_path' => $path,
@@ -255,12 +262,14 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
     public function addReply(HelpdeskTicket $ticket, array $data, ?array $files = null): HelpdeskTicketReply
     {
+        $tenantId = $this->verifyTicketTenant($ticket);
+
         if ($ticket->status === 'closed') {
             throw new \DomainException('Cannot reply to a closed ticket.');
         }
 
         $user = auth()->user();
-        $employee = Employee::resolveForUser($user);
+        $employee = Employee::resolveForUser($user, $tenantId);
         if (!$employee && $user) {
             $employee = Employee::where('tenant_id', $ticket->tenant_id)->where('user_id', $user->id)->first();
         }
@@ -307,6 +316,8 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
 
     public function updateTicketStatus(HelpdeskTicket $ticket, string $status, ?int $assignedTo = null, ?string $priority = null): void
     {
+        $this->verifyTicketTenant($ticket);
+
         $updates = ['status' => $status];
 
         if ($status === 'resolved' && !$ticket->resolved_at) {
