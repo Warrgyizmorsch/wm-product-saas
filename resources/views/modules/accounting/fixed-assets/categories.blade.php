@@ -93,6 +93,8 @@
                                             data-fixed-asset-account-id="{{ $category->fixed_asset_account_id }}"
                                             data-accumulated-depreciation-account-id="{{ $category->accumulated_depreciation_account_id }}"
                                             data-depreciation-expense-account-id="{{ $category->depreciation_expense_account_id }}"
+                                            data-gain-on-disposal-account-id="{{ $category->gain_on_disposal_account_id }}"
+                                            data-loss-on-disposal-account-id="{{ $category->loss_on_disposal_account_id }}"
                                             data-default-depreciation-method="{{ $category->default_depreciation_method }}"
                                             data-default-useful-life-months="{{ $category->default_useful_life_months }}"
                                             data-is-production-machinery="{{ $category->is_production_machinery ? '1' : '0' }}">
@@ -147,13 +149,19 @@
                                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Brief details about what items go into this category..." />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $assetAccountOptions" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $assetAccountOptions" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Depreciation Expense Account" name="depreciation_expense_account_id" :options="['' => 'Use default (5800)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Depreciation Expense Account" name="depreciation_expense_account_id" :options="['' => 'Use default (5400)'] + $expenseAccountOptions" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Gain on Disposal Account" name="gain_on_disposal_account_id" :options="['' => 'Use default (4940)'] + $incomeAccountOptions" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Loss on Disposal / Write-off Account" name="loss_on_disposal_account_id" :options="['' => 'Use default (5910)'] + $expenseAccountOptions" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.select :stacked="true" class="odoo-select2" label="Default Depreciation Method" name="default_depreciation_method" :options="[
@@ -199,13 +207,19 @@
                                 <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_category_description" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" id="edit_category_fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Fixed Asset Account" name="fixed_asset_account_id" id="edit_category_fixed_asset_account_id" :options="['' => 'Use default (1500)'] + $assetAccountOptions" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" id="edit_category_accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Accumulated Depreciation Account" name="accumulated_depreciation_account_id" id="edit_category_accumulated_depreciation_account_id" :options="['' => 'Use default (1510)'] + $assetAccountOptions" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.select :stacked="true" class="odoo-select2" label="Depreciation Expense Account" name="depreciation_expense_account_id" id="edit_category_depreciation_expense_account_id" :options="['' => 'Use default (5800)'] + $chartOfAccounts->mapWithKeys(fn ($acc) => [$acc->id => $acc->code . ' - ' . $acc->name])->all()" />
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Depreciation Expense Account" name="depreciation_expense_account_id" id="edit_category_depreciation_expense_account_id" :options="['' => 'Use default (5400)'] + $expenseAccountOptions" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Gain on Disposal Account" name="gain_on_disposal_account_id" id="edit_category_gain_on_disposal_account_id" :options="['' => 'Use default (4940)'] + $incomeAccountOptions" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.select :stacked="true" class="odoo-select2" label="Loss on Disposal / Write-off Account" name="loss_on_disposal_account_id" id="edit_category_loss_on_disposal_account_id" :options="['' => 'Use default (5910)'] + $expenseAccountOptions" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.select :stacked="true" class="odoo-select2" label="Default Depreciation Method" name="default_depreciation_method" id="edit_category_default_depreciation_method" :options="[
@@ -257,6 +271,8 @@
                 setSelect2('edit_category_fixed_asset_account_id', btn.getAttribute('data-fixed-asset-account-id'));
                 setSelect2('edit_category_accumulated_depreciation_account_id', btn.getAttribute('data-accumulated-depreciation-account-id'));
                 setSelect2('edit_category_depreciation_expense_account_id', btn.getAttribute('data-depreciation-expense-account-id'));
+                setSelect2('edit_category_gain_on_disposal_account_id', btn.getAttribute('data-gain-on-disposal-account-id'));
+                setSelect2('edit_category_loss_on_disposal_account_id', btn.getAttribute('data-loss-on-disposal-account-id'));
                 setSelect2('edit_category_default_depreciation_method', btn.getAttribute('data-default-depreciation-method'));
                 document.getElementById('edit_category_default_useful_life_months').value = btn.getAttribute('data-default-useful-life-months') || '';
                 document.getElementById('edit_category_is_production_machinery').checked = btn.getAttribute('data-is-production-machinery') === '1';

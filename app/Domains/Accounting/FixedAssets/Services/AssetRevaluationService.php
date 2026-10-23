@@ -6,20 +6,23 @@ use App\Domains\Accounting\FixedAssets\Events\AssetRevalued;
 use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetRevaluation;
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\SystemAccountService;
 use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Asset;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
  * Revaluation validate -> approve -> post, per asset-mng.md §21. Never
  * touches Asset.acquisition_cost (the original historical cost) — only
- * capitalization_cost/book_value/useful_life_months/residual_value going
- * forward, and regenerates any not-yet-posted depreciation schedules dated
- * after the revaluation so future depreciation reflects the new basis.
+ * capitalization_cost/accumulated_depreciation/book_value/useful_life_months/
+ * residual_value going forward, and discards any not-yet-posted depreciation
+ * schedules dated after the revaluation so future depreciation reflects the
+ * new basis. Posting uses the elimination method (see buildLines()).
  */
 class AssetRevaluationService
 {
@@ -101,40 +104,35 @@ class AssetRevaluationService
 
         return DB::transaction(function () use ($revaluation, $userId) {
             $asset = $revaluation->asset()->lockForUpdate()->first();
-            $category = $asset->category;
             $tenantId = $asset->tenant_id;
+            $revaluationDate = Carbon::parse($revaluation->revaluation_date)->startOfDay();
 
-            $fixedAssetAccount = $category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
-            if ($fixedAssetAccount === null) {
-                throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: no fixed asset account configured.");
+            // Depreciation already posted for a period ending after the
+            // revaluation date was charged on the old basis; revaluing behind
+            // it would leave those months on the wrong carrying amount.
+            $laterPosted = AssetDepreciationSchedule::where('asset_id', $asset->id)
+                ->where('status', AssetDepreciationSchedule::STATUS_POSTED)
+                ->where('period_end_date', '>', $revaluationDate->toDateString())
+                ->exists();
+
+            if ($laterPosted) {
+                throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: depreciation has already been posted for a period after {$revaluationDate->toDateString()}.");
             }
 
-            $amount = round(abs((float) $revaluation->revaluation_surplus_deficit), 2);
+            // Figures are taken from the locked asset now, not from the request:
+            // depreciation posted between request and posting would otherwise
+            // leave the journal out of step with the asset register.
+            $cost = round((float) $asset->capitalization_cost, 2);
+            $accumulatedDepreciation = round((float) $asset->accumulated_depreciation, 2);
+            $netBookValue = round($cost - $accumulatedDepreciation, 2);
+            $revaluedAmount = round((float) $revaluation->revalued_amount, 2);
+            $surplusDeficit = round($revaluedAmount - $netBookValue, 2);
 
-            if ($amount > 0) {
-                if ((float) $revaluation->revaluation_surplus_deficit > 0) {
-                    $reserveAccount = $this->systemAccounts->get(self::FALLBACK_REVALUATION_RESERVE_KEY, $tenantId);
-                    if ($reserveAccount === null) {
-                        throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: revaluation reserve account (code " . SystemAccount::templateCode(self::FALLBACK_REVALUATION_RESERVE_KEY) . ') not found.');
-                    }
+            $lines = $this->buildLines($asset, $cost, $accumulatedDepreciation, $revaluedAmount, $surplusDeficit);
 
-                    $lines = [
-                        ['chart_of_account_id' => $fixedAssetAccount->id, 'debit' => $amount, 'description' => "Revaluation surplus - {$asset->asset_code}"],
-                        ['chart_of_account_id' => $reserveAccount->id, 'credit' => $amount, 'description' => "Revaluation surplus - {$asset->asset_code}"],
-                    ];
-                } else {
-                    $impairmentAccount = $this->systemAccounts->get(self::FALLBACK_IMPAIRMENT_LOSS_KEY, $tenantId)
-                        ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
-                    if ($impairmentAccount === null) {
-                        throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: impairment loss account not found.");
-                    }
+            $journalId = null;
 
-                    $lines = [
-                        ['chart_of_account_id' => $impairmentAccount->id, 'debit' => $amount, 'description' => "Revaluation deficit / impairment - {$asset->asset_code}"],
-                        ['chart_of_account_id' => $fixedAssetAccount->id, 'credit' => $amount, 'description' => "Revaluation deficit / impairment - {$asset->asset_code}"],
-                    ];
-                }
-
+            if ($lines !== []) {
                 $journal = $this->journals->post($lines, [
                     'tenant_id' => $tenantId,
                     'company_id' => $asset->company_id,
@@ -146,26 +144,28 @@ class AssetRevaluationService
                     'memo' => "Revaluation - {$asset->asset_code}",
                     'posted_by' => $userId,
                 ]);
-
-                $revaluation->update([
-                    'status' => AssetRevaluation::STATUS_POSTED,
-                    'journal_id' => $journal->id,
-                ]);
-            } else {
-                // No monetary difference — nothing to post to the GL, but the
-                // revaluation (and any useful-life/residual-value revision) is
-                // still recorded and marked posted.
-                $revaluation->update(['status' => AssetRevaluation::STATUS_POSTED]);
+                $journalId = $journal->id;
             }
 
+            $revaluation->update([
+                'status' => AssetRevaluation::STATUS_POSTED,
+                'journal_id' => $journalId,
+                'previous_book_value' => $netBookValue,
+                'revaluation_surplus_deficit' => $surplusDeficit,
+            ]);
+
+            // Elimination method: the revalued amount becomes the new gross
+            // carrying amount and accumulated depreciation restarts at zero, so
+            // capitalization_cost - accumulated_depreciation keeps matching the
+            // fixed-asset and accumulated-depreciation ledgers. useful_life_months
+            // becomes the life remaining from the revaluation date.
             $updates = [
-                'capitalization_cost' => (float) $revaluation->revalued_amount,
-                'book_value' => (float) $revaluation->revalued_amount,
+                'capitalization_cost' => $revaluedAmount,
+                'accumulated_depreciation' => 0,
+                'book_value' => $revaluedAmount,
+                'useful_life_months' => $revaluation->revised_useful_life_months
+                    ?? $this->remainingLifeMonths($asset, $revaluationDate),
             ];
-
-            if ($revaluation->revised_useful_life_months !== null) {
-                $updates['useful_life_months'] = $revaluation->revised_useful_life_months;
-            }
 
             if ($revaluation->revised_residual_value !== null) {
                 $updates['residual_value'] = (float) $revaluation->revised_residual_value;
@@ -173,17 +173,151 @@ class AssetRevaluationService
 
             $asset->update($updates);
 
-            // Never touch posted schedules — only unposted (draft) future
-            // schedules are stale after a revaluation and must be recomputed
-            // against the new basis.
+            // Never touch posted schedules. Any unposted schedule (draft, reviewed
+            // or approved) for a period ending on/after the revaluation was
+            // calculated on the old basis and must be regenerated.
             AssetDepreciationSchedule::where('asset_id', $asset->id)
-                ->where('status', AssetDepreciationSchedule::STATUS_DRAFT)
-                ->where('period_start_date', '>=', $revaluation->revaluation_date)
+                ->where('status', '!=', AssetDepreciationSchedule::STATUS_POSTED)
+                ->where('period_end_date', '>=', $revaluationDate->toDateString())
                 ->delete();
 
             event(new AssetRevalued($revaluation->fresh()));
 
             return $revaluation->fresh();
         });
+    }
+
+    /**
+     * Journal lines for a revaluation using the elimination method:
+     *
+     *   Dr Accumulated Depreciation      (write back to zero)
+     *   Dr/Cr Fixed Asset                (gross cost -> revalued amount)
+     *   and the difference against carrying amount:
+     *     increase: Cr Impairment Loss up to earlier impairments of this asset
+     *               (reversal through P&L), remainder Cr Revaluation Reserve
+     *     decrease: Dr Revaluation Reserve up to this asset's reserve balance,
+     *               remainder Dr Impairment Loss
+     *
+     * @return list<array{chart_of_account_id: int, debit?: float, credit?: float, description: string}>
+     */
+    private function buildLines(Asset $asset, float $cost, float $accumulatedDepreciation, float $revaluedAmount, float $surplusDeficit): array
+    {
+        $tenantId = $asset->tenant_id;
+        $category = $asset->category;
+        $code = $asset->asset_code;
+        $lines = [];
+
+        $fixedAssetAccount = $category?->chartOfAccount ?? $this->systemAccounts->get(SystemAccount::FIXED_ASSETS, $tenantId);
+        if ($fixedAssetAccount === null) {
+            throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: no fixed asset account configured.");
+        }
+
+        if ($accumulatedDepreciation > 0) {
+            $accumulatedDepreciationAccount = $category?->accumulatedDepreciationAccount
+                ?? $this->systemAccounts->get(SystemAccount::ACCUMULATED_DEPRECIATION, $tenantId);
+            if ($accumulatedDepreciationAccount === null) {
+                throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: accumulated depreciation account (code " . SystemAccount::templateCode(SystemAccount::ACCUMULATED_DEPRECIATION) . ') not found.');
+            }
+            $lines[] = ['chart_of_account_id' => $accumulatedDepreciationAccount->id, 'debit' => $accumulatedDepreciation, 'description' => "Revaluation - accumulated depreciation written back - {$code}"];
+        }
+
+        $grossMovement = round($revaluedAmount - $cost, 2);
+        if ($grossMovement > 0) {
+            $lines[] = ['chart_of_account_id' => $fixedAssetAccount->id, 'debit' => $grossMovement, 'description' => "Revaluation - {$code}"];
+        } elseif ($grossMovement < 0) {
+            $lines[] = ['chart_of_account_id' => $fixedAssetAccount->id, 'credit' => abs($grossMovement), 'description' => "Revaluation - {$code}"];
+        }
+
+        $reserveAccount = $this->systemAccounts->get(self::FALLBACK_REVALUATION_RESERVE_KEY, $tenantId);
+        $impairmentAccount = $this->systemAccounts->get(self::FALLBACK_IMPAIRMENT_LOSS_KEY, $tenantId)
+            ?? $this->systemAccounts->get(SystemAccount::OTHER_EXPENSE, $tenantId);
+
+        if ($surplusDeficit > 0) {
+            $priorImpairment = $impairmentAccount ? max(0.0, $this->assetBalanceOn($asset, $impairmentAccount->id, 'debit')) : 0.0;
+            $reversal = round(min($surplusDeficit, $priorImpairment), 2);
+            $toReserve = round($surplusDeficit - $reversal, 2);
+
+            if ($reversal > 0) {
+                $lines[] = ['chart_of_account_id' => $impairmentAccount->id, 'credit' => $reversal, 'description' => "Reversal of earlier impairment - {$code}"];
+            }
+
+            if ($toReserve > 0) {
+                if ($reserveAccount === null) {
+                    throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: revaluation reserve account (code " . SystemAccount::templateCode(self::FALLBACK_REVALUATION_RESERVE_KEY) . ') not found.');
+                }
+                $lines[] = ['chart_of_account_id' => $reserveAccount->id, 'credit' => $toReserve, 'description' => "Revaluation surplus - {$code}"];
+            }
+        } elseif ($surplusDeficit < 0) {
+            $deficit = abs($surplusDeficit);
+            $reserveBalance = $reserveAccount ? max(0.0, $this->assetBalanceOn($asset, $reserveAccount->id, 'credit')) : 0.0;
+            $fromReserve = round(min($deficit, $reserveBalance), 2);
+            $toProfitAndLoss = round($deficit - $fromReserve, 2);
+
+            if ($fromReserve > 0) {
+                $lines[] = ['chart_of_account_id' => $reserveAccount->id, 'debit' => $fromReserve, 'description' => "Revaluation deficit against reserve - {$code}"];
+            }
+
+            if ($toProfitAndLoss > 0) {
+                if ($impairmentAccount === null) {
+                    throw new InvalidArgumentException("Cannot post revaluation for asset #{$asset->id}: impairment loss account not found.");
+                }
+                $lines[] = ['chart_of_account_id' => $impairmentAccount->id, 'debit' => $toProfitAndLoss, 'description' => "Revaluation deficit / impairment - {$code}"];
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Net balance this asset's earlier posted revaluations left on one account,
+     * signed so that the account's natural side ($side) is positive.
+     */
+    private function assetBalanceOn(Asset $asset, int $accountId, string $side): float
+    {
+        $journalIds = AssetRevaluation::query()
+            ->where('asset_id', $asset->id)
+            ->where('status', AssetRevaluation::STATUS_POSTED)
+            ->whereNotNull('journal_id')
+            ->pluck('journal_id');
+
+        if ($journalIds->isEmpty()) {
+            return 0.0;
+        }
+
+        $totals = JournalEntry::withoutGlobalScopes()
+            ->where('tenant_id', $asset->tenant_id)
+            ->whereIn('journal_id', $journalIds)
+            ->where('chart_of_account_id', $accountId)
+            ->selectRaw('COALESCE(SUM(debit), 0) as debits, COALESCE(SUM(credit), 0) as credits')
+            ->first();
+
+        $net = (float) $totals->debits - (float) $totals->credits;
+
+        return round($side === 'debit' ? $net : -$net, 2);
+    }
+
+    /**
+     * Months of useful life left at the revaluation date when the revaluation
+     * does not set a revised life. Counted from the previous revaluation (whose
+     * useful_life_months was already "remaining from then") or otherwise from
+     * the depreciation start date.
+     */
+    private function remainingLifeMonths(Asset $asset, Carbon $revaluationDate): int
+    {
+        $lastRevaluationDate = AssetRevaluation::query()
+            ->where('asset_id', $asset->id)
+            ->where('status', AssetRevaluation::STATUS_POSTED)
+            ->where('revaluation_date', '<=', $revaluationDate->toDateString())
+            ->max('revaluation_date');
+
+        $from = $lastRevaluationDate ?? $asset->depreciation_start_date ?? $asset->capitalization_date;
+
+        if ($from === null) {
+            return max(1, (int) $asset->useful_life_months);
+        }
+
+        $elapsed = max(0, (int) floor(Carbon::parse($from)->startOfDay()->diffInMonths($revaluationDate, false)));
+
+        return max(1, (int) $asset->useful_life_months - $elapsed);
     }
 }

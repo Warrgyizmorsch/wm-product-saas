@@ -127,6 +127,11 @@ class AssetDisposalService
                 throw new InvalidArgumentException("Asset #{$asset->id} cannot transition from '{$asset->status}' to '{$newStatus}'.");
             }
 
+            // Re-take cost and accumulated depreciation from the locked asset:
+            // depreciation posted after the request was raised would otherwise
+            // leave a balance behind on the accumulated depreciation ledger.
+            $this->refreshFigures($disposal, $asset);
+
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
@@ -239,5 +244,20 @@ class AssetDisposalService
 
             return $disposal->fresh();
         });
+    }
+
+    private function refreshFigures(AssetDisposal $disposal, Asset $asset): void
+    {
+        $originalCost = round((float) $asset->capitalization_cost, 2);
+        $accumulatedDepreciation = round((float) $asset->accumulated_depreciation, 2);
+        $netBookValue = round($originalCost - $accumulatedDepreciation, 2);
+        $gainLoss = round((float) $disposal->sale_proceeds - (float) $disposal->tax_amount - $netBookValue, 2);
+
+        $disposal->update([
+            'original_cost' => $originalCost,
+            'accumulated_depreciation_at_disposal' => $accumulatedDepreciation,
+            'net_book_value' => $netBookValue,
+            'gain_loss_amount' => $gainLoss,
+        ]);
     }
 }

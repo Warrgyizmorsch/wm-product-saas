@@ -107,6 +107,49 @@ class AssetCategoryAccountingOnlyAccessTest extends TestCase
         ]);
     }
 
+    public function test_category_account_heads_must_be_of_the_matching_account_type(): void
+    {
+        $fixedAssets = ChartOfAccount::where('code', '1500')->firstOrFail();
+        $expense = ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => '5400', 'name' => 'Depreciation Expense',
+            'type' => ChartOfAccount::TYPE_EXPENSE, 'normal_balance' => ChartOfAccount::BALANCE_DEBIT, 'is_active' => true,
+        ]);
+        $income = ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id, 'code' => '4940', 'name' => 'Gain on Sale of Fixed Assets',
+            'type' => ChartOfAccount::TYPE_INCOME, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'is_active' => true,
+        ]);
+
+        // Depreciation pointed at a balance-sheet account, gain at an expense: rejected.
+        $this->actingAs($this->accountant)
+            ->withHeader('X-Tenant', 'accounting-only-tenant')
+            ->post(route('accounting.fixed-assets.categories.store'), [
+                'company_id' => $this->company->id,
+                'name' => 'Wrong Heads',
+                'depreciation_expense_account_id' => $fixedAssets->id,
+                'gain_on_disposal_account_id' => $expense->id,
+            ])
+            ->assertSessionHasErrors(['depreciation_expense_account_id', 'gain_on_disposal_account_id']);
+
+        $this->actingAs($this->accountant)
+            ->withHeader('X-Tenant', 'accounting-only-tenant')
+            ->post(route('accounting.fixed-assets.categories.store'), [
+                'company_id' => $this->company->id,
+                'name' => 'Right Heads',
+                'fixed_asset_account_id' => $fixedAssets->id,
+                'depreciation_expense_account_id' => $expense->id,
+                'gain_on_disposal_account_id' => $income->id,
+                'loss_on_disposal_account_id' => $expense->id,
+            ])
+            ->assertRedirect(route('accounting.fixed-assets.categories.index'));
+
+        $this->assertDatabaseHas('asset_categories', [
+            'name' => 'Right Heads',
+            'gain_on_disposal_account_id' => $income->id,
+            'loss_on_disposal_account_id' => $expense->id,
+        ]);
+        $this->assertDatabaseMissing('asset_categories', ['name' => 'Wrong Heads']);
+    }
+
     public function test_full_lifecycle_without_touching_any_hrms_route(): void
     {
         $category = AssetCategory::create([
