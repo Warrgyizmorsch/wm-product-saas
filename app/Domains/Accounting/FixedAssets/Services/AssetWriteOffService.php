@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\FixedAssets\Services;
 
 use App\Domains\Accounting\FixedAssets\Events\AssetWrittenOff;
+use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetWriteOff;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
@@ -168,6 +169,11 @@ class AssetWriteOffService
                 'status' => Asset::STATUS_WRITTEN_OFF,
                 'book_value' => 0,
             ]);
+
+            // Unposted months would otherwise sit in the depreciation queue.
+            AssetDepreciationSchedule::where('asset_id', $asset->id)
+                ->where('status', '!=', AssetDepreciationSchedule::STATUS_POSTED)
+                ->delete();
 
             event(new AssetWrittenOff($writeOff->fresh()));
 

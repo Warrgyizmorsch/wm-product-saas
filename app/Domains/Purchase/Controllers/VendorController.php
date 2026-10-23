@@ -259,10 +259,11 @@ class VendorController extends Controller
         $openingBalance = $vendor->signedOpeningBalance();
 
         $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->total_amount);
-        $totalPaid = (float) $bills->where('status', '!=', 'cancelled')->sum(fn ($b) => $b->amount_paid);
-        if ($totalPaid == 0 && $payments->isNotEmpty()) {
-            $totalPaid = (float) $payments->where('status', 'completed')->sum('amount');
-        }
+        // Every payment made, not just what was applied to bills: a payment
+        // against the opening balance or on account has no bill to sit on.
+        $totalPaid = (float) $payments
+            ->reject(fn ($p) => in_array(strtolower((string) $p->status), ['cancelled', 'void', 'draft', 'rejected'], true))
+            ->sum('amount');
 
         // Net outstanding includes Opening Balance (historical dues owed to supplier)
         $netOutstanding = $openingBalance + $totalBilled - $totalPaid;
@@ -285,6 +286,7 @@ class VendorController extends Controller
                 'credit' => (float)$bill->total_amount, // Credit increases liability/payable
                 'debit' => 0.00,
                 'status' => $bill->status,
+                'entered_at' => $bill->created_at,
                 'url' => route('purchase.bills.show', $bill->id),
             ]);
         }
@@ -298,11 +300,16 @@ class VendorController extends Controller
                 'credit' => 0.00,
                 'debit' => (float)$pmt->amount, // Debit decreases liability/payable
                 'status' => $pmt->status,
+                'entered_at' => $pmt->created_at,
                 'url' => route('purchase.payments.show', $pmt->id),
             ]);
         }
 
-        $ledgerEntries = $ledgerEntries->sortBy('date')->values();
+        // Same-day entries in the order they happened, not bills-then-payments.
+        $ledgerEntries = $ledgerEntries->sortBy([
+            fn ($a, $b) => \Carbon\Carbon::parse($a['date'])->startOfDay() <=> \Carbon\Carbon::parse($b['date'])->startOfDay(),
+            fn ($a, $b) => $a['entered_at'] <=> $b['entered_at'],
+        ])->values();
 
         // Compute Running Payable Balance
         $runningBalance = $vendor->signedOpeningBalance();

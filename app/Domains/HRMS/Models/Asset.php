@@ -152,6 +152,12 @@ class Asset extends BaseModel
         return in_array($to, self::TRANSITIONS[$from] ?? [], true);
     }
 
+    /** Sold, scrapped, written off, lost or disposed: off the books for good. */
+    public function isRetired(): bool
+    {
+        return (self::TRANSITIONS[(string) $this->status] ?? null) === [];
+    }
+
     /**
      * Get the company owning the asset.
      */

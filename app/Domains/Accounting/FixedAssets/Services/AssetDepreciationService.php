@@ -232,6 +232,12 @@ class AssetDepreciationService
             $category = $asset->category;
             $tenantId = $asset->tenant_id;
 
+            // A sold / scrapped / written-off asset has left the books; posting
+            // would recreate accumulated depreciation with no asset behind it.
+            if ($asset->isRetired()) {
+                throw new InvalidArgumentException("Schedule #{$schedule->id} cannot be posted: asset #{$asset->id} is {$asset->status} and no longer depreciates.");
+            }
+
             // The schedule was calculated against the book value at generation
             // time. If that has moved since (revaluation, another posting), the
             // amount is stale and must be regenerated rather than posted.

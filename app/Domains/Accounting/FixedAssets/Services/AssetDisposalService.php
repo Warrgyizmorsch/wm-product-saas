@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\FixedAssets\Services;
 
 use App\Domains\Accounting\FixedAssets\Events\AssetDisposed;
+use App\Domains\Accounting\FixedAssets\Models\AssetDepreciationSchedule;
 use App\Domains\Accounting\FixedAssets\Models\AssetDisposal;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
@@ -54,7 +55,9 @@ class AssetDisposalService
 
         $saleProceeds = round((float) ($data['sale_proceeds'] ?? 0), 2);
         $taxAmount = round((float) ($data['tax_amount'] ?? 0), 2);
-        $gainLoss = round($saleProceeds - $taxAmount - $netBookValue, 2);
+        // Sale proceeds exclude GST: the tax is collected for the government,
+        // so it is neither income nor a reduction of the sale price.
+        $gainLoss = round($saleProceeds - $netBookValue, 2);
 
         return AssetDisposal::create([
             'company_id' => $asset->company_id,
@@ -144,14 +147,17 @@ class AssetDisposalService
 
             $lines = [];
 
-            if ($disposal->sale_proceeds > 0) {
+            // The buyer pays the sale price plus the GST charged on it.
+            $amountReceived = round((float) $disposal->sale_proceeds + (float) $disposal->tax_amount, 2);
+
+            if ($amountReceived > 0) {
                 $bankAccount = $this->systemAccounts->get(self::FALLBACK_BANK_KEY, $tenantId);
                 if ($bankAccount === null) {
                     throw new InvalidArgumentException("Cannot post disposal for asset #{$asset->id}: bank account (code " . SystemAccount::templateCode(self::FALLBACK_BANK_KEY) . ') not found.');
                 }
                 $lines[] = [
                     'chart_of_account_id' => $bankAccount->id,
-                    'debit' => (float) $disposal->sale_proceeds,
+                    'debit' => $amountReceived,
                     'description' => "Sale proceeds - {$asset->asset_code}",
                 ];
             }
@@ -240,6 +246,11 @@ class AssetDisposalService
                 'book_value' => 0,
             ]);
 
+            // Unposted months would otherwise sit in the depreciation queue.
+            AssetDepreciationSchedule::where('asset_id', $asset->id)
+                ->where('status', '!=', AssetDepreciationSchedule::STATUS_POSTED)
+                ->delete();
+
             event(new AssetDisposed($disposal->fresh()));
 
             return $disposal->fresh();
@@ -251,7 +262,7 @@ class AssetDisposalService
         $originalCost = round((float) $asset->capitalization_cost, 2);
         $accumulatedDepreciation = round((float) $asset->accumulated_depreciation, 2);
         $netBookValue = round($originalCost - $accumulatedDepreciation, 2);
-        $gainLoss = round((float) $disposal->sale_proceeds - (float) $disposal->tax_amount - $netBookValue, 2);
+        $gainLoss = round((float) $disposal->sale_proceeds - $netBookValue, 2);
 
         $disposal->update([
             'original_cost' => $originalCost,

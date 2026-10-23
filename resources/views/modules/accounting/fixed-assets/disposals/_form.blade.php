@@ -40,10 +40,10 @@
                     <x-ui.icon-input label="Disposal Date" icon="feather-calendar" type="date" name="disposal_date" :value="old('disposal_date', now()->toDateString())" :required="true" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.icon-input label="Sale Proceeds" icon="feather-dollar-sign" type="number" name="sale_proceeds" :value="old('sale_proceeds', 0)" placeholder="0.00" helperText="Leave 0 for scrap/lost with no recovery." />
+                    <x-ui.icon-input label="Sale Proceeds (excl. GST)" icon="feather-dollar-sign" type="number" name="sale_proceeds" :value="old('sale_proceeds', 0)" placeholder="0.00" helperText="Sale price before GST. Leave 0 for scrap/lost with no recovery." />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.icon-input label="Tax Amount" icon="feather-percent" type="number" name="tax_amount" :value="old('tax_amount', 0)" placeholder="0.00" />
+                    <x-ui.icon-input label="GST Charged" icon="feather-percent" helperText="Added to the amount received and credited to output tax." type="number" name="tax_amount" :value="old('tax_amount', 0)" placeholder="0.00" />
                 </div>
                 <div class="col-md-6">
                     <x-ui.icon-input label="Remarks" icon="feather-file-text" name="remarks" :value="old('remarks')" placeholder="Optional notes about this disposal" />
@@ -72,10 +72,10 @@
                 </div>
                 <div class="col-md-6"></div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Sale Proceeds" name="sale_proceeds" :value="old('sale_proceeds', 0)" placeholder="0.00" helperText="Leave 0 for scrap/lost with no recovery." />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="Sale Proceeds (excl. GST)" name="sale_proceeds" :value="old('sale_proceeds', 0)" placeholder="0.00" helperText="Sale price before GST. Leave 0 for scrap/lost with no recovery." />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" label="Tax Amount" name="tax_amount" :value="old('tax_amount', 0)" placeholder="0.00" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" label="GST Charged" name="tax_amount" helperText="Added to the amount received and credited to output tax." :value="old('tax_amount', 0)" placeholder="0.00" />
                 </div>
                 <div class="col-12">
                     <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" rows="3" placeholder="Optional notes about this disposal" />

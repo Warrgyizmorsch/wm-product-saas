@@ -319,8 +319,10 @@ class AccountingAutoPostingTest extends TestCase
     }
 
     /** @test */
-    public function unallocated_customer_payment_posts_nothing_and_does_not_throw(): void
+    public function unallocated_customer_payment_posts_bank_against_the_customers_receivable(): void
     {
+        // e.g. a customer settling opening dues: the money is in the bank and
+        // reduces what that customer owes, even with no invoice to apply it to.
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
             ->post(route('sales.payments.store'), [
@@ -339,7 +341,45 @@ class AccountingAutoPostingTest extends TestCase
             ->where('reference_type', 'customer_payment')
             ->where('reference_id', $payment->id)
             ->get();
-        $this->assertCount(0, $journals);
+        $this->assertCount(1, $journals);
+
+        $bank = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1020')->firstOrFail();
+        $ar = ChartOfAccount::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('code', '1100')->firstOrFail();
+
+        $entries = $journals->first()->entries;
+        $this->assertEqualsWithDelta(200, (float) $entries->firstWhere('chart_of_account_id', $bank->id)->debit, 0.01);
+        $arLine = $entries->firstWhere('chart_of_account_id', $ar->id);
+        $this->assertEqualsWithDelta(200, (float) $arLine->credit, 0.01);
+        $this->assertSame('customer', $arLine->party_type);
+        $this->assertSame($this->customer->id, (int) $arLine->party_id);
+    }
+
+    /** @test */
+    public function unallocated_receipts_saved_before_the_fix_are_backfilled_once(): void
+    {
+        $this->actingAs($this->user)->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.payments.store'), [
+                'customer_id' => $this->customer->id,
+                'payment_number' => 'PAY-OLD-1',
+                'payment_date' => now()->toDateString(),
+                'amount' => 300,
+                'payment_method' => 'Cash',
+                'allocate_to' => 'unallocated',
+            ])->assertRedirect();
+
+        $payment = CustomerPayment::withoutGlobalScopes()->where('payment_number', 'PAY-OLD-1')->firstOrFail();
+        $journalsFor = fn () => Journal::withoutGlobalScopes()->where('reference_type', 'customer_payment')->where('reference_id', $payment->id);
+
+        // Simulate the old behaviour: the receipt exists but never posted.
+        $ids = $journalsFor()->pluck('id');
+        \Illuminate\Support\Facades\DB::table('journal_entries')->whereIn('journal_id', $ids)->delete();
+        \Illuminate\Support\Facades\DB::table('journals')->whereIn('id', $ids)->delete();
+        $this->assertSame(0, $journalsFor()->count());
+
+        $this->artisan('accounting:post-unallocated-receipts', ['--tenant' => $this->tenant->id])->assertSuccessful();
+        $this->artisan('accounting:post-unallocated-receipts', ['--tenant' => $this->tenant->id])->assertSuccessful();
+
+        $this->assertSame(1, $journalsFor()->count());
     }
 
     /** @test */

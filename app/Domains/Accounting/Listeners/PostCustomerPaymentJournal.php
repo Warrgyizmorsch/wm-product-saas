@@ -34,21 +34,18 @@ class PostCustomerPaymentJournal
         $isInvoiceAllocation = $allocations->contains(fn ($a) => $a->invoice_id !== null);
         $isAdvanceAllocation = $allocations->contains(fn ($a) => $a->invoice_id === null && $a->sales_order_id !== null);
 
-        if (!$isInvoiceAllocation && !$isAdvanceAllocation) {
-            Log::warning('PostCustomerPaymentJournal: payment has no invoice/sales-order allocation, skipping auto-post', [
-                'payment_id' => $payment->id,
-            ]);
-
-            return;
-        }
-
         try {
             // The bank/cash ledger the money actually went to (e.g. HDFC); older
             // payments without one fall back to 1020 Bank Account as before.
             $bank = $payment->bank_account_id
                 ? \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')->where('tenant_id', $payment->tenant_id)->whereKey($payment->bank_account_id)->first()
                 : $this->systemAccounts->get(SystemAccount::BANK, $payment->tenant_id);
-            $creditKey = $isInvoiceAllocation ? SystemAccount::AR : SystemAccount::ADVANCE_FROM_CUSTOMERS;
+            // A sales-order advance is a liability until invoiced. Anything else
+            // (invoice receipts, and on-account money such as a customer paying
+            // old/opening dues) reduces what the customer owes.
+            $creditKey = $isAdvanceAllocation && !$isInvoiceAllocation
+                ? SystemAccount::ADVANCE_FROM_CUSTOMERS
+                : SystemAccount::AR;
             $creditAccount = $this->systemAccounts->get($creditKey, $payment->tenant_id);
 
             if (!$bank || !$creditAccount) {
