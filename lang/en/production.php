@@ -2284,6 +2284,13 @@ return array (
   'external_workers' => 'External Workers',
   'number_of_external_workers' => 'Number of External Workers',
   'allocate_external_worker' => 'Allocate External Worker',
+  'assigned_employees' => 'Assigned Employees',
+  'no_employees_assigned' => 'No employees assigned',
+  'shifts' => 'Shifts',
+  'confirm_delete_bom' => 'Are you sure you want to delete this Bill of Materials?',
+  'delete_bom' => 'Delete BOM',
+  'select_bom' => 'Select BOM',
+  'cost' => 'Cost',
 );
 
 

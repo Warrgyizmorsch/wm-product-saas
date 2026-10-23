@@ -7,6 +7,7 @@ use App\Domains\Production\Requests\StoreExternalWorkerAllocationRequest;
 use App\Domains\Production\Requests\UpdateExternalWorkerAllocationQuantityRequest;
 use App\Domains\Production\Services\ExternalWorkerAllocationService;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +19,7 @@ class ExternalWorkerAllocationController extends Controller
         private readonly ExternalWorkerAllocationService $service
     ) {}
 
-    public function store(StoreExternalWorkerAllocationRequest $request): RedirectResponse
+    public function store(StoreExternalWorkerAllocationRequest $request): RedirectResponse|JsonResponse
     {
         Gate::authorize('create', ExternalWorkerAllocation::class);
 
@@ -33,7 +34,7 @@ class ExternalWorkerAllocationController extends Controller
             $active = $request->boolean('active', true);
             $updateIfExists = $request->boolean('update_if_exists', false);
 
-            $this->service->allocate(
+            $allocation = $this->service->allocate(
                 $sectionId,
                 $shiftId,
                 $payGradeId,
@@ -43,15 +44,28 @@ class ExternalWorkerAllocationController extends Controller
                 $updateIfExists
             );
 
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'External worker allocation saved successfully.',
+                    'allocation' => $allocation,
+                ]);
+            }
             return redirect()->back()->with('success', 'External worker allocation saved successfully.');
         } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'An error occurred while saving allocation: ' . $e->getMessage()], 500);
+            }
             return redirect()->back()->withInput()->with('error', 'An error occurred while saving allocation: ' . $e->getMessage());
         }
     }
 
-    public function updateQuantity(UpdateExternalWorkerAllocationQuantityRequest $request, int $id): RedirectResponse
+    public function updateQuantity(UpdateExternalWorkerAllocationQuantityRequest $request, int $id): RedirectResponse|JsonResponse
     {
         $tenantId = require_tenant_id();
         $allocation = ExternalWorkerAllocation::withoutGlobalScopes()
@@ -64,17 +78,30 @@ class ExternalWorkerAllocationController extends Controller
 
         try {
             $quantity = (int) $request->validated('number_of_external_workers');
-            $this->service->updateQuantity($id, $quantity, $tenantId);
+            $allocation = $this->service->updateQuantity($id, $quantity, $tenantId);
 
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Number of external workers updated successfully.',
+                    'allocation' => $allocation,
+                ]);
+            }
             return redirect()->back()->with('success', 'Number of external workers updated successfully.');
         } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'An error occurred while updating allocation: ' . $e->getMessage()], 500);
+            }
             return redirect()->back()->withInput()->with('error', 'An error occurred while updating allocation: ' . $e->getMessage());
         }
     }
 
-    public function toggleStatus(Request $request, int $id): RedirectResponse
+    public function toggleStatus(Request $request, int $id): RedirectResponse|JsonResponse
     {
         $tenantId = require_tenant_id();
         $allocation = ExternalWorkerAllocation::withoutGlobalScopes()
@@ -87,18 +114,31 @@ class ExternalWorkerAllocationController extends Controller
 
         try {
             $targetActive = $request->has('active') ? $request->boolean('active') : !$allocation->active;
-            $this->service->setActive($id, $targetActive, $tenantId);
+            $allocation = $this->service->setActive($id, $targetActive, $tenantId);
 
             $statusText = $targetActive ? 'activated' : 'deactivated';
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "External worker allocation {$statusText} successfully.",
+                    'active' => $targetActive,
+                ]);
+            }
             return redirect()->back()->with('success', "External worker allocation {$statusText} successfully.");
         } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
             return redirect()->back()->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'An error occurred while updating allocation status: ' . $e->getMessage()], 500);
+            }
             return redirect()->back()->with('error', 'An error occurred while updating allocation status: ' . $e->getMessage());
         }
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(int $id): RedirectResponse|JsonResponse
     {
         $tenantId = require_tenant_id();
         $allocation = ExternalWorkerAllocation::withoutGlobalScopes()
@@ -112,10 +152,22 @@ class ExternalWorkerAllocationController extends Controller
         try {
             $this->service->deallocate($id, $tenantId);
 
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'External worker allocation removed successfully.',
+                ]);
+            }
             return redirect()->back()->with('success', 'External worker allocation removed successfully.');
         } catch (InvalidArgumentException $e) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
             return redirect()->back()->with('error', $e->getMessage());
         } catch (\Exception $e) {
+            if (request()->expectsJson() || request()->ajax()) {
+                return response()->json(['success' => false, 'message' => 'An error occurred while removing allocation: ' . $e->getMessage()], 500);
+            }
             return redirect()->back()->with('error', 'An error occurred while removing allocation: ' . $e->getMessage());
         }
     }
