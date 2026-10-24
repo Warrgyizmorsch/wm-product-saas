@@ -65,12 +65,14 @@ class ChartOfAccountController extends Controller
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'is_cash_or_bank' => ['nullable', 'boolean'],
+            'bill_wise' => ['nullable', 'boolean'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'string', 'in:' . implode(',', ChartOfAccount::OPENING_BALANCE_TYPES)],
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_cash_or_bank'] = $request->boolean('is_cash_or_bank');
+        $validated['bill_wise'] = $request->boolean('bill_wise');
         $validated['opening_balance'] = (float) ($validated['opening_balance'] ?? 0);
         $validated['opening_balance_type'] = $validated['opening_balance_type'] ?? $validated['normal_balance'];
         $validated['created_by'] = auth()->id();
@@ -104,12 +106,14 @@ class ChartOfAccountController extends Controller
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
             'is_cash_or_bank' => ['nullable', 'boolean'],
+            'bill_wise' => ['nullable', 'boolean'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'string', 'in:' . implode(',', ChartOfAccount::OPENING_BALANCE_TYPES)],
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
         $validated['is_cash_or_bank'] = $request->boolean('is_cash_or_bank');
+        $validated['bill_wise'] = $request->boolean('bill_wise');
         $validated['opening_balance'] = (float) ($validated['opening_balance'] ?? 0);
         $validated['opening_balance_type'] = $validated['opening_balance_type'] ?? $validated['normal_balance'];
 
@@ -118,6 +122,13 @@ class ChartOfAccountController extends Controller
                 $updated = $this->accounts->update($account->id, $validated);
                 $this->accounts->syncOpeningBalance($updated);
             });
+
+            // Switching bill-by-bill on or off: rebuild the register so this
+            // ledger's past entries join (or leave) it straight away.
+            if ((bool) $account->bill_wise !== $validated['bill_wise']) {
+                app(\App\Domains\Accounting\Services\BillWise\BillAllocationService::class)->forgetControls();
+                \Illuminate\Support\Facades\Artisan::call('accounting:build-bill-register', ['--tenant' => (int) $account->tenant_id]);
+            }
         } catch (InvalidArgumentException $e) {
             return back()->withErrors([$this->errorField($e) => $e->getMessage()])->withInput();
         }

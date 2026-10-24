@@ -33,7 +33,7 @@
                     <th class="text-end">31-60 Days</th>
                     <th class="text-end">61-90 Days</th>
                     <th class="text-end">90+ Days</th>
-                    <th class="text-end" title="Money not yet matched to a bill">On Account</th>
+                    <th class="text-end" title="Advances and money not yet matched to a bill — adjust them on Bill Settlement">On Account / Advance</th>
                     <th class="text-end pe-4">Total</th>
                 </tr>
             </thead>

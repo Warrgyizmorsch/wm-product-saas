@@ -60,6 +60,7 @@ class VoucherService
             'reference_id' => $meta['reference_id'] ?? null,
             'memo' => $meta['memo'] ?? null,
             'posted_by' => $meta['posted_by'] ?? null,
+            'bill_allocations' => $meta['bill_allocations'] ?? null,
         ], fn ($value) => $value !== null);
 
         $journal = ($meta['through_approval'] ?? false)

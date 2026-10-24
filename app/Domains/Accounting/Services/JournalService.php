@@ -119,8 +119,9 @@ class JournalService
                 ['total_debit' => $journal->total_debit, 'maker_id' => $journal->posted_by, 'approver_id' => $approverId]
             );
 
-            // Now on the ledger, so now in the bill-wise register (On Account).
-            $this->bills->allocateJournal($journal);
+            // Now on the ledger, so now in the bill-wise register, with the bills
+            // chosen when it was entered (the rest On Account).
+            $this->bills->allocateJournal($journal, $journal->bill_allocation_hints ?? []);
 
             return $journal->fresh(['entries']);
         });
@@ -364,6 +365,10 @@ class JournalService
                 'total_credit' => round($totalCredit, 2),
                 'posted_by' => $meta['posted_by'] ?? null,
                 'posted_at' => $status === Journal::STATUS_POSTED ? now() : null,
+                // Kept until approval so the chosen bills apply when it posts.
+                'bill_allocation_hints' => $status === Journal::STATUS_PENDING_APPROVAL && ! empty($meta['bill_allocations'])
+                    ? $meta['bill_allocations']
+                    : null,
             ], $lines);
 
             return $journal;
@@ -590,7 +595,9 @@ class JournalService
      */
     public function partyLedger(string $partyType, int $partyId, \DateTimeInterface $from, \DateTimeInterface $to, float $seedOpeningBalance = 0.0): array
     {
-        $sign = $partyType === JournalEntry::PARTY_VENDOR ? -1 : 1;
+        // Customers read positive when they owe us; suppliers, employees and
+        // transporters when we owe them.
+        $sign = $partyType === JournalEntry::PARTY_CUSTOMER ? 1 : -1;
 
         $openingTotals = $this->journals->partyOpeningBalance($partyType, $partyId, $from);
         $opening = round($seedOpeningBalance + $sign * ($openingTotals['debit'] - $openingTotals['credit']), 2);

@@ -124,7 +124,7 @@ class OpeningBalanceService
                 'reference_type' => $target['reference_type'],
                 'reference_id' => (int) $target['reference_id'],
                 'memo' => "Opening balance - {$target['label']}",
-                'bill_allocations' => $this->openingBillHints($target, $isDebit),
+                'bill_allocations' => $this->openingBillHints($target, $isDebit, $amount),
             ]);
         });
     }
@@ -137,7 +137,7 @@ class OpeningBalanceService
      *
      * @return list<array<string, mixed>>
      */
-    public function openingBillHints(array $target, bool $isDebit): array
+    public function openingBillHints(array $target, bool $isDebit, ?float $amount = null): array
     {
         $partyType = $target['party_type'] ?? null;
         if (! in_array($partyType, [JournalEntry::PARTY_CUSTOMER, JournalEntry::PARTY_VENDOR], true)) {
@@ -152,8 +152,43 @@ class OpeningBalanceService
         }
 
         $date = $this->openingDate();
+        $hints = [];
 
-        return [BillWise\BillAllocationService::newRef($ledger, 'Opening Balance', $date, $date, (string) $target['reference_type'], (int) $target['reference_id'])];
+        // Broken into the old bills it is made of (only while they still add up to it).
+        foreach ($this->openingBreakup($partyType, (int) ($target['party_id'] ?? 0), $amount) as $row) {
+            $hints[] = BillWise\BillAllocationService::newRef($ledger, $row['ref'], $row['bill_date'] ?? $date, $row['due_date'] ?? ($row['bill_date'] ?? $date), (string) $target['reference_type'], (int) $target['reference_id'])
+                + ['amount' => (float) $row['amount']];
+        }
+
+        return $hints ?: [BillWise\BillAllocationService::newRef($ledger, 'Opening Balance', $date, $date, (string) $target['reference_type'], (int) $target['reference_id'])];
+    }
+
+    /**
+     * The party's saved opening breakup, if it still sums to the opening.
+     *
+     * @return list<array{ref: string, bill_date?: string, due_date?: string, amount: float}>
+     */
+    public function openingBreakup(string $partyType, int $partyId, ?float $amount): array
+    {
+        $model = match ($partyType) {
+            JournalEntry::PARTY_CUSTOMER => \App\Domains\CRM\Models\Customer::class,
+            JournalEntry::PARTY_VENDOR => \App\Domains\Inventory\Models\Vendor::class,
+            default => null,
+        };
+
+        if ($model === null || $partyId <= 0 || ! \Illuminate\Support\Facades\Schema::hasColumn((new $model)->getTable(), 'opening_bills')) {
+            return [];
+        }
+
+        $rows = $model::query()->withoutGlobalScopes()->whereKey($partyId)->value('opening_bills');
+        $rows = is_string($rows) ? json_decode($rows, true) : $rows;
+        if (! is_array($rows) || $rows === []) {
+            return [];
+        }
+
+        $total = round(array_sum(array_map(fn ($r) => (float) ($r['amount'] ?? 0), $rows)), 2);
+
+        return $amount === null || abs($total - round(abs($amount), 2)) < 0.005 ? array_values($rows) : [];
     }
 
     /**

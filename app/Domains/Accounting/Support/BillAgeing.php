@@ -3,8 +3,7 @@
 namespace App\Domains\Accounting\Support;
 
 use App\Domains\Accounting\Services\BillWise\BillAllocationService;
-use App\Domains\CRM\Models\Customer;
-use App\Domains\Inventory\Models\Vendor;
+use App\Domains\Accounting\Models\BillAllocation;
 use Illuminate\Support\Carbon;
 
 /**
@@ -22,15 +21,17 @@ class BillAgeing
     public const BASIS_DUE = 'due';
     public const BASIS_BILL = 'bill';
 
-    public function __construct(private readonly BillAllocationService $bills)
-    {
+    public function __construct(
+        private readonly BillAllocationService $bills,
+        private readonly PartyDirectory $parties,
+    ) {
     }
 
     /**
-     * @param 'receivable'|'payable' $ledger
-     * @return array{parties: list<array<string, mixed>>, buckets: array<string, float>, onAccount: float, grandTotal: float}
+     * @param 'receivable'|'payable' $ledger  which side; with $ledgerId only that one ledger
+     * @return array{parties: list<array<string, mixed>>, buckets: array<string, float>, onAccount: float, advance: float, grandTotal: float}
      */
-    public function build(string $ledger, Carbon $asOf, string $basis = self::BASIS_DUE): array
+    public function build(string $ledger, Carbon $asOf, string $basis = self::BASIS_DUE, ?int $ledgerId = null, ?string $onlyPartyType = null): array
     {
         // Receivables read positive when owed to us, payables when we owe.
         $sign = $ledger === 'receivable' ? 1 : -1;
@@ -42,6 +43,7 @@ class BillAgeing
         $buckets = $emptyBuckets;
         $parties = [];
         $onAccountTotal = 0.0;
+        $advanceTotal = 0.0;
 
         $party = function (string $type, int $id) use (&$parties, $emptyBuckets, $partyType) {
             $key = "{$type}:{$id}";
@@ -49,9 +51,11 @@ class BillAgeing
                 "{$partyType}_id" => $id,
                 'party_type' => $type,
                 'party_id' => $id,
-                'name' => $this->partyName($type, $id),
+                'name' => $this->parties->name($type, $id),
+                'type_label' => PartyDirectory::label($type),
                 'buckets' => $emptyBuckets,
                 'on_account' => 0.0,
+                'advance' => 0.0,
                 'total' => 0.0,
                 'documents' => [],
             ];
@@ -59,8 +63,11 @@ class BillAgeing
             return $key;
         };
 
-        foreach ($this->bills->openBills($ledger, $asOf->toDateString()) as $row) {
+        foreach ($this->bills->openBills($ledger, $asOf->toDateString(), null, null, $ledgerId) as $row) {
             $bill = $row->bill;
+            if ($onlyPartyType && $bill->party_type !== $onlyPartyType) {
+                continue;
+            }
             $balance = round($sign * $row->outstanding, 2);
             $from = $basis === self::BASIS_BILL ? $bill->bill_date : ($bill->due_date ?? $bill->bill_date);
             $from = $from ? Carbon::parse($from) : null;
@@ -81,13 +88,20 @@ class BillAgeing
             $buckets[$bucket] += $balance;
         }
 
-        foreach ($this->bills->onAccount($ledger, $asOf->toDateString()) as $partyKey => $amount) {
-            [$type, $id] = explode(':', $partyKey);
-            $key = $party($type, (int) $id);
-            $value = round($sign * $amount, 2);
-            $parties[$key]['on_account'] += $value;
-            $parties[$key]['total'] += $value;
-            $onAccountTotal += $value;
+        // Money not matched to a bill: advances (opening credits, advance
+        // payments) shown apart from plain On Account receipts/payments.
+        foreach ([BillAllocation::ON_ACCOUNT => 'on_account', BillAllocation::ADVANCE => 'advance'] as $refType => $column) {
+            foreach ($this->bills->onAccount($ledger, $asOf->toDateString(), $ledgerId, $refType) as $partyKey => $amount) {
+                [$type, $id] = explode(':', $partyKey);
+                if ($onlyPartyType && $type !== $onlyPartyType) {
+                    continue;
+                }
+                $key = $party($type, (int) $id);
+                $value = round($sign * $amount, 2);
+                $parties[$key][$column] += $value;
+                $parties[$key]['total'] += $value;
+                $column === 'advance' ? $advanceTotal += $value : $onAccountTotal += $value;
+            }
         }
 
         $parties = array_values($parties);
@@ -101,18 +115,11 @@ class BillAgeing
             'parties' => $parties,
             'buckets' => $buckets,
             'onAccount' => round($onAccountTotal, 2),
-            'grandTotal' => round(array_sum($buckets) + $onAccountTotal, 2),
+            'advance' => round($advanceTotal, 2),
+            'grandTotal' => round(array_sum($buckets) + $onAccountTotal + $advanceTotal, 2),
         ];
     }
 
-    private function partyName(string $type, int $id): string
-    {
-        return match ($type) {
-            'customer' => Customer::query()->whereKey($id)->value('name') ?? "Customer #{$id}",
-            'vendor' => Vendor::query()->whereKey($id)->value('name') ?? "Vendor #{$id}",
-            default => ucfirst($type) . " #{$id}",
-        };
-    }
 
     private function bucketFor(int $days): string
     {

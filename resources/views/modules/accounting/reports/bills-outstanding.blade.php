@@ -9,11 +9,24 @@
         <x-ui.filter-toolbar :resetUrl="route('accounting.reports.bills-outstanding')" searchLabel="View">
             <x-ui.filter-field label="Show" col="col-md-3">
                 <select name="ledger" class="form-select form-select-sm">
-                    <option value="receivable" @selected($ledger === 'receivable')>Receivables (customers)</option>
-                    <option value="payable" @selected($ledger === 'payable')>Payables (suppliers)</option>
+                    <option value="receivable" @selected($choice === 'receivable')>All receivables (owed to us)</option>
+                    <option value="payable" @selected($choice === 'payable')>All payables (we owe)</option>
+                    <optgroup label="One ledger">
+                        @foreach ($ledgers as $l)
+                            <option value="{{ $l->id }}" @selected($choice === (string) $l->id)>{{ $l->code }} — {{ $l->name }}</option>
+                        @endforeach
+                    </optgroup>
                 </select>
             </x-ui.filter-field>
-            <x-ui.filter-field label="Party" col="col-md-4">
+            <x-ui.filter-field label="Party Type" col="col-md-2">
+                <select name="party_type" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    @foreach (\App\Domains\Accounting\Support\PartyDirectory::LABELS as $type => $typeLabel)
+                        <option value="{{ $type }}" @selected($partyType === $type)>{{ $typeLabel }}s</option>
+                    @endforeach
+                </select>
+            </x-ui.filter-field>
+            <x-ui.filter-field label="Party" col="col-md-3">
                 <select name="party" class="form-select form-select-sm">
                     <option value="">All parties</option>
                     @foreach ($partyOptions as $key => $name)
@@ -21,7 +34,7 @@
                     @endforeach
                 </select>
             </x-ui.filter-field>
-            <x-ui.filter-field label="As Of Date" col="col-md-3">
+            <x-ui.filter-field label="As Of Date" col="col-md-2">
                 <input type="date" name="as_of" class="form-control form-control-sm" value="{{ $asOf->toDateString() }}">
             </x-ui.filter-field>
         </x-ui.filter-toolbar>
@@ -43,6 +56,8 @@
                     <tr class="bg-light">
                         <td class="ps-4 fw-bold" colspan="4">
                             <a href="{{ route('accounting.reports.party-ledger', ['party_type' => $party['party_type'], 'party_id' => $party['party_id']]) }}">{{ $party['name'] }}</a>
+                            <span class="badge bg-soft-secondary text-secondary ms-1 fw-normal">{{ $party['type_label'] }}</span>
+                            <a href="{{ route('accounting.bill-wise.settlement', ['party' => $party['party_type'] . ':' . $party['party_id']]) }}" class="ms-2 fs-12 fw-normal">Settle bills →</a>
                         </td>
                         <td class="text-end pe-4 fw-bold">{{ number_format($party['total'], 2) }}</td>
                     </tr>
@@ -56,6 +71,12 @@
                             <td class="text-end pe-4">{{ number_format($item['balance'], 2) }}</td>
                         </tr>
                     @endforeach
+                    @if (abs($party['advance']) >= 0.01)
+                        <tr>
+                            <td class="ps-5 fst-italic text-muted" colspan="4">Advance</td>
+                            <td class="text-end pe-4 fst-italic">{{ number_format($party['advance'], 2) }}</td>
+                        </tr>
+                    @endif
                     @if (abs($party['on_account']) >= 0.01)
                         <tr>
                             <td class="ps-5 fst-italic text-muted" colspan="4">On Account (not yet matched to a bill)</td>

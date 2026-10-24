@@ -36,10 +36,12 @@ class Customer extends BaseModel
         'shipping_address',
         'opening_balance',
         'opening_balance_type',
+        'opening_bills',
     ];
 
     protected $casts = [
         'opening_balance' => 'float',
+        'opening_bills' => 'array',
     ];
 
     protected static function boot()

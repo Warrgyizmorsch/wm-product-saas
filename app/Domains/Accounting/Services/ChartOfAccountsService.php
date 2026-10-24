@@ -383,6 +383,12 @@ class ChartOfAccountsService
                 ->first()
             ?? new ChartOfAccount(['tenant_id' => $tenantId, 'code' => $templateCode]);
 
+        // A new party ledger starts bill-wise; an existing one keeps whatever
+        // the tenant set, so re-provisioning never flips their switch back.
+        if (! $account->exists) {
+            $account->bill_wise = in_array($systemKey, SystemAccount::BILL_WISE_DEFAULTS, true);
+        }
+
         $account->fill($attributes);
 
         if ($account->system_key === null) {
