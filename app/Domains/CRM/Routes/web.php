@@ -20,7 +20,7 @@ Route::prefix('crm')
     ->as('crm.')
     ->group(function (): void {
         // CRM Executive Dashboard Routes
-        Route::get('/', fn () => redirect()->route('crm.dashboard'));
+        Route::get('/', fn() => redirect()->route('crm.dashboard'));
         Route::get('dashboard', [CrmDashboardController::class, 'index'])->name('dashboard');
         Route::get('dashboard/export/{format}', [CrmDashboardController::class, 'export'])->name('dashboard.export');
 
@@ -114,6 +114,15 @@ Route::prefix('crm')
             ->name('leads.callAi.analyze');
         Route::post('leads/{lead}/call-ai/confirm', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'confirmCallFollowup'])
             ->name('leads.callAi.confirm');
+
+        // My Meetings (Executive Suite for Lead & Deal Scheduled Meetings)
+        Route::get('meetings', [LeadFollowupController::class, 'meetingsIndex'])
+            ->name('meetings.index');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/status', [LeadFollowupController::class, 'updateMeetingStatus'])
+            ->name('meetings.status');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/reschedule', [LeadFollowupController::class, 'rescheduleMeeting'])
+            ->name('meetings.reschedule');
+
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');
         Route::post('google-calendar/schedule-event', [GoogleCalendarController::class, 'scheduleEvent'])

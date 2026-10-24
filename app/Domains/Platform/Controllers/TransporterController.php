@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class TransporterController extends Controller
 {
@@ -219,8 +220,8 @@ class TransporterController extends Controller
             'name'                  => 'required|string|max:255',
             'code'                  => 'nullable|string|max:50',
             'transporter_id'        => 'nullable|string|max:50',
-            'gstin'                 => 'nullable|string|max:20',
-            'pan_number'            => 'nullable|string|max:20',
+            'gstin'                 => TaxIdentityService::gstinRules(false),
+            'pan_number'            => TaxIdentityService::panRules(false),
             'phone'                 => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'email'                 => 'nullable|email|max:150',
             'address'               => 'nullable|string',
@@ -274,8 +275,8 @@ class TransporterController extends Controller
             'name'                  => 'required|string|max:255',
             'code'                  => 'nullable|string|max:50',
             'transporter_id'        => 'nullable|string|max:50',
-            'gstin'                 => 'nullable|string|max:20',
-            'pan_number'            => 'nullable|string|max:20',
+            'gstin'                 => TaxIdentityService::gstinRules(false),
+            'pan_number'            => TaxIdentityService::panRules(false),
             'phone'                 => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'email'                 => 'nullable|email|max:150',
             'address'               => 'nullable|string',

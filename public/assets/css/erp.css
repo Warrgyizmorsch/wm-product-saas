@@ -1507,10 +1507,11 @@ body.app-skin-dark .erp-badge-active,
 
 .table-responsive {
     position: relative;
+    overflow-x: auto;
 }
 
 .table-responsive:has(.dropdown.show) {
-    overflow: visible !important;
+    overflow-x: auto !important;
 }
 
 .select2-container .select2-selection--single .select2-selection__rendered {

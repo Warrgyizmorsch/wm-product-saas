@@ -7,10 +7,11 @@ use App\Models\Concerns\BelongsToBranch;
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\NormalizesTaxIdentity;
 
 class Vendor extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
 
     protected $table = 'vendors';
 

@@ -15,10 +15,11 @@ use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
+use App\Models\Concerns\NormalizesTaxIdentity;
 
 class CrmAccount extends BaseModel
 {
-    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch;
+    use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
 
     protected $table = 'crm_accounts';
 

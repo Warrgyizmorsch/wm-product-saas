@@ -445,6 +445,7 @@ return array (
   'additional_contact' => 'अतिरिक्त संपर्क',
   'accounts_sidebar' => 'खाते / कंपनियां',
   'deals_sidebar' => 'डील्स (पाइपलाइन)',
+  'my_meetings_sidebar' => 'मेरी मीटिंग्स',
   'track_status_sidebar' => 'ट्रैक स्थिति',
   'customers_sidebar' => 'ग्राहक',
   'crm_masters_sidebar' => 'सीआरएम मास्टर्स',

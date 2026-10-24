@@ -13,11 +13,12 @@ use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
 use App\Domains\Inventory\Models\Product;
+use App\Models\Concerns\NormalizesTaxIdentity;
 use Illuminate\Database\Eloquent\Model;
 
 class Lead extends Model
 {
-    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, NormalizesTaxIdentity;
 
     protected static function boot()
     {

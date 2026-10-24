@@ -445,6 +445,7 @@ return array (
   'additional_contact' => 'Additional Contact',
   'accounts_sidebar' => 'Accounts (Companies)',
   'deals_sidebar' => 'Deals (Pipeline)',
+  'my_meetings_sidebar' => 'My Meetings',
   'track_status_sidebar' => 'Track Status',
   'customers_sidebar' => 'Customers',
   'crm_masters_sidebar' => 'CRM Masters',

@@ -9,6 +9,7 @@ use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
+use App\Services\TaxIdentityService;
 
 class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
@@ -42,7 +43,7 @@ class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             // Re-assign normalized keys for validator
             $dataToValidate = [
                 'company_name'   => $companyName ?: null,
-                'gstin'          => $rowArray['gstin'] ?? null,
+                'gstin'          => TaxIdentityService::normalizeGstin($rowArray['gstin'] ?? null),
                 'company_email'  => $companyEmail ?: null,
                 'company_phone'  => $companyPhone ?: null,
                 'contact_person' => $contactPerson ?: null,
@@ -62,7 +63,7 @@ class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             // Conditional validation rules (identical to API)
             $rules = [
                 'company_name'   => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
-                'gstin'          => 'nullable|string|max:100',
+                'gstin'          => TaxIdentityService::gstinRules(false),
                 'company_email'  => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
                 'company_phone'  => 'nullable|string|max:50',
                 'contact_person' => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',

@@ -67,7 +67,7 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_name')" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_tax_no')" name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" :placeholder="__('crm.gstin_placeholder')" :errorText="$errors->first('gstin')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_tax_no')" name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" :placeholder="__('crm.gstin_placeholder')" :errorText="$errors->first('gstin')" data-tax-type="gstin" maxlength="15" class="text-uppercase font-monospace" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.company_email')" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" :placeholder="__('crm.company_email_placeholder')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_email')" />
 

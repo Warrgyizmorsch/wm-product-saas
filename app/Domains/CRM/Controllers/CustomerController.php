@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class CustomerController extends Controller
 {
@@ -74,7 +75,7 @@ class CustomerController extends Controller
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin' => ['nullable', 'string', 'max:50'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
@@ -110,7 +111,7 @@ class CustomerController extends Controller
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin' => ['nullable', 'string', 'max:50'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
         ], [
