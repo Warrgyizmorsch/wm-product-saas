@@ -81,6 +81,8 @@ Route::prefix('sales')
         Route::post('invoices/{invoice}/credit-note', [\App\Domains\Sales\Controllers\InvoiceController::class, 'storeCreditNote'])->name('invoices.credit-note');
         Route::post('invoices/{invoice}/send', [\App\Domains\Sales\Controllers\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/pay', [\App\Domains\Sales\Controllers\InvoiceController::class, 'pay'])->name('invoices.pay');
+        Route::post('invoices/{invoice}/apply-advance', [\App\Domains\Sales\Controllers\InvoiceController::class, 'applyAdvance'])->name('invoices.apply-advance');
+        Route::post('invoices/{invoice}/remove-advance/{allocation}', [\App\Domains\Sales\Controllers\InvoiceController::class, 'removeAdvance'])->name('invoices.remove-advance');
 
         // E-Invoice & E-Way Bill Routes
         Route::post('invoices/{id}/einvoice/generate', [\App\Domains\Sales\Controllers\EInvoiceController::class, 'generateEInvoice'])->name('invoices.einvoice.generate');
