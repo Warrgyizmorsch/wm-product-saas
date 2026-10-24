@@ -361,7 +361,11 @@ class JournalRepository implements JournalRepositoryInterface
      */
     private function isOpeningOn(\Illuminate\Database\Eloquent\Builder $journal, \DateTimeInterface $date): \Illuminate\Database\Eloquent\Builder
     {
+        // whereNotNull keeps this a plain true/false: under whereNot(), a NULL
+        // reference_type would make the test NULL and silently drop an
+        // ordinary journal dated on the statement's first day.
         return $journal->whereDate('journal_date', \Illuminate\Support\Carbon::parse($date)->toDateString())
+            ->whereNotNull('reference_type')
             ->where('reference_type', 'like', '%_opening_balance');
     }
 }

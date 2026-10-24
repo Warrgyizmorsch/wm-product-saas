@@ -426,7 +426,7 @@ final class ReportTables
         $documents = [];
 
         foreach ($d[$partiesKey] as $party) {
-            $parties[] = array_merge([$party['name']], array_map(fn (string $key) => (float) $party['buckets'][$key], $bucketKeys), [(float) ($party['on_account'] ?? 0), (float) $party['total']]);
+            $parties[] = array_merge([$party['name']], array_map(fn (string $key) => (float) $party['buckets'][$key], $bucketKeys), [(float) ($party['on_account'] ?? 0), (float) ($party['advance'] ?? 0), (float) $party['total']]);
 
             foreach ($party[$documentsKey] as $item) {
                 $documents[] = [
@@ -444,8 +444,8 @@ final class ReportTables
         return [
             'meta' => [['As of', $d['asOf']->format('d M Y')], ['Aged by', ($d['basis'] ?? 'due') === 'bill' ? 'Bill date' : 'Due date']],
             'sections' => [
-                $this->section('Summary by '.strtolower($partyLabel), array_merge([$partyLabel], array_values(self::BUCKETS), ['On account / Advance', 'Total']), $parties,
-                    [array_merge(['Total'], array_map(fn (string $key) => (float) $d['buckets'][$key], $bucketKeys), [(float) ($d['onAccount'] ?? 0), (float) $d['grandTotal']])]),
+                $this->section('Summary by '.strtolower($partyLabel), array_merge([$partyLabel], array_values(self::BUCKETS), ['On account', 'Advance', 'Total']), $parties,
+                    [array_merge(['Total'], array_map(fn (string $key) => (float) $d['buckets'][$key], $bucketKeys), [(float) ($d['onAccount'] ?? 0), (float) ($d['advance'] ?? 0), (float) $d['grandTotal']])]),
                 $this->section('Open bills', [$partyLabel, $numberLabel, 'Bill date', 'Due date', 'Days', 'Bucket', 'Balance'], $documents),
             ],
         ];

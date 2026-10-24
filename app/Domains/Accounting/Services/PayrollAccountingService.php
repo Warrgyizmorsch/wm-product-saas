@@ -232,6 +232,9 @@ class PayrollAccountingService
                     'party_id'            => $employeeId,
                     'description'         => "Advance / loan recovered for month {$run->payroll_month}",
                 ];
+                // Recovery pays back the employee's open advances, oldest first.
+                $billHints[] = BillWise\BillAllocationService::againstOldest('receivable')
+                    + ['party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE, 'party_id' => $employeeId, 'account_id' => $defaultAccounts['1420']->id];
             }
         }
 

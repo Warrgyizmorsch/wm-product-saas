@@ -63,6 +63,16 @@ class BillAllocationService
         ], fn ($v) => $v !== null);
     }
 
+    /** Hint: this line settles the party's open bills on its ledger, oldest due first (an advance recovered without naming it). */
+    public static function againstOldest(string $ledger): array
+    {
+        return [
+            'ref_type' => BillAllocation::AGAINST_REF,
+            'ledger' => $ledger,
+            'oldest_first' => true,
+        ];
+    }
+
     /** False until the register migration has run, so posting never breaks on an older schema. */
     public static function enabled(): bool
     {
@@ -81,7 +91,7 @@ class BillAllocationService
      * Hint keys: ref_type (required), party_type/party_id (default: any party
      * line), ledger ('receivable'|'payable'), amount (magnitude; default: what
      * is left on the line), ref_number, bill_date, due_date, source_type,
-     * source_id, bill_reference_id (for against_ref).
+     * source_id, bill_reference_id, oldest_first (for against_ref).
      *
      * @param list<array<string, mixed>> $hints
      */
@@ -376,7 +386,13 @@ class BillAllocationService
             }
         }
 
-        return ! empty($hint['ref_number']) ? (clone $query)->where('ref_number', $hint['ref_number'])->get() : collect();
+        if (! empty($hint['ref_number'])) {
+            return (clone $query)->where('ref_number', $hint['ref_number'])->get();
+        }
+
+        return ! empty($hint['oldest_first'])
+            ? (clone $query)->orderBy('due_date')->orderBy('bill_date')->orderBy('id')->get()
+            : collect();
     }
 
     private function record(JournalEntry $line, string $type, float $signed, string $date, ?int $billId = null): void

@@ -211,6 +211,98 @@ class BillSettlementTest extends TestCase
     }
 
     /** @test */
+    public function a_voucher_line_on_a_party_ledger_needs_its_party(): void
+    {
+        $voucher = fn (?string $party) => [
+            'voucher_date' => '2026-10-20',
+            'party_name' => 'acme',
+            'items' => [
+                ['chart_of_account_id' => $this->account(SystemAccount::AP)->id, 'debit' => 100000, 'credit' => 0] + ($party ? ['party' => $party] : []),
+                ['chart_of_account_id' => $this->account(SystemAccount::BANK)->id, 'debit' => 0, 'credit' => 100000],
+            ],
+        ];
+
+        // Typing a name in the free-text Party Name box is not enough.
+        $this->as($this->user)->post(route('accounting.vouchers.payment.store'), $voucher(null))
+            ->assertSessionHasErrors(['items' => 'Line 1: Accounts Payable is kept party by party: click "Pick party & bills" and choose the party.']);
+        $this->assertSame(0, Journal::where('voucher_type', 'payment')->count());
+
+        $this->as($this->user)->post(route('accounting.vouchers.payment.store'), $voucher("vendor:{$this->vendor->id}"))
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $onAccount = app(BillAllocationService::class)->onAccount('payable', null, $this->account(SystemAccount::AP)->id)["vendor:{$this->vendor->id}"] ?? 0;
+        $this->assertEquals(100000.0, $onAccount, 'With the party and no bill picked, the payment is On Account');
+        $this->assertRegisterMatchesLedger();
+    }
+
+    /** @test */
+    public function the_vouchers_party_tags_its_payables_line_and_names_the_voucher(): void
+    {
+        $this->as($this->user)->post(route('accounting.vouchers.payment.store'), [
+            'voucher_date' => '2026-10-20',
+            'party' => "vendor:{$this->vendor->id}",
+            'party_name' => 'whatever the box showed',
+            'items' => [
+                ['chart_of_account_id' => $this->account(SystemAccount::BANK)->id, 'debit' => 0, 'credit' => 5000],
+                ['chart_of_account_id' => $this->account(SystemAccount::AP)->id, 'debit' => 5000, 'credit' => 0],
+            ],
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $journal = Journal::where('voucher_type', 'payment')->firstOrFail();
+        $line = $journal->entries()->where('chart_of_account_id', $this->account(SystemAccount::AP)->id)->firstOrFail();
+        $this->assertSame('vendor', $line->party_type);
+        $this->assertSame($this->vendor->id, (int) $line->party_id);
+        $this->assertSame('Steel Mills', $journal->voucherDetail->party_name, 'The name comes from the party picked');
+        $this->assertRegisterMatchesLedger();
+    }
+
+    /** @test */
+    public function a_lines_own_party_wins_over_the_vouchers_party(): void
+    {
+        $this->as($this->user)->post(route('accounting.vouchers.receipt.store'), [
+            'voucher_date' => '2026-10-20',
+            'party' => "vendor:{$this->vendor->id}",
+            'items' => [
+                ['chart_of_account_id' => $this->account(SystemAccount::BANK)->id, 'debit' => 3000, 'credit' => 0],
+                ['chart_of_account_id' => $this->account(SystemAccount::AR)->id, 'debit' => 0, 'credit' => 3000, 'party' => "customer:{$this->customer->id}"],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $line = Journal::where('voucher_type', 'receipt')->firstOrFail()->entries()->where('credit', '>', 0)->firstOrFail();
+        $this->assertSame('customer', $line->party_type);
+    }
+
+    /** @test */
+    public function an_unknown_voucher_party_is_refused_and_a_name_only_payee_still_posts(): void
+    {
+        $expense = ['chart_of_account_id' => $this->account(SystemAccount::OTHER_EXPENSE)->id, 'debit' => 800, 'credit' => 0];
+        $bank = ['chart_of_account_id' => $this->account(SystemAccount::BANK)->id, 'debit' => 0, 'credit' => 800];
+
+        $this->as($this->user)->post(route('accounting.vouchers.payment.store'), [
+            'voucher_date' => '2026-10-20', 'party' => 'vendor:999999', 'items' => [$bank, $expense],
+        ])->assertSessionHasErrors('party');
+
+        // A one-off payee: a name on the voucher, no party ledger touched.
+        $this->as($this->user)->post(route('accounting.vouchers.payment.store'), [
+            'voucher_date' => '2026-10-20', 'party' => '', 'party_name' => 'Ramesh Plumber', 'items' => [$bank, $expense],
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $journal = Journal::where('voucher_type', 'payment')->firstOrFail();
+        $this->assertSame('Ramesh Plumber', $journal->voucherDetail->party_name);
+        $this->assertSame(0, $journal->entries()->whereNotNull('party_id')->count());
+    }
+
+    /** @test */
+    public function the_voucher_form_offers_the_party_picker_with_each_partys_ledger(): void
+    {
+        $this->as($this->user)->get(route('accounting.vouchers.payment.index'))
+            ->assertOk()
+            ->assertSee('id="voucherParty-payment"', false)
+            ->assertViewHas('partyLedgers', fn ($ledgers) => $ledgers['vendor'] === $this->account(SystemAccount::AP)->id
+                && $ledgers['customer'] === $this->account(SystemAccount::AR)->id
+                && $ledgers['employee'] === $this->account('salary_payable')->id);
+    }
+
+    /** @test */
     public function a_voucher_waiting_for_approval_applies_its_picked_bills_when_approved(): void
     {
         $this->invoice('INV-9', 4000, '2026-09-10', 9);
@@ -405,5 +497,25 @@ class BillSettlementTest extends TestCase
         $this->assertEquals(5000.0, $this->open('Opening Balance'));
         $this->assertNull($this->customer->fresh()->opening_bills);
         $this->assertRegisterMatchesLedger();
+    }
+
+    /** @test */
+    public function ageing_shows_advances_apart_from_on_account_money(): void
+    {
+        $this->invoice('INV-AG', 5000, '2026-10-01', 31);
+        $this->journal([
+            ['chart_of_account_id' => $this->account(SystemAccount::BANK)->id, 'debit' => 2000],
+            ['chart_of_account_id' => $this->account(SystemAccount::AR)->id, 'credit' => 2000, 'party_type' => 'customer', 'party_id' => $this->customer->id],
+        ], '2026-10-05', [['ref_type' => 'advance', 'ledger' => 'receivable']]);
+        $this->onAccountReceipt(1000, '2026-10-06');
+
+        $response = $this->as($this->user)->get(route('accounting.reports.ar-aging'))->assertOk()
+            ->assertSee('On Account')->assertSee('Advance');
+        $row = $response->viewData('customers')[0];
+        $this->assertEquals(-1000.0, $row['on_account']);
+        $this->assertEquals(-2000.0, $row['advance']);
+        $this->assertEquals(-1000.0, $response->viewData('onAccount'));
+        $this->assertEquals(-2000.0, $response->viewData('advance'));
+        $this->assertEquals(2000.0, $response->viewData('grandTotal'));
     }
 }

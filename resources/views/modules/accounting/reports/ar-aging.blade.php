@@ -33,7 +33,8 @@
                     <th class="text-end">31-60 Days</th>
                     <th class="text-end">61-90 Days</th>
                     <th class="text-end">90+ Days</th>
-                    <th class="text-end" title="Advances and money not yet matched to a bill — adjust them on Bill Settlement">On Account / Advance</th>
+                    <th class="text-end" title="Money not yet matched to a bill — adjust it on Bill Settlement">On Account</th>
+                    <th class="text-end" title="Advances not yet adjusted against a bill — adjust them on Bill Settlement">Advance</th>
                     <th class="text-end pe-4">Total</th>
                 </tr>
             </thead>
@@ -49,11 +50,12 @@
                         <td class="text-end">{{ number_format($row['buckets']['61_90'], 2) }}</td>
                         <td class="text-end">{{ number_format($row['buckets']['90_plus'], 2) }}</td>
                         <td class="text-end">{{ number_format($row['on_account'], 2) }}</td>
+                        <td class="text-end">{{ number_format($row['advance'], 2) }}</td>
                         <td class="text-end pe-4 fw-bold">{{ number_format($row['total'], 2) }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted">No outstanding receivables.</td>
+                        <td colspan="9" class="text-center py-4 text-muted">No outstanding receivables.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -66,6 +68,7 @@
                     <td class="text-end">{{ number_format($buckets['61_90'], 2) }}</td>
                     <td class="text-end">{{ number_format($buckets['90_plus'], 2) }}</td>
                     <td class="text-end">{{ number_format($onAccount, 2) }}</td>
+                    <td class="text-end">{{ number_format($advance, 2) }}</td>
                     <td class="text-end pe-4">{{ number_format($grandTotal, 2) }}</td>
                 </tr>
             </tfoot>

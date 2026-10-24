@@ -190,6 +190,31 @@ class TravelExpenseAccountingService
             return null;
         }
 
+        // The advance cleared by this claim settles the employee's ADV bill:
+        // advances linked to this claim or its trip first, then their oldest.
+        $billHints = [];
+        if ($advanceAdjusted > 0 && $expenseReport->employee_id) {
+            $employeeHint = [
+                'party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                'party_id'   => (int) $expenseReport->employee_id,
+                'account_id' => $advancesAccount->id,
+            ];
+            $tripAdvanceIds = CashAdvance::where('tenant_id', $tenantId)
+                ->where('employee_id', $expenseReport->employee_id)
+                ->where(function ($q) use ($expenseReport) {
+                    $q->where('expense_report_id', $expenseReport->id);
+                    if ($expenseReport->travel_request_id) {
+                        $q->orWhere('travel_request_id', $expenseReport->travel_request_id);
+                    }
+                })
+                ->orderBy('id')
+                ->pluck('id');
+            foreach ($tripAdvanceIds as $advanceId) {
+                $billHints[] = BillWise\BillAllocationService::againstRef('receivable', 'CashAdvance', (int) $advanceId) + $employeeHint;
+            }
+            $billHints[] = BillWise\BillAllocationService::againstOldest('receivable') + $employeeHint;
+        }
+
         try {
             return $this->journalService->postOnce($lines, [
                 'tenant_id'      => $tenantId,
@@ -199,6 +224,7 @@ class TravelExpenseAccountingService
                 'reference_id'   => $expenseReport->id,
                 'memo'           => "Paid Expense Claim Portion: " . $expenseReport->title,
                 'posted_by'      => auth()->id(),
+                'bill_allocations' => $billHints,
             ]);
         } catch (\Throwable $e) {
             Log::error("Payout Journal Posting Failed: " . $e->getMessage(), [

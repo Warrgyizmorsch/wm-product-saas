@@ -165,6 +165,18 @@ class CustomerController extends Controller
                 return $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast();
             })->sum('balance_due');
 
+        // With Accounting, the figures come from the books, so this page agrees
+        // with Party Ledger, ageing and Bill Settlement (opening dues, receipt
+        // vouchers and settlements included, not only Sales documents).
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $summary = $partyAccount->summary('customer', (int) $customer->id);
+            $totalBilled = $summary['billed'];
+            $outstandingBalance = $summary['outstanding'];
+            $customerCreditBalance = $summary['advance'];
+            $overdueAmount = $summary['overdue'];
+        }
+
         $creditLimit = floatval($customer->crmAccount?->credit_limit ?? 0);
         $availableCredit = max(0, $creditLimit - $outstandingBalance);
 
