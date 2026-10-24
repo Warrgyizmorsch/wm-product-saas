@@ -8,6 +8,7 @@ use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\InvoiceItem;
 use App\Domains\Sales\Models\PaymentAllocation;
+use App\Domains\Sales\Models\CustomerPayment;
 use App\Domains\Sales\Events\InvoicePosted;
 use App\Domains\Sales\Repositories\InvoiceRepository;
 use App\Domains\Platform\Models\PaymentTerm;
@@ -646,12 +647,43 @@ class InvoiceController extends Controller
         if (!$invoice) abort(404);
         $this->authorize('view', $invoice);
 
-        $invoice->loadMissing(['customer', 'salesOrder.customer', 'materialRequirement', 'items.product', 'allocations']);
+        $invoice->loadMissing(['customer', 'salesOrder.customer', 'materialRequirement', 'items.product', 'allocations.payment']);
 
         $adjustedAmount = $invoice->allocations->sum('allocated_amount');
         $balanceDue     = $invoice->balance_due;
 
         $tenantId = require_tenant_id();
+
+        // 1. Unallocated advances tied to this Sales Order
+        $availableAdvances = collect();
+        if ($invoice->sales_order_id) {
+            $availableAdvances = PaymentAllocation::with('payment')
+                ->where('sales_order_id', $invoice->sales_order_id)
+                ->whereNull('invoice_id')
+                ->where('allocated_amount', '>', 0)
+                ->get();
+        }
+
+        // 2. Direct unallocated customer payments (not yet assigned to any SO or invoice)
+        $customerId = $invoice->customer_id ?? $invoice->salesOrder?->customer_id;
+        $unallocatedPayments = collect();
+        if ($customerId) {
+            $custPayments = CustomerPayment::where('customer_id', $customerId)
+                ->where('status', 'Posted')
+                ->with('allocations')
+                ->get();
+            foreach ($custPayments as $cp) {
+                $alreadyAlloc = (float)$cp->allocations->sum('allocated_amount');
+                $unallocBal = max(0, (float)$cp->amount - $alreadyAlloc);
+                if ($unallocBal > 0.009) {
+                    $unallocatedPayments->push((object)[
+                        'customer_payment_id' => $cp->id,
+                        'payment'             => $cp,
+                        'allocated_amount'    => $unallocBal,
+                    ]);
+                }
+            }
+        }
 
         $transporters = \App\Domains\Platform\Models\Transporter::where('tenant_id', $tenantId)
             ->where('status', 'active')
@@ -703,7 +735,8 @@ class InvoiceController extends Controller
 
         return view('modules.sales.invoices.show', compact(
             'invoice', 'adjustedAmount', 'balanceDue', 'transporters', 'autoTransporterCode',
-            'hasDispatched', 'linkedCreditNotes', 'cashBankAccounts'
+            'hasDispatched', 'linkedCreditNotes', 'cashBankAccounts',
+            'availableAdvances', 'unallocatedPayments'
         ));
     }
 
@@ -1068,6 +1101,136 @@ class InvoiceController extends Controller
                 'message' => 'Failed to send WhatsApp: ' . $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Reconcile / Apply an outstanding Advance Payment to this Invoice (Odoo-style post-invoice reconciliation)
+     */
+    public function applyAdvance(Request $request, int $invoiceId): RedirectResponse
+    {
+        $invoice = $this->invoiceRepo->find($invoiceId);
+        if (!$invoice) abort(404);
+        $this->authorize('update', $invoice);
+
+        if ($invoice->status === 'Cancelled') {
+            return back()->withErrors(['error' => 'Cannot apply payment to a cancelled invoice.']);
+        }
+
+        if ((float)$invoice->balance_due <= 0.009) {
+            return back()->with('info', 'This invoice is already fully paid.');
+        }
+
+        $validated = $request->validate([
+            'source_type'           => ['required', 'in:allocation,payment'],
+            'payment_allocation_id' => ['nullable', 'required_if:source_type,allocation', 'integer'],
+            'customer_payment_id'   => ['nullable', 'required_if:source_type,payment', 'integer'],
+            'amount'                => ['nullable', 'numeric', 'min:0.01'],
+        ]);
+
+        $tenantId = $invoice->tenant_id ?? require_tenant_id();
+
+        $appliedAmount = DB::transaction(function () use ($invoice, $validated, $tenantId) {
+            $balDue = (float)$invoice->balance_due;
+
+            if ($validated['source_type'] === 'allocation') {
+                $allocation = PaymentAllocation::where('id', $validated['payment_allocation_id'])
+                    ->whereNull('invoice_id')
+                    ->where('allocated_amount', '>', 0)
+                    ->firstOrFail();
+
+                $avail = (float)$allocation->allocated_amount;
+                $maxPossible = min($avail, $balDue);
+                $applyAmount = !empty($validated['amount']) ? min((float)$validated['amount'], $maxPossible) : $maxPossible;
+
+                if ($applyAmount < ($avail - 0.009)) {
+                    // Split allocation: remainder stays unallocated on sales order
+                    $remainder = round($avail - $applyAmount, 4);
+                    $allocation->update(['allocated_amount' => $remainder]);
+
+                    PaymentAllocation::create([
+                        'tenant_id'           => $allocation->tenant_id ?? $tenantId,
+                        'company_id'          => $allocation->company_id,
+                        'branch_id'           => $allocation->branch_id,
+                        'customer_payment_id' => $allocation->customer_payment_id,
+                        'sales_order_id'      => $allocation->sales_order_id,
+                        'invoice_id'          => $invoice->id,
+                        'allocated_amount'    => $applyAmount,
+                    ]);
+                } else {
+                    // Full allocation applies to this invoice
+                    $allocation->update([
+                        'invoice_id'       => $invoice->id,
+                        'allocated_amount' => $applyAmount,
+                    ]);
+                }
+            } else {
+                // Direct customer payment unallocated balance
+                $payment = CustomerPayment::where('id', $validated['customer_payment_id'])->firstOrFail();
+
+                $alreadyAlloc = (float)$payment->allocations()->sum('allocated_amount');
+                $avail = max(0, (float)$payment->amount - $alreadyAlloc);
+                if ($avail <= 0.009) {
+                    throw new \Exception('This payment has no unallocated balance remaining.');
+                }
+
+                $maxPossible = min($avail, $balDue);
+                $applyAmount = !empty($validated['amount']) ? min((float)$validated['amount'], $maxPossible) : $maxPossible;
+
+                PaymentAllocation::create([
+                    'tenant_id'           => $payment->tenant_id ?? $tenantId,
+                    'company_id'          => $payment->company_id,
+                    'branch_id'           => $payment->branch_id,
+                    'customer_payment_id' => $payment->id,
+                    'sales_order_id'      => $invoice->sales_order_id,
+                    'invoice_id'          => $invoice->id,
+                    'allocated_amount'    => $applyAmount,
+                ]);
+            }
+
+            $invoice->amount_paid = round((float)$invoice->amount_paid + $applyAmount, 2);
+            $invoice->balance_due = max(0, round((float)$invoice->total_amount - (float)$invoice->amount_paid, 2));
+            $invoice->status      = $invoice->balance_due <= 0.009 ? 'Paid' : 'Partially Paid';
+            $invoice->save();
+
+            return $applyAmount;
+        });
+
+        return back()->with('success', "Advance of " . format_currency($appliedAmount) . " successfully reconciled and applied to invoice {$invoice->invoice_number}.");
+    }
+
+    /**
+     * Unlink an applied payment/advance from this invoice (returns back to available advance pool)
+     */
+    public function removeAdvance(Request $request, int $invoiceId, int $allocationId): RedirectResponse
+    {
+        $invoice = $this->invoiceRepo->find($invoiceId);
+        if (!$invoice) abort(404);
+        $this->authorize('update', $invoice);
+
+        $allocation = PaymentAllocation::where('id', $allocationId)
+            ->where('invoice_id', $invoice->id)
+            ->firstOrFail();
+
+        DB::transaction(function () use ($invoice, $allocation) {
+            $unlinkedAmount = (float)$allocation->allocated_amount;
+
+            if ($allocation->sales_order_id) {
+                // Revert to Sales Order advance credit
+                $allocation->update([
+                    'invoice_id' => null,
+                ]);
+            } else {
+                // Delete allocation row so balance returns to general customer payment pool
+                $allocation->delete();
+            }
+
+            $invoice->amount_paid = max(0, round((float)$invoice->amount_paid - $unlinkedAmount, 2));
+            $invoice->balance_due = max(0, round((float)$invoice->total_amount - (float)$invoice->amount_paid, 2));
+            $invoice->status      = $invoice->amount_paid <= 0.009 ? 'Posted' : ($invoice->balance_due <= 0.009 ? 'Paid' : 'Partially Paid');
+            $invoice->save();
+        });
+
+        return back()->with('success', "Payment unlinked successfully. Returned to available advances.");
     }
 }
 
