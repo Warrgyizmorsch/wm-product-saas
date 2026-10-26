@@ -12,6 +12,7 @@ return [
         'section' => 'workspace', 'order' => 20, 'app' => 'admin',
         'label' => 'Tenant Console', 'icon' => 'feather-grid',
         'children' => [
+            ['label' => 'Demo Requests', 'route' => 'platform.demo-requests.index', 'permission' => 'platform.tenants.manage'],
             ['label' => 'Tenants', 'route' => 'platform.tenants.index', 'permission' => 'platform.tenants.manage'],
             ['label' => 'Plans', 'route' => 'platform.plans.index', 'permission' => 'platform.plans.manage'],
             ['label' => 'Add-on Prices', 'route' => 'platform.module-prices.index', 'permission' => 'platform.plans.manage'],

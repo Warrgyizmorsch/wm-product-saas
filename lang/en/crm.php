@@ -1,6 +1,9 @@
 <?php
 
 return array (
+  'select_country' => 'Select Country',
+  'select_state' => 'Select State',
+  'select_city' => 'Select City',
   'active_crm_database' => 'Active CRM database',
   'add_new_call_lead' => 'Add New Call / Lead',
   'change_owner' => 'Change Owner',
