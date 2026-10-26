@@ -16,7 +16,6 @@ class Feedback360Question extends BaseModel
     protected $fillable = [
         'tenant_id',
         'competency_id',
-        'cycle_id',
         'question_text',
         'description',
         'question_type',
@@ -33,11 +32,6 @@ class Feedback360Question extends BaseModel
     public function competency(): BelongsTo
     {
         return $this->belongsTo(Feedback360Competency::class, 'competency_id');
-    }
-
-    public function cycle(): BelongsTo
-    {
-        return $this->belongsTo(Feedback360Cycle::class, 'cycle_id');
     }
 
     public function responses(): HasMany

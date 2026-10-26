@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class VendorController extends Controller
 {
@@ -47,6 +48,13 @@ class VendorController extends Controller
         $rawOutstandingPayableUSD = (float) VendorBill::where('tenant_id', $tenantId)
             ->whereIn('status', ['posted', 'unpaid', 'partially_paid', 'approved'])
             ->sum('due_amount');
+
+        // With Accounting, the books' figure: opening dues, credit purchases and
+        // vouchers count too, so it adds up to the suppliers' own pages.
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $rawOutstandingPayableUSD = $partyAccount->totalOutstanding('vendor');
+        }
 
         $totalOutstandingPayable = function_exists('convert_from_base')
             ? convert_from_base($rawOutstandingPayableUSD)
@@ -129,8 +137,8 @@ class VendorController extends Controller
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'gstin' => ['nullable', 'string', 'max:30'],
-            'pan' => ['nullable', 'string', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'pan' => TaxIdentityService::panRules(false),
             'bank_name' => ['nullable', 'string', 'max:150'],
             'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
@@ -138,11 +146,13 @@ class VendorController extends Controller
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::vendorRules(),
         ], [
             'email.email'          => 'The email field must be a valid email address.',
             'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'phone.max'            => 'Phone number cannot exceed 20 digits.',
             'account_number.regex' => 'Bank account number must contain digits/numbers only.',
+            'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
         if (empty($validated['code'])) {
@@ -197,7 +207,7 @@ class VendorController extends Controller
                 Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin' => ['nullable', 'string', 'max:30'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'address' => ['nullable', 'string'],
         ], [
             'email.email' => 'The email field must be a valid email address.',
@@ -319,7 +329,26 @@ class VendorController extends Controller
             return $entry;
         });
 
+        // With Accounting, the figures come from the books, so this page agrees
+        // with Party Ledger and Bill Settlement: assets bought on credit,
+        // vouchers and settlements count, not only Purchase's own documents.
+        $billCount = $bills->count();
+        $statement = null;
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $summary = $partyAccount->summary('vendor', (int) $vendor->id);
+            $totalBilled = $summary['billed'];
+            $totalPaid = $summary['paid'];
+            $billCount = $summary['bills'];
+            $outstandingPayable = $summary['outstanding'];
+            $vendorAdvanceCredit = $summary['advance'];
+            $overdueAmount = $summary['overdue'];
+            $statement = $partyAccount->statement('vendor', (int) $vendor->id);
+        }
+
         return view('modules.purchase.vendors.show', compact(
+            'billCount',
+            'statement',
             'vendor',
             'bills',
             'payments',
@@ -375,8 +404,8 @@ class VendorController extends Controller
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'gstin' => ['nullable', 'string', 'max:30'],
-            'pan' => ['nullable', 'string', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'pan' => TaxIdentityService::panRules(false),
             'bank_name' => ['nullable', 'string', 'max:150'],
             'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
@@ -384,11 +413,13 @@ class VendorController extends Controller
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::vendorRules(),
         ], [
             'email.email'          => 'The email field must be a valid email address.',
             'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'phone.max'            => 'Phone number cannot exceed 20 digits.',
             'account_number.regex' => 'Bank account number must contain digits/numbers only.',
+            'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
         $validated['status'] = strtolower($validated['status']);

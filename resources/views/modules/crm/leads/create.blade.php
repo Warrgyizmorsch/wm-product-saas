@@ -67,7 +67,7 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.company_name')" name="company_name" id="company_name_input" :value="old('company_name', $lead->company_name)" :placeholder="__('crm.company_name')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_name')" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_tax_no')" name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" :placeholder="__('crm.gstin_placeholder')" :errorText="$errors->first('gstin')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.gstin_tax_no')" name="gstin" id="gstin_input" :value="old('gstin', $lead->gstin ?? '')" :placeholder="__('crm.gstin_placeholder')" :errorText="$errors->first('gstin')" data-tax-type="gstin" maxlength="15" class="text-uppercase font-monospace" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.company_email')" name="company_email" id="company_email_input" inputType="email" :value="old('company_email', $lead->company_email ?? '')" :placeholder="__('crm.company_email_placeholder')" :required="old('lead_type', $lead->lead_type ?: 'b2b') === 'b2b'" :errorText="$errors->first('company_email')" />
 
@@ -150,11 +150,30 @@
 
                             <x-ui.odoo-form-ui type="textarea" :label="__('crm.street_address')" name="address" rows="3" :placeholder="__('crm.street_address_placeholder')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.country')" name="country" :value="old('country', $lead->country)" :placeholder="__('crm.country')" />
+                            @php
+                                $createCountryInit = old('country', $lead->country ?? ($lead->exists ? '' : 'India'));
+                                $createCountryCode = strtolower($createCountryInit === 'India' ? 'in' : ($createCountryInit === 'United States' ? 'us' : ($createCountryInit === 'United Arab Emirates' ? 'ae' : ($createCountryInit === 'United Kingdom' ? 'gb' : ''))));
+                            @endphp
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.country')" name="country" id="lead_country" select2-selector="country" class="geo-country" data-tags="true" data-initial-value="{{ $createCountryInit }}">
+                                <option value="">{{ __('crm.select_country') }}</option>
+                                @if($createCountryInit)
+                                    <option value="{{ $createCountryInit }}" @if($createCountryCode) data-country="{{ $createCountryCode }}" @endif selected>{{ $createCountryInit }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" :value="old('state', $lead->state)" :placeholder="__('crm.state')" />
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.state')" name="state" id="lead_state" select2-selector="default" class="geo-state" data-tags="true" data-initial-value="{{ old('state', $lead->state ?? '') }}">
+                                <option value="">{{ __('crm.select_state') }}</option>
+                                @if(old('state', $lead->state))
+                                    <option value="{{ old('state', $lead->state) }}" selected>{{ old('state', $lead->state) }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" :value="old('city', $lead->city)" :placeholder="__('crm.city')" />
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.city')" name="city" id="lead_city" select2-selector="default" class="geo-city" data-tags="true" data-initial-value="{{ old('city', $lead->city ?? '') }}">
+                                <option value="">{{ __('crm.select_city') }}</option>
+                                @if(old('city', $lead->city))
+                                    <option value="{{ old('city', $lead->city) }}" selected>{{ old('city', $lead->city) }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
                         </div>
 
                         <!-- Right Column: Requirements, Lead Classification, Products & Revenue -->
@@ -874,6 +893,442 @@
                 const fieldName = $(this).attr('name') || $(this).attr('id');
                 performDuplicateCheck(fieldName);
             });
+
+            // CRM Dynamic Geography Support: tags (custom values), fallback & preserving existing values
+            (function () {
+                const fallbackCountries = [
+                    { name: "India", code: "in" },
+                    { name: "United States", code: "us" },
+                    { name: "United Kingdom", code: "gb" },
+                    { name: "United Arab Emirates", code: "ae" },
+                    { name: "Australia", code: "au" },
+                    { name: "Canada", code: "ca" },
+                    { name: "Germany", code: "de" },
+                    { name: "Singapore", code: "sg" },
+                    { name: "Saudi Arabia", code: "sa" },
+                    { name: "France", code: "fr" },
+                    { name: "China", code: "cn" },
+                    { name: "Japan", code: "jp" },
+                    { name: "Brazil", code: "br" },
+                    { name: "South Africa", code: "za" },
+                    { name: "New Zealand", code: "nz" },
+                    { name: "Italy", code: "it" },
+                    { name: "Spain", code: "es" },
+                    { name: "Netherlands", code: "nl" },
+                    { name: "Switzerland", code: "ch" },
+                    { name: "Russia", code: "ru" },
+                    { name: "Malaysia", code: "my" },
+                    { name: "Indonesia", code: "id" },
+                    { name: "Bangladesh", code: "bd" },
+                    { name: "Nepal", code: "np" },
+                    { name: "Sri Lanka", code: "lk" },
+                    { name: "Kuwait", code: "kw" },
+                    { name: "Qatar", code: "qa" },
+                    { name: "Oman", code: "om" }
+                ];
+
+                const STATES_BY_COUNTRY = {
+                    'india': [
+                        "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", 
+                        "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", 
+                        "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", 
+                        "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", 
+                        "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", 
+                        "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", 
+                        "Ladakh", "Lakshadweep", "Puducherry"
+                    ],
+                    'united states': [
+                        "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", 
+                        "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", 
+                        "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", 
+                        "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", 
+                        "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", 
+                        "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", 
+                        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", 
+                        "Wisconsin", "Wyoming"
+                    ],
+                    'united arab emirates': [
+                        "Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain", "Ras Al Khaimah", "Fujairah"
+                    ],
+                    'united kingdom': [
+                        "England", "Scotland", "Wales", "Northern Ireland"
+                    ],
+                    'canada': [
+                        "Alberta", "British Columbia", "Manitoba", "New Brunswick", "Newfoundland and Labrador", 
+                        "Nova Scotia", "Ontario", "Prince Edward Island", "Quebec", "Saskatchewan", 
+                        "Northwest Territories", "Nunavut", "Yukon"
+                    ],
+                    'australia': [
+                        "New South Wales", "Queensland", "South Australia", "Tasmania", "Victoria", "Western Australia", 
+                        "Australian Capital Territory", "Northern Territory"
+                    ]
+                };
+
+                const MAJOR_CITIES_BY_STATE = {
+                    'maharashtra': ["Mumbai", "Pune", "Nagpur", "Thane", "Nashik", "Aurangabad", "Solapur", "Kolhapur", "Navi Mumbai", "Amravati", "Nanded", "Jalgaon"],
+                    'delhi': ["New Delhi", "North Delhi", "South Delhi", "East Delhi", "West Delhi", "Central Delhi"],
+                    'gujarat': ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Gandhinagar", "Junagadh", "Anand", "Navsari", "Morbi"],
+                    'karnataka': ["Bengaluru", "Mysuru", "Hubli", "Mangaluru", "Belagavi", "Davangere", "Ballari", "Kalaburagi", "Shivamogga", "Tumakuru"],
+                    'tamil nadu': ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", "Tiruppur", "Vellore", "Erode", "Thoothukudi"],
+                    'telangana': ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Ramagundam"],
+                    'uttar pradesh': ["Lucknow", "Kanpur", "Noida", "Greater Noida", "Ghaziabad", "Varanasi", "Agra", "Prayagraj", "Meerut", "Bareilly", "Aligarh", "Moradabad", "Gorakhpur"],
+                    'rajasthan': ["Jaipur", "Jodhpur", "Kota", "Bikaner", "Ajmer", "Udaipur", "Bhilwara", "Alwar", "Sikar"],
+                    'west bengal': ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri", "Bardhaman", "Kharagpur"],
+                    'madhya pradesh': ["Indore", "Bhopal", "Jabalpur", "Gwalior", "Ujjain", "Sagar", "Dewas", "Satna", "Ratlam"],
+                    'punjab': ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Mohali", "Hoshiarpur"],
+                    'haryana': ["Gurugram", "Faridabad", "Panipat", "Ambala", "Yamunanagar", "Rohtak", "Hisar", "Karnal", "Sonipat", "Panchkula"],
+                    'bihar': ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Purnia", "Darbhanga", "Bihar Sharif"],
+                    'kerala': ["Thiruvananthapuram", "Kochi", "Kozhikode", "Kollam", "Thrissur", "Kannur", "Alappuzha", "Kottayam"],
+                    'andhra pradesh': ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool", "Kakinada", "Rajahmundry", "Tirupati"],
+                    'odisha': ["Bhubaneswar", "Cuttack", "Rourkela", "Berhampur", "Sambalpur", "Puri", "Balasore"],
+                    'chhattisgarh': ["Raipur", "Bhilai", "Bilaspur", "Korba", "Durg", "Rajnandgaon"],
+                    'jharkhand': ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro", "Deoghar", "Hazaribagh"],
+                    'assam': ["Guwahati", "Silchar", "Dibrugarh", "Jorhat", "Nagaon", "Tinsukia"],
+                    'uttarakhand': ["Dehradun", "Haridwar", "Roorkee", "Haldwani", "Rishikesh"],
+                    'goa': ["Panaji", "Margao", "Vasco da Gama", "Mapusa", "Ponda"]
+                };
+
+                // Country flag dictionary & robust root-relative renderer
+                const CRM_COUNTRY_CODES = {
+                    'india': 'in',
+                    'united states': 'us',
+                    'usa': 'us',
+                    'united arab emirates': 'ae',
+                    'uae': 'ae',
+                    'united kingdom': 'gb',
+                    'uk': 'gb',
+                    'canada': 'ca',
+                    'australia': 'au',
+                    'germany': 'de',
+                    'france': 'fr',
+                    'singapore': 'sg',
+                    'saudi arabia': 'sa',
+                    'qatar': 'qa',
+                    'kuwait': 'kw',
+                    'bahrain': 'bh',
+                    'oman': 'om',
+                    'japan': 'jp',
+                    'china': 'cn',
+                    'russia': 'ru',
+                    'brazil': 'br',
+                    'south africa': 'za',
+                    'mexico': 'mx',
+                    'italy': 'it',
+                    'spain': 'es',
+                    'netherlands': 'nl',
+                    'switzerland': 'ch',
+                    'sweden': 'se',
+                    'norway': 'no',
+                    'bangladesh': 'bd',
+                    'pakistan': 'pk',
+                    'sri lanka': 'lk',
+                    'nepal': 'np',
+                    'malaysia': 'my',
+                    'indonesia': 'id',
+                    'thailand': 'th',
+                    'vietnam': 'vn',
+                    'philippines': 'ph',
+                    'new zealand': 'nz'
+                };
+
+                function _crmCountryFormat(country) {
+                    if (!country) return '';
+                    const text = (country.text || country.id || '').trim();
+                    if (!text || text.toLowerCase() === 'select country') {
+                        return text;
+                    }
+                    const el = country.element;
+                    let code = el ? ($(el).data('country') || $(el).attr('data-country')) : null;
+                    if (!code) {
+                        code = CRM_COUNTRY_CODES[text.toLowerCase()];
+                    }
+                    if (code) {
+                        code = String(code).toLowerCase().trim();
+                        const flagUrl = '/assets/vendors/img/flags/1x1/' + code + '.svg';
+                        return $('<span class="hstack gap-3"><img src="' + flagUrl + '" class="avatar-image avatar-sm" onerror="this.style.display=\'none\';" /> <span>' + text + '</span></span>');
+                    }
+                    return text;
+                }
+
+                window.countryformat = _crmCountryFormat;
+
+                const countryEl = document.getElementById('lead_country');
+                const stateEl = document.getElementById('lead_state');
+                const cityEl = document.getElementById('lead_city');
+
+                if (!countryEl) return;
+
+                function initCrmCountrySelect2() {
+                    if (!countryEl) return;
+                    const $c = $(countryEl);
+                    if ($c.hasClass('select2-hidden-accessible')) {
+                        $c.select2('destroy');
+                    }
+                    $c.select2({
+                        theme: "bootstrap-5",
+                        width: "100%",
+                        tags: true,
+                        templateResult: _crmCountryFormat,
+                        templateSelection: _crmCountryFormat,
+                        createTag: function (params) {
+                            const term = $.trim(params.term);
+                            if (term === '') return null;
+                            return { id: term, text: term, newTag: true };
+                        }
+                    });
+                }
+
+                // Immediately apply Select2 to Country
+                initCrmCountrySelect2();
+
+                const initCountry = countryEl.dataset.initialValue || '';
+                const initState = stateEl ? (stateEl.dataset.initialValue || '') : '';
+                const initCity = cityEl ? (cityEl.dataset.initialValue || '') : '';
+
+                function ensureOptionExists(el, val) {
+                    if (!el || !val) return;
+                    const $s = $(el);
+                    let found = false;
+                    $s.find('option').each(function () {
+                        if ($(this).val().toLowerCase() === val.toLowerCase()) {
+                            found = true;
+                            $(this).prop('selected', true);
+                            return false;
+                        }
+                    });
+                    if (!found) {
+                        const opt = new Option(val, val, true, true);
+                        $s.append(opt);
+                    }
+                }
+
+                function populateStatesForCountry(el, countryName) {
+                    if (!el || !countryName) return false;
+                    const key = countryName.trim().toLowerCase();
+                    const list = STATES_BY_COUNTRY[key] || [];
+                    if (!list.length) return false;
+
+                    const curVal = el.value || el.dataset.initialValue || '';
+                    el.innerHTML = '<option value="">Select State</option>';
+                    list.forEach(function (st) {
+                        const opt = document.createElement('option');
+                        opt.value = st;
+                        opt.textContent = st;
+                        if (curVal && st.toLowerCase() === curVal.toLowerCase()) {
+                            opt.selected = true;
+                        }
+                        el.appendChild(opt);
+                    });
+                    if (curVal) {
+                        ensureOptionExists(el, curVal);
+                    }
+                    return true;
+                }
+
+                function populateCitiesForState(el, stateName) {
+                    if (!el || !stateName) return false;
+                    const key = stateName.trim().toLowerCase();
+                    const list = MAJOR_CITIES_BY_STATE[key] || [];
+                    if (!list.length) return false;
+
+                    const curVal = el.value || el.dataset.initialValue || '';
+                    el.innerHTML = '<option value="">Select City</option>';
+                    list.forEach(function (ct) {
+                        const opt = document.createElement('option');
+                        opt.value = ct;
+                        opt.textContent = ct;
+                        if (curVal && ct.toLowerCase() === curVal.toLowerCase()) {
+                            opt.selected = true;
+                        }
+                        el.appendChild(opt);
+                    });
+                    if (curVal) {
+                        ensureOptionExists(el, curVal);
+                    }
+                    return true;
+                }
+
+                // Hook window.initSelect2 so any element with data-tags="true" gets Select2 with tags: true & auto-fallback
+                if (typeof window.initSelect2 === 'function' && !window._crmGeoTagsHookInstalled) {
+                    window._crmGeoTagsHookInstalled = true;
+                    const origInit = window.initSelect2;
+                    window.initSelect2 = function (element) {
+                        const $el = $(element);
+                        if (!$el.length) return;
+
+                        if (!($el.attr('data-tags') === 'true' || $el.data('tags') === true)) {
+                            return origInit(element);
+                        }
+
+                        // Auto-populate states if empty
+                        if (($el.hasClass('geo-state') || $el.attr('id') === 'lead_state' || $el.attr('name') === 'state') && element.options.length <= 1) {
+                            const cVal = countryEl ? countryEl.value : '';
+                            if (cVal) {
+                                populateStatesForCountry(element, cVal);
+                            }
+                        }
+
+                        // Auto-populate cities if empty
+                        if (($el.hasClass('geo-city') || $el.attr('id') === 'lead_city' || $el.attr('name') === 'city') && element.options.length <= 1) {
+                            const sVal = stateEl ? stateEl.value : '';
+                            if (sVal) {
+                                populateCitiesForState(element, sVal);
+                            }
+                        }
+
+                        if ($el.hasClass('select2-hidden-accessible')) {
+                            $el.select2('destroy');
+                        }
+
+                        const selectorType = $el.attr('data-select2-selector') || $el.data('select2-selector');
+                        const modal = $el.closest('.modal');
+                        const options = {
+                            theme: "bootstrap-5",
+                            width: "100%",
+                            tags: true,
+                            createTag: function (params) {
+                                const term = $.trim(params.term);
+                                if (term === '') return null;
+                                return {
+                                    id: term,
+                                    text: term,
+                                    newTag: true
+                                };
+                            }
+                        };
+
+                        if (modal.length) {
+                            options.dropdownParent = modal.find('.modal-content');
+                        }
+
+                        if (selectorType === 'country' || selectorType === 'crm-country' || $el.hasClass('geo-country') || $el.attr('id') === 'lead_country') {
+                            options.templateResult = _crmCountryFormat;
+                            options.templateSelection = _crmCountryFormat;
+                        }
+
+                        $el.select2(options);
+                    };
+                }
+
+                // Re-apply country select2 on document ready and multiple intervals
+                $(function () {
+                    initCrmCountrySelect2();
+                });
+                setTimeout(initCrmCountrySelect2, 100);
+                setTimeout(initCrmCountrySelect2, 300);
+                setTimeout(initCrmCountrySelect2, 800);
+                setTimeout(initCrmCountrySelect2, 1500);
+
+                // Immediate initialization on page ready: if Country has value, populate States right away
+                function refreshStatesNow() {
+                    const cVal = countryEl ? $(countryEl).val() : '';
+                    if (cVal && stateEl && stateEl.options.length <= 1) {
+                        populateStatesForCountry(stateEl, cVal);
+                        window.initSelect2(stateEl);
+                    }
+                }
+
+                function refreshCitiesNow() {
+                    const sVal = stateEl ? $(stateEl).val() : '';
+                    if (sVal && cityEl && cityEl.options.length <= 1) {
+                        populateCitiesForState(cityEl, sVal);
+                        window.initSelect2(cityEl);
+                    }
+                }
+
+                // Check immediately & at intervals to beat API failure / latency
+                refreshStatesNow();
+                setTimeout(refreshStatesNow, 200);
+                setTimeout(refreshStatesNow, 600);
+                setTimeout(refreshStatesNow, 1200);
+
+                // Check countries fallback after 1.5s if API failed
+                setTimeout(function () {
+                    if (countryEl.options.length <= 1) {
+                        countryEl.innerHTML = '<option value="">Select Country</option>';
+                        fallbackCountries.forEach(function (c) {
+                            const opt = document.createElement('option');
+                            opt.value = c.name;
+                            opt.textContent = c.name;
+                            opt.setAttribute('data-country', c.code);
+                            if (initCountry && c.name.toLowerCase() === initCountry.toLowerCase()) {
+                                opt.selected = true;
+                            }
+                            countryEl.appendChild(opt);
+                        });
+                        ensureOptionExists(countryEl, initCountry);
+                        initCrmCountrySelect2();
+
+                        refreshStatesNow();
+                    } else {
+                        if (initCountry && !countryEl.value) {
+                            ensureOptionExists(countryEl, initCountry);
+                        }
+                        initCrmCountrySelect2();
+                        refreshStatesNow();
+                    }
+                }, 1500);
+
+                // Handle country change: populate states immediately
+                $(countryEl).on('change change.geo select2:select', function () {
+                    const cVal = $(this).val();
+                    if (!cVal) {
+                        if (stateEl) {
+                            stateEl.innerHTML = '<option value="">Select State</option>';
+                            window.initSelect2(stateEl);
+                        }
+                        if (cityEl) {
+                            cityEl.innerHTML = '<option value="">Select City</option>';
+                            window.initSelect2(cityEl);
+                        }
+                        return;
+                    }
+
+                    // Populate immediately
+                    setTimeout(function () {
+                        if (stateEl && stateEl.options.length <= 1) {
+                            populateStatesForCountry(stateEl, cVal);
+                            window.initSelect2(stateEl);
+                        }
+                    }, 50);
+
+                    // Also check after dynamic-geography.js finishes its async call
+                    setTimeout(function () {
+                        if (stateEl && stateEl.options.length <= 1) {
+                            populateStatesForCountry(stateEl, cVal);
+                            window.initSelect2(stateEl);
+                        }
+                    }, 600);
+                });
+
+                // Handle state change: populate cities
+                if (stateEl) {
+                    $(stateEl).on('change change.geo select2:select', function () {
+                        const sVal = $(this).val();
+                        if (!sVal) {
+                            if (cityEl) {
+                                cityEl.innerHTML = '<option value="">Select City</option>';
+                                window.initSelect2(cityEl);
+                            }
+                            return;
+                        }
+
+                        setTimeout(function () {
+                            if (cityEl && cityEl.options.length <= 1) {
+                                populateCitiesForState(cityEl, sVal);
+                                window.initSelect2(cityEl);
+                            }
+                        }, 50);
+
+                        setTimeout(function () {
+                            if (cityEl && cityEl.options.length <= 1) {
+                                populateCitiesForState(cityEl, sVal);
+                                window.initSelect2(cityEl);
+                            }
+                        }, 600);
+                    });
+                }
+            })();
         });
     </script>
 

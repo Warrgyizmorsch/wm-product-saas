@@ -1,0 +1,188 @@
+{
+	"info": {
+		"_postman_id": "b3e7f621-89d2-4e4b-912c-0e9812df9012",
+		"name": "MossiERP - Public Demo Requests API",
+		"description": "Public API Collection for booking live ERP demos from the landing page (mossierp.com) with preferred demo date and 24-hr time slot. No authentication required.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Submit Demo Request (Tarika A: Date & 24-Hour Time)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"full_name\": \"Vikram Sharma\",\n  \"phone\": \"+91 9876543210\",\n  \"email\": \"vikram@example.com\",\n  \"company_name\": \"Apex Manufacturing Ltd\",\n  \"team_size\": \"51-200 employees\",\n  \"modules\": [\n    \"CRM\",\n    \"Sales & Order Management\",\n    \"Inventory Management\",\n    \"Production Management\"\n  ],\n  \"preferred_date\": \"2026-10-30\",\n  \"preferred_time\": \"14:30\",\n  \"notes\": \"Interested in complete ERP demo and enterprise pricing.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/public/demo-requests",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"public",
+						"demo-requests"
+					]
+				},
+				"description": "Submit a live demo request with preferred demo date (YYYY-MM-DD) and 24-hour time (HH:MM e.g. 14:30 for 2:30 PM). Automatically saved and formatted as AM/PM in Super Admin UI."
+			},
+			"response": [
+				{
+					"name": "Successful Submission (201 Created)",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Vikram Sharma\",\n  \"phone\": \"+91 9876543210\",\n  \"email\": \"vikram@example.com\",\n  \"company_name\": \"Apex Manufacturing Ltd\",\n  \"team_size\": \"51-200 employees\",\n  \"modules\": [\n    \"CRM\",\n    \"Inventory Management\",\n    \"Production Management\"\n  ],\n  \"preferred_date\": \"2026-10-30\",\n  \"preferred_time\": \"14:30\",\n  \"notes\": \"Interested in complete ERP demo.\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/public/demo-requests",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"public",
+								"demo-requests"
+							]
+						}
+					},
+					"status": "Created",
+					"code": 201,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"message\": \"Thank you! Your demo request has been received. Our team will contact you shortly.\",\n  \"data\": {\n    \"id\": 1,\n    \"full_name\": \"Vikram Sharma\",\n    \"email\": \"vikram@example.com\",\n    \"phone\": \"+91 9876543210\",\n    \"preferred_demo_date\": \"2026-10-30\",\n    \"preferred_demo_time\": \"14:30\",\n    \"preferred_demo_formatted\": \"30 Oct 2026, 02:30 PM\",\n    \"created_at\": \"2026-10-26T14:30:00+05:30\"\n  }\n}"
+				}
+			]
+		},
+		{
+			"name": "Submit Demo Request (12-Hour AM/PM String: 02:30 PM)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Ananya Patel\",\n  \"mobile_number\": \"+91 9123456789\",\n  \"work_email\": \"ananya@patelindustries.in\",\n  \"company\": \"Patel Industries\",\n  \"team_size\": \"11-50 employees\",\n  \"modules\": [\n    \"Accounting & Finance\",\n    \"HRMS & Payroll\"\n  ],\n  \"preferred_date\": \"2026-10-31\",\n  \"preferred_time\": \"02:30 PM\",\n  \"message\": \"Need pricing and live demo for 25 users.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/public/demo-requests",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"public",
+						"demo-requests"
+					]
+				},
+				"description": "Supports 12-hour AM/PM format (e.g. `02:30 PM`) seamlessly."
+			},
+			"response": []
+		},
+		{
+			"name": "Submit Demo Request (Alias Route: /api/public/demo-requests)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"full_name\": \"Rajesh Verma\",\n  \"phone\": \"+91 9988776655\",\n  \"email\": \"rajesh@vermaexports.com\",\n  \"company_name\": \"Verma Exports\",\n  \"team_size\": \"201-500 employees\",\n  \"modules\": [\n    \"Inventory Management\",\n    \"Purchase & Procurement\"\n  ],\n  \"preferred_date\": \"2026-11-02\",\n  \"preferred_time\": \"16:00\",\n  \"notes\": \"Call between 4 PM to 5 PM.\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/api/public/demo-requests",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"public",
+						"demo-requests"
+					]
+				},
+				"description": "Direct alias endpoint with date & 24h time."
+			},
+			"response": []
+		}
+	]
+}

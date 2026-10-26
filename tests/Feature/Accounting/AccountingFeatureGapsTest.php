@@ -7,6 +7,8 @@ use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\LedgerGroup;
 use App\Domains\Accounting\Services\FiscalPeriodService;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
@@ -107,7 +109,9 @@ class AccountingFeatureGapsTest extends TestCase
             'party_name' => 'Acme Supplies',
             'items' => [
                 ['chart_of_account_id' => $this->expense->id, 'debit' => 500, 'credit' => 0],
-                ['chart_of_account_id' => $vendor->id, 'debit' => 0, 'credit' => 500],
+                // A Payables line names its supplier (the free-text Party Name is not enough).
+                ['chart_of_account_id' => $vendor->id, 'debit' => 0, 'credit' => 500,
+                    'party' => 'vendor:' . Vendor::create(['tenant_id' => $this->tenant->id, 'name' => 'Acme Supplies', 'code' => 'V-ACME', 'status' => 'active'])->id],
             ],
         ]);
 
@@ -123,7 +127,8 @@ class AccountingFeatureGapsTest extends TestCase
             'voucher_date' => now()->toDateString(),
             'party_name' => 'Acme Customer',
             'items' => [
-                ['chart_of_account_id' => $customer->id, 'debit' => 700, 'credit' => 0],
+                ['chart_of_account_id' => $customer->id, 'debit' => 700, 'credit' => 0,
+                    'party' => 'customer:' . Customer::create(['tenant_id' => $this->tenant->id, 'name' => 'Acme Customer', 'email' => 'acme.customer@example.com'])->id],
                 ['chart_of_account_id' => $this->income->id, 'debit' => 0, 'credit' => 700],
             ],
         ])->assertRedirect();

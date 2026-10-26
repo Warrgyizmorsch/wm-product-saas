@@ -240,11 +240,16 @@ class HrmsDemoSeeder extends Seeder
 
         foreach ($tablesToTruncate as $tbl) {
             if (Schema::hasTable($tbl)) {
-                DB::table($tbl)->truncate();
+                try {
+                    DB::table($tbl)->truncate();
+                } catch (\Throwable) {
+                    DB::table($tbl)->delete();
+                }
             }
         }
 
-        DB::transaction(function () {
+        try {
+            DB::transaction(function () {
             // 2. Fetch or Create Tenant & establish context
         $tenantSlug = config('tenancy.local_fallback_slug') ?: 'demo';
         $tenant = Tenant::where('slug', $tenantSlug)->first()
@@ -1275,13 +1280,21 @@ class HrmsDemoSeeder extends Seeder
         $employees = [];
         $defaultPassword = Hash::make('password');
 
-        foreach ($employeeDefinitions as $index => $def) {
-            $roleModel = $rolesBySlug->get($def['role_slug']);
+        $usersByIndex = [];
+        $usersByRole = [];
 
-            // Create or update User
-            $user = User::updateOrCreate(
-                ['tenant_id' => $tenant->id, 'email' => $def['email']],
-                [
+        foreach ($employeeDefinitions as $index => $def) {
+            $roleModel = $rolesBySlug->get($def['role_slug'])
+                ?? Role::firstOrCreate(
+                    ['slug' => $def['role_slug']],
+                    ['name' => ucfirst(str_replace('_', ' ', $def['role_slug'])), 'level' => 50, 'is_system' => true]
+                );
+
+            // Create or update User safely without global scope or cross-tenant unique index collision
+            $user = User::withoutGlobalScopes()->where('email', $def['email'])->first();
+            if ($user) {
+                $user->update([
+                    'tenant_id' => $tenant->id,
                     'company_id' => $company->id,
                     'branch_id' => $def['branch'],
                     'department_id' => $def['dept'],
@@ -1290,8 +1303,24 @@ class HrmsDemoSeeder extends Seeder
                     'phone' => $def['mobile'],
                     'password' => $defaultPassword,
                     'role' => $def['role_slug'],
-                ]
-            );
+                ]);
+            } else {
+                $user = User::create([
+                    'tenant_id' => $tenant->id,
+                    'company_id' => $company->id,
+                    'branch_id' => $def['branch'],
+                    'department_id' => $def['dept'],
+                    'role_id' => $roleModel?->id,
+                    'name' => $def['first'] . ' ' . $def['last'],
+                    'email' => $def['email'],
+                    'phone' => $def['mobile'],
+                    'password' => $defaultPassword,
+                    'role' => $def['role_slug'],
+                ]);
+            }
+
+            $usersByIndex[$index] = $user;
+            $usersByRole[$def['role_slug']] = $user;
 
             // Assign UserRole mapping
             if ($roleModel) {
@@ -1528,12 +1557,12 @@ class HrmsDemoSeeder extends Seeder
         }
 
         // Seed HR Uploaded & Issued Documents for employees (Official letters, NDAs, Policies, Appraisals)
-        $superAdminUser = $employees[0]->user ?? User::withoutGlobalScopes()->where('tenant_id', $tenant->id)->first();
-        $companyAdminUser = $employees[0]->user ?? $superAdminUser;
-        $hrHeadUser = $employees[2]->user ?? $companyAdminUser;
-        $hrManagerUser = $employees[9]->user ?? $hrHeadUser;
-        $salesManagerUser = $employees[5]->user ?? $companyAdminUser;
-        $techLeadUser = $employees[13]->user ?? $companyAdminUser;
+        $superAdminUser = $usersByIndex[0] ?? $employees[0]->user ?? User::withoutGlobalScopes()->where('tenant_id', $tenant->id)->first();
+        $companyAdminUser = $usersByIndex[0] ?? $superAdminUser;
+        $hrHeadUser = $usersByIndex[2] ?? $employees[2]->user ?? $companyAdminUser;
+        $hrManagerUser = $usersByIndex[9] ?? $employees[9]->user ?? $hrHeadUser;
+        $salesManagerUser = $usersByIndex[5] ?? $employees[5]->user ?? $companyAdminUser;
+        $techLeadUser = $usersByIndex[13] ?? $employees[13]->user ?? $companyAdminUser;
         $hrManagerUserId = $hrManagerUser?->id ?? $companyAdminUser->id;
 
         $users = [
@@ -1850,7 +1879,7 @@ class HrmsDemoSeeder extends Seeder
             }
         }
 
-        foreach (array_chunk($rosterRecords, 500) as $chunk) {
+        foreach (array_chunk($rosterRecords, 100) as $chunk) {
             DB::table('shift_rosters')->insert($chunk);
         }
 
@@ -2058,8 +2087,9 @@ class HrmsDemoSeeder extends Seeder
                     $totalWorkHours = 10.95;
                 }
 
-                // Live dynamic scenarios for TODAY (2026-09-24 afternoon)
+                // Live dynamic scenarios for TODAY
                 if ($isToday) {
+                    $isRealToday = ($dateStr === Carbon::now()->format('Y-m-d'));
                     if ($status === 'half_day') {
                         // Half day shift is completed
                         $checkInTime = '08:50:00';
@@ -2067,23 +2097,23 @@ class HrmsDemoSeeder extends Seeder
                         $totalWorkHours = 4.33;
                         $breakDuration = 0;
                     } elseif ($status === 'late') {
-                        // Late arrival today, currently working
+                        // Late arrival today, currently working if real today, else completed
                         $checkInTime = '09:42:00';
-                        $checkOutTime = null;
+                        $checkOutTime = $isRealToday ? null : '18:15:00';
                         $totalWorkHours = 6.97;
                     } elseif ($status === 'wfh') {
-                        // WFH today, currently working
+                        // WFH today, currently working if real today, else completed
                         $checkInTime = '08:55:00';
-                        $checkOutTime = null;
+                        $checkOutTime = $isRealToday ? null : '18:10:00';
                         $totalWorkHours = 7.75;
                     } else {
-                        // Regular present today, currently working
+                        // Regular present today, currently working if real today, else completed
                         $checkInTime = '08:50:00';
-                        $checkOutTime = null;
+                        $checkOutTime = $isRealToday ? null : '18:12:00';
                         $totalWorkHours = 7.83;
 
                         // Deepak Joshi is currently on active lunch break today
-                        if ($emp->id === $employees[8]->id) {
+                        if ($emp->id === $employees[8]->id && $isRealToday) {
                             $hasActiveBreakToday = true;
                         }
                     }
@@ -2216,10 +2246,10 @@ class HrmsDemoSeeder extends Seeder
             }
         }
 
-        foreach (array_chunk($breaksBatch, 500) as $chunk) {
+        foreach (array_chunk($breaksBatch, 100) as $chunk) {
             DB::table('attendance_breaks')->insert($chunk);
         }
-        foreach (array_chunk($locationLogsBatch, 500) as $chunk) {
+        foreach (array_chunk($locationLogsBatch, 100) as $chunk) {
             DB::table('attendance_location_logs')->insert($chunk);
         }
 
@@ -3061,14 +3091,19 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         // Employee Adhoc Component (Bonus for Q2 sprint delivery)
-        EmployeeAdhocComponent::create([
-            'employee_id' => $employees[14]->id,
-            'salary_component_id' => $compBonus->id,
-            'amount' => 25000.00,
-            'payroll_month' => '2026-08',
-            'status' => 'processed',
-            'remarks' => 'Q2 Outstanding Sprint Delivery & Zero-Defect Release Award',
-        ]);
+        $compBonus = $seededComponents[$payGroupTech->id]['PERF_BONUS']
+            ?? SalaryComponent::where('company_id', $company->id)->where('code', 'PERF_BONUS')->first();
+
+        if ($compBonus) {
+            EmployeeAdhocComponent::create([
+                'employee_id' => $employees[14]->id,
+                'salary_component_id' => $compBonus->id,
+                'amount' => 25000.00,
+                'payroll_month' => '2026-08',
+                'status' => 'processed',
+                'remarks' => 'Q2 Outstanding Sprint Delivery & Zero-Defect Release Award',
+            ]);
+        }
 
         // 24. Employee Lifecycle: Probation Evaluations & Exit / FnF
         EmployeeProbationEvaluation::create([
@@ -3690,7 +3725,7 @@ class HrmsDemoSeeder extends Seeder
                 'updated_at' => $now,
             ];
         }
-        foreach (array_chunk($sopAssignments, 500) as $chunk) {
+        foreach (array_chunk($sopAssignments, 100) as $chunk) {
             DB::table('sop_assignments')->insert($chunk);
         }
 
@@ -4116,9 +4151,10 @@ class HrmsDemoSeeder extends Seeder
         Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
 
         $participant->recalculateScores();
-        });
-
-        Schema::enableForeignKeyConstraints();
+            });
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
 
         $this->command?->info('HrmsDemoSeeder successfully completed! All 13 roles, complete employee forms, attendance history, salary structures, leave plans, fixed assets, recruitment, helpdesk, PIP, broadcasts, KRA/KPI scorecards, 360° Multi-Rater Feedback, exit clearances, SOP management, travel expenses, and Goals & OKRs are seeded with real-world data.');
     }

@@ -289,6 +289,10 @@ class AssetCapitalizationService
             'reference_id' => $asset->id,
             'memo' => "Capitalization of {$code} ({$asset->name})",
             'posted_by' => $userId,
+            // Bought on credit: the amount owed to the vendor is a bill.
+            'bill_allocations' => $source === self::FUNDING_VENDOR
+                ? [\App\Domains\Accounting\Services\BillWise\BillAllocationService::newRef('payable', (string) ($asset->invoice_number ?: $code), $asset->capitalization_date, $asset->capitalization_date, self::REFERENCE_TYPE, (int) $asset->id)]
+                : [],
         ]);
     }
 }

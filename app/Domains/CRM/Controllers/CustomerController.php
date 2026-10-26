@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class CustomerController extends Controller
 {
@@ -74,7 +75,7 @@ class CustomerController extends Controller
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin' => ['nullable', 'string', 'max:50'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
@@ -110,7 +111,7 @@ class CustomerController extends Controller
             'company_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin' => ['nullable', 'string', 'max:50'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
         ], [
@@ -164,6 +165,18 @@ class CustomerController extends Controller
             ->filter(function($inv) {
                 return $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast();
             })->sum('balance_due');
+
+        // With Accounting, the figures come from the books, so this page agrees
+        // with Party Ledger, ageing and Bill Settlement (opening dues, receipt
+        // vouchers and settlements included, not only Sales documents).
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $summary = $partyAccount->summary('customer', (int) $customer->id);
+            $totalBilled = $summary['billed'];
+            $outstandingBalance = $summary['outstanding'];
+            $customerCreditBalance = $summary['advance'];
+            $overdueAmount = $summary['overdue'];
+        }
 
         $creditLimit = floatval($customer->crmAccount?->credit_limit ?? 0);
         $availableCredit = max(0, $creditLimit - $outstandingBalance);

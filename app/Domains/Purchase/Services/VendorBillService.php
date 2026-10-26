@@ -342,6 +342,7 @@ class VendorBillService
                 'grand_total'                  => $grandTotal,
                 'paid_amount'                  => 0,
                 'due_amount'                   => round($grandTotal, 4),
+                ...VendorBillTdsService::fromInput($validated),
                 'notes'                        => $validated['notes'] ?? null,
                 'created_by'                   => auth()->id() ?: 1,
             ]);
@@ -512,8 +513,7 @@ class VendorBillService
             }
 
             $newPaid = round((float)($bill->paid_amount ?? 0) + $amountToApply, 4);
-            $billTotal = (float)($bill->grand_total ?: $bill->total_amount);
-            $newDue = max(0.0, round($billTotal - $newPaid, 4));
+            $newDue = $bill->dueAfterPaying($newPaid);
             $status = ($newDue <= 0.0001) ? 'Paid' : 'Partially Paid';
 
             $bill->update([

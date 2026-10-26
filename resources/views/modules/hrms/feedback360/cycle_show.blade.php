@@ -133,8 +133,11 @@
             </div>
 
             <!-- Stage Transition Controller -->
-            <div class="d-flex align-items-center gap-2">
-                <span class="text-muted fs-12 fw-bold text-uppercase">Current Stage:</span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-light text-muted border fs-11 py-1.5 px-2.5 rounded-pill" title="Lifecycle advances automatically on deadlines and 100% review completion. You can also manually switch stages anytime.">
+                    <i class="feather-zap text-warning me-1"></i>Auto-Progression Active
+                </span>
+                <span class="text-muted fs-12 fw-bold text-uppercase ms-1">Stage:</span>
                 <div class="dropdown">
                     @php
                         $stageDetails = [
@@ -233,6 +236,31 @@
             </div>
         </div>
 
+        <!-- Competencies Evaluated in this Cycle -->
+        @if(isset($cycleCompetencies) && $cycleCompetencies->isNotEmpty())
+            <div class="mb-4 p-3 bg-light border rounded">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+                        Competencies Evaluated in this Cycle ({{ $cycleCompetencies->count() }})
+                    </span>
+                    <span class="badge bg-white text-muted border fs-11 fw-normal">
+                        {{ $questions->count() }} Total Questions
+                    </span>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach($cycleCompetencies as $comp)
+                        <div class="d-inline-flex align-items-center gap-2 px-2.5 py-1.5 bg-white border rounded shadow-xs">
+                            <span class="badge bg-primary-subtle text-primary rounded-circle p-1" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px;">
+                                <i class="feather-check"></i>
+                            </span>
+                            <span class="fw-semibold text-dark fs-12">{{ $comp->name }}</span>
+                            <span class="badge bg-light text-muted border fs-10 px-1.5 py-0.5 rounded-pill">{{ $comp->questions_count ?? $comp->questions->count() }} Qs</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         <!-- Participants & Rater Roster Table -->
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
@@ -292,46 +320,54 @@
                                 <td style="min-width: 180px;">
                                     <div class="d-flex justify-content-between fs-11 text-muted mb-1">
                                         <span>{{ $completedRaters }} of {{ $totalRaters }} Raters</span>
-                                        <strong>{{ $pPct }}%</strong>
+                                        <strong class="{{ $pPct === 100 ? 'text-success' : 'text-dark' }}">{{ $pPct }}%</strong>
                                     </div>
-                                    <div class="progress" style="height: 5px;">
-                                        <div class="progress-bar bg-primary" style="width: {{ $pPct }}%"></div>
+                                    <div class="progress" style="height: 6px; border-radius: 4px; background-color: #f1f5f9;">
+                                        <div class="progress-bar {{ $pPct === 100 ? 'bg-success' : 'bg-primary' }}" style="width: {{ $pPct }}%; border-radius: 4px;"></div>
                                     </div>
-                                    <div class="mt-1.5 d-flex gap-1 flex-wrap">
-                                        @foreach($p->nominations as $nom)
-                                            @php
-                                                $typeLabel = match($nom->reviewer_type) {
-                                                    'self'          => 'Self',
-                                                    'manager'       => 'Mgr',
-                                                    'direct_report' => 'DR',
-                                                    'peer'          => 'Peer',
-                                                    default         => ucfirst(substr($nom->reviewer_type, 0, 3)),
-                                                };
-                                                $badgeStyle = $nom->status === 'completed' 
-                                                    ? 'bg-success text-white border-success' 
-                                                    : match($nom->reviewer_type) {
-                                                        'self'          => 'bg-primary-subtle text-primary border-primary-subtle',
-                                                        'manager'       => 'bg-warning-subtle text-dark border-warning-subtle',
-                                                        'direct_report' => 'bg-info-subtle text-info border-info-subtle',
-                                                        'peer'          => 'bg-purple-subtle text-purple border-secondary-subtle',
-                                                        default         => 'bg-light text-muted border',
-                                                    };
-                                            @endphp
-                                            <span class="badge {{ $badgeStyle }} border px-1.5 py-0.5" 
-                                                  title="{{ ucfirst(str_replace('_', ' ', $nom->reviewer_type)) }}: {{ $nom->reviewer?->full_name }} ({{ $nom->status === 'completed' ? 'Completed' : 'Pending' }})" 
-                                                  style="font-size: 10px; font-weight: 600; cursor: help;">
-                                                @if($nom->status === 'completed')
-                                                    <i class="feather-check" style="font-size: 9px;"></i>
-                                                @endif
-                                                {{ $typeLabel }}
+                                    @if($pPct === 100)
+                                        <div class="mt-1.5">
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1"
+                                                  title="All raters (Self, Manager, Peers) have submitted their feedback.">
+                                                <i class="feather-check-circle" style="font-size: 11px;"></i> All {{ $totalRaters }} Reviews Completed
                                             </span>
-                                        @endforeach
-                                    </div>
+                                        </div>
+                                    @else
+                                        <div class="mt-1.5 d-flex gap-1 flex-wrap">
+                                            @foreach($p->nominations as $nom)
+                                                @php
+                                                    $typeLabel = match($nom->reviewer_type) {
+                                                        'self'          => 'Self',
+                                                        'manager'       => 'Manager',
+                                                        'direct_report' => 'Report',
+                                                        'peer'          => 'Peer',
+                                                        default         => ucfirst($nom->reviewer_type),
+                                                    };
+                                                    $isDone = ($nom->status === 'completed');
+                                                @endphp
+                                                <span class="badge {{ $isDone ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-light text-muted border' }} rounded-pill px-2 py-0.5 d-inline-flex align-items-center" 
+                                                      title="{{ $typeLabel }}: {{ $nom->reviewer?->full_name }} ({{ $isDone ? 'Submitted' : 'Pending' }})" 
+                                                      style="font-size: 10px; font-weight: 600;">
+                                                    <i class="feather-{{ $isDone ? 'check' : 'clock' }} me-1" style="font-size: 9px;"></i>
+                                                    {{ $typeLabel }}
+                                                    @if(!$isDone && $isHrAdmin && $nom->reviewer_type !== 'self')
+                                                        <form action="{{ route('hrms.feedback360.nominations.destroy', $nom->id) }}" method="POST" class="d-inline ms-1 p-0 m-0" onsubmit="return confirm('Remove {{ addslashes($nom->reviewer?->full_name ?? 'this reviewer') }} ({{ $typeLabel }}) from this review roster?');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="border-0 bg-transparent text-danger p-0 ms-0.5" style="font-size: 11px; line-height: 1; cursor: pointer;" title="Remove this rater">
+                                                                &times;
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>
                                     @if($p->overall_score)
-                                        <span class="badge bg-primary text-white fs-12 px-2 py-1">
-                                            ★ {{ number_format($p->overall_score, 1) }} / 5.0
+                                        <span class="badge bg-light text-dark border fs-12 px-2.5 py-1 fw-bold">
+                                            <i class="feather-star text-warning me-1"></i>{{ number_format($p->overall_score, 1) }} <small class="text-muted fw-normal">/ 5.0</small>
                                         </span>
                                     @else
                                         <span class="text-muted fs-12">&mdash;</span>
@@ -344,6 +380,11 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="d-inline-flex gap-1.5">
+                                        @if($isHrAdmin && in_array($cycle->status, ['draft', 'nomination', 'in_progress']))
+                                            <x-ui.button variant="light" size="sm" icon="feather-user-plus" class="border px-2 py-1 text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#addRaterModal{{ $p->id }}" title="Assign individual rater">
+                                                Rater
+                                            </x-ui.button>
+                                        @endif
                                         <x-ui.button variant="light" size="sm" icon="feather-pie-chart" class="border px-2.5 py-1 text-primary fw-semibold" href="{{ route('hrms.feedback360.report', $p->id) }}">
                                             360 Report
                                         </x-ui.button>
@@ -394,5 +435,61 @@
         </div>
     </form>
 </x-ui.modal>
+
+<!-- ========================================================================= -->
+<!-- MODALS: ADD INDIVIDUAL RATER TO PARTICIPANT -->
+<!-- ========================================================================= -->
+@foreach($participants as $p)
+    @php
+        $directReports = $p->employee?->directReports ?? collect();
+        $isManagerReviewee = $directReports->isNotEmpty();
+        $assignedIds = $p->nominations->pluck('reviewer_id')->toArray();
+    @endphp
+    <x-ui.modal id="addRaterModal{{ $p->id }}" title="Assign Rater for {{ $p->employee?->full_name }}" size="md" :centered="true" :showFooter="false">
+        <form action="{{ route('hrms.feedback360.participants.add-rater', $p->id) }}" method="POST">
+            @csrf
+
+            <div class="mb-3">
+                <label class="form-label text-dark fs-12 fw-semibold">Relationship / Reviewer Type <span class="text-danger">*</span></label>
+                <select name="reviewer_type" class="form-select form-select-sm fs-12" required>
+                    <option value="peer" selected>Peer Reviewer (Colleague)</option>
+                    <option value="direct_report">Direct Report (Subordinate / Upward Feedback)</option>
+                    <option value="manager">Manager / Evaluator</option>
+                </select>
+                <small class="text-muted fs-11 mt-1 d-block">Determines scoring perspective in 360 gap analysis.</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-dark fs-12 fw-semibold">Select Employee <span class="text-danger">*</span></label>
+                <select name="reviewer_id" class="form-select form-select-sm fs-12" required>
+                    <option value="">-- Choose Employee --</option>
+                    @if($isManagerReviewee)
+                        <optgroup label="Direct Reports (Team Members)">
+                            @foreach($directReports as $dr)
+                                <option value="{{ $dr->id }}" {{ in_array($dr->id, $assignedIds) ? 'disabled' : '' }}>
+                                    {{ $dr->full_name }} ({{ $dr->designation->name ?? 'Staff' }}) {{ in_array($dr->id, $assignedIds) ? '[Already Assigned]' : '' }}
+                                </option>
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    <optgroup label="All Organization Employees">
+                        @foreach($employees as $emp)
+                            @if($emp->id !== $p->employee_id)
+                                <option value="{{ $emp->id }}" {{ in_array($emp->id, $assignedIds) ? 'disabled' : '' }}>
+                                    {{ $emp->full_name }} ({{ $emp->designation->name ?? 'Staff' }} - {{ $emp->department->name ?? 'Team' }}) {{ in_array($emp->id, $assignedIds) ? '[Already Assigned]' : '' }}
+                                </option>
+                            @endif
+                        @endforeach
+                    </optgroup>
+                </select>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
+                <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">Assign Reviewer</x-ui.button>
+            </div>
+        </form>
+    </x-ui.modal>
+@endforeach
 
 @endsection

@@ -340,15 +340,34 @@ class PostPurchaseBillJournal
                 }
             }
 
-            // 6. Accounts Payable / Vendor Account (Credit)
+            // 6. Accounts Payable / Vendor Account (Credit) — less the TDS
+            // withheld, which is owed to the government on the section's ledger.
+            $tds = round((float) ($bill->tds_amount ?? 0), 2);
+            $tdsSection = $tds > 0 && $bill->tds_section_id
+                ? \App\Domains\Accounting\Models\TdsSection::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->find($bill->tds_section_id)
+                : null;
+            $tdsAccount = $tdsSection ? app(\App\Domains\Accounting\Services\Tds\TdsSectionService::class)->payableAccount($tdsSection) : null;
+            if ($tdsAccount === null) {
+                $tds = 0.0;
+            }
+
             $lines[] = [
                 'chart_of_account_id' => $accountsPayable->id,
                 'debit'               => 0,
-                'credit'              => round((float)$bill->grand_total, 2),
+                'credit'              => round((float)$bill->grand_total - $tds, 2),
                 'description'         => "Vendor Payable - Bill {$bill->bill_number}",
                 'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_VENDOR,
                 'party_id'            => $bill->vendor_id,
             ];
+
+            if ($tds > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $tdsAccount->id,
+                    'debit'               => 0,
+                    'credit'              => $tds,
+                    'description'         => "TDS {$tdsSection->code} @ {$bill->tds_rate}% - Bill {$bill->bill_number}",
+                ];
+            }
 
             // 7. Round Off / manual adjustment — grand_total above already
             // includes it, so a non-zero adjustment needs its own line or the
@@ -365,14 +384,20 @@ class PostPurchaseBillJournal
             }
 
             // Post General Ledger Journal Entry
-            $this->journals->postOnce($lines, [
+            $journal = $this->journals->postOnce($lines, [
                 'tenant_id'      => $tenantId,
                 'journal_date'   => $bill->bill_date,
                 'source'         => Journal::SOURCE_PURCHASE,
                 'reference_type' => 'vendor_bill',
                 'reference_id'   => $bill->id,
                 'memo'           => "Vendor Bill {$bill->bill_number} ({$bill->vendor?->name})",
+                // The vendor bill opens its own bill in the bill-wise register.
+                'bill_allocations' => [\App\Domains\Accounting\Services\BillWise\BillAllocationService::newRef(
+                    'payable', (string) $bill->bill_number, $bill->bill_date, $bill->due_date, 'vendor_bill', (int) $bill->id,
+                )],
             ]);
+
+            $this->recordTds($bill, $journal->id);
 
             Log::info("PostPurchaseBillJournal: Successfully posted GL entry for Bill {$bill->bill_number}", ['bill_id' => $bill->id]);
         } catch (\Throwable $e) {
@@ -382,6 +407,42 @@ class PostPurchaseBillJournal
             ]);
             $this->failures->record($bill->tenant_id, BillPosted::class, $bill, $e->getMessage());
         }
+    }
+
+    /**
+     * The bill's line in the TDS register — also when it is below threshold
+     * (no tax), so the vendor's running total for the year includes it.
+     */
+    private function recordTds(\App\Domains\Purchase\Models\VendorBill $bill, int $journalId): void
+    {
+        if (! $bill->tds_section_id) {
+            return;
+        }
+
+        $vendor = $bill->vendor;
+        $amount = round((float) $bill->tds_amount, 2);
+
+        app(\App\Domains\Accounting\Services\Tds\TdsDeductionRecorder::class)->record([
+            'tenant_id' => (int) $bill->tenant_id,
+            'company_id' => $bill->company_id,
+            'branch_id' => $bill->branch_id,
+            'tds_section_id' => (int) $bill->tds_section_id,
+            'party_id' => (int) $bill->vendor_id,
+            'party_name' => $vendor?->name,
+            'pan' => $vendor?->pan,
+            'deductee_type' => $vendor?->deductee_type,
+            'source_type' => \App\Domains\Accounting\Models\TdsDeduction::SOURCE_VENDOR_BILL,
+            'source_id' => (int) $bill->id,
+            'source_number' => (string) $bill->bill_number,
+            'journal_id' => $journalId,
+            'deduction_date' => $bill->bill_date,
+            'base_amount' => (float) $bill->tds_base_amount,
+            'catchup_base' => (float) ($bill->tds_catchup_base ?? 0),
+            'rate' => (float) $bill->tds_rate,
+            'tds_amount' => $amount,
+            'reason' => $bill->tds_reason
+                ?? ($amount > 0 ? \App\Domains\Accounting\Models\TdsDeduction::REASON_NORMAL : \App\Domains\Accounting\Models\TdsDeduction::REASON_BELOW_THRESHOLD),
+        ]);
     }
 
     /**

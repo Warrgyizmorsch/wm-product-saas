@@ -413,6 +413,8 @@
                                         <span class="fw-bold fs-14 text-primary">Grand Total:</span>
                                         <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 150px; height: 34px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb; font-size: 15px;" readonly value="0.00">
                                     </div>
+
+                                    @include('modules.purchase.bills._tds-summary', ['vendorId' => $selectedGrn->vendor_id])
                                 </div>
                             </div>
                         </div>
@@ -729,6 +731,11 @@
                     var halfTax = totalGST / 2;
                     $('#cgstText').val('₹' + halfTax.toFixed(2));
                     $('#sgstText').val('₹' + halfTax.toFixed(2));
+                }
+
+                // TDS is on the value before GST.
+                if (window.refreshBillTds) {
+                    window.refreshBillTds(itemsTaxableValue + freightAmount, grandTotal);
                 }
             }
 

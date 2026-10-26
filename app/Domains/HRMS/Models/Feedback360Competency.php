@@ -16,28 +16,18 @@ class Feedback360Competency extends BaseModel
     protected $fillable = [
         'tenant_id',
         'company_id',
-        'cycle_id',
         'name',
-        'code',
-        'category',
         'description',
-        'weightage',
         'is_active',
     ];
 
     protected $casts = [
-        'weightage' => 'float',
         'is_active' => 'boolean',
     ];
 
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class, 'company_id');
-    }
-
-    public function cycle(): BelongsTo
-    {
-        return $this->belongsTo(Feedback360Cycle::class, 'cycle_id');
     }
 
     public function questions(): HasMany

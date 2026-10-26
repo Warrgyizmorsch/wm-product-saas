@@ -57,9 +57,24 @@ interface Feedback360RepositoryInterface
     public function addParticipantsToCycle(int $cycleId, array $employeeIds, int $tenantId, ?User $user = null): int;
 
     /**
-     * Nominate peer reviewers for a participant.
+     * Nominate peer and direct report reviewers for a participant.
      */
-    public function nominatePeers(int $participantId, array $peerIds, int $tenantId, ?User $user = null): array;
+    public function nominatePeers(int $participantId, array $peerIds, int $tenantId, ?User $user = null, array $directReportIds = []): array;
+
+    /**
+     * Delete a rater nomination from a participant's feedback roster.
+     */
+    public function deleteNomination(int $nominationId, int $tenantId): bool;
+
+    /**
+     * Manually add an individual rater (peer, direct report, or manager) to a participant.
+     */
+    public function addRaterToParticipant(int $participantId, int $reviewerId, string $reviewerType, int $tenantId, ?User $user = null): Feedback360Nomination;
+
+    /**
+     * Automatically advance lifecycle stages of active cycles based on deadlines and completion.
+     */
+    public function autoAdvanceActiveCycles(int $tenantId): void;
 
     /**
      * Approve or reject a peer nomination.

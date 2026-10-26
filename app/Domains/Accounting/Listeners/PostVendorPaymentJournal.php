@@ -90,6 +90,13 @@ class PostVendorPaymentJournal
                 'reference_type' => 'vendor_payment',
                 'reference_id' => $payment->id,
                 'memo' => $memo,
+                // Agst Ref each bill it pays (or the vendor's opening due); the
+                // rest stays On Account. Advances post to 1410, outside the register.
+                'bill_allocations' => $isOpeningBalance
+                    ? [\App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('payable', 'vendor_opening_balance', (int) $payment->vendor_id)]
+                    : $payment->allocations()->get()
+                        ->map(fn ($a) => \App\Domains\Accounting\Services\BillWise\BillAllocationService::againstRef('payable', 'vendor_bill', (int) $a->vendor_bill_id, (float) $a->allocated_amount))
+                        ->values()->all(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('PostVendorPaymentJournal: failed to auto-post journal', [

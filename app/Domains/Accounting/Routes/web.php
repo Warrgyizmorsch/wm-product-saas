@@ -39,6 +39,7 @@ use App\Domains\Accounting\Controllers\ProfitLossController;
 use App\Domains\Accounting\Controllers\ReportExportController;
 use App\Domains\Accounting\Controllers\StaffActivityReportController;
 use App\Domains\Accounting\Controllers\TaxRateController;
+use App\Domains\Accounting\Controllers\TdsController;
 use App\Domains\Accounting\Controllers\TrialBalanceController;
 use App\Domains\Accounting\Controllers\VoucherController;
 use App\Domains\Accounting\Support\VoucherType;
@@ -132,6 +133,14 @@ Route::prefix('accounting')
         Route::get('journals/{journal}', [JournalController::class, 'show'])->name('journals.show');
         Route::post('journals/{journal}/reverse', [JournalController::class, 'reverse'])->name('journals.reverse');
 
+        // Bill-wise box on vouchers / journals, and adjusting bills against On Account money.
+        Route::get('bill-wise/parties', [\App\Domains\Accounting\Controllers\BillWiseController::class, 'parties'])->name('bill-wise.parties');
+        Route::get('bill-wise/open-bills', [\App\Domains\Accounting\Controllers\BillWiseController::class, 'openBills'])->name('bill-wise.open-bills');
+        Route::get('bill-wise/settlement', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'index'])->name('bill-wise.settlement');
+        Route::post('bill-wise/settlement', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'store'])->name('bill-wise.settlement.store');
+        Route::post('bill-wise/opening-breakup', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'openingBreakup'])->name('bill-wise.opening-breakup');
+        Route::delete('bill-wise/settlement/{settlement}', [\App\Domains\Accounting\Controllers\BillSettlementController::class, 'destroy'])->name('bill-wise.settlement.destroy');
+
         // Maker-checker queue for manual journals and vouchers.
         Route::get('approvals', [JournalApprovalController::class, 'index'])->name('approvals.index');
         Route::post('approvals/{journal}/approve', [JournalApprovalController::class, 'approve'])->name('approvals.approve');
@@ -152,6 +161,7 @@ Route::prefix('accounting')
         Route::get('reports/balance-sheet/pdf', [BalanceSheetController::class, 'downloadPdf'])->name('reports.balance-sheet.pdf');
         Route::get('reports/profit-loss', [ProfitLossController::class, 'index'])->name('reports.profit-loss');
         Route::get('reports/ar-aging', [ArAgingController::class, 'index'])->name('reports.ar-aging');
+        Route::get('reports/bills-outstanding', [\App\Domains\Accounting\Controllers\BillsOutstandingController::class, 'index'])->name('reports.bills-outstanding');
         Route::get('reports/ap-aging', [ApAgingController::class, 'index'])->name('reports.ap-aging');
         Route::get('reports/cash-flow', [CashFlowController::class, 'index'])->name('reports.cash-flow');
         Route::get('reports/gst-summary', [GstSummaryController::class, 'index'])->name('reports.gst-summary');
@@ -166,6 +176,19 @@ Route::prefix('accounting')
         Route::get('gst-returns/gstr2b/{import}', [Gstr2bReconciliationController::class, 'show'])->whereNumber('import')->name('gst-returns.gstr2b.show');
         Route::post('gst-returns/gstr2b/{import}/rematch', [Gstr2bReconciliationController::class, 'rematch'])->whereNumber('import')->name('gst-returns.gstr2b.rematch');
         Route::delete('gst-returns/gstr2b/{import}', [Gstr2bReconciliationController::class, 'destroy'])->whereNumber('import')->name('gst-returns.gstr2b.destroy');
+
+        // TDS (non-salary): setup, register + challans, 26Q / Form 16A, receivable.
+        Route::get('tds/setup', [TdsController::class, 'setup'])->name('tds.setup');
+        Route::put('tds/sections/{section}', [TdsController::class, 'updateSection'])->whereNumber('section')->name('tds.sections.update');
+        Route::put('tds/settings', [TdsController::class, 'updateSettings'])->name('tds.settings.update');
+        Route::get('tds/register', [TdsController::class, 'register'])->name('tds.register');
+        Route::post('tds/challans', [TdsController::class, 'storeChallan'])->name('tds.challans.store');
+        Route::get('tds/returns', [TdsController::class, 'returns'])->name('tds.returns');
+        Route::get('tds/returns/export/{format}', [TdsController::class, 'exportReturn'])->whereIn('format', ['pdf', 'xlsx'])->name('tds.returns.export');
+        Route::get('tds/form16a/{vendor}', [TdsController::class, 'form16a'])->whereNumber('vendor')->name('tds.form16a');
+        Route::get('tds/form16/{employee}', [TdsController::class, 'form16'])->whereNumber('employee')->name('tds.form16');
+        Route::get('tds/receivable', [TdsController::class, 'receivable'])->name('tds.receivable');
+        Route::post('tds/receivable/{payment}/certificate', [TdsController::class, 'markCertificate'])->whereNumber('payment')->name('tds.receivable.certificate');
         Route::get('reports/audit-trail', [AccountingAuditLogController::class, 'index'])->name('reports.audit-trail');
         Route::get('reports/budget-vs-actual', [BudgetVsActualController::class, 'index'])->name('reports.budget-vs-actual');
 

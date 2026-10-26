@@ -142,6 +142,11 @@
         </a>
 
         @php
+            $hasAvailableAdvances = (!empty($availableAdvances) && $availableAdvances->isNotEmpty()) || (!empty($unallocatedPayments) && $unallocatedPayments->isNotEmpty());
+            $totalAvailAdvance = (!empty($availableAdvances) ? $availableAdvances->sum('allocated_amount') : 0) + (!empty($unallocatedPayments) ? $unallocatedPayments->sum('allocated_amount') : 0);
+        @endphp
+
+        @php
             $clientPhone = $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '');
             $clientEmail = $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '');
         @endphp
@@ -599,6 +604,47 @@
                 </div>
             @endif
 
+            @if ($hasAvailableAdvances && $invoice->balance_due > 0 && !in_array(strtolower((string)$invoice->status), ['cancelled', 'void']))
+                <!-- Premium Odoo-Style Advance Payment Reconcile Card -->
+                <div class="card border-0 shadow-sm rounded-3 mb-3 d-print-none" style="max-width: 900px; margin: 0 auto 1.25rem auto; background: #ffffff; border: 1px solid #e2e8f0 !important; border-left: 5px solid #10b981 !important;">
+                    <div class="card-body p-3.5">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-2xs" style="width: 44px; height: 44px; background: rgba(16, 185, 129, 0.12); color: #059669;">
+                                    <i class="feather-credit-card fs-20"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 fs-10 fw-bold text-uppercase">
+                                            <i class="feather-zap me-1"></i>Advance Credit Available
+                                        </span>
+                                        @if($invoice->salesOrder)
+                                            <span class="fs-12 text-muted">
+                                                Sales Order: <strong class="text-dark">{{ $invoice->salesOrder->sales_order_number }}</strong>
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="d-flex align-items-baseline gap-2">
+                                        <span class="fs-13 text-secondary">Available Advance:</span>
+                                        <span class="fs-18 fw-bold text-success font-monospace">{{ format_currency($totalAvailAdvance) }}</span>
+                                        <span class="fs-12 text-muted d-none d-md-inline">| Balance Due: <strong class="text-danger font-monospace">{{ format_currency($invoice->balance_due) }}</strong></span>
+                                    </div>
+                                    <div class="fs-11 text-muted mt-0.5">
+                                        You can reconcile/apply this advance to this invoice now, or keep it for future orders.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0 ms-auto ms-sm-0">
+                                <button type="button" class="btn btn-success fw-bold px-3.5 py-2 shadow-sm d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#applyAdvanceModal" style="border-radius: 6px;">
+                                    <i class="feather-check-circle fs-15"></i>
+                                    <span>Apply Advance ({{ format_currency(min($totalAvailAdvance, $invoice->balance_due)) }})</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Standard ERP Customer Tax Invoice Sheet -->
             <div class="invoice-sheet print-area mb-5">
                 <!-- Status Corner Ribbon Tag Patti -->
@@ -1013,6 +1059,24 @@
                                     <span class="fw-bold">{{ format_currency($balDue) }}</span>
                                 </div>
                             @endif
+
+                            @if($invoice->allocations->isNotEmpty())
+                                <div class="mt-2 pt-2 border-top fs-11 text-muted">
+                                    <span class="fw-bold text-dark d-block mb-1">Applied Payments / Advances:</span>
+                                    @foreach($invoice->allocations as $alloc)
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span>
+                                                <i class="feather-check text-success me-1"></i>
+                                                {{ $alloc->payment?->payment_number ?? 'Advance' }}
+                                                @if($alloc->payment?->payment_date)
+                                                    <span class="text-secondary">({{ date('d-M', strtotime($alloc->payment->payment_date)) }})</span>
+                                                @endif
+                                            </span>
+                                            <span class="fw-semibold text-dark">{{ format_currency($alloc->allocated_amount) }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -1188,6 +1252,57 @@
                         <div class="border-top d-inline-block pt-1 px-4 text-muted fw-semibold">{{ __('crm.authorized_signatory') }}</div>
                     </div>
                 </div>
+
+                <!-- Settled Payments & Advance Adjustments Table (Screen view only) -->
+                @if($invoice->allocations->isNotEmpty())
+                    <div class="card border shadow-none mt-4 d-print-none" style="border-radius: 6px; border-color: #cbd5e1 !important;">
+                        <div class="py-2 px-3 bg-light border-bottom text-muted fw-bold fs-11 text-uppercase d-flex justify-content-between align-items-center">
+                            <span><i class="feather-check-circle me-1 text-success"></i>Settled Payments / Advance Adjustments</span>
+                            <span class="badge bg-soft-success text-success fs-10">{{ $invoice->allocations->count() }} Entry(s)</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle text-center fs-11 mb-0 w-100">
+                                <thead class="bg-light text-secondary fw-bold">
+                                    <tr>
+                                        <th class="py-1.5 text-start ps-3">Payment #</th>
+                                        <th class="py-1.5">Date</th>
+                                        <th class="py-1.5">Method</th>
+                                        <th class="py-1.5">Ref / Notes</th>
+                                        <th class="py-1.5 text-end">Applied Amount</th>
+                                        <th class="py-1.5 text-center pe-3">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($invoice->allocations as $alloc)
+                                        <tr>
+                                            <td class="py-1.5 text-start ps-3 fw-bold">
+                                                @if($alloc->customer_payment_id)
+                                                    <a href="{{ route('sales.payments.show', $alloc->customer_payment_id) }}" class="text-primary">
+                                                        {{ $alloc->payment?->payment_number ?? 'Payment #' . $alloc->customer_payment_id }}
+                                                    </a>
+                                                @else
+                                                    {{ $alloc->payment?->payment_number ?? 'Advance' }}
+                                                @endif
+                                            </td>
+                                            <td class="py-1.5">{{ $alloc->payment?->payment_date ? date('d-M-Y', strtotime($alloc->payment->payment_date)) : '—' }}</td>
+                                            <td class="py-1.5">{{ $alloc->payment?->payment_method ?? 'Bank/Cash' }}</td>
+                                            <td class="py-1.5 text-muted">{{ $alloc->payment?->reference_no ?: ($alloc->payment?->notes ?: '—') }}</td>
+                                            <td class="py-1.5 text-end fw-bold text-success">{{ format_currency($alloc->allocated_amount) }}</td>
+                                            <td class="py-1.5 text-center pe-3">
+                                                <form action="{{ route('sales.invoices.remove-advance', [$invoice->id, $alloc->id]) }}" method="POST" onsubmit="return confirm('Unlink this payment from invoice? It will return to available advances.');" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-outline-danger py-0.5 px-2 fs-10" title="Unlink / Return to Advance">
+                                                        <i class="feather-rotate-ccw me-1"></i>Unlink
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -2224,7 +2339,111 @@
             $(this).after('<div class="invalid-feedback d-block fs-11 mt-1 ajax-feedback">The email field must be a valid email address.</div>');
         }
     });
+
+    // Handle Odoo-style Advance Settlement Modal
+    function updateAdvanceModalFields() {
+        const $sel = $('#advanceSourceSelect');
+        const val = $sel.val();
+        if (!val) return;
+        const parts = val.split(':');
+        const type = parts[0];
+        const id = parts[1];
+        $('#advSourceType').val(type);
+        if (type === 'allocation') {
+            $('#advAllocId').val(id);
+            $('#advCustPayId').val('');
+        } else {
+            $('#advAllocId').val('');
+            $('#advCustPayId').val(id);
+        }
+        const avail = parseFloat($sel.find('option:selected').data('avail') || 0);
+        const balDue = parseFloat("{{ (float)$invoice->balance_due }}");
+        const defaultAmt = Math.min(avail, balDue);
+        $('#advanceApplyAmountInput').val(defaultAmt.toFixed(2)).attr('max', defaultAmt.toFixed(2));
+        $('#advAvailBadge').text('₹ ' + avail.toFixed(2));
+    }
+
+    $(document).on('change', '#advanceSourceSelect', updateAdvanceModalFields);
+    $('#applyAdvanceModal').on('shown.bs.modal', function () {
+        updateAdvanceModalFields();
+        $('#advanceApplyAmountInput').focus().select();
+    });
 </script>
+
+<!-- APPLY ADVANCE / RECONCILE PAYMENT MODAL -->
+@if ($hasAvailableAdvances)
+<div class="modal fade" id="applyAdvanceModal" tabindex="-1" aria-labelledby="applyAdvanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light py-2.5 px-3 border-bottom">
+                <h6 class="modal-title fw-bold text-dark fs-14" id="applyAdvanceModalLabel">
+                    <i class="feather-check-circle text-success me-1.5"></i>Apply Advance / Reconcile Payment
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('sales.invoices.apply-advance', $invoice->id) }}" method="POST">
+                @csrf
+                <div class="modal-body p-3 fs-12">
+                    <div class="p-2.5 bg-light rounded border mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Invoice Total:</span>
+                            <strong class="text-dark">{{ format_currency($invoice->total_amount) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Already Paid:</span>
+                            <span class="text-success fw-bold">{{ format_currency($invoice->amount_paid) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between pt-1 border-top">
+                            <span class="text-muted fw-bold">Current Balance Due:</span>
+                            <strong class="text-danger fs-14 font-monospace">{{ format_currency($invoice->balance_due) }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-bold text-dark fs-12 mb-0">Select Advance Payment</label>
+                            <span class="badge bg-soft-primary text-primary fs-11" id="advAvailBadge">Available: {{ format_currency($totalAvailAdvance) }}</span>
+                        </div>
+                        <select name="selected_source" id="advanceSourceSelect" class="form-select form-select-sm" required>
+                            @if(!empty($availableAdvances))
+                                @foreach($availableAdvances as $adv)
+                                    <option value="allocation:{{ $adv->id }}" data-avail="{{ (float)$adv->allocated_amount }}">
+                                        Sales Order Advance: {{ $adv->payment?->payment_number ?? 'Payment' }} (Avail: {{ format_currency($adv->allocated_amount) }})
+                                    </option>
+                                @endforeach
+                            @endif
+                            @if(!empty($unallocatedPayments))
+                                @foreach($unallocatedPayments as $up)
+                                    <option value="payment:{{ $up->customer_payment_id }}" data-avail="{{ (float)$up->allocated_amount }}">
+                                        Customer Credit: {{ $up->payment?->payment_number ?? 'Payment' }} (Avail: {{ format_currency($up->allocated_amount) }})
+                                    </option>
+                                @endforeach
+                            @endif
+                        </select>
+                        <input type="hidden" name="source_type" id="advSourceType" value="allocation">
+                        <input type="hidden" name="payment_allocation_id" id="advAllocId" value="{{ !empty($availableAdvances) ? $availableAdvances->first()?->id : '' }}">
+                        <input type="hidden" name="customer_payment_id" id="advCustPayId" value="">
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-dark fs-12">Amount to Apply (₹)</label>
+                        <input type="number" step="0.01" min="0.01" name="amount" id="advanceApplyAmountInput" class="form-control form-control-sm font-monospace fw-bold" required>
+                        <div class="form-text fs-11 text-muted">
+                            You can apply the full amount or a partial amount. Any remaining advance remains available for future invoices.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light border-top">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-success fw-bold px-3">
+                        <i class="feather-check me-1"></i>Confirm & Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 @endpush
 
 @if(request()->has('print'))

@@ -156,7 +156,7 @@ class VendorPaymentApiController extends Controller
                         ]);
 
                         $bill->paid_amount = (float)($bill->paid_amount ?? 0) + $allocatedAmt;
-                        $bill->due_amount  = max(0, (float)($bill->grand_total ?? $bill->total_amount) - (float)$bill->paid_amount);
+                        $bill->due_amount  = $bill->dueAfterPaying((float)$bill->paid_amount);
                         $bill->status      = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
                         $bill->save();
                     }

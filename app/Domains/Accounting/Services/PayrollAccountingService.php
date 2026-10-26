@@ -95,6 +95,10 @@ class PayrollAccountingService
         $debitGroup = [];   // Account ID => Amount (Debits for actual earned salary expenses)
         $creditGroup = [];  // Account ID => Amount (Credits for statutory & other deductions)
         $totalNetPayout = 0.00;
+        $netByEmployee = [];      // employee id => net pay (one Salary Payable line each)
+        $recoveryByEmployee = []; // employee id => advance / loan recovered this month
+        $tdsByEmployee = [];      // employee id => TDS on salary (section 192)
+        $grossByEmployee = [];    // employee id => salary earned after LOP
 
         foreach ($employees as $employee) {
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
@@ -119,28 +123,23 @@ class PayrollAccountingService
                     $empEarnedByAccount[$accId] = ($empEarnedByAccount[$accId] ?? 0.00) + $val;
                     $empGrossEarned += $val;
                 } else {
-                    $codeUpper = strtoupper($code);
-                    $nameUpper = strtoupper($componentModel?->name ?? $itemData['name'] ?? '');
+                    $bucket = self::deductionBucket((string) $code, (string) ($componentModel?->name ?? $itemData['name'] ?? ''));
 
-                    if ($codeUpper === 'LOP' || str_contains($codeUpper, 'LOSS_OF_PAY') || str_contains($nameUpper, 'LOSS OF PAY')) {
+                    if ($bucket === 'lop') {
                         $empLop += $val;
                         continue; // LOP reduces earning expense; do not credit LOP as a liability!
                     }
 
                     // Statutory & other deductions (PF, ESI, TDS, PT, Advance, etc.)
-                    if (str_contains($codeUpper, 'PF') || str_contains($codeUpper, 'PROVIDENT') || str_contains($nameUpper, 'PROVIDENT') || str_contains($nameUpper, 'PF')) {
-                        $accId = $defaultAccounts['2160']->id;
-                    } elseif (str_contains($codeUpper, 'ESI') || str_contains($nameUpper, 'ESI') || str_contains($nameUpper, 'STATE INSURANCE')) {
-                        $accId = $defaultAccounts['2170']->id;
-                    } elseif (str_contains($codeUpper, 'TDS') || str_contains($codeUpper, 'TAX') || str_contains($nameUpper, 'TDS') || str_contains($nameUpper, 'INCOME TAX') || str_contains($nameUpper, 'TAX DEDUCTION')) {
-                        $accId = $defaultAccounts['2140']->id;
-                    } elseif (str_contains($codeUpper, 'PT') || str_contains($codeUpper, 'PROFTAX') || str_contains($nameUpper, 'PROFESSIONAL TAX')) {
-                        $accId = $defaultAccounts['2180']->id;
-                    } elseif (str_contains($codeUpper, 'ADVANCE') || str_contains($codeUpper, 'LOAN') || str_contains($nameUpper, 'ADVANCE') || str_contains($nameUpper, 'LOAN')) {
-                        $accId = $defaultAccounts['1420']->id;
-                    } else {
-                        // General fallback for any custom deduction component
-                        $accId = $defaultAccounts['2080']->id;
+                    $accId = $defaultAccounts[$bucket]->id;
+                    if ($bucket === '2140') {
+                        $tdsByEmployee[$employee->id] = ($tdsByEmployee[$employee->id] ?? 0.00) + $val;
+                    }
+
+                    // Advance / loan recovery reduces that employee's own advance.
+                    if ($accId === $defaultAccounts['1420']->id) {
+                        $recoveryByEmployee[$employee->id] = ($recoveryByEmployee[$employee->id] ?? 0.00) + $val;
+                        continue;
                     }
 
                     $creditGroup[$accId] = ($creditGroup[$accId] ?? 0.00) + $val;
@@ -159,13 +158,13 @@ class PayrollAccountingService
                     $debitGroup[$accId] = ($debitGroup[$accId] ?? 0.00) + $grossVal;
                 }
             }
+            $grossByEmployee[$employee->id] = $empGrossEarned > 0 ? $empGrossEarned * (1.0 - min(1.0, $empLop / $empGrossEarned)) : 0.00;
 
-            $totalNetPayout += (float) ($calc['summary']['net_payout'] ?? 0.00);
-        }
-
-        // Add Net Salary Payable liability credit
-        if ($totalNetPayout > 0) {
-            $creditGroup[$salaryPayableAccount->id] = ($creditGroup[$salaryPayableAccount->id] ?? 0.00) + $totalNetPayout;
+            $net = (float) ($calc['summary']['net_payout'] ?? 0.00);
+            $totalNetPayout += $net;
+            if ($net > 0) {
+                $netByEmployee[$employee->id] = ($netByEmployee[$employee->id] ?? 0.00) + $net;
+            }
         }
 
         // Build Journal Entry Lines
@@ -195,6 +194,39 @@ class PayrollAccountingService
                     'credit'              => $creditVal,
                     'description'         => "{$accountName} deduction for month {$run->payroll_month}",
                 ];
+            }
+        }
+
+        // Net pay owed to each employee on their own Salary Payable line, so
+        // the bill-wise register knows who is still unpaid (Tally payroll).
+        $monthEnd = $this->monthEnd($run);
+        $billHints = [];
+        foreach ($netByEmployee as $employeeId => $net) {
+            $lines[] = [
+                'chart_of_account_id' => $salaryPayableAccount->id,
+                'debit'               => 0.00,
+                'credit'              => round($net, 2),
+                'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                'party_id'            => $employeeId,
+                'description'         => "Net salary payable for month {$run->payroll_month}",
+            ];
+            $billHints[] = BillWise\BillAllocationService::newRef('payable', "SAL-{$run->payroll_month}", $monthEnd, $monthEnd, 'payroll_salary', (int) $run->id)
+                + ['party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE, 'party_id' => $employeeId, 'account_id' => $salaryPayableAccount->id];
+        }
+
+        foreach ($recoveryByEmployee as $employeeId => $recovered) {
+            if (round($recovered, 2) > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $defaultAccounts['1420']->id,
+                    'debit'               => 0.00,
+                    'credit'              => round($recovered, 2),
+                    'party_type'          => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE,
+                    'party_id'            => $employeeId,
+                    'description'         => "Advance / loan recovered for month {$run->payroll_month}",
+                ];
+                // Recovery pays back the employee's open advances, oldest first.
+                $billHints[] = BillWise\BillAllocationService::againstOldest('receivable')
+                    + ['party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE, 'party_id' => $employeeId, 'account_id' => $defaultAccounts['1420']->id];
             }
         }
 
@@ -238,12 +270,148 @@ class PayrollAccountingService
             'reference_type'        => self::ACCRUAL_REFERENCE,
             'reference_id'          => $run->id,
             'memo'                  => "Payroll Journal entry for month {$run->payroll_month} (Run ID: {$run->id})",
+            'bill_allocations'      => $billHints,
             // Null when run without a signed-in user (queue/console) — shown as "System",
             // rather than crediting user #1, who may not even belong to this tenant.
             'posted_by'             => auth()->id(),
         ];
 
-        return $this->journalService->postOnce($lines, $meta);
+        $journal = $this->journalService->postOnce($lines, $meta);
+
+        // The books are right either way; a register hiccup must not fail the
+        // payroll. `php artisan tds:sync-payroll` fills any gap later.
+        try {
+            $this->recordSalaryTds($run, $journal, $employees, $grossByEmployee, $tdsByEmployee);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Payroll: could not record salary TDS in the TDS register', ['run_id' => $run->id, 'error' => $e->getMessage()]);
+        }
+
+        return $journal;
+    }
+
+    /**
+     * Which ledger a payroll deduction goes to, by its component code/name:
+     * 'lop' (reduces earnings, not a liability) or a default account code.
+     * Order matters: a code containing both PF and TAX is PF.
+     */
+    public static function deductionBucket(string $code, string $name): string
+    {
+        $codeUpper = strtoupper($code);
+        $nameUpper = strtoupper($name);
+
+        return match (true) {
+            $codeUpper === 'LOP' || str_contains($codeUpper, 'LOSS_OF_PAY') || str_contains($nameUpper, 'LOSS OF PAY') => 'lop',
+            str_contains($codeUpper, 'PF') || str_contains($codeUpper, 'PROVIDENT') || str_contains($nameUpper, 'PROVIDENT') || str_contains($nameUpper, 'PF') => '2160',
+            str_contains($codeUpper, 'ESI') || str_contains($nameUpper, 'ESI') || str_contains($nameUpper, 'STATE INSURANCE') => '2170',
+            str_contains($codeUpper, 'TDS') || str_contains($codeUpper, 'TAX') || str_contains($nameUpper, 'TDS') || str_contains($nameUpper, 'INCOME TAX') || str_contains($nameUpper, 'TAX DEDUCTION') => '2140',
+            str_contains($codeUpper, 'PT') || str_contains($codeUpper, 'PROFTAX') || str_contains($nameUpper, 'PROFESSIONAL TAX') => '2180',
+            str_contains($codeUpper, 'ADVANCE') || str_contains($codeUpper, 'LOAN') || str_contains($nameUpper, 'ADVANCE') || str_contains($nameUpper, 'LOAN') => '1420',
+            default => '2080', // any other custom deduction
+        };
+    }
+
+    /**
+     * Each employee's salary and TDS for a run, into the TDS register under
+     * section 192 (the 24Q and Form 16 data). Every paid employee gets a row,
+     * TDS or not, so the year's salary totals for Form 16 are complete.
+     *
+     * @param array<int, float> $grossByEmployee
+     * @param array<int, float> $tdsByEmployee
+     */
+    public function recordSalaryTds(PayrollRun $run, Journal $journal, Collection $employees, array $grossByEmployee, array $tdsByEmployee): void
+    {
+        $tenantId = (int) $journal->tenant_id;
+        $section = app(Tds\TdsSectionService::class)->salarySection($tenantId);
+        $recorder = app(Tds\TdsDeductionRecorder::class);
+        $date = $this->monthEnd($run);
+
+        foreach ($employees as $employee) {
+            $gross = round((float) ($grossByEmployee[$employee->id] ?? 0), 2);
+            $tds = round((float) ($tdsByEmployee[$employee->id] ?? 0), 2);
+
+            if ($gross <= 0 && $tds <= 0) {
+                continue;
+            }
+
+            $recorder->record([
+                'tenant_id' => $tenantId,
+                'company_id' => $journal->company_id,
+                'branch_id' => $employee->branch_id,
+                'tds_section_id' => $section->id,
+                'party_type' => JournalEntry::PARTY_EMPLOYEE,
+                'party_id' => (int) $employee->id,
+                'party_name' => $employee->full_name,
+                'pan' => $employee->pan_card_number,
+                'deductee_type' => 'individual',
+                'source_type' => \App\Domains\Accounting\Models\TdsDeduction::SOURCE_PAYROLL_RUN,
+                'source_id' => (int) $run->id,
+                'source_number' => "Payroll {$run->payroll_month}",
+                'journal_id' => $journal->id,
+                'deduction_date' => $date,
+                'base_amount' => $gross,
+                'rate' => $gross > 0 ? round($tds / $gross * 100, 3) : 0,
+                'tds_amount' => $tds,
+                'reason' => blank($employee->pan_card_number) && $tds > 0
+                    ? \App\Domains\Accounting\Models\TdsDeduction::REASON_NO_PAN
+                    : \App\Domains\Accounting\Models\TdsDeduction::REASON_NORMAL,
+            ]);
+        }
+    }
+
+    /**
+     * Salary TDS for a run that was posted before the TDS register existed:
+     * recalculates each employee and records them, but only if the TDS adds up
+     * to what the run's journal actually credited to TDS Payable — otherwise
+     * (salary inputs changed since) nothing is recorded and false is returned.
+     */
+    public function backfillSalaryTds(PayrollRun $run): bool
+    {
+        $tenantId = (int) $run->tenant_id;
+        $journal = $this->journalService->activePosting($tenantId, self::ACCRUAL_REFERENCE, $run->id);
+        $tdsAccount = $this->systemAccounts->get(SystemAccount::TDS_PAYABLE, $tenantId);
+
+        if ($journal === null || $tdsAccount === null) {
+            return false;
+        }
+
+        $allComponents = SalaryComponent::get()->keyBy('code');
+        $employees = $this->runEmployees($run);
+        $gross = [];
+        $tds = [];
+
+        foreach ($employees as $employee) {
+            $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
+            $earned = 0.00;
+            $lop = 0.00;
+
+            foreach ($calc['items'] ?? $calc['computed_components'] ?? [] as $code => $item) {
+                $val = (float) ($item['calculated_value'] ?? 0);
+                if ($val <= 0) {
+                    continue;
+                }
+                if (($item['type'] ?? 'earning') === 'earning') {
+                    $earned += $val;
+                    continue;
+                }
+                $bucket = self::deductionBucket((string) $code, (string) ($allComponents[$code]?->name ?? $item['name'] ?? ''));
+                if ($bucket === 'lop') {
+                    $lop += $val;
+                } elseif ($bucket === '2140') {
+                    $tds[$employee->id] = ($tds[$employee->id] ?? 0) + $val;
+                }
+            }
+
+            $gross[$employee->id] = $earned > 0 ? $earned * (1.0 - min(1.0, $lop / $earned)) : 0.00;
+        }
+
+        $posted = (float) $journal->entries()->where('chart_of_account_id', $tdsAccount->id)->sum('credit');
+        if (abs(round(array_sum($tds), 2) - round($posted, 2)) > 0.01) {
+            return false;
+        }
+
+        $this->recordSalaryTds($run, $journal, $employees, $gross, $tds);
+
+        return true;
     }
 
     /**
@@ -307,12 +475,48 @@ class PayrollAccountingService
 
         // What the accrual actually owes staff, not a fresh recalculation that
         // could differ if attendance or salary changed since.
-        $booked = round((float) JournalEntry::withoutGlobalScopes()
+        $bookedLines = JournalEntry::withoutGlobalScopes()
             ->where('journal_id', $accrual->id)
             ->where('chart_of_account_id', $salaryPayableAccount->id)
-            ->sum('credit'), 2);
+            ->where('credit', '>', 0)
+            ->get(['party_type', 'party_id', 'credit']);
 
-        $totalNetPayout = round($booked - $this->heldNetPay($run), 2);
+        $lines = [];
+        $billHints = [];
+        $employeeLines = $bookedLines->where('party_type', JournalEntry::PARTY_EMPLOYEE);
+
+        if ($employeeLines->isNotEmpty()) {
+            // One line per employee; a payslip on hold stays owed (its SAL bill open).
+            $held = $this->heldEmployeeIds($run);
+            foreach ($employeeLines as $booked) {
+                if (in_array((int) $booked->party_id, $held, true)) {
+                    continue;
+                }
+                $lines[] = [
+                    'chart_of_account_id' => $salaryPayableAccount->id,
+                    'debit'               => round((float) $booked->credit, 2),
+                    'credit'              => 0.00,
+                    'party_type'          => JournalEntry::PARTY_EMPLOYEE,
+                    'party_id'            => (int) $booked->party_id,
+                    'description'         => "Net salary paid for month {$run->payroll_month}",
+                ];
+                $billHints[] = BillWise\BillAllocationService::againstRef('payable', 'payroll_salary', (int) $run->id)
+                    + ['party_type' => JournalEntry::PARTY_EMPLOYEE, 'party_id' => (int) $booked->party_id, 'account_id' => $salaryPayableAccount->id];
+            }
+        } else {
+            // Salary entries posted before per-employee lines: one lump line.
+            $lump = round((float) $bookedLines->sum('credit') - $this->heldNetPay($run), 2);
+            if ($lump > 0) {
+                $lines[] = [
+                    'chart_of_account_id' => $salaryPayableAccount->id,
+                    'debit'               => $lump,
+                    'credit'              => 0.00,
+                    'description'         => "Net salary payout release for month {$run->payroll_month}",
+                ];
+            }
+        }
+
+        $totalNetPayout = round(array_sum(array_column($lines, 'debit')), 2);
         if ($totalNetPayout <= 0) {
             return null;
         }
@@ -322,19 +526,11 @@ class PayrollAccountingService
 
         $this->assertCashCovers($bankAccount, $totalNetPayout, $payoutDate);
 
-        $lines = [
-            [
-                'chart_of_account_id' => $salaryPayableAccount->id,
-                'debit'               => $totalNetPayout,
-                'credit'              => 0.00,
-                'description'         => "Net salary payout release for month {$run->payroll_month}",
-            ],
-            [
-                'chart_of_account_id' => $bankAccount->id,
-                'debit'               => 0.00,
-                'credit'              => $totalNetPayout,
-                'description'         => "Salary disbursement for month {$run->payroll_month} from {$bankAccount->name}",
-            ],
+        $lines[] = [
+            'chart_of_account_id' => $bankAccount->id,
+            'debit'               => 0.00,
+            'credit'              => $totalNetPayout,
+            'description'         => "Salary disbursement for month {$run->payroll_month} from {$bankAccount->name}",
         ];
 
         $meta = [
@@ -348,6 +544,7 @@ class PayrollAccountingService
             'reference_id'          => $run->id,
             'memo'                  => "Salary disbursement for month {$run->payroll_month} (Run ID: {$run->id}) from {$bankAccount->code} {$bankAccount->name}",
             'posted_by'             => auth()->id(),
+            'bill_allocations'      => $billHints,
         ];
 
         return $this->journalService->postOnce($lines, $meta);
@@ -486,6 +683,14 @@ class PayrollAccountingService
         $name = strtolower((string) $account->name);
 
         return str_contains($name, 'cash') && ! str_contains($name, 'bank') && ! str_contains($name, 'credit');
+    }
+
+    /** @return list<int> employees whose payslip for this run's month is on hold */
+    private function heldEmployeeIds(PayrollRun $run): array
+    {
+        return PayrollHold::where('payroll_month', $run->payroll_month)
+            ->where('status', 'on_hold')
+            ->pluck('employee_id')->map(fn ($id) => (int) $id)->all();
     }
 
     /** Net pay of payslips on hold for this run's month: not paid out yet. */

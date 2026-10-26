@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
+use App\Models\Concerns\NormalizesTaxIdentity;
 
 class Customer extends BaseModel
 {
-    use HasFactory, BelongsToCompany, BelongsToBranch;
+    use HasFactory, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
 
     /**
      * Set to TRUE before Customer::create() inside deal conversion
@@ -36,10 +37,12 @@ class Customer extends BaseModel
         'shipping_address',
         'opening_balance',
         'opening_balance_type',
+        'opening_bills',
     ];
 
     protected $casts = [
         'opening_balance' => 'float',
+        'opening_bills' => 'array',
     ];
 
     protected static function boot()

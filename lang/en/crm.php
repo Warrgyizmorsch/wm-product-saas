@@ -1,6 +1,9 @@
 <?php
 
 return array (
+  'select_country' => 'Select Country',
+  'select_state' => 'Select State',
+  'select_city' => 'Select City',
   'active_crm_database' => 'Active CRM database',
   'add_new_call_lead' => 'Add New Call / Lead',
   'change_owner' => 'Change Owner',
@@ -445,6 +448,7 @@ return array (
   'additional_contact' => 'Additional Contact',
   'accounts_sidebar' => 'Accounts (Companies)',
   'deals_sidebar' => 'Deals (Pipeline)',
+  'my_meetings_sidebar' => 'My Meetings',
   'track_status_sidebar' => 'Track Status',
   'customers_sidebar' => 'Customers',
   'crm_masters_sidebar' => 'CRM Masters',

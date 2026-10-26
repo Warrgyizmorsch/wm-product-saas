@@ -59,6 +59,7 @@ Route::prefix('purchase')
         Route::get('bills/export', [VendorBillController::class, 'export'])->name('bills.export');
         Route::get('bills/pending', [VendorBillController::class, 'pendingGrns'])->name('bills.pending');
         Route::get('bills/pending-freight', [VendorBillController::class, 'pendingFreight'])->name('bills.pending-freight');
+        Route::get('bills/tds-preview', [VendorBillController::class, 'tdsPreview'])->name('bills.tds-preview');
         Route::get('bills/create-service', [VendorBillController::class, 'createService'])->name('bills.create-service');
         Route::post('bills/store-service', [VendorBillController::class, 'storeService'])->name('bills.store-service');
         Route::post('bills/{bill}/apply-advance', [VendorBillController::class, 'applyAdvance'])->name('bills.apply-advance');

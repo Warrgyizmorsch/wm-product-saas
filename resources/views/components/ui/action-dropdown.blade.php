@@ -13,6 +13,13 @@
 @once
     @push('styles')
         <style>
+            /* Ensure table-responsive never resets horizontal scroll position when dropdown opens */
+            .table-responsive,
+            .table-responsive:has(.dropdown.show),
+            .table-responsive:has(.action-dropdown-wrapper.show) {
+                overflow-x: auto !important;
+            }
+
             .action-dropdown-btn {
                 display: inline-flex !important;
                 align-items: center !important;
@@ -26,26 +33,29 @@
                 transition: all 0.28s ease !important;
                 text-decoration: none !important;
                 cursor: pointer !important;
+                flex-shrink: 0 !important;
             }
+
             .action-dropdown-btn:hover,
             .action-dropdown-btn.active {
                 background-color: color-mix(in srgb, var(--bs-primary) 12%, transparent) !important;
                 border-color: var(--bs-primary) !important;
                 color: var(--bs-primary) !important;
             }
-            /* Explicitly align action-dropdown menu to the right edge and open leftwards */
+
             .action-dropdown-wrapper {
                 position: relative !important;
+                display: inline-block !important;
+                flex-shrink: 0 !important;
             }
-            .action-dropdown-wrapper.show {
-                z-index: 1055 !important;
-            }
+
+            /* Fixed positioning so the menu floats directly in the viewport, never clipped by table-responsive and never resetting scrollLeft */
             .action-dropdown-wrapper .dropdown-menu {
-                right: 0 !important;
-                left: auto !important;
+                position: fixed !important;
+                margin: 0 !important;
                 transform: none !important;
-                margin-top: 4px !important;
-                z-index: 1055 !important;
+                z-index: 1070 !important;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
             }
 
             /* Dark Mode Support */
@@ -54,6 +64,7 @@
                 background-color: #1c2438 !important;
                 color: #cbd5e1 !important;
             }
+
             html.app-skin-dark .action-dropdown-btn:hover,
             html.app-skin-dark .action-dropdown-btn.active {
                 background-color: color-mix(in srgb, var(--bs-primary) 25%, #1c2438) !important;
@@ -77,7 +88,8 @@
 
     @if(isset($slot) && trim($slot) !== '')
         <div class="dropdown action-dropdown-wrapper" id="{{ $dropdownId }}">
-            <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions">
+            <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}"
+                title="More Actions">
                 <i class="feather feather-more-horizontal"></i>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" style="margin: 0;">
@@ -90,47 +102,62 @@
 @once
     @push('scripts')
         <script>
-            $(document).ready(function() {
-                // Custom toggle handler to prevent Bootstrap double-event conflict & auto-detect position
-                $(document).on('click', '.dropdown-toggle-custom', function(e) {
+            $(document).ready(function () {
+                // Custom toggle handler: calculates fixed coordinates to preserve table-responsive horizontal scroll
+                $(document).on('click', '.dropdown-toggle-custom', function (e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    var parent = $(this).closest('.dropdown');
+
+                    var btn = $(this);
+                    var parent = btn.closest('.dropdown');
                     var menu = parent.find('.dropdown-menu');
-                    
+
                     var willShow = !menu.hasClass('show');
-                    
-                    // Close other open dropdowns
+
+                    // Close any other open dropdowns
                     $('.dropdown-menu.show').not(menu).removeClass('show');
                     $('.dropdown.show').not(parent).removeClass('show');
-                    
+
                     if (willShow) {
-                        var btn = $(this);
-                        var btnOffset = btn.offset();
-                        var btnHeight = btn.outerHeight();
+                        // Temporarily measure dimensions
+                        menu.css({
+                            'display': 'block',
+                            'visibility': 'hidden',
+                            'position': 'fixed'
+                        });
+
+                        var menuWidth = menu.outerWidth() || 185;
                         var menuHeight = menu.outerHeight() || 150;
-                        var windowScrollTop = $(window).scrollTop();
-                        var windowHeight = $(window).height();
-                        
-                        var spaceBelow = windowHeight - (btnOffset.top - windowScrollTop + btnHeight);
-                        
-                        if (spaceBelow < menuHeight + 20 && (btnOffset.top - windowScrollTop) > menuHeight) {
-                            menu.css({
-                                'top': 'auto',
-                                'bottom': '100%',
-                                'margin-bottom': '6px',
-                                'margin-top': '0'
-                            });
-                        } else {
-                            menu.css({
-                                'top': '100%',
-                                'bottom': 'auto',
-                                'margin-top': '6px',
-                                'margin-bottom': '0'
-                            });
+                        var rect = btn[0].getBoundingClientRect();
+                        var winWidth = $(window).width();
+                        var winHeight = $(window).height();
+
+                        // Vertical positioning (open downwards by default, flip upwards if near screen bottom)
+                        var top = rect.bottom + 4;
+                        if (rect.bottom + menuHeight > winHeight && rect.top > menuHeight) {
+                            top = rect.top - menuHeight - 4;
                         }
-                        
+
+                        // Horizontal positioning (align right edge of menu to right edge of button)
+                        var left = rect.right - menuWidth;
+                        if (left < 10) {
+                            left = rect.left;
+                        }
+                        if (left + menuWidth > winWidth - 10) {
+                            left = winWidth - menuWidth - 10;
+                        }
+
+                        menu.css({
+                            'position': 'fixed',
+                            'top': top + 'px',
+                            'left': left + 'px',
+                            'right': 'auto',
+                            'bottom': 'auto',
+                            'display': '',
+                            'visibility': '',
+                            'z-index': '1070'
+                        });
+
                         parent.addClass('show');
                         menu.addClass('show');
                     } else {
@@ -138,14 +165,31 @@
                         menu.removeClass('show');
                     }
                 });
-                
+
+                // Close dropdown when clicking an item
+                $(document).on('click', '.action-dropdown-wrapper .dropdown-item', function () {
+                    $('.dropdown-menu.show').removeClass('show');
+                    $('.dropdown.show').removeClass('show');
+                });
+
                 // Close dropdown when clicking outside
-                $(document).on('click', function(e) {
-                    if (!$(e.target).closest('.dropdown').length) {
+                $(document).on('click', function (e) {
+                    if (!$(e.target).closest('.dropdown-menu').length && !$(e.target).closest('.dropdown-toggle-custom').length) {
                         $('.dropdown-menu.show').removeClass('show');
                         $('.dropdown.show').removeClass('show');
                     }
                 });
+
+                // Close dropdown when scrolling table or window so it doesn't float disconnected
+                window.addEventListener('scroll', function (e) {
+                    if (e.target && $(e.target).closest('.dropdown-menu').length) {
+                        return;
+                    }
+                    if ($('.dropdown-menu.show').length) {
+                        $('.dropdown-menu.show').removeClass('show');
+                        $('.dropdown.show').removeClass('show');
+                    }
+                }, true);
             });
         </script>
     @endpush

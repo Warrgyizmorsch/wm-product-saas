@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Services\TaxIdentityService;
 
 class CustomerApiController extends Controller
 {
@@ -111,7 +112,7 @@ class CustomerApiController extends Controller
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255'],
             'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin'            => ['nullable', 'string', 'max:50'],
+            'gstin'            => TaxIdentityService::gstinRules(false),
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
@@ -221,7 +222,7 @@ class CustomerApiController extends Controller
             'company_name'     => ['nullable', 'string', 'max:255'],
             'email'            => ['nullable', 'email', 'max:255'],
             'phone'            => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin'            => ['nullable', 'string', 'max:50'],
+            'gstin'            => TaxIdentityService::gstinRules(false),
             'status'           => ['nullable', 'in:active,inactive,blocked'],
             'billing_address'  => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],

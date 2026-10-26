@@ -748,15 +748,15 @@
                                                                 <div class="row g-2 mt-3 mb-3 align-items-end d-none" id="office_coordinate_fields">
                                                                      <div class="col-md-3">
                                                                          <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.office_latitude') }}</label>
-                                                                         <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="e.g. 28.6139">
+                                                                         <input type="text" name="office_latitude" id="office_latitude" class="form-control fs-12" placeholder="Latitude">
                                                                      </div>
                                                                      <div class="col-md-3">
                                                                          <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.office_longitude') }}</label>
-                                                                         <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="e.g. 77.2090">
+                                                                         <input type="text" name="office_longitude" id="office_longitude" class="form-control fs-12" placeholder="Longitude">
                                                                      </div>
                                                                      <div class="col-md-3">
                                                                          <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.allowed_radius_m') }}</label>
-                                                                         <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" value="100" min="1">
+                                                                         <input type="number" name="office_radius" id="office_radius" class="form-control fs-12" min="1">
                                                                      </div>
                                                                      <div class="col-md-3 d-flex align-items-end">
                                                                          <div class="d-flex gap-2 w-100">
@@ -780,7 +780,7 @@
                                                                     <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.office_tracking_desc') }}</span>
                                                                     <div class="ms-4 ps-1 mt-2 d-none" id="office_tracking_minutes_wrap">
                                                                         <label class="form-label fs-12 text-muted mb-1">{{ __('hrms.penalization.tracking_interval_mins') }}</label>
-                                                                        <input type="number" name="office_tracking_minutes" id="office_tracking_minutes" class="form-control fs-12" style="max-width: 160px;" value="15" min="1" max="120" placeholder="e.g. 15">
+                                                                        <input type="number" name="office_tracking_minutes" id="office_tracking_minutes" class="form-control fs-12" style="max-width: 160px;" min="1" max="120">
                                                                         <span class="text-muted fs-11 d-block mt-1">{{ __('hrms.penalization.tracking_interval_desc') }}</span>
                                                                     </div>
                                                                 </div>
@@ -818,9 +818,9 @@
                                                             <x-ui.alert variant="light" icon="feather-map-pin" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
                                                                     {{ __('hrms.penalization.track_movement_prefix') }} 
-                                                                    <input type="number" name="wfh_tracking_meters" id="wfh_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    <input type="number" name="wfh_tracking_meters" id="wfh_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
                                                                     {{ __('hrms.penalization.track_movement_middle') }}
-                                                                    <input type="number" name="wfh_tracking_minutes" id="wfh_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    <input type="number" name="wfh_tracking_minutes" id="wfh_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
                                                                     {{ __('hrms.penalization.minutes') }}
                                                                 </p>
                                                             </x-ui.alert>
@@ -852,12 +852,35 @@
                                                             <x-ui.alert variant="light" icon="feather-map-pin" class="border-0 p-3 m-0 rounded-3 text-dark fs-13">
                                                                 <p class="mb-0 text-dark" style="line-height: 1.6;">
                                                                     {{ __('hrms.penalization.track_movement_prefix') }} 
-                                                                    <input type="number" name="site_tracking_meters" id="site_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="50" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    <input type="number" name="site_tracking_meters" id="site_tracking_meters" class="odoo-table-input d-inline-block text-center px-1 mx-1" min="1" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
                                                                     {{ __('hrms.penalization.track_movement_middle') }}
-                                                                    <input type="number" name="site_tracking_minutes" id="site_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="15" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
+                                                                    <input type="number" name="site_tracking_minutes" id="site_tracking_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" min="1" max="120" style="width: 55px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;">
                                                                     {{ __('hrms.penalization.minutes') }}
                                                                 </p>
                                                             </x-ui.alert>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Advanced Attendance, Break & Multi-Punch Rules -->
+                                                <div class="col-12 border-top pt-4 mb-2">
+                                                    <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                        <i class="feather-sliders text-primary fs-16"></i> {{ __('hrms.penalization.advanced_attendance_settings') }}
+                                                    </h6>
+                                                    <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.advanced_attendance_settings_desc') }}</span>
+                                                    
+                                                    <div class="d-flex flex-column gap-3 px-2">
+                                                        <div>
+                                                            <x-ui.checkbox name="office_break_geofence" id="office_break_geofence" label="{{ __('hrms.penalization.office_break_geofence') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.office_break_geofence_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="pause_tracking_on_break" id="pause_tracking_on_break" label="{{ __('hrms.penalization.pause_tracking_on_break') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.pause_tracking_on_break_desc') }}</span>
+                                                        </div>
+                                                        <div>
+                                                            <x-ui.checkbox name="allow_multiple_punches" id="allow_multiple_punches" label="{{ __('hrms.penalization.allow_multiple_punches') }}" />
+                                                            <span class="text-muted fs-11 d-block ms-4 ps-1">{{ __('hrms.penalization.allow_multiple_punches_desc') }}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1546,24 +1569,31 @@
                         document.getElementById('office_geofence').checked = !!rule.office_geofence;
                         document.getElementById('office_latitude').value = rule.office_latitude || '';
                         document.getElementById('office_longitude').value = rule.office_longitude || '';
-                        document.getElementById('office_radius').value = rule.office_radius || 100;
+                        document.getElementById('office_radius').value = rule.office_radius ?? '';
                         document.getElementById('office_tracking').checked = !!rule.office_tracking;
-                        document.getElementById('office_tracking_minutes').value = rule.office_tracking_minutes || 15;
+                        document.getElementById('office_tracking_minutes').value = rule.office_tracking_minutes ?? '';
 
                         document.getElementById('wfh_location').checked = !!rule.wfh_location;
                         document.getElementById('wfh_selfie').checked = !!rule.wfh_selfie;
                         document.getElementById('wfh_geofence').checked = !!rule.wfh_geofence;
                         document.getElementById('wfh_tracking').checked = !!rule.wfh_tracking;
-                        document.getElementById('wfh_tracking_meters').value = rule.wfh_tracking_meters || 50;
-                        document.getElementById('wfh_tracking_minutes').value = rule.wfh_tracking_minutes || 15;
+                        document.getElementById('wfh_tracking_meters').value = rule.wfh_tracking_meters ?? '';
+                        document.getElementById('wfh_tracking_minutes').value = rule.wfh_tracking_minutes ?? '';
 
                         document.getElementById('site_location').checked = !!rule.site_location;
                         document.getElementById('site_selfie').checked = !!rule.site_selfie;
                         let siteGeofenceEl = document.getElementById('site_geofence');
                         if (siteGeofenceEl) siteGeofenceEl.checked = !!rule.site_geofence;
                         document.getElementById('site_tracking').checked = !!rule.site_tracking;
-                        document.getElementById('site_tracking_meters').value = rule.site_tracking_meters || 50;
-                        document.getElementById('site_tracking_minutes').value = rule.site_tracking_minutes || 15;
+                        document.getElementById('site_tracking_meters').value = rule.site_tracking_meters ?? '';
+                        document.getElementById('site_tracking_minutes').value = rule.site_tracking_minutes ?? '';
+
+                        let breakGeoEl = document.getElementById('office_break_geofence');
+                        if (breakGeoEl) breakGeoEl.checked = !!rule.office_break_geofence;
+                        let pauseBreakEl = document.getElementById('pause_tracking_on_break');
+                        if (pauseBreakEl) pauseBreakEl.checked = !!rule.pause_tracking_on_break;
+                        let multiPunchEl = document.getElementById('allow_multiple_punches');
+                        if (multiPunchEl) multiPunchEl.checked = !!rule.allow_multiple_punches;
 
                         if ($('#sel_status').length) {
                             var statusVal = rule.status ? '1' : '0';
@@ -1576,24 +1606,31 @@
                         document.getElementById('office_geofence').checked = false;
                         document.getElementById('office_latitude').value = '';
                         document.getElementById('office_longitude').value = '';
-                        document.getElementById('office_radius').value = 100;
+                        document.getElementById('office_radius').value = '';
                         document.getElementById('office_tracking').checked = false;
-                        document.getElementById('office_tracking_minutes').value = 15;
+                        document.getElementById('office_tracking_minutes').value = '';
 
                         document.getElementById('wfh_location').checked = false;
                         document.getElementById('wfh_selfie').checked = false;
                         document.getElementById('wfh_geofence').checked = false;
                         document.getElementById('wfh_tracking').checked = false;
-                        document.getElementById('wfh_tracking_meters').value = 50;
-                        document.getElementById('wfh_tracking_minutes').value = 15;
+                        document.getElementById('wfh_tracking_meters').value = '';
+                        document.getElementById('wfh_tracking_minutes').value = '';
 
                         document.getElementById('site_location').checked = false;
                         document.getElementById('site_selfie').checked = false;
                         let siteGeofenceEl = document.getElementById('site_geofence');
                         if (siteGeofenceEl) siteGeofenceEl.checked = false;
                         document.getElementById('site_tracking').checked = false;
-                        document.getElementById('site_tracking_meters').value = 50;
-                        document.getElementById('site_tracking_minutes').value = 15;
+                        document.getElementById('site_tracking_meters').value = '';
+                        document.getElementById('site_tracking_minutes').value = '';
+
+                        let breakGeoEl = document.getElementById('office_break_geofence');
+                        if (breakGeoEl) breakGeoEl.checked = false;
+                        let pauseBreakEl = document.getElementById('pause_tracking_on_break');
+                        if (pauseBreakEl) pauseBreakEl.checked = false;
+                        let multiPunchEl = document.getElementById('allow_multiple_punches');
+                        if (multiPunchEl) multiPunchEl.checked = false;
 
                         if ($('#sel_status').length) {
                             $('#sel_status').val('1').trigger('change.select2');
@@ -1783,7 +1820,11 @@
             const lngInput = document.getElementById('office_longitude');
             const lat = parseFloat(latInput ? latInput.value : '');
             const lng = parseFloat(lngInput ? lngInput.value : '');
-            const radius = parseFloat(document.getElementById('office_radius').value) || 100;
+            const radius = parseFloat(document.getElementById('office_radius').value);
+            if (!Number.isFinite(radius) || radius <= 0) {
+                alert('Enter the allowed office radius in the attendance rule before detecting or saving the location.');
+                return;
+            }
             
             if (isNaN(lat) || isNaN(lng)) return;
             
@@ -1813,54 +1854,73 @@
             
             if (!document.getElementById(mapContainerId)) return;
 
-            let curLat = parseFloat(latInput ? latInput.value : '') || 28.6139;
-            let curLng = parseFloat(lngInput ? lngInput.value : '') || 77.2090;
+            let curLat = parseFloat(latInput ? latInput.value : '');
+            let curLng = parseFloat(lngInput ? lngInput.value : '');
+            const hasOfficeCoordinates = Number.isFinite(curLat) && Number.isFinite(curLng);
 
             if (officeMapObj) {
                 officeMapObj.invalidateSize();
-                officeMapObj.setView([curLat, curLng], officeMapObj.getZoom() || 14);
-                if (officeMarkerObj) {
-                    officeMarkerObj.setLatLng([curLat, curLng]);
+                if (hasOfficeCoordinates) {
+                    officeMapObj.setView([curLat, curLng], officeMapObj.getZoom() || 14);
+                    if (officeMarkerObj) {
+                        officeMarkerObj.setLatLng([curLat, curLng]);
+                    } else {
+                        setOfficeMarker(curLat, curLng);
+                    }
                 }
                 updateGeofenceCircle();
                 return;
             }
 
-            officeMapObj = L.map(mapContainerId).setView([curLat, curLng], 14);
+            officeMapObj = L.map(mapContainerId);
+            if (hasOfficeCoordinates) {
+                officeMapObj.setView([curLat, curLng], 14);
+            } else {
+                officeMapObj.fitWorld();
+            }
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(officeMapObj);
 
-            officeMarkerObj = L.marker([curLat, curLng], {
-                draggable: true,
-                title: 'Drag to adjust office location'
-            }).addTo(officeMapObj);
+            if (hasOfficeCoordinates) {
+                setOfficeMarker(curLat, curLng);
+            }
 
             updateGeofenceCircle();
 
             officeMapObj.on('click', function(e) {
                 const clickedLat = e.latlng.lat;
                 const clickedLng = e.latlng.lng;
-                officeMarkerObj.setLatLng(e.latlng);
+                setOfficeMarker(clickedLat, clickedLng);
                 latInput.value = clickedLat.toFixed(6);
                 lngInput.value = clickedLng.toFixed(6);
                 updateGeofenceCircle();
             });
 
-            officeMarkerObj.on('dragend', function(e) {
-                const pos = e.target.getLatLng();
-                latInput.value = pos.lat.toFixed(6);
-                lngInput.value = pos.lng.toFixed(6);
-                updateGeofenceCircle();
-            });
+            function setOfficeMarker(lat, lng) {
+                if (!officeMarkerObj) {
+                    officeMarkerObj = L.marker([lat, lng], {
+                        draggable: true,
+                        title: 'Drag to adjust office location'
+                    }).addTo(officeMapObj);
+                    officeMarkerObj.on('dragend', function(e) {
+                        const pos = e.target.getLatLng();
+                        latInput.value = pos.lat.toFixed(6);
+                        lngInput.value = pos.lng.toFixed(6);
+                        updateGeofenceCircle();
+                    });
+                } else {
+                    officeMarkerObj.setLatLng([lat, lng]);
+                }
+            }
 
             const updateMapFromInputs = () => {
                 const newLat = parseFloat(latInput.value);
                 const newLng = parseFloat(lngInput.value);
                 if (!isNaN(newLat) && !isNaN(newLng)) {
                     officeMapObj.setView([newLat, newLng], officeMapObj.getZoom() || 14);
-                    officeMarkerObj.setLatLng([newLat, newLng]);
+                    setOfficeMarker(newLat, newLng);
                     updateGeofenceCircle();
                 }
             };
@@ -1881,7 +1941,7 @@
                     const lat = parseFloat(place.lat);
                     const lng = parseFloat(place.lng);
                     officeMapObj.setView([lat, lng], 15);
-                    officeMarkerObj.setLatLng([lat, lng]);
+                    setOfficeMarker(lat, lng);
 
                     latInput.value = lat.toFixed(6);
                     lngInput.value = lng.toFixed(6);

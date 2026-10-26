@@ -64,6 +64,13 @@ class VendorBill extends BaseModel
         'total_amount',
         'paid_amount',
         'due_amount',
+        'tds_section_id',
+        'tds_base_amount',
+        'tds_rate',
+        'tds_amount',
+        'tds_catchup_base',
+        'tds_reason',
+        'tds_overridden',
         'notes',
         'created_by',
     ];
@@ -84,8 +91,38 @@ class VendorBill extends BaseModel
         'total_amount' => 'decimal:4',
         'paid_amount' => 'decimal:4',
         'due_amount' => 'decimal:4',
+        'tds_base_amount' => 'decimal:4',
+        'tds_rate' => 'float',
+        'tds_amount' => 'decimal:4',
+        'tds_overridden' => 'boolean',
         'landed_cost_revaluation_data' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        // TDS is worked out once, when the bill is made (see VendorBillTdsService).
+        static::creating(fn (VendorBill $bill) => app(\App\Domains\Purchase\Services\VendorBillTdsService::class)->apply($bill));
+    }
+
+    /**
+     * What the vendor is owed for this bill in total: the bill less the TDS
+     * withheld. Paid + due always adds up to this, never to grand_total.
+     */
+    public function netPayable(): float
+    {
+        return round((float) ($this->grand_total ?: ($this->attributes['total_amount'] ?? 0)) - (float) ($this->tds_amount ?? 0), 4);
+    }
+
+    /** What is still due once $paid has been paid against the bill in total. */
+    public function dueAfterPaying(float $paid): float
+    {
+        return max(0.0, round($this->netPayable() - $paid, 4));
+    }
+
+    public function tdsSection(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\TdsSection::class, 'tds_section_id');
+    }
 
     public function items(): HasMany
     {

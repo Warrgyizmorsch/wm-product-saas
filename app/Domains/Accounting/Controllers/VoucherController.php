@@ -8,6 +8,7 @@ use App\Domains\Accounting\Policies\VoucherPolicy;
 use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Domains\Accounting\Services\JournalService;
 use App\Domains\Accounting\Services\VoucherService;
+use App\Domains\Accounting\Support\BillWiseInput;
 use App\Domains\Accounting\Support\VoucherType;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class VoucherController extends Controller
         private readonly ChartOfAccountsService $accounts,
         private readonly VoucherPolicy $voucherPolicy,
         private readonly JournalService $journals,
+        private readonly BillWiseInput $billWise,
     ) {
     }
 
@@ -45,6 +47,7 @@ class VoucherController extends Controller
             // create-voucher drawer opened from this same page.
             'accounts' => $canCreate ? $this->accounts->active() : collect(),
             'cashBankAccounts' => $canCreate ? $this->accounts->active()->where('is_cash_or_bank', true)->values() : collect(),
+            'partyLedgers' => $canCreate ? $this->partyLedgers($type) : [],
             'summary' => [
                 'total' => Journal::query()->where('voucher_type', $type)->count(),
                 'posted' => Journal::query()->where('voucher_type', $type)->where('status', Journal::STATUS_POSTED)->count(),
@@ -65,6 +68,29 @@ class VoucherController extends Controller
             'label' => VoucherType::label($type),
             'accounts' => $this->accounts->active(),
             'cashBankAccounts' => $this->accounts->active()->where('is_cash_or_bank', true)->values(),
+            'partyLedgers' => $this->partyLedgers($type),
+        ]);
+    }
+
+    /**
+     * The ledger a party's line goes to when the voucher's Party is picked and
+     * that line has no ledger yet (party type => account id).
+     *
+     * @return array<string, int>
+     */
+    private function partyLedgers(string $type): array
+    {
+        $tenantId = (int) require_tenant_id();
+        $systemAccounts = app(\App\Domains\Accounting\Services\SystemAccountService::class);
+        $payables = $systemAccounts->get(\App\Domains\Accounting\Support\SystemAccount::AP, $tenantId);
+        // Paying an employee is usually salary; money back from one, an advance returned.
+        $employee = $systemAccounts->get($type === VoucherType::RECEIPT ? \App\Domains\Accounting\Support\SystemAccount::ADVANCE_TO_EMPLOYEES : 'salary_payable', $tenantId);
+
+        return array_filter([
+            'customer' => $systemAccounts->get(\App\Domains\Accounting\Support\SystemAccount::AR, $tenantId)?->id,
+            'vendor' => $payables?->id,
+            'transporter' => $payables?->id,
+            'employee' => $employee?->id,
         ]);
     }
 
@@ -77,6 +103,8 @@ class VoucherController extends Controller
             'voucher_date' => ['required', 'date'],
             'memo' => ['nullable', 'string', 'max:500'],
             'party_name' => ['nullable', 'string', 'max:255'],
+            // The voucher's Party ("type:id"); empty when only a name was typed.
+            'party' => ['nullable', 'string', 'max:40'],
             'payment_method' => ['nullable', 'string', 'max:50'],
             'reference_no' => ['nullable', 'string', 'max:100'],
             'items' => ['required', 'array', 'min:2', 'max:20'],
@@ -84,17 +112,39 @@ class VoucherController extends Controller
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
+            ...BillWiseInput::rules(),
         ]);
+
+        // The voucher's Party tags each party-ledger line that wasn't given one
+        // in its own bill-wise box (like picking the party ledger in Tally).
+        $voucherParty = trim((string) ($validated['party'] ?? ''));
+        if ($voucherParty !== '') {
+            $validated['items'] = $this->billWise->withVoucherParty($validated['items'], $voucherParty);
+        }
+
+        // Party per line and the bills it settles / opens (the bill-wise box).
+        [$lines, $billHints] = $this->billWise->apply($validated['items']);
+        $firstParty = collect($lines)->first(fn ($line) => ! empty($line['party_id']));
+        $partyName = $validated['party_name'] ?? null;
+        if ($voucherParty !== '') {
+            [$partyType, $partyId] = explode(':', $voucherParty, 2);
+            $partyName = $this->billWise->partyName($partyType, (int) $partyId);
+        } elseif ($firstParty && $partyName === null) {
+            $partyName = $this->billWise->partyName($firstParty['party_type'], (int) $firstParty['party_id']);
+        }
 
         try {
             if ($type === VoucherType::CONTRA) {
-                $this->assertBothLinesAreCashOrBank($validated['items']);
+                $this->assertBothLinesAreCashOrBank($lines);
             }
 
-            $journal = $this->vouchers->post($type, $validated['items'], [
+            $journal = $this->vouchers->post($type, $lines, [
                 'journal_date' => $validated['voucher_date'],
                 'memo' => $validated['memo'] ?? null,
-                'party_name' => $validated['party_name'] ?? null,
+                'party_type' => $firstParty['party_type'] ?? null,
+                'party_id' => $firstParty['party_id'] ?? null,
+                'party_name' => $partyName,
+                'bill_allocations' => $billHints,
                 'payment_method' => $validated['payment_method'] ?? null,
                 'reference_no' => $validated['reference_no'] ?? null,
                 'posted_by' => auth()->id(),

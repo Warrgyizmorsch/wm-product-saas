@@ -278,6 +278,10 @@ class SalesAccountingService
                 'reference_id'          => $invoice->id,
                 'memo'                  => "Sales Invoice Posting #{$invoice->invoice_number}",
                 'journal_number_prefix' => 'INV-JNL',
+                // The invoice opens its own bill in the bill-wise register.
+                'bill_allocations'      => [\App\Domains\Accounting\Services\BillWise\BillAllocationService::newRef(
+                    'receivable', (string) $invoice->invoice_number, $invoice->invoice_date ?? now(), $invoice->due_date, 'Invoice', (int) $invoice->id,
+                )],
             ];
 
             return $this->journalService->postOnce($lines, $meta);

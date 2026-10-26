@@ -7,6 +7,7 @@ use App\Domains\Accounting\Models\CostCenter;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Services\ChartOfAccountsService;
 use App\Domains\Accounting\Services\JournalService;
+use App\Domains\Accounting\Support\BillWiseInput;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class JournalController extends Controller
     public function __construct(
         private readonly JournalService $journals,
         private readonly ChartOfAccountsService $accounts,
+        private readonly BillWiseInput $billWise,
     ) {
     }
 
@@ -78,15 +80,20 @@ class JournalController extends Controller
             'items.*.debit' => ['nullable', 'numeric', 'min:0'],
             'items.*.credit' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
+            ...BillWiseInput::rules(),
         ]);
+
+        // Party per line and the bills it settles / opens (the bill-wise box).
+        [$lines, $billHints] = $this->billWise->apply($validated['items']);
 
         try {
             // submit(): posts now, or holds for maker-checker approval.
-            $journal = $this->journals->submit($validated['items'], [
+            $journal = $this->journals->submit($lines, [
                 'journal_date' => $validated['journal_date'],
                 'memo' => $validated['memo'] ?? null,
                 'source' => Journal::SOURCE_MANUAL,
                 'posted_by' => auth()->id(),
+                'bill_allocations' => $billHints,
             ]);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['items' => $e->getMessage()])->withInput();

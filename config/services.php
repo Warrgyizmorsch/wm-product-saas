@@ -39,6 +39,10 @@ return [
         'key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'openstreetmap' => [
+        'key' => env('OPENSTREETMAP_API_KEY'),
+    ],
+
     'razorpay' => [
         'key' => env('RAZORPAY_KEY_ID'),
         'secret' => env('RAZORPAY_KEY_SECRET'),
