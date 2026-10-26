@@ -121,21 +121,50 @@ class PenalizationPolicyController extends Controller
         $validated['office_biometric']        = $request->boolean('office_biometric');
         $validated['office_web']              = $request->boolean('office_web');
         $validated['office_geofence']         = $request->boolean('office_geofence');
-        $validated['office_radius']           = $request->filled('office_radius') ? (int)$request->office_radius : 100;
         $validated['office_tracking']         = $request->boolean('office_tracking');
-        $validated['office_tracking_minutes'] = $request->filled('office_tracking_minutes') ? (int) $request->office_tracking_minutes : 15;
-        $validated['wfh_location']            = $request->boolean('wfh_location');
-        $validated['wfh_selfie']              = $request->boolean('wfh_selfie');
         $validated['wfh_geofence']            = $request->boolean('wfh_geofence');
         $validated['wfh_tracking']            = $request->boolean('wfh_tracking');
-        $validated['wfh_tracking_meters']     = $request->filled('wfh_tracking_meters') ? (int) $request->wfh_tracking_meters : 50;
-        $validated['wfh_tracking_minutes']    = $request->filled('wfh_tracking_minutes') ? (int) $request->wfh_tracking_minutes : 15;
+        $validated['site_tracking']            = $request->boolean('site_tracking');
+        $requiredRuleFields = [];
+        if ($validated['office_geofence']) {
+            $requiredRuleFields += [
+                'office_latitude' => 'required|numeric|between:-90,90',
+                'office_longitude' => 'required|numeric|between:-180,180',
+                'office_radius' => 'required|integer|min:1',
+            ];
+        }
+        if ($validated['office_tracking']) {
+            $requiredRuleFields['office_tracking_minutes'] = 'required|integer|min:1|max:120';
+        }
+        if ($validated['wfh_geofence'] || $validated['wfh_tracking']) {
+            $requiredRuleFields['wfh_tracking_meters'] = 'required|integer|min:1';
+        }
+        if ($validated['wfh_tracking']) {
+            $requiredRuleFields['wfh_tracking_minutes'] = 'required|integer|min:1|max:120';
+        }
+        if ($validated['site_tracking']) {
+            $requiredRuleFields['site_tracking_meters'] = 'required|integer|min:1';
+            $requiredRuleFields['site_tracking_minutes'] = 'required|integer|min:1|max:120';
+        }
+        if ($requiredRuleFields) {
+            $request->validate($requiredRuleFields);
+        }
+        $validated['office_radius']           = $request->filled('office_radius') ? (int)$request->office_radius : null;
+        $validated['office_tracking']         = $request->boolean('office_tracking');
+        $validated['office_tracking_minutes'] = $request->filled('office_tracking_minutes') ? (int) $request->office_tracking_minutes : null;
+        $validated['wfh_location']            = $request->boolean('wfh_location');
+        $validated['wfh_selfie']              = $request->boolean('wfh_selfie');
+        $validated['wfh_tracking']            = $request->boolean('wfh_tracking');
+        $validated['wfh_tracking_meters']     = $request->filled('wfh_tracking_meters') ? (int) $request->wfh_tracking_meters : null;
+        $validated['wfh_tracking_minutes']    = $request->filled('wfh_tracking_minutes') ? (int) $request->wfh_tracking_minutes : null;
         $validated['site_location']           = $request->boolean('site_location');
         $validated['site_selfie']             = $request->boolean('site_selfie');
         $validated['site_geofence']           = $request->boolean('site_geofence');
-        $validated['site_tracking']           = $request->boolean('site_tracking');
-        $validated['site_tracking_meters']    = $request->filled('site_tracking_meters') ? (int) $request->site_tracking_meters : 50;
-        $validated['site_tracking_minutes']   = $request->filled('site_tracking_minutes') ? (int) $request->site_tracking_minutes : 15;
+        $validated['site_tracking_meters']    = $request->filled('site_tracking_meters') ? (int) $request->site_tracking_meters : null;
+        $validated['site_tracking_minutes']   = $request->filled('site_tracking_minutes') ? (int) $request->site_tracking_minutes : null;
+        $validated['office_break_geofence']   = $request->boolean('office_break_geofence');
+        $validated['pause_tracking_on_break'] = $request->boolean('pause_tracking_on_break');
+        $validated['allow_multiple_punches']  = $request->boolean('allow_multiple_punches');
         $validated['status']                  = filter_var($request->status, FILTER_VALIDATE_BOOLEAN);
 
         $validated['business_unit_id'] = !empty($validated['business_unit_id']) ? $validated['business_unit_id'] : null;

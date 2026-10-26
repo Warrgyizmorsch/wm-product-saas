@@ -210,6 +210,11 @@ class Employee extends BaseModel
         return $this->belongsTo(Employee::class, 'reporting_manager_id');
     }
 
+    public function directReports(): HasMany
+    {
+        return $this->hasMany(Employee::class, 'reporting_manager_id');
+    }
+
     public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(Document::class, 'documentable');

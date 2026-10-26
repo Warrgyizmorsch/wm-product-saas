@@ -35,10 +35,10 @@
 
         $officeLat = $rule ? $rule->office_latitude  : null;
         $officeLng = $rule ? $rule->office_longitude : null;
-        $officeRad = ($rule && $rule->office_radius) ? (int)$rule->office_radius : 200;
+        $officeRad = $rule?->office_radius ? (int)$rule->office_radius : null;
         $wfhLat    = $employee->wfh_latitude  ?? null;
         $wfhLng    = $employee->wfh_longitude ?? null;
-        $wfhRad    = ($rule && $rule->wfh_tracking_meters) ? (int)$rule->wfh_tracking_meters : 200;
+        $wfhRad    = $rule?->wfh_tracking_meters ? (int)$rule->wfh_tracking_meters : null;
     @endphp
 
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
@@ -182,19 +182,19 @@
                                 $isAbsentOrLeave = in_array($statusVal, ['absent', 'on_leave']);
 
                                 // Location Badge Class & Translated Label
-                                $locLower = strtolower($attendance->location_type);
-                                $locBadgeClass = 'bg-soft-secondary text-secondary';
-                                $locText = '-';
-                                if ($locLower === 'office') {
-                                    $locBadgeClass = 'bg-soft-primary text-primary';
-                                    $locText = __('hrms.my_attendance.office');
-                                } elseif ($locLower === 'wfh') {
+                                $locLower = strtolower((string)$attendance->location_type);
+                                $locBadgeClass = 'bg-soft-primary text-primary';
+                                $locText = __('hrms.my_attendance.office');
+                                if ($locLower === 'wfh') {
                                     $locBadgeClass = 'bg-soft-success text-success';
                                     $locText = __('hrms.my_attendance.wfh');
-                                } elseif ($locLower === 'onsite') {
+                                } elseif (in_array($locLower, ['onsite', 'on-site', 'site'])) {
                                     $locBadgeClass = 'bg-soft-warning text-warning';
                                     $locText = __('hrms.my_attendance.onsite');
-                                } elseif (!empty($attendance->location_type)) {
+                                } elseif ($locLower === 'office') {
+                                    $locBadgeClass = 'bg-soft-primary text-primary';
+                                    $locText = __('hrms.my_attendance.office');
+                                } elseif (!empty($attendance->formatted_location_type) && $attendance->formatted_location_type !== '—') {
                                     $locText = $attendance->formatted_location_type;
                                 }
 
@@ -336,7 +336,10 @@
                                             data-check-in-lng="{{ $attendance->check_in_longitude }}"
                                             data-check-out-lat="{{ $attendance->check_out_latitude }}"
                                             data-check-out-lng="{{ $attendance->check_out_longitude }}"
-                                            data-location-logs="{{ json_encode(isset($attendance->locationLogs) && $attendance->locationLogs ? $attendance->locationLogs->map(fn($l) => ['lat' => (float)$l->latitude, 'lng' => (float)$l->longitude, 'time' => $l->created_at ? $l->created_at->format('h:i A') : '']) : []) }}"
+                                            data-location-logs="{{ json_encode($attendance->formatted_location_logs ?? []) }}"
+                                            data-route-snapshot="{{ $attendance->route_snapshot_url ?? '' }}"
+                                            data-total-distance="{{ (float)($attendance->total_distance_km ?? 0) }}"
+                                            data-route-summary="{{ json_encode($attendance->route_summary ?? []) }}"
                                             onclick="viewAttendanceDetailDrawer(this)">
                                         <i class="feather-eye fs-13"></i>
                                     </button>
@@ -389,7 +392,17 @@
 
         <!-- Single Location Map -->
         <div class="mb-4">
-            <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">{{ __('hrms.my_attendance.session_map') }}</span>
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.my_attendance.session_map') }}</span>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="badge bg-soft-primary text-primary border px-2 py-0.5 rounded-pill fs-11 fw-semibold" id="detail-drawer-distance-badge" style="display: none;">
+                        <i class="feather-navigation fs-11 me-1"></i> <span id="detail-drawer-distance-val">0.00</span> KM
+                    </span>
+                    <a href="#" target="_blank" id="detail-drawer-snapshot-link" class="badge bg-light text-muted border px-2 py-0.5 rounded-pill fs-11 fw-semibold text-decoration-none" style="display: none;">
+                        <i class="feather-image fs-11 me-1"></i> Snapshot
+                    </a>
+                </div>
+            </div>
             <div class="position-relative w-100" id="detail-drawer-map-wrap" style="display: none;">
                 <input type="text" id="detail_drawer_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="{{ __('hrms.my_attendance.search_address_placeholder') }}">
                 <div id="detail-drawer-map" style="height: 250px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
@@ -397,6 +410,21 @@
             <div id="detail-drawer-map-none" class="alert alert-light border text-center fs-12 py-4 mb-0">
                 <i class="feather-map-pin text-muted fs-20 d-block mb-1"></i> {{ __('hrms.my_attendance.no_coords') }}
             </div>
+        </div>
+
+        <!-- Telemetry Compliance & Tracking Gap Status (Pillar 1 & Pillar 3) -->
+        <div id="detail-drawer-telemetry-card" class="mb-4 rounded-3 p-3 border" style="display: none;">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="detail-drawer-telemetry-icon" class="avatar-xs rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                        <i class="feather-activity fs-12"></i>
+                    </span>
+                    <strong class="fs-12 fw-bold" id="detail-drawer-telemetry-title">GPS Telemetry Status</strong>
+                </div>
+                <span class="badge rounded-pill fs-10 fw-bold px-2.5 py-1" id="detail-drawer-telemetry-badge">100% Active</span>
+            </div>
+            <p class="fs-11 text-muted mb-0 ps-4" id="detail-drawer-telemetry-desc">Shift telemetry continuously recorded without GPS interruption.</p>
+            <div id="detail-drawer-telemetry-gap-list" class="mt-2 ps-4" style="display: none;"></div>
         </div>
 
         <!-- Check-In & Check-Out Info Grid (Stacked/Comparison) -->
@@ -498,12 +526,12 @@
         detailDrawerOverlays = [];
     }
 
-    function viewAttendanceDetailDrawer(btn) {
+    window.viewAttendanceDetailDrawer = function(btn) {
         const searchInput = document.getElementById('detail_drawer_map_search');
         if (searchInput) {
             searchInput.value = '';
             searchInput.disabled = false;
-            searchInput.placeholder = {{ json_encode(__('hrms.my_attendance.search_address_placeholder')) }};
+            searchInput.placeholder = {!! json_encode(__('hrms.my_attendance.search_address_placeholder')) !!};
         }
 
         const date = btn.getAttribute('data-date');
@@ -581,6 +609,49 @@
             console.error("Failed to parse location logs:", e);
         }
 
+        // Distance & Route Snapshot
+        const totalDistance = parseFloat(btn.getAttribute('data-total-distance') || '0');
+        const routeSnapshot = btn.getAttribute('data-route-snapshot') || '';
+        const distBadge = document.getElementById('detail-drawer-distance-badge');
+        const distVal = document.getElementById('detail-drawer-distance-val');
+        const snapshotLink = document.getElementById('detail-drawer-snapshot-link');
+
+        // Route Summary & Telemetry Compliance (Pillar 1 & Pillar 3)
+        let routeSummary = {};
+        try {
+            const rawSummary = btn.getAttribute('data-route-summary');
+            if (rawSummary) {
+                routeSummary = (typeof rawSummary === 'string') ? JSON.parse(rawSummary) : rawSummary;
+            }
+        } catch(e) {
+            console.error("Failed to parse route summary:", e);
+        }
+
+        const teleCard = document.getElementById('detail-drawer-telemetry-card');
+        const teleTitle = document.getElementById('detail-drawer-telemetry-title');
+        const teleDesc = document.getElementById('detail-drawer-telemetry-desc');
+        const teleBadge = document.getElementById('detail-drawer-telemetry-badge');
+        const teleIcon = document.getElementById('detail-drawer-telemetry-icon');
+        const teleGapList = document.getElementById('detail-drawer-telemetry-gap-list');
+
+        if (distBadge && distVal) {
+            if (totalDistance > 0) {
+                distVal.textContent = totalDistance.toFixed(2);
+                distBadge.style.display = 'inline-flex';
+            } else {
+                distBadge.style.display = 'none';
+            }
+        }
+
+        if (snapshotLink) {
+            if (routeSnapshot && routeSnapshot !== '') {
+                snapshotLink.href = routeSnapshot;
+                snapshotLink.style.display = 'inline-flex';
+            } else {
+                snapshotLink.style.display = 'none';
+            }
+        }
+
         // Show/hide map div based on coordinates presence
         const mapWrap = document.getElementById('detail-drawer-map-wrap');
         const mapNone = document.getElementById('detail-drawer-map-none');
@@ -598,10 +669,85 @@
             mapNone.style.display = 'block';
         }
 
+        // Telemetry Compliance Status (Pillar 1 & Pillar 3)
+        if (teleCard) {
+            if (hasPunchCoords) {
+                teleCard.style.display = 'block';
+                const hasGaps = !!(routeSummary && routeSummary.has_tracking_gaps && routeSummary.tracking_gaps && routeSummary.tracking_gaps.length > 0);
+                const totalUntracked = routeSummary ? (routeSummary.total_untracked_minutes || 0) : 0;
+
+                if (hasGaps) {
+                    teleCard.style.background = '#fff5f5';
+                    teleCard.style.borderColor = '#fecaca';
+                    if (teleIcon) {
+                        teleIcon.className = 'avatar-xs rounded-circle d-flex align-items-center justify-content-center bg-danger text-white';
+                        teleIcon.innerHTML = '<i class="feather-alert-triangle fs-12"></i>';
+                    }
+                    if (teleTitle) {
+                        teleTitle.className = 'fs-12 fw-bold text-danger';
+                        teleTitle.textContent = 'Location Tracking Interrupted';
+                    }
+                    if (teleBadge) {
+                        teleBadge.className = 'badge bg-danger text-white rounded-pill fs-10 fw-bold px-2 py-0.5';
+                        teleBadge.textContent = totalUntracked + 'm Untracked';
+                    }
+                    if (teleDesc) {
+                        teleDesc.className = 'fs-11 text-dark mb-0 ps-4';
+                        teleDesc.textContent = 'GPS was disabled or signal was lost mid-shift. Compliance gap audit:';
+                    }
+                    if (teleGapList) {
+                        teleGapList.style.display = 'block';
+                        teleGapList.innerHTML = routeSummary.tracking_gaps.map(function(g) {
+                            if (g.is_approved_break) {
+                                return '<div class="d-flex align-items-center gap-1.5 fs-11 text-success py-0.5"><i class="feather-check-circle fs-11"></i> <strong>' + (g.duration_min || 0) + ' mins (Approved Break)</strong>: ' + (g.from_time || '') + ' &rarr; ' + (g.to_time || '') + '</div>';
+                            }
+                            return '<div class="d-flex align-items-center gap-1.5 fs-11 text-danger py-0.5"><i class="feather-clock fs-11"></i> <strong>' + (g.duration_min || 0) + ' mins offline (GPS Interrupted)</strong>: ' + (g.from_time || '') + ' &rarr; ' + (g.to_time || '') + '</div>';
+                        }).join('');
+                    }
+                } else {
+                    teleCard.style.background = '#f0fdf4';
+                    teleCard.style.borderColor = '#bbf7d0';
+                    if (teleIcon) {
+                        teleIcon.className = 'avatar-xs rounded-circle d-flex align-items-center justify-content-center bg-success text-white';
+                        teleIcon.innerHTML = '<i class="feather-check fs-12"></i>';
+                    }
+                    if (teleTitle) {
+                        teleTitle.className = 'fs-12 fw-bold text-success';
+                        teleTitle.textContent = 'Continuous Telemetry Verified';
+                    }
+                    if (teleBadge) {
+                        teleBadge.className = 'badge bg-success text-white rounded-pill fs-10 fw-bold px-2 py-0.5';
+                        teleBadge.textContent = '100% Compliant';
+                    }
+                    if (teleDesc) {
+                        teleDesc.className = 'fs-11 text-muted mb-0 ps-4';
+                        teleDesc.textContent = 'Location telemetry verified continuously with zero missing intervals.';
+                    }
+                    if (teleGapList) {
+                        teleGapList.style.display = 'none';
+                    }
+                }
+            } else {
+                teleCard.style.display = 'none';
+            }
+        }
+
         // Show Drawer
         const drawerEl = document.getElementById('attendanceRecordDetailDrawer');
-        const bootstrapDrawer = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
-        bootstrapDrawer.show();
+        if (drawerEl) {
+            try {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+                    const bootstrapDrawer = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
+                    bootstrapDrawer.show();
+                } else if (typeof $ !== 'undefined' && typeof $(drawerEl).offcanvas === 'function') {
+                    $(drawerEl).offcanvas('show');
+                } else {
+                    drawerEl.classList.add('show');
+                }
+            } catch (err) {
+                console.error("Error opening drawer:", err);
+            }
+        }
 
         if (!window.initNominatimAutocomplete) {
             window.initNominatimAutocomplete = function(inputEl, onSelectCallback) {
@@ -653,7 +799,7 @@
                     updateDropdownPosition();
 
                     if (!currentResults || currentResults.length === 0) {
-                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">' + {{ json_encode(__('hrms.my_attendance.no_locations_found')) }} + '</div>';
+                        dropdown.innerHTML = '<div class="p-2 text-muted fs-11 text-center bg-white">' + {!! json_encode(__('hrms.my_attendance.no_locations_found')) !!} + '</div>';
                         dropdown.style.display = 'block';
                         return;
                     }
@@ -763,14 +909,14 @@
 
         // Render Leaflet map
         setTimeout(() => {
-            if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs || hasGeofenceCoords) {
+            if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs) {
                 if (typeof L === 'undefined') {
                     return;
                 }
 
-                @if($officeLat && $officeLng)
+                @if(!empty($officeLat) && !empty($officeLng))
                 const initCenter = [{{ (float)$officeLat }}, {{ (float)$officeLng }}];
-                @elseif($wfhLat && $wfhLng)
+                @elseif(!empty($wfhLat) && !empty($wfhLng))
                 const initCenter = [{{ (float)$wfhLat }}, {{ (float)$wfhLng }}];
                 @else
                 const initCenter = [20.5937, 78.9629];
@@ -813,36 +959,43 @@
                 }
 
                 const pathLatLngs = [];
-                const allPoints = [];
+
+                const checkinLatVal = hasCheckinCoords ? parseFloat(checkinLat) : null;
+                const checkinLngVal = hasCheckinCoords ? parseFloat(checkinLng) : null;
+                const checkoutLatVal = hasCheckoutCoords ? parseFloat(checkoutLat) : null;
+                const checkoutLngVal = hasCheckoutCoords ? parseFloat(checkoutLng) : null;
+
+                // Detect if Check-In and Check-Out are in virtually the exact same location (< 35m)
+                const isSameSpot = hasCheckinCoords && hasCheckoutCoords &&
+                    (Math.abs(checkinLatVal - checkoutLatVal) < 0.00035) &&
+                    (Math.abs(checkinLngVal - checkoutLngVal) < 0.00035);
 
                 const greenIcon = L.divIcon({
                     className: 'custom-attendance-pin',
-                    html: `<div style="background-color: #10b981; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-in" style="font-size: 12px;"></i></div>`,
-                    iconSize: [26, 26],
-                    iconAnchor: [13, 13],
-                    popupAnchor: [0, -13]
+                    html: `<div style="background-color: #10b981; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-weight: bold;"><i class="feather-log-in" style="font-size: 13px;"></i></div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: isSameSpot ? [30, 14] : [14, 14],
+                    popupAnchor: isSameSpot ? [-16, -14] : [0, -14]
                 });
 
                 const redIcon = L.divIcon({
                     className: 'custom-attendance-pin',
-                    html: `<div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-out" style="font-size: 12px;"></i></div>`,
-                    iconSize: [26, 26],
-                    iconAnchor: [13, 13],
-                    popupAnchor: [0, -13]
+                    html: `<div style="background-color: #ef4444; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-weight: bold;"><i class="feather-log-out" style="font-size: 13px;"></i></div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: isSameSpot ? [-2, 14] : [14, 14],
+                    popupAnchor: isSameSpot ? [16, -14] : [0, -14]
                 });
 
-                // Add Check-In Marker
+                // Add Check-In Marker (Green)
                 if (hasCheckinCoords) {
-                    const checkinLatVal = parseFloat(checkinLat);
-                    const checkinLngVal = parseFloat(checkinLng);
                     const checkinLatLng = [checkinLatVal, checkinLngVal];
                     pathLatLngs.push(checkinLatLng);
-                    allPoints.push(checkinLatLng);
                     
                     const marker = L.marker(checkinLatLng, {
                         icon: greenIcon,
-                        title: {{ json_encode(__('hrms.my_attendance.check_in_point')) }}
-                    }).addTo(detailDrawerMapObj).bindPopup('<b>' + {{ json_encode(__('hrms.my_attendance.check_in_point')) }} + '</b><br>' + {{ json_encode(__('hrms.my_attendance.lbl_time') . ': ') }} + checkinTime + '<br>Lat: ' + checkinLatVal.toFixed(6) + '<br>Lng: ' + checkinLngVal.toFixed(6));
+                        title: {!! json_encode(__('hrms.my_attendance.check_in_point')) !!},
+                        zIndexOffset: 600
+                    }).addTo(detailDrawerMapObj).bindPopup('<b>' + {!! json_encode(__('hrms.my_attendance.check_in_point')) !!} + '</b><br>' + {!! json_encode(__('hrms.my_attendance.lbl_time') . ': ') !!} + checkinTime + '<br>Lat: ' + checkinLatVal.toFixed(6) + '<br>Lng: ' + checkinLngVal.toFixed(6));
                     
                     detailDrawerOverlays.push(marker);
                 }
@@ -855,7 +1008,6 @@
                             const lngVal = parseFloat(log.lng);
                             const logLatLng = [latVal, lngVal];
                             pathLatLngs.push(logLatLng);
-                            allPoints.push(logLatLng);
 
                             const circleMarker = L.circleMarker(logLatLng, {
                                 radius: 5,
@@ -863,76 +1015,146 @@
                                 color: '#ffffff',
                                 weight: 1.5,
                                 fillOpacity: 0.85
-                            }).addTo(detailDrawerMapObj).bindPopup('<b>' + {{ json_encode(__('hrms.my_attendance.location_tracking')) }} + '</b><br>' + {{ json_encode(__('hrms.my_attendance.lbl_time') . ': ') }} + (log.time || '') + '<br>Lat: ' + latVal.toFixed(6) + '<br>Lng: ' + lngVal.toFixed(6));
+                            }).addTo(detailDrawerMapObj).bindPopup('<b>' + {!! json_encode(__('hrms.my_attendance.location_tracking')) !!} + '</b><br>' + {!! json_encode(__('hrms.my_attendance.lbl_time') . ': ') !!} + (log.time || '') + '<br>Lat: ' + latVal.toFixed(6) + '<br>Lng: ' + lngVal.toFixed(6));
                             
                             detailDrawerOverlays.push(circleMarker);
                         }
                     });
                 }
 
-                // Add Check-Out Marker
+                // Add Check-Out Marker (Red)
                 if (hasCheckoutCoords) {
-                    const checkoutLatVal = parseFloat(checkoutLat);
-                    const checkoutLngVal = parseFloat(checkoutLng);
                     const checkoutLatLng = [checkoutLatVal, checkoutLngVal];
                     pathLatLngs.push(checkoutLatLng);
-                    allPoints.push(checkoutLatLng);
 
                     const marker = L.marker(checkoutLatLng, {
                         icon: redIcon,
-                        title: {{ json_encode(__('hrms.my_attendance.check_out_point')) }}
-                    }).addTo(detailDrawerMapObj).bindPopup('<b>' + {{ json_encode(__('hrms.my_attendance.check_out_point')) }} + '</b><br>' + {{ json_encode(__('hrms.my_attendance.lbl_time') . ': ') }} + checkoutTime + '<br>Lat: ' + checkoutLatVal.toFixed(6) + '<br>Lng: ' + checkoutLngVal.toFixed(6));
+                        title: {!! json_encode(__('hrms.my_attendance.check_out_point')) !!},
+                        zIndexOffset: 500
+                    }).addTo(detailDrawerMapObj).bindPopup('<b>' + {!! json_encode(__('hrms.my_attendance.check_out_point')) !!} + '</b><br>' + {!! json_encode(__('hrms.my_attendance.lbl_time') . ': ') !!} + checkoutTime + '<br>Lat: ' + checkoutLatVal.toFixed(6) + '<br>Lng: ' + checkoutLngVal.toFixed(6));
                     
                     detailDrawerOverlays.push(marker);
                 }
 
-                // Add Polyline connecting all tracking path points
+                // Add Polyline connecting all tracking path points (Vibrant Route Path with Pillar 1 Gap Highlighting)
                 if (pathLatLngs.length >= 2) {
-                    const polyline = L.polyline(pathLatLngs, {
-                        color: '#4f46e5',
-                        weight: 4,
-                        opacity: 0.85,
-                        dashArray: '4, 6'
-                    }).addTo(detailDrawerMapObj);
-                    detailDrawerOverlays.push(polyline);
+                    const trackingGaps = (routeSummary && routeSummary.tracking_gaps) ? routeSummary.tracking_gaps : [];
+                    const gapMap = {};
+                    trackingGaps.forEach(function(g) {
+                        if (typeof g.from_index !== 'undefined') {
+                            gapMap[parseInt(g.from_index)] = g;
+                        }
+                    });
+
+                    for (let i = 0; i < pathLatLngs.length - 1; i++) {
+                        const p1 = pathLatLngs[i];
+                        const p2 = pathLatLngs[i + 1];
+
+                        let gapInfo = gapMap[i];
+                        if (!gapInfo && trackingGaps.length > 0) {
+                            gapInfo = trackingGaps.find(function(g) {
+                                return Math.abs(parseFloat(g.from_lat) - p1[0]) < 0.0001 &&
+                                       Math.abs(parseFloat(g.from_lng) - p1[1]) < 0.0001;
+                            });
+                        }
+
+                        if (gapInfo) {
+                            const isBreak = !!gapInfo.is_approved_break;
+                            const lineColor = isBreak ? '#f59e0b' : '#ef4444';
+                            const badgeBg = isBreak ? '#f59e0b' : '#ef4444';
+                            const badgeIcon = isBreak ? 'feather-pause' : 'feather-alert-triangle';
+                            const badgeText = isBreak ? `${gapInfo.duration_min || 0}m Break` : `${gapInfo.duration_min || 0}m GPS Off`;
+                            const popupTitle = isBreak ? '<b>✓ Authorized Break Window</b>' : '<b>⚠️ Location Tracking Gap</b>';
+
+                            // Render Polyline (Amber dashed for break, Red dashed for offline)
+                            const gapPolyline = L.polyline([p1, p2], {
+                                color: lineColor,
+                                weight: 4.5,
+                                opacity: 0.95,
+                                dashArray: isBreak ? '6, 6' : '8, 8',
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }).addTo(detailDrawerMapObj);
+                            detailDrawerOverlays.push(gapPolyline);
+
+                            // Midpoint Marker
+                            const midLat = (p1[0] + p2[0]) / 2;
+                            const midLng = (p1[1] + p2[1]) / 2;
+                            const gapIcon = L.divIcon({
+                                className: 'custom-gap-marker',
+                                html: `<div style="background: ${badgeBg}; color: #ffffff; border: 2px solid #ffffff; border-radius: 9999px; padding: 2px 7px; font-size: 10px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 4px; cursor: pointer;"><i class="${badgeIcon}" style="font-size: 10px;"></i> ${badgeText}</div>`,
+                                iconAnchor: [38, 12]
+                            });
+                            const gapMarker = L.marker([midLat, midLng], { icon: gapIcon, zIndexOffset: 700 })
+                                .addTo(detailDrawerMapObj)
+                                .bindPopup(`${popupTitle}<br>Duration: ${gapInfo.duration_min || 0} mins<br>From: ${gapInfo.from_time || ''} &rarr; To: ${gapInfo.to_time || ''}`);
+                            detailDrawerOverlays.push(gapMarker);
+                        } else {
+                            // Normal verified continuous path segment
+                            const segmentGlow = L.polyline([p1, p2], {
+                                color: '#6366f1',
+                                weight: 8,
+                                opacity: 0.35,
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }).addTo(detailDrawerMapObj);
+                            detailDrawerOverlays.push(segmentGlow);
+
+                            const segmentLine = L.polyline([p1, p2], {
+                                color: '#3b82f6',
+                                weight: 4.5,
+                                opacity: 0.95,
+                                lineCap: 'round',
+                                lineJoin: 'round'
+                            }).addTo(detailDrawerMapObj);
+                            detailDrawerOverlays.push(segmentLine);
+                        }
+                    }
                 }
 
-                // Draw geofence threshold radius circles
-                @if($officeLat && $officeLng)
+                // Draw geofence threshold radius circles (informative background overlays)
+                @if(!empty($officeLat) && !empty($officeLng) && !empty($officeRad))
                 const officePos = [{{ (float)$officeLat }}, {{ (float)$officeLng }}];
-                allPoints.push(officePos);
-
                 const officeCircle = L.circle(officePos, {
                     color: '#4f46e5',
                     weight: 2,
                     fillColor: '#4f46e5',
                     fillOpacity: 0.08,
-                    radius: {{ $officeRad }}
+                    radius: {{ (int)$officeRad }}
                 }).addTo(detailDrawerMapObj);
                 detailDrawerOverlays.push(officeCircle);
                 @endif
 
-                @if($wfhLat && $wfhLng)
+                @if(!empty($wfhLat) && !empty($wfhLng) && !empty($wfhRad))
                 const wfhPos = [{{ (float)$wfhLat }}, {{ (float)$wfhLng }}];
-                allPoints.push(wfhPos);
-
                 const wfhCircle = L.circle(wfhPos, {
                     color: '#10b981',
                     weight: 2,
                     fillColor: '#10b981',
                     fillOpacity: 0.08,
-                    radius: {{ $wfhRad }}
+                    radius: {{ (int)$wfhRad }}
                 }).addTo(detailDrawerMapObj);
                 detailDrawerOverlays.push(wfhCircle);
                 @endif
 
-                // Set View/Bounds
+                // Focus and Zoom map strictly on ACTUAL SESSION POINTS
+                window.lastDrawerPathPoints = pathLatLngs;
                 detailDrawerMapObj.invalidateSize();
-                if (allPoints.length > 0) {
-                    const bounds = L.latLngBounds(allPoints);
-                    detailDrawerMapObj.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+                if (pathLatLngs.length > 0) {
+                    const bounds = L.latLngBounds(pathLatLngs);
+                    const sw = bounds.getSouthWest();
+                    const ne = bounds.getNorthEast();
+                    const latSpan = Math.abs(ne.lat - sw.lat);
+                    const lngSpan = Math.abs(ne.lng - sw.lng);
+
+                    // If single spot or walking distance (< 300m), zoom in to neighborhood street level (zoom 16)
+                    if (latSpan < 0.003 && lngSpan < 0.003) {
+                        detailDrawerMapObj.setView(bounds.getCenter(), 16);
+                    } else {
+                        detailDrawerMapObj.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+                    }
                 } else {
-                    detailDrawerMapObj.setView(initCenter, 13);
+                    detailDrawerMapObj.setView(initCenter, 15);
                 }
             }
         }, 300);
@@ -944,6 +1166,16 @@
         detailDrawerEl.addEventListener('shown.bs.offcanvas', function() {
             if (detailDrawerMapObj) {
                 detailDrawerMapObj.invalidateSize();
+                if (typeof window.lastDrawerPathPoints !== 'undefined' && window.lastDrawerPathPoints.length > 0) {
+                    const bounds = L.latLngBounds(window.lastDrawerPathPoints);
+                    const sw = bounds.getSouthWest();
+                    const ne = bounds.getNorthEast();
+                    if (Math.abs(ne.lat - sw.lat) < 0.003 && Math.abs(ne.lng - sw.lng) < 0.003) {
+                        detailDrawerMapObj.setView(bounds.getCenter(), 16);
+                    } else {
+                        detailDrawerMapObj.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+                    }
+                }
             }
         });
     }

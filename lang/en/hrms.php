@@ -92,6 +92,7 @@ return [
         'view_history' => 'View Attendance History',
         'edit_employee_logs' => 'Edit Employee Attendance Logs',
         'drawer_title' => 'Attendance History',
+        'close_panel' => 'Close Panel',
         'daily_overview' => 'Daily Attendance Overview',
         'employee_history' => 'Employee Attendance History',
         'fetching_logs' => 'Fetching logs...',
@@ -2800,6 +2801,16 @@ return [
         // Attendance Rules Tab - On Site
         'site_settings' => 'On-Site Settings',
         'site_settings_desc' => 'Configure check-in methods, validations, and location tracking for client-site deployments. Note: Validation methods are uniform on check-in and check-out.',
+
+        // Attendance Rules Tab - Advanced & Telemetry
+        'advanced_attendance_settings' => 'Advanced Attendance & Break Rules',
+        'advanced_attendance_settings_desc' => 'Configure break compliance, telemetry privacy, and multi-shift punch rules.',
+        'office_break_geofence' => 'Require Office Geofence for Breaks',
+        'office_break_geofence_desc' => 'Enforce office coordinate radius checks when employees start or resume breaks.',
+        'pause_tracking_on_break' => 'Break Telemetry Privacy Mode',
+        'pause_tracking_on_break_desc' => 'Automatically suspend periodic GPS tracking while on an authorized break and suppress untracked gap penalties.',
+        'allow_multiple_punches' => 'Enable Multi-Punch / Split-Shifts',
+        'allow_multiple_punches_desc' => 'Allow employees to clock in again after clocking out on the same calendar day, bridging interim time as a split-shift break.',
 
         // Expense Policies
         'expense_rules_desc' => 'Define expense limits per category and optionally per designation. Scope can be restricted to a specific Company, Business Unit, or Branch. Multiple rules can coexist — a more specific rule (e.g. by designation) will take priority over a global one.',

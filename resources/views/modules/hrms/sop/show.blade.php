@@ -97,10 +97,12 @@
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.sop.index') }}" class="border fw-semibold">
             Back to SOP Hub
         </x-ui.button>
-        <x-ui.button variant="light" icon="feather-printer" class="border fw-semibold" onclick="window.print()">
-            Print / PDF
-        </x-ui.button>
         @if($isHrOrAdmin)
+            @if($sop->status === 'published')
+                <x-ui.button href="{{ route('hrms.sop.export-audit', $sop->id) }}" variant="light" icon="feather-download" class="border fw-semibold">
+                    Export Sign-off CSV
+                </x-ui.button>
+            @endif
             @if($sop->status === 'draft')
                 <x-ui.button variant="success" icon="feather-check-circle" data-bs-toggle="modal" data-bs-target="#publishSopModal" class="fw-bold">
                     Publish SOP
@@ -453,8 +455,8 @@
                     @endif
                 </table>
 
-                @if($isHrOrAdmin)
-                    <div class="mt-3 pt-3 border-top d-flex flex-column gap-2">
+                <div class="mt-3 pt-3 border-top d-flex flex-column gap-2">
+                    @if($isHrOrAdmin)
                         @if($sop->status === 'draft')
                             <x-ui.button type="button" variant="success" size="sm" icon="feather-check-circle" data-bs-toggle="modal" data-bs-target="#publishSopModal" class="w-100 fw-bold">
                                 Publish SOP
@@ -466,12 +468,12 @@
                                     Sync & Dispatch Assignments
                                 </x-ui.button>
                             </form>
-                            <x-ui.button href="{{ route('hrms.sop.export-audit', $sop->id) }}" variant="light" size="sm" icon="feather-download" class="border w-100 text-muted">
-                                Export Sign-off CSV
-                            </x-ui.button>
                         @endif
-                    </div>
-                @endif
+                    @endif
+                    <x-ui.button variant="light" size="sm" icon="feather-printer" class="border w-100 fw-semibold text-dark" onclick="window.print()">
+                        Print / Save as PDF
+                    </x-ui.button>
+                </div>
             </x-ui.card>
 
             <!-- STAFF COMPLIANCE TRACKING (ADMIN / HR) -->

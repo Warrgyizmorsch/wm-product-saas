@@ -31,6 +31,7 @@ class Feedback360Cycle extends BaseModel
         'max_peer_nominations',
         'allow_self_nomination',
         'require_manager_approval',
+        'competency_ids',
         'created_by',
     ];
 
@@ -45,6 +46,7 @@ class Feedback360Cycle extends BaseModel
         'max_peer_nominations'        => 'integer',
         'allow_self_nomination'       => 'boolean',
         'require_manager_approval'    => 'boolean',
+        'competency_ids'              => 'array',
     ];
 
     public function company(): BelongsTo
@@ -57,14 +59,12 @@ class Feedback360Cycle extends BaseModel
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function competencies(): HasMany
+    public function getSelectedCompetenciesAttribute()
     {
-        return $this->hasMany(Feedback360Competency::class, 'cycle_id');
-    }
-
-    public function questions(): HasMany
-    {
-        return $this->hasMany(Feedback360Question::class, 'cycle_id')->orderBy('sort_order');
+        if (empty($this->competency_ids)) {
+            return collect();
+        }
+        return Feedback360Competency::whereIn('id', (array) $this->competency_ids)->get();
     }
 
     public function participants(): HasMany

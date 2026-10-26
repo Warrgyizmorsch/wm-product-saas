@@ -696,8 +696,10 @@ Route::prefix('hrms')
             Route::post('/cycles/{id}/participants', [Feedback360Controller::class, 'addParticipants'])->name('cycles.participants');
             Route::post('/cycles/{id}/bulk-remind', [Feedback360Controller::class, 'bulkRemind'])->name('cycles.bulk-remind');
 
-            // Peer Nominations & Approvals
+            // Peer & Upward Review Nominations & Approvals
             Route::post('/participants/{participantId}/nominate-peers', [Feedback360Controller::class, 'nominatePeers'])->name('participants.nominate-peers');
+            Route::post('/participants/{participantId}/add-rater', [Feedback360Controller::class, 'addRater'])->name('participants.add-rater');
+            Route::delete('/nominations/{nominationId}', [Feedback360Controller::class, 'destroyNomination'])->name('nominations.destroy');
             Route::post('/nominations/{nominationId}/approve', [Feedback360Controller::class, 'approveNomination'])->name('nominations.approve');
             Route::post('/nominations/batch-approve', [Feedback360Controller::class, 'batchApproveNominations'])->name('nominations.batch-approve');
 
