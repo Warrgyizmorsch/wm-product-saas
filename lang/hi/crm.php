@@ -1,6 +1,9 @@
 <?php
 
 return array (
+  'select_country' => 'देश चुनें',
+  'select_state' => 'राज्य चुनें',
+  'select_city' => 'शहर चुनें',
   'active_crm_database' => 'सक्रिय CRM डेटाबेस',
   'add_new_call_lead' => 'नई कॉल / लीड जोड़ें',
   'change_owner' => 'ओनर बदलें',

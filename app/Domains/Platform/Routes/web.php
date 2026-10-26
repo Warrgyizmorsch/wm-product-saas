@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Platform\Controllers\CurrencyController;
+use App\Domains\Platform\Controllers\DemoRequestController;
 use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
 use App\Domains\Platform\Controllers\BillingCheckoutController;
 use App\Domains\Platform\Controllers\ModulePriceController;
@@ -15,6 +16,13 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('platform')
     ->as('platform.')
     ->group(function (): void {
+        Route::get('demo-requests', [DemoRequestController::class, 'index'])
+            ->name('demo-requests.index');
+        Route::patch('demo-requests/{demoRequest}/status', [DemoRequestController::class, 'updateStatus'])
+            ->name('demo-requests.status');
+        Route::delete('demo-requests/{demoRequest}', [DemoRequestController::class, 'destroy'])
+            ->name('demo-requests.destroy');
+
         Route::get('tenants', [TenantController::class, 'index'])
             ->name('tenants.index');
         Route::get('tenants/create', [TenantController::class, 'create'])

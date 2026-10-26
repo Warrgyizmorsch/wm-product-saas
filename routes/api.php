@@ -81,3 +81,11 @@ Route::match(['get', 'post'], 'crm/webhooks/twilio/voice', [\App\Domains\CRM\Con
 Route::match(['get', 'post'], 'crm/webhooks/twilio/status', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioStatusWebhook'])
     ->name('api.crm.webhooks.twilio.status');
 
+// Public Demo Requests API (For landing page mossierp.com)
+Route::post('/v1/public/demo-requests', [\App\Domains\Platform\Controllers\Api\PublicDemoRequestController::class, 'store'])
+    ->middleware('throttle:30,1')
+    ->name('api.public.demo-requests.store');
+Route::post('/public/demo-requests', [\App\Domains\Platform\Controllers\Api\PublicDemoRequestController::class, 'store'])
+    ->middleware('throttle:30,1');
+
+
