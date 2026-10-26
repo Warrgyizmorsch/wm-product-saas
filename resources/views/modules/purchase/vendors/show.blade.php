@@ -105,7 +105,7 @@
                     <div class="p-3 rounded-3 border bg-light shadow-2xs">
                         <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('purchase.total_bills_amount') }}</span>
                         <h4 class="fw-bold text-dark mb-0 fs-18 font-monospace">{!! format_currency($totalBilled) !!}</h4>
-                        <span class="fs-11 text-muted">{{ __('purchase.vendor_bills_count', ['count' => $bills->count()]) }}</span>
+                        <span class="fs-11 text-muted">{{ __('purchase.vendor_bills_count', ['count' => $billCount ?? $bills->count()]) }}</span>
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -408,6 +408,57 @@
                         </div>
                     </div>
 
+                    @if($statement)
+                    {{-- From the books: the same lines and balance as Accounting's Party Ledger. --}}
+                    <div class="d-flex justify-content-between align-items-center fs-12 text-muted mb-2">
+                        <span>{{ $statement['from']->format('d M Y') }} – {{ $statement['to']->format('d M Y') }}</span>
+                        @if(\Illuminate\Support\Facades\Route::has('accounting.reports.party-ledger'))
+                            <a href="{{ route('accounting.reports.party-ledger', ['party_type' => 'vendor', 'party_id' => $vendor->id]) }}">Open in Party Ledger →</a>
+                        @endif
+                    </div>
+                    <div class="table-responsive">
+                        <x-ui.odoo-form-ui type="table" class="mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{{ __('purchase.date') }}</th>
+                                    <th>{{ __('purchase.voucher_ref_no') }}</th>
+                                    <th>{{ __('purchase.description') }}</th>
+                                    <th>Bill-wise</th>
+                                    <th class="text-end">{{ __('purchase.debit_settlement') }}</th>
+                                    <th class="text-end">{{ __('purchase.credit_bill_payable') }}</th>
+                                    <th class="text-end">{{ __('purchase.running_payable_balance') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="table-warning">
+                                    <td class="fw-bold" colspan="6">{{ __('purchase.opening_balance') }}</td>
+                                    <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($statement['opening']) !!}</td>
+                                </tr>
+                                @forelse($statement['rows'] as $row)
+                                    <tr>
+                                        <td>{{ \Carbon\Carbon::parse($row['date'])->format('d-M-Y') }}</td>
+                                        <td class="font-monospace fw-bold"><a href="{{ $row['url'] }}" class="text-primary">{{ $row['journal_number'] }}</a></td>
+                                        <td class="fs-12 text-muted">{{ $row['description'] ?: '—' }}</td>
+                                        <td class="fs-12">{{ implode(', ', $row['bill_refs']) ?: '—' }}</td>
+                                        <td class="text-end font-monospace fw-bold text-success">{!! $row['debit'] > 0 ? format_currency($row['debit']) : '—' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-danger">{!! $row['credit'] > 0 ? format_currency($row['credit']) : '—' !!}</td>
+                                        <td class="text-end font-monospace fw-bold text-primary">{!! format_currency($row['running_balance']) !!}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">{{ __('purchase.no_ledger_transactions') }}</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold bg-light">
+                                    <td colspan="6">Closing Balance</td>
+                                    <td class="text-end font-monospace text-primary">{!! format_currency($statement['closing']) !!}</td>
+                                </tr>
+                            </tfoot>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                    @else
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" class="mb-0">
                             <thead class="table-light">
@@ -474,6 +525,7 @@
                             </tbody>
                         </x-ui.odoo-form-ui>
                     </div>
+                    @endif
                 </div>
 
             </div>

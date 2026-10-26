@@ -39,10 +39,10 @@ class ApAgingController extends Controller
         return view('modules.accounting.reports.ap-aging', [
             'asOf' => $asOf,
             'basis' => $basis,
-            // Advances are shown with On Account here (one column).
-            'vendors' => array_map(fn ($p) => ['bills' => $p['documents'], 'on_account' => $p['on_account'] + $p['advance']] + $p, $report['parties']),
+            'vendors' => array_map(fn ($p) => ['bills' => $p['documents']] + $p, $report['parties']),
             'buckets' => $report['buckets'],
-            'onAccount' => $report['onAccount'] + $report['advance'],
+            'onAccount' => $report['onAccount'],
+            'advance' => $report['advance'],
             'grandTotal' => $report['grandTotal'],
         ]);
     }

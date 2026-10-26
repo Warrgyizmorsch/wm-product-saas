@@ -49,6 +49,13 @@ class VendorController extends Controller
             ->whereIn('status', ['posted', 'unpaid', 'partially_paid', 'approved'])
             ->sum('due_amount');
 
+        // With Accounting, the books' figure: opening dues, credit purchases and
+        // vouchers count too, so it adds up to the suppliers' own pages.
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $rawOutstandingPayableUSD = $partyAccount->totalOutstanding('vendor');
+        }
+
         $totalOutstandingPayable = function_exists('convert_from_base')
             ? convert_from_base($rawOutstandingPayableUSD)
             : $rawOutstandingPayableUSD;
@@ -320,7 +327,26 @@ class VendorController extends Controller
             return $entry;
         });
 
+        // With Accounting, the figures come from the books, so this page agrees
+        // with Party Ledger and Bill Settlement: assets bought on credit,
+        // vouchers and settlements count, not only Purchase's own documents.
+        $billCount = $bills->count();
+        $statement = null;
+        $partyAccount = app(\App\Domains\Accounting\Services\PartyAccountService::class);
+        if ($partyAccount->available()) {
+            $summary = $partyAccount->summary('vendor', (int) $vendor->id);
+            $totalBilled = $summary['billed'];
+            $totalPaid = $summary['paid'];
+            $billCount = $summary['bills'];
+            $outstandingPayable = $summary['outstanding'];
+            $vendorAdvanceCredit = $summary['advance'];
+            $overdueAmount = $summary['overdue'];
+            $statement = $partyAccount->statement('vendor', (int) $vendor->id);
+        }
+
         return view('modules.purchase.vendors.show', compact(
+            'billCount',
+            'statement',
             'vendor',
             'bills',
             'payments',

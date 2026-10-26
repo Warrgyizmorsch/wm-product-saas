@@ -20,8 +20,10 @@ use Illuminate\Validation\ValidationException;
  */
 class BillWiseInput
 {
-    public function __construct(private readonly PartyDirectory $parties)
-    {
+    public function __construct(
+        private readonly PartyDirectory $parties,
+        private readonly \App\Domains\Accounting\Services\BillWise\BillAllocationService $register,
+    ) {
     }
 
     /** Validation rules to merge into a store() request. */
@@ -34,18 +36,39 @@ class BillWiseInput
     }
 
     /**
+     * The voucher-level party ("type:id") onto every bill-wise line that has
+     * no party of its own. Lines keep a party picked in their own box.
+     *
+     * @param array<int|string, array<string, mixed>> $items
+     * @return array<int|string, array<string, mixed>>
+     */
+    public function withVoucherParty(array $items, string $party): array
+    {
+        [$type, $id] = array_pad(explode(':', $party, 2), 2, null);
+        if (! PartyDirectory::isType($type) || ! ctype_digit((string) $id) || ! $this->parties->exists($type, (int) $id)) {
+            throw ValidationException::withMessages(['party' => 'The selected party is invalid.']);
+        }
+
+        $billWise = array_map('intval', array_keys($this->register->controlAccounts((int) require_tenant_id())));
+
+        foreach ($items as $key => $item) {
+            if (trim((string) ($item['party'] ?? '')) === '' && in_array((int) ($item['chart_of_account_id'] ?? 0), $billWise, true)) {
+                $items[$key]['party'] = "{$type}:{$id}";
+            }
+        }
+
+        return $items;
+    }
+
+    /**
      * @param array<int|string, array<string, mixed>> $items validated items
      * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>} [lines, hints]
      */
     public function apply(array $items): array
     {
         $items = array_values($items);
-        $billWise = ChartOfAccount::query()
-            ->whereIn('id', array_column($items, 'chart_of_account_id'))
-            ->where('bill_wise', true)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        // The register's own list (Receivable / Payable are always bill-wise).
+        $billWise = array_map('intval', array_keys($this->register->controlAccounts((int) require_tenant_id())));
 
         $lines = [];
         $hints = [];
@@ -75,6 +98,11 @@ class BillWiseInput
                 }
             } elseif ($allocations !== []) {
                 $this->fail($index, 'Choose the party before picking bills.');
+            } elseif (in_array($accountId, $billWise, true)) {
+                // Like Tally's Sundry Creditors / Debtors: an untagged line here
+                // would be missing from every party's ledger and outstanding.
+                $name = ChartOfAccount::whereKey($accountId)->value('name');
+                $this->fail($index, "{$name} is kept party by party: click \"Pick party & bills\" and choose the party.");
             }
 
             $lines[] = $item;

@@ -39,10 +39,10 @@ class ArAgingController extends Controller
         return view('modules.accounting.reports.ar-aging', [
             'asOf' => $asOf,
             'basis' => $basis,
-            // Advances are shown with On Account here (one column).
-            'customers' => array_map(fn ($p) => ['invoices' => $p['documents'], 'on_account' => $p['on_account'] + $p['advance']] + $p, $report['parties']),
+            'customers' => array_map(fn ($p) => ['invoices' => $p['documents']] + $p, $report['parties']),
             'buckets' => $report['buckets'],
-            'onAccount' => $report['onAccount'] + $report['advance'],
+            'onAccount' => $report['onAccount'],
+            'advance' => $report['advance'],
             'grandTotal' => $report['grandTotal'],
         ]);
     }

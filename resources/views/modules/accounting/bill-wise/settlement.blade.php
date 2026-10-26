@@ -128,7 +128,8 @@
                                             <input type="number" step="0.01" min="0" max="{{ abs($row->outstanding) }}"
                                                 name="bills[{{ $row->bill->id }}]" value="{{ old('bills.' . $row->bill->id) }}"
                                                 class="form-control form-control-sm text-end bill-input" data-side="{{ $row->outstanding > 0 ? 'dr' : 'cr' }}"
-                                                data-open="{{ abs($row->outstanding) }}" @disabled(! $canSettle)>
+                                                data-open="{{ abs($row->outstanding) }}" @disabled(! $canSettle || $pieces->isEmpty())
+                                                @if ($pieces->isEmpty()) title="Nothing unadjusted to match against this bill" placeholder="—" @endif>
                                         </td>
                                     </tr>
                                 @empty
@@ -170,7 +171,23 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-center py-4 text-muted">Nothing unadjusted — every payment is matched to a bill.</td></tr>
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">
+                                            Nothing unadjusted — every payment is matched to a bill.
+                                            @if ($bills->isNotEmpty())
+                                                @php $voucher = str_starts_with((string) $party, 'customer:') ? 'receipt' : 'payment'; @endphp
+                                                <div class="fs-12 mt-2">
+                                                    Adjusting only re-labels money already paid or received. To reduce a bill, record a
+                                                    @if (\Illuminate\Support\Facades\Route::has("accounting.vouchers.{$voucher}.index"))
+                                                        <a href="{{ route("accounting.vouchers.{$voucher}.index") }}">{{ $voucher === 'receipt' ? 'Receipt' : 'Payment' }} Voucher</a>
+                                                    @else
+                                                        {{ $voucher === 'receipt' ? 'Receipt' : 'Payment' }} Voucher
+                                                    @endif
+                                                    and pick the bill under "Pick party &amp; bills".
+                                                </div>
+                                            @endif
+                                        </td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </x-ui.table>

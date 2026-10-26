@@ -70,7 +70,11 @@
                     <x-ui.icon-input label="{{ $label }} Date" icon="feather-calendar" type="date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.icon-input label="Party Name" icon="feather-user" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @if ($type === 'contra')
+                        <x-ui.icon-input label="Party Name" icon="feather-user" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @else
+                        @include('modules.accounting.vouchers._party-field')
+                    @endif
                 </div>
                 <div class="col-md-6">
                     <x-ui.icon-input label="Reference No." icon="feather-hash" name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
@@ -92,7 +96,11 @@
                     <x-ui.odoo-form-ui type="input" inputType="date" label="{{ $label }} Date" name="voucher_date" :value="old('voucher_date', date('Y-m-d'))" :required="true" />
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" label="Party Name" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @if ($type === 'contra')
+                        <x-ui.odoo-form-ui type="input" label="Party Name" name="party_name" :value="old('party_name')" placeholder="Who is this to/from?" />
+                    @else
+                        @include('modules.accounting.vouchers._party-field')
+                    @endif
                 </div>
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" label="Reference No." name="reference_no" :value="old('reference_no')" placeholder="Cheque / UTR / UPI ref" />
@@ -329,6 +337,8 @@
                 addRow(0);
                 addRow(1);
                 calculateTotals();
+
+                if (window.VoucherParty) VoucherParty.init(type);
             }
 
             window.voucherFormConfigs = window.voucherFormConfigs || {};
