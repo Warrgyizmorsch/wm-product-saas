@@ -34,10 +34,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'module.access' => EnsureTenantModuleAccess::class,
             'billing.active' => \App\Http\Middleware\EnsureBillingActive::class,
             'permission' => \App\Http\Middleware\RequirePermission::class,
+            'platform.admin' => \App\Http\Middleware\EnsurePlatformAdmin::class,
+            'platform.audit' => \App\Http\Middleware\RecordPlatformAudit::class,
             'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
             'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
             'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,
         ]);
+
+        // The platform console has its own sign-in page.
+        $middleware->redirectGuestsTo(fn (\Illuminate\Http\Request $request) => $request->is('admin', 'admin/*')
+            ? route('admin.login')
+            : route('login'));
 
         $middleware->validateCsrfTokens(except: [
             'purchase/rfq-portal/*/submit',

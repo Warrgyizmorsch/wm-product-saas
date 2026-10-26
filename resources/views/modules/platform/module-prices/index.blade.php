@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Add-on Prices | SaaS ERP')
+@section('title', 'Add-on Prices | Platform Console')
 @section('page-title', 'Add-on Prices')
-@section('breadcrumb', 'Tenant Console / Add-on Prices')
+@section('breadcrumb', 'Add-on Prices')
 
 @section('content')
     <form action="{{ route('platform.module-prices.update') }}" method="POST">

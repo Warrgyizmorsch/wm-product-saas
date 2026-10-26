@@ -12,14 +12,9 @@ return [
         'section' => 'workspace', 'order' => 20, 'app' => 'admin',
         'label' => 'Tenant Console', 'icon' => 'feather-grid',
         'children' => [
-            ['label' => 'Demo Requests', 'route' => 'platform.demo-requests.index', 'permission' => 'platform.tenants.manage'],
-            ['label' => 'Tenants', 'route' => 'platform.tenants.index', 'permission' => 'platform.tenants.manage'],
-            ['label' => 'Plans', 'route' => 'platform.plans.index', 'permission' => 'platform.plans.manage'],
-            ['label' => 'Add-on Prices', 'route' => 'platform.module-prices.index', 'permission' => 'platform.plans.manage'],
-            ['label' => 'Currencies', 'route' => 'platform.currencies.index', 'permission' => 'platform.currencies.manage'],
+            // Tenants, plans, prices, usage and the gateway live in the /admin console.
+            ['label' => 'Platform Console', 'route' => 'admin.dashboard', 'permission' => 'platform.console.access'],
             ['label' => 'Subscriptions', 'route' => 'platform.subscription.index', 'permission' => 'tenant.subscription.manage'],
-            ['label' => 'Usage Limits', 'route' => 'platform.usage.index', 'permission' => 'platform.usage.view'],
-            ['label' => 'Payment Gateway', 'route' => 'platform.payment-gateway.index', 'permission' => 'platform.payment_gateway.manage'],
             ['label' => 'Payment Terms', 'route' => 'platform.payment-terms.index', 'permission' => 'tenant.settings.manage'],
             ['label' => 'Notification Master', 'route' => 'platform.notification-rules.index', 'permission' => 'tenant.settings.manage'],
             ['label' => 'Email & SMTP Setup', 'route' => 'platform.emailSettings.index', 'permission' => 'tenant.settings.manage'],

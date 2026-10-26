@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Add Tenant | SaaS ERP')
+@section('title', 'Add Tenant | Platform Console')
 @section('page-title', 'Add Tenant')
-@section('breadcrumb', 'Platform / Tenants / Add')
+@section('breadcrumb', 'Tenants / Add')
 
 @section('page-actions')
     <a href="{{ route('platform.tenants.index') }}" class="btn btn-light">

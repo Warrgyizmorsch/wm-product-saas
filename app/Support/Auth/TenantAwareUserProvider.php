@@ -95,6 +95,12 @@ class TenantAwareUserProvider extends EloquentUserProvider
             return $user;
         }
 
+        // The /admin console has no tenant: platform staff below super admin
+        // (support, sales, finance) get in there, never into a tenant's workspace.
+        if (request()->is('admin', 'admin/*') && app(AccessService::class)->canUsePlatformConsole($user)) {
+            return $user;
+        }
+
         return app(AccessService::class)->allows($user, 'platform.tenants.manage')
             ? $user
             : null;

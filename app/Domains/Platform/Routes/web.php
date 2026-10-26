@@ -1,58 +1,19 @@
 <?php
 
-use App\Domains\Platform\Controllers\CurrencyController;
-use App\Domains\Platform\Controllers\DemoRequestController;
-use App\Domains\Platform\Controllers\PaymentGatewaySettingsController;
 use App\Domains\Platform\Controllers\BillingCheckoutController;
-use App\Domains\Platform\Controllers\ModulePriceController;
-use App\Domains\Platform\Controllers\PlanController;
 use App\Domains\Platform\Controllers\SubscriptionController;
-use App\Domains\Platform\Controllers\TenantController;
 use App\Domains\Platform\Controllers\TenantModuleController;
 use App\Domains\Platform\Controllers\TransporterController;
-use App\Domains\Platform\Controllers\UsageOverviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('platform')
     ->as('platform.')
     ->group(function (): void {
-        Route::get('demo-requests', [DemoRequestController::class, 'index'])
-            ->name('demo-requests.index');
-        Route::patch('demo-requests/{demoRequest}/status', [DemoRequestController::class, 'updateStatus'])
-            ->name('demo-requests.status');
-        Route::delete('demo-requests/{demoRequest}', [DemoRequestController::class, 'destroy'])
-            ->name('demo-requests.destroy');
-
-        Route::get('tenants', [TenantController::class, 'index'])
-            ->name('tenants.index');
-        Route::get('tenants/create', [TenantController::class, 'create'])
-            ->name('tenants.create');
-        Route::post('tenants', [TenantController::class, 'store'])
-            ->name('tenants.store');
-        Route::get('tenants/{tenant}/edit', [TenantController::class, 'edit'])
-            ->name('tenants.edit');
-        Route::put('tenants/{tenant}', [TenantController::class, 'update'])
-            ->name('tenants.update');
-        Route::patch('tenants/{tenant}/status', [TenantController::class, 'status'])
-            ->name('tenants.status');
-
-        Route::get('plans', [PlanController::class, 'index'])
-            ->name('plans.index');
-        Route::get('plans/create', [PlanController::class, 'create'])
-            ->name('plans.create');
-        Route::post('plans', [PlanController::class, 'store'])
-            ->name('plans.store');
-        Route::get('plans/{plan}/edit', [PlanController::class, 'edit'])
-            ->name('plans.edit');
-        Route::put('plans/{plan}', [PlanController::class, 'update'])
-            ->name('plans.update');
-        Route::get('module-prices', [ModulePriceController::class, 'index'])
-            ->name('module-prices.index');
-        Route::put('module-prices', [ModulePriceController::class, 'update'])
-            ->name('module-prices.update');
-
-        Route::get('usage', [UsageOverviewController::class, 'index'])
-            ->name('usage.index');
+        // Platform-owner screens moved to the /admin console (Routes/admin.php).
+        // Old bookmarks land on the new address.
+        foreach (['demo-requests', 'tenants', 'plans', 'module-prices', 'usage', 'payment-gateway', 'currencies'] as $moved) {
+            Route::permanentRedirect($moved, '/admin/'.$moved);
+        }
 
         Route::get('subscription/checkout', [BillingCheckoutController::class, 'show'])
             ->name('billing.checkout');
@@ -76,11 +37,6 @@ Route::prefix('platform')
         Route::post('modules/{module}/reinstall', [TenantModuleController::class, 'reinstall'])
             ->name('modules.reinstall');
 
-        Route::get('payment-gateway', [PaymentGatewaySettingsController::class, 'index'])
-            ->name('payment-gateway.index');
-        Route::put('payment-gateway', [PaymentGatewaySettingsController::class, 'update'])
-            ->name('payment-gateway.update');
-
         Route::get('subscription', [SubscriptionController::class, 'index'])
             ->name('subscription.index');
         Route::put('subscription', [SubscriptionController::class, 'update'])
@@ -91,15 +47,6 @@ Route::prefix('platform')
             ->name('subscription.verify');
         Route::post('subscription/cancel', [SubscriptionController::class, 'cancel'])
             ->name('subscription.cancel');
-
-        Route::get('currencies', [CurrencyController::class, 'index'])
-            ->name('currencies.index');
-        Route::post('currencies', [CurrencyController::class, 'store'])
-            ->name('currencies.store');
-        Route::put('currencies/{currency}', [CurrencyController::class, 'update'])
-            ->name('currencies.update');
-        Route::patch('currencies/{currency}/status', [CurrencyController::class, 'toggleStatus'])
-            ->name('currencies.status');
 
         Route::post('transporters/quick-create', [TransporterController::class, 'quickCreate'])
             ->name('transporters.quick-create');

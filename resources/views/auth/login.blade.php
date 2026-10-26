@@ -377,7 +377,7 @@
 
             <div class="form-wrap">
                 <div class="form-card">
-                    <span class="badge reveal" style="--d:1"><span class="pulse"></span>{{ __('ui.login_badge') }}</span>
+                    <span class="badge reveal" style="--d:1"><span class="pulse"></span>{{ $loginBadge ?? __('ui.login_badge') }}</span>
 
                     <h1 class="title reveal" style="--d:2">{{ __('ui.welcome_back') }} <span class="wave" aria-hidden="true">👋</span></h1>
                     <p class="subtitle reveal" style="--d:3">{{ __('ui.login_subtitle') }}</p>
@@ -397,7 +397,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('login.store') }}" id="loginForm" novalidate>
+                    <form method="POST" action="{{ $loginAction ?? route('login.store') }}" id="loginForm" novalidate>
                         @csrf
 
                         <div class="field reveal @error('email') is-invalid @enderror" style="--d:4">

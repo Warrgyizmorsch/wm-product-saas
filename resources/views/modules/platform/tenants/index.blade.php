@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Tenant Console | SaaS ERP')
+@section('title', 'Tenants | Platform Console')
 @section('page-title', 'Tenant Console')
-@section('breadcrumb', 'Platform / Tenants')
+@section('breadcrumb', 'Tenants')
 
 @section('page-actions')
     <x-ui.button href="{{ route('platform.tenants.create') }}" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createTenantModal">

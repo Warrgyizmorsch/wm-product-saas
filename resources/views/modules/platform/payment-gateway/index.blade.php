@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Payment Gateway | SaaS ERP')
+@section('title', 'Payment Gateway | Platform Console')
 @section('page-title', 'Payment Gateway')
-@section('breadcrumb', 'Tenant Console / Payment Gateway')
+@section('breadcrumb', 'Payment Gateway')
 
 @section('content')
 
