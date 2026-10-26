@@ -5,11 +5,24 @@
 @section('breadcrumb', $workCenter->code)
 
 @section('page-actions')
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 align-items-center">
         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal">
             <i class="feather-pie-chart me-1"></i>{{ __('production.calculation_breakdown') }}
         </button>
         @can('update', $workCenter)
+            <button type="button" 
+                    class="btn btn-sm {{ $isCountdownActive ? 'btn-soft-warning' : 'btn-outline-secondary' }}" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#editCountdownDurationModal"
+                    @if($isCountdownActive) disabled title="Countdown is actively ticking. Debounce duration cannot be changed." @endif>
+                <i class="feather-clock me-1"></i>Debounce: {{ $workCenter->calculation_countdown_minutes ?? 10 }}m
+            </button>
+            <form method="POST" action="{{ route('production.work-centers.recalculate-now', $workCenter->id) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-outline-warning" title="Manually trigger immediate recalculation rollup">
+                    <i class="feather-zap me-1"></i>Recalculate
+                </button>
+            </form>
             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#workCenterEmployeesModal">
                 <i class="feather-user-check me-1"></i>{{ __('production.assign_internal_employees') }}
             </button>
@@ -29,19 +42,23 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
-        .section-machines-popover {
-            max-width: 320px;
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        .section-machines-popover,
+        .section-popover {
+            max-width: 400px;
+            box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.15);
             border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
-        .section-machines-popover .popover-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
+        .section-machines-popover .popover-header,
+        .section-popover .popover-header {
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
             padding: 8px 12px;
         }
-        .section-machines-popover .popover-body {
+        .section-machines-popover .popover-body,
+        .section-popover .popover-body {
             padding: 8px 12px;
-            max-height: 240px;
+            max-height: 260px;
             overflow-y: auto;
         }
         .section-machines-badge {
@@ -51,6 +68,77 @@
         .section-machines-badge:hover {
             filter: brightness(0.95);
             transform: translateY(-1px);
+        }
+        .resource-cluster-pill {
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            user-select: none;
+        }
+        .resource-cluster-pill:hover {
+            filter: brightness(0.92);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        }
+        .section-code-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--bs-font-monospace);
+            font-weight: 700;
+            font-size: 11px;
+            line-height: 1;
+            padding: 5px 8px;
+            border-radius: 6px;
+            background-color: #ede9fe;
+            color: #5b21b6;
+            border: 1px solid #c4b5fd;
+            letter-spacing: 0.3px;
+            box-shadow: 0 1px 2px rgba(91, 33, 182, 0.06);
+            margin-right: 6px;
+        }
+        .section-shift-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--bs-font-monospace);
+            font-weight: 600;
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background-color: #ecfdf5;
+            color: #047857;
+            border: 1px solid #a7f3d0;
+            box-shadow: 0 1px 2px rgba(4, 120, 87, 0.05);
+            transition: all 0.15s ease-in-out;
+            cursor: pointer;
+            user-select: none;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+        .section-shift-pill:hover {
+            background-color: #d1fae5;
+            border-color: #6ee7b7;
+            color: #065f46;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(4, 120, 87, 0.12);
+        }
+        .section-details-trigger {
+            cursor: pointer;
+            color: #1e293b;
+            text-decoration: none;
+            transition: color 0.15s ease-in-out;
+        }
+        .section-details-trigger:hover {
+            color: #4f46e5;
+            text-decoration: none;
+        }
+        .capacity-popover-trigger {
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        .capacity-popover-trigger:hover {
+            opacity: 0.85;
         }
 
         /* Fix Select2 accessible hidden select */
@@ -138,7 +226,7 @@
             right: 8px;
         }
         .modal .select2-container--bootstrap-5 .select2-dropdown {
-            z-index: 1065 !important;
+            z-index: 2000 !important;
             border: 1px solid #cbd5e1 !important;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
             border-radius: 8px !important;
@@ -179,6 +267,124 @@
             color: var(--bs-primary, #4361ee) !important;
             background-color: #ffffff !important;
         }
+
+        /* =========================================================================
+           MULTI-MODAL STACKING & Z-INDEX OVERRIDES (CRITICAL FIX FOR DURALUX LAYOUT)
+           duralux.blade.php sets .modal { z-index: 1060 !important; } and
+           .modal-backdrop { z-index: 1050 !important; }.
+           To stack child modals (e.g. Manual Production, Personnel, Calculation)
+           above Section Details, we provide explicit rules with higher specificity & !important.
+           ========================================================================= */
+        .modal.modal-stacked,
+        .modal.modal-level-2,
+        .modal[data-modal-stack="2"] {
+            z-index: 1080 !important;
+        }
+        .modal.modal-level-3,
+        .modal[data-modal-stack="3"] {
+            z-index: 1100 !important;
+        }
+        .modal.modal-level-4,
+        .modal[data-modal-stack="4"] {
+            z-index: 1120 !important;
+        }
+
+        .modal-backdrop.backdrop-stacked,
+        .modal-backdrop.backdrop-level-2,
+        .modal-backdrop[data-backdrop-stack="2"] {
+            z-index: 1075 !important;
+        }
+        .modal-backdrop.backdrop-level-3,
+        .modal-backdrop[data-backdrop-stack="3"] {
+            z-index: 1095 !important;
+        }
+        .modal-backdrop.backdrop-level-4,
+        .modal-backdrop[data-backdrop-stack="4"] {
+            z-index: 1115 !important;
+        }
+
+        /* Direct sibling override: when Section Details is open, child modals are automatically elevated */
+        .section-details-modal.show ~ .manual-production-modal.show,
+        .section-details-modal.show ~ .section-personnel-modal.show,
+        .section-details-modal.show ~ [id^="sectionCalculationModal_"].show {
+            z-index: 1080 !important;
+        }
+
+        /* Manual Production Setup Modal Styling */
+        .manual-production-modal .modal-dialog {
+            max-height: calc(100vh - 2.5rem);
+            margin-top: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+        .manual-production-modal .modal-content {
+            max-height: calc(100vh - 2.5rem);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .manual-production-modal .modal-header,
+        .manual-production-modal .modal-footer {
+            flex-shrink: 0;
+        }
+        .manual-production-modal .modal-body {
+            overflow-y: auto;
+            flex: 1 1 auto;
+            max-height: calc(100vh - 12rem);
+        }
+        .manual-production-modal .worker-card-item {
+            transition: all 0.15s ease-in-out;
+            border: 1px solid #e2e8f0;
+        }
+        .manual-production-modal .worker-card-item:hover {
+            border-color: #3b82f6 !important;
+            background-color: #f8faff !important;
+        }
+        .manual-production-modal .worker-card-item.selected-card {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+        .manual-production-modal .workers-scroll-list::-webkit-scrollbar,
+        .manual-production-modal .modal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .manual-production-modal .workers-scroll-list::-webkit-scrollbar-thumb,
+        .manual-production-modal .modal-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .manual-production-modal .workers-scroll-list::-webkit-scrollbar-thumb:hover,
+        .manual-production-modal .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Dedicated Batches Toolbar */
+        .manual-batches-bar {
+            background-color: #f8fafc;
+            padding: 12px 20px !important;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .manual-batches-bar .manual-batch-mode-btn {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            padding: 4px 10px;
+            white-space: nowrap;
+        }
+
+        /* Bootstrap utility polyfills for fractional spacing classes */
+        .py-2\.5 { padding-top: 0.625rem !important; padding-bottom: 0.625rem !important; }
+        .px-2\.5 { padding-left: 0.625rem !important; padding-right: 0.625rem !important; }
+        .p-2\.5 { padding: 0.625rem !important; }
+        .py-1\.5 { padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
+        .px-1\.5 { padding-left: 0.375rem !important; padding-right: 0.375rem !important; }
+        .pt-1\.5 { padding-top: 0.375rem !important; }
+        .pb-1\.5 { padding-bottom: 0.375rem !important; }
+        .gap-1\.5 { gap: 0.375rem !important; }
+        .gap-0\.5 { gap: 0.125rem !important; }
+        .py-0\.5 { padding-top: 0.125rem !important; padding-bottom: 0.125rem !important; }
+        .px-0\.5 { padding-left: 0.125rem !important; padding-right: 0.125rem !important; }
+        .mt-0\.5 { margin-top: 0.125rem !important; }
+        .mb-0\.5 { margin-bottom: 0.125rem !important; }
     </style>
 @endpush
 
@@ -193,6 +399,50 @@
         @endif
         @if ($errors->any())
             <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
+        @endif
+
+        @php
+            $latestSnapshot = $workCenter->latestCalculation;
+        @endphp
+
+        <!-- Active Countdown Banner -->
+        @if($isCountdownActive)
+            <div class="alert alert-warning border border-warning shadow-sm rounded-3 p-3 mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3" id="activeCountdownBanner">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="avatar-text avatar-md bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                        <i class="feather-clock fs-20"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="fw-bold text-dark mb-0 fs-14">
+                                <i class="feather-loader text-warning me-1"></i>Automatic Debounce Countdown Active
+                            </h6>
+                            <span class="badge bg-warning text-dark font-monospace fs-13 px-2.5 py-1 rounded-pill" id="countdownTimerDisplay">
+                                {{ gmdate('i:s', $countdownRemainingSeconds) }}
+                            </span>
+                        </div>
+                        <p class="text-muted fs-12 mb-0 mt-1">
+                            Pending updates detected on sections: 
+                            @if(!empty($workCenter->pending_calculation_section_ids))
+                                @foreach($workCenter->pending_calculation_section_ids as $pSecId)
+                                    <span class="badge bg-soft-dark text-dark font-monospace fs-10">SEC #{{ $pSecId }}</span>
+                                @endforeach
+                            @else
+                                <span class="badge bg-soft-dark text-dark font-monospace fs-10">All Active Sections</span>
+                            @endif
+                            &bull; Automatic recalculation fires when timer completes.
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <form method="POST" action="{{ route('production.work-centers.recalculate-now', $workCenter->id) }}">
+                        @csrf
+                        <button type="submit" class="btn btn-warning text-dark fw-bold btn-sm shadow-sm d-flex align-items-center gap-1.5">
+                            <i class="feather-zap fs-13"></i> Recalculate Now (Bypass)
+                        </button>
+                    </form>
+                </div>
+            </div>
         @endif
 
         <!-- Profile / Metrics Layout -->
@@ -230,23 +480,21 @@
                         <span class="fw-semibold text-dark">{{ $workCenter->created_at->format('Y-m-d') }}</span>
                     </div>
                     @php
-                        $wcDirectEmps = $workCenter->employeeAssignments ? $workCenter->employeeAssignments->where('active', true) : collect();
-                        $secEmps = $workCenter->sections ? $workCenter->sections->flatMap(fn($sec) => $sec->employeeAssignments ? $sec->employeeAssignments->where('active', true) : collect()) : collect();
-                        $allActiveEmpAssignments = $wcDirectEmps->concat($secEmps)->unique('employee_id');
-                        $wcAssignedEmpCount = $allActiveEmpAssignments->count();
+                        $wcDirectEmps = $workCenter->employeeAssignments 
+                            ? $workCenter->employeeAssignments->whereNull('section_id')->where('active', true) 
+                            : collect();
+                        $wcAssignedEmpCount = $wcDirectEmps->count();
 
                         if ($wcAssignedEmpCount > 0) {
                             $wcEmpListHtml = '<ul class=\'list-unstyled mb-0 fs-12\'>';
-                            foreach ($allActiveEmpAssignments as $assign) {
+                            foreach ($wcDirectEmps as $assign) {
                                 $emp = $assign->employee;
                                 $empCode = $emp?->employee_id ?? ('EMP-' . ($emp?->id ?? $assign->employee_id));
                                 $empName = $emp?->full_name ?? $emp?->name ?? 'Employee #' . $assign->employee_id;
-                                $secTag = $assign->section ? '<span class=\'text-muted fs-10 ms-1\'>(' . e($assign->section->name) . ')</span>' : '';
                                 $wcEmpListHtml .= '<li class=\'py-1 border-bottom border-light d-flex align-items-center gap-1\'>'
                                     . '<i class=\'feather-user text-primary fs-11\'></i>'
                                     . '<span class=\'fw-bold font-monospace text-dark\'>[' . e($empCode) . ']</span> '
                                     . '<span class=\'text-dark\'>' . e($empName) . '</span>'
-                                    . $secTag
                                     . '</li>';
                             }
                             $wcEmpListHtml .= '</ul>';
@@ -276,35 +524,45 @@
 
             <!-- Capacity Panel -->
             <div class="col-md-4 border-end">
-                <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_metrics') }}</h5>
-                <div class="d-flex flex-column gap-4 py-2 px-2">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0">{{ __('production.wc_metrics') }}</h5>
+                    @if($latestSnapshot)
+                        <span class="badge bg-soft-success text-success fs-10 font-monospace">Snapshot #{{ $latestSnapshot->id }}</span>
+                    @endif
+                </div>
+                <div class="d-flex flex-column gap-3 py-1 px-1">
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.capacity_per_hour') }}</span>
-                            <button type="button" class="btn btn-xs btn-outline-primary border-0 p-0"
-                                    data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal"
-                                    title="{{ __('production.view_calculation_breakdown') }}">
-                                <i class="feather-info fs-13 me-1"></i>{{ __('production.calculation_breakdown') }}
-                            </button>
+                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="Average capacity across {{ number_format($latestSnapshot?->unique_operating_hours ?? 0, 1) }}h operational hours. Output varies by interval.">
+                                <i class="feather-alert-triangle me-0.5"></i>Avg / hr
+                            </span>
                         </div>
-                        <span class="fs-22 fw-bold text-dark font-monospace">
-                            0
-                        </span>
-                    </div>
-                    <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.operational_efficiency') }}</span>
-                        <span class="fs-22 fw-bold text-dark">0%</span>
-                        <div class="progress progress-xs mt-2" style="height: 6px;">
-                            <div class="progress-bar bg-primary" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="d-flex align-items-baseline gap-2">
+                            <span class="fs-22 fw-bold text-dark font-monospace">
+                                {{ number_format($latestSnapshot?->capacity_per_hour ?? 0, 2) }}
+                            </span>
+                            <span class="fs-12 text-muted">units / hr</span>
                         </div>
                     </div>
-                    <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.effective_capacity') }}</span>
-                        <span class="fs-18 fw-bold text-success">
-                            0
-                        </span>
+
+                    <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-dark fw-bold fs-12 text-uppercase d-block">Daily Production Capacity</span>
+                            <small class="text-muted fs-11">Total theoretical daily output</small>
+                        </div>
+                        <span class="fs-20 fw-bolder text-primary font-monospace">{{ number_format($latestSnapshot?->daily_capacity ?? 0, 1) }} <span class="fs-11 fw-normal text-muted">units</span></span>
                     </div>
-                    <div class="border-top pt-3">
+
+                    <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
+                        <div>
+                            <span class="text-muted fs-11 text-uppercase d-block fw-semibold">Operational Window</span>
+                            <small class="text-muted fs-11">Unique hours across section shifts</small>
+                        </div>
+                        <span class="fs-16 fw-bold text-dark font-monospace">{{ number_format($latestSnapshot?->unique_operating_hours ?? 0, 2) }} <span class="fs-11 fw-normal text-muted">hrs / day</span></span>
+                    </div>
+
+                    <div class="pt-1">
                         <span class="text-muted fs-11 text-uppercase d-block mb-1"><i class="feather-calendar me-1"></i>Production Calendar</span>
                         <span class="fs-13 fw-semibold text-dark">
                             @if ($workCenter->calendar)
@@ -321,49 +579,45 @@
             <div class="col-md-4">
                 <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_cost_structure') }}</h5>
                 @php
-                    $laborCost = 0.0;
-                    $overheadCost = (float) ($workCenter->overhead_cost ?? 0);
-                    $totalStationCost = $laborCost + $overheadCost;
+                    $laborCostHour = (float) ($latestSnapshot?->labor_cost_per_hour ?? 0.0);
+                    $laborCostDaily = (float) ($latestSnapshot?->total_daily_labor_cost ?? 0.0);
+                    $machCostHour = (float) ($latestSnapshot?->machine_cost_per_hour ?? 0.0);
+                    $machCostDaily = (float) ($latestSnapshot?->total_daily_machine_cost ?? 0.0);
+                    $overheadFlat = (float) ($latestSnapshot?->overhead_cost ?? $workCenter->overhead_cost ?? 0);
+                    $totalDailyCost = (float) ($latestSnapshot?->total_daily_cost ?? ($overheadFlat + $laborCostDaily + $machCostDaily));
+                    $totalCostHour = (float) ($latestSnapshot?->total_cost_per_hour ?? ($latestSnapshot?->unique_operating_hours > 0 ? $totalDailyCost / $latestSnapshot->unique_operating_hours : 0));
                 @endphp
-                <div class="d-flex flex-column gap-3 py-1 px-1">
-                    <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
+                <div class="d-flex flex-column gap-2 py-1 px-1">
+                    <div class="d-flex justify-content-between align-items-center pb-1.5 border-bottom">
                         <div>
-                            <div class="d-flex align-items-center gap-1">
-                                <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.wc_labor_cost_per_hour') }}</span>
-                                <button type="button" class="btn btn-xs btn-outline-primary border-0 p-0"
-                                        data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal"
-                                        title="{{ __('production.view_calculation_breakdown') }}">
-                                    <i class="feather-info fs-12"></i>
-                                </button>
-                            </div>
-                            <small class="text-muted fs-11">Scheduled Section shifts</small>
+                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block">Daily Labor Cost</span>
+                            <small class="text-muted fs-10">Avg: {{ format_currency($laborCostHour) }} / hr</small>
                         </div>
-                        <span class="fs-18 fw-bold text-primary font-monospace">{{ format_currency($laborCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                        <span class="fs-16 fw-bold text-primary font-monospace">{{ format_currency($laborCostDaily) }} <span class="fs-10 fw-normal text-muted">/ day</span></span>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center pb-1.5 border-bottom">
+                        <div>
+                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block">Daily Machinery Expense</span>
+                            <small class="text-muted fs-10">Energy & fuel operating costs</small>
+                        </div>
+                        <span class="fs-16 fw-bold text-warning font-monospace">{{ format_currency($machCostDaily) }} <span class="fs-10 fw-normal text-muted">/ day</span></span>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pb-1.5 border-bottom">
                         <div>
                             <span class="text-muted fs-11 text-uppercase d-block fw-semibold">{{ __('production.overhead_cost_rate') }}</span>
-                            <small class="text-muted fs-11">{{ __('production.overhead_cost_rate_help') }}</small>
+                            <small class="text-muted fs-10">Fixed daily facility overhead</small>
                         </div>
-                        <span class="fs-18 fw-bold text-dark font-monospace">{{ format_currency($overheadCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                        <span class="fs-16 fw-bold text-dark font-monospace">{{ format_currency($overheadFlat) }} <span class="fs-10 fw-normal text-muted">/ day</span></span>
                     </div>
 
-                    <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center">
+                    <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center mt-1">
                         <div>
-                            <span class="text-dark fw-bold fs-12 text-uppercase d-block">Total Station Cost</span>
-                            <small class="text-muted fs-11">Combined Labor + Overhead cost</small>
+                            <span class="text-dark fw-bold fs-12 text-uppercase d-block">Total Daily Cost</span>
+                            <small class="text-muted fs-11">Effective: {{ format_currency($totalCostHour) }} / hr</small>
                         </div>
-                        <span class="fs-20 fw-bolder text-primary font-monospace">{{ format_currency($totalStationCost) }} <span class="fs-11 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
-                    </div>
-                    
-                    <div class="border-top pt-2 mt-1">
-                        <h6 class="fw-bold text-dark mb-1 fs-12">{{ __('production.wc_cost_guide') }}</h6>
-                        <ul class="fs-11 text-muted ps-3 mb-0">
-                            <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => format_currency($laborCost)]) }}</li>
-                            <li class="mb-1">Overhead Cost = <span class="fw-semibold text-dark">{{ format_currency($overheadCost) }}</span> / hr</li>
-                            <li>{{ __('production.wc_cost_guide_text_2') }}</li>
-                        </ul>
+                        <span class="fs-18 fw-bolder text-primary font-monospace">{{ format_currency($totalDailyCost) }} <span class="fs-11 fw-normal text-muted">/ day</span></span>
                     </div>
                 </div>
             </div>
@@ -439,12 +693,11 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 12%">{{ __('production.section_code') }}</th>
-                            <th style="width: 17%">{{ __('production.section_name') }}</th>
-                            <th style="width: 25%">{{ __('production.section_shifts') }}</th>
-                            <th style="width: 7%">{{ __('production.machines_count') }}</th>
-                            <th style="width: 13%">{{ __('production.capacity_per_hour') }}</th>
-                            <th style="width: 16%">{{ __('production.labor_cost_per_hour') }}</th>
+                            <th style="width: 20%">{{ __('production.section_name') }}</th>
+                            <th style="width: 12%">{{ __('production.section_shifts') }}</th>
+                            <th style="width: 27%">Resources & Workforce</th>
+                            <th style="width: 15%">Daily Capacity</th>
+                            <th style="width: 16%">Daily Operating Cost</th>
                             <th style="width: 6%">{{ __('production.status') }}</th>
                             <th style="width: 4%" class="text-end">{{ __('production.actions') }}</th>
                         </tr>
@@ -452,161 +705,305 @@
                     <tbody>
                         @forelse ($workCenter->sections as $section)
                             @php
-                                $calc = $section->getCalculationDetails();
-                                $capPerHour = (float) ($calc['capacity']['capacity_per_hour'] ?? 0);
-                                $capUnit = $calc['capacity']['capacity_unit'] ?? __('production.units_per_hour');
-                                $laborCost = (float) ($calc['labor_cost']['labor_cost_per_hour'] ?? 0);
-                                $hasOverlaps = (bool) ($calc['labor_cost']['has_overlapping_shifts'] ?? false);
+                                $secCalc = $section->latestCalculation;
+                                $capPerHour = (float) ($secCalc?->capacity_per_hour ?? 0);
+                                $dailyCap = (float) ($secCalc?->daily_capacity ?? 0);
+                                $laborCost = (float) ($secCalc?->labor_cost_per_hour ?? 0);
+                                $dailyLaborCost = (float) ($secCalc?->total_daily_labor_cost ?? 0);
+                                $machCost = (float) ($secCalc?->machine_cost_per_hour ?? 0);
+                                $dailyMachCost = (float) ($secCalc?->total_daily_machine_cost ?? 0);
+                                $dailyOperatingCost = (float) ($secCalc?->total_daily_operating_cost ?? 0);
+                                $hasBreaks = !empty($secCalc?->calculation_details['breaks'] ?? []);
+                                $manualBatchesCount = $section->manualProductions ? $section->manualProductions->count() : 0;
+                                $activeBatchesCount = $section->manualProductions ? $section->manualProductions->where('active', true)->count() : 0;
+
+                                // Internal Employees
+                                $activeSecEmpCount = $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->count() : 0;
+                                if ($activeSecEmpCount > 0) {
+                                    $empListHtml = '<ul class="list-unstyled mb-0 text-start fs-12">';
+                                    foreach ($section->employeeAssignments->where('active', true) as $assign) {
+                                        $empCode = $assign->employee?->code ?? 'EMP';
+                                        $empName = $assign->employee?->full_name ?? $assign->employee?->name ?? 'Employee';
+                                        $empShift = $assign->employee?->shift;
+                                        $shName = $empShift ? ($empShift->code ?: $empShift->name) : 'No shift';
+                                        $empListHtml .= '<li class="py-1 border-bottom border-light d-flex align-items-center justify-content-between gap-1">'
+                                            . '<div><span class="badge bg-soft-info text-info font-monospace fs-10 me-1">' . e($empCode) . '</span>'
+                                            . '<span class="text-dark">' . e($empName) . '</span></div>'
+                                            . '<span class="badge bg-soft-success text-success font-monospace fs-10">' . e($shName) . '</span>'
+                                            . '</li>';
+                                    }
+                                    $empListHtml .= '</ul>';
+                                } else {
+                                    $empListHtml = '<div class="text-muted fs-11 fst-italic py-1 text-center"><i class="feather-info me-1"></i>No employees assigned</div>';
+                                }
+
+                                // External Workers
+                                $secExtAllocs = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('active', true) : collect();
+                                $activeSecExtCount = (int) $secExtAllocs->sum('number_of_external_workers');
+                                if ($activeSecExtCount > 0) {
+                                    $extListHtml = '<ul class="list-unstyled mb-0 text-start fs-12">';
+                                    foreach ($secExtAllocs as $alloc) {
+                                        $pgName = $alloc->payGrade?->name ?? 'Worker';
+                                        $wCount = $alloc->number_of_external_workers;
+                                        $shCode = $alloc->shift ? ($alloc->shift->code ?: substr($alloc->shift->name, 0, 2)) : '';
+                                        $extListHtml .= '<li class="py-1 border-bottom border-light d-flex align-items-center justify-content-between gap-1">'
+                                            . '<div><span class="fw-medium text-dark">' . e($pgName) . '</span></div>'
+                                            . '<div class="d-flex align-items-center gap-1">'
+                                            . '<span class="badge bg-soft-primary text-primary font-monospace fs-10">' . $wCount . ' ' . \Illuminate\Support\Str::plural('Worker', $wCount) . '</span>'
+                                            . ($shCode ? '<span class="badge bg-soft-success text-success font-monospace fs-10">' . e($shCode) . '</span>' : '')
+                                            . '</div></li>';
+                                    }
+                                    $extListHtml .= '</ul>';
+                                } else {
+                                    $extListHtml = '<div class="text-muted fs-11 fst-italic py-1 text-center"><i class="feather-info me-1"></i>No external workers allocated</div>';
+                                }
+
+                                $totalSecPersonnel = $activeSecEmpCount + $activeSecExtCount;
+
+                                // Assigned Machines
+                                $machineCount = $section->machines ? $section->machines->count() : 0;
+                                if ($machineCount > 0) {
+                                    $machineListHtml = '<ul class="list-unstyled mb-0 text-start fs-12">';
+                                    foreach ($section->machines as $sm) {
+                                        $machCostInfo = $sm->operating_cost_per_hour > 0 ? (' &bull; ' . format_currency($sm->operating_cost_per_hour) . '/hr') : '';
+                                        $machineListHtml .= '<li class="py-1 border-bottom border-light d-flex align-items-center justify-content-between gap-1">'
+                                            . '<div><i class="feather-cpu text-secondary fs-11 me-1"></i>'
+                                            . '<span class="badge bg-soft-secondary text-secondary font-monospace fs-10 me-1">' . e($sm->code) . '</span>'
+                                            . '<span class="text-dark">' . e($sm->name) . '</span></div>'
+                                            . '<span class="text-muted fs-11 font-monospace">' . $machCostInfo . '</span>'
+                                            . '</li>';
+                                    }
+                                    $machineListHtml .= '</ul>';
+                                } else {
+                                    $machineListHtml = '<div class="text-muted fs-11 fst-italic py-1 text-center"><i class="feather-info me-1"></i>No machines assigned</div>';
+                                }
+
+                                // Manual Batches
+                                if ($manualBatchesCount > 0) {
+                                    $batchListHtml = '<ul class="list-unstyled mb-0 text-start fs-12">';
+                                    foreach ($section->manualProductions as $batch) {
+                                        $shCode = $batch->shift ? ($batch->shift->code ?: substr($batch->shift->name, 0, 2)) : 'N/A';
+                                        $statusBadge = $batch->active
+                                            ? '<span class="badge bg-soft-success text-success fs-9 px-1 py-0">Active</span>'
+                                            : '<span class="badge bg-soft-secondary text-muted fs-9 px-1 py-0">Inactive</span>';
+                                        $batchListHtml .= '<li class="py-1 border-bottom border-light d-flex align-items-center justify-content-between gap-1">'
+                                            . '<div><i class="feather-tool text-warning fs-11 me-1"></i>'
+                                            . '<span class="fw-semibold text-dark">' . e($batch->batch_name) . '</span> '
+                                            . '<span class="badge bg-soft-success text-success font-monospace fs-10">' . e($shCode) . '</span></div>'
+                                            . '<div class="d-flex align-items-center gap-1.5">'
+                                            . '<span class="text-muted fs-11 font-monospace">' . number_format((float) ($batch->capacity_per_hour ?? 0), 1) . ' u/h</span>'
+                                            . $statusBadge
+                                            . '</div></li>';
+                                    }
+                                    $batchListHtml .= '</ul>';
+                                } else {
+                                    $batchListHtml = '<div class="text-muted fs-11 fst-italic py-1 text-center"><i class="feather-info me-1"></i>No manual production batches configured</div>';
+                                }
+
+                                // Capacity Breakdown for Popover
+                                $totals = $secCalc?->calculation_details['totals'] ?? [];
+                                $machHourlyCap = (float) ($totals['hourly_machine_capacity'] ?? ($section->machines ? $section->machines->sum('capacity') : 0));
+                                $machDailyCap  = (float) ($totals['daily_machine_capacity'] ?? 0);
+                                $manHourlyCap  = (float) ($totals['hourly_manual_capacity'] ?? ($section->activeManualProductions ? $section->activeManualProductions->sum('capacity_per_hour') : 0));
+                                $manDailyCap   = (float) ($totals['daily_manual_capacity'] ?? 0);
+                                $totalDailyCap = (float) ($totals['total_daily_capacity'] ?? $dailyCap);
+                                $totalHourlyCap= (float) ($totals['total_hourly_capacity'] ?? $capPerHour);
+
+                                $capacityPopoverHtml = '<div class="fs-12 text-start p-1" style="min-width: 330px;">'
+                                    . '<div class="d-flex justify-content-between align-items-center gap-3 py-1 border-bottom border-light">'
+                                    . '<span class="text-muted text-nowrap me-2"><i class="feather-cpu text-secondary me-1.5"></i>Machine Cap:</span>'
+                                    . '<span class="fw-bold font-monospace text-dark text-nowrap text-end ms-auto">' . number_format($machDailyCap, 1) . ' u/d <span class="text-muted fw-normal fs-11 ms-0.5">(' . number_format($machHourlyCap, 1) . ' u/h)</span></span>'
+                                    . '</div>'
+                                    . '<div class="d-flex justify-content-between align-items-center gap-3 py-1 border-bottom border-light">'
+                                    . '<span class="text-muted text-nowrap me-2"><i class="feather-tool text-warning me-1.5"></i>Manual Batch:</span>'
+                                    . '<span class="fw-bold font-monospace text-dark text-nowrap text-end ms-auto">' . number_format($manDailyCap, 1) . ' u/d <span class="text-muted fw-normal fs-11 ms-0.5">(' . number_format($manHourlyCap, 1) . ' u/h)</span></span>'
+                                    . '</div>'
+                                    . '<div class="d-flex justify-content-between align-items-center gap-3 pt-1.5">'
+                                    . '<span class="fw-bold text-dark text-nowrap me-2"><i class="feather-bar-chart-2 text-primary me-1.5"></i>Total Cap:</span>'
+                                    . '<span class="fw-bolder font-monospace text-primary fs-13 text-nowrap text-end ms-auto">' . number_format($totalDailyCap, 1) . ' u/d <span class="text-muted fw-normal fs-11 ms-0.5">(' . number_format($totalHourlyCap, 1) . ' u/h)</span></span>'
+                                    . '</div>'
+                                    . '</div>';
                             @endphp
                             <tr>
+                                <!-- 1. Section Code Badge + Name -->
                                 <td class="align-middle">
-                                    <span class="font-monospace fw-bold text-dark">{{ $section->code }}</span>
+                                    <div class="d-flex align-items-center flex-wrap" style="gap: 8px;">
+                                        <span class="section-code-badge me-1">{{ $section->code }}</span>
+                                        <a href="javascript:void(0)" 
+                                           class="fw-bold text-dark text-decoration-none section-details-trigger fs-13"
+                                           data-bs-toggle="modal" 
+                                           data-bs-target="#sectionDetailsModal_{{ $section->id }}"
+                                           title="View Section Details">
+                                            <span>{{ $section->name }}</span>
+                                            <i class="feather-maximize-2 text-primary fs-10 ms-1.5 opacity-75"></i>
+                                        </a>
+                                    </div>
                                 </td>
+
+                                <!-- 2. Shifts (Clean Badges with Tooltips) -->
                                 <td class="align-middle">
-                                    <div class="fw-semibold text-dark d-flex align-items-center flex-wrap gap-1">
-                                        <span>{{ $section->name }}</span>
-                                        @if($section->supports_manual_production)
-                                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="{{ __('production.manual_capacity_per_hour') }}: {{ number_format((float) $section->manual_capacity_per_hour, 2) }} {{ __('production.units_per_hour') }}">
-                                                <i class="feather-user me-0.5"></i>{{ __('production.manual_production') }} ({{ number_format((float) $section->manual_capacity_per_hour, 2) }} {{ __('production.units_per_hour') }})
+                                    <div class="d-flex align-items-center flex-wrap gap-1">
+                                        @forelse ($section->shifts as $shift)
+                                            @php
+                                                $shiftCode = $shift->code ?: strtoupper(substr($shift->name, 0, 2));
+                                                $shiftWindow = substr($shift->start_time, 0, 5) . '–' . substr($shift->end_time, 0, 5);
+                                                $shiftWorkingHrs = $shift->working_hours_formatted ?? ($shift->working_hours ? number_format($shift->working_hours, 1) . ' hrs' : '8:00 hrs');
+                                                $shiftTooltip = e($shift->name . ' (' . $shiftWindow . ' · ' . $shiftWorkingHrs . ')');
+                                            @endphp
+                                            <span class="section-shift-pill"
+                                                  role="button"
+                                                  tabindex="0"
+                                                  data-bs-toggle="tooltip"
+                                                  data-bs-placement="top"
+                                                  title="{{ $shiftTooltip }}">
+                                                <i class="feather-clock fs-10 opacity-75"></i>{{ $shiftCode }}
+                                            </span>
+                                        @empty
+                                            <span class="text-muted fs-11 fst-italic">No shifts</span>
+                                        @endforelse
+                                    </div>
+                                </td>
+
+                                <!-- 3. Resources & Workforce Cluster (4 Pills) -->
+                                <td class="align-middle">
+                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <!-- Pill 1: Internal Employees -->
+                                        <span class="badge bg-soft-info text-info border border-info-subtle rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
+                                              role="button"
+                                              tabindex="0"
+                                              data-bs-toggle="popover"
+                                              data-bs-trigger="hover focus"
+                                              data-bs-placement="top"
+                                              data-bs-html="true"
+                                              data-bs-custom-class="section-popover"
+                                              data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-user-check text-info fs-12'></i>Internal Employees ({{ $activeSecEmpCount }})</div>"
+                                              data-bs-content="{{ $empListHtml }}"
+                                              data-modal-target="#sectionEmployeesModal_{{ $section->id }}"
+                                              data-modal-tab="internal"
+                                              title="Click to manage Internal Employees">
+                                            <i class="feather-user me-1 fs-11"></i>{{ $activeSecEmpCount }} Emp
+                                        </span>
+
+                                        <!-- Pill 2: External Workers -->
+                                        <span class="badge bg-soft-primary text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
+                                              role="button"
+                                              tabindex="0"
+                                              data-bs-toggle="popover"
+                                              data-bs-trigger="hover focus"
+                                              data-bs-placement="top"
+                                              data-bs-html="true"
+                                              data-bs-custom-class="section-popover"
+                                              data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-users text-primary fs-12'></i>External Workers ({{ $activeSecExtCount }})</div>"
+                                              data-bs-content="{{ $extListHtml }}"
+                                              data-modal-target="#sectionEmployeesModal_{{ $section->id }}"
+                                              data-modal-tab="external"
+                                              title="Click to allocate External Workers">
+                                            <i class="feather-users me-1 fs-11"></i>{{ $activeSecExtCount }} Ext
+                                        </span>
+
+                                        <!-- Pill 3: Assigned Machines -->
+                                        <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
+                                              role="button"
+                                              tabindex="0"
+                                              data-bs-toggle="popover"
+                                              data-bs-trigger="hover focus"
+                                              data-bs-placement="top"
+                                              data-bs-html="true"
+                                              data-bs-custom-class="section-popover"
+                                              data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-cpu text-secondary fs-12'></i>Assigned Machines ({{ $machineCount }})</div>"
+                                              data-bs-content="{{ $machineListHtml }}">
+                                            <i class="feather-cpu me-1 fs-11"></i>{{ $machineCount }} Mach
+                                        </span>
+
+                                        <!-- Pill 4: Manual Production Batches -->
+                                        @if($manualBatchesCount > 0)
+                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
+                                                  role="button"
+                                                  tabindex="0"
+                                                  data-bs-toggle="popover"
+                                                  data-bs-trigger="hover focus"
+                                                  data-bs-placement="top"
+                                                  data-bs-html="true"
+                                                  data-bs-custom-class="section-popover"
+                                                  data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-tool text-warning fs-12'></i>Manual Production Batches ({{ $manualBatchesCount }})</div>"
+                                                  data-bs-content="{{ $batchListHtml }}"
+                                                  data-modal-target="#sectionManualProductionModal_{{ $section->id }}"
+                                                  title="Click to configure Manual Production Batches">
+                                                <i class="feather-tool me-1 fs-11"></i>{{ $manualBatchesCount }} {{ \Illuminate\Support\Str::plural('Manual Batch', $manualBatchesCount) }}
+                                            </span>
+                                        @else
+                                            <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
+                                                  role="button"
+                                                  tabindex="0"
+                                                  data-bs-toggle="popover"
+                                                  data-bs-trigger="hover focus"
+                                                  data-bs-placement="top"
+                                                  data-bs-html="true"
+                                                  data-bs-custom-class="section-popover"
+                                                  data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-tool text-secondary fs-12'></i>Manual Production Batches (0)</div>"
+                                                  data-bs-content="{{ $batchListHtml }}"
+                                                  data-modal-target="#sectionManualProductionModal_{{ $section->id }}"
+                                                  title="Click to configure Manual Production Batches">
+                                                <i class="feather-tool me-1 fs-11"></i>No Manual Batch
                                             </span>
                                         @endif
                                     </div>
-                                    @if($section->description)
-                                        <small class="text-muted fs-11 text-truncate d-block" style="max-width: 250px;">{{ $section->description }}</small>
-                                    @endif
-                                    <div class="mt-1 d-flex align-items-center gap-1.5 flex-wrap">
-                                        @php
-                                            $activeSecEmpCount = $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->count() : 0;
-                                            $secExtAllocs = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('active', true) : collect();
-                                            $activeSecExtCount = (int) $secExtAllocs->sum('number_of_external_workers');
-                                            $totalSecPersonnel = $activeSecEmpCount + $activeSecExtCount;
-                                        @endphp
-                                        <button type="button" 
-                                                class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-0.5 fw-semibold d-inline-flex align-items-center gap-1 sec-personnel-trigger"
-                                                id="secPersonnelBtn_{{ $section->id }}"
-                                                data-section-id="{{ $section->id }}"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#sectionEmployeesModal_{{ $section->id }}"
-                                                data-target-tab="internal"
-                                                title="Manage Section Personnel (Internal Employees & External Workers)">
-                                            <i class="feather-users fs-10"></i>
-                                            <span>Section Personnel</span>
-                                            <span class="badge bg-soft-info text-info rounded-pill px-1.5 py-0 fs-10 ms-0.5 font-monospace sec-personnel-count-badge" title="{{ $activeSecEmpCount }} Internal, {{ $activeSecExtCount }} External">{{ $totalSecPersonnel }}</span>
-                                        </button>
+                                </td>
 
-                                        <button type="button" 
-                                                class="btn btn-xs {{ $section->supports_manual_production ? 'btn-soft-warning text-warning border border-warning-subtle' : 'btn-outline-secondary' }} rounded-pill px-2 py-0.5 fw-semibold d-inline-flex align-items-center gap-1"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#sectionManualProductionModal_{{ $section->id }}"
-                                                title="Configure Manual Production for this Section">
-                                            <i class="feather-tool fs-10"></i>
-                                            <span>Manual Production</span>
-                                            @if($section->supports_manual_production)
-                                                <span class="badge bg-warning text-white rounded-pill px-1.5 py-0 fs-10 ms-0.5 font-monospace">{{ number_format((float) $section->manual_capacity_per_hour, 1) }}/hr</span>
-                                            @endif
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- 4. Daily Capacity (with Hover Breakdown Popover) -->
                                 <td class="align-middle">
-                                    @forelse ($section->shifts as $shift)
-                                        @php
-                                            $extAllocations = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('shift_id', $shift->id) : collect();
-                                            $activeExtCount = (int) $extAllocations->where('active', true)->sum('number_of_external_workers');
-                                        @endphp
-                                        <div class="d-inline-flex flex-column gap-1 p-2 border rounded bg-white mb-1.5 me-1.5 fs-11 shadow-xs">
-                                            <div class="d-flex align-items-center justify-content-between gap-2">
-                                                <span class="fw-semibold text-dark">{{ $shift->name }}</span>
-                                                @if(!str_contains($shift->name, substr($shift->start_time, 0, 5)))
-                                                    <span class="text-muted font-monospace fs-10">({{ substr($shift->start_time, 0, 5) }}–{{ substr($shift->end_time, 0, 5) }})</span>
-                                                @endif
-                                            </div>
-                                            <div class="d-flex align-items-center gap-1.5 flex-wrap mt-0.5">
-                                                <button type="button" 
-                                                        class="btn btn-xs {{ $activeExtCount > 0 ? 'btn-soft-primary text-primary' : 'btn-outline-secondary' }} rounded-pill px-2.5 py-0.5 fw-semibold d-inline-flex align-items-center gap-1" 
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#sectionEmployeesModal_{{ $section->id }}"
-                                                        data-target-tab="external"
-                                                        data-target-shift="{{ $shift->id }}"
-                                                        title="Allocate External Workers for this Section & Shift">
-                                                    <i class="feather-users fs-10"></i>
-                                                    <span>External Workers</span>
-                                                    @if($activeExtCount > 0)
-                                                        <span class="badge bg-primary text-white rounded-pill px-1.5 py-0 fs-10 ms-0.5" title="{{ $activeExtCount }} External Workers">{{ $activeExtCount }}</span>
-                                                    @endif
-                                                </button>
-                                            </div>
-                                        </div>
-                                    @empty
-                                        <span class="text-danger fs-11"><i class="feather-alert-triangle me-1"></i>No shifts</span>
-                                    @endforelse
-                                </td>
-                                <td class="align-middle">
-                                    @php
-                                        $machineCount = $section->machines->count();
-                                        if ($machineCount > 0) {
-                                            $machineListHtml = '<ul class=\'list-unstyled mb-0 text-start fs-12\'>';
-                                            foreach ($section->machines as $sm) {
-                                                $machineListHtml .= '<li class=\'py-1 border-bottom border-light d-flex align-items-center gap-1\'>'
-                                                    . '<i class=\'feather-cpu text-primary fs-11\'></i>'
-                                                    . '<span class=\'fw-bold font-monospace text-dark\'>[' . e($sm->code) . ']</span> '
-                                                    . '<span class=\'text-dark\'>' . e($sm->name) . '</span>'
-                                                    . '</li>';
-                                            }
-                                            $machineListHtml .= '</ul>';
-                                        } else {
-                                            $machineListHtml = '<div class=\'text-muted fs-11 fst-italic py-1 text-center\'>'
-                                                . '<i class=\'feather-info text-muted me-1\'></i>' . e(__('production.no_machines_assigned'))
-                                                . '</div>';
-                                        }
-                                    @endphp
-                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2.5 py-1 fs-12 section-machines-badge"
-                                          role="button"
-                                          tabindex="0"
-                                          data-bs-toggle="popover"
-                                          data-bs-trigger="hover focus"
-                                          data-bs-placement="top"
-                                          data-bs-html="true"
-                                          data-bs-custom-class="section-machines-popover"
-                                          data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-cpu text-primary fs-12'></i>{{ __('production.assigned_machines') }} ({{ $machineCount }})</div>"
-                                          data-bs-content="{{ $machineListHtml }}">
-                                        <i class="feather-cpu me-1 fs-11"></i>{{ $machineCount }}
-                                    </span>
-                                </td>
-                                <td class="align-middle">
-                                    <div class="d-flex align-items-center gap-1.5 flex-nowrap">
-                                        <span class="fw-bold font-monospace text-dark fs-12">
-                                            {{ number_format($capPerHour, 2) }}
-                                        </span>
-                                        <small class="text-muted fs-10">{{ $capUnit }}</small>
-                                        <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
-                                                data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
-                                                title="{{ __('production.view_calculation_breakdown') }}">
-                                            <i class="feather-info fs-12"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                                <td class="align-middle">
-                                    <div class="d-flex flex-column gap-1">
-                                        <div class="d-flex align-items-center gap-1.5 flex-nowrap">
-                                            <span class="fw-bold font-monospace text-dark fs-12">
-                                                {{ format_currency($laborCost) }}
+                                    <div class="d-flex flex-column align-items-start capacity-popover-trigger"
+                                         role="button"
+                                         tabindex="0"
+                                         data-bs-toggle="popover"
+                                         data-bs-trigger="hover focus"
+                                         data-bs-placement="top"
+                                         data-bs-html="true"
+                                         data-bs-custom-class="section-popover"
+                                         data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-activity text-success fs-12'></i>Daily Capacity Breakdown</div>"
+                                         data-bs-content="{{ $capacityPopoverHtml }}"
+                                         data-bs-target="#sectionCalculationModal_{{ $section->id }}">
+                                        <div class="d-flex align-items-center gap-1 flex-nowrap">
+                                            <span class="fw-bold font-monospace text-dark fs-13">
+                                                {{ number_format($dailyCap, 1) }}
                                             </span>
-                                            <small class="text-muted fs-10">/ hr</small>
+                                            <small class="text-muted fs-10">units/day</small>
                                             <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
                                                     data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
                                                     title="{{ __('production.view_calculation_breakdown') }}">
-                                                <i class="feather-info fs-12"></i>
+                                                <i class="feather-info fs-11"></i>
                                             </button>
                                         </div>
-                                        @if($hasOverlaps)
+                                        <small class="text-muted fs-10 font-monospace">Avg: {{ number_format($capPerHour, 1) }}/hr</small>
+                                    </div>
+                                </td>
+
+                                <!-- 5. Daily Operating Cost -->
+                                <td class="align-middle">
+                                    <div class="d-flex flex-column gap-0.5">
+                                        <div class="d-flex align-items-center gap-1.5 flex-nowrap">
+                                            <span class="fw-bold font-monospace text-primary fs-12">
+                                                {{ format_currency($dailyOperatingCost) }}
+                                            </span>
+                                            <small class="text-muted fs-10">/day</small>
+                                            <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
+                                                    data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
+                                                    title="{{ __('production.view_calculation_breakdown') }}">
+                                                <i class="feather-info fs-11"></i>
+                                            </button>
+                                        </div>
+                                        <small class="text-muted fs-10 font-monospace">Labor: {{ format_currency($dailyLaborCost) }} | Mach: {{ format_currency($dailyMachCost) }}</small>
+                                        @if($hasBreaks)
                                             <div>
-                                                <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="{{ __('production.overlapping_shifts') }}">
-                                                    <i class="feather-layers me-0.5"></i>{{ __('production.overlapping_shifts') }}
+                                                <span class="badge bg-soft-warning text-warning fs-9 px-1.5 py-0.5 rounded-pill" title="Contains shift break gaps in timeline">
+                                                    <i class="feather-coffee me-0.5"></i>Break Gaps
                                                 </span>
                                             </div>
                                         @endif
                                     </div>
                                 </td>
+
+                                <!-- 6. Status -->
                                 <td class="align-middle">
                                     @if ($section->isActive())
                                         <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">{{ __('production.active') }}</span>
@@ -614,8 +1011,16 @@
                                         <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.inactive') }}</span>
                                     @endif
                                 </td>
+
+                                <!-- 7. Actions Dropdown -->
                                 <td class="text-end align-middle">
                                     <x-ui.action-dropdown>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#sectionDetailsModal_{{ $section->id }}">
+                                                <i class="feather-eye me-2 text-primary fs-12"></i>View Section Details
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
                                         <li>
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}">
                                                 <i class="feather-bar-chart-2 me-2 text-primary fs-12"></i>{{ __('production.view_calculation_breakdown') }}
@@ -667,7 +1072,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-4 text-muted">
+                                <td colspan="7" class="text-center py-4 text-muted">
                                     <i class="feather-info me-2"></i>{{ __('production.no_sections_found') }}
                                 </td>
                             </tr>
@@ -675,9 +1080,76 @@
                     </tbody>
                 </x-ui.odoo-form-ui>
             </div>
+        <!-- Work Center Activity & Audit Logs Section -->
+        <div class="mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="feather-activity me-1.5 text-primary"></i>Activity & Audit History
+                    </h5>
+                    <small class="text-muted">Real-time log of debounce triggers, calculation rollups, manual batch changes, and configuration updates</small>
+                </div>
+                <button type="button" class="btn btn-xs btn-outline-primary" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal">
+                    <i class="feather-file-text me-1"></i>Inspect Full Snapshot
+                </button>
+            </div>
+
+            <div class="card border shadow-none rounded-3 overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 18%">Timestamp</th>
+                                <th style="width: 18%">Action Type</th>
+                                <th style="width: 44%">Description</th>
+                                <th style="width: 20%">Initiated By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($workCenter->activityLogs()->latest()->take(10)->get() as $log)
+                                <tr>
+                                    <td class="font-monospace text-muted fs-11">
+                                        {{ $log->created_at->format('Y-m-d H:i:s') }}
+                                        <small class="text-muted d-block fs-10">({{ $log->created_at->diffForHumans() }})</small>
+                                    </td>
+                                    <td>
+                                        @php
+                                            $badgeClass = match($log->action_type) {
+                                                'calculation_completed' => 'bg-soft-success text-success',
+                                                'countdown_armed', 'countdown_reset' => 'bg-soft-warning text-warning',
+                                                'manual_bypass' => 'bg-soft-primary text-primary',
+                                                'duration_updated' => 'bg-soft-info text-info',
+                                                'section_modified' => 'bg-soft-secondary text-secondary',
+                                                default => 'bg-light text-dark',
+                                            };
+                                        @endphp
+                                        <span class="badge {{ $badgeClass }} font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                            {{ str_replace('_', ' ', $log->action_type) }}
+                                        </span>
+                                    </td>
+                                    <td class="text-dark">
+                                        {{ $log->description }}
+                                    </td>
+                                    <td>
+                                        @if($log->user)
+                                            <span class="fw-semibold text-dark"><i class="feather-user me-1 text-muted fs-11"></i>{{ $log->user->name }}</span>
+                                        @else
+                                            <span class="text-muted fst-italic"><i class="feather-cpu me-1 fs-11"></i>Automated System</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted fst-italic">
+                                        <i class="feather-info me-1"></i>No activity logs recorded yet. Calculations or modifications will generate audit logs automatically.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-
-
     </div>
 
     <!-- Modals for Section Management -->
@@ -1510,25 +1982,585 @@
                 </div>
             </div>
         </div>
+
+        <!-- Section Details Modal for Section {{ $section->id }} -->
+        @php
+            $secDetailsCalc = $section->latestCalculation;
+            $secDetailsDailyCap = (float) ($secDetailsCalc?->daily_capacity ?? 0);
+            $secDetailsCapPerHour = (float) ($secDetailsCalc?->capacity_per_hour ?? 0);
+            $secDetailsDailyOperatingCost = (float) ($secDetailsCalc?->total_daily_operating_cost ?? 0);
+            $secDetailsHourlyOperatingCost = (float) ($secDetailsCalc?->total_operating_cost_per_hour ?? 0);
+            $secDetailsLaborCost = (float) ($secDetailsCalc?->labor_cost_per_hour ?? 0);
+            $secDetailsDailyLaborCost = (float) ($secDetailsCalc?->total_daily_labor_cost ?? 0);
+            $secDetailsMachCost = (float) ($secDetailsCalc?->machine_cost_per_hour ?? 0);
+            $secDetailsDailyMachCost = (float) ($secDetailsCalc?->total_daily_machine_cost ?? 0);
+            
+            $secDetailsEmpCount = $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->count() : 0;
+            $secDetailsExtAllocs = $section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('active', true) : collect();
+            $secDetailsExtCount = (int) $secDetailsExtAllocs->sum('number_of_external_workers');
+            $secDetailsTotalPersonnel = $secDetailsEmpCount + $secDetailsExtCount;
+
+            $secDetailsManualBatchesCount = $section->manualProductions ? $section->manualProductions->count() : 0;
+
+            $secDetailsTotals = $secDetailsCalc?->calculation_details['totals'] ?? [];
+            $secDetailsMachHourlyCap = (float) ($secDetailsTotals['hourly_machine_capacity'] ?? ($section->machines ? $section->machines->sum('capacity') : 0));
+            $secDetailsMachDailyCap  = (float) ($secDetailsTotals['daily_machine_capacity'] ?? 0);
+            $secDetailsManHourlyCap  = (float) ($secDetailsTotals['hourly_manual_capacity'] ?? ($section->activeManualProductions ? $section->activeManualProductions->sum('capacity_per_hour') : 0));
+            $secDetailsManDailyCap   = (float) ($secDetailsTotals['daily_manual_capacity'] ?? 0);
+            $secDetailsTotalDailyCap = (float) ($secDetailsTotals['total_daily_capacity'] ?? $secDetailsDailyCap);
+            $secDetailsTotalHourlyCap= (float) ($secDetailsTotals['total_hourly_capacity'] ?? $secDetailsCapPerHour);
+        @endphp
+        <div class="modal fade section-details-modal" id="sectionDetailsModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionDetailsModalLabel_{{ $section->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg rounded-3">
+                    <div class="modal-header border-bottom py-3 bg-light">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="section-code-badge fs-12 px-2.5 py-1.5 me-2">{{ $section->code }}</span>
+                            <h5 class="modal-title fw-bold text-dark fs-16 mb-0" id="sectionDetailsModalLabel_{{ $section->id }}">
+                                {{ $section->name }}
+                            </h5>
+                            @if ($section->isActive())
+                                <span class="badge bg-soft-success text-success rounded-pill px-2.5 py-1 fs-11">● Active</span>
+                            @else
+                                <span class="badge bg-soft-danger text-danger rounded-pill px-2.5 py-1 fs-11">● Inactive</span>
+                            @endif
+                            <div class="w-100 text-muted fs-12 mt-0.5">
+                                Work Center: <span class="fw-semibold text-dark">{{ $workCenter->name }}</span>
+                                <span class="badge bg-soft-primary text-primary font-monospace ms-1">{{ $workCenter->code }}</span>
+                                @if($section->description)
+                                    &bull; <span class="fst-italic">{{ $section->description }}</span>
+                                @endif
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <!-- Top 4 KPI Metric Cards -->
+                        <div class="row g-3 mb-4">
+                            <!-- 1. Operating Window -->
+                            <div class="col-md-3 col-6">
+                                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="text-muted fs-11 text-uppercase fw-semibold">Operating Window</span>
+                                        <i class="feather-clock text-primary fs-14"></i>
+                                    </div>
+                                    @php
+                                        $uohTotalMin = (int) round(((float) ($secDetailsCalc?->unique_operating_hours ?? 0)) * 60);
+                                        $uohHours = intdiv($uohTotalMin, 60);
+                                        $uohMins = $uohTotalMin % 60;
+                                        $uohFormatted = sprintf('%d:%02d', $uohHours, $uohMins);
+                                    @endphp
+                                    <div class="fs-20 fw-bold text-dark font-monospace">
+                                        {{ $uohFormatted }}
+                                        <span class="fs-11 fw-normal text-muted">hrs/day</span>
+                                    </div>
+                                    <small class="text-muted fs-11 mt-1">
+                                        {{ $section->shifts->count() }} {{ \Illuminate\Support\Str::plural('Shift', $section->shifts->count()) }} configured
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- 2. Daily Capacity -->
+                            <div class="col-md-3 col-6">
+                                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="text-muted fs-11 text-uppercase fw-semibold">Daily Capacity</span>
+                                        <i class="feather-activity text-success fs-14"></i>
+                                    </div>
+                                    <div class="fs-20 fw-bold text-dark font-monospace">
+                                        {{ number_format($secDetailsDailyCap, 1) }}
+                                        <span class="fs-11 fw-normal text-muted">units/day</span>
+                                    </div>
+                                    <small class="text-muted fs-11 mt-1">
+                                        Avg {{ number_format($secDetailsCapPerHour, 1) }} units/hr
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- 3. Daily Operating Cost -->
+                            <div class="col-md-3 col-6">
+                                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="text-muted fs-11 text-uppercase fw-semibold">Daily Operating Cost</span>
+                                        <i class="feather-dollar-sign text-warning fs-14"></i>
+                                    </div>
+                                    <div class="fs-20 fw-bold text-primary font-monospace">
+                                        {{ format_currency($secDetailsDailyOperatingCost) }}
+                                    </div>
+                                    <small class="text-muted fs-11 mt-1">
+                                        {{ format_currency($secDetailsHourlyOperatingCost) }}/hr
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- 4. Total Workforce -->
+                            <div class="col-md-3 col-6">
+                                <div class="p-3 rounded-3 bg-light border h-100 d-flex flex-column justify-content-between">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <span class="text-muted fs-11 text-uppercase fw-semibold">Total Workforce</span>
+                                        <i class="feather-users text-info fs-14"></i>
+                                    </div>
+                                    <div class="fs-20 fw-bold text-dark font-monospace">
+                                        {{ $secDetailsTotalPersonnel }}
+                                        <span class="fs-11 fw-normal text-muted">Personnel</span>
+                                    </div>
+                                    <small class="text-muted fs-11 mt-1">
+                                        {{ $secDetailsEmpCount }} Internal + {{ $secDetailsExtCount }} External
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab Navigation -->
+                        <ul class="nav nav-tabs nav-tabs-bottom mb-3" id="secDetailsTabs_{{ $section->id }}" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active fw-semibold fs-13 py-2 px-3" 
+                                        id="sec-shifts-tab-{{ $section->id }}" 
+                                        data-bs-toggle="tab" 
+                                        data-bs-target="#sec-shifts-pane-{{ $section->id }}" 
+                                        type="button" 
+                                        role="tab">
+                                    <i class="feather-calendar me-1"></i>Shifts & Schedule
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-1.5 py-0 fs-10 ms-1">{{ $section->shifts->count() }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-semibold fs-13 py-2 px-3" 
+                                        id="sec-machines-tab-{{ $section->id }}" 
+                                        data-bs-toggle="tab" 
+                                        data-bs-target="#sec-machines-pane-{{ $section->id }}" 
+                                        type="button" 
+                                        role="tab">
+                                    <i class="feather-cpu me-1"></i>Machines
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-1.5 py-0 fs-10 ms-1">{{ $section->machines->count() }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-semibold fs-13 py-2 px-3" 
+                                        id="sec-personnel-tab-{{ $section->id }}" 
+                                        data-bs-toggle="tab" 
+                                        data-bs-target="#sec-personnel-pane-{{ $section->id }}" 
+                                        type="button" 
+                                        role="tab">
+                                    <i class="feather-users me-1"></i>Personnel
+                                    <span class="badge bg-soft-info text-info rounded-pill px-1.5 py-0 fs-10 ms-1">{{ $secDetailsTotalPersonnel }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-semibold fs-13 py-2 px-3" 
+                                        id="sec-batches-tab-{{ $section->id }}" 
+                                        data-bs-toggle="tab" 
+                                        data-bs-target="#sec-batches-pane-{{ $section->id }}" 
+                                        type="button" 
+                                        role="tab">
+                                    <i class="feather-tool me-1"></i>Manual Batches
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-1.5 py-0 fs-10 ms-1">{{ $secDetailsManualBatchesCount }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-semibold fs-13 py-2 px-3" 
+                                        id="sec-cost-tab-{{ $section->id }}" 
+                                        data-bs-toggle="tab" 
+                                        data-bs-target="#sec-cost-pane-{{ $section->id }}" 
+                                        type="button" 
+                                        role="tab">
+                                    <i class="feather-pie-chart me-1"></i>Cost & Capacity
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Panes Content -->
+                        <div class="tab-content" id="secDetailsTabContent_{{ $section->id }}">
+                            <!-- Pane 1: Shifts & Schedule -->
+                            <div class="tab-pane fade show active" id="sec-shifts-pane-{{ $section->id }}" role="tabpanel">
+                                <div class="table-responsive border rounded-3">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 15%">Shift Code</th>
+                                                <th style="width: 25%">Shift Name</th>
+                                                <th style="width: 25%">Operating Window</th>
+                                                <th style="width: 15%">Net Working Hours</th>
+                                                <th style="width: 20%">Workforce On Duty</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($section->shifts as $sh)
+                                                @php
+                                                    $shExtCount = (int) ($section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('shift_id', $sh->id)->where('active', true)->sum('number_of_external_workers') : 0);
+                                                    $shEmpCount = (int) ($section->employeeAssignments ? $section->employeeAssignments->where('active', true)->filter(fn($a) => ($a->employee?->shift_id ?? $a->shift_id) == $sh->id)->count() : 0);
+                                                    $shCode = $sh->code ?: strtoupper(substr($sh->name, 0, 2));
+                                                    $shWorkingDuration = $sh->working_hours_formatted ?? ($sh->working_hours ? number_format($sh->working_hours, 1) . ' hrs' : '8:00 hrs');
+                                                @endphp
+                                                <tr>
+                                                    <td>
+                                                        <span class="section-shift-pill fs-11 py-0.5 px-2 mb-0"><i class="feather-clock fs-10 opacity-75"></i>{{ $shCode }}</span>
+                                                    </td>
+                                                    <td class="fw-semibold text-dark">{{ $sh->name }}</td>
+                                                    <td class="font-monospace text-muted">
+                                                        {{ substr($sh->start_time, 0, 5) }} &ndash; {{ substr($sh->end_time, 0, 5) }}
+                                                    </td>
+                                                    <td class="font-monospace fw-semibold text-dark">
+                                                        {{ $shWorkingDuration }}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-info text-info font-monospace fs-10 px-1.5 py-0.5 me-1" title="{{ $shEmpCount }} Internal">{{ $shEmpCount }} Emp</span>
+                                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-1.5 py-0.5" title="{{ $shExtCount }} External">{{ $shExtCount }} Ext</span>
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="text-center py-3 text-muted fst-italic">
+                                                        <i class="feather-info me-1"></i>No shifts assigned to this section.
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Pane 2: Machines -->
+                            <div class="tab-pane fade" id="sec-machines-pane-{{ $section->id }}" role="tabpanel">
+                                <div class="table-responsive border rounded-3">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 15%">Machine Code</th>
+                                                <th style="width: 25%">Machine Name</th>
+                                                <th style="width: 15%">Power (kW)</th>
+                                                <th style="width: 20%">Capacity / hr</th>
+                                                <th style="width: 25%">Operating Cost / hr</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($section->machines as $sm)
+                                                <tr>
+                                                    <td>
+                                                        <span class="badge bg-soft-secondary text-secondary font-monospace">{{ $sm->code }}</span>
+                                                    </td>
+                                                    <td class="fw-medium text-dark">{{ $sm->name }}</td>
+                                                    <td class="font-monospace text-muted">
+                                                        {{ number_format((float) ($sm->consumption_per_hour ?? 0), 2) }} kW
+                                                    </td>
+                                                    <td class="font-monospace fw-semibold text-success">
+                                                        {{ number_format((float) ($sm->capacity ?? 0), 1) }} u/h
+                                                    </td>
+                                                    <td class="font-monospace fw-semibold text-primary">
+                                                        {{ format_currency($sm->operating_cost_per_hour) }}/hr
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="text-center py-3 text-muted fst-italic">
+                                                        <i class="feather-info me-1"></i>No machines assigned to this section.
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                        @if($section->machines && $section->machines->isNotEmpty())
+                                            <tfoot class="table-light border-top">
+                                                <tr class="fw-bold">
+                                                    <td colspan="3" class="text-dark">Total Machine Output:</td>
+                                                    <td class="font-monospace text-success">{{ number_format($secDetailsMachHourlyCap, 1) }} u/h</td>
+                                                    <td class="font-monospace text-primary">{{ format_currency($secDetailsMachCost) }}/hr</td>
+                                                </tr>
+                                            </tfoot>
+                                        @endif
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Pane 3: Personnel -->
+                            <div class="tab-pane fade" id="sec-personnel-pane-{{ $section->id }}" role="tabpanel">
+                                <div class="row g-3">
+                                    <!-- Internal Employees -->
+                                    <div class="col-md-6">
+                                        <div class="card border rounded-3 mb-0 shadow-none">
+                                            <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                                <span class="fw-bold fs-12 text-dark">
+                                                    <i class="feather-user-check text-info me-1"></i>Internal Employees ({{ $secDetailsEmpCount }})
+                                                </span>
+                                            </div>
+                                            <div class="card-body p-0">
+                                                <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th>Code</th>
+                                                                <th>Name</th>
+                                                                <th>Shift</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @forelse($section->employeeAssignments ? $section->employeeAssignments->where('active', true) : [] as $assign)
+                                                                <tr>
+                                                                    <td><span class="badge bg-soft-info text-info font-monospace">{{ $assign->employee?->code ?? 'EMP' }}</span></td>
+                                                                    <td>{{ $assign->employee?->full_name ?? $assign->employee?->name ?? 'Employee' }}</td>
+                                                                    <td class="text-muted font-monospace fs-11">{{ $assign->employee?->shift?->name ?? 'No shift assigned' }}</td>
+                                                                </tr>
+                                                            @empty
+                                                                <tr>
+                                                                    <td colspan="3" class="text-center py-3 text-muted fst-italic">No internal employees assigned.</td>
+                                                                </tr>
+                                                            @endforelse
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- External Workers -->
+                                    <div class="col-md-6">
+                                        <div class="card border rounded-3 mb-0 shadow-none">
+                                            <div class="card-header bg-light py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                                <span class="fw-bold fs-12 text-dark">
+                                                    <i class="feather-users text-primary me-1"></i>External Workers ({{ $secDetailsExtCount }})
+                                                </span>
+                                            </div>
+                                            <div class="card-body p-0">
+                                                <div class="table-responsive" style="max-height: 260px; overflow-y: auto;">
+                                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th>Pay Grade</th>
+                                                                <th>Shift</th>
+                                                                <th class="text-center">Count</th>
+                                                                <th class="text-end">Rate</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @forelse($secDetailsExtAllocs as $alloc)
+                                                                <tr>
+                                                                    <td class="fw-medium text-dark">{{ $alloc->payGrade?->name ?? 'Worker' }}</td>
+                                                                    <td class="text-muted font-monospace fs-11">{{ $alloc->shift?->name ?? 'Shift' }}</td>
+                                                                    <td class="text-center font-monospace fw-bold text-primary">{{ $alloc->number_of_external_workers }}</td>
+                                                                    <td class="text-end font-monospace">{{ format_currency((float) ($alloc->payGrade?->hourly_rate ?? 0)) }}/hr</td>
+                                                                </tr>
+                                                            @empty
+                                                                <tr>
+                                                                    <td colspan="4" class="text-center py-3 text-muted fst-italic">No external workers allocated.</td>
+                                                                </tr>
+                                                            @endforelse
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pane 4: Manual Batches -->
+                            <div class="tab-pane fade" id="sec-batches-pane-{{ $section->id }}" role="tabpanel">
+                                <div class="table-responsive border rounded-3">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 25%">Batch Name</th>
+                                                <th style="width: 25%">Shift</th>
+                                                <th style="width: 20%">Target Rate</th>
+                                                <th style="width: 20%">Workforce Allocated</th>
+                                                <th style="width: 10%">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($section->manualProductions ?: [] as $batch)
+                                                @php
+                                                    $batchEmpCount = $batch->employees ? $batch->employees->count() : 0;
+                                                    $batchExtCount = (int) ($batch->externalAllocations ? $batch->externalAllocations->sum('number_of_external_workers') : 0);
+                                                @endphp
+                                                <tr>
+                                                    <td class="fw-semibold text-dark">
+                                                        <i class="feather-tool text-warning me-1"></i>{{ $batch->batch_name }}
+                                                    </td>
+                                                    <td class="font-monospace text-muted">
+                                                        {{ $batch->shift?->name ?? 'Shift' }}
+                                                        @if($batch->shift?->code)
+                                                            <span class="badge bg-soft-success text-success font-monospace">{{ $batch->shift->code }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="font-monospace fw-bold text-dark">
+                                                        {{ number_format((float) ($batch->capacity_per_hour ?? 0), 1) }} u/h
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-info text-info font-monospace fs-10 px-1.5 py-0.5 me-1">{{ $batchEmpCount }} Emp</span>
+                                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-1.5 py-0.5">{{ $batchExtCount }} Ext</span>
+                                                    </td>
+                                                    <td>
+                                                        @if($batch->active)
+                                                            <span class="badge bg-soft-success text-success rounded-pill px-2 py-0.5">Active</span>
+                                                        @else
+                                                            <span class="badge bg-soft-secondary text-muted rounded-pill px-2 py-0.5">Inactive</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="5" class="text-center py-3 text-muted fst-italic">
+                                                        <i class="feather-info me-1"></i>No manual production batches configured for this section.
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Pane 5: Cost & Capacity -->
+                            <div class="tab-pane fade" id="sec-cost-pane-{{ $section->id }}" role="tabpanel">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="card border rounded-3 p-3 shadow-none mb-0">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="feather-dollar-sign text-warning me-1"></i>Operating Cost Breakdown</h6>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Labor Cost per Hour:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ format_currency($secDetailsLaborCost) }}/hr</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Total Daily Labor Cost:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ format_currency($secDetailsDailyLaborCost) }}</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Machine Cost per Hour:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ format_currency($secDetailsMachCost) }}/hr</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Total Daily Machine Cost:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ format_currency($secDetailsDailyMachCost) }}</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center pt-2">
+                                                <span class="fw-bold text-dark fs-13">Total Daily Operating Cost:</span>
+                                                <span class="fs-16 fw-bolder text-primary font-monospace">{{ format_currency($secDetailsDailyOperatingCost) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="card border rounded-3 p-3 shadow-none mb-0">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="feather-activity text-success me-1"></i>Capacity Breakdown</h6>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Machine Daily Capacity:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ number_format($secDetailsMachDailyCap, 1) }} u/d <span class="text-muted fw-normal fs-11">({{ number_format($secDetailsMachHourlyCap, 1) }} u/h)</span></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Manual Daily Capacity:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ number_format($secDetailsManDailyCap, 1) }} u/d <span class="text-muted fw-normal fs-11">({{ number_format($secDetailsManHourlyCap, 1) }} u/h)</span></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                <span class="text-muted fs-12">Average Hourly Output:</span>
+                                                <span class="fw-bold font-monospace text-dark fs-13">{{ number_format($secDetailsTotalHourlyCap, 1) }} units/hr</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center pt-2">
+                                                <span class="fw-bold text-dark fs-13">Total Daily Production Capacity:</span>
+                                                <span class="fs-16 fw-bolder text-success font-monospace">{{ number_format($secDetailsTotalDailyCap, 1) }} units</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 fw-semibold"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#sectionEmployeesModal_{{ $section->id }}"
+                                    data-target-tab="internal">
+                                <i class="feather-users me-1"></i>Manage Personnel
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 fw-semibold"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#sectionManualProductionModal_{{ $section->id }}">
+                                <i class="feather-tool me-1"></i>Manual Production
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2.5 py-1 fw-semibold"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#sectionCalculationModal_{{ $section->id }}">
+                                <i class="feather-bar-chart-2 me-1"></i>Calculation Breakdown
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     @endforeach
+
+    <!-- Edit Countdown Duration Modal -->
+    <div class="modal fade" id="editCountdownDurationModal" tabindex="-1" aria-labelledby="editCountdownDurationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <form method="POST" action="{{ route('production.work-centers.countdown-duration', $workCenter->id) }}">
+                    @csrf
+                    <div class="modal-header border-bottom py-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-text avatar-sm bg-soft-warning text-warning rounded d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="feather-clock"></i>
+                            </div>
+                            <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="editCountdownDurationModalLabel">
+                                Debounce Countdown Settings
+                            </h5>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-muted fs-12 mb-3">
+                            When machines, shifts, or workers are updated on any section of this Work Center, an automatic countdown is armed before running the heavy calculation roll-up. Subsequent updates during the countdown reset the timer (debouncing).
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-dark fs-13" for="calculation_countdown_minutes">
+                                Debounce Duration (Minutes) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="calculation_countdown_minutes" id="calculation_countdown_minutes" 
+                                   class="form-control font-monospace" min="1" max="1440" required
+                                   value="{{ $workCenter->calculation_countdown_minutes ?? 10 }}">
+                            <div class="form-text fs-11 text-muted">
+                                Wait time in minutes before recalculating after changes. Minimum 1 minute (cannot be zero). Default is 10 minutes.
+                            </div>
+                        </div>
+                        @if($isCountdownActive)
+                            <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
+                                <i class="feather-alert-triangle me-1"></i> A countdown is actively running ({{ gmdate('i:s', $countdownRemainingSeconds) }} remaining). Duration cannot be modified until the current calculation finishes.
+                            </div>
+                        @endif
+                    </div>
+                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm" @if($isCountdownActive) disabled @endif>
+                            <i class="feather-save me-1"></i>Save Duration
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- Work Center Calculation Breakdown Modal -->
     @php
-        $wcCalc = $workCenter->getCalculationDetails();
-        $wcCapCalc = $wcCalc['capacity'] ?? [];
-        $wcLaborCalc = $wcCalc['labor_cost'] ?? [];
-        $wcCapPerHour = (float) ($wcCapCalc['capacity_per_hour'] ?? 0);
-        $wcTotalTheoCap = (float) ($wcCapCalc['total_theoretical_capacity'] ?? 0);
-        $wcLaborCostPerHour = (float) ($wcLaborCalc['labor_cost_per_hour'] ?? 0);
-        $wcTotalSchedLabor = (float) ($wcLaborCalc['total_scheduled_labor_cost'] ?? 0);
-        $wcUniqOperatingHours = (float) ($wcCapCalc['unique_operating_hours'] ?? $wcLaborCalc['unique_operating_hours'] ?? 0);
-        $wcCapWindows = $wcCapCalc['windows'] ?? [];
-        $wcCapGaps = $wcCapCalc['gaps'] ?? [];
-        $wcLaborAssignments = $wcLaborCalc['assignments'] ?? [];
-        $wcLaborWindows = $wcLaborCalc['windows'] ?? [];
-        $wcLaborGaps = $wcLaborCalc['gaps'] ?? [];
-        $wcHasMissingRates = (bool) ($wcLaborCalc['has_missing_rates'] ?? false);
-        $wcHasOverlapping = (bool) ($wcLaborCalc['has_overlapping_assignments'] ?? false);
+        $latestSnapshot = $workCenter->latestCalculation;
+        $wcDetails = $latestSnapshot?->calculation_details ?? [];
+        $wcCapPerHour = (float) ($latestSnapshot?->capacity_per_hour ?? 0);
+        $wcDailyCap = (float) ($latestSnapshot?->daily_capacity ?? 0);
+        $wcLaborCostPerHour = (float) ($latestSnapshot?->labor_cost_per_hour ?? 0);
+        $wcDailyLaborCost = (float) ($latestSnapshot?->total_daily_labor_cost ?? 0);
+        $wcMachCostPerHour = (float) ($latestSnapshot?->machine_cost_per_hour ?? 0);
+        $wcDailyMachCost = (float) ($latestSnapshot?->total_daily_machine_cost ?? 0);
+        $wcOverheadDaily = (float) ($latestSnapshot?->overhead_cost ?? $workCenter->overhead_cost ?? 0);
+        $wcTotalDailyCost = (float) ($latestSnapshot?->total_daily_cost ?? 0);
+        $wcTotalCostPerHour = (float) ($latestSnapshot?->total_cost_per_hour ?? 0);
+        $wcUniqOperatingHours = (float) ($latestSnapshot?->unique_operating_hours ?? 0);
+
+        $wcSectionsBreakdown = $wcDetails['sections'] ?? [];
+        $wcDirectStaff = $wcDetails['direct_personnel']['employees'] ?? [];
+        $wcDirectStaffDaily = (float) ($wcDetails['direct_personnel']['total_daily_cost'] ?? 0);
+        $wcTimelineIntervals = $wcDetails['timeline_intervals'] ?? [];
+        $wcTimelineGaps = $wcDetails['timeline_gaps'] ?? [];
     @endphp
 
     <div class="modal fade" id="workCenterCalculationModal" tabindex="-1" aria-labelledby="workCenterCalculationModalLabel" aria-hidden="true">
@@ -1540,457 +2572,397 @@
                             <i class="feather-pie-chart"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="workCenterCalculationModalLabel">
-                                {{ __('production.wc_calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $workCenter->code }}</span> ({{ $workCenter->name }})
-                            </h5>
-                            <small class="text-muted fs-11">Auditable Time-Window Aggregations across all Sections</small>
+                            <div class="d-flex align-items-center gap-2">
+                                <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="workCenterCalculationModalLabel">
+                                    {{ __('production.wc_calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $workCenter->code }}</span> ({{ $workCenter->name }})
+                                </h5>
+                                @if($latestSnapshot)
+                                    <span class="badge bg-soft-success text-success font-monospace fs-11">Snapshot #{{ $latestSnapshot->id }}</span>
+                                @endif
+                            </div>
+                            <small class="text-muted fs-11">
+                                Snapshot Recorded: {{ $latestSnapshot ? $latestSnapshot->created_at->format('Y-m-d H:i:s') : 'None yet' }}
+                                &bull; Unique Operating Hours: <span class="font-monospace fw-semibold text-dark">{{ number_format($wcUniqOperatingHours, 2) }} hrs</span>
+                            </small>
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
                 <div class="modal-body p-4">
-                    <!-- Top Summary Cards (KPIs) -->
+                    <!-- Top Summary Cards (6 KPIs) -->
                     <div class="row g-3 mb-4">
-                        <div class="col-md-3">
+                        <div class="col-md-2 col-sm-4">
                             <div class="p-3 rounded border bg-light h-100">
                                 <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
-                                    <i class="feather-activity me-1 text-primary"></i>{{ __('production.capacity_per_hour') }}
+                                    <i class="feather-activity me-1 text-primary"></i>Daily Capacity
                                 </span>
-                                <span class="fs-20 fw-bolder text-dark font-monospace d-block">
+                                <span class="fs-18 fw-bolder text-dark font-monospace d-block">
+                                    {{ number_format($wcDailyCap, 1) }}
+                                </span>
+                                <small class="text-muted fs-10">Total units / day</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-2 col-sm-4">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                    <i class="feather-clock me-1 text-warning"></i>Avg Capacity / hr
+                                </span>
+                                <span class="fs-18 fw-bolder text-dark font-monospace d-block">
                                     {{ number_format($wcCapPerHour, 2) }}
                                 </span>
-                                <small class="text-muted fs-11">{{ __('production.units_hr') }}</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-3">
-                            <div class="p-3 rounded border bg-light h-100">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="text-muted fs-11 text-uppercase fw-semibold">
-                                        <i class="feather-dollar-sign me-1 text-success"></i>{{ __('production.labor_cost_per_hour') }}
-                                    </span>
-                                    @if($wcHasOverlapping)
-                                        <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill">
-                                            <i class="feather-layers me-0.5"></i>{{ __('production.overlapping_assignments') }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <span class="fs-20 fw-bolder text-primary font-monospace d-block">
-                                    {{ format_currency($wcLaborCostPerHour) }}
+                                <span class="badge bg-soft-warning text-warning fs-9 px-1 py-0.5 rounded-pill">
+                                    <i class="feather-alert-triangle me-0.5"></i>Avg Across Operating
                                 </span>
-                                <small class="text-muted fs-11">per unique elapsed operating hour</small>
                             </div>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-2 col-sm-4">
                             <div class="p-3 rounded border bg-light h-100">
                                 <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
-                                    <i class="feather-box me-1 text-info"></i>{{ __('production.total_theoretical_capacity') }}
+                                    <i class="feather-dollar-sign me-1 text-primary"></i>Daily Labor Cost
                                 </span>
-                                <span class="fs-20 fw-bolder text-dark font-monospace d-block">
-                                    {{ number_format($wcTotalTheoCap, 2) }}
+                                <span class="fs-18 fw-bolder text-primary font-monospace d-block">
+                                    {{ format_currency($wcDailyLaborCost) }}
                                 </span>
-                                <small class="text-muted fs-11">Sum of window theoretical capacities</small>
+                                <small class="text-muted fs-10">Avg: {{ format_currency($wcLaborCostPerHour) }}/hr</small>
                             </div>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-2 col-sm-4">
                             <div class="p-3 rounded border bg-light h-100">
                                 <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
-                                    <i class="feather-clock me-1 text-warning"></i>{{ __('production.unique_operating_hours') }}
+                                    <i class="feather-cpu me-1 text-warning"></i>Daily Machinery
                                 </span>
-                                <span class="fs-20 fw-bolder text-dark font-monospace d-block">
-                                    {{ number_format($wcUniqOperatingHours, 2) }} h
+                                <span class="fs-18 fw-bolder text-warning font-monospace d-block">
+                                    {{ format_currency($wcDailyMachCost) }}
                                 </span>
-                                <small class="text-muted fs-11">Union of all section shift intervals (gaps excluded)</small>
+                                <small class="text-muted fs-10">Avg: {{ format_currency($wcMachCostPerHour) }}/hr</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-2 col-sm-4">
+                            <div class="p-3 rounded border bg-light h-100">
+                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
+                                    <i class="feather-home me-1 text-secondary"></i>Daily Overhead
+                                </span>
+                                <span class="fs-18 fw-bolder text-dark font-monospace d-block">
+                                    {{ format_currency($wcOverheadDaily) }}
+                                </span>
+                                <small class="text-muted fs-10">Flat facility cost</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-2 col-sm-4">
+                            <div class="p-3 rounded border bg-soft-primary border-primary h-100">
+                                <span class="text-primary fs-11 text-uppercase fw-semibold d-block mb-1">
+                                    <i class="feather-check-circle me-1"></i>Total Daily Cost
+                                </span>
+                                <span class="fs-18 fw-bolder text-primary font-monospace d-block">
+                                    {{ format_currency($wcTotalDailyCost) }}
+                                </span>
+                                <small class="text-primary fs-10">Effective: {{ format_currency($wcTotalCostPerHour) }}/hr</small>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Navigation Tabs for Capacity vs Labor Cost -->
-                    <ul class="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+                    <!-- Tabs: Timeline Intervals, Sections Rollup, Direct Staff & Overhead, Activity Logs, Raw JSON -->
+                    <ul class="nav nav-tabs nav-tabs-bottom mb-3" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
-                                    id="wc-capacity-tab" data-bs-toggle="tab" data-bs-target="#wc-capacity-pane" 
-                                    type="button" role="tab" aria-controls="wc-capacity-pane" aria-selected="true">
-                                <i class="feather-activity text-primary fs-14"></i>
-                                {{ __('production.wc_capacity_breakdown') }}
-                                <span class="badge bg-soft-primary text-primary ms-1 font-monospace">{{ number_format($wcCapPerHour, 2) }}</span>
+                                    id="wc-intervals-tab" data-bs-toggle="tab" data-bs-target="#wc-intervals-pane" 
+                                    type="button" role="tab" aria-controls="wc-intervals-pane" aria-selected="true">
+                                <i class="feather-clock text-warning fs-14"></i>
+                                Timeline Intervals ({{ count($wcTimelineIntervals) }})
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
-                                    id="wc-labor-tab" data-bs-toggle="tab" data-bs-target="#wc-labor-pane" 
-                                    type="button" role="tab" aria-controls="wc-labor-pane" aria-selected="false">
-                                <i class="feather-dollar-sign text-success fs-14"></i>
-                                {{ __('production.wc_labor_cost_breakdown') }}
-                                <span class="badge bg-soft-success text-success ms-1 font-monospace">{{ format_currency($wcLaborCostPerHour) }}</span>
+                                    id="wc-sections-tab" data-bs-toggle="tab" data-bs-target="#wc-sections-pane" 
+                                    type="button" role="tab" aria-controls="wc-sections-pane" aria-selected="false">
+                                <i class="feather-grid text-primary fs-14"></i>
+                                Contributing Sections ({{ count($wcSectionsBreakdown) }})
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
+                                    id="wc-direct-tab" data-bs-toggle="tab" data-bs-target="#wc-direct-pane" 
+                                    type="button" role="tab" aria-controls="wc-direct-pane" aria-selected="false">
+                                <i class="feather-users text-info fs-14"></i>
+                                Direct Personnel & Overhead ({{ count($wcDirectStaff) }})
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
+                                    id="wc-logs-tab" data-bs-toggle="tab" data-bs-target="#wc-logs-pane" 
+                                    type="button" role="tab" aria-controls="wc-logs-pane" aria-selected="false">
+                                <i class="feather-activity text-secondary fs-14"></i>
+                                Activity & Audit Logs
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-semibold fs-13 d-flex align-items-center gap-1.5 py-2 px-3" 
+                                    id="wc-json-tab" data-bs-toggle="tab" data-bs-target="#wc-json-pane" 
+                                    type="button" role="tab" aria-controls="wc-json-pane" aria-selected="false">
+                                <i class="feather-code text-muted fs-14"></i>
+                                Raw Snapshot JSON
                             </button>
                         </li>
                     </ul>
 
                     <div class="tab-content">
-                        <!-- CAPACITY TAB CONTENT -->
-                        <div class="tab-pane fade show active" id="wc-capacity-pane" role="tabpanel" aria-labelledby="wc-capacity-tab">
-                            <!-- Formula Banner -->
-                            <div class="p-3 mb-3 rounded bg-soft-primary border border-primary-subtle text-primary fs-12">
-                                <div class="fw-bold mb-1">
-                                    <i class="feather-info me-1"></i>{{ __('production.wc_capacity_formula_explanation') }}
+                        <!-- TAB 1: TIMELINE INTERVALS -->
+                        <div class="tab-pane fade show active" id="wc-intervals-pane" role="tabpanel" aria-labelledby="wc-intervals-tab">
+                            <div class="card border mb-3 shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-clock me-1 text-warning"></i>1,440-Minute Timeline Interval Slices
+                                    </h6>
+                                    <small class="text-muted fs-11">Discrete intervals computed at every shift, machine, or break boundary</small>
                                 </div>
-                                <div class="font-monospace fs-11 text-dark">
-                                    {{ number_format($wcTotalTheoCap, 2) }} units &divide; {{ number_format($wcUniqOperatingHours, 2) }} h = <strong class="text-primary fs-13">{{ number_format($wcCapPerHour, 2) }} {{ __('production.units_hr') }}</strong>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover table-bordered align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 14%">Time Window</th>
+                                                <th style="width: 10%">Duration</th>
+                                                <th style="width: 14%">Active Sections</th>
+                                                <th style="width: 14%">Machines Burn</th>
+                                                <th style="width: 16%">Labor Burn Rate</th>
+                                                <th style="width: 16%" class="text-end">Interval Capacity/hr</th>
+                                                <th style="width: 16%" class="text-end">Interval Total Cost</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($wcTimelineIntervals as $interval)
+                                                @php
+                                                    $durHrs = ($interval['duration_minutes'] ?? 0) / 60;
+                                                    $machBurn = (float) ($interval['machine_burn_rate_per_hour'] ?? 0);
+                                                    $laborBurn = (float) ($interval['labor_burn_rate_per_hour'] ?? 0);
+                                                    $intervalCap = (float) ($interval['capacity_per_hour'] ?? 0);
+                                                    $intervalCost = ($machBurn + $laborBurn) * $durHrs;
+                                                @endphp
+                                                <tr>
+                                                    <td>
+                                                        <span class="font-monospace fw-bold text-dark">
+                                                            {{ $interval['start_time'] ?? '' }} &ndash; {{ $interval['end_time'] ?? '' }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-secondary text-secondary font-monospace">
+                                                            {{ $interval['duration_minutes'] ?? 0 }}m ({{ number_format($durHrs, 2) }}h)
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-primary text-primary font-monospace">
+                                                            {{ count($interval['active_section_ids'] ?? []) }} Sections
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="font-monospace fw-semibold text-warning">
+                                                            {{ format_currency($machBurn) }}/hr
+                                                        </span>
+                                                        <small class="text-muted d-block fs-10">({{ $interval['active_machines_count'] ?? 0 }} machines)</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="font-monospace fw-semibold text-primary">
+                                                            {{ format_currency($laborBurn) }}/hr
+                                                        </span>
+                                                        <small class="text-muted d-block fs-10">({{ $interval['active_workers_count'] ?? 0 }} workers)</small>
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">
+                                                        {{ number_format($intervalCap, 2) }} units/hr
+                                                    </td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">
+                                                        {{ format_currency($intervalCost) }}
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="7" class="text-center text-muted py-3 fst-italic">
+                                                        No timeline intervals calculated.
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Active Sections Contributing to Capacity -->
+                        <!-- TAB 2: CONTRIBUTING SECTIONS BREAKDOWN -->
+                        <div class="tab-pane fade" id="wc-sections-pane" role="tabpanel" aria-labelledby="wc-sections-tab">
                             <div class="card border mb-3 shadow-none">
                                 <div class="card-header bg-light py-2 px-3 border-bottom">
                                     <h6 class="fw-bold text-dark fs-12 mb-0">
-                                        <i class="feather-grid me-1 text-primary"></i>Contributing Sections ({{ count($wcCapCalc['sections'] ?? []) }})
+                                        <i class="feather-grid me-1 text-primary"></i>Section Capacity & Expense Roll-Up
                                     </h6>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered align-middle mb-0 fs-12">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width: 15%">{{ __('production.section_code') }}</th>
-                                                <th style="width: 30%">{{ __('production.section_name') }}</th>
-                                                <th style="width: 15%">Machines</th>
-                                                <th style="width: 20%">Manual Production</th>
-                                                <th style="width: 20%" class="text-end">{{ __('production.capacity_per_hour') }}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($wcCapCalc['sections'] ?? [] as $sec)
-                                                <tr>
-                                                    <td><span class="font-monospace fw-bold">{{ $sec['code'] }}</span></td>
-                                                    <td class="fw-semibold text-dark">{{ $sec['name'] }}</td>
-                                                    <td>
-                                                        <span class="badge bg-soft-secondary text-secondary rounded-pill px-2">
-                                                            <i class="feather-cpu me-1"></i>{{ $sec['machine_count'] }}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        @if($sec['supports_manual_production'])
-                                                            <span class="badge bg-soft-warning text-warning rounded-pill px-2">
-                                                                <i class="feather-user me-1"></i>{{ number_format($sec['manual_capacity_per_hour'], 2) }} units/hr
-                                                            </span>
-                                                        @else
-                                                            <span class="text-muted fs-11">Disabled</span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-end font-monospace fw-bold text-dark">
-                                                        {{ number_format($sec['capacity_per_hour'], 2) }} units/hr
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="5" class="text-center text-muted py-2">No sections configured</td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <!-- Timeline Slicing Windows -->
-                            <div class="card border mb-3 shadow-none">
-                                <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
-                                    <h6 class="fw-bold text-dark fs-12 mb-0">
-                                        <i class="feather-clock me-1 text-warning"></i>Capacity Operating Windows Breakdown ({{ count($wcCapWindows) }})
-                                    </h6>
-                                    <small class="text-muted fs-11">Split at every Section shift boundary</small>
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-hover table-bordered align-middle mb-0 fs-12">
                                         <thead class="table-light">
                                             <tr>
-                                                <th style="width: 18%">{{ __('production.window_range') }}</th>
-                                                <th style="width: 10%">{{ __('production.window_duration') }}</th>
-                                                <th style="width: 32%">{{ __('production.active_sections') }}</th>
-                                                <th style="width: 20%" class="text-end">{{ __('production.combined_capacity_per_hour') }}</th>
-                                                <th style="width: 20%" class="text-end">{{ __('production.window_theoretical_capacity') }}</th>
+                                                <th style="width: 12%">Code</th>
+                                                <th style="width: 22%">Section Name</th>
+                                                <th style="width: 14%">Operating Hours</th>
+                                                <th style="width: 16%" class="text-end">Daily Capacity</th>
+                                                <th style="width: 18%" class="text-end">Daily Labor Cost</th>
+                                                <th style="width: 18%" class="text-end">Daily Machine Cost</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @forelse($wcCapWindows as $win)
-                                                <tr class="@if($win['is_overlapping']) bg-soft-info-subtle @endif">
-                                                    <td>
-                                                        <span class="font-monospace fw-bold text-dark">{{ $win['window_label'] }}</span>
-                                                        @if($win['is_overnight'])
-                                                            <span class="badge bg-soft-dark text-dark fs-10 px-1 py-0.5 ms-1">Overnight</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-soft-secondary text-secondary font-monospace">{{ number_format($win['duration_hours'], 2) }} h</span>
-                                                    </td>
-                                                    <td>
-                                                        <div class="d-flex flex-wrap gap-1 align-items-center">
-                                                            @foreach($win['active_sections'] as $as)
-                                                                <span class="badge bg-soft-primary text-primary px-2 py-0.5">
-                                                                    {{ $as['name'] }} ({{ number_format($as['capacity_per_hour'], 2) }}/h)
-                                                                </span>
-                                                            @endforeach
-                                                            @if($win['is_overlapping'])
-                                                                <span class="badge bg-soft-warning text-warning rounded-pill px-1.5 py-0.5 fs-10 ms-1">
-                                                                    <i class="feather-layers me-0.5"></i>Overlap ({{ count($win['active_sections']) }})
-                                                                </span>
-                                                            @endif
-                                                        </div>
-                                                    </td>
-                                                    <td class="text-end font-monospace fw-bold text-dark">
-                                                        {{ number_format($win['combined_capacity_per_hour'], 2) }} units/hr
-                                                    </td>
-                                                    <td class="text-end font-monospace fw-bold text-primary">
-                                                        {{ number_format($win['theoretical_capacity'], 2) }} units
-                                                    </td>
+                                            @forelse($wcSectionsBreakdown as $secB)
+                                                <tr>
+                                                    <td><span class="font-monospace fw-bold text-dark">{{ $secB['code'] ?? '—' }}</span></td>
+                                                    <td class="fw-semibold text-dark">{{ $secB['name'] ?? '—' }}</td>
+                                                    <td><span class="badge bg-soft-secondary text-secondary font-monospace">{{ number_format($secB['operating_hours'] ?? 0, 2) }} hrs</span></td>
+                                                    <td class="text-end font-monospace fw-bold text-dark">{{ number_format($secB['daily_capacity'] ?? 0, 1) }} units</td>
+                                                    <td class="text-end font-monospace text-primary fw-semibold">{{ format_currency($secB['total_daily_labor_cost'] ?? 0) }}</td>
+                                                    <td class="text-end font-monospace text-warning fw-semibold">{{ format_currency($secB['total_daily_machine_cost'] ?? 0) }}</td>
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="5" class="text-center text-muted py-3">No operating windows</td>
+                                                    <td colspan="6" class="text-center text-muted py-3 fst-italic">
+                                                        No sections contributing to this snapshot.
+                                                    </td>
                                                 </tr>
                                             @endforelse
                                         </tbody>
-                                        @if(!empty($wcCapWindows))
-                                            <tfoot class="table-light fw-bold">
-                                                <tr>
-                                                    <td>Total</td>
-                                                    <td><span class="font-monospace">{{ number_format($wcUniqOperatingHours, 2) }} h</span></td>
-                                                    <td class="text-muted fs-11">Unique operating duration</td>
-                                                    <td class="text-end text-muted fs-11">Theoretical Capacity Sum:</td>
-                                                    <td class="text-end font-monospace text-primary fs-13">{{ number_format($wcTotalTheoCap, 2) }} units</td>
-                                                </tr>
-                                            </tfoot>
-                                        @endif
                                     </table>
                                 </div>
                             </div>
-
-                            <!-- Timeline Gaps Table -->
-                            @if(!empty($wcCapGaps))
-                                <div class="card border border-warning-subtle mb-0 shadow-none">
-                                    <div class="card-header bg-soft-warning py-2 px-3 border-bottom border-warning-subtle">
-                                        <h6 class="fw-bold text-warning-emphasis fs-12 mb-0">
-                                            <i class="feather-pause-circle me-1"></i>{{ __('production.timeline_gaps') }}
-                                        </h6>
-                                        <small class="text-muted fs-11">{{ __('production.timeline_gaps_desc') }}</small>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered align-middle mb-0 fs-12">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th style="width: 25%">Excluded Gap Interval</th>
-                                                    <th style="width: 15%">{{ __('production.gap_duration') }}</th>
-                                                    <th style="width: 60%">Notes</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($wcCapGaps as $gap)
-                                                    <tr>
-                                                        <td><span class="font-monospace fw-bold text-danger">{{ $gap['window_label'] }}</span></td>
-                                                        <td><span class="badge bg-soft-danger text-danger font-monospace">{{ number_format($gap['duration_hours'], 2) }} h</span></td>
-                                                        <td class="text-muted fs-11">No active section shifts operating during this period. Safely excluded from timeline.</td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            @endif
                         </div>
 
-                        <!-- LABOR COST TAB CONTENT -->
-                        <div class="tab-pane fade" id="wc-labor-pane" role="tabpanel" aria-labelledby="wc-labor-tab">
-                            <!-- Formula Banner -->
-                            <div class="p-3 mb-3 rounded bg-soft-success border border-success-subtle text-success fs-12">
-                                <div class="fw-bold mb-1">
-                                    <i class="feather-info me-1"></i>{{ __('production.wc_labor_formula_explanation') }}
-                                </div>
-                                <div class="font-monospace fs-11 text-dark">
-                                    {{ format_currency($wcTotalSchedLabor) }} &divide; {{ number_format($wcUniqOperatingHours, 2) }} h = <strong class="text-success fs-13">{{ format_currency($wcLaborCostPerHour) }} / hr</strong>
-                                </div>
-                            </div>
-
-                            <!-- Section / Shift Assignments Table -->
+                        <!-- TAB 3: DIRECT STAFF & OVERHEAD -->
+                        <div class="tab-pane fade" id="wc-direct-pane" role="tabpanel" aria-labelledby="wc-direct-tab">
                             <div class="card border mb-3 shadow-none">
                                 <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
                                     <h6 class="fw-bold text-dark fs-12 mb-0">
-                                        <i class="feather-users me-1 text-success"></i>{{ __('production.section_shift_assignments') }} ({{ count($wcLaborAssignments) }})
+                                        <i class="feather-users me-1 text-info"></i>Direct Work Center Staff (Unassigned to any Section)
                                     </h6>
-                                    <small class="text-muted fs-11">Costed individually using each Section's assigned worker count</small>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered align-middle mb-0 fs-12">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width: 20%">Section</th>
-                                                <th style="width: 20%">Shift</th>
-                                                <th style="width: 15%">Shift Hours</th>
-                                                <th style="width: 12%">Workers</th>
-                                                <th style="width: 15%">Hourly Rate / Worker</th>
-                                                <th style="width: 18%" class="text-end">Hourly Cost</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($wcLaborAssignments as $a)
-                                                <tr>
-                                                    <td>
-                                                        <span class="fw-semibold text-dark">{{ $a['section_name'] }}</span>
-                                                        <span class="font-monospace text-muted fs-11">[{{ $a['section_code'] }}]</span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="fw-semibold text-dark">{{ $a['shift_name'] }}</span>
-                                                        <span class="font-monospace text-muted fs-11">[{{ $a['shift_code'] }}]</span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="font-monospace fs-11">{{ $a['start_time'] }}–{{ $a['end_time'] }}</span>
-                                                        @if($a['is_overnight'])
-                                                            <span class="badge bg-soft-dark text-dark fs-9">Overnight</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-soft-info text-info rounded-pill px-2">
-                                                            <i class="feather-user me-0.5"></i>{{ $a['workers_required'] }}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        @if($a['is_rate_missing'])
-                                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1.5 py-0.5" title="No hourly rate configured on shift">
-                                                                {{ __('production.missing_rate_badge') }}
-                                                            </span>
-                                                        @elseif($a['effective_hourly_rate'] == 0)
-                                                            <span class="badge bg-soft-secondary text-secondary fs-10 px-1.5 py-0.5">
-                                                                {{ __('production.explicit_zero_rate_badge') }}
-                                                            </span>
-                                                        @else
-                                                            <span class="font-monospace text-dark">{{ format_currency($a['effective_hourly_rate']) }}</span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-end font-monospace fw-bold text-dark">
-                                                        {{ format_currency($a['assignment_labor_cost_per_hour']) }} / hr
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="6" class="text-center text-muted py-2">No shift assignments configured</td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <!-- Timeline Slicing Windows -->
-                            <div class="card border mb-3 shadow-none">
-                                <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
-                                    <h6 class="fw-bold text-dark fs-12 mb-0">
-                                        <i class="feather-clock me-1 text-primary"></i>Labor Cost Operating Windows Breakdown ({{ count($wcLaborWindows) }})
-                                    </h6>
-                                    <small class="text-muted fs-11">Sum of active assignment costs &times; window duration</small>
+                                    <span class="badge bg-soft-info text-info font-monospace fs-11">Total Daily: {{ format_currency($wcDirectStaffDaily) }}</span>
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-hover table-bordered align-middle mb-0 fs-12">
                                         <thead class="table-light">
                                             <tr>
-                                                <th style="width: 17%">{{ __('production.window_range') }}</th>
-                                                <th style="width: 9%">{{ __('production.window_duration') }}</th>
-                                                <th style="width: 32%">Active Assignments</th>
-                                                <th style="width: 10%">Workers</th>
-                                                <th style="width: 16%" class="text-end">{{ __('production.combined_labor_rate') }}</th>
-                                                <th style="width: 16%" class="text-end">{{ __('production.window_labor_cost') }}</th>
+                                                <th style="width: 35%">Employee Name</th>
+                                                <th style="width: 25%">Monthly HRMS CTC</th>
+                                                <th style="width: 20%">Daily Salary (CTC / 30)</th>
+                                                <th style="width: 20%">Role / Notes</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @forelse($wcLaborWindows as $win)
-                                                <tr class="@if($win['is_overlapping']) bg-soft-info-subtle @endif">
-                                                    <td>
-                                                        <span class="font-monospace fw-bold text-dark">{{ $win['window_label'] }}</span>
-                                                        @if($win['is_overnight'])
-                                                            <span class="badge bg-soft-dark text-dark fs-10 px-1 py-0.5 ms-1">Overnight</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-soft-secondary text-secondary font-monospace">{{ number_format($win['duration_hours'], 2) }} h</span>
-                                                    </td>
-                                                    <td>
-                                                        <div class="d-flex flex-wrap gap-1 align-items-center">
-                                                            @foreach($win['active_assignments'] as $aa)
-                                                                <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11">
-                                                                    {{ $aa['section_name'] }} / {{ $aa['shift_name'] }} ({{ $aa['workers_required'] }}w &times; {{ format_currency($aa['effective_hourly_rate']) }})
-                                                                </span>
-                                                            @endforeach
-                                                            @if($win['is_overlapping'])
-                                                                <span class="badge bg-soft-warning text-warning rounded-pill px-1.5 py-0.5 fs-10 ms-1">
-                                                                    <i class="feather-layers me-0.5"></i>Overlap ({{ count($win['active_assignments']) }})
-                                                                </span>
-                                                            @endif
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-soft-info text-info font-monospace">{{ $win['combined_workers'] }}</span>
-                                                    </td>
-                                                    <td class="text-end font-monospace fw-bold text-dark">
-                                                        {{ format_currency($win['combined_hourly_cost']) }} / hr
-                                                    </td>
-                                                    <td class="text-end font-monospace fw-bold text-success">
-                                                        {{ format_currency($win['window_cost']) }}
-                                                    </td>
+                                            @forelse($wcDirectStaff as $dst)
+                                                <tr>
+                                                    <td class="fw-semibold text-dark"><i class="feather-user me-1 text-muted"></i>{{ $dst['name'] ?? '—' }}</td>
+                                                    <td class="font-monospace text-muted">{{ format_currency($dst['monthly_ctc'] ?? 0) }} / mo</td>
+                                                    <td class="font-monospace fw-bold text-primary">{{ format_currency($dst['daily_cost'] ?? 0) }} / day</td>
+                                                    <td class="text-muted fs-11">Floating Station Personnel</td>
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="6" class="text-center text-muted py-3">No operating windows</td>
+                                                    <td colspan="4" class="text-center text-muted py-3 fst-italic">
+                                                        No direct station employees assigned. All labor is sourced from section-level rosters.
+                                                    </td>
                                                 </tr>
                                             @endforelse
                                         </tbody>
-                                        @if(!empty($wcLaborWindows))
-                                            <tfoot class="table-light fw-bold">
-                                                <tr>
-                                                    <td>Total</td>
-                                                    <td><span class="font-monospace">{{ number_format($wcUniqOperatingHours, 2) }} h</span></td>
-                                                    <td colspan="2" class="text-muted fs-11">Union of active assignments</td>
-                                                    <td class="text-end text-muted fs-11">Total Scheduled Cost:</td>
-                                                    <td class="text-end font-monospace text-success fs-13">{{ format_currency($wcTotalSchedLabor) }}</td>
-                                                </tr>
-                                            </tfoot>
-                                        @endif
                                     </table>
                                 </div>
                             </div>
 
-                            <!-- Timeline Gaps Table -->
-                            @if(!empty($wcLaborGaps))
-                                <div class="card border border-warning-subtle mb-0 shadow-none">
-                                    <div class="card-header bg-soft-warning py-2 px-3 border-bottom border-warning-subtle">
-                                        <h6 class="fw-bold text-warning-emphasis fs-12 mb-0">
-                                            <i class="feather-pause-circle me-1"></i>{{ __('production.timeline_gaps') }}
-                                        </h6>
-                                        <small class="text-muted fs-11">{{ __('production.timeline_gaps_desc') }}</small>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-bordered align-middle mb-0 fs-12">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th style="width: 25%">Excluded Gap Interval</th>
-                                                    <th style="width: 15%">{{ __('production.gap_duration') }}</th>
-                                                    <th style="width: 60%">Notes</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($wcLaborGaps as $gap)
-                                                    <tr>
-                                                        <td><span class="font-monospace fw-bold text-danger">{{ $gap['window_label'] }}</span></td>
-                                                        <td><span class="badge bg-soft-danger text-danger font-monospace">{{ number_format($gap['duration_hours'], 2) }} h</span></td>
-                                                        <td class="text-muted fs-11">No section shifts operating during this period. Safely excluded from timeline.</td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                            <div class="card border shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-home me-1 text-secondary"></i>Work Center Flat Overhead Integration
+                                    </h6>
+                                </div>
+                                <div class="card-body p-3 fs-12">
+                                    <p class="text-muted mb-2">
+                                        Facility overhead is configured directly on the Work Center as a flat daily cost. It is aggregated into the total daily operational cost and distributed across active operational hours.
+                                    </p>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <div class="p-2 border rounded bg-light">
+                                                <span class="text-muted fs-10 text-uppercase d-block fw-semibold">Configured Daily Overhead</span>
+                                                <span class="fs-16 fw-bold font-monospace text-dark">{{ format_currency($wcOverheadDaily) }} / day</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="p-2 border rounded bg-light">
+                                                <span class="text-muted fs-10 text-uppercase d-block fw-semibold">Unique Operating Hours</span>
+                                                <span class="fs-16 fw-bold font-monospace text-dark">{{ number_format($wcUniqOperatingHours, 2) }} hrs</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="p-2 border rounded bg-light">
+                                                <span class="text-muted fs-10 text-uppercase d-block fw-semibold">Derived Hourly Rate</span>
+                                                <span class="fs-16 fw-bold font-monospace text-primary">
+                                                    {{ $wcUniqOperatingHours > 0 ? format_currency($wcOverheadDaily / $wcUniqOperatingHours) : '—' }} / hr
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            @endif
+                            </div>
+                        </div>
+
+                        <!-- TAB 4: ACTIVITY & AUDIT LOGS -->
+                        <div class="tab-pane fade" id="wc-logs-pane" role="tabpanel" aria-labelledby="wc-logs-tab">
+                            <div class="card border shadow-none">
+                                <div class="card-header bg-light py-2 px-3 border-bottom">
+                                    <h6 class="fw-bold text-dark fs-12 mb-0">
+                                        <i class="feather-activity me-1 text-primary"></i>Audit Log Entries
+                                    </h6>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 20%">Timestamp</th>
+                                                <th style="width: 20%">Action</th>
+                                                <th style="width: 40%">Description</th>
+                                                <th style="width: 20%">User</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($workCenter->activityLogs()->latest()->take(20)->get() as $log)
+                                                <tr>
+                                                    <td class="font-monospace text-muted fs-11">{{ $log->created_at->format('Y-m-d H:i:s') }}</td>
+                                                    <td>
+                                                        <span class="badge bg-soft-secondary text-secondary font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                            {{ str_replace('_', ' ', $log->action_type) }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-dark">{{ $log->description }}</td>
+                                                    <td>{{ $log->user ? $log->user->name : 'System Automation' }}</td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="4" class="text-center py-3 text-muted fst-italic">No activity logs recorded.</td>
+                                                </tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 5: RAW SNAPSHOT JSON -->
+                        <div class="tab-pane fade" id="wc-json-pane" role="tabpanel" aria-labelledby="wc-json-tab">
+                            <div class="card border shadow-none">
+                                <div class="card-header bg-dark text-white py-2 px-3 d-flex justify-content-between align-items-center">
+                                    <span class="font-monospace fs-11">production_work_center_calculations #{{ $latestSnapshot?->id ?? 'N/A' }}</span>
+                                    <span class="badge bg-secondary font-monospace fs-10">JSON Payload</span>
+                                </div>
+                                <pre class="bg-dark text-light p-3 mb-0 fs-11 font-monospace" style="max-height: 450px; overflow-y: auto;"><code>{{ json_encode($latestSnapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</code></pre>
+                            </div>
                         </div>
                     </div>
+                </div>
+
                 <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
                         {{ __('production.close_tab') ?? 'Close' }}
@@ -3014,148 +3986,862 @@
     @endforeach
 
     <!-- Section-Level Manual Production Modals -->
+    @php
+        $tenantId = (int) $workCenter->tenant_id;
+        $allActiveBatches = \App\Domains\Production\Models\SectionManualProduction::where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->with(['employees', 'externalAllocations', 'section'])
+            ->get();
+
+        $occupiedEmpAssignments = [];
+        $occupiedEmployeeIds = [];
+        $occupiedExtAllocations = [];
+
+        foreach ($allActiveBatches as $actBatch) {
+            foreach ($actBatch->employees as $empAssign) {
+                $occupiedEmpAssignments[$empAssign->id] = [
+                    'batch_id' => $actBatch->id,
+                    'batch_name' => $actBatch->batch_name,
+                    'section_name' => $actBatch->section->name ?? '',
+                ];
+                if ($empAssign->employee_id) {
+                    $occupiedEmployeeIds[$empAssign->employee_id] = [
+                        'batch_id' => $actBatch->id,
+                        'batch_name' => $actBatch->batch_name,
+                        'section_name' => $actBatch->section->name ?? '',
+                    ];
+                }
+            }
+            foreach ($actBatch->externalAllocations as $extAlloc) {
+                $occupiedExtAllocations[$extAlloc->id] = [
+                    'batch_id' => $actBatch->id,
+                    'batch_name' => $actBatch->batch_name,
+                    'section_name' => $actBatch->section->name ?? '',
+                ];
+            }
+        }
+    @endphp
     @foreach ($workCenter->sections as $section)
         @php
-            $hasWorkerAssignments = $section->hasActiveWorkerAssignments();
-            $workerCounts = $section->getActiveWorkerCounts();
-            $isManualProd = (bool) $section->supports_manual_production;
-            $manualCapVal = $section->manual_capacity_per_hour !== null ? (float) $section->manual_capacity_per_hour : '';
+            $secActiveShifts = $section->shifts->filter(fn($s) => (bool) ($s->active ?? true));
+            $secInternalAssignments = $section->employeeAssignments->where('active', true)
+                ->concat($workCenter->employeeAssignments->whereNull('section_id')->where('active', true))
+                ->unique('id');
+            $secExtAllocs = $section->externalWorkerAllocations->where('active', true);
+            $hasBatches = $section->manualProductions->isNotEmpty();
         @endphp
-        <div class="modal fade" id="sectionManualProductionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionManualProductionModalLabel_{{ $section->id }}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg rounded-3">
-                    <div class="modal-header border-bottom py-3">
-                        <div>
-                            <h5 class="modal-title fw-bold text-dark fs-15" id="sectionManualProductionModalLabel_{{ $section->id }}">
-                                <i class="feather-tool text-warning me-2"></i>{{ __('production.manual_production') }} &mdash; {{ $section->name }}
-                            </h5>
-                            <div class="text-muted fs-11 mt-0.5">
-                                Work Center: <span class="font-monospace fw-semibold text-dark">{{ $workCenter->code }}</span>
-                                &bull; Section: <span class="fw-semibold text-dark">{{ $section->name }} ({{ $section->code }})</span>
+        <div class="modal fade manual-production-modal" id="sectionManualProductionModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionManualProductionModalLabel_{{ $section->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+                <form method="POST" action="{{ route('production.work-center-sections.manual-productions.store', $section->id) }}" id="manualProductionForm_{{ $section->id }}" class="modal-content border-0 shadow-lg rounded-3 manual-prod-form" data-section-id="{{ $section->id }}" data-store-url="{{ route('production.work-center-sections.manual-productions.store', $section->id) }}">
+                    @csrf
+                    <input type="hidden" name="_method" value="POST" class="form-method-input">
+                    <input type="hidden" name="_modal" value="sectionManualProductionModal_{{ $section->id }}">
+                    <input type="hidden" name="batch_id" class="batch-id-input" value="">
+
+                    <div class="modal-header border-bottom py-3 px-4 bg-light flex-shrink-0">
+                        <div class="d-flex align-items-center justify-content-between w-100">
+                            <div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <h5 class="modal-title fw-bold text-dark fs-16 mb-0 d-flex align-items-center" id="sectionManualProductionModalLabel_{{ $section->id }}">
+                                        <i class="feather-tool text-warning me-2 fs-18"></i>Manual Production Setup
+                                    </h5>
+                                    <span class="badge bg-soft-primary text-primary px-2.5 py-1 rounded-pill font-monospace fs-11 ms-1">
+                                        <i class="feather-layers me-1"></i>Section: {{ $section->name }} ({{ $section->code }})
+                                    </span>
+                                </div>
+                                <div class="text-muted fs-11 mt-1">
+                                    Work Center: <span class="font-monospace fw-semibold text-dark">{{ $workCenter->code }} &mdash; {{ $workCenter->name }}</span>
+                                </div>
                             </div>
+                            <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
 
-                    @if(!$hasWorkerAssignments)
-                        <div class="modal-body p-4">
-                            <div class="alert alert-warning d-flex align-items-start gap-2 py-3 px-3 mb-0">
-                                <i class="feather-alert-triangle text-warning fs-18 mt-0.5 flex-shrink-0"></i>
-                                <div>
-                                    <h6 class="alert-heading fw-bold fs-13 mb-1">No Active Worker Assignments</h6>
-                                    <div class="fs-12 text-muted">
-                                        Manual production cannot be configured or enabled because this section has not been assigned any active internal employees or external workers. Manual production operations require human workers.
-                                    </div>
-                                    <div class="mt-3 d-flex gap-2 flex-wrap">
-                                        <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 fw-semibold" data-bs-target="#sectionEmployeesModal_{{ $section->id }}" data-target-tab="internal" data-bs-toggle="modal">
-                                            <i class="feather-user-check me-1"></i>Assign Internal Employees
-                                        </button>
-                                        @can('create', App\Domains\Production\Models\ExternalWorkerAllocation::class)
-                                            <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-2.5 py-1 fw-semibold" data-bs-target="#sectionEmployeesModal_{{ $section->id }}" data-target-tab="external" data-bs-toggle="modal">
-                                                <i class="feather-users me-1"></i>Allocate External Workers
-                                            </button>
-                                        @endcan
-                                    </div>
-                                </div>
-                            </div>
-
-                            @if($isManualProd)
-                                <div class="mt-3 p-3 bg-light rounded border">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="fw-bold text-dark fs-12">Manual Production Currently Enabled</div>
-                                            <small class="text-muted fs-11">Since there are no active workers, disable manual production to keep section capacity accurate.</small>
-                                        </div>
-                                        <form method="POST" action="{{ route('production.work-center-sections.update-manual-production', $section->id) }}">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="supports_manual_production" value="0">
-                                            <button type="submit" class="btn btn-xs btn-outline-danger">
-                                                Disable Now
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
-                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    @else
-                        <form method="POST" action="{{ route('production.work-center-sections.update-manual-production', $section->id) }}">
-                            @csrf
-                            @method('PATCH')
-                            <div class="modal-body p-4">
-                                <!-- Workforce summary banner -->
-                                <div class="alert alert-info py-2 px-3 fs-12 mb-3 d-flex align-items-center justify-content-between">
-                                    <div>
-                                        <i class="feather-users me-1 text-info"></i>
-                                        <strong>Active Section Workforce:</strong>
-                                        {{ $workerCounts['internal'] }} Internal, {{ $workerCounts['external'] }} External (Total: {{ $workerCounts['total'] }})
-                                    </div>
-                                    <span class="badge bg-soft-success text-success font-monospace">Eligible</span>
-                                </div>
-
-                                <div class="p-3 border rounded bg-light mb-0">
-                                    <div class="form-check form-switch mb-0">
-                                        <input type="hidden" name="supports_manual_production" value="0">
-                                        <input class="form-check-input section-manual-prod-toggle" type="checkbox" name="supports_manual_production" value="1" 
-                                               id="modal_supports_manual_production_{{ $section->id }}" 
-                                               data-target="#modal_manual_capacity_container_{{ $section->id }}"
-                                               @checked($isManualProd)>
-                                        <label class="form-check-label fw-bold text-dark fs-13" for="modal_supports_manual_production_{{ $section->id }}">
-                                            {{ __('production.manual_production') }}
-                                        </label>
-                                        <div class="form-text fs-11 text-muted">{{ __('production.manual_production_desc') }}</div>
-                                    </div>
-
-                                    <div id="modal_manual_capacity_container_{{ $section->id }}" class="mt-3 pt-3 border-top @if(!$isManualProd) d-none @endif">
-                                        <label class="form-label fw-bold fs-12 text-dark" for="modal_manual_capacity_per_hour_{{ $section->id }}">
-                                            {{ __('production.manual_capacity_per_hour') }} <span class="text-danger">*</span>
-                                        </label>
-                                        <div class="input-group">
-                                            <input type="number" step="any" min="0.0001" name="manual_capacity_per_hour" id="modal_manual_capacity_per_hour_{{ $section->id }}" 
-                                                   class="form-control fs-12" 
-                                                   placeholder="e.g. 10.00"
-                                                   value="{{ $manualCapVal }}"
-                                                   @if(!$isManualProd) disabled @endif>
-                                            <span class="input-group-text fs-11 text-muted bg-white">{{ __('production.units_per_hour') }}</span>
-                                        </div>
-                                        <div class="form-text fs-11 text-muted">{{ __('production.manual_capacity_hint') }}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
-                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="feather-save me-1"></i>Save Configuration
+                    @if($hasBatches)
+                        <!-- Dedicated Batches Toolbar Below Header -->
+                        <div class="manual-batches-bar border-bottom flex-shrink-0" style="background-color: #f8fafc; padding: 12px 20px;">
+                            <div class="d-flex align-items-center flex-wrap" style="gap: 8px; row-gap: 8px;">
+                                <span class="text-muted fs-11 fw-bold text-uppercase me-1 d-inline-flex align-items-center">
+                                    <i class="feather-layers text-primary me-1"></i>Batches:
+                                </span>
+                                <button type="button" class="btn btn-xs btn-primary rounded-pill px-3 py-1 fw-semibold manual-batch-mode-btn active" data-section-id="{{ $section->id }}" data-batch-mode="create">
+                                    <i class="feather-plus me-1"></i>New Batch
                                 </button>
+                                @foreach($section->manualProductions as $exBatch)
+                                    <button type="button" 
+                                            class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 fw-semibold manual-batch-mode-btn"
+                                            data-section-id="{{ $section->id }}"
+                                            data-batch-mode="edit"
+                                            data-batch-id="{{ $exBatch->id }}"
+                                            data-batch-name="{{ $exBatch->batch_name }}"
+                                            data-shift-id="{{ $exBatch->shift_id }}"
+                                            data-capacity="{{ $exBatch->capacity_per_hour }}"
+                                            data-active="{{ $exBatch->active ? '1' : '0' }}"
+                                            data-update-url="{{ route('production.manual-productions.update', $exBatch->id) }}"
+                                            data-delete-url="{{ route('production.manual-productions.destroy', $exBatch->id) }}"
+                                            data-internal-ids="{{ json_encode($exBatch->employees->pluck('id')->values()->all()) }}"
+                                            data-external-ids="{{ json_encode($exBatch->externalAllocations->pluck('id')->values()->all()) }}"
+                                            title="Click to edit {{ $exBatch->batch_name }}">
+                                        <i class="feather-edit-2 me-1 text-primary"></i>{{ $exBatch->batch_name }}
+                                        <span class="badge bg-white text-dark border ms-1 font-monospace fs-10">{{ (float) $exBatch->capacity_per_hour }} u/h</span>
+                                        @if(!$exBatch->active)
+                                            <span class="badge bg-soft-danger text-danger border border-danger-subtle ms-1 font-monospace fs-10">Inactive</span>
+                                        @else
+                                            <span class="badge bg-soft-success text-success border border-success-subtle ms-1 font-monospace fs-10">Active</span>
+                                        @endif
+                                    </button>
+                                @endforeach
                             </div>
-                        </form>
+                        </div>
                     @endif
-                </div>
+
+                    <div class="modal-body p-4" style="overflow-y: auto;">
+                        @if(old('_modal') === 'sectionManualProductionModal_'.$section->id && $errors->any())
+                            <div class="alert alert-danger py-2.5 px-3 fs-12 d-flex align-items-center gap-2 mb-3" role="alert">
+                                <i class="feather-alert-triangle text-danger fs-16 flex-shrink-0"></i>
+                                <div>
+                                    <strong>Validation Error:</strong> {{ $errors->first() }}
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Worker Selection Validation Error Alert -->
+                        <div class="alert alert-danger py-2 px-3 fs-12 d-flex align-items-center gap-2 mb-3 d-none worker-selection-error" role="alert">
+                            <i class="feather-alert-triangle text-danger fs-16 flex-shrink-0"></i>
+                            <div>
+                                <strong>Worker Selection Required:</strong> A manual production batch cannot be created without selecting at least one worker (internal employee or external worker allocation).
+                            </div>
+                        </div>
+                        <!-- Top Shift Filter Bar -->
+                        <div class="p-3 bg-light rounded-3 border mb-3">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-7">
+                                    <label class="form-label fw-bold text-dark fs-12 mb-1" for="shiftSelect_{{ $section->id }}">
+                                        <i class="feather-clock text-primary me-1"></i>Select Operating Shift <span class="text-danger">*</span>
+                                    </label>
+                                    <select name="shift_id" class="form-select form-select-sm shift-filter-select" data-select2-selector="default" id="shiftSelect_{{ $section->id }}" style="width: 100%;" required>
+                                        @if($secActiveShifts->isEmpty())
+                                            <option value="">No Active Operating Shifts Configured</option>
+                                        @else
+                                            @foreach($secActiveShifts as $sShift)
+                                                @php
+                                                    $startTime = substr($sShift->start_time, 0, 5);
+                                                    $endTime = substr($sShift->end_time, 0, 5);
+                                                    $timeStr = $startTime . '–' . $endTime;
+                                                    $hasTime = str_contains($sShift->name, $startTime);
+                                                @endphp
+                                                <option value="{{ $sShift->id }}" 
+                                                        data-name="{{ $sShift->name }}"
+                                                        data-start="{{ $startTime }}" 
+                                                        data-end="{{ $endTime }}"
+                                                        @selected($loop->first)>
+                                                    {{ $sShift->name }}{{ $hasTime ? '' : ' (' . $timeStr . ')' }}
+                                                </option>
+                                            @endforeach
+                                        @endif
+                                    </select>
+                                    <div class="fs-11 text-muted mt-1">
+                                        <i class="feather-info me-1"></i>Filters both internal and external worker pools below to workers operating on this shift.
+                                    </div>
+                                </div>
+                                <div class="col-md-5">
+                                    <div class="p-2.5 rounded-2 bg-white border text-md-end">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="fs-10 fw-bold text-muted text-uppercase">Operating Shift Scope</span>
+                                            <span class="badge bg-soft-info text-info font-monospace fs-11 shift-time-display">
+                                                @if($secActiveShifts->first())
+                                                    {{ substr($secActiveShifts->first()->start_time, 0, 5) }} &ndash; {{ substr($secActiveShifts->first()->end_time, 0, 5) }}
+                                                @else
+                                                    N/A
+                                                @endif
+                                            </span>
+                                        </div>
+                                        <div class="fs-12 fw-semibold text-dark text-truncate shift-name-display">
+                                            {{ $secActiveShifts->first()?->name ?? 'No shift' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if($secActiveShifts->isEmpty())
+                            <div class="alert alert-warning py-3 px-3 fs-12 d-flex align-items-center gap-2 mb-0">
+                                <i class="feather-alert-triangle text-warning fs-18 flex-shrink-0"></i>
+                                <div>
+                                    <strong>No Operating Shifts Configured:</strong> Manual production batches must be anchored to an operating shift. Please configure shifts for this section before creating batches.
+                                </div>
+                            </div>
+                        @else
+                            <!-- Two Side-by-Side Worker Blocks -->
+                            <div class="row g-3 mb-3">
+                                <!-- Column 1: Internal Employees -->
+                                <div class="col-md-6">
+                                    <div class="card border rounded-3 h-100 shadow-none mb-0">
+                                        <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <i class="feather-user-check text-info fs-14 me-2"></i>
+                                                <span class="fw-bold text-dark fs-13">Internal Employees</span>
+                                            </div>
+                                            <span class="badge bg-soft-info text-info rounded-pill font-monospace fs-10 px-2 py-1 internal-selected-badge">
+                                                0 Selected
+                                            </span>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <!-- Search Box -->
+                                            <div class="input-group input-group-sm mb-2">
+                                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="feather-search fs-11"></i></span>
+                                                <input type="text" class="form-control form-control-sm border-start-0 search-workers-input search-internal-input" data-target="#internalList_{{ $section->id }}" placeholder="Search employees by name, ID or role...">
+                                            </div>
+                                            <!-- Select All Bar -->
+                                            <div class="d-flex align-items-center justify-content-between py-1.5 px-2 mb-2 bg-light rounded-2 border">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <input type="checkbox" class="form-check-input select-all-btn select-all-internal m-0" id="selectAllInternal_{{ $section->id }}" data-target="#internalList_{{ $section->id }}" style="float: none; width: 1.05rem; height: 1.05rem; cursor: pointer;">
+                                                    <label class="form-check-label fs-11 fw-semibold text-dark cursor-pointer m-0" for="selectAllInternal_{{ $section->id }}">
+                                                        Select All on this Shift
+                                                    </label>
+                                                </div>
+                                                <span class="badge bg-white text-muted border font-monospace fs-10 internal-pool-count-label"></span>
+                                            </div>
+                                            <!-- Scrollable Checkbox List -->
+                                            <div class="workers-scroll-list border rounded p-2 bg-light-subtle" id="internalList_{{ $section->id }}" style="height: 250px; max-height: 250px; overflow-y: auto;">
+                                                @forelse($secInternalAssignments as $assignment)
+                                                    @php
+                                                        $emp = $assignment->employee;
+                                                        if (!$emp) continue;
+                                                        $empShift = $emp->shift;
+                                                        $empShiftId = $empShift?->id ?? '';
+                                                        $empShiftName = $empShift?->name ?? 'Any Shift';
+                                                        $isWcLevel = is_null($assignment->section_id);
+
+                                                        $assignedBatchInfo = $occupiedEmpAssignments[$assignment->id] ?? ($emp ? ($occupiedEmployeeIds[$emp->id] ?? null) : null);
+                                                        $isAssignedToOther = !empty($assignedBatchInfo);
+                                                        $assignedBatchId = $assignedBatchInfo['batch_id'] ?? '';
+                                                        $assignedBatchName = $assignedBatchInfo['batch_name'] ?? '';
+                                                    @endphp
+                                                    <div class="worker-card-item rounded-2 mb-2 p-2.5 bg-white border worker-row internal-worker-row {{ $isAssignedToOther ? 'worker-occupied bg-light opacity-75' : '' }}"
+                                                         data-worker-name="{{ strtolower($emp->full_name ?? $emp->name ?? '') }} {{ strtolower($emp->employee_id ?? '') }} {{ strtolower($emp->designation?->name ?? '') }}"
+                                                         data-shift-id="{{ $empShiftId }}"
+                                                         data-assigned-batch-id="{{ $assignedBatchId }}"
+                                                         data-assigned-batch-name="{{ $assignedBatchName }}">
+                                                        <label class="d-flex align-items-start gap-2.5 w-100 {{ $isAssignedToOther ? 'cursor-not-allowed' : 'cursor-pointer' }} mb-0" for="sec_emp_{{ $section->id }}_{{ $assignment->id }}">
+                                                            <div class="pt-0.5 flex-shrink-0">
+                                                                <input class="form-check-input worker-checkbox internal-cb m-0" 
+                                                                       type="checkbox" 
+                                                                       name="employee_ids[]" 
+                                                                       value="{{ $assignment->id }}" 
+                                                                       id="sec_emp_{{ $section->id }}_{{ $assignment->id }}"
+                                                                       {{ $isAssignedToOther ? 'disabled' : '' }}
+                                                                       style="float: none; width: 1.15rem; height: 1.15rem; cursor: {{ $isAssignedToOther ? 'not-allowed' : 'pointer' }};">
+                                                            </div>
+                                                            <div class="flex-grow-1 min-w-0">
+                                                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                                                    <div class="d-flex align-items-center gap-1.5 min-w-0 flex-wrap">
+                                                                        <span class="fw-semibold text-dark fs-12 text-truncate">{{ $emp->full_name ?? $emp->name }}</span>
+                                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 worker-assigned-badge {{ $isAssignedToOther ? '' : 'd-none' }}" title="Assigned to batch: {{ $assignedBatchName }}">
+                                                                            <i class="feather-lock me-1"></i>Assigned: <span class="assigned-batch-label">{{ $assignedBatchName }}</span>
+                                                                        </span>
+                                                                    </div>
+                                                                    <span class="badge bg-soft-secondary text-secondary font-monospace fs-10 flex-shrink-0">
+                                                                        {{ $emp->employee_id ? '['.$emp->employee_id.']' : '[ID:'.$emp->id.']' }}
+                                                                    </span>
+                                                                </div>
+                                                                <div class="d-flex align-items-center justify-content-between gap-2 mt-1">
+                                                                    <span class="text-muted fs-11 text-truncate">
+                                                                        {{ $emp->designation?->name ?? 'Staff' }}
+                                                                        @if($isWcLevel)
+                                                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-9 py-0 ms-1">WC Level</span>
+                                                                        @endif
+                                                                    </span>
+                                                                    <span class="badge bg-light text-muted border font-monospace fs-10 flex-shrink-0">
+                                                                        <i class="feather-clock me-1 text-primary"></i>{{ $empShiftName }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                @empty
+                                                    <div class="text-center py-4 text-muted fs-11 fst-italic">
+                                                        No internal employees assigned to this section or work center.
+                                                    </div>
+                                                @endforelse
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Column 2: External Workers (Agency Allocations) -->
+                                <div class="col-md-6">
+                                    <div class="card border rounded-3 h-100 shadow-none mb-0">
+                                        <div class="card-header bg-white py-2.5 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                            <div class="d-flex align-items-center">
+                                                <i class="feather-users text-primary fs-14 me-2"></i>
+                                                <span class="fw-bold text-dark fs-13">External Workers (Agency Allocations)</span>
+                                            </div>
+                                            <span class="badge bg-soft-primary text-primary rounded-pill font-monospace fs-10 px-2 py-1 external-selected-badge">
+                                                0 Batches (0 Workers)
+                                            </span>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <!-- Search Box -->
+                                            <div class="input-group input-group-sm mb-2">
+                                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="feather-search fs-11"></i></span>
+                                                <input type="text" class="form-control form-control-sm border-start-0 search-workers-input search-external-input" data-target="#externalList_{{ $section->id }}" placeholder="Search by pay grade, agency or code...">
+                                            </div>
+                                            <!-- Select All Bar -->
+                                            <div class="d-flex align-items-center justify-content-between py-1.5 px-2 mb-2 bg-light rounded-2 border">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <input type="checkbox" class="form-check-input select-all-btn select-all-external m-0" id="selectAllExternal_{{ $section->id }}" data-target="#externalList_{{ $section->id }}" style="float: none; width: 1.05rem; height: 1.05rem; cursor: pointer;">
+                                                    <label class="form-check-label fs-11 fw-semibold text-dark cursor-pointer m-0" for="selectAllExternal_{{ $section->id }}">
+                                                        Select All on this Shift
+                                                    </label>
+                                                </div>
+                                                <span class="badge bg-white text-muted border font-monospace fs-10 external-pool-count-label"></span>
+                                            </div>
+                                            <!-- Scrollable Checkbox List -->
+                                            <div class="workers-scroll-list border rounded p-2 bg-light-subtle" id="externalList_{{ $section->id }}" style="height: 250px; max-height: 250px; overflow-y: auto;">
+                                                @forelse($secExtAllocs as $alloc)
+                                                    @php
+                                                        $pg = $alloc->payGrade;
+                                                        $allocShift = $alloc->shift;
+                                                        $assignedBatchInfo = $occupiedExtAllocations[$alloc->id] ?? null;
+                                                        $isAssignedToOther = !empty($assignedBatchInfo);
+                                                        $assignedBatchId = $assignedBatchInfo['batch_id'] ?? '';
+                                                        $assignedBatchName = $assignedBatchInfo['batch_name'] ?? '';
+                                                    @endphp
+                                                    <div class="worker-card-item rounded-2 mb-2 p-2.5 bg-white border worker-row external-worker-row {{ $isAssignedToOther ? 'worker-occupied bg-light opacity-75' : '' }}"
+                                                         data-worker-name="{{ strtolower($pg?->name ?? '') }} {{ strtolower($pg?->code ?? '') }} {{ strtolower($allocShift?->name ?? '') }}"
+                                                         data-shift-id="{{ $alloc->shift_id }}"
+                                                         data-worker-count="{{ $alloc->number_of_external_workers }}"
+                                                         data-assigned-batch-id="{{ $assignedBatchId }}"
+                                                         data-assigned-batch-name="{{ $assignedBatchName }}">
+                                                        <label class="d-flex align-items-start gap-2.5 w-100 {{ $isAssignedToOther ? 'cursor-not-allowed' : 'cursor-pointer' }} mb-0" for="sec_alloc_{{ $section->id }}_{{ $alloc->id }}">
+                                                            <div class="pt-0.5 flex-shrink-0">
+                                                                <input class="form-check-input worker-checkbox external-cb m-0" 
+                                                                       type="checkbox" 
+                                                                       name="external_allocation_ids[]" 
+                                                                       value="{{ $alloc->id }}" 
+                                                                       id="sec_alloc_{{ $section->id }}_{{ $alloc->id }}"
+                                                                       data-worker-count="{{ $alloc->number_of_external_workers }}"
+                                                                       {{ $isAssignedToOther ? 'disabled' : '' }}
+                                                                       style="float: none; width: 1.15rem; height: 1.15rem; cursor: {{ $isAssignedToOther ? 'not-allowed' : 'pointer' }};">
+                                                            </div>
+                                                            <div class="flex-grow-1 min-w-0">
+                                                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                                                    <div class="d-flex align-items-center gap-1.5 min-w-0 flex-wrap">
+                                                                        <span class="fw-semibold text-dark fs-12 text-truncate">{{ $pg?->name ?? 'External Worker Batch' }}</span>
+                                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 worker-assigned-badge {{ $isAssignedToOther ? '' : 'd-none' }}" title="Assigned to batch: {{ $assignedBatchName }}">
+                                                                            <i class="feather-lock me-1"></i>Assigned: <span class="assigned-batch-label">{{ $assignedBatchName }}</span>
+                                                                        </span>
+                                                                    </div>
+                                                                    <span class="badge bg-soft-primary text-primary font-monospace fs-10 flex-shrink-0">
+                                                                        {{ $alloc->number_of_external_workers }} {{ Str::plural('Worker', $alloc->number_of_external_workers) }}
+                                                                    </span>
+                                                                </div>
+                                                                <div class="d-flex align-items-center justify-content-between gap-2 mt-1">
+                                                                    <span class="text-muted fs-11 font-monospace text-truncate">
+                                                                        Rate: <strong class="text-dark">{{ format_currency((float) ($pg?->hourly_rate ?? 0)) }}</strong> / hr
+                                                                    </span>
+                                                                    <span class="badge bg-light text-muted border font-monospace fs-10 flex-shrink-0">
+                                                                        <i class="feather-clock me-1 text-primary"></i>{{ $allocShift?->name ?? 'Shift #'.$alloc->shift_id }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                @empty
+                                                    <div class="text-center py-4 text-muted fs-11 fst-italic">
+                                                        No external worker allocations configured for this section.
+                                                    </div>
+                                                @endforelse
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Batch Details, Target Speed, Status -->
+                            <div class="p-3 bg-light rounded-3 border">
+                                <div class="row g-3 align-items-start">
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-bold text-dark fs-12 mb-1" for="batchName_{{ $section->id }}">
+                                            Batch Name <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" name="batch_name" id="batchName_{{ $section->id }}" class="form-control form-control-sm batch-name-input" placeholder="e.g. Morning Packing Line 1" required style="height: 38px;">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold text-dark fs-12 mb-1" for="batchCapacity_{{ $section->id }}">
+                                            Target Production Rate <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" step="any" min="0.0001" name="capacity_per_hour" id="batchCapacity_{{ $section->id }}" class="form-control capacity-input font-monospace" placeholder="e.g. 50.00" required style="height: 38px;">
+                                            <span class="input-group-text fs-11 text-muted bg-white font-monospace">pcs / hr</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-bold text-dark fs-12 mb-1">Batch Status</label>
+                                        <div class="d-flex align-items-center justify-content-between p-2 rounded-2 bg-white border" style="height: 38px;">
+                                            <span class="fw-semibold fs-12 status-label-text text-success">Active Batch</span>
+                                            <div class="form-check form-switch m-0 p-0 d-flex align-items-center">
+                                                <input type="hidden" name="active" value="0">
+                                                <input class="form-check-input batch-active-switch m-0" type="checkbox" name="active" value="1" id="batchActive_{{ $section->id }}" checked style="cursor: pointer; width: 2.25rem; height: 1.2rem;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Live Dynamic Summary Banner -->
+                                <div class="rounded-3 bg-soft-primary border border-primary-subtle py-2.5 px-3 mt-3 mb-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="feather-check-circle text-primary fs-16 flex-shrink-0"></i>
+                                        <span class="fw-semibold text-dark fs-12">
+                                            Team Size: <strong class="text-primary font-monospace fs-13 total-team-count">0</strong> Workers
+                                            <span class="text-muted ms-1">(<span class="internal-team-count font-monospace text-dark fw-bold">0</span> Internal + <span class="external-team-count font-monospace text-dark fw-bold">0</span> External)</span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2 font-monospace fs-12">
+                                        <span class="text-muted">Target Speed:</span>
+                                        <strong class="text-success fs-13 speed-preview-val">0.00</strong>
+                                        <span class="text-muted fs-11">pcs / hr</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="modal-footer bg-light py-2.5 px-4 border-top d-flex justify-content-between flex-shrink-0">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-soft-info text-info rounded-pill font-monospace fs-11 mode-indicator-badge px-2.5 py-1">
+                                <i class="feather-plus-circle me-1"></i>New Batch Mode
+                            </span>
+                            <button type="button" class="btn btn-xs btn-outline-danger d-none delete-batch-btn" data-section-id="{{ $section->id }}" title="Delete this batch">
+                                <i class="feather-trash-2 me-1"></i>Delete Batch
+                            </button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm px-3 save-batch-submit-btn" @if($secActiveShifts->isEmpty()) disabled @endif>
+                                <i class="feather-save me-1"></i><span class="submit-btn-text">Save Manual Batch</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
+        <!-- Hidden Delete Form for Batch Deletion -->
+        <form method="POST" action="" id="deleteBatchForm_{{ $section->id }}" class="d-none">
+            @csrf
+            @method('DELETE')
+        </form>
     @endforeach
 
     @push('scripts')
         <script>
             $(function() {
-                // Toggle manual capacity per hour input in dedicated modal
-                $(document).on('change', '.section-manual-prod-toggle', function() {
-                    var $target = $($(this).data('target'));
-                    var $input = $target.find('input');
-                    if ($(this).is(':checked')) {
-                        $target.removeClass('d-none');
-                        $input.prop('disabled', false);
+                // =========================================================================
+                // MANUAL PRODUCTION MODAL INTERACTIVITY
+                // =========================================================================
+
+                function updateManualModalSummary($modal) {
+                    // Count internal checked
+                    var internalChecked = 0;
+                    $modal.find('.internal-worker-row').each(function() {
+                        var $row = $(this);
+                        var isChecked = $row.find('.internal-cb').is(':checked');
+                        if (isChecked) {
+                            $row.addClass('selected-card');
+                        } else {
+                            $row.removeClass('selected-card');
+                        }
+                        if (!$row.hasClass('d-none')) {
+                            if (isChecked) {
+                                internalChecked++;
+                            }
+                        }
+                    });
+
+                    // Count external checked & worker headcounts
+                    var externalBatchesChecked = 0;
+                    var externalWorkersTotal = 0;
+                    $modal.find('.external-worker-row').each(function() {
+                        var $row = $(this);
+                        var $cb = $row.find('.external-cb');
+                        var isChecked = $cb.is(':checked');
+                        if (isChecked) {
+                            $row.addClass('selected-card');
+                        } else {
+                            $row.removeClass('selected-card');
+                        }
+                        if (!$row.hasClass('d-none')) {
+                            if (isChecked) {
+                                externalBatchesChecked++;
+                                var count = parseInt($cb.attr('data-worker-count'), 10) || 0;
+                                externalWorkersTotal += count;
+                            }
+                        }
+                    });
+
+                    var totalTeam = internalChecked + externalWorkersTotal;
+
+                    // Update badges and summary text
+                    $modal.find('.internal-selected-badge').text(internalChecked + ' Selected');
+                    $modal.find('.external-selected-badge').text(externalBatchesChecked + ' ' + (externalBatchesChecked === 1 ? 'Batch' : 'Batches') + ' (' + externalWorkersTotal + ' Workers)');
+                    $modal.find('.total-team-count').text(totalTeam);
+                    $modal.find('.internal-team-count').text(internalChecked);
+                    $modal.find('.external-team-count').text(externalWorkersTotal);
+
+                    // Speed preview
+                    var speedVal = parseFloat($modal.find('.capacity-input').val()) || 0;
+                    $modal.find('.speed-preview-val').text(speedVal.toFixed(2));
+                }
+
+                function applyWorkerAvailability($modal, currentEditingBatchId) {
+                    currentEditingBatchId = currentEditingBatchId ? String(currentEditingBatchId) : '';
+
+                    $modal.find('.worker-row').each(function() {
+                        var $row = $(this);
+                        var assignedBatchId = String($row.attr('data-assigned-batch-id') || '');
+                        var assignedBatchName = $row.attr('data-assigned-batch-name') || '';
+                        var $cb = $row.find('.worker-checkbox');
+                        var $badge = $row.find('.worker-assigned-badge');
+                        var $label = $row.find('label');
+
+                        if (assignedBatchId !== '' && assignedBatchId !== currentEditingBatchId) {
+                            $cb.prop('disabled', true);
+                            $badge.removeClass('d-none');
+                            $badge.find('.assigned-batch-label').text(assignedBatchName);
+                            $badge.attr('title', 'Assigned to batch: ' + assignedBatchName);
+                            $row.addClass('worker-occupied bg-light opacity-75');
+                            $label.removeClass('cursor-pointer').addClass('cursor-not-allowed');
+                            $cb.css('cursor', 'not-allowed');
+                        } else {
+                            $cb.prop('disabled', false);
+                            $badge.addClass('d-none');
+                            $row.removeClass('worker-occupied bg-light opacity-75');
+                            $label.removeClass('cursor-not-allowed').addClass('cursor-pointer');
+                            $cb.css('cursor', 'pointer');
+                        }
+                    });
+                }
+
+                function filterWorkersByShiftAndSearch($modal) {
+                    var selectedShiftId = String($modal.find('.shift-filter-select').val() || '');
+                    var internalSearch = ($modal.find('.search-internal-input').val() || '').toLowerCase().trim();
+                    var externalSearch = ($modal.find('.search-external-input').val() || '').toLowerCase().trim();
+
+                    var visibleInternalCount = 0;
+                    var availableInternalCount = 0;
+                    var allInternalChecked = true;
+
+                    $modal.find('.internal-worker-row').each(function() {
+                        var $row = $(this);
+                        var rowShiftId = String($row.attr('data-shift-id') || '');
+                        var workerName = ($row.attr('data-worker-name') || '').toLowerCase();
+
+                        // Match shift: if employee has no specific master shift (blank), or matches selected shift
+                        var matchesShift = (selectedShiftId === '' || rowShiftId === '' || rowShiftId === selectedShiftId);
+                        var matchesSearch = (internalSearch === '' || workerName.indexOf(internalSearch) !== -1);
+
+                        if (matchesShift && matchesSearch) {
+                            $row.removeClass('d-none');
+                            visibleInternalCount++;
+                            var isLocked = $row.find('.internal-cb').is(':disabled');
+                            if (!isLocked) {
+                                availableInternalCount++;
+                                if (!$row.find('.internal-cb').is(':checked')) {
+                                    allInternalChecked = false;
+                                }
+                            }
+                        } else {
+                            $row.addClass('d-none');
+                        }
+                    });
+
+                    if (availableInternalCount === 0) allInternalChecked = false;
+                    $modal.find('.select-all-internal').prop('checked', availableInternalCount > 0 && allInternalChecked);
+
+                    var lockedInternalCount = visibleInternalCount - availableInternalCount;
+                    var intLabelText = availableInternalCount + ' available';
+                    if (lockedInternalCount > 0) {
+                        intLabelText += ' (' + lockedInternalCount + ' in other batches)';
+                    }
+                    $modal.find('.internal-pool-count-label').text(intLabelText);
+
+                    var visibleExternalCount = 0;
+                    var availableExternalCount = 0;
+                    var allExternalChecked = true;
+
+                    $modal.find('.external-worker-row').each(function() {
+                        var $row = $(this);
+                        var rowShiftId = String($row.attr('data-shift-id') || '');
+                        var workerName = ($row.attr('data-worker-name') || '').toLowerCase();
+
+                        var matchesShift = (selectedShiftId === '' || rowShiftId === selectedShiftId);
+                        var matchesSearch = (externalSearch === '' || workerName.indexOf(externalSearch) !== -1);
+
+                        if (matchesShift && matchesSearch) {
+                            $row.removeClass('d-none');
+                            visibleExternalCount++;
+                            var isLocked = $row.find('.external-cb').is(':disabled');
+                            if (!isLocked) {
+                                availableExternalCount++;
+                                if (!$row.find('.external-cb').is(':checked')) {
+                                    allExternalChecked = false;
+                                }
+                            }
+                        } else {
+                            $row.addClass('d-none');
+                        }
+                    });
+
+                    if (availableExternalCount === 0) allExternalChecked = false;
+                    $modal.find('.select-all-external').prop('checked', availableExternalCount > 0 && allExternalChecked);
+
+                    var lockedExternalCount = visibleExternalCount - availableExternalCount;
+                    var extLabelText = availableExternalCount + ' allocations available';
+                    if (lockedExternalCount > 0) {
+                        extLabelText += ' (' + lockedExternalCount + ' in other batches)';
+                    }
+                    $modal.find('.external-pool-count-label').text(extLabelText);
+
+                    // Update shift display card
+                    var $selectedOpt = $modal.find('.shift-filter-select option:selected');
+                    if ($selectedOpt.length && $selectedOpt.val()) {
+                        $modal.find('.shift-name-display').text($selectedOpt.attr('data-name') || $selectedOpt.text());
+                        var start = $selectedOpt.attr('data-start') || '';
+                        var end = $selectedOpt.attr('data-end') || '';
+                        if (start && end) {
+                            $modal.find('.shift-time-display').text(start + ' - ' + end);
+                        }
+                    }
+
+                    updateManualModalSummary($modal);
+                }
+
+                // Event: Shift dropdown change
+                $(document).on('change', '.manual-production-modal .shift-filter-select', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    filterWorkersByShiftAndSearch($modal);
+                });
+
+                // Event: Search text typing (internal & external)
+                $(document).on('input', '.manual-production-modal .search-workers-input', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    filterWorkersByShiftAndSearch($modal);
+                });
+
+                // Event: "Select All" toggle for Internal
+                $(document).on('change', '.manual-production-modal .select-all-internal', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    var isChecked = $(this).is(':checked');
+                    $modal.find('.internal-worker-row:not(.d-none) .internal-cb:not(:disabled)').prop('checked', isChecked);
+                    updateManualModalSummary($modal);
+                });
+
+                // Event: "Select All" toggle for External
+                $(document).on('change', '.manual-production-modal .select-all-external', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    var isChecked = $(this).is(':checked');
+                    $modal.find('.external-worker-row:not(.d-none) .external-cb:not(:disabled)').prop('checked', isChecked);
+                    updateManualModalSummary($modal);
+                });
+
+                // Event: Individual worker checkbox toggle
+                $(document).on('change', '.manual-production-modal .worker-checkbox', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    // Check if all visible internals are checked
+                    var allInternalChecked = true;
+                    var hasAvailableInternals = false;
+                    $modal.find('.internal-worker-row:not(.d-none)').each(function() {
+                        var $cb = $(this).find('.internal-cb');
+                        if (!$cb.is(':disabled')) {
+                            hasAvailableInternals = true;
+                            if (!$cb.is(':checked')) allInternalChecked = false;
+                        }
+                    });
+                    $modal.find('.select-all-internal').prop('checked', hasAvailableInternals && allInternalChecked);
+
+                    // Check if all visible externals are checked
+                    var allExternalChecked = true;
+                    var hasAvailableExternals = false;
+                    $modal.find('.external-worker-row:not(.d-none)').each(function() {
+                        var $cb = $(this).find('.external-cb');
+                        if (!$cb.is(':disabled')) {
+                            hasAvailableExternals = true;
+                            if (!$cb.is(':checked')) allExternalChecked = false;
+                        }
+                    });
+                    $modal.find('.select-all-external').prop('checked', hasAvailableExternals && allExternalChecked);
+
+                    updateManualModalSummary($modal);
+                });
+
+                // Event: Capacity input typing
+                $(document).on('input', '.manual-production-modal .capacity-input', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    updateManualModalSummary($modal);
+                });
+
+                // Event: Active switch toggle
+                $(document).on('change', '.manual-production-modal .batch-active-switch', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    var isChecked = $(this).is(':checked');
+                    if (isChecked) {
+                        $modal.find('.status-label-text').removeClass('text-muted text-danger').addClass('text-success').text('Active Batch');
                     } else {
-                        $target.addClass('d-none');
-                        $input.prop('disabled', true);
+                        $modal.find('.status-label-text').removeClass('text-success').addClass('text-danger').text('Inactive Batch');
                     }
                 });
 
-                // Initialize Bootstrap popovers for machine badges
+                // Event: Batch Mode button click (Create New vs Edit Existing)
+                $(document).on('click', '.manual-batch-mode-btn', function() {
+                    var $btn = $(this);
+                    var $modal = $btn.closest('.manual-production-modal');
+                    var mode = $btn.attr('data-batch-mode');
+                    var $form = $modal.find('.manual-prod-form');
+
+                    $modal.find('.manual-batch-mode-btn').removeClass('active btn-primary').addClass('btn-outline-secondary');
+                    $btn.removeClass('btn-outline-secondary').addClass('active btn-primary');
+                    $modal.find('.worker-selection-error').addClass('d-none');
+
+                    if (mode === 'create') {
+                        // Reset to Create mode
+                        $form.attr('action', $form.attr('data-store-url'));
+                        $form.find('.form-method-input').val('POST');
+                        $modal.find('.batch-id-input').val('');
+                        $modal.find('.batch-name-input').val('');
+                        $modal.find('.capacity-input').val('');
+                        $modal.find('.batch-active-switch').prop('checked', true).trigger('change');
+                        $modal.find('.worker-checkbox').prop('checked', false);
+                        applyWorkerAvailability($modal, '');
+                        $modal.find('.delete-batch-btn').addClass('d-none');
+                        $modal.find('.submit-btn-text').text('Save Manual Batch');
+                        $modal.find('.mode-indicator-badge').html('<i class="feather-plus-circle me-1"></i>New Batch Mode');
+
+                        var firstShiftVal = $modal.find('.shift-filter-select option:first').val();
+                        if (firstShiftVal) {
+                            $modal.find('.shift-filter-select').val(firstShiftVal).trigger('change');
+                        }
+                    } else if (mode === 'edit') {
+                        // Switch to Edit mode
+                        var batchId = $btn.attr('data-batch-id');
+                        var batchName = $btn.attr('data-batch-name');
+                        var shiftId = $btn.attr('data-shift-id');
+                        var capacity = $btn.attr('data-capacity');
+                        var active = $btn.attr('data-active') === '1';
+                        var deleteUrl = $btn.attr('data-delete-url');
+
+                        var internalIds = [];
+                        var externalIds = [];
+                        try {
+                            internalIds = JSON.parse($btn.attr('data-internal-ids') || '[]');
+                        } catch(e) {}
+                        try {
+                            externalIds = JSON.parse($btn.attr('data-external-ids') || '[]');
+                        } catch(e) {}
+
+                        // Update form action and method to PUT
+                        var updateUrl = $btn.attr('data-update-url') || ('{{ url("production/manual-productions") }}/' + batchId);
+                        $form.attr('action', updateUrl);
+                        $form.find('.form-method-input').val('PUT');
+                        $modal.find('.batch-id-input').val(batchId);
+
+                        // Fill fields
+                        $modal.find('.batch-name-input').val(batchName);
+                        $modal.find('.capacity-input').val(capacity);
+                        $modal.find('.batch-active-switch').prop('checked', active).trigger('change');
+
+                        // Apply availability for this batch (unlocks its own workers, locks others)
+                        applyWorkerAvailability($modal, batchId);
+
+                        // Select shift
+                        if (shiftId) {
+                            $modal.find('.shift-filter-select').val(shiftId).trigger('change');
+                        }
+
+                        // Check matching internal & external checkboxes
+                        $modal.find('.internal-cb').each(function() {
+                            var val = parseInt($(this).val(), 10);
+                            $(this).prop('checked', internalIds.indexOf(val) !== -1);
+                        });
+
+                        $modal.find('.external-cb').each(function() {
+                            var val = parseInt($(this).val(), 10);
+                            $(this).prop('checked', externalIds.indexOf(val) !== -1);
+                        });
+
+                        // Delete button
+                        if (deleteUrl) {
+                            $modal.find('.delete-batch-btn').removeClass('d-none').attr('data-delete-url', deleteUrl);
+                        } else {
+                            $modal.find('.delete-batch-btn').addClass('d-none');
+                        }
+
+                        var statusBadge = active 
+                            ? '<span class="badge bg-soft-success text-success ms-1 font-monospace fs-10">Active</span>' 
+                            : '<span class="badge bg-soft-danger text-danger ms-1 font-monospace fs-10">Inactive</span>';
+
+                        $modal.find('.submit-btn-text').text('Update Manual Batch');
+                        $modal.find('.mode-indicator-badge').html('<i class="feather-edit-2 me-1"></i>Editing: ' + $('<div>').text(batchName).html() + ' ' + statusBadge);
+                    }
+
+                    filterWorkersByShiftAndSearch($modal);
+                });
+
+                // Prevent submitting empty batch (no workers selected)
+                $(document).on('submit', '.manual-prod-form', function(e) {
+                    var $form = $(this);
+                    var $modal = $form.closest('.manual-production-modal');
+                    var internalChecked = $modal.find('.internal-cb:checked').length;
+                    var externalChecked = $modal.find('.external-cb:checked').length;
+                    var totalSelected = internalChecked + externalChecked;
+
+                    if (totalSelected === 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        var $err = $modal.find('.worker-selection-error');
+                        $err.removeClass('d-none');
+                        if ($err.length && $err[0].scrollIntoView) {
+                            $err[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+
+                        $modal.find('.workers-scroll-list').addClass('border-danger shadow-sm');
+                        setTimeout(function() {
+                            $modal.find('.workers-scroll-list').removeClass('border-danger shadow-sm');
+                        }, 4000);
+
+                        alert('A manual production batch cannot be created or updated without selecting at least one worker or employee. Please select at least one worker from the lists above.');
+                        return false;
+                    } else {
+                        $modal.find('.worker-selection-error').addClass('d-none');
+                    }
+                });
+
+                // Event: Delete batch inside modal
+                $(document).on('click', '.manual-production-modal .delete-batch-btn', function() {
+                    var $modal = $(this).closest('.manual-production-modal');
+                    var deleteUrl = $(this).attr('data-delete-url');
+                    var secId = $(this).attr('data-section-id');
+                    if (deleteUrl && confirm('Are you sure you want to remove this manual batch?')) {
+                        var $delForm = $('#deleteBatchForm_' + secId);
+                        if ($delForm.length) {
+                            $delForm.attr('action', deleteUrl).submit();
+                        }
+                    }
+                });
+
+                // Initialize when modal is shown
+                $(document).on('shown.bs.modal', '.manual-production-modal', function() {
+                    var $modal = $(this);
+                    $modal.find('.shift-filter-select[data-select2-selector]').each(function() {
+                        initModalSelect2($(this), $modal);
+                    });
+                    var activeEditBatchId = $modal.find('.manual-batch-mode-btn.active').attr('data-batch-id') || '';
+                    applyWorkerAvailability($modal, activeEditBatchId);
+                    filterWorkersByShiftAndSearch($modal);
+                });
+
+                // Initialize Bootstrap popovers for machine & resource badges
                 if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
                     $('[data-bs-toggle="popover"]').each(function () {
                         if (!bootstrap.Popover.getInstance(this)) {
@@ -3163,6 +4849,124 @@
                         }
                     });
                 }
+
+                // Initialize Bootstrap tooltips for shift badges
+                if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                    $('[data-bs-toggle="tooltip"]').each(function () {
+                        if (!bootstrap.Tooltip.getInstance(this)) {
+                            new bootstrap.Tooltip(this);
+                        }
+                    });
+                }
+
+                // Resource Cluster Pills: click handler to hide hover popover and trigger target modal
+                $(document).on('click', '.resource-cluster-pill[data-modal-target]', function(e) {
+                    e.preventDefault();
+                    if (typeof bootstrap !== 'undefined') {
+                        var popover = bootstrap.Popover.getInstance(this);
+                        if (popover) {
+                            popover.hide();
+                        }
+                        var targetModal = $(this).attr('data-modal-target');
+                        var targetTab = $(this).attr('data-modal-tab');
+                        if (targetModal) {
+                            var $m = $(targetModal);
+                            if ($m.length) {
+                                if (targetTab) {
+                                    var secId = targetModal.replace('#sectionEmployeesModal_', '');
+                                    var tabBtn = $m.find('#sec-' + targetTab + '-tab-' + secId);
+                                    if (tabBtn.length && bootstrap.Tab) {
+                                        bootstrap.Tab.getOrCreateInstance(tabBtn[0]).show();
+                                    }
+                                }
+                                var modalInstance = bootstrap.Modal.getOrCreateInstance($m[0]);
+                                modalInstance.show();
+                            }
+                        }
+                    }
+                });
+
+                // Capacity Popover: click to open calculation breakdown modal
+                $(document).on('click', '.capacity-popover-trigger', function(e) {
+                    if ($(e.target).closest('button[data-bs-toggle="modal"]').length) return;
+                    e.preventDefault();
+                    if (typeof bootstrap !== 'undefined') {
+                        var popover = bootstrap.Popover.getInstance(this);
+                        if (popover) {
+                            popover.hide();
+                        }
+                        var targetModal = $(this).attr('data-bs-target');
+                        if (targetModal) {
+                            var $m = $(targetModal);
+                            if ($m.length) {
+                                bootstrap.Modal.getOrCreateInstance($m[0]).show();
+                            }
+                        }
+                    }
+                });
+
+                // =========================================================================
+                // SECTION DETAILS MODAL TO CHILD MODAL TRANSITIONS
+                // =========================================================================
+
+                // Cleanly close section details modal before opening child modal to avoid stacking & z-index issues
+                $(document).on('click', '.section-details-modal [data-bs-toggle="modal"][data-bs-target]', function(e) {
+                    var targetSelector = $(this).attr('data-bs-target');
+                    if (!targetSelector || !targetSelector.startsWith('#')) return;
+
+                    var targetEl = document.querySelector(targetSelector);
+                    if (!targetEl || !targetEl.classList.contains('modal')) return;
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    var $detailsModal = $(this).closest('.section-details-modal');
+                    var targetTab = $(this).attr('data-target-tab');
+
+                    var detailsInstance = bootstrap.Modal.getInstance($detailsModal[0]) || new bootstrap.Modal($detailsModal[0]);
+                    detailsInstance.hide();
+
+                    $detailsModal.one('hidden.bs.modal', function() {
+                        var targetInstance = bootstrap.Modal.getOrCreateInstance(targetEl);
+                        targetInstance.show();
+
+                        if (targetTab) {
+                            var tabTrigger = targetEl.querySelector('[data-bs-toggle="pill"][data-target-tab="' + targetTab + '"], [data-bs-toggle="tab"][data-target-tab="' + targetTab + '"]');
+                            if (tabTrigger) {
+                                var tab = new bootstrap.Tab(tabTrigger);
+                                tab.show();
+                            }
+                        }
+                    });
+                });
+
+                // Dismiss open popovers & tooltips whenever any modal is displayed
+                $(document).on('show.bs.modal', '.modal', function() {
+                    if (typeof bootstrap !== 'undefined') {
+                        $('[data-bs-toggle="popover"]').each(function() {
+                            var p = bootstrap.Popover.getInstance(this);
+                            if (p) p.hide();
+                        });
+                        $('[data-bs-toggle="tooltip"]').each(function() {
+                            var t = bootstrap.Tooltip.getInstance(this);
+                            if (t) t.hide();
+                        });
+                    }
+                });
+
+                // Handle target-tab navigation when opening personnel modal from shortcuts
+                $(document).on('click', '[data-bs-target^="#sectionEmployeesModal_"][data-target-tab]', function() {
+                    var targetModal = $(this).attr('data-bs-target');
+                    var targetTab = $(this).attr('data-target-tab');
+                    if (targetModal && targetTab) {
+                        var secId = targetModal.replace('#sectionEmployeesModal_', '');
+                        var $m = $(targetModal);
+                        var tabBtn = $m.find('#sec-' + targetTab + '-tab-' + secId);
+                        if (tabBtn.length && bootstrap.Tab) {
+                            bootstrap.Tab.getOrCreateInstance(tabBtn[0]).show();
+                        }
+                    }
+                });
 
                 // Standard modal Select2 initialization adhering to theme-wide bootstrap-5 standard
                 function initModalSelect2($select, $modal) {
@@ -3700,6 +5504,27 @@
                         }
                     });
                 });
+
+                // Countdown Timer Ticker
+                var countdownSeconds = {{ $isCountdownActive ? (int) $countdownRemainingSeconds : 0 }};
+                if (countdownSeconds > 0) {
+                    var $timerEl = $('#countdown-timer-display');
+                    var timerInterval = setInterval(function() {
+                        countdownSeconds--;
+                        if (countdownSeconds <= 0) {
+                            clearInterval(timerInterval);
+                            if ($timerEl.length) $timerEl.text('00:00');
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            var m = Math.floor(countdownSeconds / 60);
+                            var s = countdownSeconds % 60;
+                            var formatted = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+                            if ($timerEl.length) $timerEl.text(formatted);
+                        }
+                    }, 1000);
+                }
 
             });
         </script>

@@ -2291,6 +2291,15 @@ return array (
   'delete_bom' => 'Delete BOM',
   'select_bom' => 'Select BOM',
   'cost' => 'Cost',
+  'operating_expense_configuration' => 'Operating Expense Configuration',
+  'operating_expense_subtitle' => 'Configure energy consumption rates to accurately determine machine hourly operating expense.',
+  'energy_source' => 'Energy Source',
+  'consumption_per_hour' => 'Consumption Rate',
+  'energy_rate_per_unit' => 'Cost Rate / Unit',
+  'operating_cost_per_hour' => 'Operating Cost / Hr',
+  'calculation_countdown_minutes' => 'Debounce Countdown (Minutes)',
+  'calculation_countdown_hint' => 'Wait time in minutes before recalculating after changes (minimum 1 minute, cannot be zero).',
+  'capacity_placeholder' => 'e.g. 50.00 units/hr',
 );
 
 

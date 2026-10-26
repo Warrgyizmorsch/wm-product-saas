@@ -66,7 +66,7 @@ class WorkCenterDashboardController extends Controller
         $availableMinutes = $schedulingService->calculateCapacity($workCenter->id, today());
         if ($availableMinutes <= 0) {
             // Fallback for non-working days or unconfigured calendars (8h default per active machine)
-            $machineCount = $workCenter->machines()->where('status', \App\Domains\Production\Models\Machine::STATUS_ACTIVE)->count() ?: 1;
+            $machineCount = $workCenter->machines()->where('production_machines.status', \App\Domains\Production\Models\Machine::STATUS_ACTIVE)->count() ?: 1;
             $availableMinutes = (8 * 60) * $machineCount * (($workCenter->efficiency_percentage ?? 100.0) / 100.0);
         }
 

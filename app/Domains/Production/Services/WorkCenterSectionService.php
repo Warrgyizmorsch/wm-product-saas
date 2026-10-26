@@ -54,13 +54,13 @@ class WorkCenterSectionService
             }
 
             $fresh = $section->fresh(['workCenter', 'machines']);
-            $calculated = $this->calculationService->calculateAndSave($fresh);
+            $this->calculationService->calculateAndSave($fresh);
 
             if ($workCenter) {
                 app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
             }
 
-            return $calculated;
+            return $fresh;
         });
     }
 
@@ -100,24 +100,24 @@ class WorkCenterSectionService
             }
 
             $fresh = $updated->fresh(['workCenter', 'machines']);
-            $calculated = $this->calculationService->calculateAndSave($fresh);
+            $this->calculationService->calculateAndSave($fresh);
 
             if ($workCenter) {
                 app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
             }
 
-            return $calculated;
+            return $fresh;
         });
     }
 
     public function recalculate(WorkCenterSection $section): WorkCenterSection
     {
         $fresh = $section->fresh(['workCenter', 'machines']);
-        $calculated = $this->calculationService->calculateAndSave($fresh);
+        $this->calculationService->calculateAndSave($fresh);
         if ($fresh->workCenter) {
             app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
         }
-        return $calculated;
+        return $fresh;
     }
 
     public function updateManualProduction(int $id, bool $supportsManual, ?float $capacity): WorkCenterSection
@@ -149,13 +149,13 @@ class WorkCenterSectionService
             ]);
 
             $fresh = $updated->fresh(['workCenter', 'machines']);
-            $calculated = $this->calculationService->calculateAndSave($fresh);
+            $this->calculationService->calculateAndSave($fresh);
 
             if ($fresh->workCenter) {
                 app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
             }
 
-            return $calculated;
+            return $fresh;
         });
     }
 

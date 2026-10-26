@@ -89,6 +89,16 @@ class WorkCenterEmployeeAssignment extends BaseModel
         return $this->belongsTo(Employee::class, 'employee_id');
     }
 
+    public function manualProductions(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            SectionManualProduction::class,
+            'production_section_manual_production_employees',
+            'work_center_employee_id',
+            'manual_production_id'
+        )->withTimestamps();
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('production_work_center_employees.active', true);

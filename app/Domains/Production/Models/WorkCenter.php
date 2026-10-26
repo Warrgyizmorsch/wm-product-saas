@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WorkCenter extends BaseModel
@@ -28,15 +29,38 @@ class WorkCenter extends BaseModel
         'description',
         'location',
         'overhead_cost',
+        'calculation_countdown_minutes',
+        'calculation_countdown_end_at',
+        'pending_calculation_section_ids',
+        'is_calculation_running',
         'status',
         'production_calendar_id',
     ];
 
     protected $casts = [
-        'overhead_cost' => 'decimal:4',
+        'overhead_cost'                   => 'decimal:4',
+        'calculation_countdown_minutes'   => 'integer',
+        'calculation_countdown_end_at'    => 'datetime',
+        'pending_calculation_section_ids' => 'array',
+        'is_calculation_running'          => 'boolean',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
+
+    public function calculations(): HasMany
+    {
+        return $this->hasMany(WorkCenterCalculation::class, 'work_center_id');
+    }
+
+    public function latestCalculation(): HasOne
+    {
+        return $this->hasOne(WorkCenterCalculation::class, 'work_center_id')->latestOfMany();
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(WorkCenterActivityLog::class, 'work_center_id');
+    }
 
     public function sections(): HasMany
     {

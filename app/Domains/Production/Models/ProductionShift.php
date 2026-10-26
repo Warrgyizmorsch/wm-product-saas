@@ -90,5 +90,46 @@ class ProductionShift extends BaseModel
     {
         return (bool) $this->active;
     }
+
+    /**
+     * Net working hours in float (e.g. 8.5)
+     */
+    public function getWorkingHoursAttribute(): float
+    {
+        if (!$this->start_time || !$this->end_time) {
+            return 8.0;
+        }
+
+        $st = \Carbon\Carbon::parse($this->start_time);
+        $et = \Carbon\Carbon::parse($this->end_time);
+        if ($et->lt($st)) {
+            $et->addDay();
+        }
+
+        $diffMinutes = max(0, $st->diffInMinutes($et) - (int) ($this->break_minutes ?? 0));
+        return round($diffMinutes / 60, 2);
+    }
+
+    /**
+     * Net working hours formatted in minutes method (e.g. '8:30 hrs', '0:10 hrs', '7:30 hrs')
+     */
+    public function getWorkingHoursFormattedAttribute(): string
+    {
+        if (!$this->start_time || !$this->end_time) {
+            return '8:00 hrs';
+        }
+
+        $st = \Carbon\Carbon::parse($this->start_time);
+        $et = \Carbon\Carbon::parse($this->end_time);
+        if ($et->lt($st)) {
+            $et->addDay();
+        }
+
+        $diffMinutes = max(0, $st->diffInMinutes($et) - (int) ($this->break_minutes ?? 0));
+        $hrs = intdiv($diffMinutes, 60);
+        $mins = $diffMinutes % 60;
+
+        return sprintf('%d:%02d hrs', $hrs, $mins);
+    }
 }
 

@@ -30,6 +30,18 @@ class Machine extends BaseModel
         self::STATUS_DECOMMISSIONED,
     ];
 
+    public const ENERGY_ELECTRICITY = 'electricity';
+    public const ENERGY_PETROL      = 'petrol';
+    public const ENERGY_DIESEL      = 'diesel';
+    public const ENERGY_OTHERS      = 'others';
+
+    public const ENERGY_SOURCES = [
+        self::ENERGY_ELECTRICITY,
+        self::ENERGY_PETROL,
+        self::ENERGY_DIESEL,
+        self::ENERGY_OTHERS,
+    ];
+
     protected $fillable = [
         'tenant_id',
         'section_id',
@@ -40,6 +52,10 @@ class Machine extends BaseModel
         'manufacturer',
         'model_number',
         'capacity',
+        'energy_source',
+        'consumption_per_hour',
+        'energy_rate_per_unit',
+        'operating_cost_per_hour',
         'status',
         'installation_date',
         'maintenance_status', // A7: future maintenance module integration point
@@ -51,6 +67,9 @@ class Machine extends BaseModel
 
     protected $casts = [
         'capacity'                  => 'float',
+        'consumption_per_hour'      => 'float',
+        'energy_rate_per_unit'      => 'float',
+        'operating_cost_per_hour'   => 'float',
         'installation_date'         => 'date',
         'last_maintenance_date'     => 'date',
         'next_maintenance_due_date' => 'date',
@@ -161,5 +180,17 @@ class Machine extends BaseModel
     public function scopeAvailableForProduction(Builder $query): void
     {
         $query->whereIn('status', [self::STATUS_ACTIVE]);
+    }
+
+    // ─── Accessors ────────────────────────────────────────────────────────────
+
+    public function getCapacityPerHourAttribute(): float
+    {
+        return (float) ($this->capacity ?? 0);
+    }
+
+    public function getPowerConsumptionKwAttribute(): float
+    {
+        return (float) ($this->consumption_per_hour ?? 0);
     }
 }

@@ -23,6 +23,7 @@ class ExternalWorkerAllocation extends BaseModel
         'section_id',
         'shift_id',
         'pay_grade_id',
+        'manual_production_id',
         'number_of_external_workers',
         'active',
     ];
@@ -126,6 +127,11 @@ class ExternalWorkerAllocation extends BaseModel
         return $this->belongsTo(ExternalWorkerPayGrade::class, 'pay_grade_id')->withTrashed();
     }
 
+    public function manualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'manual_production_id');
+    }
+
     /**
      * Operational Work Center derived through the Section.
      */
@@ -164,6 +170,11 @@ class ExternalWorkerAllocation extends BaseModel
     public function getNumberOfExternalWorkersAttribute(): int
     {
         return (int) ($this->attributes['number_of_external_workers'] ?? 1);
+    }
+
+    public function getHourlyRateAttribute(): float
+    {
+        return (float) ($this->payGrade?->hourly_rate ?? 0);
     }
 
     // ─── Scopes & Helpers ─────────────────────────────────────────────────────

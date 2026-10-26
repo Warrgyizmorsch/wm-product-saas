@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WorkCenterSection extends BaseModel
@@ -158,6 +159,31 @@ class WorkCenterSection extends BaseModel
     public function machines(): HasMany
     {
         return $this->hasMany(Machine::class, 'section_id');
+    }
+
+    public function manualProductions(): HasMany
+    {
+        return $this->hasMany(SectionManualProduction::class, 'section_id');
+    }
+
+    public function activeManualProductions(): HasMany
+    {
+        return $this->manualProductions()->where('production_section_manual_productions.active', true);
+    }
+
+    public function calculations(): HasMany
+    {
+        return $this->hasMany(WorkCenterSectionCalculation::class, 'section_id');
+    }
+
+    public function latestCalculation(): HasOne
+    {
+        return $this->hasOne(WorkCenterSectionCalculation::class, 'section_id')->latestOfMany();
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(WorkCenterActivityLog::class, 'section_id');
     }
 
     public function externalWorkerAllocations(): HasMany

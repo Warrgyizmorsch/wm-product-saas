@@ -2,13 +2,21 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\HRMS\Models\Employee;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterCalculation;
+use App\Domains\Production\Models\WorkCenterEmployeeAssignment;
 use App\Domains\Production\Models\WorkCenterSection;
+use App\Domains\Production\Models\WorkCenterSectionCalculation;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class WorkCenterCalculationService
 {
     public function __construct(
         private readonly ?SectionCalculationService $sectionCalculationService = null,
+        private readonly ?WorkCenterActivityLogger $activityLogger = null,
     ) {}
 
     protected function getSectionCalculationService(): SectionCalculationService
@@ -16,702 +24,375 @@ class WorkCenterCalculationService
         return $this->sectionCalculationService ?? app(SectionCalculationService::class);
     }
 
+    protected function getActivityLogger(): WorkCenterActivityLogger
+    {
+        return $this->activityLogger ?? app(WorkCenterActivityLogger::class);
+    }
+
     /**
-     * Calculate Work Center Capacity Per Hour over its unique operating timeline.
-     *
-     * Formula:
-     * Work Center Capacity per Hour = Total Theoretical Capacity / Unique Work Center Operating Hours
-     *
-     * Where:
-     * - Window Capacity per Hour = Sum of capacities per hour of all active Sections
-     * - Window Theoretical Capacity = Window Capacity per Hour × Window Duration
-     * - Total Theoretical Capacity = Sum of all window theoretical capacities
-     * - Unique Work Center Operating Hours = Duration of the union of all assigned Section shift intervals
+     * Compute full calculation payload for a Work Center roll-up.
+     */
+    public function calculate(WorkCenter $workCenter, ?array $sectionCalculationResults = null): array
+    {
+        $tenantId = (int) $workCenter->tenant_id;
+
+        // 1. Resolve Active Sections
+        $sections = $workCenter->relationLoaded('sections')
+            ? $workCenter->sections->where('tenant_id', $tenantId)->filter(fn($sec) => $sec->isActive())
+            : $workCenter->sections()->where('tenant_id', $tenantId)->active()->with(['machines', 'manualProductions'])->get();
+
+        $sectionCalcService = $this->getSectionCalculationService();
+
+        // 2. Obtain Section Calculations
+        $sectionDetails = [];
+        $totalSectionDailyCap    = 0.0;
+        $totalSectionHourlyCap   = 0.0;
+        $totalSectionDailyLabor  = 0.0;
+        $totalSectionDailyMach   = 0.0;
+        $totalSectionHourlyMach  = 0.0;
+
+        $allShiftsAcrossSections = [];
+
+        foreach ($sections as $section) {
+            // Use passed in calculation results or calculate on the fly
+            $secCalc = $sectionCalculationResults[$section->id] ?? $sectionCalcService->calculate($section);
+
+            $totalSectionDailyCap   += (float) ($secCalc['daily_capacity'] ?? 0.0);
+            $totalSectionHourlyCap  += (float) ($secCalc['capacity_per_hour'] ?? 0.0);
+            $totalSectionDailyLabor += (float) ($secCalc['total_daily_labor_cost'] ?? 0.0);
+            $totalSectionDailyMach  += (float) ($secCalc['total_daily_machine_cost'] ?? 0.0);
+            $totalSectionHourlyMach += (float) ($secCalc['machine_cost_per_hour'] ?? 0.0);
+
+            $secShifts = $secCalc['calculation_details']['operating_hours']['shifts'] ?? [];
+            foreach ($secShifts as $s) {
+                $allShiftsAcrossSections[$s['id']] = $s;
+            }
+
+            $sectionDetails[] = [
+                'section_id'                 => $section->id,
+                'section_code'               => $section->code,
+                'section_name'               => $section->name,
+                'capacity_per_hour'          => (float) ($secCalc['capacity_per_hour'] ?? 0.0),
+                'daily_capacity'             => (float) ($secCalc['daily_capacity'] ?? 0.0),
+                'labor_cost_per_hour'        => (float) ($secCalc['labor_cost_per_hour'] ?? 0.0),
+                'total_daily_labor_cost'     => (float) ($secCalc['total_daily_labor_cost'] ?? 0.0),
+                'machine_cost_per_hour'      => (float) ($secCalc['machine_cost_per_hour'] ?? 0.0),
+                'total_daily_machine_cost'   => (float) ($secCalc['total_daily_machine_cost'] ?? 0.0),
+                'total_daily_operating_cost' => (float) ($secCalc['total_daily_operating_cost'] ?? 0.0),
+                'unique_operating_hours'     => (float) ($secCalc['unique_operating_hours'] ?? 0.0),
+            ];
+        }
+
+        // 3. Work Center Unique Operating Hours (Union of clock intervals across all sections)
+        $operatingHoursData = $this->calculateUniqueOperatingHours(array_values($allShiftsAcrossSections));
+        $uniqueOperatingHours = (float) ($operatingHoursData['unique_clock_hours'] ?? 0.0);
+
+        // 4. Direct Work Center Staff (section_id IS NULL)
+        $directStaff = $this->calculateDirectStaffLabor($workCenter);
+        $directStaffDailyLabor = (float) ($directStaff['total_daily_cost'] ?? 0.0);
+
+        // 5. Work Center Aggregated Labor
+        $wcDailyLaborCost = round($totalSectionDailyLabor + $directStaffDailyLabor, 4);
+        $wcLaborCostPerHour = $uniqueOperatingHours > 0
+            ? round($wcDailyLaborCost / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        // 6. Work Center Machine Expenses
+        $wcDailyMachineCost = round($totalSectionDailyMach, 4);
+        $wcHourlyMachineCost = round($totalSectionHourlyMach, 4);
+
+        // 7. Overhead & Total Operating Cost
+        $overheadDailyCost = round((float) ($workCenter->overhead_cost ?? 0.0), 4);
+        $overheadCostPerHour = $uniqueOperatingHours > 0
+            ? round($overheadDailyCost / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        $wcTotalDailyCost = round($wcDailyLaborCost + $wcDailyMachineCost + $overheadDailyCost, 4);
+        $wcTotalCostPerHour = $uniqueOperatingHours > 0
+            ? round($wcTotalDailyCost / $uniqueOperatingHours, 4)
+            : 0.0;
+
+        $wcDailyCapacity = round($totalSectionDailyCap, 4);
+        $wcHourlyCapacity = round($totalSectionHourlyCap, 4);
+
+        // 8. Detailed Calculation JSON
+        $calculationDetails = [
+            'operating_hours' => [
+                'unique_clock_hours'   => $uniqueOperatingHours,
+                'unique_clock_minutes' => $operatingHoursData['unique_clock_minutes'] ?? 0,
+                'operational_window'   => $operatingHoursData['operational_window'] ?? 'None',
+                'shifts_count'         => count($allShiftsAcrossSections),
+            ],
+            'sections_contribution' => $sectionDetails,
+            'direct_work_center_staff' => [
+                'employees'        => $directStaff['employees'],
+                'total_daily_cost' => $directStaffDailyLabor,
+            ],
+            'overhead' => [
+                'flat_daily_amount'      => $overheadDailyCost,
+                'derived_cost_per_hour'  => $overheadCostPerHour,
+                'note'                   => 'Direct flat daily operating expense entered in Work Center form',
+            ],
+            'totals' => [
+                'total_daily_capacity'         => $wcDailyCapacity,
+                'total_hourly_capacity'        => $wcHourlyCapacity,
+                'section_daily_labor_cost'     => round($totalSectionDailyLabor, 4),
+                'direct_staff_daily_labor_cost'=> $directStaffDailyLabor,
+                'total_daily_labor_cost'       => $wcDailyLaborCost,
+                'average_hourly_labor_cost'    => $wcLaborCostPerHour,
+                'total_daily_machine_cost'     => $wcDailyMachineCost,
+                'total_hourly_machine_cost'    => $wcHourlyMachineCost,
+                'overhead_daily_cost'          => $overheadDailyCost,
+                'total_daily_cost'             => $wcTotalDailyCost,
+                'total_cost_per_hour'          => $wcTotalCostPerHour,
+                'unique_operating_hours'       => $uniqueOperatingHours,
+            ],
+        ];
+
+        return [
+            'capacity_per_hour'             => $wcHourlyCapacity,
+            'daily_capacity'                => $wcDailyCapacity,
+            'labor_cost_per_hour'           => $wcLaborCostPerHour,
+            'total_daily_labor_cost'        => $wcDailyLaborCost,
+            'machine_cost_per_hour'         => $wcHourlyMachineCost,
+            'total_daily_machine_cost'      => $wcDailyMachineCost,
+            'overhead_cost'                 => $overheadDailyCost,
+            'total_daily_cost'              => $wcTotalDailyCost,
+            'total_cost_per_hour'           => $wcTotalCostPerHour,
+            'unique_operating_hours'        => $uniqueOperatingHours,
+            'calculation_details'           => $calculationDetails,
+            'calculated_at'                 => now()->toIso8601String(),
+
+            // Legacy backward-compatibility sub-keys
+            'capacity' => [
+                'capacity_per_hour'          => $wcHourlyCapacity,
+                'total_theoretical_capacity' => $wcDailyCapacity,
+                'unique_operating_hours'     => $uniqueOperatingHours,
+                'capacity_unit'              => 'units/hr',
+                'sections'                   => $sectionDetails,
+            ],
+            'labor_cost' => [
+                'labor_cost_per_hour'        => $wcLaborCostPerHour,
+                'total_scheduled_labor_cost' => $wcDailyLaborCost,
+                'unique_operating_hours'     => $uniqueOperatingHours,
+            ],
+        ];
+    }
+
+    /**
+     * Calculate and persist Work Center Rollup Snapshot into production_work_center_calculations.
+     * Recalculates impacted sections or all active sections if none specified.
+     */
+    public function calculateAndSave(
+        WorkCenter $workCenter,
+        string $triggerType = 'manual',
+        ?string $batchId = null,
+        array $impactedSectionIds = []
+    ): WorkCenterCalculation {
+        $batchId = $batchId ?: (string) Str::uuid();
+        $tenantId = (int) $workCenter->tenant_id;
+        $sectionCalcService = $this->getSectionCalculationService();
+
+        // 1. Resolve sections that need calculation
+        $allSections = $workCenter->sections()->where('tenant_id', $tenantId)->active()->get();
+
+        $sectionsToRecalculate = empty($impactedSectionIds)
+            ? $allSections
+            : $allSections->whereIn('id', $impactedSectionIds);
+
+        $sectionCalculationSnapshots = [];
+        $sectionCalculationResults   = [];
+
+        foreach ($allSections as $sec) {
+            $isImpacted = $sectionsToRecalculate->contains('id', $sec->id);
+
+            if ($isImpacted) {
+                // Calculate and save fresh snapshot for this section in the same batch
+                $savedSecCalc = $sectionCalcService->calculateAndSave(
+                    section: $sec,
+                    triggerType: $triggerType,
+                    batchId: $batchId
+                );
+                $sectionCalculationSnapshots[$sec->id] = $savedSecCalc;
+                $sectionCalculationResults[$sec->id]   = [
+                    'capacity_per_hour'          => $savedSecCalc->capacity_per_hour,
+                    'daily_capacity'             => $savedSecCalc->daily_capacity,
+                    'labor_cost_per_hour'        => $savedSecCalc->labor_cost_per_hour,
+                    'total_daily_labor_cost'     => $savedSecCalc->total_daily_labor_cost,
+                    'machine_cost_per_hour'      => $savedSecCalc->machine_cost_per_hour,
+                    'total_daily_machine_cost'   => $savedSecCalc->total_daily_machine_cost,
+                    'total_daily_operating_cost' => $savedSecCalc->total_daily_operating_cost,
+                    'unique_operating_hours'     => $savedSecCalc->unique_operating_hours,
+                    'calculation_details'        => $savedSecCalc->calculation_details,
+                ];
+            } else {
+                // Fetch latest existing section calculation snapshot
+                $latestSecCalc = WorkCenterSectionCalculation::where('tenant_id', $tenantId)
+                    ->where('section_id', $sec->id)
+                    ->latest('id')
+                    ->first();
+
+                if ($latestSecCalc) {
+                    $sectionCalculationSnapshots[$sec->id] = $latestSecCalc;
+                    $sectionCalculationResults[$sec->id]   = [
+                        'capacity_per_hour'          => $latestSecCalc->capacity_per_hour,
+                        'daily_capacity'             => $latestSecCalc->daily_capacity,
+                        'labor_cost_per_hour'        => $latestSecCalc->labor_cost_per_hour,
+                        'total_daily_labor_cost'     => $latestSecCalc->total_daily_labor_cost,
+                        'machine_cost_per_hour'      => $latestSecCalc->machine_cost_per_hour,
+                        'total_daily_machine_cost'   => $latestSecCalc->total_daily_machine_cost,
+                        'total_daily_operating_cost' => $latestSecCalc->total_daily_operating_cost,
+                        'unique_operating_hours'     => $latestSecCalc->unique_operating_hours,
+                        'calculation_details'        => $latestSecCalc->calculation_details,
+                    ];
+                } else {
+                    $freshSecCalc = $sectionCalcService->calculateAndSave(
+                        section: $sec,
+                        triggerType: $triggerType,
+                        batchId: $batchId
+                    );
+                    $sectionCalculationSnapshots[$sec->id] = $freshSecCalc;
+                    $sectionCalculationResults[$sec->id]   = $freshSecCalc->toArray();
+                }
+            }
+        }
+
+        // 2. Roll up Work Center Metrics
+        $wcCalc = $this->calculate($workCenter, $sectionCalculationResults);
+
+        // 3. Persist Work Center Snapshot
+        $record = WorkCenterCalculation::create([
+            'tenant_id'                => $tenantId,
+            'work_center_id'           => (int) $workCenter->id,
+            'batch_id'                 => $batchId,
+            'trigger_type'             => $triggerType,
+            'impacted_section_ids'     => empty($impactedSectionIds) ? $allSections->pluck('id')->all() : array_values($impactedSectionIds),
+            'capacity_per_hour'        => $wcCalc['capacity_per_hour'],
+            'daily_capacity'           => $wcCalc['daily_capacity'],
+            'labor_cost_per_hour'      => $wcCalc['labor_cost_per_hour'],
+            'total_daily_labor_cost'   => $wcCalc['total_daily_labor_cost'],
+            'machine_cost_per_hour'    => $wcCalc['machine_cost_per_hour'],
+            'total_daily_machine_cost' => $wcCalc['total_daily_machine_cost'],
+            'overhead_cost'            => $wcCalc['overhead_cost'],
+            'total_daily_cost'         => $wcCalc['total_daily_cost'],
+            'total_cost_per_hour'      => $wcCalc['total_cost_per_hour'],
+            'unique_operating_hours'   => $wcCalc['unique_operating_hours'],
+            'calculation_details'      => $wcCalc['calculation_details'],
+        ]);
+
+        // 4. Link section calculation snapshots to this parent WC calculation record
+        foreach ($sectionCalculationSnapshots as $secSnapshot) {
+            if ($secSnapshot->batch_id === $batchId) {
+                $secSnapshot->update(['work_center_calculation_id' => $record->id]);
+            }
+        }
+
+        // 5. Record activity log
+        $this->getActivityLogger()->logWorkCenterCalculationCompleted($record);
+
+        return $record;
+    }
+
+    /**
+     * Calculate direct Work Center employees (work_center_id set, section_id IS NULL).
+     * e.g., floating supervisors, maintenance crew, department heads.
+     */
+    public function calculateDirectStaffLabor(WorkCenter $workCenter): array
+    {
+        $tenantId = (int) $workCenter->tenant_id;
+
+        $assignments = WorkCenterEmployeeAssignment::where('tenant_id', $tenantId)
+            ->where('work_center_id', $workCenter->id)
+            ->whereNull('section_id')
+            ->where('active', true)
+            ->with('employee')
+            ->get();
+
+        $employees = [];
+        $totalDailyCost = 0.0;
+
+        foreach ($assignments as $assignment) {
+            $emp = $assignment->employee;
+            if (!$emp || !(bool) ($emp->status ?? true)) {
+                continue;
+            }
+
+            $monthlySalary = (float) ($emp->current_salary ?? 0.0);
+            $dailySalary   = round($monthlySalary / 30, 4);
+
+            $employees[] = [
+                'assignment_id'           => $assignment->id,
+                'employee_id'             => $emp->id,
+                'name'                    => $emp->full_name,
+                'hrms_net_monthly_salary' => $monthlySalary,
+                'daily_salary'            => $dailySalary,
+                'role'                    => $emp->job_title ?: 'Work Center Staff',
+            ];
+
+            $totalDailyCost += $dailySalary;
+        }
+
+        return [
+            'employees'        => $employees,
+            'total_daily_cost' => round($totalDailyCost, 4),
+        ];
+    }
+
+    /**
+     * Calculate union of unique clock hours across an array of shift configurations.
+     */
+    protected function calculateUniqueOperatingHours(array $shiftsData): array
+    {
+        if (empty($shiftsData)) {
+            return [
+                'unique_clock_hours'   => 0.0,
+                'unique_clock_minutes' => 0,
+                'operational_window'   => 'None',
+            ];
+        }
+
+        $covered = array_fill(0, 1440, false);
+
+        foreach ($shiftsData as $s) {
+            $sMin   = (int) ($s['start_minute'] ?? 0);
+            $eMin   = (int) ($s['end_minute'] ?? 0);
+            $isOver = (bool) ($s['is_overnight'] ?? false);
+
+            for ($m = 0; $m < 1440; $m++) {
+                $isActive = $isOver ? ($m >= $sMin || $m < $eMin) : ($m >= $sMin && $m < $eMin);
+                if ($isActive) {
+                    $covered[$m] = true;
+                }
+            }
+        }
+
+        $totalCoveredMinutes = count(array_filter($covered));
+        $uniqueHours = round($totalCoveredMinutes / 60, 4);
+
+        $window = "{$uniqueHours} hrs operational window across sections";
+
+        return [
+            'unique_clock_hours'   => $uniqueHours,
+            'unique_clock_minutes' => $totalCoveredMinutes,
+            'operational_window'   => $window,
+        ];
+    }
+
+    /**
+     * Legacy helper to calculate capacity alone.
      */
     public function calculateCapacity(WorkCenter $workCenter): array
     {
-        $tenantId = (int) $workCenter->tenant_id;
-
-        $sections = $workCenter->relationLoaded('sections')
-            ? $workCenter->sections->where('tenant_id', $tenantId)->filter(fn($sec) => $sec->isActive())
-            : $workCenter->sections()->where('tenant_id', $tenantId)->active()->with(['machines', 'shifts'])->get();
-
-        if ($sections->isEmpty()) {
-            return [
-                'capacity_per_hour'          => 0.0,
-                'total_theoretical_capacity' => 0.0,
-                'unique_operating_hours'     => 0.0,
-                'capacity_unit'              => 'units/hr',
-                'sections'                   => [],
-                'windows'                    => [],
-                'timeline_windows'           => [],
-                'gaps'                       => [],
-            ];
-        }
-
-        $sectionCalcService = $this->getSectionCalculationService();
-        $sectionData = [];
-        $sectionMap  = [];
-        $allShiftIntervals = [];
-
-        foreach ($sections as $section) {
-            $capInfo = $sectionCalcService->calculateCapacity($section);
-            $sectionCap = (float) ($capInfo['total_capacity'] ?? 0.0);
-
-            $shifts = $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => (bool) ($s->active ?? true));
-
-            $shiftIntervals = [];
-            foreach ($shifts as $shift) {
-                $startMin = $this->parseTimeToMinutes($shift->start_time ?? '00:00');
-                $endMin   = $this->parseTimeToMinutes($shift->end_time ?? '00:00');
-                $isOvernight = ($endMin <= $startMin);
-                $durationMin = $isOvernight ? (1440 - $startMin + $endMin) : ($endMin - $startMin);
-                if ($durationMin === 0) {
-                    $durationMin = 1440;
-                }
-
-                $interval = [
-                    'shift_id'     => $shift->id,
-                    'name'         => $shift->name,
-                    'start_time'   => substr((string) $shift->start_time, 0, 5),
-                    'end_time'     => substr((string) $shift->end_time, 0, 5),
-                    'start_minute' => $startMin,
-                    'end_minute'   => $endMin,
-                    'is_overnight' => $isOvernight,
-                    'duration_min' => $durationMin,
-                ];
-
-                $shiftIntervals[] = $interval;
-                $allShiftIntervals[] = $interval;
-            }
-
-            $sectionItem = [
-                'id'                         => $section->id,
-                'code'                       => $section->code,
-                'name'                       => $section->name,
-                'capacity_per_hour'          => round($sectionCap, 4),
-                'machine_count'              => $section->relationLoaded('machines') ? $section->machines->count() : $section->machines()->count(),
-                'supports_manual_production' => (bool) $section->supports_manual_production,
-                'manual_capacity_per_hour'   => (float) ($section->manual_capacity_per_hour ?? 0.0),
-                'shifts_count'               => count($shiftIntervals),
-                'shift_intervals'            => $shiftIntervals,
-            ];
-
-            $sectionData[] = $sectionItem;
-            $sectionMap[$section->id] = $sectionItem;
-        }
-
-        if (empty($allShiftIntervals)) {
-            return [
-                'capacity_per_hour'          => 0.0,
-                'total_theoretical_capacity' => 0.0,
-                'unique_operating_hours'     => 0.0,
-                'capacity_unit'              => 'units/hr',
-                'sections'                   => $sectionData,
-                'windows'                    => [],
-                'timeline_windows'           => [],
-                'gaps'                       => [],
-            ];
-        }
-
-        // Map minute [0..1439] -> active Section IDs
-        $minuteActiveSections = array_fill(0, 1440, []);
-        $covered = array_fill(0, 1440, false);
-
-        foreach ($sectionData as $sec) {
-            $secId = $sec['id'];
-            $secActiveMinuteFlags = array_fill(0, 1440, false);
-
-            foreach ($sec['shift_intervals'] as $s) {
-                $sMin   = $s['start_minute'];
-                $eMin   = $s['end_minute'];
-                $isOver = $s['is_overnight'];
-
-                for ($m = 0; $m < 1440; $m++) {
-                    $isActive = $isOver
-                        ? ($m >= $sMin || $m < $eMin)
-                        : ($m >= $sMin && $m < $eMin);
-
-                    if ($isActive) {
-                        $secActiveMinuteFlags[$m] = true;
-                    }
-                }
-            }
-
-            for ($m = 0; $m < 1440; $m++) {
-                if ($secActiveMinuteFlags[$m]) {
-                    $minuteActiveSections[$m][] = $secId;
-                    $covered[$m] = true;
-                }
-            }
-        }
-
-        $totalCoveredMinutes = count(array_filter($covered));
-        if ($totalCoveredMinutes === 0) {
-            return [
-                'capacity_per_hour'          => 0.0,
-                'total_theoretical_capacity' => 0.0,
-                'unique_operating_hours'     => 0.0,
-                'capacity_unit'              => 'units/hr',
-                'sections'                   => $sectionData,
-                'windows'                    => [],
-                'timeline_windows'           => [],
-                'gaps'                       => [],
-            ];
-        }
-
-        // Find chronological start minute T0:
-        $earliestShiftStart = min(array_column($allShiftIntervals, 'start_minute'));
-        $hasGaps = ($totalCoveredMinutes < 1440);
-
-        if ($hasGaps) {
-            $t0 = null;
-            for ($i = 0; $i < 1440; $i++) {
-                $m     = ($earliestShiftStart + $i) % 1440;
-                $prevM = ($m - 1 + 1440) % 1440;
-                if ($covered[$m] && !$covered[$prevM]) {
-                    $t0 = $m;
-                    break;
-                }
-            }
-            if ($t0 === null) {
-                $t0 = $earliestShiftStart;
-            }
-        } else {
-            $t0 = $earliestShiftStart;
-        }
-
-        // Unroll timeline from T0 to T0 + 1440 and extract contiguous intervals
-        $windows = [];
-        $gaps    = [];
-        $currentIntervalStart = $t0;
-        $currentIntervalActive = ($minuteActiveSections[$t0 % 1440] ?? []);
-        sort($currentIntervalActive);
-
-        for ($offset = 1; $offset < 1440; $offset++) {
-            $T = $t0 + $offset;
-            $m = $T % 1440;
-            $activeIds = $minuteActiveSections[$m] ?? [];
-            sort($activeIds);
-
-            if ($activeIds !== $currentIntervalActive) {
-                $durationMin   = $T - $currentIntervalStart;
-                $durationHours = round($durationMin / 60, 4);
-
-                if (!empty($currentIntervalActive)) {
-                    $windows[] = $this->buildCapacityWindowPayload(
-                        $currentIntervalStart,
-                        $T,
-                        $durationHours,
-                        $currentIntervalActive,
-                        $sectionMap
-                    );
-                } else {
-                    $gaps[] = $this->buildGapPayload(
-                        $currentIntervalStart,
-                        $T,
-                        $durationHours
-                    );
-                }
-
-                $currentIntervalStart  = $T;
-                $currentIntervalActive = $activeIds;
-            }
-        }
-
-        // Close the final interval up to T0 + 1440
-        $endT = $t0 + 1440;
-        if ($endT > $currentIntervalStart) {
-            $durationMin   = $endT - $currentIntervalStart;
-            $durationHours = round($durationMin / 60, 4);
-
-            if (!empty($currentIntervalActive)) {
-                $windows[] = $this->buildCapacityWindowPayload(
-                    $currentIntervalStart,
-                    $endT,
-                    $durationHours,
-                    $currentIntervalActive,
-                    $sectionMap
-                );
-            } else {
-                $gaps[] = $this->buildGapPayload(
-                    $currentIntervalStart,
-                    $endT,
-                    $durationHours
-                );
-            }
-        }
-
-        $totalTheoreticalCapacity = 0.0;
-        $uniqueOperatingHours     = 0.0;
-
-        foreach ($windows as $win) {
-            $totalTheoreticalCapacity += $win['theoretical_capacity'];
-            $uniqueOperatingHours     += $win['duration_hours'];
-        }
-
-        $totalTheoreticalCapacity = round($totalTheoreticalCapacity, 4);
-        $uniqueOperatingHours     = round($uniqueOperatingHours, 4);
-        $capacityPerHour          = $uniqueOperatingHours > 0
-            ? round($totalTheoreticalCapacity / $uniqueOperatingHours, 4)
-            : 0.0;
-
-        return [
-            'capacity_per_hour'          => $capacityPerHour,
-            'total_theoretical_capacity' => $totalTheoreticalCapacity,
-            'unique_operating_hours'     => $uniqueOperatingHours,
-            'capacity_unit'              => 'units/hr',
-            'sections'                   => $sectionData,
-            'windows'                    => $windows,
-            'timeline_windows'           => $windows,
-            'gaps'                       => $gaps,
-        ];
+        $calc = $this->calculate($workCenter);
+        return $calc['capacity'];
     }
 
     /**
-     * Calculate Work Center Labor Cost Per Hour from individual Section/shift assignments.
-     *
-     * Formula:
-     * Assignment Labor Cost per Hour = Shift Hourly Labor Rate per Worker × Section-Specific Assigned Worker Count
-     * Work Center Labor Cost per Hour = Total Scheduled Labor Cost / Unique Work Center Operating Hours
+     * Legacy helper to calculate labor cost alone.
      */
     public function calculateLaborCost(WorkCenter $workCenter): array
     {
-        $tenantId = (int) $workCenter->tenant_id;
-
-        $sections = $workCenter->relationLoaded('sections')
-            ? $workCenter->sections->where('tenant_id', $tenantId)->filter(fn($sec) => $sec->isActive())
-            : $workCenter->sections()->where('tenant_id', $tenantId)->active()->with(['shifts'])->get();
-
-        if ($sections->isEmpty()) {
-            return [
-                'labor_cost_per_hour'        => 0.0,
-                'total_scheduled_labor_cost' => 0.0,
-                'unique_operating_hours'     => 0.0,
-                'has_overlapping_assignments'=> false,
-                'has_missing_rates'          => false,
-                'assignments'                => [],
-                'windows'                    => [],
-                'timeline_windows'           => [],
-                'gaps'                       => [],
-            ];
-        }
-
-        $assignmentData = [];
-        $assignmentMap  = [];
-        $hasMissingRates = false;
-
-        foreach ($sections as $section) {
-            $shifts = $section->shifts->where('tenant_id', $tenantId)->filter(fn($s) => (bool) ($s->active ?? true));
-
-            foreach ($shifts as $shift) {
-                $workersRequired = (int) ($shift->pivot->target_headcount ?? $shift->pivot->workers_required ?? 1);
-                $isRateMissing   = ($shift->hourly_labor_rate === null);
-                if ($isRateMissing) {
-                    $hasMissingRates = true;
-                }
-
-                $hourlyRate      = $shift->hourly_labor_rate !== null ? (float) $shift->hourly_labor_rate : null;
-                $effectiveRate   = (float) ($shift->hourly_labor_rate ?? 0.0);
-                $hourlyCost      = round($workersRequired * $effectiveRate, 4);
-
-                $startMin = $this->parseTimeToMinutes($shift->start_time ?? '00:00');
-                $endMin   = $this->parseTimeToMinutes($shift->end_time ?? '00:00');
-
-                $isOvernight = ($endMin <= $startMin);
-                $durationMin = $isOvernight ? (1440 - $startMin + $endMin) : ($endMin - $startMin);
-                if ($durationMin === 0) {
-                    $durationMin = 1440;
-                }
-
-                $assignmentKey = "{$section->id}_{$shift->id}";
-
-                $item = [
-                    'assignment_key'               => $assignmentKey,
-                    'section_id'                   => $section->id,
-                    'section_code'                 => $section->code,
-                    'section_name'                 => $section->name,
-                    'shift_id'                     => $shift->id,
-                    'shift_code'                   => $shift->code,
-                    'shift_name'                   => $shift->name,
-                    'start_time'                   => substr((string) $shift->start_time, 0, 5),
-                    'end_time'                     => substr((string) $shift->end_time, 0, 5),
-                    'start_minute'                 => $startMin,
-                    'end_minute'                   => $endMin,
-                    'is_overnight'                 => $isOvernight,
-                    'duration_minutes'             => $durationMin,
-                    'duration_hours'               => round($durationMin / 60, 4),
-                    'target_headcount'             => $workersRequired,
-                    'workers_required'             => $workersRequired,
-                    'hourly_labor_rate'            => $hourlyRate,
-                    'is_rate_missing'              => $isRateMissing,
-                    'effective_hourly_rate'        => $effectiveRate,
-                    'assignment_labor_cost_per_hour'=> $hourlyCost,
-                ];
-
-                $assignmentData[] = $item;
-                $assignmentMap[$assignmentKey] = $item;
-            }
-        }
-
-        if (empty($assignmentData)) {
-            return [
-                'labor_cost_per_hour'        => 0.0,
-                'total_scheduled_labor_cost' => 0.0,
-                'unique_operating_hours'     => 0.0,
-                'has_overlapping_assignments'=> false,
-                'has_missing_rates'          => false,
-                'assignments'                => [],
-                'windows'                    => [],
-                'timeline_windows'           => [],
-                'gaps'                       => [],
-            ];
-        }
-
-        // Map minute [0..1439] -> active Assignment Keys
-        $minuteActiveAssignments = array_fill(0, 1440, []);
-        $covered = array_fill(0, 1440, false);
-
-        foreach ($assignmentData as $a) {
-            $sMin   = $a['start_minute'];
-            $eMin   = $a['end_minute'];
-            $isOver = $a['is_overnight'];
-
-            for ($m = 0; $m < 1440; $m++) {
-                $isActive = $isOver
-                    ? ($m >= $sMin || $m < $eMin)
-                    : ($m >= $sMin && $m < $eMin);
-
-                if ($isActive) {
-                    $minuteActiveAssignments[$m][] = $a['assignment_key'];
-                    $covered[$m] = true;
-                }
-            }
-        }
-
-        $totalCoveredMinutes = count(array_filter($covered));
-        if ($totalCoveredMinutes === 0) {
-            return [
-                'labor_cost_per_hour'        => 0.0,
-                'total_scheduled_labor_cost' => 0.0,
-                'unique_operating_hours'     => 0.0,
-                'has_overlapping_assignments'=> false,
-                'has_missing_rates'          => $hasMissingRates,
-                'assignments'                => $assignmentData,
-                'windows'                    => [],
-                'timeline_windows'           => [],
-                'gaps'                       => [],
-            ];
-        }
-
-        // Chronological anchor T0:
-        $earliestShiftStart = min(array_column($assignmentData, 'start_minute'));
-        $hasGaps = ($totalCoveredMinutes < 1440);
-
-        if ($hasGaps) {
-            $t0 = null;
-            for ($i = 0; $i < 1440; $i++) {
-                $m     = ($earliestShiftStart + $i) % 1440;
-                $prevM = ($m - 1 + 1440) % 1440;
-                if ($covered[$m] && !$covered[$prevM]) {
-                    $t0 = $m;
-                    break;
-                }
-            }
-            if ($t0 === null) {
-                $t0 = $earliestShiftStart;
-            }
-        } else {
-            $t0 = $earliestShiftStart;
-        }
-
-        // Unroll timeline from T0 to T0 + 1440 and extract contiguous intervals
-        $windows = [];
-        $gaps    = [];
-        $currentIntervalStart = $t0;
-        $currentIntervalActive = ($minuteActiveAssignments[$t0 % 1440] ?? []);
-        sort($currentIntervalActive);
-
-        for ($offset = 1; $offset < 1440; $offset++) {
-            $T = $t0 + $offset;
-            $m = $T % 1440;
-            $activeKeys = $minuteActiveAssignments[$m] ?? [];
-            sort($activeKeys);
-
-            if ($activeKeys !== $currentIntervalActive) {
-                $durationMin   = $T - $currentIntervalStart;
-                $durationHours = round($durationMin / 60, 4);
-
-                if (!empty($currentIntervalActive)) {
-                    $windows[] = $this->buildLaborWindowPayload(
-                        $currentIntervalStart,
-                        $T,
-                        $durationHours,
-                        $currentIntervalActive,
-                        $assignmentMap
-                    );
-                } else {
-                    $gaps[] = $this->buildGapPayload(
-                        $currentIntervalStart,
-                        $T,
-                        $durationHours
-                    );
-                }
-
-                $currentIntervalStart  = $T;
-                $currentIntervalActive = $activeKeys;
-            }
-        }
-
-        // Close the final interval up to T0 + 1440
-        $endT = $t0 + 1440;
-        if ($endT > $currentIntervalStart) {
-            $durationMin   = $endT - $currentIntervalStart;
-            $durationHours = round($durationMin / 60, 4);
-
-            if (!empty($currentIntervalActive)) {
-                $windows[] = $this->buildLaborWindowPayload(
-                    $currentIntervalStart,
-                    $endT,
-                    $durationHours,
-                    $currentIntervalActive,
-                    $assignmentMap
-                );
-            } else {
-                $gaps[] = $this->buildGapPayload(
-                    $currentIntervalStart,
-                    $endT,
-                    $durationHours
-                );
-            }
-        }
-
-        $totalScheduledLaborCost    = 0.0;
-        $uniqueOperatingHours       = 0.0;
-        $hasOverlappingAssignments  = false;
-
-        foreach ($windows as $win) {
-            $totalScheduledLaborCost += $win['window_cost'];
-            $uniqueOperatingHours    += $win['duration_hours'];
-            if ($win['is_overlapping']) {
-                $hasOverlappingAssignments = true;
-            }
-        }
-
-        $totalScheduledLaborCost = round($totalScheduledLaborCost, 4);
-        $uniqueOperatingHours    = round($uniqueOperatingHours, 4);
-        $laborCostPerHour        = $uniqueOperatingHours > 0
-            ? round($totalScheduledLaborCost / $uniqueOperatingHours, 4)
-            : 0.0;
-
-        return [
-            'labor_cost_per_hour'        => $laborCostPerHour,
-            'total_scheduled_labor_cost' => $totalScheduledLaborCost,
-            'unique_operating_hours'     => $uniqueOperatingHours,
-            'has_overlapping_assignments'=> $hasOverlappingAssignments,
-            'has_missing_rates'          => $hasMissingRates,
-            'assignments'                => $assignmentData,
-            'windows'                    => $windows,
-            'timeline_windows'           => $windows,
-            'gaps'                       => $gaps,
-        ];
-    }
-
-    /**
-     * Compute full calculation payload.
-     */
-    public function calculate(WorkCenter $workCenter): array
-    {
-        return [
-            'capacity'      => $this->calculateCapacity($workCenter),
-            'labor_cost'    => $this->calculateLaborCost($workCenter),
-            'calculated_at' => now()->toIso8601String(),
-        ];
-    }
-
-    /**
-     * Calculate and persist Work Center metrics (safely bypassed during schema redesign).
-     */
-    public function calculateAndSave(WorkCenter $workCenter): WorkCenter
-    {
-        return $workCenter->fresh(['sections.machines']) ?: $workCenter;
-    }
-
-    private function parseTimeToMinutes(string $timeStr): int
-    {
-        $parts = explode(':', trim($timeStr));
-        $h     = (int) ($parts[0] ?? 0);
-        $m     = (int) ($parts[1] ?? 0);
-
-        return ($h * 60 + $m) % 1440;
-    }
-
-    private function buildCapacityWindowPayload(
-        int $startAbsMin,
-        int $endAbsMin,
-        float $durationHours,
-        array $activeSectionIds,
-        array $sectionMap
-    ): array {
-        $startClockMin = $startAbsMin % 1440;
-        $endClockMin   = $endAbsMin % 1440;
-
-        $startH = (int) floor($startClockMin / 60);
-        $startM = $startClockMin % 60;
-        $endH   = (int) floor($endClockMin / 60);
-        $endM   = $endClockMin % 60;
-
-        $startTimeStr = sprintf('%02d:%02d', $startH, $startM);
-        $endTimeStr   = sprintf('%02d:%02d', $endH, $endM);
-
-        $isOvernight = ((int) floor($startAbsMin / 1440)) !== ((int) floor(($endAbsMin - 1) / 1440));
-        $endTimeLabel = $isOvernight ? "{$endTimeStr} next day" : $endTimeStr;
-        $windowLabel  = "{$startTimeStr}–{$endTimeLabel}";
-
-        $activeSections          = [];
-        $combinedCapacityPerHour = 0.0;
-
-        foreach ($activeSectionIds as $secId) {
-            if (isset($sectionMap[$secId])) {
-                $sec = $sectionMap[$secId];
-                $activeSections[] = [
-                    'id'                => $sec['id'],
-                    'code'              => $sec['code'],
-                    'name'              => $sec['name'],
-                    'capacity_per_hour' => $sec['capacity_per_hour'],
-                ];
-                $combinedCapacityPerHour += $sec['capacity_per_hour'];
-            }
-        }
-
-        $combinedCapacityPerHour = round($combinedCapacityPerHour, 4);
-        $theoreticalCapacity     = round($durationHours * $combinedCapacityPerHour, 4);
-        $isOverlapping           = count($activeSections) > 1;
-
-        return [
-            'start_time'               => $startTimeStr,
-            'end_time'                 => $endTimeStr,
-            'end_time_label'           => $endTimeLabel,
-            'window'                   => $windowLabel,
-            'window_label'             => $windowLabel,
-            'duration_hours'           => $durationHours,
-            'is_overnight'             => $isOvernight,
-            'is_overlap'               => $isOverlapping,
-            'is_overlapping'           => $isOverlapping,
-            'active_sections'          => $activeSections,
-            'active_section_names'     => array_column($activeSections, 'name'),
-            'combined_capacity_per_hour'=> $combinedCapacityPerHour,
-            'combined_capacity'        => $combinedCapacityPerHour,
-            'theoretical_capacity'     => $theoreticalCapacity,
-            'window_theoretical_capacity' => $theoreticalCapacity,
-        ];
-    }
-
-    private function buildLaborWindowPayload(
-        int $startAbsMin,
-        int $endAbsMin,
-        float $durationHours,
-        array $activeAssignmentKeys,
-        array $assignmentMap
-    ): array {
-        $startClockMin = $startAbsMin % 1440;
-        $endClockMin   = $endAbsMin % 1440;
-
-        $startH = (int) floor($startClockMin / 60);
-        $startM = $startClockMin % 60;
-        $endH   = (int) floor($endClockMin / 60);
-        $endM   = $endClockMin % 60;
-
-        $startTimeStr = sprintf('%02d:%02d', $startH, $startM);
-        $endTimeStr   = sprintf('%02d:%02d', $endH, $endM);
-
-        $isOvernight = ((int) floor($startAbsMin / 1440)) !== ((int) floor(($endAbsMin - 1) / 1440));
-        $endTimeLabel = $isOvernight ? "{$endTimeStr} next day" : $endTimeStr;
-        $windowLabel  = "{$startTimeStr}–{$endTimeLabel}";
-
-        $activeAssignments  = [];
-        $combinedWorkers    = 0;
-        $combinedHourlyCost = 0.0;
-        $windowHasMissingRate = false;
-
-        foreach ($activeAssignmentKeys as $key) {
-            if (isset($assignmentMap[$key])) {
-                $a = $assignmentMap[$key];
-                $activeAssignments[] = [
-                    'assignment_key'                => $a['assignment_key'],
-                    'section_id'                    => $a['section_id'],
-                    'section_code'                  => $a['section_code'],
-                    'section_name'                  => $a['section_name'],
-                    'shift_id'                      => $a['shift_id'],
-                    'shift_code'                    => $a['shift_code'],
-                    'shift_name'                    => $a['shift_name'],
-                    'workers_required'              => $a['workers_required'],
-                    'hourly_labor_rate'             => $a['hourly_labor_rate'],
-                    'is_rate_missing'               => $a['is_rate_missing'],
-                    'effective_hourly_rate'         => $a['effective_hourly_rate'],
-                    'assignment_labor_cost_per_hour'=> $a['assignment_labor_cost_per_hour'],
-                ];
-                $combinedWorkers    += $a['workers_required'];
-                $combinedHourlyCost += $a['assignment_labor_cost_per_hour'];
-                if ($a['is_rate_missing']) {
-                    $windowHasMissingRate = true;
-                }
-            }
-        }
-
-        $combinedHourlyCost = round($combinedHourlyCost, 4);
-        $windowCost         = round($durationHours * $combinedHourlyCost, 4);
-        $isOverlapping      = count($activeAssignments) > 1;
-
-        return [
-            'start_time'               => $startTimeStr,
-            'end_time'                 => $endTimeStr,
-            'end_time_label'           => $endTimeLabel,
-            'window'                   => $windowLabel,
-            'window_label'             => $windowLabel,
-            'duration_hours'           => $durationHours,
-            'is_overnight'             => $isOvernight,
-            'is_overlap'               => $isOverlapping,
-            'is_overlapping'           => $isOverlapping,
-            'active_assignments'       => $activeAssignments,
-            'active_workers'           => $combinedWorkers,
-            'combined_workers'         => $combinedWorkers,
-            'combined_hourly_cost'     => $combinedHourlyCost,
-            'combined_labor_cost_per_hour' => $combinedHourlyCost,
-            'window_cost'              => $windowCost,
-            'has_missing_rates'        => $windowHasMissingRate,
-        ];
-    }
-
-    private function buildGapPayload(
-        int $startAbsMin,
-        int $endAbsMin,
-        float $durationHours
-    ): array {
-        $startClockMin = $startAbsMin % 1440;
-        $endClockMin   = $endAbsMin % 1440;
-
-        $startH = (int) floor($startClockMin / 60);
-        $startM = $startClockMin % 60;
-        $endH   = (int) floor($endClockMin / 60);
-        $endM   = $endClockMin % 60;
-
-        $startTimeStr = sprintf('%02d:%02d', $startH, $startM);
-        $endTimeStr   = sprintf('%02d:%02d', $endH, $endM);
-
-        $isOvernight = ((int) floor($startAbsMin / 1440)) !== ((int) floor(($endAbsMin - 1) / 1440));
-        $endTimeLabel = $isOvernight ? "{$endTimeStr} next day" : $endTimeStr;
-        $windowLabel  = "{$startTimeStr}–{$endTimeLabel}";
-
-        return [
-            'start_time'     => $startTimeStr,
-            'end_time'       => $endTimeStr,
-            'end_time_label' => $endTimeLabel,
-            'window'         => $windowLabel,
-            'window_label'   => $windowLabel,
-            'duration_hours' => $durationHours,
-            'is_overnight'   => $isOvernight,
-            'is_gap'         => true,
-        ];
+        $calc = $this->calculate($workCenter);
+        return $calc['labor_cost'];
     }
 }

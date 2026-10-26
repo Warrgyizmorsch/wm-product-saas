@@ -25,7 +25,7 @@ class StoreMachineApiRequest extends ApiFormRequest
             'machine_type'       => 'nullable|string|max:100',
             'manufacturer'       => 'nullable|string|max:255',
             'model_number'       => 'nullable|string|max:100',
-            'capacity'           => 'nullable|numeric|min:0',
+            'capacity'           => 'required|numeric|gt:0|max:99999999.9999',
             'status'             => ['required', Rule::in(Machine::STATUSES)],
             'installation_date'  => 'nullable|date',
         ];

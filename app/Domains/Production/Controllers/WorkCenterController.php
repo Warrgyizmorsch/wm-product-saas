@@ -16,6 +16,8 @@ use Illuminate\View\View;
 
 use App\Domains\Production\Models\ProductionShift;
 use App\Domains\Production\Models\ProductionCalendar;
+use App\Domains\Production\Services\CountdownCalculationEngine;
+use Illuminate\Http\JsonResponse;
 
 class WorkCenterController extends Controller
 {
@@ -115,6 +117,27 @@ class WorkCenterController extends Controller
             ->get()
             ->groupBy('employee_id');
 
+        $countdownEngine = app(CountdownCalculationEngine::class);
+        $isCountdownActive = $countdownEngine->isCountdownActive($workCenter);
+        $countdownRemainingSeconds = ($workCenter->calculation_countdown_end_at && $isCountdownActive)
+            ? max(0, (int) now()->diffInSeconds($workCenter->calculation_countdown_end_at, false))
+            : 0;
+
+        $workCenter->load([
+            'latestCalculation',
+            'sections.latestCalculation',
+            'sections.machines',
+            'sections.manualProductions.employees.employee.shift',
+            'sections.manualProductions.externalAllocations.payGrade',
+            'sections.manualProductions.externalAllocations.shift',
+            'sections.manualProductions.shift',
+            'sections.externalWorkerAllocations.payGrade',
+            'sections.externalWorkerAllocations.shift',
+            'sections.employeeAssignments.employee.shift',
+            'employeeAssignments.employee.shift',
+            'activityLogs' => fn($q) => $q->latest()->take(20),
+        ]);
+
         return view('modules.production.work-centers.show', compact(
             'workCenter',
             'eligibleMachines',
@@ -122,7 +145,9 @@ class WorkCenterController extends Controller
             'activePayGrades',
             'availableEmployees',
             'employeesWithActiveSection',
-            'employeesWithActiveWorkCenter'
+            'employeesWithActiveWorkCenter',
+            'isCountdownActive',
+            'countdownRemainingSeconds'
         ));
     }
 
@@ -150,6 +175,7 @@ class WorkCenterController extends Controller
             $tenantId = require_tenant_id();
             $data = $request->validated();
             unset($data['capacity_per_hour'], $data['efficiency_percentage'], $data['cost_per_hour']);
+            $data['calculation_countdown_minutes'] = $workCenter->calculation_countdown_minutes ?? 10;
             if (isset($data['overhead_cost'])) {
                 $data['overhead_cost'] = convert_to_base($data['overhead_cost']);
             }
@@ -261,5 +287,69 @@ class WorkCenterController extends Controller
         }
 
         return redirect()->back()->with($failedCount > 0 ? 'warning' : 'success', $message);
+    }
+
+    public function recalculateNow(int $id, CountdownCalculationEngine $engine): RedirectResponse|JsonResponse
+    {
+        $workCenter = $this->repository->find($id);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('update', $workCenter);
+
+        try {
+            $snapshot = $engine->recalculateNow($workCenter, auth()->id());
+            $msg = "Work Center '{$workCenter->name}' recalculated successfully. Daily Capacity: {$snapshot->daily_capacity} units.";
+            if (request()->wantsJson()) {
+                return response()->json(['success' => true, 'message' => $msg, 'snapshot' => $snapshot]);
+            }
+            return redirect()->route('production.work-centers.show', $workCenter->id)->with('success', $msg);
+        } catch (\Exception $e) {
+            if (request()->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function updateCountdownDuration(Request $request, int $id, CountdownCalculationEngine $engine): RedirectResponse|JsonResponse
+    {
+        $workCenter = $this->repository->find($id);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('update', $workCenter);
+
+        $validated = $request->validate([
+            'calculation_countdown_minutes' => 'required|integer|min:1|max:1440',
+        ]);
+
+        try {
+            $updated = $engine->updateCountdownDuration($workCenter, (int) $validated['calculation_countdown_minutes'], auth()->id());
+            $msg = "Countdown debounce duration updated to {$updated->calculation_countdown_minutes} minutes.";
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => $msg, 'minutes' => $updated->calculation_countdown_minutes]);
+            }
+            return redirect()->route('production.work-centers.show', $workCenter->id)->with('success', $msg);
+        } catch (\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function calculationDetails(int $id): JsonResponse
+    {
+        $workCenter = $this->repository->find($id);
+        abort_if(!$workCenter, 404, 'Work center not found.');
+        Gate::authorize('view', $workCenter);
+
+        $latestSnapshot = $workCenter->latestCalculation;
+        if (!$latestSnapshot) {
+            $calcService = app(\App\Domains\Production\Services\WorkCenterCalculationService::class);
+            $latestSnapshot = $calcService->calculateAndSave($workCenter);
+        }
+
+        return response()->json([
+            'success'  => true,
+            'snapshot' => $latestSnapshot,
+        ]);
     }
 }

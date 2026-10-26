@@ -31,6 +31,7 @@ class StoreWorkCenterRequest extends FormRequest
                 'nullable', 'integer',
                 Rule::exists('production_calendars', 'id')->where('tenant_id', $tenantId)
             ],
+            'calculation_countdown_minutes' => 'required|integer|min:1|max:1440',
         ];
     }
 
@@ -38,6 +39,9 @@ class StoreWorkCenterRequest extends FormRequest
     {
         return [
             'code.unique' => 'A work center with this code already exists in your organization.',
+            'calculation_countdown_minutes.required' => 'The debounce countdown minutes field is required.',
+            'calculation_countdown_minutes.min'      => 'The debounce countdown minutes must be at least 1.',
+            'calculation_countdown_minutes.max'      => 'The debounce countdown minutes may not be greater than 1440.',
         ];
     }
 }

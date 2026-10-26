@@ -2,11 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Domains\Production\Models\ExternalWorkerPayGrade;
 use App\Domains\Production\Models\Machine;
-use App\Domains\Production\Models\ProductionShift;
-use App\Domains\Production\Models\WorkCenter;
-use App\Domains\Production\Models\WorkCenterSection;
 use App\Models\Tenant;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -27,263 +23,239 @@ class ProductionTestWorkCenterSeeder extends Seeder
         }
         $tenantId = $tenant->id;
 
-        $this->command?->info("Cleaning Work Centers, Sections, and Pay Grades for Tenant #{$tenantId}...");
+        $this->command?->info("Clearing Work Centers, Sections, Manual Productions, Calculations, and Machines tables...");
 
         Schema::disableForeignKeyConstraints();
 
-        // 1. Unassign machines from sections so no foreign keys block truncation
-        if (Schema::hasTable('production_machines')) {
-            DB::table('production_machines')->update(['section_id' => null]);
-        }
-
-        // 2. Truncate tables to reset AUTO_INCREMENT IDs back to 1
+        // 1. Tables related to Work Centers, Sections, Manual Production, Calculations, and Machines
         $tablesToReset = [
+            'production_section_manual_production_employees',
+            'production_section_manual_productions',
+            'production_work_center_section_calculations',
+            'production_work_center_calculations',
+            'production_work_center_activity_logs',
             'production_external_worker_allocations',
             'production_work_center_employees',
             'production_work_center_sections',
             'production_work_centers',
-            'production_external_worker_pay_grades',
+            'production_machines',
         ];
 
         foreach ($tablesToReset as $table) {
             if (Schema::hasTable($table)) {
-                DB::statement("TRUNCATE TABLE `{$table}`");
+                if (DB::getDriverName() === 'sqlite') {
+                    DB::table($table)->delete();
+                    if (Schema::hasTable('sqlite_sequence')) {
+                        DB::statement("DELETE FROM sqlite_sequence WHERE name = '{$table}'");
+                    }
+                } else {
+                    DB::statement("TRUNCATE TABLE `{$table}`");
+                    try {
+                        DB::statement("ALTER TABLE `{$table}` AUTO_INCREMENT = 1");
+                    } catch (\Throwable $e) {
+                        // In case table or driver does not support ALTER AUTO_INCREMENT
+                    }
+                }
+                $this->command?->info("✓ Cleared data and reset auto-increment to initial state for `{$table}`");
             }
         }
 
         Schema::enableForeignKeyConstraints();
 
-        $this->command?->info("Cleaned Work Centers, Sections, and Pay Grades. Existing employees & shifts preserved.");
+        $this->command?->info("Seeding standalone machines with complete operating cost and energy profiles...");
 
-        // ─── Resolve Existing Shifts (DO NOT CREATE NEW SHIFTS) ─────────────
-        $existingShiftIds = ProductionShift::where('tenant_id', $tenantId)
-            ->where('active', true)
-            ->pluck('id')
-            ->toArray();
+        // 2. Only seed machines with complete details and section_id = null (user will assign them)
+        $machines = [
+            [
+                'code'                    => 'MAC-5AX-01',
+                'name'                    => 'DMG MORI 5-Axis VMC',
+                'machine_type'            => 'VMC',
+                'manufacturer'            => 'DMG MORI',
+                'model_number'            => 'DMU 50 Gen 3',
+                'capacity'                => 35.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 45.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 9.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-01-15',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-VMC-02',
+                'name'                    => 'Haas VF-4 3-Axis VMC',
+                'machine_type'            => 'VMC',
+                'manufacturer'            => 'Haas Automation',
+                'model_number'            => 'VF-4SS',
+                'capacity'                => 40.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 30.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 6.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-02-10',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-PRS-100T',
+                'name'                    => 'Amada 100-Ton Hydraulic Press Brake',
+                'machine_type'            => 'Press Brake',
+                'manufacturer'            => 'Amada',
+                'model_number'            => 'HFE-M2 1003',
+                'capacity'                => 60.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 35.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 7.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2024-11-20',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-PCH-CNC',
+                'name'                    => 'Trumpf CNC Turret Punch Press',
+                'machine_type'            => 'Punch Press',
+                'manufacturer'            => 'Trumpf',
+                'model_number'            => 'TruPunch 2000',
+                'capacity'                => 50.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 40.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 8.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2024-12-05',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-PLS-DSL',
+                'name'                    => 'Heavy Duty Diesel Plasma Cutter',
+                'machine_type'            => 'Plasma Cutter',
+                'manufacturer'            => 'Hypertherm',
+                'model_number'            => 'Powermax 125 HD',
+                'capacity'                => 25.00,
+                'energy_source'           => Machine::ENERGY_DIESEL,
+                'consumption_per_hour'    => 5.00,
+                'energy_rate_per_unit'    => 1.20,
+                'operating_cost_per_hour' => 6.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-03-01',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-WLD-TIG',
+                'name'                    => 'Lincoln Electric Robotic TIG Cell',
+                'machine_type'            => 'Welding Cell',
+                'manufacturer'            => 'Lincoln Electric',
+                'model_number'            => 'Power Wave S500',
+                'capacity'                => 30.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 20.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 4.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-01-28',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-SMT-LSR',
+                'name'                    => 'High Precision Laser SMT Assembler',
+                'machine_type'            => 'SMT Assembler',
+                'manufacturer'            => 'Yamaha',
+                'model_number'            => 'YSM20R High-Speed',
+                'capacity'                => 80.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 50.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 10.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2024-10-15',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-ASY-PNE',
+                'name'                    => 'Pneumatic Robotic Screw Feeder',
+                'machine_type'            => 'Assembly System',
+                'manufacturer'            => 'Atlas Copco',
+                'model_number'            => 'Tensor STB33',
+                'capacity'                => 60.00,
+                'energy_source'           => Machine::ENERGY_OTHERS,
+                'consumption_per_hour'    => 1.00,
+                'energy_rate_per_unit'    => 5.00,
+                'operating_cost_per_hour' => 5.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-02-20',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-LAT-CNC',
+                'name'                    => 'Mazak Quick Turn CNC Turning Center',
+                'machine_type'            => 'CNC Lathe',
+                'manufacturer'            => 'Mazak',
+                'model_number'            => 'Quick Turn 250-MSY',
+                'capacity'                => 45.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 25.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 5.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-03-10',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-INJ-120',
+                'name'                    => 'Engel Victory Hydraulic Injection Molding',
+                'machine_type'            => 'Injection Molding',
+                'manufacturer'            => 'Engel',
+                'model_number'            => 'Victory 330/80',
+                'capacity'                => 120.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 55.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 11.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2024-09-01',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-GEN-PET',
+                'name'                    => 'Honda Portable Petrol Backup Generator',
+                'machine_type'            => 'Generator',
+                'manufacturer'            => 'Honda Power Equipment',
+                'model_number'            => 'EU7000is Inverter',
+                'capacity'                => 20.00,
+                'energy_source'           => Machine::ENERGY_PETROL,
+                'consumption_per_hour'    => 3.50,
+                'energy_rate_per_unit'    => 1.60,
+                'operating_cost_per_hour' => 5.60,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2025-01-05',
+                'maintenance_status'      => 'operational',
+            ],
+            [
+                'code'                    => 'MAC-LSR-CUT',
+                'name'                    => 'Bystronic ByStar Fiber Laser Cutter',
+                'machine_type'            => 'Laser Cutter',
+                'manufacturer'            => 'Bystronic',
+                'model_number'            => 'ByStar Fiber 10kW',
+                'capacity'                => 50.00,
+                'energy_source'           => Machine::ENERGY_ELECTRICITY,
+                'consumption_per_hour'    => 60.00,
+                'energy_rate_per_unit'    => 0.20,
+                'operating_cost_per_hour' => 12.00,
+                'status'                  => Machine::STATUS_ACTIVE,
+                'installation_date'       => '2024-11-12',
+                'maintenance_status'      => 'operational',
+            ],
+        ];
 
-        // Fallback to any shift if none active
-        if (empty($existingShiftIds)) {
-            $existingShiftIds = ProductionShift::where('tenant_id', $tenantId)->pluck('id')->toArray();
+        foreach ($machines as $data) {
+            Machine::create(array_merge($data, [
+                'tenant_id'  => $tenantId,
+                'section_id' => null, // Standalone machine ready to be assigned to sections by user
+            ]));
+            $this->command?->info("✓ Seeded machine {$data['code']}: {$data['name']} (Capacity: {$data['capacity']}, Operating Cost: \${$data['operating_cost_per_hour']}/hr, Energy: {$data['energy_source']})");
         }
 
-        $shiftA = !empty($existingShiftIds) ? [$existingShiftIds[0]] : [];
-        $shiftB = count($existingShiftIds) >= 2 ? [$existingShiftIds[1]] : $shiftA;
-        $shiftAB = count($existingShiftIds) >= 2 
-            ? [$existingShiftIds[0], $existingShiftIds[1]] 
-            : $shiftA;
-
-        // ─── Pay Grades (Create if not available) ───────────────────────────
-        ExternalWorkerPayGrade::create([
-            'tenant_id'   => $tenantId,
-            'name'        => 'Grade A - Master Craftsman',
-            'code'        => 'PG-MSTR',
-            'hourly_rate' => 350.00,
-            'description' => 'High precision CNC programming, toolmaking and fabrication.',
-            'active'      => true,
-        ]);
-
-        ExternalWorkerPayGrade::create([
-            'tenant_id'   => $tenantId,
-            'name'        => 'Grade B - Skilled Welder & Technician',
-            'code'        => 'PG-SKLD',
-            'hourly_rate' => 220.00,
-            'description' => 'Certified structural TIG/MIG welding and machine setup.',
-            'active'      => true,
-        ]);
-
-        ExternalWorkerPayGrade::create([
-            'tenant_id'   => $tenantId,
-            'name'        => 'Grade C - Semi-Skilled Operator',
-            'code'        => 'PG-SEMI',
-            'hourly_rate' => 150.00,
-            'description' => 'Mechanical sub-assembly and machine tending.',
-            'active'      => true,
-        ]);
-
-        ExternalWorkerPayGrade::create([
-            'tenant_id'   => $tenantId,
-            'name'        => 'Grade D - General Helper',
-            'code'        => 'PG-HLPR',
-            'hourly_rate' => 100.00,
-            'description' => 'Material staging, deburring, and shopfloor movement.',
-            'active'      => true,
-        ]);
-
-        // ─── 5 Work Centers Configuration ────────────────────────────────────
-
-        // 1. Work Center 1: NO SECTIONS (0 sections)
-        WorkCenter::create([
-            'tenant_id'        => $tenantId,
-            'name'             => 'Primary CNC Machining Center',
-            'code'             => 'WC-01',
-            'work_center_type' => 'machining',
-            'description'      => 'Standalone work center without any subdivided sections.',
-            'location'         => 'Plant 1 - Bay A',
-            'status'           => 'active',
-            'overhead_cost'    => 150.00,
-        ]);
-
-        // 2. Work Center 2: TWO SECTIONS
-        $wc2 = WorkCenter::create([
-            'tenant_id'        => $tenantId,
-            'name'             => 'Heavy Fabrication Center',
-            'code'             => 'WC-02',
-            'work_center_type' => 'fabrication',
-            'description'      => 'Fabrication unit with cutting and welding sections.',
-            'location'         => 'Plant 1 - Bay B',
-            'status'           => 'active',
-            'overhead_cost'    => 180.00,
-        ]);
-
-        WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc2->id,
-            'name'                       => 'TIG/MIG Welding Section',
-            'code'                       => 'SEC-02-A',
-            'description'                => 'Argon shielded welding booths.',
-            'status'                     => 'active',
-            'supports_manual_production' => true,
-            'manual_capacity_per_hour'   => 12.0,
-            'assigned_shifts'            => $shiftAB,
-        ]);
-
-        WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc2->id,
-            'name'                       => 'Structural Assembly Section',
-            'code'                       => 'SEC-02-B',
-            'description'                => 'Structural framing and alignment.',
-            'status'                     => 'active',
-            'supports_manual_production' => true,
-            'manual_capacity_per_hour'   => 8.0,
-            'assigned_shifts'            => $shiftA,
-        ]);
-
-        // 3. Work Center 3: THREE SECTIONS
-        $wc3 = WorkCenter::create([
-            'tenant_id'        => $tenantId,
-            'name'             => 'Electronics & Sub-Assembly Center',
-            'code'             => 'WC-03',
-            'work_center_type' => 'assembly',
-            'description'      => 'Multi-section modular assembly facility.',
-            'location'         => 'Plant 2 - Bay A',
-            'status'           => 'active',
-            'overhead_cost'    => 120.00,
-        ]);
-
-        WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc3->id,
-            'name'                       => 'PCB Prep & Harnessing Section',
-            'code'                       => 'SEC-03-A',
-            'description'                => 'Wiring harness and electronics staging.',
-            'status'                     => 'active',
-            'supports_manual_production' => true,
-            'manual_capacity_per_hour'   => 20.0,
-            'assigned_shifts'            => $shiftA,
-        ]);
-
-        WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc3->id,
-            'name'                       => 'Mechanical Sub-Assembly Line',
-            'code'                       => 'SEC-03-B',
-            'description'                => 'Component level assembly and torquing.',
-            'status'                     => 'active',
-            'supports_manual_production' => true,
-            'manual_capacity_per_hour'   => 15.0,
-            'assigned_shifts'            => $shiftAB,
-        ]);
-
-        WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc3->id,
-            'name'                       => 'Final Enclosure Boxing Section',
-            'code'                       => 'SEC-03-C',
-            'description'                => 'Chassis mounting and cover fitment.',
-            'status'                     => 'active',
-            'supports_manual_production' => true,
-            'manual_capacity_per_hour'   => 10.0,
-            'assigned_shifts'            => $shiftB,
-        ]);
-
-        // 4. Work Center 4: WITH MACHINE ASSIGNMENT
-        $wc4 = WorkCenter::create([
-            'tenant_id'        => $tenantId,
-            'name'             => 'Precision CNC Milling Center',
-            'code'             => 'WC-04',
-            'work_center_type' => 'machining',
-            'description'      => 'Machining work center with assigned CNC machines.',
-            'location'         => 'Plant 2 - Bay B',
-            'status'           => 'active',
-            'overhead_cost'    => 200.00,
-        ]);
-
-        $sec4A = WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc4->id,
-            'name'                       => '5-Axis CNC Milling Bay',
-            'code'                       => 'SEC-04-A',
-            'description'                => 'Complex 5-axis aerospace and precision parts.',
-            'status'                     => 'active',
-            'supports_manual_production' => false,
-            'assigned_shifts'            => $shiftAB,
-        ]);
-
-        $sec4B = WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc4->id,
-            'name'                       => 'Vertical Machining Bay',
-            'code'                       => 'SEC-04-B',
-            'description'                => 'High-speed VMC prismatics.',
-            'status'                     => 'active',
-            'supports_manual_production' => false,
-            'assigned_shifts'            => $shiftA,
-        ]);
-
-        // Ensure machines exist and assign them to WC 4 sections
-        $macVmc1 = Machine::updateOrCreate(
-            ['tenant_id' => $tenantId, 'code' => 'MAC-5AX-01'],
-            ['name' => 'DMG MORI 5-Axis VMC', 'status' => Machine::STATUS_ACTIVE, 'section_id' => $sec4A->id]
-        );
-        $macVmc2 = Machine::updateOrCreate(
-            ['tenant_id' => $tenantId, 'code' => 'MAC-VMC-02'],
-            ['name' => 'Haas VF-4 3-Axis VMC', 'status' => Machine::STATUS_ACTIVE, 'section_id' => $sec4B->id]
-        );
-
-        // 5. Work Center 5: WITH MACHINE ASSIGNMENT
-        $wc5 = WorkCenter::create([
-            'tenant_id'        => $tenantId,
-            'name'             => 'Sheet Metal Punch & Press Center',
-            'code'             => 'WC-05',
-            'work_center_type' => 'fabrication',
-            'description'      => 'Heavy stamping and hydraulic press operations with dedicated press machines.',
-            'location'         => 'Plant 1 - Press Shop',
-            'status'           => 'active',
-            'overhead_cost'    => 160.00,
-        ]);
-
-        $sec5A = WorkCenterSection::create([
-            'tenant_id'                  => $tenantId,
-            'work_center_id'             => $wc5->id,
-            'name'                       => 'Hydraulic Press & Bending Section',
-            'code'                       => 'SEC-05-A',
-            'description'                => 'CNC press brake and hydraulic deep drawing.',
-            'status'                     => 'active',
-            'supports_manual_production' => false,
-            'assigned_shifts'            => $shiftAB,
-        ]);
-
-        $macPress1 = Machine::updateOrCreate(
-            ['tenant_id' => $tenantId, 'code' => 'MAC-PRS-100T'],
-            ['name' => 'Amada 100-Ton Hydraulic Press Brake', 'status' => Machine::STATUS_ACTIVE, 'section_id' => $sec5A->id]
-        );
-        $macPunch1 = Machine::updateOrCreate(
-            ['tenant_id' => $tenantId, 'code' => 'MAC-PCH-CNC'],
-            ['name' => 'Trumpf CNC Turret Punch Press', 'status' => Machine::STATUS_ACTIVE, 'section_id' => $sec5A->id]
-        );
-
-        $this->command?->info("✓ Successfully seeded 5 Work Centers (WC-01: 0 sec, WC-02: 2 sec, WC-03: 3 sec, WC-04: machines, WC-05: machines).");
-        $this->command?->info("✓ 0 internal or external employees assigned. Ready for UI testing.");
+        $this->command?->info("✓ Seeding complete! Only `production_machines` populated. Work centers, sections, manual productions, and calculations remain clear for manual setup.");
     }
 }

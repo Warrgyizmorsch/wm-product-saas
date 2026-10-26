@@ -70,7 +70,8 @@ class WorkCenterService
 
     public function recalculate(WorkCenter $workCenter): WorkCenter
     {
-        return $this->getWorkCenterCalculationService()->calculateAndSave($workCenter);
+        $this->getWorkCenterCalculationService()->calculateAndSave($workCenter);
+        return $workCenter->fresh();
     }
 
     private function getWorkCenterCalculationService(): WorkCenterCalculationService

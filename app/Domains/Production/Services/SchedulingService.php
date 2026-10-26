@@ -1199,7 +1199,7 @@ class SchedulingService
                 $totalMinutes += max(0.0, $diff);
             }
 
-        $machineCount = $wc->machines()->where('status', Machine::STATUS_ACTIVE)->count();
+        $machineCount = $wc->machines()->where('production_machines.status', Machine::STATUS_ACTIVE)->count();
         if ($machineCount <= 0) {
             $machineCount = 1;
         }

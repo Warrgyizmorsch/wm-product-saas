@@ -42,6 +42,7 @@ use App\Domains\Production\Controllers\WorkCenterSectionController;
 use App\Domains\Production\Controllers\ExternalWorkerPayGradeController;
 use App\Domains\Production\Controllers\ExternalWorkerAllocationController;
 use App\Domains\Production\Controllers\WorkCenterEmployeeController;
+use App\Domains\Production\Controllers\SectionManualProductionController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
@@ -110,11 +111,18 @@ Route::prefix('production')
 
         // ── Work Centers ──────────────────────────────────────────────────────
         Route::post('work-centers/bulk-action', [WorkCenterController::class, 'bulkAction'])->name('work-centers.bulk-action');
+        Route::post('work-centers/{work_center}/recalculate-now', [WorkCenterController::class, 'recalculateNow'])->name('work-centers.recalculate-now');
+        Route::post('work-centers/{work_center}/countdown-duration', [WorkCenterController::class, 'updateCountdownDuration'])->name('work-centers.countdown-duration');
+        Route::get('work-centers/{work_center}/calculation-details', [WorkCenterController::class, 'calculationDetails'])->name('work-centers.calculation-details');
         Route::resource('work-centers', WorkCenterController::class);
 
         // ── Work Center Sections ──────────────────────────────────────────────
         Route::get('sections/by-work-center/{workCenter}', [WorkCenterSectionController::class, 'byWorkCenter'])->name('work-center-sections.by-work-center');
         Route::patch('work-center-sections/{section}/manual-production', [WorkCenterSectionController::class, 'updateManualProduction'])->name('work-center-sections.update-manual-production');
+        Route::post('work-center-sections/{section}/manual-productions', [SectionManualProductionController::class, 'store'])->name('work-center-sections.manual-productions.store');
+        Route::put('manual-productions/{batch}', [SectionManualProductionController::class, 'update'])->name('manual-productions.update');
+        Route::patch('manual-productions/{batch}/toggle-status', [SectionManualProductionController::class, 'toggleStatus'])->name('manual-productions.toggle-status');
+        Route::delete('manual-productions/{batch}', [SectionManualProductionController::class, 'destroy'])->name('manual-productions.destroy');
         Route::resource('work-center-sections', WorkCenterSectionController::class);
 
         // ── External Worker Pay Grades ────────────────────────────────────────
@@ -394,3 +402,9 @@ Route::prefix('production')
         Route::get('planning-exceptions/{order}', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'show'])->name('planning-exceptions.show');
         Route::get('orders/{order}/risk-analysis', [\App\Domains\Production\Controllers\PlanningExceptionController::class, 'show'])->name('orders.risk-analysis');
     });
+
+// Fallback / legacy alias routes without 'production/' prefix to protect against any cached clients
+Route::put('manual-productions/{batch}', [SectionManualProductionController::class, 'update']);
+Route::patch('manual-productions/{batch}/toggle-status', [SectionManualProductionController::class, 'toggleStatus']);
+Route::delete('manual-productions/{batch}', [SectionManualProductionController::class, 'destroy']);
+
