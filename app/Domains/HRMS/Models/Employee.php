@@ -48,6 +48,8 @@ class Employee extends BaseModel
         'diet_preference',
         'aadhaar_card_number',
         'pan_card_number',
+        'uan_number',     // PF Universal Account Number (ECR)
+        'esi_ip_number',  // ESIC insurance number (monthly contribution return)
         'photo',
 
         'present_address',

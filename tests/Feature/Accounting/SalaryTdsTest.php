@@ -217,5 +217,13 @@ class SalaryTdsTest extends TestCase
         $http->get(route('accounting.tds.returns.export', ['format' => 'xlsx', 'form' => '24Q', 'fy' => '2026-27', 'quarter' => 3]))->assertOk();
         $http->get(route('accounting.tds.form16', ['employee' => $asha->id, 'fy' => '2026-27']))
             ->assertOk()->assertHeader('content-type', 'application/pdf');
+
+        // An employee with nil TDS can still get a Form 16 (salary summary).
+        $vikram = $this->employee('Vikram', 40000, 0, 'BCDPV5678G');
+        app(PayrollAccountingService::class)->postPayrollRunJournal($this->payrollRun('2026-11'));
+        $http->get(route('accounting.tds.returns', ['form' => '24Q', 'fy' => '2026-27', 'quarter' => 3]))
+            ->assertOk()->assertSee(route('accounting.tds.form16', ['employee' => $vikram->id, 'fy' => '2026-27']), false);
+        $http->get(route('accounting.tds.form16', ['employee' => $vikram->id, 'fy' => '2026-27']))
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
     }
 }

@@ -112,6 +112,7 @@ return [
         'label' => 'Payroll', 'icon' => 'feather-dollar-sign',
         'children' => [
             ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index', 'permission' => [...$hrAdmin, 'hrms.payroll.manage', 'hrms.payroll_runs.view', 'hrms.payroll_runs.create', 'hr.payroll.manage']],
+            ['label' => 'PF & ESI Returns', 'route' => 'hrms.payroll.statutory-returns.index', 'permission' => [...$hrAdmin, 'hrms.payroll.manage', 'hrms.payroll_runs.view', 'hrms.payroll_runs.create', 'hr.payroll.manage']],
             ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary', 'permission' => $selfService],
         ],
     ],

@@ -456,6 +456,10 @@ Route::prefix('hrms')
             Route::post('/run/{run}/resolve-pending', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'resolvePending'])->name('payroll.run.resolve-pending');
             Route::post('/run/{run}/release', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'releasePayouts'])->name('payroll.run.release');
             Route::post('/statutory-dues/pay', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'payStatutoryDue'])->name('payroll.statutory.pay');
+            // PF ECR and ESIC monthly returns from posted payroll.
+            Route::get('/statutory-returns', [\App\Domains\HRMS\Controllers\PayrollStatutoryReturnController::class, 'index'])->name('payroll.statutory-returns.index');
+            Route::get('/statutory-returns/ecr', [\App\Domains\HRMS\Controllers\PayrollStatutoryReturnController::class, 'ecr'])->name('payroll.statutory-returns.ecr');
+            Route::get('/statutory-returns/esi', [\App\Domains\HRMS\Controllers\PayrollStatutoryReturnController::class, 'esi'])->name('payroll.statutory-returns.esi');
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
             Route::get('/run/{run}/export-bank-file', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'exportBankFile'])->name('payroll.run.export-bank-file');
             Route::get('/payslip/{run}/{employee}/download', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadPayslip'])->name('payroll.payslip.download');
