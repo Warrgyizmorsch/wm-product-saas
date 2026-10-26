@@ -436,6 +436,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Repositories\TaxRateRepository::class
         );
 
+        // ── Accounting: TDS (Purchase asks this how much to deduct on a bill) ──
+        $this->app->bind(
+            \App\Domains\Accounting\Services\Tds\TdsCalculatorInterface::class,
+            \App\Domains\Accounting\Services\Tds\TdsCalculator::class
+        );
+
         // ── Accounting: Voucher Detail ──────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\VoucherDetailRepositoryInterface::class,

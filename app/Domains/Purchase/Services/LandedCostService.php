@@ -251,6 +251,9 @@ class LandedCostService
                     'grand_total'           => $grandTotal,
                     'paid_amount'           => 0,
                     'due_amount'            => round($grandTotal, 4),
+                    // Its GL (and so any TDS) is the landed cost voucher's own
+                    // journal, which carries no TDS line: keep the bill at gross.
+                    'tds_overridden'        => true,
                     'notes'                 => "Auto-generated Service Bill for Landed Cost Voucher {$voucher->voucher_number}",
                     'created_by'            => auth()->id() ?: 1,
                 ]);

@@ -71,6 +71,8 @@
                                 <x-ui.odoo-form-ui type="input" :label="__('purchase.gstin_tax_id')" name="gstin" id="gstin" :value="old('gstin')" placeholder="e.g. 27AAAAA0000A1Z5" :errorText="$errors->first('gstin')" />
 
                                 <x-ui.odoo-form-ui type="input" :label="__('purchase.pan_number')" name="pan" id="pan" :value="old('pan')" placeholder="e.g. ABCDE1234F" :errorText="$errors->first('pan')" />
+
+                                @include('modules.purchase.vendors._tds-fields')
                             </div>
 
                             {{-- Section 3: Address Information --}}

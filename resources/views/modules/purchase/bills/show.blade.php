@@ -352,6 +352,19 @@
                         <span>{{ __('purchase.grand_total') }}:</span>
                         <strong class="font-monospace">{{ format_currency($bill->grand_total) }}</strong>
                     </div>
+
+                    @if((float) $bill->tds_amount > 0)
+                        <div class="d-flex justify-content-between text-muted mt-2">
+                            <span>Less: TDS {{ $bill->tdsSection?->code }} @ {{ rtrim(rtrim(number_format((float) $bill->tds_rate, 3), '0'), '.') }}% on {{ format_currency((float) $bill->tds_base_amount + (float) $bill->tds_catchup_base) }}:</span>
+                            <strong class="font-monospace">-{{ format_currency($bill->tds_amount) }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between fw-bold">
+                            <span>Net payable to vendor:</span>
+                            <strong class="font-monospace">{{ format_currency($bill->netPayable()) }}</strong>
+                        </div>
+                    @elseif($bill->tds_section_id && $bill->tds_reason === 'below_threshold')
+                        <div class="small text-muted mt-2">TDS {{ $bill->tdsSection?->code }}: below the threshold, nothing deducted.</div>
+                    @endif
                 </div>
             </div>
         </div>

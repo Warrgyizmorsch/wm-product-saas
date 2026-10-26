@@ -28,6 +28,13 @@ return new class extends Migration
                 } catch (\Throwable $e) {
                     // Ignore if foreign key was already dropped or unsupported
                 }
+
+                // SQLite can't drop a column that still has an index on it.
+                if (Schema::hasIndex('feedback_360_competencies', 'feedback_360_competencies_cycle_id_index')) {
+                    Schema::table('feedback_360_competencies', function (Blueprint $table) {
+                        $table->dropIndex('feedback_360_competencies_cycle_id_index');
+                    });
+                }
             }
 
             Schema::table('feedback_360_competencies', function (Blueprint $table) {
@@ -52,6 +59,12 @@ return new class extends Migration
                     });
                 } catch (\Throwable $e) {
                     // Ignore if foreign key was already dropped or unsupported
+                }
+
+                if (Schema::hasIndex('feedback_360_questions', 'feedback_360_questions_cycle_id_index')) {
+                    Schema::table('feedback_360_questions', function (Blueprint $table) {
+                        $table->dropIndex('feedback_360_questions_cycle_id_index');
+                    });
                 }
 
                 Schema::table('feedback_360_questions', function (Blueprint $table) {

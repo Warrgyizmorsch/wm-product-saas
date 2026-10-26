@@ -37,10 +37,24 @@ class Vendor extends BaseModel
         'opening_balance_type',
         'opening_bills',
         'status',
+        // TDS (see App\Domains\Accounting\Services\Tds\TdsCalculator)
+        'tds_applicable',
+        'tds_section_id',
+        'deductee_type',
+        'ldc_number',
+        'ldc_rate',
+        'ldc_valid_from',
+        'ldc_valid_to',
+        'ldc_limit',
     ];
 
     protected $casts = [
         'opening_bills' => 'array',
+        'tds_applicable' => 'boolean',
+        'ldc_rate' => 'float',
+        'ldc_limit' => 'float',
+        'ldc_valid_from' => 'date',
+        'ldc_valid_to' => 'date',
     ];
 
     public function operations(): HasMany

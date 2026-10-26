@@ -59,6 +59,10 @@ return [
             ['label' => 'GSTR-3B', 'route' => 'accounting.reports.gstr3b', 'permission' => 'accounting.reports.view'],
             ['label' => 'Upload GST Returns', 'route' => 'accounting.gst-returns.gstr1', 'permission' => 'accounting.gst_returns.view'],
             ['label' => 'GSTR-2B Reconciliation', 'route' => 'accounting.gst-returns.gstr2b.index', 'permission' => 'accounting.gst_returns.view'],
+            ['label' => 'TDS Register & Challans', 'route' => 'accounting.tds.register', 'permission' => 'accounting.tds.view'],
+            ['label' => 'TDS Returns (26Q / 24Q)', 'route' => 'accounting.tds.returns', 'permission' => 'accounting.tds.returns.view'],
+            ['label' => 'TDS Receivable', 'route' => 'accounting.tds.receivable', 'permission' => 'accounting.tds.view'],
+            ['label' => 'TDS Setup', 'route' => 'accounting.tds.setup', 'permission' => 'accounting.tds.view'],
             ['label' => 'Audit Trail', 'route' => 'accounting.reports.audit-trail', 'permission' => 'accounting.reports.view'],
             // Budget vs Actual is the one report that checks accounting.budgets.view, not accounting.reports.view.
             ['label' => 'Budget vs Actual', 'route' => 'accounting.reports.budget-vs-actual', 'permission' => 'accounting.budgets.view'],
