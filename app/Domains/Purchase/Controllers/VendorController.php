@@ -146,11 +146,13 @@ class VendorController extends Controller
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::vendorRules(),
         ], [
             'email.email'          => 'The email field must be a valid email address.',
             'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'phone.max'            => 'Phone number cannot exceed 20 digits.',
             'account_number.regex' => 'Bank account number must contain digits/numbers only.',
+            'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
         if (empty($validated['code'])) {
@@ -411,11 +413,13 @@ class VendorController extends Controller
             'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'in:debit,credit'],
             'status' => ['required', 'string', 'in:active,inactive,Active,Inactive'],
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::vendorRules(),
         ], [
             'email.email'          => 'The email field must be a valid email address.',
             'phone.regex'          => 'Phone number must contain digits/numbers only (no special characters or letters).',
             'phone.max'            => 'Phone number cannot exceed 20 digits.',
             'account_number.regex' => 'Bank account number must contain digits/numbers only.',
+            'tds_section_id.required_if' => 'Pick the TDS section to deduct under.',
         ]);
 
         $validated['status'] = strtolower($validated['status']);

@@ -25,8 +25,23 @@ class CustomerPayment extends BaseModel
         'bank_account_id',
         'reference_no',
         'status',
-        'notes'
+        'notes',
+        // TDS the customer withheld: the invoice is settled by amount + tds_amount.
+        'tds_amount',
+        'tds_section_code',
+        'tds_certificate_received',
     ];
+
+    protected $casts = [
+        'tds_amount' => 'float',
+        'tds_certificate_received' => 'boolean',
+    ];
+
+    /** What this receipt settles on the customer's account: money received plus TDS withheld. */
+    public function settledAmount(): float
+    {
+        return round((float) $this->amount + (float) ($this->tds_amount ?? 0), 2);
+    }
 
     public function customer(): BelongsTo
     {

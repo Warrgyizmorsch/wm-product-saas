@@ -122,6 +122,7 @@ class JournalService
             // Now on the ledger, so now in the bill-wise register, with the bills
             // chosen when it was entered (the rest On Account).
             $this->bills->allocateJournal($journal, $journal->bill_allocation_hints ?? []);
+            app(\App\Domains\Accounting\Services\Tds\TdsDeductionRecorder::class)->captureManualJournal($journal);
 
             return $journal->fresh(['entries']);
         });
@@ -304,6 +305,7 @@ class JournalService
             // On Account. A reversal mirrors its original instead.
             if (empty($meta['is_reversal'])) {
                 $this->bills->allocateJournal($journal, $meta['bill_allocations'] ?? []);
+                app(\App\Domains\Accounting\Services\Tds\TdsDeductionRecorder::class)->captureManualJournal($journal);
             }
 
             return $journal;

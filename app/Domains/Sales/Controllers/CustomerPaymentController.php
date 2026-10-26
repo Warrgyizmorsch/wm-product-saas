@@ -113,6 +113,8 @@ class CustomerPaymentController extends Controller
             'invoice_id'     => ['nullable', 'exists:invoices,id'],
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
             'bank_account_id' => ['nullable', 'integer'],
+            'tds_amount'     => ['nullable', 'numeric', 'min:0'],
+            'tds_section_code' => ['nullable', 'string', 'max:20'],
         ]);
 
         // Only this tenant's own cash/bank ledgers can receive the money.
@@ -125,8 +127,9 @@ class CustomerPaymentController extends Controller
         }
 
         $baseAmount = convert_to_base((float) $validated['amount']);
+        $tdsAmount = round(convert_to_base((float) ($validated['tds_amount'] ?? 0)), 2);
 
-        $payment = DB::transaction(function () use ($validated, $baseAmount) {
+        $payment = DB::transaction(function () use ($validated, $baseAmount, $tdsAmount) {
             $payment = CustomerPayment::create([
                 'tenant_id'      => tenant_id() ?? 1,
                 'customer_id'    => $validated['customer_id'],
@@ -139,11 +142,14 @@ class CustomerPaymentController extends Controller
                     ? trim('Against opening balance. ' . ($validated['notes'] ?? ''))
                     : ($validated['notes'] ?? null),
                 'bank_account_id' => $validated['bank_account_id'] ?? null,
+                'tds_amount'     => $tdsAmount,
+                'tds_section_code' => $tdsAmount > 0 ? ($validated['tds_section_code'] ?? null) : null,
                 'status'         => 'Posted',   // Direct post — Odoo/Tally style
             ]);
 
             $allocateTo    = $validated['allocate_to'] ?? 'unallocated';
-            $allocatedAmt  = $baseAmount;
+            // TDS withheld by the customer settles the invoice too.
+            $allocatedAmt  = $payment->settledAmount();
 
             // ── Link to Invoice ─────────────────────────────────────────────
             if ($allocateTo === 'invoice' && !empty($validated['invoice_id'])) {

@@ -48,6 +48,8 @@ final class SystemAccount
     public const OUTPUT_SGST = 'output_sgst';
     public const OUTPUT_IGST = 'output_igst';
     public const TDS_PAYABLE = 'tds_payable';
+    // TDS customers withheld from what they paid us.
+    public const TDS_RECEIVABLE = 'tds_receivable';
 
     // Income and expense
     public const SALES_REVENUE = 'sales_revenue';

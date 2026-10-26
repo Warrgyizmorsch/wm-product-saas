@@ -235,7 +235,7 @@ class PurchaseReturnApiController extends Controller
                         $due = (float)($bill->due_amount ?? $bill->balance_due);
                         $apply = min((float)$purchaseReturn->total_refund_amount, $due);
                         $bill->due_amount = max(0, $due - $apply);
-                        $bill->paid_amount = max(0, (float)($bill->grand_total ?? $bill->total_amount) - (float)$bill->due_amount);
+                        $bill->paid_amount = max(0, $bill->netPayable() - (float)$bill->due_amount);
                         $bill->status = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
                         $bill->save();
                     }

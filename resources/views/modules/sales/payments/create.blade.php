@@ -49,6 +49,21 @@
                         </x-ui.odoo-form-ui>
 
                         <x-ui.odoo-form-ui type="input" :label="__('crm.bank_reference_txn_no')" name="reference_no" :value="old('reference_no')" :placeholder="__('crm.bank_reference_placeholder')" />
+
+                        {{-- TDS the customer deducted: settles the invoice along with the money received. --}}
+                        <div class="row g-2">
+                            <div class="col-7">
+                                <x-ui.odoo-form-ui type="input" inputType="number" :label="'TDS deducted by customer (' . active_currency_symbol() . ')'" name="tds_amount" :value="old('tds_amount', '')" step="0.01" min="0" placeholder="0.00" />
+                            </div>
+                            <div class="col-5">
+                                <x-ui.odoo-form-ui type="select" label="TDS section" name="tds_section_code">
+                                    <option value="">—</option>
+                                    @foreach (['194C', '194J', '194H', '194I', '194Q', '194A', '194O'] as $tdsCode)
+                                        <option value="{{ $tdsCode }}" @selected(old('tds_section_code') === $tdsCode)>{{ $tdsCode }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Column 2: Date & Allocations -->

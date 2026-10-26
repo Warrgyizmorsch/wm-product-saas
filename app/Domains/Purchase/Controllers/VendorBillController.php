@@ -209,6 +209,9 @@ class VendorBillController extends Controller
             'freight_tax_method'    => 'nullable|string',
             'freight_allocation_method' => 'nullable|string|in:by_amount,by_quantity,none,direct_expense',
             'adjustment'            => 'nullable|numeric',
+            'tds_section_id'        => 'nullable|integer|exists:tds_sections,id',
+            'tds_amount'            => 'nullable|numeric|min:0',
+            'tds_overridden'        => 'nullable|boolean',
             'notes'                 => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer',
@@ -240,6 +243,26 @@ class VendorBillController extends Controller
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");
+    }
+
+    /** TDS the bill form shows while it is filled in (JSON). */
+    public function tdsPreview(Request $request, \App\Domains\Purchase\Services\VendorBillTdsService $tds)
+    {
+        $this->authorize('create', VendorBill::class);
+
+        $validated = $request->validate([
+            'vendor_id' => 'required|integer',
+            'base' => 'required|numeric|min:0',
+            'bill_date' => 'nullable|date',
+            'tds_section_id' => 'nullable|integer',
+        ]);
+
+        return response()->json($tds->preview(
+            (int) $validated['vendor_id'],
+            (float) $validated['base'],
+            $validated['bill_date'] ?? now()->toDateString(),
+            filled($validated['tds_section_id'] ?? null) ? (int) $validated['tds_section_id'] : null,
+        ));
     }
 
     public function show(int $id)
@@ -454,6 +477,9 @@ class VendorBillController extends Controller
             'bill_date'             => 'required|date',
             'due_date'              => 'required|date|after_or_equal:bill_date',
             'vendor_invoice_number' => 'nullable|string|max:255',
+            'tds_section_id'        => 'nullable|integer|exists:tds_sections,id',
+            'tds_amount'            => 'nullable|numeric|min:0',
+            'tds_overridden'        => 'nullable|boolean',
             'notes'                 => 'nullable|string',
         ]);
 
@@ -519,6 +545,7 @@ class VendorBillController extends Controller
             'grand_total'           => $grandTotal,
             'paid_amount'           => 0,
             'due_amount'            => round($grandTotal, 4),
+            ...\App\Domains\Purchase\Services\VendorBillTdsService::fromInput($validated),
             'notes'                 => $notes,
             'created_by'            => auth()->id() ?: 1,
         ]);

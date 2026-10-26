@@ -76,8 +76,7 @@ class VendorPaymentService
                 ]);
 
                 $newPaid = (float)($bill->paid_amount ?? 0) + $allocatedAmount;
-                $billTotal = (float)($bill->grand_total ?: $bill->total_amount);
-                $newDue = max(0.0, $billTotal - $newPaid);
+                $newDue = $bill->dueAfterPaying($newPaid);
                 $status = ($newDue <= 0.001) ? 'Paid' : 'Partially Paid';
 
                 $this->billRepo->update($bill, [
@@ -188,7 +187,7 @@ class VendorPaymentService
                 ]);
 
                 $paid = round((float) ($bill->paid_amount ?? 0) + $apply, 4);
-                $due = max(0.0, round((float) ($bill->grand_total ?: $bill->total_amount) - $paid, 4));
+                $due = $bill->dueAfterPaying($paid);
 
                 $this->billRepo->update($bill, [
                     'paid_amount' => $paid,
