@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class CrmAccountController extends Controller
 {
@@ -597,7 +598,7 @@ class CrmAccountController extends Controller
     {
         return [
             'name'          => 'required|string|max:255',
-            'gstin'         => 'nullable|string|max:50',
+            'gstin'         => TaxIdentityService::gstinRules(false),
             'email'         => 'required|email|max:255',
             'phone'         => 'nullable|string|regex:/^[0-9]+$/|max:20',
             'website'       => 'nullable|string|max:255',

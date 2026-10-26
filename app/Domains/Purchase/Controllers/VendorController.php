@@ -16,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\TaxIdentityService;
 
 class VendorController extends Controller
 {
@@ -129,8 +130,8 @@ class VendorController extends Controller
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'gstin' => ['nullable', 'string', 'max:30'],
-            'pan' => ['nullable', 'string', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'pan' => TaxIdentityService::panRules(false),
             'bank_name' => ['nullable', 'string', 'max:150'],
             'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],
@@ -197,7 +198,7 @@ class VendorController extends Controller
                 Rule::unique('vendors', 'email')->where($uniqueScope),
             ],
             'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin' => ['nullable', 'string', 'max:30'],
+            'gstin' => TaxIdentityService::gstinRules(false),
             'address' => ['nullable', 'string'],
         ], [
             'email.email' => 'The email field must be a valid email address.',
@@ -375,8 +376,8 @@ class VendorController extends Controller
             'address' => ['nullable', 'string'],
             'billing_address' => ['nullable', 'string'],
             'shipping_address' => ['nullable', 'string'],
-            'gstin' => ['nullable', 'string', 'max:30'],
-            'pan' => ['nullable', 'string', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'pan' => TaxIdentityService::panRules(false),
             'bank_name' => ['nullable', 'string', 'max:150'],
             'account_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:50'],
             'ifsc_code' => ['nullable', 'string', 'max:30'],

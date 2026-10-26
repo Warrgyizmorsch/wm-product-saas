@@ -23,6 +23,7 @@ use App\Exports\LeadSampleExport;
 use App\Exports\LeadExport;
 use App\Imports\LeadImport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\TaxIdentityService;
 
 class LeadController extends Controller
 {
@@ -141,7 +142,7 @@ class LeadController extends Controller
     public function checkDuplicate(Request $request): JsonResponse
     {
         $tenantId  = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
-        $rawGstin  = trim((string)$request->input('gstin', ''));
+        $rawGstin  = TaxIdentityService::normalizeGstin($request->input('gstin')) ?? '';
         $rawPhone  = trim((string)$request->input('phone', ''));
         $rawEmail  = strtolower(trim((string)$request->input('email', '')));
         $company   = trim((string)$request->input('company_name', ''));
@@ -809,7 +810,7 @@ class LeadController extends Controller
             'company_name' => $isB2B ? 'required|string|max:255' : 'nullable|string|max:255',
             'company_email' => $isB2B ? 'required|email|max:255' : 'nullable|email|max:255',
             'company_phone' => 'nullable|string|regex:/^[0-9]+$/',
-            'gstin' => 'nullable|string|max:100',
+            'gstin' => TaxIdentityService::gstinRules(false),
             'lead_type' => 'nullable|string|in:b2b,b2c',
             'contact_person' => $isB2B ? 'nullable|string|max:255' : 'required|string|max:255',
             'designation' => 'nullable|string|max:255',
@@ -854,6 +855,7 @@ class LeadController extends Controller
     {
         return [
             'company_name.required' => 'Company Name is required for B2B (Business Client) leads.',
+            'gstin.*' => 'Please enter a valid 15-character Indian GSTIN (e.g. 27AAAAA0000A1Z5).',
             'company_email.required' => 'Company Email is required for B2B (Business Client) leads.',
             'company_email.email' => 'Please enter a valid email address for Company Email.',
             'contact_person.required' => 'Contact Person is required for B2C (Individual Customer) leads.',

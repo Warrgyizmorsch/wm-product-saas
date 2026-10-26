@@ -79,6 +79,13 @@
 
 
     <style>
+        /* Global Table Scroll Retention: Never allow dropdowns to reset horizontal scroll position */
+        .table-responsive,
+        .table-responsive:has(.dropdown.show),
+        .table-responsive:has(.action-dropdown-wrapper.show) {
+            overflow-x: auto !important;
+        }
+
         .modal {
             z-index: 1060 !important;
         }
@@ -768,6 +775,7 @@
     @endif
 
     <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
+    <script src="{{ asset('assets/js/tax-identity-formatter.js') }}?v={{ @filemtime(public_path('assets/js/tax-identity-formatter.js')) }}"></script>
     <script>
         // Global safety: automatically hoist any opened Bootstrap modal to document.body
         // to prevent CSS stacking context traps (e.g. nested inside .nxl-container or .main-content)

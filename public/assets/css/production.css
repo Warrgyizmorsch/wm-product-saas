@@ -8,10 +8,11 @@
 
 .table-responsive {
     position: relative;
+    overflow-x: auto;
 }
 
 .table-responsive:has(.dropdown.show) {
-    overflow: visible !important;
+    overflow-x: auto !important;
 }
 
 .erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
