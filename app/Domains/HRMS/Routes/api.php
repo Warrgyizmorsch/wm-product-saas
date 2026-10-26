@@ -478,6 +478,9 @@ Route::prefix('api/hrms/attendance')
         Route::delete('/date/{date}', [AttendanceApiController::class, 'destroyDate'])->name('destroy-date');
         Route::post('/track-location', [AttendanceApiController::class, 'trackLocation'])->name('track-location');
         Route::get('/employee/{employee}', [AttendanceApiController::class, 'getEmployeeLocationLogs'])->name('employee-logs');
+        Route::get('/{attendance}/route', [AttendanceApiController::class, 'getRoute'])->name('route');
+        Route::post('/{attendance}/consolidate-route', [AttendanceApiController::class, 'consolidateRoute'])->name('consolidate-route');
+        Route::post('/prune-logs', [AttendanceApiController::class, 'pruneLocationLogs'])->name('prune-logs');
     });
 
 
@@ -960,8 +963,10 @@ Route::prefix('api/hrms/feedback-360')
         Route::post('/cycles/{id}/participants', [Feedback360ApiController::class, 'addParticipants'])->name('cycles.participants')->whereNumber('id');
         Route::post('/cycles/{id}/bulk-remind', [Feedback360ApiController::class, 'bulkRemind'])->name('cycles.bulk-remind')->whereNumber('id');
 
-        // 2. Peer Nominations & Approvals
+        // 2. Peer & Upward Nominations & Approvals
         Route::post('/participants/{participantId}/nominate-peers', [Feedback360ApiController::class, 'nominatePeers'])->name('participants.nominate-peers')->whereNumber('participantId');
+        Route::post('/participants/{participantId}/add-rater', [Feedback360ApiController::class, 'addRater'])->name('participants.add-rater')->whereNumber('participantId');
+        Route::delete('/nominations/{nominationId}', [Feedback360ApiController::class, 'destroyNomination'])->name('nominations.destroy')->whereNumber('nominationId');
         Route::post('/nominations/{nominationId}/approve', [Feedback360ApiController::class, 'approveNomination'])->name('nominations.approve')->whereNumber('nominationId');
         Route::post('/nominations/batch-approve', [Feedback360ApiController::class, 'batchApproveNominations'])->name('nominations.batch-approve');
 

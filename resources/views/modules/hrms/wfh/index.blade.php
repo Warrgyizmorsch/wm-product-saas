@@ -690,10 +690,10 @@
                             <div class="fw-bold text-dark fs-12 mb-2"><i class="feather-map-pin me-1 text-primary"></i> {{ __('hrms.wfh.target_coordinates') }}</div>
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-4">
-                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.wfh.latitude')" name="wfh_latitude" id="wfh_req_latitude" placeholder="e.g. 28.6139" value="{{ old('wfh_latitude', $employee?->wfh_latitude) }}" class="odoo-underline-input" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.wfh.latitude')" name="wfh_latitude" id="wfh_req_latitude" placeholder="Latitude" value="{{ old('wfh_latitude', $employee?->wfh_latitude) }}" class="odoo-underline-input" />
                                 </div>
                                 <div class="col-md-4">
-                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.wfh.longitude')" name="wfh_longitude" id="wfh_req_longitude" placeholder="e.g. 77.2090" value="{{ old('wfh_longitude', $employee?->wfh_longitude) }}" class="odoo-underline-input" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('hrms.wfh.longitude')" name="wfh_longitude" id="wfh_req_longitude" placeholder="Longitude" value="{{ old('wfh_longitude', $employee?->wfh_longitude) }}" class="odoo-underline-input" />
                                 </div>
                                 <div class="col-md-4 d-flex align-items-end">
                                     <div class="d-flex gap-2 w-100">
@@ -1218,6 +1218,20 @@ const runWfhReqSetup = () => {
 
     let reqWfhMap = null;
     let reqWfhMarker = null;
+    const setReqWfhMarker = (lat, lng) => {
+        const latInput = $('#wfh_req_latitude');
+        const lngInput = $('#wfh_req_longitude');
+        if (!reqWfhMarker) {
+            reqWfhMarker = L.marker([lat, lng], { draggable: true }).addTo(reqWfhMap);
+            reqWfhMarker.on('dragend', function(e) {
+                const position = e.target.getLatLng();
+                latInput.val(position.lat.toFixed(8));
+                lngInput.val(position.lng.toFixed(8));
+            });
+        } else {
+            reqWfhMarker.setLatLng([lat, lng]);
+        }
+    };
 
     const initWfhReqMapPicker = () => {
         if (typeof L === 'undefined') {
@@ -1232,38 +1246,37 @@ const runWfhReqSetup = () => {
         const mapContainer = document.getElementById(mapContainerId);
         if (!mapContainer) return;
 
-        let initialLat = parseFloat(latInput.val()) || 28.6139; // Default center
-        let initialLng = parseFloat(lngInput.val()) || 77.2090;
+        let initialLat = parseFloat(latInput.val());
+        let initialLng = parseFloat(lngInput.val());
+        const hasInitialCoordinates = Number.isFinite(initialLat) && Number.isFinite(initialLng);
         
         if (reqWfhMap) {
             reqWfhMap.invalidateSize();
-            reqWfhMap.setView([initialLat, initialLng], reqWfhMap.getZoom() || 13);
-            if (reqWfhMarker) {
-                reqWfhMarker.setLatLng([initialLat, initialLng]);
+            if (hasInitialCoordinates) {
+                reqWfhMap.setView([initialLat, initialLng], reqWfhMap.getZoom() || 13);
+                setReqWfhMarker(initialLat, initialLng);
             }
             return;
         }
 
-        reqWfhMap = L.map(mapContainerId).setView([initialLat, initialLng], 13);
+        reqWfhMap = L.map(mapContainerId);
+        if (hasInitialCoordinates) {
+            reqWfhMap.setView([initialLat, initialLng], 13);
+        } else {
+            reqWfhMap.fitWorld();
+        }
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(reqWfhMap);
 
-        reqWfhMarker = L.marker([initialLat, initialLng], {
-            draggable: true
-        }).addTo(reqWfhMap);
-
-        // Update inputs on marker drag
-        reqWfhMarker.on('dragend', function(e) {
-            const position = e.target.getLatLng();
-            latInput.val(position.lat.toFixed(8));
-            lngInput.val(position.lng.toFixed(8));
-        });
+        if (hasInitialCoordinates) {
+            setReqWfhMarker(initialLat, initialLng);
+        }
 
         // Update marker and inputs on map click
         reqWfhMap.on('click', function(e) {
-            reqWfhMarker.setLatLng(e.latlng);
+            setReqWfhMarker(e.latlng.lat, e.latlng.lng);
             latInput.val(e.latlng.lat.toFixed(8));
             lngInput.val(e.latlng.lng.toFixed(8));
         });
@@ -1273,7 +1286,7 @@ const runWfhReqSetup = () => {
             const lat = parseFloat(latInput.val());
             const lng = parseFloat(lngInput.val());
             if (!isNaN(lat) && !isNaN(lng)) {
-                reqWfhMarker.setLatLng([lat, lng]);
+                setReqWfhMarker(lat, lng);
                 reqWfhMap.setView([lat, lng], reqWfhMap.getZoom() || 14);
             }
         };
@@ -1288,7 +1301,7 @@ const runWfhReqSetup = () => {
                 const lat = parseFloat(place.lat);
                 const lng = parseFloat(place.lng);
                 reqWfhMap.setView([lat, lng], 15);
-                reqWfhMarker.setLatLng([lat, lng]);
+                setReqWfhMarker(lat, lng);
 
                 latInput.val(lat.toFixed(8));
                 lngInput.val(lng.toFixed(8));
@@ -1372,8 +1385,8 @@ const runWfhReqSetup = () => {
                     $('#wfh_req_latitude').val(lat.toFixed(8));
                     $('#wfh_req_longitude').val(lng.toFixed(8));
                     
-                    if (reqWfhMap && reqWfhMarker) {
-                        reqWfhMarker.setLatLng([lat, lng]);
+                    if (reqWfhMap) {
+                        setReqWfhMarker(lat, lng);
                         reqWfhMap.setView([lat, lng], 15);
                     } else {
                         // Auto-open map to show detected location
@@ -1381,8 +1394,8 @@ const runWfhReqSetup = () => {
                         if (mapWrap && mapWrap.style.display === 'none') {
                             window.toggleWfhReqMap();
                             setTimeout(() => {
-                                if (reqWfhMap && reqWfhMarker) {
-                                    reqWfhMarker.setLatLng([lat, lng]);
+                                if (reqWfhMap) {
+                                    setReqWfhMarker(lat, lng);
                                     reqWfhMap.setView([lat, lng], 15);
                                 }
                             }, 600);

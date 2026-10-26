@@ -57,10 +57,24 @@
             border: 1px solid #e2e8f0 !important;
             border-radius: 8px !important;
             padding: 10px 14px !important;
-        }
         #createCompetencyModal .odoo-form-label {
             width: 155px !important;
             white-space: nowrap !important;
+        }
+        .competency-select-card {
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            transition: all 0.15s ease-in-out;
+            user-select: none;
+        }
+        .competency-select-card:hover {
+            border-color: #cbd5e1;
+            background-color: #f8fafc;
+        }
+        .competency-select-card.is-selected {
+            border-color: #0d6efd !important;
+            background-color: #f8faff !important;
         }
     </style>
 @endpush
@@ -97,20 +111,20 @@
                     'icon' => 'feather-layers',
                 ],
                 [
-                    'id' => 'my-reviews',
-                    'label' => 'My Reviews to Complete' . ($statistics['my_pending_count'] > 0 ? " ({$statistics['my_pending_count']})" : ''),
-                    'active' => ($activeTab === 'my_reviews'),
-                    'icon' => 'feather-edit-3',
-                ],
-                [
                     'id' => 'my-evaluations',
                     'label' => 'My 360 Evaluations & Reports',
                     'active' => ($activeTab === 'my_evaluations'),
                     'icon' => 'feather-user-check',
                 ],
                 [
+                    'id' => 'my-reviews',
+                    'label' => 'My Reviews to Complete' . ($statistics['my_pending_count'] > 0 ? " ({$statistics['my_pending_count']})" : ''),
+                    'active' => ($activeTab === 'my_reviews'),
+                    'icon' => 'feather-edit-3',
+                ],
+                [
                     'id' => 'peer-approvals',
-                    'label' => 'Peer Approvals' . ($statistics['pending_approvals_count'] > 0 ? " ({$statistics['pending_approvals_count']})" : ''),
+                    'label' => 'Nomination Approvals' . ($statistics['pending_approvals_count'] > 0 ? " ({$statistics['pending_approvals_count']})" : ''),
                     'active' => ($activeTab === 'peer_approvals'),
                     'icon' => 'feather-check-square',
                 ],
@@ -551,7 +565,7 @@
                                             </div>
                                         @elseif($eval->cycle?->allow_self_nomination && in_array($eval->cycle?->status, ['nomination', 'in_progress']))
                                             <x-ui.button variant="light" size="sm" class="border flex-grow-1 fw-semibold justify-content-center" icon="feather-user-plus" data-bs-toggle="modal" data-bs-target="#nominatePeersModal{{ $eval->id }}">
-                                                Nominate Peers
+                                                {{ ($eval->employee?->directReports && $eval->employee->directReports->isNotEmpty()) ? 'Nominate Reviewers' : 'Nominate Peers' }}
                                             </x-ui.button>
                                         @endif
 
@@ -578,16 +592,16 @@
 
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-3 border-bottom">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0 fs-16">Peer Approvals</h5>
-                        <small class="text-muted">Review peer reviewer requests submitted by team members. Click Review & Approve to view the checklist and selectively approve nominees.</small>
+                        <h5 class="fw-bold text-dark mb-0 fs-16">Nomination Approvals</h5>
+                        <small class="text-muted">Review peer and upward feedback nominations submitted by employees. Click Review & Approve to inspect the checklist and selectively approve nominees.</small>
                     </div>
                     @if($pendingApprovals->isNotEmpty())
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-1.5 rounded-pill fs-12 fw-semibold">
-                                <i class="feather-clock me-1"></i> {{ $pendingApprovals->count() }} Peer Nominees Pending
+                                <i class="feather-clock me-1"></i> {{ $pendingApprovals->count() }} Nominees Pending
                             </span>
                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1.5 rounded-pill fs-12 fw-semibold">
-                                <i class="feather-user-check me-1"></i> {{ $groupedApprovals->count() }} Nomination Requests
+                                <i class="feather-user-check me-1"></i> {{ $groupedApprovals->count() }} Reviewee Request{{ $groupedApprovals->count() > 1 ? 's' : '' }}
                             </span>
                         </div>
                     @endif
@@ -595,7 +609,7 @@
 
                 @if($pendingApprovals->isEmpty())
                     <div class="alert alert-light border text-muted fs-13 py-3 rounded">
-                        <i class="feather-check-circle text-success me-2"></i>No pending peer nominations require approval at this time.
+                        <i class="feather-check-circle text-success me-2"></i>No pending peer or upward nominations require approval at this time.
                     </div>
                 @else
                     <div class="table-responsive border rounded">
@@ -605,7 +619,7 @@
                                     <th style="width: 50px;" class="text-center text-muted fw-semibold">#</th>
                                     <th>Subject Employee</th>
                                     <th>Feedback Cycle</th>
-                                    <th>Nominated Peers</th>
+                                    <th>Nominated Reviewers</th>
                                     <th>Requested Date</th>
                                     <th class="text-end" style="min-width: 170px;">Action</th>
                                 </tr>
@@ -618,6 +632,8 @@
                                         $subjectEmployee = $firstNom->employee;
                                         $cycle = $firstNom->cycle;
                                         $nominator = $firstNom->nominator;
+                                        $peersCount = $group->where('reviewer_type', 'peer')->count();
+                                        $reportsCount = $group->where('reviewer_type', 'direct_report')->count();
                                     @endphp
                                     <tr>
                                         <td class="text-center text-muted fw-semibold">{{ $loop->iteration }}</td>
@@ -639,9 +655,16 @@
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2.5 py-1 fs-12 fw-semibold">
-                                                    <i class="feather-users me-1"></i>{{ $group->count() }} Peer{{ $group->count() > 1 ? 's' : '' }} Nominated
-                                                </span>
+                                                @if($peersCount > 0)
+                                                    <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2.5 py-1 fs-12 fw-semibold">
+                                                        <i class="feather-users me-1"></i>{{ $peersCount }} Peer{{ $peersCount > 1 ? 's' : '' }}
+                                                    </span>
+                                                @endif
+                                                @if($reportsCount > 0)
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-12 fw-semibold">
+                                                        <i class="feather-user-check me-1"></i>{{ $reportsCount }} Direct Report{{ $reportsCount > 1 ? 's' : '' }}
+                                                    </span>
+                                                @endif
                                                 <span class="text-muted fs-11">
                                                     ({{ $group->pluck('reviewer.full_name')->filter()->take(2)->join(', ') }}{{ $group->count() > 2 ? ' +'.($group->count() - 2).' more' : '' }})
                                                 </span>
@@ -684,27 +707,11 @@
                     @forelse($competencies as $comp)
                         <div class="col-xl-6 col-12">
                             <div class="card border shadow-sm p-3.5 review-card" style="border-radius: 12px !important;">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
-                                            {{ $comp->category }}
-                                        </span>
-                                        @if($comp->cycle_id)
-                                            <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
-                                                <i class="feather-target me-1"></i>{{ $comp->cycle?->name }}
-                                            </span>
-                                        @else
-                                            <span class="badge bg-light text-muted border rounded-pill px-2.5 py-1 fs-11 fw-medium">
-                                                <i class="feather-globe me-1"></i>Global (All Cycles)
-                                            </span>
-                                        @endif
+                                <div class="d-flex justify-content-between align-items-start mb-1.5">
+                                    <div>
+                                        <h6 class="fw-bold text-dark mb-1 fs-15">{{ $comp->name }}</h6>
                                     </div>
                                     <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Competency" data-bs-toggle="modal" data-bs-target="#deleteCompModal{{ $comp->id }}" />
-                                </div>
-
-                                <div class="mb-1.5">
-                                    <h6 class="fw-bold text-dark mb-1 fs-15">{{ $comp->name }}</h6>
-                                    <span class="badge bg-secondary-subtle text-secondary font-monospace fs-10 px-2 py-0.5 rounded">{{ $comp->code }}</span>
                                 </div>
 
                                 @if($comp->description)
@@ -788,66 +795,7 @@
                         </div>
                     @endforelse
 
-                    @php
-                        $openQuestions = $questions->whereNull('competency_id');
-                    @endphp
 
-                    @if($openQuestions->isNotEmpty())
-                        <div class="col-xl-6 col-12">
-                            <div class="card border shadow-sm p-3.5 review-card" style="border-radius: 12px !important; background-color: #fafbfd !important;">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
-                                            Qualitative & Open-Ended
-                                        </span>
-                                        <span class="badge bg-light text-muted border rounded-pill px-2.5 py-1 fs-11 fw-medium">
-                                            <i class="feather-globe me-1"></i>Global
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div class="mb-1.5">
-                                    <h6 class="fw-bold text-dark mb-1 fs-15">General Written Feedback Questions</h6>
-                                    <span class="badge bg-secondary-subtle text-secondary font-monospace fs-10 px-2 py-0.5 rounded">GENERAL-TEXT</span>
-                                </div>
-
-                                <p class="text-muted fs-12 mb-2 lh-base">Open-ended prompts presented to all reviewers to collect qualitative feedback and growth recommendations.</p>
-
-                                <div class="border-top pt-2.5 mt-2">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <span class="text-muted fs-11 fw-bold text-uppercase d-inline-flex align-items-center gap-1">
-                                            <i class="feather-message-square text-info"></i> Open Comment Prompts
-                                        </span>
-                                        <span class="badge bg-light text-secondary border rounded-pill fs-10 px-2 py-0.5">
-                                            {{ $openQuestions->count() }} prompts
-                                        </span>
-                                    </div>
-                                    <div class="d-flex flex-column gap-1.5 mt-1.5">
-                                        @foreach($openQuestions as $oq)
-                                            <div class="p-2 rounded border d-flex align-items-center justify-content-between gap-2" style="background-color: #ffffff; border-color: #e2e8f0 !important;">
-                                                <div class="d-flex align-items-start gap-2 flex-grow-1 min-w-0">
-                                                    <i class="feather-message-square text-info mt-0.5 fs-13 flex-shrink-0"></i>
-                                                    <div class="min-w-0">
-                                                        <span class="text-dark fs-12 fw-medium d-block lh-sm text-break">{{ $oq->question_text }}</span>
-                                                        <div class="d-flex align-items-center gap-1.5 mt-1">
-                                                            <span class="badge bg-light text-muted border fs-10 px-1.5 py-0.5 rounded">
-                                                                Open Text
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <form action="{{ route('hrms.feedback360.questions.destroy', $oq->id) }}" method="POST" class="d-inline m-0 flex-shrink-0">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <x-ui.icon-btn type="submit" icon="feather-x" variant="soft-danger" size="sm" title="Remove question" />
-                                                </form>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    @endif
                 </div>
             </div>
 
@@ -860,14 +808,11 @@
 <!-- MODAL: CREATE FEEDBACK CYCLE -->
 <!-- ========================================================================= -->
 <x-ui.modal id="createCycleModal" title="Create 360-Degree Feedback Cycle" size="lg" :centered="true" :showFooter="false">
-    <form action="{{ route('hrms.feedback360.cycles.store') }}" method="POST">
+    <form action="{{ route('hrms.feedback360.cycles.store') }}" method="POST" id="createCycleForm">
         @csrf
         <div class="row g-4">
-            <div class="col-md-7">
+            <div class="col-12">
                 <x-ui.odoo-form-ui type="input" label="Cycle Name" name="name" placeholder="e.g. Q3 2026 Leadership & Multi-Rater Review" :required="true" />
-            </div>
-            <div class="col-md-5">
-                <x-ui.odoo-form-ui type="input" label="Cycle Code" name="code" placeholder="e.g. F360-2026-Q3" />
             </div>
 
             <div class="col-md-6">
@@ -923,6 +868,73 @@
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
+
+            <!-- Competencies Selection for this Cycle -->
+            <div class="col-12">
+                <div class="p-3 bg-light rounded-3 border">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-0.5">
+                                <h6 class="fw-bold text-dark fs-12 text-uppercase mb-0" style="letter-spacing: 0.5px;">
+                                    Competencies to Evaluate in this Cycle <span class="text-danger">*</span>
+                                </h6>
+                                <span id="selectedCompCountBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold">
+                                    {{ $competencies->count() }} of {{ $competencies->count() }} Selected
+                                </span>
+                            </div>
+                            <span class="text-muted fs-11">Select which competencies from your Master Bank are evaluated in this review cycle.</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary px-3 py-1 fw-bold fs-12 rounded shadow-xs" onclick="toggleCycleCompetencies(true)">
+                                Select All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary px-3 py-1 fw-semibold fs-12 rounded shadow-xs" onclick="toggleCycleCompetencies(false)">
+                                Deselect All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="cycleCompetencyAlert" class="alert alert-danger py-2 px-3 fs-12 mb-2 d-none">
+                        <i class="feather-alert-triangle me-1"></i>Please select at least one competency to evaluate in this review cycle.
+                    </div>
+
+                    @if($competencies->isEmpty())
+                        <div class="text-center py-4 bg-white rounded-3 border">
+                            <i class="feather-info text-primary fs-20 mb-1"></i>
+                            <div class="text-dark fw-semibold fs-13">No Master Competencies Found</div>
+                            <div class="text-muted fs-11">Add competencies in the "Competencies & Question Bank" tab first.</div>
+                        </div>
+                    @else
+                        <div class="d-flex flex-column gap-2" style="max-height: 280px; overflow-y: auto; padding-right: 2px;">
+                            @foreach($competencies as $comp)
+                                <label for="comp_check_{{ $comp->id }}" class="competency-select-card is-selected d-flex align-items-start gap-2.5 p-2.5 rounded-3 mb-0 shadow-xs">
+                                    <div class="m-0 pt-0.5 flex-shrink-0" style="padding-left: 0 !important; width: 20px;">
+                                        <input type="checkbox"
+                                               name="competency_ids[]"
+                                               value="{{ $comp->id }}"
+                                               id="comp_check_{{ $comp->id }}"
+                                               class="form-check-input cycle-comp-checkbox"
+                                               checked
+                                               onchange="updateSelectedCompCount()"
+                                               style="width: 18px !important; height: 18px !important; margin: 0 !important; float: none !important; cursor: pointer;">
+                                    </div>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                            <span class="fw-bold text-dark fs-13 text-break">{{ $comp->name }}</span>
+                                            <span class="badge bg-light text-muted border fs-11 px-2.5 py-1 rounded-pill flex-shrink-0">
+                                                {{ $comp->questions_count ?? $comp->questions->count() }} Questions
+                                            </span>
+                                        </div>
+                                        @if($comp->description)
+                                            <p class="text-muted fs-12 lh-sm text-break mb-0 mt-1">{{ $comp->description }}</p>
+                                        @endif
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </div>
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
@@ -935,29 +947,15 @@
 <!-- ========================================================================= -->
 <!-- MODAL: CREATE COMPETENCY & EVALUATION QUESTIONS (UNIFIED FORM) -->
 <!-- ========================================================================= -->
-<x-ui.modal id="createCompetencyModal" title="Add Competency & Evaluation Questions" size="xl" :centered="true" :static="true" :showFooter="false">
+<x-ui.modal id="createCompetencyModal" title="Add Competency & Evaluation Questions" size="lg" :centered="true" :static="true" :showFooter="false">
     <form action="{{ route('hrms.feedback360.competencies.store') }}" method="POST" id="createCompetencyWithQuestionsForm">
         @csrf
         <div class="row g-3">
-            <div class="col-md-7">
-                <x-ui.odoo-form-ui type="input" label="Competency Name" name="name" placeholder="e.g. Continuous Growth & Core Values" :required="true" />
-            </div>
-            <div class="col-md-5">
-                <x-ui.odoo-form-ui type="input" label="Category" name="category" placeholder="e.g. Core Values / Leadership" :required="true" />
-            </div>
-            <div class="col-md-7">
-                <x-ui.odoo-form-ui type="select" label="Feedback Cycle Scope" name="cycle_id" helperText="Assign to a specific cycle or keep Global for all company cycles.">
-                    <option value="">🌐 Global (All Feedback Cycles)</option>
-                    @foreach($cycles as $c)
-                        <option value="{{ $c->id }}">🎯 {{ $c->name }}</option>
-                    @endforeach
-                </x-ui.odoo-form-ui>
-            </div>
-            <div class="col-md-5">
-                <x-ui.odoo-form-ui type="input" label="Code (Optional)" name="code" placeholder="e.g. COMP-CULT" />
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="input" label="Competency Name" name="name" placeholder="e.g. Leadership, Teamwork, Communication, or Problem Solving" :required="true" />
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="2" placeholder="Define expected behaviors and standards for this competency..." />
+                <x-ui.odoo-form-ui type="textarea" label="Description / Guidance Note" name="description" rows="2" placeholder="Define expected behaviors and standards evaluated under this competency (optional)..." />
             </div>
         </div>
 
@@ -1052,7 +1050,7 @@
             <x-ui.odoo-form-ui type="select" label="Competency" name="competency_id" :searchable="true">
                 <option value="">-- General / Open-Ended (No Specific Competency) --</option>
                 @foreach($competencies as $comp)
-                    <option value="{{ $comp->id }}">{{ $comp->name }} ({{ $comp->category }})</option>
+                    <option value="{{ $comp->id }}">{{ $comp->name }}</option>
                 @endforeach
             </x-ui.odoo-form-ui>
 
@@ -1101,17 +1099,61 @@
 @endforeach
 
 @foreach($myEvaluations as $eval)
-    <!-- Modal: Nominate Peers for this Evaluation -->
-    <x-ui.modal id="nominatePeersModal{{ $eval->id }}" title="Nominate Peer Reviewers" size="md" :centered="true" :showFooter="false">
+    @php
+        $directReports = $eval->employee?->directReports ?? collect();
+        $isManagerReviewee = $directReports->isNotEmpty();
+        $assignedDrIds = $eval->nominations->where('reviewer_type', 'direct_report')->pluck('reviewer_id')->toArray();
+        $assignedPeerIds = $eval->nominations->where('reviewer_type', 'peer')->pluck('reviewer_id')->toArray();
+    @endphp
+    <!-- Modal: Nominate Reviewers for this Evaluation -->
+    <x-ui.modal id="nominatePeersModal{{ $eval->id }}" title="Nominate Reviewers: {{ $eval->cycle?->name }}" size="{{ $isManagerReviewee ? 'lg' : 'md' }}" :centered="true" :showFooter="false">
         <form action="{{ route('hrms.feedback360.participants.nominate-peers', $eval->id) }}" method="POST">
             @csrf
-            <x-ui.odoo-form-ui type="select" label="Peer Raters" name="peer_ids[]" :multiple="true" :searchable="true" :required="true" helperText="Select colleagues you worked with closely. Min: {{ $eval->cycle?->min_peer_nominations ?? 2 }}, Max: {{ $eval->cycle?->max_peer_nominations ?? 5 }}">
-                @foreach($employees as $emp)
-                    @if($emp->id !== $eval->employee_id)
-                        <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->designation->name ?? 'Staff' }})</option>
-                    @endif
-                @endforeach
-            </x-ui.odoo-form-ui>
+
+            <!-- Section 1: Peer Reviewers -->
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fs-12 fw-bold text-uppercase text-dark" style="letter-spacing: 0.5px;">
+                        <i class="feather-users text-primary me-1"></i> Peer Reviewers (Colleagues)
+                    </span>
+                    <span class="text-muted fs-11">
+                        Min: {{ $eval->cycle?->min_peer_nominations ?? 2 }} &bull; Max: {{ $eval->cycle?->max_peer_nominations ?? 5 }}
+                    </span>
+                </div>
+                <x-ui.odoo-form-ui type="select" label="Peer Raters" name="peer_ids[]" :multiple="true" :searchable="true" helperText="Select colleagues across departments you collaborated with closely.">
+                    @foreach($employees as $emp)
+                        @if($emp->id !== $eval->employee_id && !$directReports->pluck('id')->contains($emp->id))
+                            <option value="{{ $emp->id }}" {{ in_array($emp->id, $assignedPeerIds) ? 'selected' : '' }}>
+                                {{ $emp->full_name }} ({{ $emp->designation->name ?? 'Staff' }} - {{ $emp->department->name ?? 'General' }})
+                            </option>
+                        @endif
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+
+            <!-- Section 2: Direct Reports (Shown only if employee has reporting subordinates) -->
+            @if($isManagerReviewee)
+                <div class="mt-4 pt-3 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fs-12 fw-bold text-uppercase text-primary" style="letter-spacing: 0.5px;">
+                            <i class="feather-user-check me-1"></i> Direct Reports (Upward Feedback)
+                        </span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">
+                            Team Size: {{ $directReports->count() }} Subordinates
+                        </span>
+                    </div>
+                    <p class="text-muted fs-12 mb-2">
+                        Select 2–5 direct reports to evaluate your leadership, guidance, and team management. Their evaluations are confidential.
+                    </p>
+                    <x-ui.odoo-form-ui type="select" label="Direct Report Raters" name="direct_report_ids[]" :multiple="true" :searchable="true" helperText="Choose key team members who report directly to you.">
+                        @foreach($directReports as $dr)
+                            <option value="{{ $dr->id }}" {{ in_array($dr->id, $assignedDrIds) ? 'selected' : '' }}>
+                                {{ $dr->full_name }} ({{ $dr->designation->name ?? 'Staff' }})
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+            @endif
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                 <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Discard</x-ui.button>
@@ -1136,7 +1178,7 @@
         $cycle = $firstNom->cycle;
         $nominator = $firstNom->nominator;
     @endphp
-    <x-ui.modal id="{{ $modalId }}" title="Review Peer Nominations: {{ $subjectEmployee?->full_name }}" size="lg" :centered="true" :showFooter="false">
+    <x-ui.modal id="{{ $modalId }}" title="Review Nominations: {{ $subjectEmployee?->full_name }}" size="lg" :centered="true" :showFooter="false">
         <form action="{{ route('hrms.feedback360.nominations.batch-approve') }}" method="POST">
             @csrf
 
@@ -1152,7 +1194,7 @@
 
             <div class="alert alert-light border text-muted fs-12 mb-3 py-2 px-3 rounded d-flex align-items-center gap-2">
                 <i class="feather-info text-primary fs-14"></i>
-                <span>Select the peers you wish to approve or reject. You can check/uncheck individuals below.</span>
+                <span>Review peer and upward feedback nominees. You can approve or reject individuals below.</span>
             </div>
 
             <!-- Select All / Total Strip -->
@@ -1173,14 +1215,14 @@
                 @foreach($group as $nom)
                     <label class="d-flex align-items-center gap-3 p-3 border rounded bg-white hover-bg-light cursor-pointer mb-0" for="nom_check_{{ $nom->id }}" style="transition: all 0.15s ease-in-out;">
                         <input class="form-check-input flex-shrink-0 mt-0 nom-check-{{ $modalId }}" type="checkbox" name="nomination_ids[]" value="{{ $nom->id }}" id="nom_check_{{ $nom->id }}" checked>
-                        <div class="avatar-initials bg-info-subtle text-info fw-bold flex-shrink-0 me-2" style="width: 36px; height: 36px; min-width: 36px;">
-                            {{ substr($nom->reviewer?->first_name ?? 'P', 0, 1) }}
+                        <div class="avatar-initials {{ $nom->reviewer_type === 'direct_report' ? 'bg-primary-subtle text-primary' : 'bg-info-subtle text-info' }} fw-bold flex-shrink-0 me-2" style="width: 36px; height: 36px; min-width: 36px;">
+                            {{ substr($nom->reviewer?->first_name ?? 'R', 0, 1) }}
                         </div>
                         <div class="flex-grow-1 overflow-hidden">
                             <div class="d-flex align-items-center justify-content-between gap-2">
                                 <span class="fw-bold text-dark fs-13">{{ $nom->reviewer?->full_name }}</span>
-                                <span class="badge bg-info-subtle text-info rounded-pill px-2 py-0.5 fs-11 fw-semibold">
-                                    {{ ucfirst($nom->reviewer_type ?? 'peer') }}
+                                <span class="badge {{ $nom->reviewer_type === 'direct_report' ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-info-subtle text-info border border-info-subtle' }} rounded-pill px-2.5 py-0.5 fs-11 fw-semibold">
+                                    {{ $nom->reviewer_type === 'direct_report' ? 'Direct Report (Upward)' : 'Peer' }}
                                 </span>
                             </div>
                             <div class="text-muted fs-11 mt-0.5">
@@ -1301,6 +1343,77 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     tr.querySelector('input').value = '';
                 }
+            }
+        });
+    }
+});
+
+function updateSelectedCompCount() {
+    const checkboxes = document.querySelectorAll('.cycle-comp-checkbox');
+    const total = checkboxes.length;
+    let checked = 0;
+
+    checkboxes.forEach(function(cb) {
+        const card = cb.closest('.competency-select-card');
+        if (cb.checked) {
+            checked++;
+            if (card) {
+                card.classList.add('is-selected');
+                card.style.borderColor = '#0d6efd';
+                card.style.backgroundColor = '#f8faff';
+            }
+        } else {
+            if (card) {
+                card.classList.remove('is-selected');
+                card.style.borderColor = '#e2e8f0';
+                card.style.backgroundColor = '#ffffff';
+            }
+        }
+    });
+
+    const badge = document.getElementById('selectedCompCountBadge');
+    if (badge) {
+        badge.textContent = checked + ' of ' + total + ' Selected';
+        if (checked === 0) {
+            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold';
+        } else if (checked === total) {
+            badge.className = 'badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold';
+        } else {
+            badge.className = 'badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold';
+        }
+    }
+
+    const alertEl = document.getElementById('cycleCompetencyAlert');
+    if (alertEl && checked > 0) {
+        alertEl.classList.add('d-none');
+    }
+}
+
+function toggleCycleCompetencies(select) {
+    document.querySelectorAll('.cycle-comp-checkbox').forEach(function(cb) {
+        cb.checked = select;
+    });
+    updateSelectedCompCount();
+}
+
+window.toggleCycleCompetencies = toggleCycleCompetencies;
+window.updateSelectedCompCount = updateSelectedCompCount;
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateSelectedCompCount();
+
+    const cycleForm = document.getElementById('createCycleForm');
+    if (cycleForm) {
+        cycleForm.addEventListener('submit', function(e) {
+            const checked = cycleForm.querySelectorAll('.cycle-comp-checkbox:checked');
+            const alertEl = document.getElementById('cycleCompetencyAlert');
+            if (checked.length === 0) {
+                e.preventDefault();
+                if (alertEl) {
+                    alertEl.classList.remove('d-none');
+                    alertEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                return false;
             }
         });
     }

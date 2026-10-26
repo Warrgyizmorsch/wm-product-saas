@@ -526,6 +526,18 @@ class AttendanceController extends Controller
             ->with('leaveType')
             ->get();
 
+        $wfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($q) use ($startDate, $endDate) {
+                $q->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhere(function($sub) use ($startDate, $endDate) {
+                      $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                          ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                  });
+            })
+            ->get();
+
         $attendancesByDate = $attendances->keyBy(function($att) {
             return $att->date->format('Y-m-d');
         });
@@ -544,12 +556,51 @@ class AttendanceController extends Controller
                 $holidays,
                 $leaves
             );
+
+            $hasWfhToday = $wfhRequests->first(function($w) use ($dateStr) {
+                $sDate = $w->start_date instanceof \Carbon\Carbon ? $w->start_date->format('Y-m-d') : \Carbon\Carbon::parse($w->start_date)->format('Y-m-d');
+                $eDate = $w->end_date instanceof \Carbon\Carbon ? $w->end_date->format('Y-m-d') : \Carbon\Carbon::parse($w->end_date)->format('Y-m-d');
+                return $sDate <= $dateStr && $eDate >= $dateStr;
+            });
+
+            if ($hasWfhToday) {
+                $locationType = 'wfh';
+                $formattedLocationType = 'WFH';
+            } elseif ($attRecord && !empty($attRecord->location_type)) {
+                $locRaw = strtolower(trim($attRecord->location_type));
+                if (in_array($locRaw, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                    $formattedLocationType = 'On-Site';
+                } elseif ($locRaw === 'wfh') {
+                    $locationType = 'wfh';
+                    $formattedLocationType = 'WFH';
+                } else {
+                    $locationType = 'office';
+                    $formattedLocationType = 'Office';
+                }
+            } else {
+                $empLoc = strtolower(trim((string)$employee->office));
+                if (in_array($empLoc, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                    $formattedLocationType = 'On-Site';
+                } elseif ($empLoc === 'wfh') {
+                    $locationType = 'wfh';
+                    $formattedLocationType = 'WFH';
+                } else {
+                    $locationType = 'office';
+                    $formattedLocationType = 'Office';
+                }
+            }
+
+            if ($attRecord && empty($attRecord->location_type)) {
+                $attRecord->update(['location_type' => $locationType]);
+            }
             
             $dayObj = new \stdClass();
             $dayObj->id = $attRecord ? $attRecord->id : null;
             $dayObj->date = $currentDate->copy();
-            $dayObj->location_type = $attRecord ? $attRecord->location_type : '';
-            $dayObj->formatted_location_type = $attRecord ? $attRecord->formatted_location_type : '—';
+            $dayObj->location_type = $locationType;
+            $dayObj->formatted_location_type = $formattedLocationType;
             $dayObj->check_in = $attRecord ? $attRecord->check_in : null;
             $dayObj->check_in_latitude = $attRecord ? $attRecord->check_in_latitude : null;
             $dayObj->check_out = $attRecord ? $attRecord->check_out : null;
@@ -559,15 +610,34 @@ class AttendanceController extends Controller
             $dayObj->formatted_break_hours = $attRecord ? $attRecord->formatted_break_hours : '—';
             $dayObj->formatted_work_hours = $attRecord ? $attRecord->formatted_work_hours : '—';
             
-            $dayObj->status = $resolved['status'];
-            $dayObj->status_label = $resolved['label'];
+            $dayObj->status = ($hasWfhToday && $resolved['status'] === 'present') ? 'wfh' : $resolved['status'];
+            $dayObj->status_label = ($hasWfhToday && $resolved['status'] === 'present') ? 'WFH' : $resolved['label'];
             $dayObj->holiday_name = $resolved['holiday_name'];
             $dayObj->leave_type_name = $resolved['leave_type_name'];
             
             $dayObj->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
             $dayObj->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
+            // Auto-refresh snapshot if using old watermarked image or missing
+            $hasOldSnapshot = empty($attRecord?->route_snapshot_url) 
+                || str_contains($attRecord->route_snapshot_url, '1792818237')
+                || str_contains($attRecord->route_snapshot_url, '1792821251');
+
+            if ($attRecord && !empty($attRecord->route_polyline) && $hasOldSnapshot) {
+                try {
+                    $refreshedSnapshot = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->regenerateRouteSnapshot($attRecord);
+                    if ($refreshedSnapshot) {
+                        $attRecord->route_snapshot_url = $refreshedSnapshot;
+                    }
+                } catch (\Throwable $e) {}
+            }
+
             $dayObj->check_in_longitude = $attRecord ? $attRecord->check_in_longitude : null;
             $dayObj->check_out_longitude = $attRecord ? $attRecord->check_out_longitude : null;
+            $dayObj->total_distance_km = $attRecord ? (float)($attRecord->total_distance_km ?? 0) : 0;
+            $dayObj->route_snapshot_url = $attRecord ? $attRecord->route_snapshot_url : null;
+            $dayObj->route_polyline = $attRecord ? $attRecord->route_polyline : null;
+            $dayObj->route_summary = $attRecord ? $attRecord->route_summary : [];
+            $dayObj->formatted_location_logs = $attRecord ? $attRecord->formatted_location_logs : [];
             $dayObj->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
 
             $calendarDays[] = $dayObj;
@@ -720,7 +790,10 @@ class AttendanceController extends Controller
 
     public function breakIn(Request $request, Attendance $attendance)
     {
-        $this->attendanceRepository->breakIn($attendance->id);
+        $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
+        $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
+
+        $this->attendanceRepository->breakIn($attendance->id, $latitude, $longitude);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json(['status' => 'success', 'message' => 'Break started successfully.']);
@@ -731,7 +804,10 @@ class AttendanceController extends Controller
 
     public function breakOut(Request $request, Attendance $attendance)
     {
-        $this->attendanceRepository->breakOut($attendance->id);
+        $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
+        $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
+
+        $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json(['status' => 'success', 'message' => 'Break ended successfully.']);
@@ -812,6 +888,18 @@ class AttendanceController extends Controller
             })
             ->toArray();
 
+        $wfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($q) use ($startDate, $endDate) {
+                $q->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                  ->orWhere(function($sub) use ($startDate, $endDate) {
+                      $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                          ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                  });
+            })
+            ->get();
+
         $attendancesByDate = $logs->keyBy(function($att) {
             return $att->date->format('Y-m-d');
         });
@@ -830,12 +918,51 @@ class AttendanceController extends Controller
                 $holidays,
                 $leaves
             );
+
+            $hasWfhToday = $wfhRequests->first(function($w) use ($dateStr) {
+                $sDate = $w->start_date instanceof \Carbon\Carbon ? $w->start_date->format('Y-m-d') : \Carbon\Carbon::parse($w->start_date)->format('Y-m-d');
+                $eDate = $w->end_date instanceof \Carbon\Carbon ? $w->end_date->format('Y-m-d') : \Carbon\Carbon::parse($w->end_date)->format('Y-m-d');
+                return $sDate <= $dateStr && $eDate >= $dateStr;
+            });
+
+            if ($hasWfhToday) {
+                $locationType = 'wfh';
+                $formattedLocationType = 'WFH';
+            } elseif ($attRecord && !empty($attRecord->location_type)) {
+                $locRaw = strtolower(trim($attRecord->location_type));
+                if (in_array($locRaw, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                    $formattedLocationType = 'On-Site';
+                } elseif ($locRaw === 'wfh') {
+                    $locationType = 'wfh';
+                    $formattedLocationType = 'WFH';
+                } else {
+                    $locationType = 'office';
+                    $formattedLocationType = 'Office';
+                }
+            } else {
+                $empLoc = strtolower(trim((string)$employee->office));
+                if (in_array($empLoc, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                    $formattedLocationType = 'On-Site';
+                } elseif ($empLoc === 'wfh') {
+                    $locationType = 'wfh';
+                    $formattedLocationType = 'WFH';
+                } else {
+                    $locationType = 'office';
+                    $formattedLocationType = 'Office';
+                }
+            }
+
+            if ($attRecord && empty($attRecord->location_type)) {
+                $attRecord->update(['location_type' => $locationType]);
+            }
             
             $log = new \stdClass();
             $log->id = $attRecord ? $attRecord->id : 'virtual_' . $currentDate->timestamp;
             $log->date = $currentDate->format('M d, Y');
-            $log->formatted_location_type = $attRecord ? $attRecord->formatted_location_type : '—';
-            $log->location_type = $attRecord ? $attRecord->location_type : '';
+            $log->formatted_location_type = $formattedLocationType;
+            $log->location_type = $locationType;
             $log->check_in = $attRecord ? $attRecord->check_in : null;
             $log->check_out = $attRecord ? $attRecord->check_out : null;
             $log->breaks = $attRecord ? $attRecord->breaks : collect();
@@ -843,8 +970,8 @@ class AttendanceController extends Controller
             $log->formatted_break_hours = $attRecord ? $attRecord->formatted_break_hours : '—';
             $log->formatted_work_hours = $attRecord ? $attRecord->formatted_work_hours : '—';
             
-            $log->status = $resolved['status'];
-            $log->status_label = $resolved['label'];
+            $log->status = ($hasWfhToday && $resolved['status'] === 'present') ? 'wfh' : $resolved['status'];
+            $log->status_label = ($hasWfhToday && $resolved['status'] === 'present') ? 'WFH' : $resolved['label'];
             $log->holiday_name = $resolved['holiday_name'];
             $log->leave_type_name = $resolved['leave_type_name'];
             $log->check_in_latitude = $attRecord ? $attRecord->check_in_latitude : null;
@@ -854,6 +981,22 @@ class AttendanceController extends Controller
             $log->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
             $log->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
             $log->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
+
+            $snapshotUrl = null;
+            if ($attRecord && !empty($attRecord->route_snapshot_url)) {
+                $rawUrl = $attRecord->route_snapshot_url;
+                if (str_starts_with($rawUrl, 'http://') || str_starts_with($rawUrl, 'https://')) {
+                    $snapshotUrl = $rawUrl;
+                } elseif (str_starts_with($rawUrl, 'storage/') || str_starts_with($rawUrl, '/storage/')) {
+                    $snapshotUrl = asset(ltrim($rawUrl, '/'));
+                } else {
+                    $snapshotUrl = asset('storage/' . ltrim($rawUrl, '/'));
+                }
+            }
+            $log->total_distance_km = $attRecord ? (float)($attRecord->total_distance_km ?? 0) : 0;
+            $log->route_snapshot_url = $snapshotUrl;
+            $log->route_summary = $attRecord ? $attRecord->route_summary : [];
+            $log->formatted_location_logs = $attRecord ? $attRecord->formatted_location_logs : [];
 
             $calendarDays[] = $log;
             
@@ -966,7 +1109,10 @@ class AttendanceController extends Controller
                     'check_out_longitude' => $log->check_out_longitude,
                     'check_in_selfie_url' => $log->check_in_selfie_path ? asset('storage/' . $log->check_in_selfie_path) : null,
                     'check_out_selfie_url' => $log->check_out_selfie_path ? asset('storage/' . $log->check_out_selfie_path) : null,
-                    'location_logs' => $log->locationLogs->map(fn($l) => [
+                    'total_distance_km' => $log->total_distance_km,
+                    'route_snapshot_url' => $log->route_snapshot_url,
+                    'route_summary' => $log->route_summary,
+                    'location_logs' => !empty($log->formatted_location_logs) ? $log->formatted_location_logs : $log->locationLogs->map(fn($l) => [
                         'lat' => (float)$l->latitude,
                         'lng' => (float)$l->longitude,
                         'time' => $l->created_at ? $l->created_at->format('h:i A') : ''
@@ -1002,6 +1148,12 @@ class AttendanceController extends Controller
             ->with('leaveType')
             ->get();
 
+        $wfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('status', 'approved')
+            ->whereDate('start_date', '<=', $dateStr)
+            ->whereDate('end_date', '>=', $dateStr)
+            ->get()
+            ->keyBy('employee_id');
+
         $attendances = Attendance::where('date', $dateStr)
             ->forUserScope($user)
             ->with(['breaks', 'locationLogs'])
@@ -1013,9 +1165,45 @@ class AttendanceController extends Controller
             ->pluck('employee_id')
             ->toArray();
 
-        $logs = $employees->map(function ($employee) use ($carbonDate, $attendances, $holidays, $leaves) {
+        $logs = $employees->map(function ($employee) use ($carbonDate, $dateStr, $attendances, $holidays, $leaves, $wfhRequests) {
             $attRecord = $attendances->get($employee->id);
             $resolved = $this->resolveStatusForDate($employee, $carbonDate, $attRecord, $holidays, $leaves);
+
+            $hasWfhToday = $wfhRequests->has($employee->id);
+
+            // Resolve effective location type (WFH request > record location > employee profile location)
+            if ($hasWfhToday) {
+                $locationType = 'wfh';
+                $formattedLocationType = 'WFH';
+            } elseif ($attRecord && !empty($attRecord->location_type)) {
+                $locRaw = strtolower(trim($attRecord->location_type));
+                if (in_array($locRaw, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                    $formattedLocationType = 'On-Site';
+                } elseif ($locRaw === 'wfh') {
+                    $locationType = 'wfh';
+                    $formattedLocationType = 'WFH';
+                } else {
+                    $locationType = 'office';
+                    $formattedLocationType = 'Office';
+                }
+            } else {
+                $empLoc = strtolower(trim((string)$employee->office));
+                if (in_array($empLoc, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                    $formattedLocationType = 'On-Site';
+                } elseif ($empLoc === 'wfh') {
+                    $locationType = 'wfh';
+                    $formattedLocationType = 'WFH';
+                } else {
+                    $locationType = 'office';
+                    $formattedLocationType = 'Office';
+                }
+            }
+
+            if ($attRecord && empty($attRecord->location_type)) {
+                $attRecord->update(['location_type' => $locationType]);
+            }
 
             $log = new \stdClass();
             $log->id = $attRecord ? $attRecord->id : 'virtual_' . $employee->id;
@@ -1023,15 +1211,15 @@ class AttendanceController extends Controller
             $log->employee_name = $employee->display_name;
             $log->employee_code = $employee->employee_id;
             $log->department = $employee->department?->name ?? 'No Department';
-            $log->formatted_location_type = $attRecord ? $attRecord->formatted_location_type : '—';
-            $log->location_type = $attRecord ? $attRecord->location_type : '';
+            $log->formatted_location_type = $formattedLocationType;
+            $log->location_type = $locationType;
             $log->check_in = $attRecord ? $attRecord->check_in : null;
             $log->check_out = $attRecord ? $attRecord->check_out : null;
             $log->breaks = $attRecord ? $attRecord->breaks : collect();
             $log->total_break_hours = $attRecord ? $attRecord->total_break_hours : 0;
             $log->formatted_break_hours = $attRecord ? $attRecord->formatted_break_hours : '—';
             $log->formatted_work_hours = $attRecord ? $attRecord->formatted_work_hours : '—';
-            $log->status = $resolved['status'];
+            $log->status = ($hasWfhToday && $resolved['status'] === 'present') ? 'wfh' : $resolved['status'];
             $log->holiday_name = $resolved['holiday_name'];
             $log->leave_type_name = $resolved['leave_type_name'];
             $log->check_in_latitude = $attRecord ? $attRecord->check_in_latitude : null;
@@ -1040,6 +1228,21 @@ class AttendanceController extends Controller
             $log->check_out_longitude = $attRecord ? $attRecord->check_out_longitude : null;
             $log->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
             $log->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
+            $log->total_distance_km = $attRecord ? (float)($attRecord->total_distance_km ?? 0) : 0;
+            $snapshotUrl = null;
+            if ($attRecord && !empty($attRecord->route_snapshot_url)) {
+                $rawUrl = $attRecord->route_snapshot_url;
+                if (str_starts_with($rawUrl, 'http://') || str_starts_with($rawUrl, 'https://')) {
+                    $snapshotUrl = $rawUrl;
+                } elseif (str_starts_with($rawUrl, 'storage/') || str_starts_with($rawUrl, '/storage/')) {
+                    $snapshotUrl = asset(ltrim($rawUrl, '/'));
+                } else {
+                    $snapshotUrl = asset('storage/' . ltrim($rawUrl, '/'));
+                }
+            }
+            $log->route_snapshot_url = $snapshotUrl;
+            $log->route_summary = $attRecord ? $attRecord->route_summary : [];
+            $log->formatted_location_logs = $attRecord ? $attRecord->formatted_location_logs : [];
             $log->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
 
             return $log;
@@ -1143,11 +1346,10 @@ class AttendanceController extends Controller
                     'check_out_longitude' => $log->check_out_longitude,
                     'check_in_selfie_url' => $log->check_in_selfie_path ? asset('storage/' . $log->check_in_selfie_path) : null,
                     'check_out_selfie_url' => $log->check_out_selfie_path ? asset('storage/' . $log->check_out_selfie_path) : null,
-                    'location_logs' => $log->locationLogs->map(fn($l) => [
-                        'lat' => (float)$l->latitude,
-                        'lng' => (float)$l->longitude,
-                        'time' => $l->created_at ? $l->created_at->format('h:i A') : ''
-                    ])->toArray(),
+                    'total_distance_km' => $log->total_distance_km,
+                    'route_snapshot_url' => $log->route_snapshot_url,
+                    'route_summary' => $log->route_summary,
+                    'location_logs' => $log->formatted_location_logs,
                 ];
             }),
         ]);

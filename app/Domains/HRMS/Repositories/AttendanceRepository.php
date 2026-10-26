@@ -4,6 +4,7 @@ namespace App\Domains\HRMS\Repositories;
 
 use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\AttendanceBreak;
+use App\Domains\HRMS\Models\AttendanceLocationLog;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\HolidayCalendar;
 use App\Domains\HRMS\Models\LeaveRequest;
@@ -15,9 +16,20 @@ class AttendanceRepository implements AttendanceRepositoryInterface
     public function getEmployeeTodayAttendance(int $employeeId): ?Attendance
     {
         $today = Carbon::now()->format('Y-m-d');
+        $shiftCutoff = Carbon::now()->subHours(18);
+
         return Attendance::where('employee_id', $employeeId)
-            ->where('date', $today)
+            ->where(function ($q) use ($today, $shiftCutoff) {
+                $q->where('date', $today)
+                  ->orWhere(function ($sub) use ($shiftCutoff) {
+                      // Include active overnight shift that started yesterday within last 18 hours
+                      $sub->whereNotNull('check_in')
+                          ->whereNull('check_out')
+                          ->where('check_in', '>=', $shiftCutoff);
+                  });
+            })
             ->with('breaks')
+            ->latest('check_in')
             ->first();
     }
 
@@ -26,17 +38,100 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         $selfiePath = $this->uploadSelfie($selfiePath, 'in');
         $tenantId = auth()->user()?->tenant_id;
         $today = Carbon::now()->format('Y-m-d');
+        $shiftCutoff = Carbon::now()->subHours(18);
 
-        // Check if already checked in today
+        // 1. Auto-flag any old unclosed attendances (older than 18 hours or from past days) as missing logs FIRST
+        // This guarantees stale open shifts from previous days never block check-in indefinitely!
+        $pastMissingLogs = Attendance::where('employee_id', $employeeId)
+            ->whereNull('check_out')
+            ->where(function ($q) use ($shiftCutoff, $today) {
+                $q->where('check_in', '<', $shiftCutoff)
+                  ->orWhere('date', '<', Carbon::yesterday()->format('Y-m-d'));
+            })
+            ->get();
+
+        if ($pastMissingLogs->isNotEmpty()) {
+            foreach ($pastMissingLogs as $pastLog) {
+                if ($pastLog->status !== 'missing_logs') {
+                    $pastLog->update(['status' => 'missing_logs']);
+
+                    $pastMissingCount = Attendance::where('employee_id', $employeeId)
+                        ->where('status', 'missing_logs')
+                        ->whereBetween('date', [Carbon::now()->startOfMonth()->toDateString(), Carbon::now()->endOfMonth()->toDateString()])
+                        ->count();
+
+                    $this->applyMissingLogsPenalty(Employee::find($employeeId), $pastLog->date->toDateString(), $pastMissingCount);
+                }
+            }
+        }
+
+        // 2. Check if employee already has an active ongoing shift (started within last 18h) or already checked in today
         $existing = Attendance::where('employee_id', $employeeId)
-            ->where('date', $today)
+            ->where(function ($q) use ($today, $shiftCutoff) {
+                $q->where('date', $today)
+                  ->orWhere(function ($sub) use ($shiftCutoff) {
+                      $sub->whereNotNull('check_in')
+                          ->whereNull('check_out')
+                          ->where('check_in', '>=', $shiftCutoff);
+                  });
+            })
+            ->latest('check_in')
             ->first();
 
+        $employee = Employee::find($employeeId);
+
         if ($existing) {
+            // 1. If currently clocked in (still working), return active attendance
+            if (empty($existing->check_out)) {
+                return $existing;
+            }
+
+            // 2. Already clocked out today: Check if multiple punches / split shifts are allowed
+            $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+            if (!$rule || empty($rule->allow_multiple_punches)) {
+                return $existing; // Default: Single shift per calendar date preserved
+            }
+
+            // 3. Multi-Punch Allowed: Reopen session for the new work period
+            // Calculate elapsed interim period between previous checkout and new check-in
+            $prevCheckOut = \Carbon\Carbon::parse($existing->check_out);
+            $now = \Carbon\Carbon::now();
+            $interimMinutes = max(0, (int) $prevCheckOut->diffInMinutes($now));
+
+            // Record the interim period as an authorized split shift interval
+            AttendanceBreak::create([
+                'attendance_id'    => $existing->id,
+                'break_in'         => $prevCheckOut,
+                'break_out'        => $now,
+                'duration_minutes' => $interimMinutes,
+            ]);
+
+            $existing->load('breaks');
+            $totalBreakMinutes = $existing->breaks->sum('duration_minutes');
+            $totalBreakHours = round($totalBreakMinutes / 60, 2);
+
+            $existing->update([
+                'check_out'             => null,
+                'check_out_latitude'    => null,
+                'check_out_longitude'   => null,
+                'check_out_selfie_path' => null,
+                'total_break_hours'     => $totalBreakHours,
+            ]);
+
+            // Add resumption milestone breadcrumb
+            if ($latitude !== null && $longitude !== null) {
+                AttendanceLocationLog::create([
+                    'tenant_id'     => $existing->tenant_id,
+                    'attendance_id' => $existing->id,
+                    'latitude'      => $latitude,
+                    'longitude'     => $longitude,
+                    'created_at'    => Carbon::now(),
+                ]);
+            }
+
             return $existing;
         }
 
-        $employee = Employee::find($employeeId);
         $status = 'present';
 
         // Check if employee has an approved WFH request for today
@@ -48,10 +143,15 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
         if ($hasWfh) {
             $locationType = 'wfh';
-            $expectedLat = $hasWfh->wfh_latitude;
-            $expectedLng = $hasWfh->wfh_longitude;
+            $expectedLat = $hasWfh->wfh_latitude ?? $employee?->wfh_latitude;
+            $expectedLng = $hasWfh->wfh_longitude ?? $employee?->wfh_longitude;
         } else {
-            $locationType = $employee ? ($employee->office ?: 'office') : 'office';
+            $locationType = strtolower(trim((string) ($employee?->office ?: 'office')));
+            $locationType = match ($locationType) {
+                'on-site', 'site' => 'onsite',
+                'work from home', 'remote' => 'wfh',
+                default => in_array($locationType, ['office', 'wfh', 'onsite'], true) ? $locationType : 'office',
+            };
             if ($locationType === 'wfh') {
                 $expectedLat = $employee?->wfh_latitude;
                 $expectedLng = $employee?->wfh_longitude;
@@ -62,15 +162,18 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         // Geofencing Check
-        $rule = \App\Domains\HRMS\Models\AttendanceRule::where(function ($q) use ($employee) {
-                if ($employee) {
-                    $q->where('company_id', $employee->company_id)
-                      ->orWhereNull('company_id');
-                }
-            })
-            ->where('status', true)
-            ->orderByRaw('company_id IS NULL ASC')
-            ->first();
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+        if ($rule && $rule->isTrackingEnabled($locationType)) {
+            $trackingMinutes = $rule->getTrackingMinutes($locationType);
+            $movementThreshold = $locationType === 'wfh'
+                ? $rule->wfh_tracking_meters
+                : (in_array($locationType, ['onsite', 'site'], true) ? $rule->site_tracking_meters : null);
+            if (!$trackingMinutes || ($movementThreshold !== null && (int) $movementThreshold < 1)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'attendance_rule' => 'Live location tracking is enabled, but its interval or movement threshold is missing from attendance rules. Please contact HR.',
+                ]);
+            }
+        }
 
         // Selfie Requirement Check
         $selfieRequired = false;
@@ -91,9 +194,9 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         if ($locationType === 'wfh') {
             $wfhLocationRequired = $rule ? (bool)$rule->wfh_location : false;
             $wfhGeofenceEnabled = $rule ? (bool)$rule->wfh_geofence : false;
-            $wfhRadius = $rule && $rule->wfh_tracking_meters ? (int)$rule->wfh_tracking_meters : 200; // default 200m
+            $wfhRadius = (int) ($rule?->wfh_tracking_meters ?? 0);
 
-            if ($wfhLocationRequired || $wfhGeofenceEnabled) {
+            if ($wfhLocationRequired || $wfhGeofenceEnabled || ($rule && $rule->isTrackingEnabled($locationType))) {
                 if (is_null($latitude) || is_null($longitude)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Your GPS coordinates are required to check in for WFH. Please enable location services in your browser.',
@@ -102,6 +205,11 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             }
 
             if ($wfhGeofenceEnabled) {
+                if ($wfhRadius < 1) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'location' => 'The WFH geofence radius is missing from the attendance rules. Please contact HR.',
+                    ]);
+                }
                 if (is_null($expectedLat) || is_null($expectedLng)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'WFH geofencing is enabled, but your WFH coordinates are not configured. Please update them in your profile or contact HR.',
@@ -123,27 +231,34 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         } elseif ($locationType === 'office') {
             // Check if office web check-in is enabled. If not, reject!
             $officeWebEnabled = $rule ? (bool)$rule->office_web : false;
-            if (!$officeWebEnabled) {
+            if ($rule && !$officeWebEnabled) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'location' => 'Web/Mobile check-in is disabled for office employees under the current rules.',
                 ]);
             }
 
             $officeGeofenceEnabled = $rule ? (bool)$rule->office_geofence : false;
-            if ($officeGeofenceEnabled) {
+            if ($officeGeofenceEnabled || ($rule && $rule->isTrackingEnabled($locationType))) {
                 if (is_null($latitude) || is_null($longitude)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Your GPS coordinates are required to check in at the office. Please enable location services in your browser.',
                     ]);
                 }
 
+                if ($officeGeofenceEnabled) {
                 $officeLat = $rule ? $rule->office_latitude : null;
                 $officeLng = $rule ? $rule->office_longitude : null;
-                $officeRadius = $rule && $rule->office_radius ? (int)$rule->office_radius : 200; // default 200m
+                $officeRadius = (int) ($rule?->office_radius ?? 0);
 
                 if (is_null($officeLat) || is_null($officeLng)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Office geofencing coordinates are not configured in attendance rules. Please contact HR.',
+                    ]);
+                }
+
+                if ($officeRadius < 1) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'location' => 'The office geofence radius is missing from the attendance rules. Please contact HR.',
                     ]);
                 }
 
@@ -158,10 +273,11 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                         ),
                     ]);
                 }
+                }
             }
         } elseif ($locationType === 'onsite' || $locationType === 'site') {
             $siteLocationRequired = $rule ? (bool)$rule->site_location : false;
-            if ($siteLocationRequired) {
+            if ($siteLocationRequired || ($rule && $rule->isTrackingEnabled($locationType))) {
                 if (is_null($latitude) || is_null($longitude)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Your GPS coordinates are required to check in for On-Site. Please enable location services in your browser.',
@@ -206,28 +322,6 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             }
         }
 
-        // Find past attendances where check_out is null and date < today to auto-flag missing logs
-        $pastMissingLogs = Attendance::where('employee_id', $employeeId)
-            ->whereNull('check_out')
-            ->where('date', '<', $today)
-            ->get();
-
-        if ($pastMissingLogs->isNotEmpty()) {
-            foreach ($pastMissingLogs as $pastLog) {
-                if ($pastLog->status !== 'missing_logs') {
-                    $pastLog->update(['status' => 'missing_logs']);
-                    
-                    // Count total missing logs in the current calendar month
-                    $pastMissingCount = Attendance::where('employee_id', $employeeId)
-                        ->where('status', 'missing_logs')
-                        ->whereBetween('date', [Carbon::now()->startOfMonth()->toDateString(), Carbon::now()->endOfMonth()->toDateString()])
-                        ->count();
-
-                    $this->applyMissingLogsPenalty($employee, $pastLog->date->toDateString(), $pastMissingCount);
-                }
-            }
-        }
-
         return Attendance::create([
             'tenant_id' => $tenantId,
             'employee_id' => $employeeId,
@@ -257,15 +351,18 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         $locationType = $attendance->location_type;
 
         // Fetch attendance rule
-        $rule = \App\Domains\HRMS\Models\AttendanceRule::where(function ($q) use ($employee) {
-                if ($employee) {
-                    $q->where('company_id', $employee->company_id)
-                      ->orWhereNull('company_id');
-                }
-            })
-            ->where('status', true)
-            ->orderByRaw('company_id IS NULL ASC')
-            ->first();
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+        if ($rule && $rule->isTrackingEnabled($locationType)) {
+            $trackingMinutes = $rule->getTrackingMinutes($locationType);
+            $movementThreshold = $locationType === 'wfh'
+                ? $rule->wfh_tracking_meters
+                : (in_array($locationType, ['onsite', 'site'], true) ? $rule->site_tracking_meters : null);
+            if (!$trackingMinutes || ($movementThreshold !== null && (int) $movementThreshold < 1)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'attendance_rule' => 'Live location tracking is enabled, but its interval or movement threshold is missing from attendance rules. Please contact HR.',
+                ]);
+            }
+        }
 
         // Selfie Requirement Check
         $selfieRequired = false;
@@ -287,14 +384,20 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         if ($locationType === 'wfh') {
             $wfhLocationRequired = $rule ? (bool)$rule->wfh_location : false;
             $wfhGeofenceEnabled = $rule ? (bool)$rule->wfh_geofence : false;
-            $wfhRadius = $rule && $rule->wfh_tracking_meters ? (int)$rule->wfh_tracking_meters : 200;
+            $wfhRadius = (int) ($rule?->wfh_tracking_meters ?? 0);
 
-            if ($wfhLocationRequired || $wfhGeofenceEnabled) {
+            if ($wfhLocationRequired || $wfhGeofenceEnabled || ($rule && $rule->isTrackingEnabled($locationType))) {
                 if (is_null($latitude) || is_null($longitude)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Your GPS coordinates are required to check out for WFH. Please enable location services in your browser.',
                     ]);
                 }
+            }
+
+            if ($wfhGeofenceEnabled && $wfhRadius < 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'location' => 'The WFH geofence radius is missing from the attendance rules. Please contact HR.',
+                ]);
             }
 
             if ($wfhGeofenceEnabled) {
@@ -304,8 +407,14 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                     ->whereDate('end_date', '>=', $attendance->date)
                     ->first();
 
-                $expectedLat = $hasWfh ? $hasWfh->wfh_latitude : ($employee ? $employee->wfh_latitude : null);
-                $expectedLng = $hasWfh ? $hasWfh->wfh_longitude : ($employee ? $employee->wfh_longitude : null);
+                $expectedLat = $hasWfh?->wfh_latitude ?? $employee?->wfh_latitude;
+                $expectedLng = $hasWfh?->wfh_longitude ?? $employee?->wfh_longitude;
+
+                if (is_null($expectedLat) || is_null($expectedLng)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'location' => 'WFH geofencing is enabled, but home coordinates are missing from the approved request and employee profile.',
+                    ]);
+                }
 
                 if (!is_null($expectedLat) && !is_null($expectedLng)) {
                     $distance = $this->calculateDistance((float)$latitude, (float)$longitude, (float)$expectedLat, (float)$expectedLng);
@@ -324,27 +433,34 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         } elseif ($locationType === 'office') {
             // Check if office web check-in is enabled. If not, reject!
             $officeWebEnabled = $rule ? (bool)$rule->office_web : false;
-            if (!$officeWebEnabled) {
+            if ($rule && !$officeWebEnabled) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'location' => 'Web/Mobile check-out is disabled for office employees under the current rules.',
                 ]);
             }
 
             $officeGeofenceEnabled = $rule ? (bool)$rule->office_geofence : false;
-            if ($officeGeofenceEnabled) {
+            if ($officeGeofenceEnabled || ($rule && $rule->isTrackingEnabled($locationType))) {
                 if (is_null($latitude) || is_null($longitude)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Your GPS coordinates are required to check out at the office. Please enable location services in your browser.',
                     ]);
                 }
 
+                if ($officeGeofenceEnabled) {
                 $officeLat = $rule ? $rule->office_latitude : null;
                 $officeLng = $rule ? $rule->office_longitude : null;
-                $officeRadius = $rule && $rule->office_radius ? (int)$rule->office_radius : 200;
+                $officeRadius = (int) ($rule?->office_radius ?? 0);
 
                 if (is_null($officeLat) || is_null($officeLng)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Office geofencing coordinates are not configured in attendance rules. Please contact HR.',
+                    ]);
+                }
+
+                if ($officeRadius < 1) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'location' => 'The office geofence radius is missing from the attendance rules. Please contact HR.',
                     ]);
                 }
 
@@ -359,10 +475,11 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                         ),
                     ]);
                 }
+                }
             }
         } elseif ($locationType === 'onsite' || $locationType === 'site') {
             $siteLocationRequired = $rule ? (bool)$rule->site_location : false;
-            if ($siteLocationRequired) {
+            if ($siteLocationRequired || ($rule && $rule->isTrackingEnabled($locationType))) {
                 if (is_null($latitude) || is_null($longitude)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'location' => 'Your GPS coordinates are required to check out for On-Site. Please enable location services in your browser.',
@@ -404,6 +521,13 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             'check_out_longitude' => $longitude,
             'check_out_selfie_path' => $selfiePath,
         ]);
+
+        // Consolidate location tracking route into polyline/snapshot and purge raw logs
+        try {
+            app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendance);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Route consolidation skipped for Attendance #{$attendance->id}: " . $e->getMessage());
+        }
 
         return $attendance;
     }
@@ -602,33 +726,121 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
     }
 
-    public function breakIn(int $attendanceId)
+    public function breakIn(int $attendanceId, ?float $latitude = null, ?float $longitude = null)
     {
         $attendance = Attendance::findOrFail($attendanceId);
+
+        if (!$attendance->isWorking()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'attendance' => 'You must be checked in and not checked out to start a break.',
+            ]);
+        }
 
         // Check if already on break
         if ($attendance->isOnBreak()) {
             return $attendance->activeBreak();
         }
 
+        // Enhancement 2: Optional Break Geofence Validation
+        $employee = Employee::find($attendance->employee_id);
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+
+        if ($rule && !empty($rule->office_break_geofence) && $attendance->location_type === 'office') {
+            if (is_null($latitude) || is_null($longitude)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'location' => 'Your GPS coordinates are required to start a break under office geofence rules.',
+                ]);
+            }
+
+            $officeLat = $rule->office_latitude;
+            $officeLng = $rule->office_longitude;
+            $officeRadius = (int) ($rule->office_radius ?? 0);
+
+            if (!is_null($officeLat) && !is_null($officeLng) && $officeRadius > 0) {
+                $distance = $this->calculateDistance((float)$latitude, (float)$longitude, (float)$officeLat, (float)$officeLng);
+                if ($distance > $officeRadius) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'location' => sprintf(
+                            'Break-In failed. You are outside the office geofence range (Distance: %d meters, allowed radius: %d meters).',
+                            round($distance),
+                            $officeRadius
+                        ),
+                    ]);
+                }
+            }
+        }
+
+        // Record break milestone breadcrumb
+        if ($latitude !== null && $longitude !== null) {
+            AttendanceLocationLog::create([
+                'tenant_id'     => $attendance->tenant_id,
+                'attendance_id' => $attendance->id,
+                'latitude'      => $latitude,
+                'longitude'     => $longitude,
+                'created_at'    => Carbon::now(),
+            ]);
+        }
+
         return AttendanceBreak::create([
             'attendance_id' => $attendanceId,
-            'break_in' => Carbon::now(),
+            'break_in'      => Carbon::now(),
         ]);
     }
 
-    public function breakOut(int $attendanceId)
+    public function breakOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null)
     {
         $attendance = Attendance::findOrFail($attendanceId);
         $activeBreak = $attendance->activeBreak();
 
         if (!$activeBreak) {
-            return null;
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'break' => 'There is no active break to end.',
+            ]);
+        }
+
+        // Enhancement 2: Optional Break Geofence Validation
+        $employee = Employee::find($attendance->employee_id);
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+
+        if ($rule && !empty($rule->office_break_geofence) && $attendance->location_type === 'office') {
+            if (is_null($latitude) || is_null($longitude)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'location' => 'Your GPS coordinates are required to resume work under office geofence rules.',
+                ]);
+            }
+
+            $officeLat = $rule->office_latitude;
+            $officeLng = $rule->office_longitude;
+            $officeRadius = (int) ($rule->office_radius ?? 0);
+
+            if (!is_null($officeLat) && !is_null($officeLng) && $officeRadius > 0) {
+                $distance = $this->calculateDistance((float)$latitude, (float)$longitude, (float)$officeLat, (float)$officeLng);
+                if ($distance > $officeRadius) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'location' => sprintf(
+                            'Resume Work failed. You are outside the office geofence range (Distance: %d meters, allowed radius: %d meters).',
+                            round($distance),
+                            $officeRadius
+                        ),
+                    ]);
+                }
+            }
+        }
+
+        // Record break milestone breadcrumb
+        if ($latitude !== null && $longitude !== null) {
+            AttendanceLocationLog::create([
+                'tenant_id'     => $attendance->tenant_id,
+                'attendance_id' => $attendance->id,
+                'latitude'      => $latitude,
+                'longitude'     => $longitude,
+                'created_at'    => Carbon::now(),
+            ]);
         }
 
         $now = Carbon::now();
         $activeBreak->update([
-            'break_out' => $now,
+            'break_out'        => $now,
             'duration_minutes' => max(0, intval($activeBreak->break_in->diffInMinutes($now))),
         ]);
 
@@ -741,13 +953,13 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
     public function trackLocation(int $employeeId, float $latitude, float $longitude): array
     {
-        $today = Carbon::today()->format('Y-m-d');
-
-        // Find employee active checked-in shift today
+        // Find employee active checked-in shift (within last 18 hours, supports day & overnight night shifts)
+        $shiftCutoff = Carbon::now()->subHours(18);
         $attendance = Attendance::where('employee_id', $employeeId)
-            ->where('date', $today)
             ->whereNotNull('check_in')
             ->whereNull('check_out')
+            ->where('check_in', '>=', $shiftCutoff)
+            ->latest('check_in')
             ->first();
 
         if (!$attendance) {
@@ -755,31 +967,154 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         $employee = Employee::find($employeeId);
-        $locationType = $attendance->location_type;
+        $locationType = strtolower(trim((string) $attendance->location_type));
+        $locationType = match ($locationType) {
+            'on-site', 'site' => 'onsite',
+            'work from home', 'remote' => 'wfh',
+            default => $locationType,
+        };
 
-        // Fetch company rule
-        $rule = \App\Domains\HRMS\Models\AttendanceRule::where(function ($q) use ($employee) {
-                if ($employee) {
-                    $q->where('company_id', $employee->company_id)
-                      ->orWhereNull('company_id');
+        if (empty($locationType)) {
+            $shiftDate = $attendance->date ? $attendance->date->format('Y-m-d') : Carbon::today()->format('Y-m-d');
+            $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employeeId)
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', $shiftDate)
+                ->whereDate('end_date', '>=', $shiftDate)
+                ->exists();
+
+            if ($hasWfh) {
+                $locationType = 'wfh';
+            } else {
+                $empLoc = strtolower(trim((string)$employee?->office));
+                if (in_array($empLoc, ['onsite', 'on-site', 'site'])) {
+                    $locationType = 'onsite';
+                } elseif ($empLoc === 'wfh') {
+                    $locationType = 'wfh';
+                } else {
+                    $locationType = 'office';
                 }
-            })
-            ->where('status', true)
-            ->orderByRaw('company_id IS NULL ASC')
-            ->first();
-
-        // Check if tracking is enabled for this location type
-        $trackingEnabled = false;
-        if ($locationType === 'wfh') {
-            $trackingEnabled = $rule ? (bool)$rule->wfh_tracking : false;
-        } elseif ($locationType === 'onsite' || $locationType === 'site') {
-            $trackingEnabled = $rule ? (bool)$rule->site_tracking : false;
-        } elseif ($locationType === 'office') {
-            $trackingEnabled = $rule ? (bool)($rule->office_tracking ?? false) : false;
+            }
+            $attendance->update(['location_type' => $locationType]);
         }
 
-        if (!$trackingEnabled) {
-            return ['status' => 'disabled', 'tracking' => false];
+        // Fetch company rule
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+
+        // If location tracking is NOT checked in Attendance Rules, SKIP IT completely
+        if (!$rule || !$rule->isTrackingEnabled($locationType)) {
+            return [
+                'status'           => 'skipped',
+                'tracking'         => false,
+                'interval_minutes' => null,
+                'message'          => 'Location tracking is disabled in attendance rules.',
+            ];
+        }
+
+        $intervalMinutes = $rule->getTrackingMinutes($locationType);
+
+        if (!$intervalMinutes || $intervalMinutes < 1) {
+            return [
+                'status' => 'invalid_tracking_configuration',
+                'tracking' => false,
+                'recorded' => false,
+                'message' => 'The tracking interval is missing from attendance rules.',
+            ];
+        }
+
+        // Ignore uninitialized (0, 0) GPS fix hardware errors
+        if (abs($latitude) < 0.0001 && abs($longitude) < 0.0001) {
+            return [
+                'status'                    => 'ignored_invalid_coordinates',
+                'tracking'                  => true,
+                'tracking_interval_minutes' => $intervalMinutes,
+                'next_ping_seconds'         => $intervalMinutes * 60,
+            ];
+        }
+
+        // WFH and onsite thresholds filter movement from the last saved point
+        // or first check-in point; they are not fixed location geofences.
+        $normalizedLocationType = strtolower(trim((string) $locationType));
+        $movementThreshold = in_array($normalizedLocationType, ['onsite', 'site', 'on-site'], true)
+            ? (int) ($rule->site_tracking_meters ?? 0)
+            : ($normalizedLocationType === 'wfh' ? (int) ($rule->wfh_tracking_meters ?? 0) : null);
+        $wfhOutOfBounds = null;
+        if ($movementThreshold !== null) {
+            if ($movementThreshold < 1) {
+                return [
+                    'status'    => 'invalid_tracking_configuration',
+                    'tracking'  => false,
+                    'recorded'  => false,
+                    'message'   => 'The movement threshold is missing from attendance rules.',
+                ];
+            }
+
+            if ($normalizedLocationType === 'wfh' && (bool) $rule->wfh_geofence) {
+                $checkDate = $attendance->date ? $attendance->date->format('Y-m-d') : Carbon::now()->format('Y-m-d');
+                $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employeeId)
+                    ->where('status', 'approved')
+                    ->whereDate('start_date', '<=', $checkDate)
+                    ->whereDate('end_date', '>=', $checkDate)
+                    ->first();
+                $expectedLat = $hasWfh?->wfh_latitude ?? $employee?->wfh_latitude;
+                $expectedLng = $hasWfh?->wfh_longitude ?? $employee?->wfh_longitude;
+                if (is_null($expectedLat) || is_null($expectedLng)) {
+                    return [
+                        'status' => 'invalid_tracking_configuration',
+                        'tracking' => false,
+                        'recorded' => false,
+                        'message' => 'WFH geofencing is enabled but home coordinates are missing from the approved request and employee profile.',
+                    ];
+                }
+                $homeDistance = $this->calculateDistance($latitude, $longitude, (float) $expectedLat, (float) $expectedLng);
+                if ($homeDistance > $movementThreshold) {
+                    $wfhOutOfBounds = [
+                        'status' => 'out_of_bounds',
+                        'distance' => round($homeDistance),
+                        'radius' => $movementThreshold,
+                        'tracking' => true,
+                        'recorded' => false,
+                        'tracking_interval_minutes' => $intervalMinutes,
+                        'next_ping_seconds' => $intervalMinutes * 60,
+                    ];
+                }
+            }
+
+            $lastLocation = \App\Domains\HRMS\Models\AttendanceLocationLog::where('attendance_id', $attendance->id)
+                ->latest('created_at')
+                ->first();
+            $referenceLatitude = $lastLocation?->latitude ?? $attendance->check_in_latitude;
+            $referenceLongitude = $lastLocation?->longitude ?? $attendance->check_in_longitude;
+
+            if (!is_null($referenceLatitude) && !is_null($referenceLongitude)
+                && abs((float) $referenceLatitude) < 0.0001
+                && abs((float) $referenceLongitude) < 0.0001) {
+                $referenceLatitude = null;
+                $referenceLongitude = null;
+            }
+
+            if (!is_null($referenceLatitude) && !is_null($referenceLongitude)) {
+                $distance = $this->calculateDistance(
+                    (float) $latitude,
+                    (float) $longitude,
+                    (float) $referenceLatitude,
+                    (float) $referenceLongitude
+                );
+
+                if ($distance <= $movementThreshold) {
+                    if ($wfhOutOfBounds !== null) {
+                        return $wfhOutOfBounds;
+                    }
+                    return [
+                        'status'                    => 'below_movement_threshold',
+                        'tracking'                  => true,
+                        'recorded'                  => false,
+                        'distance_meters'           => (int) round($distance),
+                        'movement_threshold_meters' => $movementThreshold,
+                        'tracking_interval_minutes' => $intervalMinutes,
+                        'next_ping_seconds'         => $intervalMinutes * 60,
+                    ];
+                }
+            }
         }
 
         // Save location log
@@ -794,13 +1129,14 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         // Out-of-bounds check (WFH & Office geofencing)
         if ($locationType === 'wfh') {
             $wfhGeofenceEnabled = $rule ? (bool)$rule->wfh_geofence : false;
-            $wfhRadius = $rule && $rule->wfh_tracking_meters ? (int)$rule->wfh_tracking_meters : 200;
+            $wfhRadius = (int) ($rule?->wfh_tracking_meters ?? 0);
 
             if ($wfhGeofenceEnabled) {
+                $checkDate = $attendance->date ? $attendance->date->format('Y-m-d') : Carbon::now()->format('Y-m-d');
                 $hasWfh = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employeeId)
                     ->where('status', 'approved')
-                    ->whereDate('start_date', '<=', $today)
-                    ->whereDate('end_date', '>=', $today)
+                    ->whereDate('start_date', '<=', $checkDate)
+                    ->whereDate('end_date', '>=', $checkDate)
                     ->first();
 
                 $expectedLat = $hasWfh ? $hasWfh->wfh_latitude : ($employee ? $employee->wfh_latitude : null);
@@ -811,17 +1147,19 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
                     if ($distance > $wfhRadius) {
                         return [
-                            'status' => 'out_of_bounds',
-                            'distance' => round($distance),
-                            'radius' => $wfhRadius,
-                            'tracking' => true
+                            'status'                    => 'out_of_bounds',
+                            'distance'                  => round($distance),
+                            'radius'                    => $wfhRadius,
+                            'tracking'                  => true,
+                            'tracking_interval_minutes' => $intervalMinutes,
+                            'next_ping_seconds'         => $intervalMinutes * 60,
                         ];
                     }
                 }
             }
         } elseif ($locationType === 'office') {
             $officeGeofenceEnabled = $rule ? (bool)$rule->office_geofence : false;
-            $officeRadius = $rule && $rule->office_radius ? (int)$rule->office_radius : 200;
+            $officeRadius = (int) ($rule?->office_radius ?? 0);
 
             if ($officeGeofenceEnabled) {
                 $expectedLat = $rule ? $rule->office_latitude : null;
@@ -832,17 +1170,25 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
                     if ($distance > $officeRadius) {
                         return [
-                            'status' => 'out_of_bounds',
-                            'distance' => round($distance),
-                            'radius' => $officeRadius,
-                            'tracking' => true
+                            'status'                    => 'out_of_bounds',
+                            'distance'                  => round($distance),
+                            'radius'                    => $officeRadius,
+                            'tracking'                  => true,
+                            'tracking_interval_minutes' => $intervalMinutes,
+                            'next_ping_seconds'         => $intervalMinutes * 60,
                         ];
                     }
                 }
             }
         }
 
-        return ['status' => 'ok', 'tracking' => true];
+        return [
+            'status'                    => 'ok',
+            'tracking'                  => true,
+            'recorded'                  => true,
+            'tracking_interval_minutes' => $intervalMinutes,
+            'next_ping_seconds'         => $intervalMinutes * 60,
+        ];
     }
 
     /**

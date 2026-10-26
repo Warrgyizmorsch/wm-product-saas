@@ -40,11 +40,20 @@
     </div>
 @endsection
 
-@section('content')
+@push('styles')
 @once
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 @endonce
+<style>
+    .custom-attendance-pin {
+        background: transparent !important;
+        border: none !important;
+    }
+</style>
+@endpush
+
+@section('content')
 
 <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
 
@@ -545,7 +554,7 @@
     </div>
 
     <x-slot name="footer">
-        <button type="button" class="btn btn-light border fw-semibold text-uppercase fs-11" data-bs-dismiss="offcanvas">{{ __('hrms.common.close_panel') }}</button>
+        <button type="button" class="btn btn-light border fw-semibold text-uppercase fs-11" data-bs-dismiss="offcanvas">{{ __('hrms.attendance.close_panel') !== 'hrms.attendance.close_panel' ? __('hrms.attendance.close_panel') : (__('hrms.common.close_panel') !== 'hrms.common.close_panel' ? __('hrms.common.close_panel') : 'Close Panel') }}</button>
     </x-slot>
 </x-ui.drawer>
 
@@ -762,13 +771,32 @@
                                          </div>
                                      </div>
                                      
-                                     <!-- Map -->
+                                     <!-- Map & Route Snapshot -->
                                      <div class="mt-2">
-                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">${@json(__('hrms.attendance.location_map'))}</span>
-                                          <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
-                                               <div id="map-${log.id}" class="attendance-row-map" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                                          <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                               <span class="text-muted fs-10 text-uppercase fw-semibold d-flex align-items-center gap-1">
+                                                    <i class="feather-map-pin text-primary"></i> ${@json(__('hrms.attendance.location_map'))}
+                                               </span>
+                                               <div class="d-flex align-items-center gap-1">
+                                                    ${log.total_distance_km > 0 ? `
+                                                        <span class="badge bg-soft-primary text-primary border px-2 py-0.5 rounded-pill fs-11 fw-semibold">
+                                                            <i class="feather-navigation fs-11 me-1"></i>${parseFloat(log.total_distance_km).toFixed(2)} KM
+                                                        </span>
+                                                    ` : ''}
+                                                    ${log.route_snapshot_url ? `
+                                                        <a href="${log.route_snapshot_url}" target="_blank" class="badge bg-light text-muted border px-2 py-0.5 rounded-pill fs-11 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1">
+                                                            <i class="feather-image fs-11"></i> Snapshot
+                                                        </a>
+                                                    ` : ''}
+                                               </div>
                                           </div>
-                                          <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0">
+
+
+
+                                          <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
+                                               <div id="map-${log.id}" class="attendance-row-map" style="height: 220px; min-height: 220px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                                          </div>
+                                          <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0" style="display: none;">
                                                <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> ${@json(__('hrms.attendance.no_coords_captured'))}
                                           </div>
                                      </div>
@@ -899,11 +927,15 @@
                         let locationBadge = '';
                         const locLower = log.location_type ? log.location_type.toLowerCase() : '';
                         if (locLower === 'wfh') {
-                            locationBadge = '<span class="badge bg-soft-success text-success border-0" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block;">WFH</span>';
-                        } else if (locLower === 'on-site' || locLower === 'onsite') {
-                            locationBadge = '<span class="badge bg-soft-warning text-warning border-0" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block;">On-Site</span>';
-                        } else if (locLower && locLower !== 'office' && locLower !== '-') {
-                            locationBadge = `<span class="badge bg-soft-dark text-slate border-0" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block;">${log.location_type}</span>`;
+                            locationBadge = '<span class="badge bg-soft-success text-success border-0 fw-semibold" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; display: inline-block;">WFH</span>';
+                        } else if (locLower === 'on-site' || locLower === 'onsite' || locLower === 'site') {
+                            locationBadge = '<span class="badge bg-soft-warning text-warning border-0 fw-semibold" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; display: inline-block;">On-Site</span>';
+                        } else if (locLower === 'office') {
+                            locationBadge = '<span class="badge bg-soft-primary text-primary border-0 fw-semibold" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; display: inline-block;">Office</span>';
+                        } else if (locLower && locLower !== '-') {
+                            locationBadge = `<span class="badge bg-soft-secondary text-secondary border-0 fw-semibold" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; display: inline-block;">${log.location_type}</span>`;
+                        } else {
+                            locationBadge = '<span class="badge bg-soft-primary text-primary border-0 fw-semibold" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; display: inline-block;">Office</span>';
                         }
 
                         let actionButton = '';
@@ -918,7 +950,10 @@
                         tr.innerHTML = `
                             <td>
                                 <span class="fw-bold text-dark d-block fs-13 mb-0">${log.employee_name}</span>
-                                ${locationBadge}
+                                <div class="d-flex align-items-center gap-1.5 flex-wrap mt-1">
+                                    ${log.employee_code ? `<span class="text-muted fs-11">${log.employee_code}</span>` : ''}
+                                    ${locationBadge}
+                                </div>
                             </td>
                             <td class="text-muted text-nowrap">${log.check_in}</td>
                             <td class="text-muted text-nowrap">${log.check_out}</td>
@@ -939,6 +974,13 @@
                         detailsTr.innerHTML = `
                             <td colspan="7" class="p-0">
                                 <div style="padding: 12px; max-width: 100%; overflow-x: hidden;">
+                                     <div class="d-flex align-items-center justify-content-between mb-2 pb-1.5 border-bottom">
+                                         <div class="d-flex align-items-center gap-1.5">
+                                             <span class="fs-11 text-muted text-uppercase fw-semibold">Assigned Location:</span>
+                                             ${locationBadge}
+                                         </div>
+                                         ${log.total_distance_km > 0 ? `<div class="fs-11 text-muted"><i class="feather-navigation me-1"></i><strong>${parseFloat(log.total_distance_km).toFixed(2)} km</strong> tracked</div>` : ''}
+                                     </div>
                                      <div class="row g-2">
                                          <!-- Check In -->
                                          <div class="col-sm-6 col-12">
@@ -986,13 +1028,32 @@
                                          </div>
                                      </div>
                                      
-                                     <!-- Map -->
+                                     <!-- Map & Route Snapshot -->
                                      <div class="mt-2">
-                                          <span class="text-muted fs-10 text-uppercase fw-semibold d-block mb-1">${@json(__('hrms.attendance.location_map'))}</span>
-                                          <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
-                                               <div id="map-${log.id}" class="attendance-row-map" style="height: 180px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                                          <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                               <span class="text-muted fs-10 text-uppercase fw-semibold d-flex align-items-center gap-1">
+                                                    <i class="feather-map-pin text-primary"></i> ${@json(__('hrms.attendance.location_map'))}
+                                               </span>
+                                               <div class="d-flex align-items-center gap-1">
+                                                    ${log.total_distance_km > 0 ? `
+                                                        <span class="badge bg-soft-primary text-primary border px-2 py-0.5 rounded-pill fs-11 fw-semibold">
+                                                            <i class="feather-navigation fs-11 me-1"></i>${parseFloat(log.total_distance_km).toFixed(2)} KM
+                                                        </span>
+                                                    ` : ''}
+                                                    ${log.route_snapshot_url ? `
+                                                        <a href="${log.route_snapshot_url}" target="_blank" class="badge bg-light text-muted border px-2 py-0.5 rounded-pill fs-11 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1">
+                                                            <i class="feather-image fs-11"></i> Snapshot
+                                                        </a>
+                                                    ` : ''}
+                                               </div>
                                           </div>
-                                          <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0">
+
+
+
+                                          <div class="position-relative w-100" id="map-wrap-${log.id}" style="display: none; overflow: hidden; border-radius: 8px;">
+                                               <div id="map-${log.id}" class="attendance-row-map" style="height: 220px; min-height: 220px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                                          </div>
+                                          <div id="map-none-${log.id}" class="alert alert-light border text-center fs-11 py-2.5 mb-0" style="display: none;">
                                                <i class="feather-map-pin text-muted fs-14 d-block mb-0.5"></i> ${@json(__('hrms.attendance.no_coords_captured'))}
                                           </div>
                                      </div>
@@ -1059,126 +1120,153 @@
 
     // Initialize Leaflet Map for a specific details row
     function initializeRowMap(logId, log) {
-        if (typeof L === 'undefined') {
-            setTimeout(() => initializeRowMap(logId, log), 100);
-            return;
-        }
-
         const checkinLat = parseFloat(log.check_in_latitude);
         const checkinLng = parseFloat(log.check_in_longitude);
         const checkoutLat = parseFloat(log.check_out_latitude);
         const checkoutLng = parseFloat(log.check_out_longitude);
-        const locationLogs = log.location_logs || [];
+        const locationLogs = Array.isArray(log.location_logs) ? log.location_logs : [];
         
-        const hasCheckin = checkinLat && checkinLng && checkinLat !== 0 && checkinLng !== 0;
-        const hasCheckout = checkoutLat && checkoutLng && checkoutLat !== 0 && checkoutLng !== 0;
+        const hasCheckin = !isNaN(checkinLat) && !isNaN(checkinLng) && checkinLat !== 0 && checkinLng !== 0;
+        const hasCheckout = !isNaN(checkoutLat) && !isNaN(checkoutLng) && checkoutLat !== 0 && checkoutLng !== 0;
         const hasLogs = locationLogs.length > 0;
         
         const mapWrap = document.getElementById(`map-wrap-${logId}`);
         const mapNone = document.getElementById(`map-none-${logId}`);
         
-        if (hasCheckin || hasCheckout || hasLogs) {
-            if (mapWrap) mapWrap.style.display = 'block';
-            if (mapNone) mapNone.style.display = 'none';
-            
-            setTimeout(() => {
-                const mapEl = document.getElementById(`map-${logId}`);
-                if (!mapEl) return;
-
-                // Clean up previous Leaflet map on this container if any
-                if (window.activeRowMaps[logId]) {
-                    window.activeRowMaps[logId].remove();
-                    delete window.activeRowMaps[logId];
-                }
-                mapEl.innerHTML = '';
-                
-                // Base center
-                const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : (hasCheckout ? [checkoutLat, checkoutLng] : [20.5937, 78.9629]);
-                
-                const map = L.map(mapEl).setView(defaultCenter, 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(map);
-                
-                const pathLatLngs = [];
-                
-                const greenIcon = L.divIcon({
-                    className: 'custom-attendance-pin',
-                    html: `<div style="background-color: #10b981; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-in" style="font-size: 12px;"></i></div>`,
-                    iconSize: [26, 26],
-                    iconAnchor: [13, 13],
-                    popupAnchor: [0, -13]
-                });
-
-                const redIcon = L.divIcon({
-                    className: 'custom-attendance-pin',
-                    html: `<div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"><i class="feather-log-out" style="font-size: 12px;"></i></div>`,
-                    iconSize: [26, 26],
-                    iconAnchor: [13, 13],
-                    popupAnchor: [0, -13]
-                });
-
-                // 1. Add Check-In Marker (Green)
-                if (hasCheckin) {
-                    const checkinLatLng = [checkinLat, checkinLng];
-                    pathLatLngs.push(checkinLatLng);
-
-                    L.marker(checkinLatLng, { icon: greenIcon, title: 'Check In Point' })
-                        .addTo(map)
-                        .bindPopup(`<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`);
-                }
-                
-                // 2. Add intermediate tracking location logs (Blue circles)
-                if (hasLogs) {
-                    locationLogs.forEach(locLog => {
-                        if (locLog.lat && locLog.lng) {
-                            const logLatLng = [parseFloat(locLog.lat), parseFloat(locLog.lng)];
-                            pathLatLngs.push(logLatLng);
-
-                            L.circleMarker(logLatLng, {
-                                radius: 5,
-                                fillColor: '#3b82f6',
-                                color: '#ffffff',
-                                weight: 1.5,
-                                fillOpacity: 0.85
-                            }).addTo(map).bindPopup(`<b>Tracking Log</b><br>Time: ${locLog.time || ''}<br>Lat: ${logLatLng[0].toFixed(6)}<br>Lng: ${logLatLng[1].toFixed(6)}`);
-                        }
-                    });
-                }
-                
-                // 3. Add Check-Out Marker (Red)
-                if (hasCheckout) {
-                    const checkoutLatLng = [checkoutLat, checkoutLng];
-                    pathLatLngs.push(checkoutLatLng);
-
-                    L.marker(checkoutLatLng, { icon: redIcon, title: 'Check Out Point' })
-                        .addTo(map)
-                        .bindPopup(`<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`);
-                }
-                
-                // 4. Indigo Path Connecting Line
-                if (pathLatLngs.length >= 2) {
-                    L.polyline(pathLatLngs, {
-                        color: '#4f46e5',
-                        weight: 3,
-                        opacity: 0.85,
-                        dashArray: '4, 6'
-                    }).addTo(map);
-                }
-                
-                window.activeRowMaps[logId] = map;
-                
-                map.invalidateSize();
-                if (pathLatLngs.length > 0) {
-                    const bounds = L.latLngBounds(pathLatLngs);
-                    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
-                }
-            }, 150);
-        } else {
+        if (!hasCheckin && !hasCheckout && !hasLogs) {
             if (mapWrap) mapWrap.style.display = 'none';
             if (mapNone) mapNone.style.display = 'block';
+            return;
         }
+
+        if (mapWrap) mapWrap.style.display = 'block';
+        if (mapNone) mapNone.style.display = 'none';
+
+        if (typeof L === 'undefined') {
+            setTimeout(() => initializeRowMap(logId, log), 150);
+            return;
+        }
+
+        const mapEl = document.getElementById(`map-${logId}`);
+        if (!mapEl) return;
+
+        // Clean up previous Leaflet map cleanly to prevent "Map container is already initialized"
+        if (mapEl._leaflet_id) {
+            try {
+                if (window.activeRowMaps && window.activeRowMaps[logId]) {
+                    window.activeRowMaps[logId].remove();
+                }
+            } catch(e) {}
+            delete mapEl._leaflet_id;
+        }
+        mapEl.innerHTML = '';
+        
+        // Base center
+        const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : (hasCheckout ? [checkoutLat, checkoutLng] : [20.5937, 78.9629]);
+        
+        const map = L.map(mapEl, {
+            zoomControl: true,
+            scrollWheelZoom: false
+        }).setView(defaultCenter, 14);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        
+        window.activeRowMaps = window.activeRowMaps || {};
+        window.activeRowMaps[logId] = map;
+        
+        const pathLatLngs = [];
+        
+        const isSameSpot = hasCheckin && hasCheckout &&
+            (Math.abs(checkinLat - checkoutLat) < 0.00035) &&
+            (Math.abs(checkinLng - checkoutLng) < 0.00035);
+
+        const greenIcon = L.divIcon({
+            className: 'custom-attendance-pin',
+            html: `<div style="background-color: #10b981; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-weight: bold;"><i class="feather-log-in" style="font-size: 13px;"></i></div>`,
+            iconSize: [28, 28],
+            iconAnchor: isSameSpot ? [30, 14] : [14, 14],
+            popupAnchor: isSameSpot ? [-16, -14] : [0, -14]
+        });
+
+        const redIcon = L.divIcon({
+            className: 'custom-attendance-pin',
+            html: `<div style="background-color: #ef4444; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-weight: bold;"><i class="feather-log-out" style="font-size: 13px;"></i></div>`,
+            iconSize: [28, 28],
+            iconAnchor: isSameSpot ? [-2, 14] : [14, 14],
+            popupAnchor: isSameSpot ? [16, -14] : [0, -14]
+        });
+
+        // 1. Add Check-In Marker (Green)
+        if (hasCheckin) {
+            const checkinLatLng = [checkinLat, checkinLng];
+            pathLatLngs.push(checkinLatLng);
+
+            L.marker(checkinLatLng, { icon: greenIcon, title: 'Check In Point', zIndexOffset: 600 })
+                .addTo(map)
+                .bindPopup(`<b>Check In Point</b><br>Lat: ${checkinLat.toFixed(6)}<br>Lng: ${checkinLng.toFixed(6)}`);
+        }
+        
+        // 2. Add intermediate tracking location logs (Blue circles)
+        if (hasLogs) {
+            locationLogs.forEach(locLog => {
+                if (locLog.lat && locLog.lng) {
+                    const logLatLng = [parseFloat(locLog.lat), parseFloat(locLog.lng)];
+                    pathLatLngs.push(logLatLng);
+
+                    L.circleMarker(logLatLng, {
+                        radius: 5,
+                        fillColor: '#3b82f6',
+                        color: '#ffffff',
+                        weight: 1.5,
+                        fillOpacity: 0.85
+                    }).addTo(map).bindPopup(`<b>Tracking Log</b><br>Time: ${locLog.time || ''}<br>Lat: ${logLatLng[0].toFixed(6)}<br>Lng: ${logLatLng[1].toFixed(6)}`);
+                }
+            });
+        }
+        
+        // 3. Add Check-Out Marker (Red)
+        if (hasCheckout) {
+            const checkoutLatLng = [checkoutLat, checkoutLng];
+            pathLatLngs.push(checkoutLatLng);
+
+            L.marker(checkoutLatLng, { icon: redIcon, title: 'Check Out Point', zIndexOffset: 500 })
+                .addTo(map)
+                .bindPopup(`<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`);
+        }
+        
+        // 4. Indigo Path Connecting Line
+        if (pathLatLngs.length >= 2) {
+            L.polyline(pathLatLngs, {
+                color: '#6366f1',
+                weight: 4,
+                opacity: 0.9,
+                dashArray: '6, 6',
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(map);
+        }
+        
+        // Fit bounds
+        if (pathLatLngs.length > 0) {
+            const bounds = L.latLngBounds(pathLatLngs);
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+            if (Math.abs(ne.lat - sw.lat) < 0.003 && Math.abs(ne.lng - sw.lng) < 0.003) {
+                map.setView(bounds.getCenter(), 15);
+            } else {
+                map.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
+            }
+        }
+
+        // Multi-stage size invalidation to adapt to table animation
+        [50, 150, 350].forEach(delay => {
+            setTimeout(() => {
+                if (map) map.invalidateSize();
+            }, delay);
+        });
     }
 
     function submitCleanForm(form) {

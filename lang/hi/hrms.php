@@ -92,6 +92,7 @@ return [
         'view_history' => 'उपस्थिति इतिहास देखें',
         'edit_employee_logs' => 'कर्मचारी उपस्थिति लॉग संपादित करें',
         'drawer_title' => 'उपस्थिति इतिहास',
+        'close_panel' => 'पैनल बंद करें',
         'daily_overview' => 'दैनिक उपस्थिति अवलोकन',
         'employee_history' => 'कर्मचारी उपस्थिति इतिहास',
         'fetching_logs' => 'लॉग प्राप्त किए जा रहे हैं...',

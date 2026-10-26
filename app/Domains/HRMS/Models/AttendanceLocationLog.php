@@ -29,4 +29,13 @@ class AttendanceLocationLog extends BaseModel
     {
         return $this->belongsTo(Attendance::class);
     }
+
+    protected static function booted()
+    {
+        static::creating(function ($log) {
+            if (empty($log->created_at)) {
+                $log->created_at = \Carbon\Carbon::now();
+            }
+        });
+    }
 }

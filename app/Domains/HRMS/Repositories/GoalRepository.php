@@ -281,13 +281,6 @@ class GoalRepository implements GoalRepositoryInterface
      */
     public function storeCycle(array $data, int $tenantId, ?User $user = null): GoalCycle
     {
-        $status = $data['status'] ?? 'active';
-        if ($status === 'upcoming') {
-            $status = 'planning';
-        } elseif ($status === 'review_period') {
-            $status = 'review';
-        }
-
         return GoalCycle::create([
             'tenant_id'   => $tenantId,
             'company_id'  => $data['company_id'] ?? $user?->company_id,
@@ -295,7 +288,7 @@ class GoalRepository implements GoalRepositoryInterface
             'code'        => !empty($data['code']) ? $data['code'] : ('CYCLE-' . date('Ym')),
             'start_date'  => $data['start_date'],
             'end_date'    => $data['end_date'],
-            'status'      => $status,
+            'status'      => $data['status'] ?? 'active',
             'description' => $data['description'] ?? null,
         ]);
     }
