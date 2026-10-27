@@ -63,6 +63,16 @@ class SalesOrderItem extends Model
         return $this->hasMany(\App\Domains\Projects\Models\Milestone::class, 'sales_order_item_id');
     }
 
+    public function isService(): bool
+    {
+        return $this->product?->isService() ?? false;
+    }
+
+    public function isGoods(): bool
+    {
+        return !$this->isService();
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $item) {

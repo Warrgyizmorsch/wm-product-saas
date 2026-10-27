@@ -63,8 +63,15 @@ class ProjectController extends Controller
      * which query params they honor.
      */
     private const LIST_FILTER_KEYS = [
-        'status', 'search', 'sort', 'direction',
-        'priority', 'client_id', 'owner_id', 'start_date', 'end_date',
+        'status',
+        'search',
+        'sort',
+        'direction',
+        'priority',
+        'client_id',
+        'owner_id',
+        'start_date',
+        'end_date',
     ];
 
     public function index(Request $request): View
@@ -74,15 +81,15 @@ class ProjectController extends Controller
         $filters = $request->only(self::LIST_FILTER_KEYS);
 
         $data = [
-            'projects'       => $this->projects->list($filters),
-            'summary'        => $this->projects->summary(),
-            'statuses'       => Project::STATUSES,
-            'priorities'     => Project::PRIORITIES,
-            'filters'        => $filters,
+            'projects' => $this->projects->list($filters),
+            'summary' => $this->projects->summary(),
+            'statuses' => Project::STATUSES,
+            'priorities' => Project::PRIORITIES,
+            'filters' => $filters,
             'selectedClient' => $filters['client_id'] ?? null
                 ? Customer::query()->find($filters['client_id'], ['id', 'name'])
                 : null,
-            'selectedOwner'  => $filters['owner_id'] ?? null
+            'selectedOwner' => $filters['owner_id'] ?? null
                 ? User::query()->where('tenant_id', require_tenant_id())->find($filters['owner_id'], ['id', 'name'])
                 : null,
         ];
@@ -111,7 +118,7 @@ class ProjectController extends Controller
         $orders = SalesOrder::query()
             ->where('tenant_id', $tenantId)
             ->where('status', 'Confirmed')
-            ->when($companyId, fn ($q) => $q->where(fn ($sub) => $sub->whereNull('company_id')->orWhere('company_id', $companyId)))
+            ->when($companyId, fn($q) => $q->where(fn($sub) => $sub->whereNull('company_id')->orWhere('company_id', $companyId)))
             ->whereDoesntHave('projects')
             ->with('customer:id,name')
             ->orderByDesc('id')
@@ -154,13 +161,13 @@ class ProjectController extends Controller
         $this->authorize('viewAny', Project::class);
 
         $results = Customer::query()
-            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%' . $request->query('q') . '%'))
+            ->when($request->filled('q'), fn($q) => $q->where('name', 'like', '%' . $request->query('q') . '%'))
             ->orderBy('name')
             ->limit(20)
             ->get(['id', 'name']);
 
         return response()->json([
-            'results' => $results->map(fn (Customer $customer) => ['id' => $customer->id, 'text' => $customer->name]),
+            'results' => $results->map(fn(Customer $customer) => ['id' => $customer->id, 'text' => $customer->name]),
         ]);
     }
 
@@ -170,13 +177,13 @@ class ProjectController extends Controller
 
         $results = User::query()
             ->where('tenant_id', require_tenant_id())
-            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%' . $request->query('q') . '%'))
+            ->when($request->filled('q'), fn($q) => $q->where('name', 'like', '%' . $request->query('q') . '%'))
             ->orderBy('name')
             ->limit(20)
             ->get(['id', 'name']);
 
         return response()->json([
-            'results' => $results->map(fn (User $user) => ['id' => $user->id, 'text' => $user->name]),
+            'results' => $results->map(fn(User $user) => ['id' => $user->id, 'text' => $user->name]),
         ]);
     }
 
@@ -204,13 +211,13 @@ class ProjectController extends Controller
             }
 
             $conversionData = array_filter([
-                'name'        => $validated['name'] ?? null,
-                'owner_id'    => $validated['owner_id'] ?? null,
-                'manager_id'  => $validated['manager_id'] ?? null,
-                'start_date'  => $validated['start_date'] ?? null,
-                'end_date'    => $validated['end_date'] ?? null,
-                'priority'    => $validated['priority'] ?? null,
-                'status'      => Project::STATUS_ACTIVE,
+                'name' => $validated['name'] ?? null,
+                'owner_id' => $validated['owner_id'] ?? null,
+                'manager_id' => $validated['manager_id'] ?? null,
+                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
+                'priority' => $validated['priority'] ?? null,
+                'status' => Project::STATUS_ACTIVE,
                 'description' => $validated['description'] ?? null,
             ]);
 
@@ -295,7 +302,7 @@ class ProjectController extends Controller
 
         $taskFilters = array_filter(
             $request->only(['search', 'status', 'priority', 'assignee_id']),
-            fn ($value) => trim((string) $value) !== '',
+            fn($value) => trim((string) $value) !== '',
         );
         $hasActiveTaskFilters = $taskFilters !== [];
 
@@ -307,9 +314,9 @@ class ProjectController extends Controller
             ->where('tenant_id', $project->tenant_id)
             ->where(function ($q) use ($project) {
                 $q->where('project_id', $project->id)
-                  ->orWhereHas('projectTask', function ($tq) use ($project) {
-                      $tq->where('project_id', $project->id);
-                  });
+                    ->orWhereHas('projectTask', function ($tq) use ($project) {
+                        $tq->where('project_id', $project->id);
+                    });
             })
             ->with(['product', 'projectTask'])
             ->get();
@@ -331,14 +338,14 @@ class ProjectController extends Controller
                 : 0.0;
 
             $manufacturingSummary = [
-                'total_orders'       => $totalOrders,
-                'completed_orders'   => $completedOrders,
+                'total_orders' => $totalOrders,
+                'completed_orders' => $completedOrders,
                 'in_progress_orders' => $inProgressOrders,
-                'pending_orders'     => $pendingOrders,
-                'ordered_quantity'   => $orderedQuantity,
-                'produced_quantity'  => $producedQuantity,
-                'overall_progress'   => $overallProgress,
-                'orders'             => $productionOrders,
+                'pending_orders' => $pendingOrders,
+                'ordered_quantity' => $orderedQuantity,
+                'produced_quantity' => $producedQuantity,
+                'overall_progress' => $overallProgress,
+                'orders' => $productionOrders,
             ];
         }
 
@@ -362,59 +369,59 @@ class ProjectController extends Controller
         $isOverBudget = $revisedBudget > 0 && $totalCostConsumed > $revisedBudget;
 
         $costSummary = [
-            'total_consumed'  => $totalCostConsumed,
-            'mfg_cost'        => $mfgCost,
-            'timesheet_cost'  => $timesheetCost,
-            'revised_budget'  => $revisedBudget,
-            'percent'         => $costPercent,
-            'is_over_budget'  => $isOverBudget,
+            'total_consumed' => $totalCostConsumed,
+            'mfg_cost' => $mfgCost,
+            'timesheet_cost' => $timesheetCost,
+            'revised_budget' => $revisedBudget,
+            'percent' => $costPercent,
+            'is_over_budget' => $isOverBudget,
         ];
 
         return view('modules.projects.show', [
-            'project'             => $project,
+            'project' => $project,
             'manufacturingSummary' => $manufacturingSummary,
-            'costSummary'         => $costSummary,
-            'members'             => $members,
-            'canManageMembers'    => $canManageMembers,
-            'canUpdateProject'    => $canUpdateProject,
-            'canViewIssues'       => $canViewIssues,
-            'canCreateIssues'     => $canCreateIssues,
-            'canViewDocuments'    => $canViewDocuments,
-            'canUploadDocuments'  => $canUploadDocuments,
-            'canViewReviews'      => $canViewReviews,
-            'canCreateReviews'    => $canCreateReviews,
-            'canViewCRs'          => $canViewCRs,
-            'canCreateCRs'        => $canCreateCRs,
-            'canViewBilling'      => $canViewBilling,
-            'canGenerateInvoice'  => $canGenerateInvoice,
-            'canCloseProject'     => auth()->user()->can('close', $project),
-            'billingSummary'      => $billingSummary,
-            'unbilledTimeLogs'    => $unbilledTimeLogs,
-            'unbilledMilestones'  => $unbilledMilestones,
-            'serviceProducts'     => $serviceProducts,
-            'statusTransitions'   => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
-            'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
+            'costSummary' => $costSummary,
+            'members' => $members,
+            'canManageMembers' => $canManageMembers,
+            'canUpdateProject' => $canUpdateProject,
+            'canViewIssues' => $canViewIssues,
+            'canCreateIssues' => $canCreateIssues,
+            'canViewDocuments' => $canViewDocuments,
+            'canUploadDocuments' => $canUploadDocuments,
+            'canViewReviews' => $canViewReviews,
+            'canCreateReviews' => $canCreateReviews,
+            'canViewCRs' => $canViewCRs,
+            'canCreateCRs' => $canCreateCRs,
+            'canViewBilling' => $canViewBilling,
+            'canGenerateInvoice' => $canGenerateInvoice,
+            'canCloseProject' => auth()->user()->can('close', $project),
+            'billingSummary' => $billingSummary,
+            'unbilledTimeLogs' => $unbilledTimeLogs,
+            'unbilledMilestones' => $unbilledMilestones,
+            'serviceProducts' => $serviceProducts,
+            'statusTransitions' => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
+            'customers' => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
             'activeMemberOptions' => $activeMembers->pluck('user'),
-            'milestones'          => $milestones,
-            'milestoneKpis'       => $milestoneKpis,
+            'milestones' => $milestones,
+            'milestoneKpis' => $milestoneKpis,
             'canManageMilestones' => $canManageMilestones,
-            'taskLists'           => $taskLists,
-            'canManageTaskLists'  => $canManageTaskLists,
-            'tasksByList'         => $filteredTasksByList,
-            'allTasks'            => $allTasks->keyBy('id'),
-            'issues'              => $issues,
-            'documents'           => $documents,
-            'reviews'             => $reviews,
-            'changeRequests'      => $changeRequests,
-            'taskFilters'         => $taskFilters,
+            'taskLists' => $taskLists,
+            'canManageTaskLists' => $canManageTaskLists,
+            'tasksByList' => $filteredTasksByList,
+            'allTasks' => $allTasks->keyBy('id'),
+            'issues' => $issues,
+            'documents' => $documents,
+            'reviews' => $reviews,
+            'changeRequests' => $changeRequests,
+            'taskFilters' => $taskFilters,
             'hasActiveTaskFilters' => $hasActiveTaskFilters,
-            'taskStatuses'        => Task::STATUSES,
-            'taskPriorities'      => Task::PRIORITIES,
-            'canCreateTasks'      => $canCreateTasks,
-            'dashboard'           => $this->projects->dashboardStats($project, $taskLists, $tasksByList, $allTasks, $milestones, $members),
-            'recentActivities'    => $this->activity->forProject($project, 5),
-            'activeMembers'       => $activeMembers,
-            'tenantUsers'         => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
+            'taskStatuses' => Task::STATUSES,
+            'taskPriorities' => Task::PRIORITIES,
+            'canCreateTasks' => $canCreateTasks,
+            'dashboard' => $this->projects->dashboardStats($project, $taskLists, $tasksByList, $allTasks, $milestones, $members),
+            'recentActivities' => $this->activity->forProject($project, 5),
+            'activeMembers' => $activeMembers,
+            'tenantUsers' => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
                 : collect(),
         ]);
@@ -498,23 +505,23 @@ class ProjectController extends Controller
 
         return [
             'name' => [
-                'rules'   => ['required', 'string', 'max:255'],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'name', $value),
+                'rules' => ['required', 'string', 'max:255'],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'name', $value),
             ],
             'description' => [
-                'rules'   => ['nullable', 'string'],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'description', $value),
+                'rules' => ['nullable', 'string'],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'description', $value),
             ],
             'budget_amount' => [
-                'rules'   => ['nullable', 'numeric', 'min:0'],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'budget_amount', $value),
+                'rules' => ['nullable', 'numeric', 'min:0'],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'budget_amount', $value),
             ],
             'budget_hours' => [
-                'rules'   => ['nullable', 'numeric', 'min:0'],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'budget_hours', $value),
+                'rules' => ['nullable', 'numeric', 'min:0'],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'budget_hours', $value),
             ],
             'start_date' => [
-                'rules'   => ['required', 'date'],
+                'rules' => ['required', 'date'],
                 'handler' => function (Project $project, $value) {
                     if ($project->end_date && Carbon::parse($value)->gt($project->end_date)) {
                         throw ValidationException::withMessages([
@@ -526,7 +533,7 @@ class ProjectController extends Controller
                 },
             ],
             'end_date' => [
-                'rules'   => ['nullable', 'date'],
+                'rules' => ['nullable', 'date'],
                 'handler' => function (Project $project, $value) {
                     if ($value !== null && $project->start_date && Carbon::parse($value)->lt($project->start_date)) {
                         throw ValidationException::withMessages([
@@ -538,19 +545,19 @@ class ProjectController extends Controller
                 },
             ],
             'priority' => [
-                'rules'   => ['required', Rule::in(Project::PRIORITIES)],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'priority', $value),
+                'rules' => ['required', Rule::in(Project::PRIORITIES)],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'priority', $value),
             ],
             'status' => [
-                'rules'   => ['required', Rule::in(Project::STATUSES)],
-                'handler' => fn (Project $project, $value) => $this->projects->changeStatus($project, $value, 'value')->status,
+                'rules' => ['required', Rule::in(Project::STATUSES)],
+                'handler' => fn(Project $project, $value) => $this->projects->changeStatus($project, $value, 'value')->status,
             ],
             'customer_id' => [
-                'rules'   => ['nullable', 'integer', Rule::exists('customers', 'id')->where('tenant_id', require_tenant_id())],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'customer_id', $value),
+                'rules' => ['nullable', 'integer', Rule::exists('customers', 'id')->where('tenant_id', require_tenant_id())],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'customer_id', $value),
             ],
             'owner_id' => [
-                'rules'   => ['required', 'integer', $this->members->activeCollaboratorRule($project)],
+                'rules' => ['required', 'integer', $this->members->activeCollaboratorRule($project)],
                 'handler' => function (Project $project, $value) {
                     $this->members->ensureCollaborator($project, (int) $value);
 
@@ -558,7 +565,7 @@ class ProjectController extends Controller
                 },
             ],
             'manager_id' => [
-                'rules'   => ['nullable', 'integer', $this->members->activeCollaboratorRule($project)],
+                'rules' => ['nullable', 'integer', $this->members->activeCollaboratorRule($project)],
                 'handler' => function (Project $project, $value) {
                     if ($value !== null) {
                         $this->members->ensureCollaborator($project, (int) $value);
@@ -568,12 +575,12 @@ class ProjectController extends Controller
                 },
             ],
             'budget_type' => [
-                'rules'   => ['nullable', Rule::in(Project::BUDGET_TYPES)],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'budget_type', $value),
+                'rules' => ['nullable', Rule::in(Project::BUDGET_TYPES)],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'budget_type', $value),
             ],
             'billing_method' => [
-                'rules'   => ['nullable', Rule::in(Project::BILLING_METHODS)],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'billing_method', $value),
+                'rules' => ['nullable', Rule::in(Project::BILLING_METHODS)],
+                'handler' => fn(Project $project, $value) => $this->projects->updateField($project, 'billing_method', $value),
             ],
         ];
     }

@@ -55,6 +55,11 @@ class SalesReturnController extends Controller
             $salesOrder = SalesOrder::with(['invoices' => function($q) {
                 $q->where('status', '!=', 'Cancelled')->with('items.product', 'items.warehouse');
             }, 'items.product', 'items.warehouse', 'customer'])->find($salesOrderId);
+
+            if ($salesOrder && $salesOrder->hasOnlyServices()) {
+                return redirect()->route('sales.orders.show', $salesOrder->id)
+                    ->with('info', "Sales Order {$salesOrder->sales_order_number} contains only service items. Services cannot be physically returned to inventory. Please issue a Credit Note instead.");
+            }
         }
 
         $tenantId = require_tenant_id();
@@ -63,9 +68,11 @@ class SalesReturnController extends Controller
             $q->where('status', '!=', 'Cancelled')->with('items.product', 'items.warehouse');
         }, 'customer', 'items.product', 'items.warehouse'])
         ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced'])
-        ->latest()->get();
+        ->latest()->get()
+        ->filter(fn($so) => !$so->hasOnlyServices())
+        ->values();
 
-        if ($salesOrder && !$salesOrders->contains('id', $salesOrder->id)) {
+        if ($salesOrder && !$salesOrders->contains('id', $salesOrder->id) && !$salesOrder->hasOnlyServices()) {
             $salesOrders->prepend($salesOrder);
         }
 
@@ -74,7 +81,7 @@ class SalesReturnController extends Controller
             ->latest()->get();
 
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
-        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get();
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get()->filter(fn($p) => !$p->isService())->values();
 
         // Query Dispatched Aggregates for Tenant (where dispatch order is not Cancelled)
         $dispatchedSoAggregates = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
@@ -247,6 +254,12 @@ class SalesReturnController extends Controller
                     $prodId = (int)$item['product_id'];
                     $product = \App\Domains\Inventory\Models\Product::find($prodId);
                     $prodName = $product?->name ?? "Product #{$prodId}";
+
+                    if ($product && $product->isService()) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => "{$prodName} is a Service item and cannot be physically returned into warehouse inventory. Services require a Credit Note instead of a physical return."
+                        ]);
+                    }
 
                     // Calculate total dispatched quantity for this order/invoice and product
                     $dispQuery = \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {

@@ -56,15 +56,22 @@ class DispatchOrderRepository
 
     public function getPendingDOs(int $limit = 5): Collection
     {
-        return MaterialRequirement::with(['salesOrder.customer'])
+        return MaterialRequirement::with(['salesOrder.customer', 'items.product'])
             ->whereHas('salesOrder', function ($q) {
                 $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
             })
             ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
             ->whereNotIn('status', ['Cancelled', 'Delivered'])
             ->latest()
+            ->get()
+            ->filter(function ($mr) {
+                if ($mr->salesOrder && $mr->salesOrder->hasOnlyServices()) {
+                    return false;
+                }
+                return $mr->items->filter(fn($item) => $item->product && !$item->product->isService())->isNotEmpty();
+            })
             ->take($limit)
-            ->get();
+            ->values();
     }
 
     public function getAllPendingMaterialRequirements(): Collection
@@ -79,7 +86,14 @@ class DispatchOrderRepository
         })
         ->whereNotIn('status', ['Cancelled'])
         ->latest()
-        ->get();
+        ->get()
+        ->filter(function ($mr) {
+            if ($mr->salesOrder && $mr->salesOrder->hasOnlyServices()) {
+                return false;
+            }
+            return $mr->items->filter(fn($item) => $item->product && !$item->product->isService())->isNotEmpty();
+        })
+        ->values();
     }
 
     public function getPendingSalesOrders(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
@@ -123,12 +137,20 @@ class DispatchOrderRepository
         $pendingList = collect();
 
         foreach ($allOrders as $order) {
+            if ($order->hasOnlyServices()) {
+                continue;
+            }
+
             $orderDispatches = $dispatchedAggregates->get($order->id, collect());
             $totalOrdered = 0;
             $totalDispatched = 0;
             $itemsDetail = [];
 
             foreach ($order->items as $item) {
+                if ($item->isService()) {
+                    continue;
+                }
+
                 $ordered = (float) $item->quantity;
                 $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
                 $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
@@ -154,7 +176,7 @@ class DispatchOrderRepository
 
             $totalPending = max(0, $totalOrdered - $totalDispatched);
 
-            if ($totalPending > 0) {
+            if ($totalPending > 0 && !empty($itemsDetail)) {
                 $progress = $totalOrdered > 0 ? round(($totalDispatched / $totalOrdered) * 100) : 0;
                 $order->total_ordered_qty = $totalOrdered;
                 $order->total_dispatched_qty = $totalDispatched;
@@ -186,7 +208,7 @@ class DispatchOrderRepository
     {
         $allOrders = \App\Domains\Sales\Models\SalesOrder::where('tenant_id', $tenantId)
             ->whereIn('status', ['Confirmed', 'Partially Shipped'])
-            ->with(['items'])
+            ->with(['items.product'])
             ->get();
 
         $dispatchedAggregates = DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($tenantId) {
@@ -200,17 +222,28 @@ class DispatchOrderRepository
 
         $count = 0;
         foreach ($allOrders as $order) {
-            $orderDispatches = $dispatchedAggregates->get($order->id, collect());
-            $totalOrdered = (float) $order->items->sum('quantity');
-            $totalDispatched = 0;
-
-            foreach ($order->items as $item) {
-                $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
-                $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
-                $totalDispatched += min((float) $item->quantity, $dispatched);
+            if ($order->hasOnlyServices()) {
+                continue;
             }
 
-            if (($totalOrdered - $totalDispatched) > 0) {
+            $orderDispatches = $dispatchedAggregates->get($order->id, collect());
+            $totalOrdered = 0;
+            $totalDispatched = 0;
+            $hasPhysical = false;
+
+            foreach ($order->items as $item) {
+                if ($item->isService()) {
+                    continue;
+                }
+                $hasPhysical = true;
+                $ordered = (float) $item->quantity;
+                $totalOrdered += $ordered;
+                $dispRow = $orderDispatches->firstWhere('product_id', $item->product_id);
+                $dispatched = $dispRow ? (float) $dispRow->total_dispatched : 0.0;
+                $totalDispatched += min($ordered, $dispatched);
+            }
+
+            if ($hasPhysical && ($totalOrdered - $totalDispatched) > 0) {
                 $count++;
             }
         }
@@ -264,8 +297,9 @@ class DispatchOrderRepository
     public function getDispatchedQtyForSalesOrder(int $salesOrderId): float
     {
         return (float) DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($salesOrderId) {
-            $q->where('sales_order_id', $salesOrderId)->where('status', 'Dispatched');
-        })->sum('quantity_dispatched');
+            $q->where('sales_order_id', $salesOrderId)
+              ->whereIn('status', ['Confirmed', 'Shipped', 'Dispatched', 'Delivered']);
+        })->sum(DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
     }
 
     public function createDispatchOrder(array $dispatchData, array $itemsData): DispatchOrder

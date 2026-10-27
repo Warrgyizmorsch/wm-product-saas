@@ -152,4 +152,32 @@ class SalesOrder extends BaseModel
     {
         return $this->hasMany(\App\Domains\Projects\Models\Project::class, 'sales_order_id');
     }
+
+    public function hasOnlyServices(): bool
+    {
+        if ($this->items->isEmpty()) {
+            return false;
+        }
+        return $this->items->every(fn($item) => $item->isService());
+    }
+
+    public function hasServices(): bool
+    {
+        return $this->items->contains(fn($item) => $item->isService());
+    }
+
+    public function hasPhysicalGoods(): bool
+    {
+        return $this->items->contains(fn($item) => !$item->isService());
+    }
+
+    public function requiresMaterialRequirement(): bool
+    {
+        return $this->hasPhysicalGoods();
+    }
+
+    public function requiresDispatch(): bool
+    {
+        return $this->hasPhysicalGoods();
+    }
 }

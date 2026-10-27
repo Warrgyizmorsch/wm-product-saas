@@ -267,7 +267,8 @@
                         'id' => $p->id,
                         'name' => $p->name,
                         'sku' => $p->sku,
-                        'selling_price' => convert_from_base($p->selling_price)
+                        'selling_price' => convert_from_base($p->selling_price),
+                        'is_service' => $p->isService(),
                     ];
                 });
             @endphp
@@ -301,7 +302,8 @@
                 opts += '<option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>';
                 productsList.forEach(function(p) {
                     const sel = (p.id == selectedId) ? ' selected' : '';
-                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})</option>`;
+                    const tag = p.is_service ? ' [Service]' : '';
+                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}" data-is-service="${p.is_service ? 1 : 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})${tag}</option>`;
                 });
                 return opts;
             }

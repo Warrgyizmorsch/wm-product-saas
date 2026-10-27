@@ -611,6 +611,13 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
+        if ($order->hasOnlyServices()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot create dispatch order for service-only Sales Order. Services do not require physical shipping and can be directly converted to Invoice.',
+            ], 422);
+        }
+
         $dispatchNo = 'DO-' . strtoupper(bin2hex(random_bytes(4)));
 
         $dispatch = DB::transaction(function () use ($order, $dispatchNo, $tenantId, $companyId, $branchId, $request) {
@@ -628,6 +635,10 @@ class SalesOrderApiController extends Controller
             ]);
 
             foreach ($order->items as $item) {
+                if ($item->isService()) {
+                    continue; // Skip service items from physical dispatch orders
+                }
+
                 DispatchOrderItem::create([
                     'tenant_id'         => $tenantId,
                     'company_id'        => $companyId,

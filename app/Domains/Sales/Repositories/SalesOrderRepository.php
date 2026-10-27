@@ -98,14 +98,23 @@ class SalesOrderRepository
     }
 
     /**
-     * Confirm Sales Order and auto-generate Material Requirement.
+     * Confirm Sales Order and auto-generate Material Requirement for physical items only.
+     * Service products do not require material requisition or inventory reservation.
      */
-    public function confirmOrder(SalesOrder $order, string $nextRequirementNumber): MaterialRequirement
+    public function confirmOrder(SalesOrder $order, string $nextRequirementNumber): ?MaterialRequirement
     {
         return DB::transaction(function () use ($order, $nextRequirementNumber) {
             $order->update([
                 'status' => 'Confirmed',
             ]);
+
+            // Filter out service items - in ERPs, service items do NOT generate material requirement / inventory reservation
+            $physicalItems = $order->items->filter(fn($item) => !$item->isService());
+
+            // If order has ONLY service items, NO material requirement is generated!
+            if ($physicalItems->isEmpty()) {
+                return null;
+            }
 
             $delivery = MaterialRequirement::where('sales_order_id', $order->id)->first();
             if (!$delivery) {
@@ -123,7 +132,7 @@ class SalesOrderRepository
                     ->orderBy('is_default', 'desc')
                     ->first()?->id ?? 1;
 
-                foreach ($order->items as $soItem) {
+                foreach ($physicalItems as $soItem) {
                     MaterialRequirementItem::create([
                         'tenant_id' => $order->tenant_id,
                         'company_id' => $order->company_id,

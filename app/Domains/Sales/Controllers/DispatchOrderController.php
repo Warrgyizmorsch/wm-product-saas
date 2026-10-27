@@ -79,6 +79,10 @@ class DispatchOrderController extends Controller
                 return redirect()->route('sales.dispatches.index')
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
             }
+            if ($prefillSalesOrder && $prefillSalesOrder->hasOnlyServices()) {
+                return redirect()->route('sales.orders.show', $prefillSalesOrder->id)
+                    ->with('info', "Sales Order {$prefillSalesOrder->sales_order_number} contains only service items. Services do not require physical dispatch or shipping and can be directly invoiced.");
+            }
             if ($prefillSalesOrder) {
                 $mr = MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
                 $mrId = $mr?->id;

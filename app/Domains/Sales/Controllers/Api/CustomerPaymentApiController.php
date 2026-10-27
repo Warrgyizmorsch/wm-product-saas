@@ -118,8 +118,12 @@ class CustomerPaymentApiController extends Controller
         $validated = $validator->validated();
 
         $payment = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId) {
-            $lastId    = (CustomerPayment::where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
-            $payNumber = 'PAY-' . str_pad((string)$lastId, 5, '0', STR_PAD_LEFT);
+            $lastId    = (CustomerPayment::withoutGlobalScopes()->where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
+            $payNumber = 'PAY-' . str_pad((string)$lastId, 4, '0', STR_PAD_LEFT);
+            while (CustomerPayment::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('payment_number', $payNumber)->exists()) {
+                $lastId++;
+                $payNumber = 'PAY-' . str_pad((string)$lastId, 4, '0', STR_PAD_LEFT);
+            }
 
             $pay = CustomerPayment::create([
                 'tenant_id'      => $tenantId,

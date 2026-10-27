@@ -53,9 +53,17 @@ class CustomerPaymentController extends Controller
         $invoices = Invoice::whereIn('status', ['Posted', 'Partially Paid', 'Overdue'])->where('balance_due', '>', 0)->latest()->get();
         $salesOrders = SalesOrder::whereIn('status', ['Confirmed', 'Partially Shipped'])->latest()->get();
 
-        $latest = CustomerPayment::latest('id')->first();
+        $tenantId = require_tenant_id();
+        $latest = CustomerPayment::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->latest('id')
+            ->first();
         $nextSeq = $latest ? intval(str_replace('PAY-', '', $latest->payment_number)) + 1 : 1;
         $nextPaymentNumber = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        while (CustomerPayment::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('payment_number', $nextPaymentNumber)->exists()) {
+            $nextSeq++;
+            $nextPaymentNumber = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        }
 
         $prefillCustomerId    = $request->input('customer_id') ?? $request->input('amp;customer_id');
         $prefillInvoiceId     = $request->input('invoice_id') ?? $request->input('amp;invoice_id');
@@ -99,11 +107,31 @@ class CustomerPaymentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', CustomerPayment::class);
+        $tenantId = require_tenant_id();
+
+        // If the submitted payment number already exists, auto-increment to the next unique payment number
+        if (!empty($request->payment_number) && CustomerPayment::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('payment_number', $request->payment_number)->exists()) {
+            $latest = CustomerPayment::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->latest('id')
+                ->first();
+            $nextSeq = $latest ? intval(str_replace('PAY-', '', $latest->payment_number)) + 1 : 1;
+            $newPayNum = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            while (CustomerPayment::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('payment_number', $newPayNum)->exists()) {
+                $nextSeq++;
+                $newPayNum = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            }
+            $request->merge(['payment_number' => $newPayNum]);
+        }
 
         $validated = $request->validate([
             'customer_id'    => ['required', 'exists:customers,id'],
-            'payment_number' => ['required', 'string', 'max:255', 'unique:customer_payments,payment_number'],
+            'payment_number' => [
+                'required',
+                'string',
+                'max:255',
+                \Illuminate\Validation\Rule::unique('customer_payments', 'payment_number')->where('tenant_id', $tenantId),
+            ],
             'payment_date'   => ['required', 'date'],
             'payment_method' => ['required', 'string', 'max:100'],
             'amount'         => ['required', 'numeric', 'min:0.01'],

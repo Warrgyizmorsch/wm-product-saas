@@ -25,7 +25,9 @@ class DispatchOrderService
         $materialRequirements = $this->dispatchRepo->getAllPendingMaterialRequirements();
 
         return $materialRequirements->map(function ($requirement) {
-            $itemsData = $requirement->items->map(function ($item) {
+            $itemsData = $requirement->items->filter(function ($item) {
+                return !($item->product && $item->product->isService());
+            })->map(function ($item) {
                 $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForMRItem($item->id);
                 $remainingQty = max(0, (float) $item->quantity - $alreadyDispatched);
                 $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
@@ -155,10 +157,18 @@ class DispatchOrderService
             if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped'])) {
                 throw new Exception("Sales Order {$so->sales_order_number} must be Confirmed before creating a Dispatch Order.");
             }
+            if ($so && $so->hasOnlyServices()) {
+                throw new Exception("Sales Order {$so->sales_order_number} contains only service items. Services cannot be dispatched as they do not require physical shipping.");
+            }
         }
 
         // 1. Remaining ordered qty & Stock availability validation
         foreach ($validated['items'] as $item) {
+            $product = Product::find($item['product_id']);
+            if ($product && $product->isService()) {
+                throw new Exception("Product '{$product->name}' is a service item and cannot be included in physical dispatch orders.");
+            }
+
             $mrItemId = $item['material_requirement_item_id'] ?? null;
             $mrItem = $mrItemId ? MaterialRequirementItem::find($mrItemId) : null;
             if (!$mrItem && !empty($finalSalesOrderId)) {
@@ -577,10 +587,10 @@ class DispatchOrderService
             // Update linked Sales Order status
             if ($dispatch->salesOrder) {
                 $so = $dispatch->salesOrder;
-                $totalOrdered = $so->items->sum('quantity');
+                $totalPhysicalOrdered = $so->items->filter(fn($item) => !$item->isService())->sum('quantity');
                 $totalDispatched = $this->dispatchRepo->getDispatchedQtyForSalesOrder($so->id);
 
-                if ($totalDispatched >= $totalOrdered) {
+                if ($totalPhysicalOrdered > 0 && $totalDispatched >= $totalPhysicalOrdered) {
                     $so->update(['status' => 'Shipped']);
                 } else if ($totalDispatched > 0) {
                     $so->update(['status' => 'Partially Shipped']);

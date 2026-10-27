@@ -68,9 +68,11 @@
                             <x-ui.odoo-form-ui type="select" :label="__('crm.sales_order_ref')" name="sales_order_id" id="salesOrderSelect" class="odoo-select2">
                                 <option value="">{{ __('crm.select_sales_order_placeholder') }}</option>
                                 @foreach ($salesOrders as $so)
+                                    @if (!$so->hasOnlyServices())
                                     <option value="{{ $so->id }}" @selected(old('sales_order_id', $prefillSalesOrderId) == $so->id)>
                                         {{ $so->sales_order_number }} ({{ __('crm.customer') }}: {{ $so->customer?->name }})
                                     </option>
+                                    @endif
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -168,7 +170,9 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     @php
-        $salesOrdersData = $salesOrders->map(function($so) use ($soDispatchedMap, $soReturnedMap) {
+        $salesOrdersData = $salesOrders->filter(function($so) {
+            return !$so->hasOnlyServices();
+        })->map(function($so) use ($soDispatchedMap, $soReturnedMap) {
             $soSubtotal = (float)($so->subtotal ?: 1);
             $soDiscountType = $so->discount_type ?? 'item_wise';
             $soOrderDiscount = ($soDiscountType === 'order_wise') ? (float)($so->discount ?: 0) : 0;
@@ -176,7 +180,9 @@
                 'id' => $so->id,
                 'sales_order_number' => $so->sales_order_number,
                 'customer_name' => $so->customer?->name,
-                'items' => $so->items->map(function($item) use ($so, $soSubtotal, $soOrderDiscount, $soDiscountType, $soDispatchedMap, $soReturnedMap) {
+                'items' => $so->items->filter(function($item) {
+                    return !($item->product && $item->product->isService());
+                })->map(function($item) use ($so, $soSubtotal, $soOrderDiscount, $soDiscountType, $soDispatchedMap, $soReturnedMap) {
                     $qty = (float)$item->quantity;
                     $grossPrice = (float)$item->unit_price;
                     $lineGrossTotal = $qty * $grossPrice;
@@ -220,7 +226,9 @@
                 'invoice_date' => $inv->invoice_date ? $inv->invoice_date->format('d/m/Y') : '',
                 'total_amount' => round(convert_from_base((float)$inv->total_amount), 2),
                 'gst_type' => $inv->gst_type ?? ((float)$inv->igst_amount > 0 ? 'IGST' : 'CGST + SGST'),
-                'items' => $inv->items->map(function($item) use ($inv, $invSubtotal, $invOrderDiscount, $invDiscountType, $invDispatchedMap, $soDispatchedMap, $invReturnedMap, $soReturnedMap) {
+                'items' => $inv->items->filter(function($item) {
+                    return !($item->product && $item->product->isService());
+                })->map(function($item) use ($inv, $invSubtotal, $invOrderDiscount, $invDiscountType, $invDispatchedMap, $soDispatchedMap, $invReturnedMap, $soReturnedMap) {
                     $qty = (float)$item->quantity;
                     $grossPrice = (float)$item->unit_price;
                     $lineGrossTotal = $qty * $grossPrice;

@@ -136,6 +136,13 @@ class InvoiceController extends Controller
             $mode = 'sales_order';
         }
 
+        if ($salesOrderId && !$dispatchOrderId) {
+            $checkSO = SalesOrder::with('items.product')->find((int)$salesOrderId);
+            if ($checkSO && $checkSO->hasOnlyServices()) {
+                $mode = 'sales_order';
+            }
+        }
+
         if ($dispatchOrderId) {
             $matchingDO = $dispatchOrders->firstWhere('id', (int)$dispatchOrderId) 
                 ?: $dispatchOrders->firstWhere('material_requirement_id', (int)$dispatchOrderId);

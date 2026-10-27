@@ -55,6 +55,11 @@ class MaterialRequirementService
                     continue;
                 }
 
+                $product = \App\Domains\Inventory\Models\Product::find($itemData['product_id']);
+                if ($product && $product->isService()) {
+                    continue;
+                }
+
                 MaterialRequirementItem::create([
                     'tenant_id'               => $delivery->tenant_id,
                     'material_requirement_id' => $delivery->id,
