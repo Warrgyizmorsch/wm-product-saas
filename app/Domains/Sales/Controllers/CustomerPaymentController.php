@@ -186,11 +186,26 @@ class CustomerPaymentController extends Controller
                     $apply = min($allocatedAmt, (float) $invoice->balance_due);
 
                     PaymentAllocation::create([
+                        'tenant_id'           => $payment->tenant_id,
+                        'company_id'          => $payment->company_id,
+                        'branch_id'           => $payment->branch_id,
                         'customer_payment_id' => $payment->id,
                         'sales_order_id'      => $invoice->sales_order_id,
                         'invoice_id'          => $invoice->id,
                         'allocated_amount'    => $apply,
                     ]);
+
+                    if ($allocatedAmt > $apply) {
+                        PaymentAllocation::create([
+                            'tenant_id'           => $payment->tenant_id,
+                            'company_id'          => $payment->company_id,
+                            'branch_id'           => $payment->branch_id,
+                            'customer_payment_id' => $payment->id,
+                            'sales_order_id'      => $invoice->sales_order_id,
+                            'invoice_id'          => null,
+                            'allocated_amount'    => $allocatedAmt - $apply,
+                        ]);
+                    }
 
                     $invoice->amount_paid = (float) $invoice->amount_paid + $apply;
                     $invoice->balance_due = max(0, (float) $invoice->total_amount - $invoice->amount_paid);
@@ -202,6 +217,9 @@ class CustomerPaymentController extends Controller
             // ── Link to Sales Order (advance) ────────────────────────────────
             elseif ($allocateTo === 'sales_order' && !empty($validated['sales_order_id'])) {
                 PaymentAllocation::create([
+                    'tenant_id'           => $payment->tenant_id,
+                    'company_id'          => $payment->company_id,
+                    'branch_id'           => $payment->branch_id,
                     'customer_payment_id' => $payment->id,
                     'sales_order_id'      => $validated['sales_order_id'],
                     'invoice_id'          => null,

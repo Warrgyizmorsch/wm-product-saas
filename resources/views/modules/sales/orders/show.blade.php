@@ -19,7 +19,10 @@
         $totalInvoicedQty = \App\Domains\Sales\Models\InvoiceItem::whereHas('invoice', function ($q) use ($order) {
             $q->where('sales_order_id', $order->id)->where('status', '!=', 'Cancelled');
         })->sum('quantity');
-        $hasUnbilledQty = ($totalOrderedQty - $totalInvoicedQty) > 0.0001;
+        $totalReturnedBeforeInvoiceQty = \App\Domains\Sales\Models\SalesReturnItem::whereHas('salesReturn', function ($q) use ($order) {
+            $q->where('sales_order_id', $order->id)->where('status', 'Completed')->whereNull('invoice_id');
+        })->sum('quantity');
+        $hasUnbilledQty = ($totalOrderedQty - $totalInvoicedQty - $totalReturnedBeforeInvoiceQty) > 0.0001;
         $invoicingPolicy = tenant()?->settings['invoicing_policy'] ?? 'both';
         $totalDispatchedQty = $order->dispatches->where('status', '!=', 'Cancelled')->flatMap->items->sum(function ($item) {
             return $item->quantity_dispatched ?? $item->quantity ?? 0;
@@ -348,14 +351,14 @@
                 <x-ui.button variant="outline-info" size="sm" :href="route('projects.show', $order->projects->first()->project_code)" class="fw-bold px-3 d-print-none" icon="feather-folder">
                     {{ __('projects.view_project') }} ({{ $order->projects->first()->project_code }})
                 </x-ui.button>
-            @elseif ($order->status === 'Confirmed' && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
+            @elseif (!in_array($order->status, ['Draft', 'Cancelled']) && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
                 <x-ui.button variant="outline-primary" size="sm" class="fw-bold px-3 d-print-none" data-bs-toggle="modal"
                     data-bs-target="#convertToProjectModal" icon="feather-folder-plus">
                     {{ __('projects.convert_to_project') }}
                 </x-ui.button>
             @endif
 
-            @if ($hasUnbilledQty && ($invoicingPolicy !== 'dispatch_order' || $order->hasOnlyServices()))
+            @if ($hasUnbilledQty)
                 <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}"
                     class="btn btn-sm btn-primary fw-bold px-3 d-print-none shadow-2xs">
                     <i class="feather-file-text me-1.5"></i>{{ __('crm.create_invoice') ?? 'Create Invoice' }}
@@ -1504,7 +1507,7 @@
         </div>
     </div>
 
-    @if ($order->status === 'Confirmed' && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
+    @if (!in_array($order->status, ['Draft', 'Cancelled']) && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
         <x-ui.modal id="convertToProjectModal" :title="'<i class=\'feather-folder-plus me-2 text-primary\'></i>' . __('projects.convert_to_project')" :centered="true" size="lg" :formAction="route('sales.orders.convert-to-project', $order->id)" formMethod="POST">
 
             <p class="text-muted fs-13 mb-3">

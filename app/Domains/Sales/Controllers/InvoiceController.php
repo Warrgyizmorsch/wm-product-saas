@@ -137,10 +137,7 @@ class InvoiceController extends Controller
         }
 
         if ($salesOrderId && !$dispatchOrderId) {
-            $checkSO = SalesOrder::with('items.product')->find((int)$salesOrderId);
-            if ($checkSO && $checkSO->hasOnlyServices()) {
-                $mode = 'sales_order';
-            }
+            $mode = 'sales_order';
         }
 
         if ($dispatchOrderId) {
@@ -178,10 +175,11 @@ class InvoiceController extends Controller
             }
         }
 
-        $latest = Invoice::latest('id')->first();
+        $tenantId = require_tenant_id();
+        $latest = Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('INV-', '', $latest->invoice_number)) + 1 : 1;
         $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
-        while (Invoice::where('invoice_number', $nextInvoiceNumber)->exists()) {
+        while (Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('invoice_number', $nextInvoiceNumber)->exists()) {
             $nextSeq++;
             $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
         }
@@ -278,9 +276,13 @@ class InvoiceController extends Controller
                     ->where('sales_order_item_id', $soItem->id)
                     ->sum('quantity');
 
-                $unbilledQty = max(0, $orderedQty - $alreadyInvoiced);
+                $alreadyReturned = \App\Domains\Sales\Models\SalesReturnItem::whereHas('salesReturn', fn($q) => $q->where('sales_order_id', $salesOrder->id)->where('status', 'Completed')->whereNull('invoice_id'))
+                    ->where('product_id', $soItem->product_id)
+                    ->sum('quantity');
+
+                $unbilledQty = max(0, $orderedQty - $alreadyInvoiced - $alreadyReturned);
                 if ($unbilledQty <= 0.0001) {
-                    continue; // Skip items already fully invoiced
+                    continue; // Skip items already fully invoiced or returned
                 }
 
                 $unitPrice = round(convert_from_base(floatval($soItem->unit_price)), 2);
@@ -356,6 +358,17 @@ class InvoiceController extends Controller
                 $query->where('branch_id', $branchId);
             }
         });
+
+        if (!empty($request->invoice_number) && Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('invoice_number', $request->invoice_number)->exists()) {
+            $latest = Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest('id')->first();
+            $nextSeq = $latest ? intval(str_replace('INV-', '', $latest->invoice_number)) + 1 : 1;
+            $newInvNum = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            while (Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('invoice_number', $newInvNum)->exists()) {
+                $nextSeq++;
+                $newInvNum = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            }
+            $request->merge(['invoice_number' => $newInvNum]);
+        }
 
         $validated = $request->validate([
             'sales_order_id'          => ['nullable', 'exists:sales_orders,id'],
@@ -621,9 +634,24 @@ class InvoiceController extends Controller
             foreach ($unallocatedAdvances as $allocation) {
                 if ($remainingBalance <= 0) break;
 
-                $applyAmount = min($allocation->allocated_amount, $remainingBalance);
+                $originalAllocated = (float) $allocation->allocated_amount;
+                $applyAmount = min($originalAllocated, $remainingBalance);
+
+                if ($applyAmount < $originalAllocated) {
+                    $remainder = $originalAllocated - $applyAmount;
+                    PaymentAllocation::create([
+                        'tenant_id'           => $allocation->tenant_id,
+                        'company_id'          => $allocation->company_id,
+                        'branch_id'           => $allocation->branch_id,
+                        'customer_payment_id' => $allocation->customer_payment_id,
+                        'sales_order_id'      => $allocation->sales_order_id,
+                        'invoice_id'          => null,
+                        'allocated_amount'    => $remainder,
+                    ]);
+                }
+
                 $allocation->update([
-                    'invoice_id' => $invoice->id,
+                    'invoice_id'       => $invoice->id,
                     'allocated_amount' => $applyAmount,
                 ]);
 

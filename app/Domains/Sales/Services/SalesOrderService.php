@@ -30,10 +30,12 @@ class SalesOrderService
 
     public function getNextSalesOrderNumber(): string
     {
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $year = now()->format('Y');
-        $prefix = "{$year}-";
+        $prefix = "SO-{$year}-";
 
-        $latest = SalesOrder::query()
+        $latest = SalesOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->where('sales_order_number', 'like', "{$prefix}%")
             ->orderBy('id', 'desc')
             ->first();
@@ -45,7 +47,13 @@ class SalesOrderService
             $nextNum = intval($lastNumStr) + 1;
         }
 
-        return 'SO-' . $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $nextSoNumber = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        while (SalesOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('sales_order_number', $nextSoNumber)->exists()) {
+            $nextNum++;
+            $nextSoNumber = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        }
+
+        return $nextSoNumber;
     }
 
     public function create(array $data, array $items): SalesOrder

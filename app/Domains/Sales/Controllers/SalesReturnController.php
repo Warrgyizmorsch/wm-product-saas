@@ -485,7 +485,11 @@ class SalesReturnController extends Controller
                 if ($invoice) {
                     $apply = min((float) $returnOrder->total_refund_amount, (float) $invoice->balance_due);
                     $invoice->balance_due = max(0, (float) $invoice->balance_due - $apply);
-                    $invoice->status = $invoice->balance_due <= 0 ? 'Paid' : 'Partially Paid';
+                    if ($invoice->balance_due <= 0) {
+                        $invoice->status = (float) $invoice->amount_paid > 0 ? 'Paid' : 'Credited';
+                    } else {
+                        $invoice->status = (float) $invoice->amount_paid > 0 ? 'Partially Paid' : 'Partially Credited';
+                    }
                     $invoice->save();
                 }
             }

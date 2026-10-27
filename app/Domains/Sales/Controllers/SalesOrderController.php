@@ -351,8 +351,12 @@ class SalesOrderController extends Controller
         $this->authorize('view', $order);
         $this->authorize('create', \App\Domains\Projects\Models\Project::class);
 
-        if ($order->status !== 'Confirmed') {
-            return back()->withErrors(['status' => 'Only Confirmed Sales Orders can be converted to a Delivery Project.']);
+        if (in_array($order->status, ['Draft', 'Cancelled'])) {
+            return back()->withErrors(['status' => 'Draft or Cancelled Sales Orders cannot be converted to a Delivery Project.']);
+        }
+
+        if ($order->projects()->exists()) {
+            return back()->withErrors(['conversion' => 'A Delivery Project has already been created for this Sales Order.']);
         }
 
         $validated = $request->validate([
