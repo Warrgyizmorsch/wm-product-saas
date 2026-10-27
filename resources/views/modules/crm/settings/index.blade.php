@@ -408,6 +408,35 @@
                                     </div>
                                 </div>
 
+                                <!-- Mappls (MapmyIndia) Integration Configuration -->
+                                <div class="p-3 border rounded-3 mb-4 bg-light">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <label class="form-label fw-bold fs-13 text-dark mb-0 d-flex align-items-center gap-1.5">
+                                            <i class="feather-map-pin text-primary fs-14"></i> Mappls (MapmyIndia) API Key & Search Integration
+                                        </label>
+                                        <a href="https://about.mappls.com/api/" target="_blank" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-0.5 d-inline-flex align-items-center gap-1">
+                                            <i class="feather-external-link fs-10"></i> Get Free Mappls Key (No Card Required)
+                                        </a>
+                                    </div>
+                                    <p class="text-muted fs-12 mb-3">
+                                        Enter your tenant's free Mappls API key below. This enables pinpoint address autocomplete for Indian offices, complexes, landmarks (e.g. Ashoka Palace, Sobhagpura) and renders the interactive map with accurate coordinates.
+                                    </p>
+                                    <div class="row g-3">
+                                        <div class="col-md-8">
+                                            <label class="form-label fs-11 fw-semibold text-secondary mb-1">Mappls API Key / Vector SDK Key</label>
+                                            <input type="text" name="mappls_api_key" class="form-control form-control-sm font-monospace fs-12 bg-white" placeholder="e.g. your_mappls_api_key_here" value="{{ $settings['mappls_api_key'] ?? '' }}">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fs-11 fw-semibold text-secondary mb-1">Allowed Geo-Fence Radius (Meters)</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" name="geofence_radius_meters" class="form-control fs-12 bg-white" min="50" max="10000" placeholder="500" value="{{ $settings['geofence_radius_meters'] ?? 500 }}">
+                                                <span class="input-group-text bg-white fs-11 text-muted">Meters</span>
+                                            </div>
+                                            <small class="text-muted fs-10 d-block mt-0.5">Permitted radius when verifying presence on Mark Connected.</small>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="d-flex justify-content-end">
                                     <button type="submit" class="btn btn-primary px-4 fw-semibold shadow-sm">
                                         <i class="feather-save me-1"></i>Save Verification Policy

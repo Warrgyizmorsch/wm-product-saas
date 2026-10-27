@@ -126,10 +126,17 @@ Route::prefix('api/crm')
         Route::get('/my-meetings', [LeadFollowupApiController::class, 'myMeetings'])->name('my-meetings');
         Route::get('/meetings', [LeadFollowupApiController::class, 'myMeetings'])->name('meetings.index');
 
-        // Standalone followups & documents
+        // Standalone meetings, followups & documents
+        Route::get('meetings/{followup}', [LeadFollowupApiController::class, 'show'])->whereNumber('followup')->name('meetings.show');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/assign', [LeadFollowupApiController::class, 'assignMeeting'])->whereNumber('followup')->name('meetings.assign');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('followup')->name('meetings.status');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}', [LeadFollowupApiController::class, 'update'])->whereNumber('followup')->name('meetings.update');
+        Route::delete('meetings/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('followup')->name('meetings.destroy');
+
         Route::get('followups/{followup}', [LeadFollowupApiController::class, 'show'])->whereNumber('followup')->name('followups.show');
         Route::match(['put', 'patch', 'post'], 'followups/{followup}', [LeadFollowupApiController::class, 'update'])->whereNumber('followup')->name('followups.update');
         Route::match(['put', 'patch', 'post'], 'followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('followup')->name('followups.status');
+        Route::match(['put', 'patch', 'post'], 'followups/{followup}/assign', [LeadFollowupApiController::class, 'assignMeeting'])->whereNumber('followup')->name('followups.assign');
         Route::delete('followups/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('followup')->name('followups.destroy');
         Route::delete('documents/{document}', [LeadApiController::class, 'deleteDocument'])->whereNumber('document')->name('documents.destroy');
 
@@ -137,6 +144,7 @@ Route::prefix('api/crm')
         Route::get('leads/{lead}/followups/{followup}', [LeadFollowupApiController::class, 'show'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.show');
         Route::match(['put', 'patch', 'post'], 'leads/{lead}/followups/{followup}', [LeadFollowupApiController::class, 'update'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.update');
         Route::match(['put', 'patch', 'post'], 'leads/{lead}/followups/{followup}/status', [LeadFollowupApiController::class, 'updateStatus'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.status');
+        Route::match(['put', 'patch', 'post'], 'leads/{lead}/followups/{followup}/assign', [LeadFollowupApiController::class, 'assignMeeting'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.assign');
         Route::delete('leads/{lead}/followups/{followup}', [LeadFollowupApiController::class, 'destroy'])->whereNumber('lead')->whereNumber('followup')->name('leads.followups.destroy');
 
         // ==========================================

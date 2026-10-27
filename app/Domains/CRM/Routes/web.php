@@ -122,6 +122,8 @@ Route::prefix('crm')
             ->name('meetings.status');
         Route::match(['put', 'patch', 'post'], 'meetings/{followup}/reschedule', [LeadFollowupController::class, 'rescheduleMeeting'])
             ->name('meetings.reschedule');
+        Route::match(['put', 'patch', 'post'], 'meetings/{followup}/assign', [LeadFollowupController::class, 'assignMeeting'])
+            ->name('meetings.assign');
 
         Route::get('activities', [LeadActivityController::class, 'index'])
             ->name('activities.index');

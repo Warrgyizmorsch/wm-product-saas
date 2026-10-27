@@ -546,6 +546,7 @@
                     :required="true"
                     :searchable="true"
                     :errorText="$errors->first('type')"
+                    onchange="if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'deal_activity_calendar', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});"
                 >
                     <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
                     <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
@@ -581,6 +582,15 @@
                     <option value="90">{{ __('crm.duration_options.90') ?? '90 Mins' }}</option>
                     <option value="120">{{ __('crm.duration_options.120') ?? '120 Mins' }}</option>
                 </x-ui.modal-form-ui>
+            </div>
+
+            <div class="col-12">
+                @include('modules.crm.partials.meeting-location-field', [
+                    'idPrefix' => 'deal_activity_calendar',
+                    'addressFieldName' => 'location_address',
+                    'latFieldName' => 'latitude',
+                    'lngFieldName' => 'longitude'
+                ])
             </div>
 
             <div class="col-12">
@@ -726,17 +736,40 @@
         }
     });
 
-    document.getElementById('modal_activity_type')?.addEventListener('change', function() {
+    function updateDealActivityType(val) {
         const meetSwitch = document.getElementById('createMeetSwitchUnified');
         const syncSwitch = document.getElementById('syncGoogleSwitch');
+        const isMeeting = (val || '').trim().toLowerCase() === 'meeting' || (val || '').trim().toLowerCase().includes('meeting') || (val || '').trim().toLowerCase() === 'demo';
+        
         if (meetSwitch && syncSwitch) {
-            if (this.value === 'Meeting') {
+            if (isMeeting) {
                 meetSwitch.checked = true;
                 syncSwitch.checked = true;
             } else {
                 meetSwitch.checked = false;
             }
         }
+
+        if (window.crmToggleMeetingLocation) {
+            window.crmToggleMeetingLocation(val, 'deal_activity_calendar', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});
+        }
+    }
+
+    document.getElementById('modal_activity_type')?.addEventListener('change', function() {
+        updateDealActivityType(this.value);
     });
+
+    if (window.$) {
+        $(document).on('change', '#modal_activity_type', function() {
+            updateDealActivityType($(this).val());
+        });
+
+        $('#scheduleDealActivityModal').on('shown.bs.modal', function() {
+            const currentType = $('#modal_activity_type').val();
+            if (currentType) {
+                updateDealActivityType(currentType);
+            }
+        });
+    }
 </script>
 @endpush

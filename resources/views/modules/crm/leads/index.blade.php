@@ -295,7 +295,8 @@
                     <form method="GET" action="{{ route('crm.leads.index') }}" class="d-inline">
                         <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>
-                                {{ __('crm.filter_options') }}</h6>
+                                {{ __('crm.filter_options') }}
+                            </h6>
                             <div class="mb-3">
                                 <label
                                     class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
@@ -308,13 +309,17 @@
                                 <x-ui.odoo-form-ui type="select" name="priority">
                                     <option value="">{{ __('crm.all_priorities') }}</option>
                                     <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>
-                                        {{ __('crm.priorities.Low') }}</option>
+                                        {{ __('crm.priorities.Low') }}
+                                    </option>
                                     <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>
-                                        {{ __('crm.priorities.Medium') }}</option>
+                                        {{ __('crm.priorities.Medium') }}
+                                    </option>
                                     <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>
-                                        {{ __('crm.priorities.High') }}</option>
+                                        {{ __('crm.priorities.High') }}
+                                    </option>
                                     <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>
-                                        {{ __('crm.priorities.Urgent') }}</option>
+                                        {{ __('crm.priorities.Urgent') }}
+                                    </option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
@@ -323,11 +328,14 @@
                                 <x-ui.odoo-form-ui type="select" name="segment">
                                     <option value="">{{ __('crm.all_segments') }}</option>
                                     <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>
-                                        {{ __('crm.segments.SME') }}</option>
+                                        {{ __('crm.segments.SME') }}
+                                    </option>
                                     <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>
-                                        {{ __('crm.segments.Mid-Market') }}</option>
+                                        {{ __('crm.segments.Mid-Market') }}
+                                    </option>
                                     <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>
-                                        {{ __('crm.segments.Enterprise') }}</option>
+                                        {{ __('crm.segments.Enterprise') }}
+                                    </option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3">
@@ -2588,7 +2596,8 @@
                 </div>
                 <div>
                     <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="leadFollowupOffcanvasTitle">
-                        {{ __('crm.edit_followup') }}</h5>
+                        {{ __('crm.edit_followup') }}
+                    </h5>
                     <span class="text-muted fs-11">{{ __('crm.log_interaction_next_followup') }}</span>
                 </div>
             </div>
@@ -2661,7 +2670,7 @@
                             <div class="row g-2">
                                 <div class="col-6">
                                     <x-ui.modal-form-ui type="select" :label="__('crm.next_activity_type')"
-                                        name="next_activity_type" id="offcanvasNextActivityType">
+                                        name="next_activity_type" id="offcanvasNextActivityType" onchange="if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'lead_index_next', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                                         <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
                                         <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
                                         <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
@@ -2685,6 +2694,14 @@
                             <x-ui.modal-form-ui type="input" inputType="datetime-local"
                                 :label="__('crm.next_followup_datetime_optional')" name="next_followup_date"
                                 id="offcanvasNextFollowupDate" />
+
+                            @include('modules.crm.partials.meeting-location-field', [
+                                'idPrefix' => 'lead_index_next',
+                                'label' => 'Next Meeting Venue Location',
+                                'addressFieldName' => 'next_location_address',
+                                'latFieldName' => 'next_latitude',
+                                'lngFieldName' => 'next_longitude'
+                            ])
 
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
@@ -2737,13 +2754,20 @@
                         id="offcanvasEventTitle" :placeholder="__('crm.event_title_placeholder')" value="" />
 
                     <x-ui.modal-form-ui type="select" :label="__('crm.activity_type')" name="schedule_type"
-                        id="offcanvasScheduleType" :required="true" onchange="$('#offcanvasFollowupType').val(this.value)">
+                        id="offcanvasScheduleType" :required="true" onchange="$('#offcanvasFollowupType').val(this.value); if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'lead_index_schedule', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                         <option value="Call">{{ __('crm.interaction_types.Call') }}</option>
                         <option value="Meeting">{{ __('crm.interaction_types.Meeting') }}</option>
                         <option value="Demo">{{ __('crm.interaction_types.Demo') }}</option>
                         <option value="Email">{{ __('crm.interaction_types.Email') }}</option>
                         <option value="WhatsApp">{{ __('crm.activity_types.WhatsApp') }}</option>
                     </x-ui.modal-form-ui>
+
+                    @include('modules.crm.partials.meeting-location-field', [
+                        'idPrefix' => 'lead_index_schedule',
+                        'addressFieldName' => 'location_address',
+                        'latFieldName' => 'latitude',
+                        'lngFieldName' => 'longitude'
+                    ])
 
                     <div class="row g-2">
                         <div class="col-6">
@@ -2820,7 +2844,8 @@
                 </div>
                 <div>
                     <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="assignLeadOffcanvasTitle">
-                        {{ __('crm.assign_lead_owner') }}</h5>
+                        {{ __('crm.assign_lead_owner') }}
+                    </h5>
                     <span class="text-muted fs-11" id="assignLeadOffcanvasSubtitle">{{ __('crm.select_sales_rep') }}</span>
                 </div>
             </div>

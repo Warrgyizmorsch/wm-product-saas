@@ -776,6 +776,7 @@
 
     <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
     <script src="{{ asset('assets/js/tax-identity-formatter.js') }}?v={{ @filemtime(public_path('assets/js/tax-identity-formatter.js')) }}"></script>
+    <script src="{{ asset('assets/js/crm-meeting-location-picker.js') }}?v={{ @filemtime(public_path('assets/js/crm-meeting-location-picker.js')) }}"></script>
     <script>
         // Global safety: automatically hoist any opened Bootstrap modal to document.body
         // to prevent CSS stacking context traps (e.g. nested inside .nxl-container or .main-content)
