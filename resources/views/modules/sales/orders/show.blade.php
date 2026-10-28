@@ -115,6 +115,33 @@
             border-left-color: #e2e8f0;
         }
 
+        .so-status-pipeline .pipeline-step.active.step-warning {
+            background-color: #d97706 !important;
+            color: #ffffff !important;
+        }
+
+        .so-status-pipeline .pipeline-step.active.step-warning::after {
+            border-left-color: #d97706 !important;
+        }
+
+        .so-status-pipeline .pipeline-step.active.step-success {
+            background-color: #10b981 !important;
+            color: #ffffff !important;
+        }
+
+        .so-status-pipeline .pipeline-step.active.step-success::after {
+            border-left-color: #10b981 !important;
+        }
+
+        .so-status-pipeline .pipeline-step.active.step-danger {
+            background-color: #dc2626 !important;
+            color: #ffffff !important;
+        }
+
+        .so-status-pipeline .pipeline-step.active.step-danger::after {
+            border-left-color: #dc2626 !important;
+        }
+
         .so-status-pipeline .pipeline-step:hover:not(.active) {
             background-color: #e2e8f0;
             color: #0f172a;
@@ -151,6 +178,24 @@
 
         html.app-skin-dark .so-status-pipeline .pipeline-step.active::after {
             border-left-color: var(--bs-primary, #1e40af) !important;
+        }
+
+        html.app-skin-dark .so-status-pipeline .pipeline-step.active.step-warning {
+            background-color: #b45309 !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .so-status-pipeline .pipeline-step.active.step-warning::after {
+            border-left-color: #b45309 !important;
+        }
+
+        html.app-skin-dark .so-status-pipeline .pipeline-step.active.step-danger {
+            background-color: #b91c1c !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .so-status-pipeline .pipeline-step.active.step-danger::after {
+            border-left-color: #b91c1c !important;
         }
 
         html.app-skin-dark .so-status-pipeline .pipeline-step.completed {
@@ -271,31 +316,35 @@
 
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <!-- Chevron Arrow Status Pipeline -->
-        <div class="so-status-pipeline d-inline-flex align-items-center d-print-none me-2">
+        <div class="so-status-pipeline d-inline-flex align-items-center d-print-none me-1">
             @php
                 $isServiceOnly = $order->hasOnlyServices();
                 if ($isServiceOnly) {
                     $statuses = ['Draft', 'Confirmed'];
-                    if ($order->invoices->isNotEmpty() && $order->invoices->where('status', '!=', 'Cancelled')->every(fn($i) => in_array($i->status, ['Paid', 'Closed']))) {
+                    if ($order->status === 'Completed' || $order->isFullyInvoiced()) {
                         $statuses[] = 'Completed';
                     } elseif ($order->invoices->isNotEmpty()) {
                         $statuses[] = 'Invoiced';
                     }
-                    if ($order->status === 'Cancelled') {
-                        $statuses[] = 'Cancelled';
-                    }
                 } else {
                     $statuses = ['Draft', 'Confirmed'];
-                    if ($order->status === 'Partially Shipped') {
+                    if ($order->status === 'In Fulfillment') {
+                        $statuses[] = 'In Fulfillment';
+                    } elseif ($order->status === 'Partially Shipped') {
                         $statuses[] = 'Partially Shipped';
                     }
                     $statuses[] = 'Shipped';
-                    if ($order->status === 'Cancelled') {
-                        $statuses[] = 'Cancelled';
-                    }
+                    $statuses[] = 'Completed';
                 }
+
+                if ($order->status === 'Short-Closed') {
+                    $statuses[] = 'Short-Closed';
+                } elseif ($order->status === 'Cancelled') {
+                    $statuses[] = 'Cancelled';
+                }
+
                 $displayStatus = $order->status;
-                if ($isServiceOnly && in_array($order->status, ['Partially Shipped', 'Shipped'])) {
+                if ($isServiceOnly && in_array($order->status, ['In Fulfillment', 'Partially Shipped', 'Shipped'])) {
                     $displayStatus = 'Confirmed';
                 }
                 $currentIndex = array_search($displayStatus, $statuses);
@@ -305,6 +354,13 @@
                     $stepClass = '';
                     if ($displayStatus === $state) {
                         $stepClass = 'active';
+                        if ($state === 'Cancelled') {
+                            $stepClass .= ' step-danger';
+                        } elseif ($state === 'Short-Closed' || $state === 'Partially Shipped') {
+                            $stepClass .= ' step-warning';
+                        } elseif ($state === 'Completed') {
+                            $stepClass .= ' step-success';
+                        }
                     } elseif ($currentIndex !== false && $index < $currentIndex) {
                         $stepClass = 'completed';
                     }
@@ -312,8 +368,10 @@
                 <span class="pipeline-step {{ $stepClass }}">
                     @if($state === 'Draft') {{ __('crm.status_draft') ?? 'Draft' }}
                     @elseif($state === 'Confirmed') {{ __('crm.status_confirmed') ?? 'Confirmed' }}
+                    @elseif($state === 'In Fulfillment') In Fulfillment
                     @elseif($state === 'Partially Shipped') {{ __('crm.status_partially_shipped') ?? 'Partially Shipped' }}
                     @elseif($state === 'Shipped') {{ __('crm.status_shipped') ?? 'Shipped' }}
+                    @elseif($state === 'Short-Closed') Short-Closed
                     @elseif($state === 'Invoiced') Invoiced
                     @elseif($state === 'Completed') Completed
                     @elseif($state === 'Cancelled') {{ __('crm.status_cancelled') ?? 'Cancelled' }}
@@ -338,24 +396,24 @@
                 class="btn btn-sm btn-light border fw-semibold px-2.5 d-print-none">
                 <i class="feather-edit me-1 text-muted"></i>{{ __('crm.edit') ?? 'Edit' }}
             </a>
-
-            <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none"
-                onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-light border text-danger fw-semibold px-2.5">
-                    <i class="feather-x-circle me-1 text-danger"></i>{{ __('crm.cancel') ?? 'Cancel' }}
-                </button>
-            </form>
-        @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
-            @if ($order->projects && $order->projects->isNotEmpty())
-                <x-ui.button variant="outline-info" size="sm" :href="route('projects.show', $order->projects->first()->project_code)" class="fw-bold px-3 d-print-none" icon="feather-folder">
-                    {{ __('projects.view_project') }} ({{ $order->projects->first()->project_code }})
-                </x-ui.button>
-            @elseif (!in_array($order->status, ['Draft', 'Cancelled']) && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
-                <x-ui.button variant="outline-primary" size="sm" class="fw-bold px-3 d-print-none" data-bs-toggle="modal"
-                    data-bs-target="#convertToProjectModal" icon="feather-folder-plus">
-                    {{ __('projects.convert_to_project') }}
-                </x-ui.button>
+        @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped', 'In Fulfillment']))
+            @php
+                $soMr = $order->materialRequirements->first();
+            @endphp
+            @if ($soMr)
+                @if ($soMr->status === 'Released')
+                    <a href="{{ route('inventory.material-requirements.show', $soMr->id) }}"
+                        class="btn btn-sm btn-outline-success fw-semibold px-2.5 d-print-none"
+                        title="Material Requirement Released for Dispatch">
+                        <i class="feather-check-circle me-1 text-success"></i>MR Released
+                    </a>
+                @elseif (in_array($soMr->status, ['Pending', 'Draft', 'Processing', 'Partially Ready']))
+                    <a href="{{ route('inventory.material-requirements.show', $soMr->id) }}"
+                        class="btn btn-sm btn-outline-warning fw-semibold px-2.5 d-print-none"
+                        title="Material Requirement Pending Store Release">
+                        <i class="feather-clock me-1 text-warning"></i>MR Pending Release
+                    </a>
+                @endif
             @endif
 
             @if ($hasUnbilledQty)
@@ -364,27 +422,67 @@
                     <i class="feather-file-text me-1.5"></i>{{ __('crm.create_invoice') ?? 'Create Invoice' }}
                 </a>
             @endif
-
-            <a href="{{ route('sales.orders.download', $order->id) }}"
-                class="btn btn-sm btn-light border fw-semibold px-2.5 d-print-none" target="_blank" title="Download PDF">
-                <i class="feather-download me-1 text-muted"></i>PDF
-            </a>
-
-            <button type="button" onclick="window.print()" class="btn btn-sm btn-light border fw-semibold px-2.5 d-print-none"
-                title="Print Order">
-                <i class="feather-printer me-1 text-muted"></i>Print
-            </button>
-
-            @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
-                <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none"
-                    onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
-                    @csrf
-                    <button type="submit" class="btn btn-sm btn-light border text-danger fw-semibold px-2.5">
-                        <i class="feather-x-circle me-1 text-danger"></i>{{ __('crm.cancel') ?? 'Cancel' }}
-                    </button>
-                </form>
-            @endif
         @endif
+
+        <!-- More Actions Dropdown -->
+        <div class="dropdown d-inline-flex align-items-center d-print-none">
+            <button class="btn btn-sm btn-light border fw-semibold px-2.5 dropdown-toggle d-inline-flex align-items-center"
+                type="button"
+                data-bs-toggle="dropdown"
+                data-bs-auto-close="true"
+                aria-expanded="false"
+                title="More Order Actions">
+                <i class="feather-more-horizontal me-1 text-muted"></i>More
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border p-1" style="min-width: 220px; z-index: 1060; right: 0 !important; left: auto !important;">
+                <li>
+                    <a class="dropdown-item py-1.5 fs-13" href="{{ route('sales.orders.download', $order->id) }}" target="_blank">
+                        <i class="feather-download me-2 text-muted"></i>Download PDF
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item py-1.5 fs-13" href="javascript:void(0)" onclick="window.print()">
+                        <i class="feather-printer me-2 text-muted"></i>Print Order
+                    </a>
+                </li>
+
+                @if ($order->projects && $order->projects->isNotEmpty())
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                        <a class="dropdown-item py-1.5 fs-13" href="{{ route('projects.show', $order->projects->first()->project_code) }}">
+                            <i class="feather-folder me-2 text-info"></i>{{ __('projects.view_project') }} ({{ $order->projects->first()->project_code }})
+                        </a>
+                    </li>
+                @elseif (!in_array($order->status, ['Draft', 'Cancelled', 'Short-Closed']) && auth()->user()->can('create', \App\Domains\Projects\Models\Project::class))
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                        <button type="button" class="dropdown-item py-1.5 fs-13" data-bs-toggle="modal" data-bs-target="#convertToProjectModal">
+                            <i class="feather-folder-plus me-2 text-primary"></i>{{ __('projects.convert_to_project') }}
+                        </button>
+                    </li>
+                @endif
+
+                @if (in_array($order->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment']))
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                        <button type="button" class="dropdown-item py-1.5 fs-13 text-warning" data-bs-toggle="modal" data-bs-target="#shortCloseOrderModal">
+                            <i class="feather-minus-circle me-2 text-warning"></i>Short-Close Order
+                        </button>
+                    </li>
+                @endif
+
+                @if (!in_array($order->status, ['Shipped', 'Cancelled', 'Short-Closed']))
+                    @if (!in_array($order->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment']))
+                        <li><hr class="dropdown-divider my-1"></li>
+                    @endif
+                    <li>
+                        <button type="button" class="dropdown-item py-1.5 fs-13 text-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                            <i class="feather-x-circle me-2 text-danger"></i>{{ __('crm.cancel') ?? 'Cancel Order' }}
+                        </button>
+                    </li>
+                @endif
+            </ul>
+        </div>
     </div>
 @endsection
 
@@ -453,12 +551,18 @@
         $badgeClass = 'bg-soft-secondary text-secondary';
         if ($order->status === 'Confirmed')
             $badgeClass = 'bg-soft-primary text-primary';
+        elseif ($order->status === 'In Fulfillment')
+            $badgeClass = 'bg-soft-info text-info border border-info-subtle';
         elseif ($order->status === 'Partially Shipped')
-            $badgeClass = 'bg-soft-warning text-warning';
+            $badgeClass = 'bg-soft-warning text-warning border border-warning-subtle';
         elseif ($order->status === 'Shipped')
             $badgeClass = 'bg-soft-success text-success';
+        elseif ($order->status === 'Completed')
+            $badgeClass = 'bg-soft-success text-success border border-success-subtle';
+        elseif ($order->status === 'Short-Closed')
+            $badgeClass = 'bg-soft-warning text-warning border border-warning-subtle';
         elseif ($order->status === 'Cancelled')
-            $badgeClass = 'bg-soft-danger text-danger';
+            $badgeClass = 'bg-soft-danger text-danger border border-danger-subtle';
     @endphp
 
     <div class="card border-0 shadow-sm rounded-3 overflow-hidden bg-white print-area">
@@ -528,6 +632,15 @@
                     </span>
                 </div>
             </div>
+
+            @if(in_array($order->status, ['Short-Closed', 'Cancelled']) && !empty($order->closure_reason))
+                <div class="mt-3 p-2.5 rounded-2 {{ $order->status === 'Cancelled' ? 'bg-soft-danger text-danger border border-danger-subtle' : 'bg-soft-warning text-warning-emphasis border border-warning-subtle' }} fs-12 d-flex align-items-center">
+                    <i class="{{ $order->status === 'Cancelled' ? 'feather-alert-circle text-danger' : 'feather-info text-warning' }} me-2 fs-14 flex-shrink-0"></i>
+                    <div>
+                        <strong>{{ $order->status }} Reason:</strong> {{ $order->closure_reason }}
+                    </div>
+                </div>
+            @endif
         </div>
 
         <!-- ==================== KEY KPI METRICS RIBBON (Lead Style) ==================== -->
@@ -847,19 +960,20 @@
                                 <thead class="fs-11 text-uppercase fw-bold text-muted"
                                     style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
                                     <tr>
-                                        <th class="ps-3 py-2.5 text-center" style="width: 4%;">#</th>
-                                        <th class="py-2.5 ps-3" style="width: 36%;">
+                                        <th class="ps-3 py-2.5 text-center" style="width: 3%;">#</th>
+                                        <th class="py-2.5 ps-3" style="width: 29%;">
                                             {{ __('crm.product_details') ?? 'PRODUCT DETAILS' }}</th>
-                                        <th class="py-2.5 text-center" style="width: 14%;">
+                                        <th class="py-2.5 text-center" style="width: 11%;">
                                             {{ __('crm.warehouse') ?? 'WAREHOUSE' }}</th>
-                                        <th class="text-center py-2.5" style="width: 8%;">{{ __('crm.qty') ?? 'QTY' }}</th>
-                                        <th class="text-end py-2.5 pe-3" style="width: 11%;">
+                                        <th class="text-center py-2.5" style="width: 8%;">{{ __('crm.qty') ?? 'ORDER QTY' }}</th>
+                                        <th class="text-center py-2.5" style="width: 17%;">FULFILLMENT STATUS</th>
+                                        <th class="text-end py-2.5 pe-3" style="width: 10%;">
                                             {{ __('crm.unit_price') ?? 'UNIT PRICE' }}</th>
-                                        <th class="text-end py-2.5 pe-3" style="width: 9%;">
+                                        <th class="text-end py-2.5 pe-3" style="width: 7%;">
                                             {{ __('crm.discount') ?? 'DISCOUNT' }}</th>
-                                        <th class="text-end py-2.5 pe-3" style="width: 8%;">
+                                        <th class="text-end py-2.5 pe-3" style="width: 5%;">
                                             {{ __('crm.taxes_percent') ?? 'TAXES (%)' }}</th>
-                                        <th class="text-end pe-4 py-2.5" style="width: 14%;">
+                                        <th class="text-end pe-4 py-2.5" style="width: 10%;">
                                             {{ __('crm.amount') ?? 'AMOUNT' }}</th>
                                     </tr>
                                 </thead>
@@ -935,7 +1049,70 @@
                                                     </span>
                                                 @endif
                                             </td>
-                                            <td class="text-center fw-bold py-2 fs-13">{{ $item->quantity }}</td>
+                                            <td class="text-center py-2">
+                                                <span class="fw-bold fs-13 text-dark">{{ (float) $item->quantity }}</span>
+                                                @if(!$item->isService())
+                                                    <div class="text-muted fs-10">Open: <strong class="{{ $item->open_allocatable_qty > 0 ? 'text-primary' : 'text-muted' }}">{{ (float)$item->open_allocatable_qty }}</strong></div>
+                                                @endif
+                                            </td>
+                                            <td class="text-center py-2">
+                                                @if ($item->isService())
+                                                    @php
+                                                        $serviceInvoicedQty = \App\Domains\Sales\Models\InvoiceItem::where('sales_order_item_id', $item->id)
+                                                            ->whereHas('invoice', fn($q) => $q->where('status', '!=', 'Cancelled'))
+                                                            ->sum('quantity');
+                                                        $isServiceInvoiced = $serviceInvoicedQty >= (float)$item->quantity && (float)$item->quantity > 0;
+                                                    @endphp
+                                                    @if ($isServiceInvoiced)
+                                                        <span class="badge bg-soft-success text-success border border-success-subtle fs-11 px-2 py-0.5 d-inline-flex align-items-center mb-1">
+                                                            <i class="feather-check-circle me-1"></i>Fulfilled (Invoiced)
+                                                        </span>
+                                                    @elseif ($serviceInvoicedQty > 0)
+                                                        <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11 px-2 py-0.5 d-inline-flex align-items-center mb-1">
+                                                            <i class="feather-clock me-1"></i>Partially Invoiced
+                                                        </span>
+                                                    @else
+                                                        <span class="badge bg-soft-info text-info border border-info-subtle fs-11 px-2 py-0.5 d-inline-flex align-items-center mb-1">
+                                                            <i class="feather-file-text me-1"></i>Direct Billing
+                                                        </span>
+                                                    @endif
+                                                    <div class="d-flex align-items-center justify-content-center gap-1.5 fs-10 text-muted flex-wrap">
+                                                        <span>Non-Inventory</span>
+                                                        <span>&bull;</span>
+                                                        <span class="{{ $serviceInvoicedQty > 0 ? 'text-success fw-bold' : '' }}">Inv: {{ (float)$serviceInvoicedQty }}</span>
+                                                    </div>
+                                                @else
+                                                    @php
+                                                        $rawStatus = $item->status ?: 'Pending';
+                                                        $statusConfig = match($rawStatus) {
+                                                            'Allocated' => ['badge' => 'bg-soft-primary text-primary border-primary-subtle', 'icon' => 'feather-box', 'label' => 'Allocated (In DO)'],
+                                                            'Partially Dispatched' => ['badge' => 'bg-soft-warning text-warning border-warning-subtle', 'icon' => 'feather-truck', 'label' => 'Partially Dispatched'],
+                                                            'Fulfilled', 'Dispatched' => ['badge' => 'bg-soft-success text-success border-success-subtle', 'icon' => 'feather-check-circle', 'label' => 'Dispatched'],
+                                                            'Short-Closed' => ['badge' => 'bg-soft-secondary text-secondary border-secondary-subtle', 'icon' => 'feather-minus-circle', 'label' => 'Short-Closed'],
+                                                            'Cancelled' => ['badge' => 'bg-soft-danger text-danger border-danger-subtle', 'icon' => 'feather-x-circle', 'label' => 'Cancelled'],
+                                                            default => ['badge' => 'bg-soft-secondary text-muted border-secondary-subtle', 'icon' => 'feather-clock', 'label' => 'Pending Allocation'],
+                                                        };
+                                                    @endphp
+                                                    <span class="badge {{ $statusConfig['badge'] }} border fs-11 px-2 py-0.5 d-inline-flex align-items-center mb-1">
+                                                        <i class="{{ $statusConfig['icon'] }} me-1 fs-11"></i>{{ $statusConfig['label'] }}
+                                                    </span>
+                                                    <div class="d-flex align-items-center justify-content-center gap-1.5 fs-10 text-muted flex-wrap">
+                                                        <span title="Allocated in Dispatch Orders" class="{{ $item->allocated_qty > 0 ? 'text-primary fw-bold' : '' }}">
+                                                            Alloc: {{ (float)$item->allocated_qty }}
+                                                        </span>
+                                                        <span>&bull;</span>
+                                                        <span title="Dispatched / Outward" class="{{ $item->dispatched_qty > 0 ? 'text-success fw-bold' : '' }}">
+                                                            Disp: {{ (float)$item->dispatched_qty }}
+                                                        </span>
+                                                        @if($item->invoiced_qty > 0)
+                                                            <span>&bull;</span>
+                                                            <span title="Invoiced" class="text-info fw-bold">
+                                                                Inv: {{ (float)$item->invoiced_qty }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                            </td>
                                             <td class="text-end text-muted py-2 pe-3 font-monospace">
                                                 {{ format_currency($item->unit_price) }}</td>
                                             <td class="text-end text-danger py-2 pe-3 font-monospace">
@@ -1537,6 +1714,52 @@
                 <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold" icon="feather-check-circle">
                     {{ __('projects.create_project') }}
                 </x-ui.button>
+            </x-slot:footer>
+        </x-ui.modal>
+    @endif
+
+    <!-- Short-Close Order Modal -->
+    @if (in_array($order->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment']))
+        <x-ui.modal id="shortCloseOrderModal" :title="'<i class=\'feather-minus-circle me-2 text-warning\'></i>' . 'Short-Close Sales Order'" :centered="true" :formAction="route('sales.orders.short-close', $order->id)" formMethod="POST">
+            <div class="mb-3">
+                <div class="alert alert-warning py-2.5 px-3 fs-13 mb-3 d-flex align-items-start">
+                    <i class="feather-alert-triangle me-2 fs-16 text-warning mt-0.5 flex-shrink-0"></i>
+                    <div>
+                        <strong>Notice:</strong> Short-closing will conclude this sales order prematurely. All remaining open or unallocated item quantities will be cancelled, and pending un-shipped dispatch orders will be cancelled.
+                    </div>
+                </div>
+                <label for="shortCloseReason" class="form-label fw-semibold fs-13">Reason for Short-Closing <span class="text-danger">*</span></label>
+                <textarea name="reason" id="shortCloseReason" class="form-control fs-13" rows="3" required placeholder="Enter reason (e.g. Customer requested partial order cancellation, item discontinued...)"></textarea>
+            </div>
+
+            <x-slot:footer>
+                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('crm.close') ?? 'Close' }}</button>
+                <button type="submit" class="btn btn-warning fw-bold text-dark">
+                    <i class="feather-minus-circle me-1"></i>Short-Close Order
+                </button>
+            </x-slot:footer>
+        </x-ui.modal>
+    @endif
+
+    <!-- Cancel Order Modal -->
+    @if (!in_array($order->status, ['Shipped', 'Cancelled', 'Short-Closed']))
+        <x-ui.modal id="cancelOrderModal" :title="'<i class=\'feather-x-circle me-2 text-danger\'></i>' . 'Cancel Sales Order'" :centered="true" :formAction="route('sales.orders.cancel', $order->id)" formMethod="POST">
+            <div class="mb-3">
+                <div class="alert alert-danger py-2.5 px-3 fs-13 mb-3 d-flex align-items-start">
+                    <i class="feather-alert-circle me-2 fs-16 text-danger mt-0.5 flex-shrink-0"></i>
+                    <div>
+                        <strong>Are you sure?</strong> You are about to cancel Sales Order <strong>{{ $order->sales_order_number }}</strong>. Any pending un-shipped dispatch orders linked to this sales order will also be cancelled automatically.
+                    </div>
+                </div>
+                <label for="cancelReason" class="form-label fw-semibold fs-13">Reason for Cancellation</label>
+                <textarea name="reason" id="cancelReason" class="form-control fs-13" rows="3" placeholder="Enter reason (e.g. Customer cancelled requirement, duplicate entry...)"></textarea>
+            </div>
+
+            <x-slot:footer>
+                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('crm.close') ?? 'Close' }}</button>
+                <button type="submit" class="btn btn-danger fw-bold">
+                    <i class="feather-x-circle me-1"></i>Confirm Cancellation
+                </button>
             </x-slot:footer>
         </x-ui.modal>
     @endif

@@ -10,6 +10,7 @@ use App\Domains\Purchase\Models\PurchaseRequisition;
 use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use App\Domains\Production\Models\ProductionOrderRequest;
 use App\Domains\Inventory\Services\StockService;
+use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Repositories\MaterialRequirementRepository;
 use Illuminate\Support\Facades\DB;
 
@@ -278,6 +279,110 @@ class MaterialRequirementService
         });
     }
 
+    public function releaseForDispatch(MaterialRequirement $delivery, array $selectedItemIds = [], array $itemWarehouses = [], array $releaseQuantities = []): array
+    {
+        return DB::transaction(function () use ($delivery, $selectedItemIds, $itemWarehouses, $releaseQuantities) {
+            // 1. Update warehouse assignment on items if submitted
+            if (!empty($itemWarehouses)) {
+                foreach ($itemWarehouses as $itemId => $whId) {
+                    if ($whId) {
+                        MaterialRequirementItem::where('id', $itemId)
+                            ->where('material_requirement_id', $delivery->id)
+                            ->update(['warehouse_id' => (int) $whId]);
+                    }
+                }
+            }
+
+            $delivery->load(['items.product', 'items.warehouse']);
+
+            $allPhysicalItems = $delivery->items->filter(fn ($i) => !($i->product && $i->product->isService()));
+            if ($allPhysicalItems->isEmpty()) {
+                $allPhysicalItems = $delivery->items;
+            }
+
+            if (empty($selectedItemIds)) {
+                $itemsToRelease = $allPhysicalItems;
+            } else {
+                $selectedIds = array_map('intval', (array) $selectedItemIds);
+                $itemsToRelease = $allPhysicalItems->filter(fn ($i) => in_array($i->id, $selectedIds));
+            }
+
+            if ($itemsToRelease->isEmpty()) {
+                throw new \Exception("Please select at least one item with unreleased quantity to release for dispatch.");
+            }
+
+            // 2. Validate stock and release quantities for selected items
+            $defaultWarehouseId = Warehouse::where('tenant_id', $delivery->tenant_id)->orderBy('is_default', 'desc')->first()?->id ?? 1;
+            $releasedCount = 0;
+
+            foreach ($itemsToRelease as $item) {
+                if ($item->product && $item->product->isService()) {
+                    continue;
+                }
+                $whId = $item->warehouse_id ?: $defaultWarehouseId;
+                $avail = StockService::getAvailableStock($item->product_id, $whId);
+                $reserved = (float) ($item->quantity_reserved ?? 0);
+                $ordered = (float) ($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
+                $prevReleased = (float) ($item->quantity_released ?? 0);
+                $remainingToRelease = max(0.0, $ordered - $prevReleased);
+
+                if ($remainingToRelease <= 0) {
+                    continue; // Already fully released, skip
+                }
+
+                // If specific release quantity is requested for this item
+                $requestedReleaseQty = isset($releaseQuantities[$item->id]) ? (float)$releaseQuantities[$item->id] : $remainingToRelease;
+                $qtyToRelease = min($remainingToRelease, max(0.0, $requestedReleaseQty));
+
+                if ($qtyToRelease <= 0) {
+                    continue;
+                }
+
+                if (($avail + $reserved) < $qtyToRelease) {
+                    $whName = $item->warehouse?->name ?? 'selected warehouse';
+                    $totalAvail = $avail + $reserved;
+                    throw new \Exception("Cannot release {$qtyToRelease} units of '{$item->product?->name}': Only {$totalAvail} units available in {$whName}.");
+                }
+
+                $newTotalReleased = $prevReleased + $qtyToRelease;
+                $itemStatus = ($newTotalReleased >= $ordered) ? 'Released' : 'Partially Released';
+
+                $item->update([
+                    'quantity_released' => $newTotalReleased,
+                    'status'            => $itemStatus,
+                ]);
+                $releasedCount++;
+            }
+
+            if ($releasedCount === 0) {
+                throw new \Exception("All selected items are already fully released or have 0 quantity to release.");
+            }
+
+            // 3. Update overall MR status based on physical items
+            $delivery->load('items');
+            $allPhysical = $delivery->items->filter(fn ($i) => !($i->product && $i->product->isService()));
+            $fullyReleasedCount = $allPhysical->filter(function ($i) {
+                $ordered = (float) ($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity);
+                return (float) ($i->quantity_released ?? 0) >= $ordered;
+            })->count();
+
+            $partiallyReleasedCount = $allPhysical->filter(fn ($i) => (float) ($i->quantity_released ?? 0) > 0)->count();
+
+            if ($fullyReleasedCount === $allPhysical->count()) {
+                $delivery->update(['status' => 'Released']);
+            } elseif ($partiallyReleasedCount > 0) {
+                $delivery->update(['status' => 'Partially Ready']);
+            }
+
+            return [
+                'released_count'       => $releasedCount,
+                'fully_released_count' => $fullyReleasedCount,
+                'total_count'          => $allPhysical->count(),
+                'status'               => $delivery->fresh()->status,
+            ];
+        });
+    }
+
     public function cancel(MaterialRequirement $delivery): void
     {
         DB::transaction(function () use ($delivery) {
@@ -371,6 +476,7 @@ class MaterialRequirementService
         elseif ($allPacked) $delivery->update(['status' => 'Packed']);
         elseif ($allPicked) $delivery->update(['status' => 'Picked']);
         elseif ($allReady) $delivery->update(['status' => 'Ready']);
+        elseif ($delivery->status === 'Released') $delivery->update(['status' => 'Released']);
         elseif ($allPending) $delivery->update(['status' => 'Pending']);
         elseif ($anyReadyOrReserved) $delivery->update(['status' => 'Partially Ready']);
         else $delivery->update(['status' => 'Processing']);

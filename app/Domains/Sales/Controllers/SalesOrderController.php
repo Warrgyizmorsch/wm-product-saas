@@ -51,7 +51,7 @@ class SalesOrderController extends Controller
         );
     }
 
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
         $this->authorize('create', SalesOrder::class);
 
@@ -306,7 +306,7 @@ class SalesOrderController extends Controller
         return redirect()->route('sales.orders.show', $order->id)->with('success', $successMsg);
     }
 
-    public function cancel(int|string $id): RedirectResponse
+    public function cancel(Request $request, int|string $id): RedirectResponse
     {
         $id = (int) $id;
         if ($id <= 0)
@@ -317,13 +317,37 @@ class SalesOrderController extends Controller
             abort(404, 'Sales Order not found.');
         $this->authorize('cancel', $order);
 
-        if ($order->status === 'Shipped') {
-            return back()->withErrors(['status' => 'Cannot cancel a Shipped Sales Order.']);
+        $reason = $request->input('reason', 'Cancelled by user');
+
+        try {
+            $this->orderRepo->cancelOrder($order, $reason);
+            return back()->with('success', 'Sales Order and associated un-shipped dispatch orders cancelled successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['status' => $e->getMessage()]);
         }
+    }
 
-        $this->orderRepo->cancelOrder($order);
+    public function shortClose(Request $request, int|string $id): RedirectResponse
+    {
+        $id = (int) $id;
+        if ($id <= 0)
+            abort(404, 'Sales Order not found.');
 
-        return back()->with('success', 'Sales Order cancelled successfully.');
+        $order = $this->orderRepo->find($id);
+        if (!$order)
+            abort(404, 'Sales Order not found.');
+        $this->authorize('shortClose', $order);
+
+        $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        try {
+            $this->orderRepo->shortCloseOrder($order, $request->input('reason'));
+            return back()->with('success', "Sales Order {$order->sales_order_number} has been Short-Closed. Remaining open quantities have been cleanly cancelled.");
+        } catch (\Exception $e) {
+            return back()->withErrors(['status' => $e->getMessage()]);
+        }
     }
 
     public function destroy(int|string $id): RedirectResponse

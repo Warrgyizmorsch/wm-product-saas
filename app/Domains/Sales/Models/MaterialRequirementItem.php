@@ -33,6 +33,7 @@ class MaterialRequirementItem extends Model
         'quantity',
         'quantity_ordered',
         'quantity_reserved',
+        'quantity_released',
         'quantity_pr_raised',
         'status',
         'purchase_requisition_id',
@@ -48,6 +49,7 @@ class MaterialRequirementItem extends Model
         'quantity' => 'decimal:4',
         'quantity_ordered' => 'decimal:4',
         'quantity_reserved' => 'decimal:4',
+        'quantity_released' => 'decimal:4',
         'quantity_pr_raised' => 'decimal:4',
         'purchase_requisition_id' => 'integer',
         'production_order_id' => 'integer',
@@ -119,10 +121,39 @@ class MaterialRequirementItem extends Model
             ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
     }
 
+    public function getDeliveredQtyAttribute(): float
+    {
+        $mrItemId = $this->id;
+        $productId = $this->product_id;
+        $salesOrderId = $this->materialRequirement?->sales_order_id;
+
+        return (float) \App\Domains\Sales\Models\DispatchOrderItem::whereHas('dispatchOrder', function ($q) use ($salesOrderId) {
+                $q->where('status', 'Delivered');
+                if ($salesOrderId) {
+                    $q->where('sales_order_id', $salesOrderId);
+                }
+            })
+            ->where(function ($q) use ($mrItemId, $productId) {
+                $q->where('material_requirement_item_id', $mrItemId);
+                if ($productId) {
+                    $q->orWhere('product_id', $productId);
+                }
+            })
+            ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(NULLIF(quantity_dispatched, 0), quantity_ordered)'));
+    }
+
     public function getPendingQtyAttribute(): float
     {
         $ordered = (float) ($this->quantity_ordered > 0 ? $this->quantity_ordered : $this->quantity);
-        return max(0.0, $ordered - $this->dispatched_qty - (float) $this->quantity_reserved);
+        $relQty = (float) ($this->quantity_released ?? 0);
+        $fulfilledOrReleased = max($this->dispatched_qty, $relQty);
+        return max(0.0, $ordered - $fulfilledOrReleased - (float) $this->quantity_reserved);
+    }
+
+    public function getRemainingToReleaseAttribute(): float
+    {
+        $ordered = (float) ($this->quantity_ordered > 0 ? $this->quantity_ordered : $this->quantity);
+        return max(0.0, $ordered - (float) ($this->quantity_released ?? 0));
     }
 
     public function getRemainingPrQtyAttribute(): float
@@ -134,14 +165,19 @@ class MaterialRequirementItem extends Model
     public function getCalculatedStatusAttribute(): string
     {
         $ordered = (float) ($this->quantity_ordered > 0 ? $this->quantity_ordered : $this->quantity);
+        $delivered = $this->delivered_qty;
         $dispatched = $this->dispatched_qty;
         $reserved = (float) $this->quantity_reserved;
 
-        if ($dispatched >= $ordered) {
+        if ($ordered > 0 && $delivered >= $ordered) {
+            return 'Delivered';
+        } elseif ($delivered > 0) {
+            return 'Partially Delivered';
+        } elseif ($ordered > 0 && $dispatched >= $ordered) {
             return 'Dispatched';
         } elseif ($dispatched > 0) {
             return 'Partially Dispatched';
-        } elseif ($reserved >= $ordered) {
+        } elseif ($reserved >= $ordered && $ordered > 0) {
             return 'Reserved';
         } elseif ($reserved > 0) {
             return 'Partially Reserved';

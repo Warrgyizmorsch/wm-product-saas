@@ -663,6 +663,20 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
+        if ($request->filled('dispatch_order_id')) {
+            $do = \App\Domains\Sales\Models\DispatchOrder::find($request->input('dispatch_order_id'));
+            if ($do && empty($do->invoice_id)) {
+                $do->update(['invoice_id' => $invoice->id]);
+            }
+        }
+
+        if ($salesOrder) {
+            foreach ($salesOrder->items as $soItem) {
+                $soItem->refreshStatus();
+            }
+            $salesOrder->refreshFulfillmentStatus();
+        }
+
         event(new InvoicePosted($invoice));
 
         \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.invoice.created', [
@@ -979,6 +993,13 @@ class InvoiceController extends Controller
 
             return $journal;
         });
+
+        if ($inv->sales_order_id && $inv->salesOrder) {
+            foreach ($inv->salesOrder->items as $soItem) {
+                $soItem->refreshStatus();
+            }
+            $inv->salesOrder->refreshFulfillmentStatus();
+        }
 
         return redirect()->route('sales.invoices.show', $inv->id)
             ->with('success', "Financial Credit Note {$journal->journal_number} created successfully. Invoice {$inv->invoice_number} has been cancelled without altering warehouse inventory.");

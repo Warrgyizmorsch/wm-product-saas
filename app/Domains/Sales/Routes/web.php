@@ -18,6 +18,7 @@ Route::prefix('sales')
         Route::delete('orders/{order}', [SalesOrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [SalesOrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/short-close', [SalesOrderController::class, 'shortClose'])->name('orders.short-close');
         Route::post('orders/{order}/convert-to-project', [SalesOrderController::class, 'convertToProject'])->name('orders.convert-to-project');
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
@@ -28,6 +29,7 @@ Route::prefix('sales')
         Route::get('material-requirements/{delivery}', fn($delivery) => redirect()->route('inventory.material-requirements.show', $delivery))->name('material-requirements.show');
         Route::post('material-requirements/{delivery}/ship', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
         Route::post('material-requirements/{delivery}/cancel', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
+        Route::post('material-requirements/{delivery}/release', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'releaseForDispatch'])->name('material-requirements.release');
 
         Route::post('material-requirements/items/{itemId}/warehouse', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'updateWarehouse'])->name('material-requirements.update-warehouse');
         Route::post('material-requirements/items/{itemId}/reserve', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'reserveQty'])->name('material-requirements.reserve-qty');
@@ -66,6 +68,7 @@ Route::prefix('sales')
         Route::get('dispatches/{dispatch}', fn($dispatch) => redirect()->route('inventory.dispatches.show', $dispatch))->name('dispatches.show');
         Route::post('dispatches/{dispatch}/confirm', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');
         Route::post('dispatches/{dispatch}/ship', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'ship'])->name('dispatches.ship');
+        Route::post('dispatches/{dispatch}/cancel', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'cancel'])->name('dispatches.cancel');
 
         // Invoices Routes
         Route::get('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'index'])->name('invoices.index');

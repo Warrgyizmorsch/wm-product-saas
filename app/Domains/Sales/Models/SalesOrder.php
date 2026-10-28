@@ -61,6 +61,7 @@ class SalesOrder extends BaseModel
         'total_amount',
         'terms_conditions',
         'notes',
+        'closure_reason',
     ];
 
     protected $casts = [
@@ -179,5 +180,83 @@ class SalesOrder extends BaseModel
     public function requiresDispatch(): bool
     {
         return $this->hasPhysicalGoods();
+    }
+
+    public function isFullyInvoiced(): bool
+    {
+        $activeInvoices = $this->invoices()->where('status', '!=', 'Cancelled')->get();
+        if ($activeInvoices->isEmpty()) {
+            return false;
+        }
+
+        $orderTotal = (float) ($this->total_amount ?? 0);
+        $invoicedAmount = (float) $activeInvoices->sum(fn($i) => (float)($i->total_amount ?? $i->grand_total ?? 0));
+
+        if ($orderTotal > 0 && ($invoicedAmount + 0.01) >= $orderTotal) {
+            return true;
+        }
+
+        $items = $this->items()->get();
+        if ($items->isEmpty()) {
+            return false;
+        }
+
+        $totalOrdered = (float) $items->sum('quantity');
+        if ($totalOrdered <= 0) {
+            return false;
+        }
+
+        $totalInvoicedQty = (float) \App\Domains\Sales\Models\InvoiceItem::whereHas('invoice', function ($q) {
+            $q->where('sales_order_id', $this->id)->where('status', '!=', 'Cancelled');
+        })->sum('quantity');
+
+        $totalCancelled = (float) $items->sum('cancelled_qty');
+
+        return ($totalInvoicedQty + $totalCancelled + 0.0001) >= $totalOrdered;
+    }
+
+    public function refreshFulfillmentStatus(): string
+    {
+        if (in_array($this->status, ['Draft', 'Cancelled', 'Closed', 'Short-Closed'])) {
+            return $this->status;
+        }
+
+        $physicalItems = $this->items()->get()->filter(fn($item) => !$item->isService());
+        if ($physicalItems->isEmpty()) {
+            $newStatus = $this->isFullyInvoiced() ? 'Completed' : 'Confirmed';
+            if ($this->status !== $newStatus) {
+                $this->update(['status' => $newStatus]);
+            }
+            return $newStatus;
+        }
+
+        $totalOrdered = (float) $physicalItems->sum('quantity');
+        $totalDispatched = (float) $physicalItems->sum('dispatched_qty');
+        $totalCancelled = (float) $physicalItems->sum('cancelled_qty');
+        $totalAllocated = (float) $physicalItems->sum('allocated_qty');
+
+        if ($totalCancelled >= $totalOrdered && $totalOrdered > 0) {
+            $newStatus = 'Cancelled';
+        } elseif (($totalDispatched + $totalCancelled) >= $totalOrdered && $totalOrdered > 0) {
+            if ($totalCancelled > 0) {
+                $newStatus = 'Short-Closed';
+            } elseif ($this->isFullyInvoiced()) {
+                $newStatus = 'Completed';
+            } else {
+                $newStatus = 'Shipped';
+            }
+        } elseif ($totalDispatched > 0) {
+            $newStatus = 'Partially Shipped';
+        } elseif ($totalAllocated > 0) {
+            $newStatus = in_array($this->status, ['In Fulfillment', 'Processing']) ? $this->status : 'In Fulfillment';
+        } else {
+            $newStatus = 'Confirmed';
+        }
+
+        if ($this->status !== $newStatus) {
+            $this->update(['status' => $newStatus]);
+        }
+
+        return $newStatus;
     }
 }

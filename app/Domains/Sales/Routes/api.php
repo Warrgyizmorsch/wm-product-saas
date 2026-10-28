@@ -48,6 +48,7 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
         Route::patch('/{id}/status', [SalesOrderApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/confirm', [SalesOrderApiController::class, 'confirm'])->name('confirm');
         Route::post('/{id}/cancel', [SalesOrderApiController::class, 'cancel'])->name('cancel');
+        Route::post('/{id}/short-close', [SalesOrderApiController::class, 'shortClose'])->name('short-close');
         Route::post('/{id}/convert-to-invoice', [SalesOrderApiController::class, 'convertToInvoice'])->name('convert-to-invoice');
         Route::post('/{id}/convert-to-dispatch', [SalesOrderApiController::class, 'convertToDispatch'])->name('convert-to-dispatch');
         Route::delete('/{id}', [SalesOrderApiController::class, 'destroy'])->name('destroy');
@@ -92,6 +93,7 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
     // Dispatch Orders / Challans APIs
     Route::prefix('dispatches')->name('dispatches.')->group(function () {
         Route::get('/meta', [DispatchOrderApiController::class, 'meta'])->name('meta');
+        Route::get('/pending-sales-orders', [DispatchOrderApiController::class, 'pendingSalesOrders'])->name('pending-sales-orders');
         Route::get('/available-serials', [DispatchOrderApiController::class, 'getAvailableSerials'])->name('available-serials');
         Route::get('/available-batches', [DispatchOrderApiController::class, 'getAvailableBatches'])->name('available-batches');
         Route::get('/export', [DispatchOrderApiController::class, 'export'])->name('export');
@@ -101,6 +103,7 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
         Route::patch('/{id}/status', [DispatchOrderApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/confirm', [DispatchOrderApiController::class, 'confirm'])->name('confirm');
         Route::post('/{id}/ship', [DispatchOrderApiController::class, 'ship'])->name('ship');
+        Route::post('/{id}/cancel', [DispatchOrderApiController::class, 'cancel'])->name('cancel');
         Route::post('/{id}/update-tracking', [DispatchOrderApiController::class, 'updateTracking'])->name('update-tracking');
         Route::post('/{id}/pod', [DispatchOrderApiController::class, 'uploadPod'])->name('pod');
     });

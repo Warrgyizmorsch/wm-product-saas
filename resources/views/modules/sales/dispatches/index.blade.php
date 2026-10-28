@@ -180,6 +180,13 @@
                                                 <span class="text-muted fs-11">
                                                     <i class="feather-calendar me-1 fs-10"></i>{{ $so->order_date ? $so->order_date->format('d M Y') : $so->created_at?->format('d M Y') }}
                                                 </span>
+                                                @if ($mr = $so->materialRequirements?->first())
+                                                    <div class="mt-1">
+                                                        <a href="{{ route('inventory.material-requirements.show', $mr->id) }}" class="badge bg-soft-success text-success border border-success-subtle fs-10 fw-semibold text-decoration-none">
+                                                            <i class="feather-check-circle me-1 fs-9"></i>{{ $mr->requirement_number }} • Released
+                                                        </a>
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>

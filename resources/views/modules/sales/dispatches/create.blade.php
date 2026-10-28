@@ -837,16 +837,26 @@
             }
         });
 
-        if (preselectedId) {
+        const preselectedSoId = parseInt('{{ $soId ?? $prefillSalesOrder?->id ?? request('sales_order_id') ?? request('so_id') }}') || parseInt(urlParams.get('sales_order_id')) || parseInt(urlParams.get('so_id')) || null;
+        const targetSelectId = preselectedId || parseInt($('#orderSelectPicker').val()) || null;
+
+        if (targetSelectId || preselectedSoId) {
             fetch('{{ route('sales.dispatches.pending-mr') }}', { headers: { Accept: 'application/json' } })
                 .then(response => response.ok ? response.json() : Promise.reject())
                 .then(res => {
                     deliveryOrders = res.data || res || [];
-                    const order = deliveryOrders.find(o => Number(o.id) === Number(preselectedId));
+                    let order = null;
+                    if (targetSelectId) {
+                        order = deliveryOrders.find(o => Number(o.id) === Number(targetSelectId));
+                    }
+                    if (!order && preselectedSoId) {
+                        order = deliveryOrders.find(o => Number(o.sales_order_id) === Number(preselectedSoId));
+                    }
                     if (order) {
                         selectDeliveryOrder(order);
                     }
-                });
+                })
+                .catch(err => console.error('Error pre-loading dispatch order:', err));
         }
 
         // Fast Barcode Scan Lookup for Dispatches

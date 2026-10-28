@@ -618,6 +618,17 @@ class SalesOrderApiController extends Controller
             ], 422);
         }
 
+        $mrs = $order->materialRequirements;
+        if ($mrs && $mrs->isNotEmpty()) {
+            $isReleased = $mrs->contains(fn($mr) => in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched']));
+            if (!$isReleased) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Cannot create dispatch order: Material Requirement {$mrs->first()->requirement_number} has not been released by Store Incharge yet.",
+                ], 422);
+            }
+        }
+
         $dispatchNo = 'DO-' . strtoupper(bin2hex(random_bytes(4)));
 
         $dispatch = DB::transaction(function () use ($order, $dispatchNo, $tenantId, $companyId, $branchId, $request) {
@@ -710,12 +721,12 @@ class SalesOrderApiController extends Controller
 
     /**
      * POST /api/sales/orders/{id}/confirm
-     * Confirm a draft Sales Order.
+     * Confirm a draft Sales Order and generate Material Requirement if physical items exist.
      */
     public function confirm(int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
-        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+        $order = SalesOrder::where('tenant_id', $tenantId)->with('items')->find($id);
 
         if (!$order) {
             return response()->json([
@@ -724,23 +735,36 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $order);
+        $this->authorize('confirm', $order);
 
-        $order->status = 'Confirmed';
-        $order->save();
+        if ($order->status !== 'Draft') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only Draft Sales Orders can be confirmed.',
+            ], 422);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => "Sales Order {$order->order_number} confirmed successfully.",
-            'data'    => $order->fresh(['customer', 'items.product']),
-        ]);
+        try {
+            app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->confirmOrder($order);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sales Order {$order->sales_order_number} confirmed successfully.",
+                'data'    => $order->fresh(['customer', 'items.product', 'materialRequirements']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
      * POST /api/sales/orders/{id}/cancel
-     * Cancel a Sales Order.
+     * Cancel a Sales Order (with cascading cleanup of open DOs and reservations).
      */
-    public function cancel(int $id): JsonResponse
+    public function cancel(Request $request, int $id): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
         $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
@@ -752,16 +776,70 @@ class SalesOrderApiController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $order);
+        $this->authorize('cancel', $order);
 
-        $order->status = 'Cancelled';
-        $order->save();
+        $reason = $request->input('reason', 'Cancelled via API');
 
-        return response()->json([
-            'success' => true,
-            'message' => "Sales Order {$order->order_number} cancelled.",
-            'data'    => $order->fresh(),
+        try {
+            app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->cancelOrder($order, $reason);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sales Order {$order->sales_order_number} and associated un-shipped dispatch orders cancelled.",
+                'data'    => $order->fresh(['items']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * POST /api/sales/orders/{id}/short-close
+     * Short-Close a Sales Order (cancel remaining open quantities).
+     */
+    public function shortClose(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sales Order not found',
+            ], 404);
+        }
+
+        $this->authorize('shortClose', $order);
+
+        $validator = Validator::make($request->all(), [
+            'reason' => ['required', 'string', 'max:500'],
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->shortCloseOrder($order, $request->input('reason'));
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sales Order {$order->sales_order_number} has been Short-Closed successfully.",
+                'data'    => $order->fresh(['items.product', 'customer']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
