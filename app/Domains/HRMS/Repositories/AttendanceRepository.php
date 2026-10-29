@@ -1000,6 +1000,17 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         // Fetch company rule
         $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
 
+        // Break Telemetry Privacy Mode: Suspend tracking during authorized breaks
+        if ($rule && !empty($rule->pause_tracking_on_break) && $attendance->isOnBreak()) {
+            return [
+                'status'           => 'paused_on_break',
+                'tracking'         => false,
+                'recorded'         => false,
+                'interval_minutes' => $rule->getTrackingMinutes($locationType),
+                'message'          => 'Periodic GPS tracking is suspended while on an authorized break.',
+            ];
+        }
+
         // If location tracking is NOT checked in Attendance Rules, SKIP IT completely
         if (!$rule || !$rule->isTrackingEnabled($locationType)) {
             return [

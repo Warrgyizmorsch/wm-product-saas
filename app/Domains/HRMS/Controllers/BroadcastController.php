@@ -77,7 +77,7 @@ class BroadcastController extends Controller
 
         $validated['content'] = $validated['content'] ?? $validated['message'] ?? '';
         if (empty(trim($validated['content']))) {
-            return redirect()->back()->withInput()->with('error', 'Announcement content is required.');
+            return redirect()->back()->withInput()->with('error', __('hrms.broadcasts.err_content_required'));
         }
 
         $validated['is_acknowledgement_required'] = $request->boolean('is_acknowledgement_required');
@@ -104,9 +104,9 @@ class BroadcastController extends Controller
         };
 
         $msg = match($broadcast->status) {
-            'published' => 'Announcement published successfully.',
-            'draft'     => 'Announcement saved as draft.',
-            default     => 'Announcement scheduled successfully.',
+            'published' => __('hrms.broadcasts.flash_published_success'),
+            'draft'     => __('hrms.broadcasts.flash_draft_success'),
+            default     => __('hrms.broadcasts.flash_scheduled_success'),
         };
 
         return redirect()->route('hrms.broadcasts.index', ['active_tab' => $targetTab])
@@ -145,7 +145,7 @@ class BroadcastController extends Controller
 
         $validated['content'] = $validated['content'] ?? $validated['message'] ?? '';
         if (empty(trim($validated['content']))) {
-            return redirect()->back()->withInput()->with('error', 'Announcement content is required.');
+            return redirect()->back()->withInput()->with('error', __('hrms.broadcasts.err_content_required'));
         }
 
         $validated['is_acknowledgement_required'] = $request->boolean('is_acknowledgement_required');
@@ -164,7 +164,7 @@ class BroadcastController extends Controller
 
         $this->broadcastRepository->updateBroadcast($broadcastId, $validated, $request, $tenantId);
 
-        return redirect()->back()->with('success', 'Announcement updated successfully.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_updated_success'));
     }
 
     /**
@@ -178,7 +178,7 @@ class BroadcastController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->broadcastRepository->deleteBroadcast($broadcastId, $tenantId);
 
-        return redirect()->route('hrms.broadcasts.index')->with('success', 'Announcement deleted successfully.');
+        return redirect()->route('hrms.broadcasts.index')->with('success', __('hrms.broadcasts.flash_deleted_success'));
     }
 
     /**
@@ -192,7 +192,7 @@ class BroadcastController extends Controller
 
         $this->broadcastRepository->acknowledge($broadcastId, $employee, $request->input('signature_data'), $tenantId);
 
-        return redirect()->back()->with('success', 'Thank you. Your acknowledgement has been recorded.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_acknowledged_success'));
     }
 
     /**
@@ -215,19 +215,19 @@ class BroadcastController extends Controller
                 ->where('tenant_id', $tenantId)
                 ->exists();
             if (!$parentValid) {
-                return redirect()->back()->with('error', 'Invalid parent comment reference.');
+                return redirect()->back()->with('error', __('hrms.broadcasts.err_invalid_parent_comment'));
             }
         }
 
         $commentText = trim($validated['comment_text'] ?? $validated['comment'] ?? '');
         if ($commentText === '') {
-            return redirect()->back()->with('error', 'Comment cannot be empty.');
+            return redirect()->back()->with('error', __('hrms.broadcasts.err_comment_empty'));
         }
 
         $broadcast = Broadcast::where('tenant_id', $tenantId)->findOrFail($broadcastId);
 
         if (!$broadcast->allow_comments) {
-            return redirect()->back()->with('error', 'Comments are disabled for this announcement.');
+            return redirect()->back()->with('error', __('hrms.broadcasts.err_comments_disabled'));
         }
 
         $isHrAdmin = $this->isHrAdmin();
@@ -237,17 +237,17 @@ class BroadcastController extends Controller
             $hasAccess = $broadcast->target_type === 'all'
                 || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
             if (!$hasAccess) {
-                abort(403, 'You are not authorized to comment on this targeted announcement.');
+                abort(403, __('hrms.broadcasts.unauthorized_comment'));
             }
         }
 
         if (!$employee && !$isHrAdmin) {
-            return redirect()->back()->with('error', 'An employee profile is required to comment.');
+            return redirect()->back()->with('error', __('hrms.broadcasts.err_employee_required_to_comment'));
         }
 
         $this->broadcastRepository->storeComment($broadcastId, $validated, auth()->user(), $employee, $tenantId);
 
-        return redirect()->back()->with('success', 'Comment posted.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_comment_posted'));
     }
 
     /**
@@ -259,7 +259,7 @@ class BroadcastController extends Controller
 
         $comment->update(['is_pinned' => !$comment->is_pinned]);
 
-        return redirect()->back()->with('success', $comment->is_pinned ? 'Comment pinned.' : 'Comment unpinned.');
+        return redirect()->back()->with('success', $comment->is_pinned ? __('hrms.broadcasts.flash_comment_pinned') : __('hrms.broadcasts.flash_comment_unpinned'));
     }
 
     /**
@@ -273,10 +273,10 @@ class BroadcastController extends Controller
         $deleted = $this->broadcastRepository->deleteComment($comment->id, auth()->user(), $isHrAdmin, $tenantId);
 
         if (!$deleted) {
-            abort(403, 'Unauthorized to delete this comment.');
+            abort(403, __('hrms.broadcasts.unauthorized_delete_comment'));
         }
 
-        return redirect()->back()->with('success', 'Comment removed.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_comment_removed'));
     }
 
     /**
@@ -290,10 +290,10 @@ class BroadcastController extends Controller
         $deleted = $this->broadcastRepository->deleteComment($commentId, auth()->user(), $isHrAdmin, $tenantId);
 
         if (!$deleted) {
-            abort(403, 'Unauthorized to delete this comment.');
+            abort(403, __('hrms.broadcasts.unauthorized_delete_comment'));
         }
 
-        return redirect()->back()->with('success', 'Comment removed.');
+        return redirect()->back()->with('success', __('hrms.broadcasts.flash_comment_removed'));
     }
 
     /**
@@ -319,7 +319,7 @@ class BroadcastController extends Controller
     private function authorizeAdmin(): void
     {
         if (!$this->isHrAdmin()) {
-            abort(403, 'Only HR Administrators can manage announcements.');
+            abort(403, __('hrms.broadcasts.unauthorized_admin'));
         }
     }
 

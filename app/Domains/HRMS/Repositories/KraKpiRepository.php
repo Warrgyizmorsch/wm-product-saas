@@ -50,18 +50,7 @@ class KraKpiRepository implements KraKpiRepositoryInterface
                 ->first();
         }
 
-        // 3. Team Scorecards (For Managers)
-        $teamPlans = collect();
-        if ($currentEmployee) {
-            $teamPlans = EmployeeGoalPlan::with(['employee.department', 'employee.designation', 'appraisalCycle', 'items'])
-                ->where('tenant_id', $tenantId)
-                ->where('manager_id', $currentEmployee->id)
-                ->when($activeCycle, fn($q) => $q->where('appraisal_cycle_id', $activeCycle->id))
-                ->latest()
-                ->get();
-        }
-
-        // 4. All Scorecards (For HR/Admin with Search & Filters)
+        // 3. All Scorecards (For HR/Admin with Search & Filters; Scoped for non-admin)
         $plansQuery = EmployeeGoalPlan::with(['employee.department', 'employee.designation', 'manager', 'appraisalCycle', 'items'])
             ->where('tenant_id', $tenantId);
 
@@ -154,7 +143,7 @@ class KraKpiRepository implements KraKpiRepositoryInterface
 
         $activeTab = $inputs['active_tab'] ?? null;
         if (!$activeTab) {
-            $activeTab = $isHrOrAdmin ? 'plans' : ($teamPlans->isNotEmpty() ? 'team' : ($myPlan ? 'myplan' : 'plans'));
+            $activeTab = $isHrOrAdmin ? 'plans' : ($myPlan ? 'myplan' : 'plans');
         }
 
         return compact(
@@ -162,7 +151,6 @@ class KraKpiRepository implements KraKpiRepositoryInterface
             'cycles',
             'activeCycle',
             'myPlan',
-            'teamPlans',
             'allPlans',
             'kraCategories',
             'kpiMasters',

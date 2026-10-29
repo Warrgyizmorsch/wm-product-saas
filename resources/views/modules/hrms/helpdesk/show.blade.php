@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Ticket #' . $ticket->ticket_number . ' | Helpdesk')
-@section('page-title', 'Ticket #' . $ticket->ticket_number)
-@section('breadcrumb', 'HRMS / Helpdesk / Ticket Thread')
+@section('title', __('hrms.helpdesk.title_show', ['code' => $ticket->ticket_number]))
+@section('page-title', __('hrms.helpdesk.page_title_show', ['code' => $ticket->ticket_number]))
+@section('breadcrumb', __('hrms.helpdesk.breadcrumb_show'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.helpdesk.tickets.index') }}" class="border text-dark fw-semibold">
-            Back to Helpdesk
+            {{ __('hrms.helpdesk.btn_back_to_helpdesk') }}
         </x-ui.button>
     </div>
 @endsection
@@ -194,14 +194,14 @@
                     <x-ui.priority-badge :priority="$ticket->priority" :icon="false" class="px-3 py-1.5" style="font-size: 12px;" />
 
                     @if($ticket->category)
-                        <span class="badge bg-light text-dark border rounded-pill px-3 py-1.5" style="font-size: 12px;">
+                        <x-ui.badge variant="light" class="border text-dark rounded-pill px-3 py-1.5" style="font-size: 12px;">
                             <i class="feather-tag me-1 text-primary"></i> {{ $ticket->category->name }}
-                        </span>
+                        </x-ui.badge>
                     @endif
 
                     @if($ticket->is_confidential)
                         <x-ui.badge variant="danger" soft style="font-size: 12px;">
-                            <i class="feather-lock me-1"></i> Confidential
+                            <i class="feather-lock me-1"></i> {{ __('hrms.helpdesk.badge_confidential') }}
                         </x-ui.badge>
                     @endif
                 </div>
@@ -212,13 +212,13 @@
             <div class="col-lg-5 col-md-5">
                 <div class="bg-light-subtle rounded-3 p-3 border d-flex align-items-center justify-content-between gap-3 shadow-2xs">
                     <div>
-                        <div class="hero-sla-label mb-1">SLA Target Resolution</div>
+                        <div class="hero-sla-label mb-1">{{ __('hrms.helpdesk.sla_target_resolution') }}</div>
                         @if(in_array($ticket->status, ['resolved', 'closed']))
-                            <div class="hero-sla-value text-success"><i class="feather-check-circle me-1"></i> Resolved</div>
+                            <div class="hero-sla-value text-success"><i class="feather-check-circle me-1"></i> {{ __('hrms.helpdesk.status_resolved_title') }}</div>
                         @elseif($ticket->isOverdue())
-                            <div class="hero-sla-value text-danger"><i class="feather-alert-triangle me-1"></i> Overdue Target</div>
+                            <div class="hero-sla-value text-danger"><i class="feather-alert-triangle me-1"></i> {{ __('hrms.helpdesk.overdue_target') }}</div>
                         @else
-                            <div class="hero-sla-value text-primary"><i class="feather-clock me-1"></i> Due {{ $ticket->due_at ? $ticket->due_at->diffForHumans() : 'N/A' }}</div>
+                            <div class="hero-sla-value text-primary"><i class="feather-clock me-1"></i> {{ __('hrms.helpdesk.due_time', ['time' => $ticket->due_at ? $ticket->due_at->diffForHumans() : __('hrms.common.na')]) }}</div>
                         @endif
                     </div>
                     <div class="text-end">
@@ -237,7 +237,7 @@
                             <i class="feather-calendar fs-5"></i>
                         </div>
                         <div>
-                            <span class="hero-meta-label d-block leading-tight">Created Date</span>
+                            <span class="hero-meta-label d-block leading-tight">{{ __('hrms.helpdesk.created_date') }}</span>
                             <span class="hero-meta-value">{{ $ticket->created_at->format('M d, Y H:i') }}</span>
                             <span class="hero-meta-sub ms-1">({{ $ticket->created_at->diffForHumans() }})</span>
                         </div>
@@ -250,8 +250,8 @@
                             <i class="feather-user fs-5"></i>
                         </div>
                         <div>
-                            <span class="hero-meta-label d-block leading-tight">Requested By</span>
-                            <div class="hero-meta-value">{{ $ticket->employee ? ($ticket->employee->full_name ?? $ticket->employee->first_name . ' ' . $ticket->employee->last_name) : 'N/A' }}</div>
+                            <span class="hero-meta-label d-block leading-tight">{{ __('hrms.helpdesk.requested_by') }}</span>
+                            <div class="hero-meta-value">{{ $ticket->employee ? ($ticket->employee->full_name ?? $ticket->employee->first_name . ' ' . $ticket->employee->last_name) : __('hrms.common.na') }}</div>
                             @if($ticket->employee)
                                 <div class="d-flex flex-wrap align-items-center gap-2 mt-1" style="font-size: 13px;">
                                     @if($ticket->employee->office_email || $ticket->employee->personal_email)
@@ -276,8 +276,8 @@
                             <i class="feather-headphones fs-5"></i>
                         </div>
                         <div>
-                            <span class="hero-meta-label d-block leading-tight">Assigned Agent</span>
-                            <span class="hero-meta-value">{{ $ticket->assignedAgent ? ($ticket->assignedAgent->full_name ?? $ticket->assignedAgent->first_name . ' ' . $ticket->assignedAgent->last_name) : 'Unassigned' }}</span>
+                            <span class="hero-meta-label d-block leading-tight">{{ __('hrms.helpdesk.assigned_agent') }}</span>
+                            <span class="hero-meta-value">{{ $ticket->assignedAgent ? ($ticket->assignedAgent->full_name ?? $ticket->assignedAgent->first_name . ' ' . $ticket->assignedAgent->last_name) : __('hrms.helpdesk.badge_unassigned') }}</span>
                         </div>
                     </div>
                 </div>
@@ -293,10 +293,10 @@
                 <div class="ticket-card-header d-flex align-items-center justify-content-between">
                     <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
                         <i class="feather-file-text text-primary fs-5"></i>
-                        <span>Ticket Description</span>
+                        <span>{{ __('hrms.helpdesk.ticket_description') }}</span>
                     </div>
                     <span class="text-muted" style="font-size: 13px; font-weight: 500;">
-                        Submitted {{ $ticket->created_at->format('M d, Y \a\t H:i') }}
+                        {{ __('hrms.helpdesk.submitted_at', ['date' => $ticket->created_at->format('M d, Y'), 'time' => $ticket->created_at->format('H:i')]) }}
                     </span>
                 </div>
                 <div class="p-4">
@@ -307,7 +307,7 @@
                     @if($ticket->attachments->count() > 0)
                         <div class="mt-3 pt-3 border-top">
                             <div class="fw-semibold text-dark mb-2" style="font-size: 13px;">
-                                <i class="feather-paperclip me-1 text-primary"></i> Attachments ({{ $ticket->attachments->count() }}):
+                                <i class="feather-paperclip me-1 text-primary"></i> {{ __('hrms.helpdesk.attachments_count', ['count' => $ticket->attachments->count()]) }}
                             </div>
                             <div class="d-flex flex-wrap gap-2">
                                 @foreach($ticket->attachments as $att)
@@ -328,7 +328,7 @@
                 <div class="ticket-card-header d-flex align-items-center justify-content-between">
                     <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
                         <i class="feather-message-square text-primary fs-5"></i>
-                        <span>Activity & Responses</span>
+                        <span>{{ __('hrms.helpdesk.activity_responses') }}</span>
                         <x-ui.badge variant="primary" class="fw-bold px-2.5 py-1" style="font-size: 12px;">
                             {{ $ticket->replies->count() }}
                         </x-ui.badge>
@@ -344,10 +344,10 @@
                                         <div class="d-flex align-items-center justify-content-between mb-2">
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="internal-note-pill">
-                                                    <i class="feather-lock me-1"></i> Internal HR Note
+                                                    <i class="feather-lock me-1"></i> {{ __('hrms.helpdesk.internal_hr_note') }}
                                                 </span>
                                                 <span class="fw-bold text-dark" style="font-size: 14px;">
-                                                    {{ $reply->sender ? ($reply->sender->full_name ?? $reply->sender->first_name . ' ' . $reply->sender->last_name) : 'HR Staff' }}
+                                                    {{ $reply->sender ? ($reply->sender->full_name ?? $reply->sender->first_name . ' ' . $reply->sender->last_name) : __('hrms.helpdesk.hr_staff') }}
                                                 </span>
                                             </div>
                                             <small class="text-muted" style="font-size: 13px;">{{ $reply->created_at->diffForHumans() }}</small>
@@ -375,7 +375,7 @@
                                             </div>
                                             <div>
                                                 <div class="fw-bold text-dark" style="font-size: 15px;">
-                                                    {{ $reply->sender ? ($reply->sender->full_name ?? $reply->sender->first_name . ' ' . $reply->sender->last_name) : 'User' }}
+                                                    {{ $reply->sender ? ($reply->sender->full_name ?? $reply->sender->first_name . ' ' . $reply->sender->last_name) : __('hrms.helpdesk.user') }}
                                                 </div>
                                                 <small class="text-muted" style="font-size: 12px;">
                                                     {{ $reply->sender ? ($reply->sender->employee_id ?? $reply->sender->employee_code) : '' }}
@@ -391,7 +391,7 @@
 
                                     @if($reply->attachments->count() > 0)
                                         <div class="mt-3 pt-2 border-top">
-                                            <div class="small text-muted mb-2" style="font-size: 12px;">Attached files:</div>
+                                            <div class="small text-muted mb-2" style="font-size: 12px;">{{ __('hrms.helpdesk.attached_files_colon') }}</div>
                                             <div class="d-flex flex-wrap gap-2">
                                                 @foreach($reply->attachments as $att)
                                                     <a href="{{ route('hrms.helpdesk.tickets.attachment', [$ticket->id, $att->id]) }}" class="attachment-pill">
@@ -408,8 +408,8 @@
                                 <div class="avatar-initials-lg mx-auto mb-3 bg-primary-subtle text-primary" style="width: 56px; height: 56px; font-size: 22px;">
                                     <i class="feather-message-square"></i>
                                 </div>
-                                <h6 class="fw-bold text-dark mb-1" style="font-size: 16px;">No responses posted yet</h6>
-                                <p class="text-muted mb-0" style="font-size: 13px;">Use the reply composer below to post a response or update the ticket requester.</p>
+                                <h6 class="fw-bold text-dark mb-1" style="font-size: 16px;">{{ __('hrms.helpdesk.no_replies_yet') }}</h6>
+                                <p class="text-muted mb-0" style="font-size: 13px;">{{ __('hrms.helpdesk.no_replies_yet_hint') }}</p>
                             </div>
                         @endforelse
                     </div>
@@ -421,30 +421,34 @@
         <div class="col-lg-4">
             <!-- Agent Control Actions Box -->
             @if($canUpdate ?? $canManage)
+                @php
+                    $isTicketClosed = $ticket->status === 'closed';
+                    $isLockedForUser = $isTicketClosed && empty($isSuperAdmin);
+                @endphp
                 <div class="ticket-card mb-4">
                     <div class="ticket-card-header">
                         <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
                             <i class="feather-sliders text-primary fs-5"></i>
-                            <span>Ticket Management</span>
+                            <span>{{ __('hrms.helpdesk.ticket_management') }}</span>
                         </div>
                     </div>
                     <div class="p-4">
                         <form action="{{ route('hrms.helpdesk.tickets.status', $ticket->id) }}" method="POST">
                             @csrf
                             <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Update Status" name="status">
-                                    <option value="open" {{ $ticket->status == 'open' ? 'selected' : '' }}>Open</option>
-                                    <option value="in_progress" {{ $ticket->status == 'in_progress' ? 'selected' : '' }}>In Progress</option>
-                                    <option value="pending_employee" {{ $ticket->status == 'pending_employee' ? 'selected' : '' }}>Pending Employee Reply</option>
-                                    <option value="resolved" {{ $ticket->status == 'resolved' ? 'selected' : '' }}>Resolved</option>
-                                    <option value="closed" {{ $ticket->status == 'closed' ? 'selected' : '' }}>Closed</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.helpdesk.field_update_status')" name="status" :disabled="$isLockedForUser">
+                                    <option value="open" {{ $ticket->status == 'open' ? 'selected' : '' }}>{{ __('hrms.helpdesk.status_open_title') }}</option>
+                                    <option value="in_progress" {{ $ticket->status == 'in_progress' ? 'selected' : '' }}>{{ __('hrms.helpdesk.status_in_progress_title') }}</option>
+                                    <option value="pending_employee" {{ $ticket->status == 'pending_employee' ? 'selected' : '' }}>{{ __('hrms.helpdesk.status_pending_employee_title') }}</option>
+                                    <option value="resolved" {{ $ticket->status == 'resolved' ? 'selected' : '' }}>{{ __('hrms.helpdesk.status_resolved_title') }}</option>
+                                    <option value="closed" {{ $ticket->status == 'closed' ? 'selected' : '' }}>{{ __('hrms.helpdesk.status_closed_title') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             @if($canManage)
                                 <div class="mb-3">
-                                    <x-ui.odoo-form-ui type="select" label="Assign Agent" name="assigned_to">
-                                        <option value="">-- Unassigned --</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.helpdesk.field_assign_agent')" name="assigned_to" :disabled="$isLockedForUser">
+                                        <option value="">{{ __('hrms.helpdesk.none_unassigned') }}</option>
                                         @foreach($agents as $agent)
                                             <option value="{{ $agent->id }}" {{ $ticket->assigned_to == $agent->id ? 'selected' : '' }}>
                                                 {{ $agent->full_name ?? trim(($agent->first_name ?? '') . ' ' . ($agent->last_name ?? '')) }} ({{ $agent->employee_id ?? $agent->employee_code }})
@@ -455,16 +459,16 @@
                             @endif
 
                             <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Priority Level" name="priority">
-                                    <option value="low" {{ $ticket->priority == 'low' ? 'selected' : '' }}>Low</option>
-                                    <option value="medium" {{ $ticket->priority == 'medium' ? 'selected' : '' }}>Medium</option>
-                                    <option value="high" {{ $ticket->priority == 'high' ? 'selected' : '' }}>High</option>
-                                    <option value="urgent" {{ $ticket->priority == 'urgent' ? 'selected' : '' }}>Urgent</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.helpdesk.field_priority_level')" name="priority" :disabled="$isLockedForUser">
+                                    <option value="low" {{ $ticket->priority == 'low' ? 'selected' : '' }}>{{ __('hrms.helpdesk.priority_low') }}</option>
+                                    <option value="medium" {{ $ticket->priority == 'medium' ? 'selected' : '' }}>{{ __('hrms.helpdesk.priority_medium') }}</option>
+                                    <option value="high" {{ $ticket->priority == 'high' ? 'selected' : '' }}>{{ __('hrms.helpdesk.priority_high') }}</option>
+                                    <option value="urgent" {{ $ticket->priority == 'urgent' ? 'selected' : '' }}>{{ __('hrms.helpdesk.priority_urgent') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
-                            <x-ui.button type="submit" variant="primary" icon="feather-save" class="w-100 fw-bold">
-                                Save Changes
+                            <x-ui.button type="submit" variant="primary" icon="feather-save" class="w-100 fw-bold" :disabled="$isLockedForUser">
+                                {{ __('hrms.helpdesk.btn_save_changes') }}
                             </x-ui.button>
                         </form>
                     </div>
@@ -477,29 +481,28 @@
                     <div class="ticket-card-header">
                         <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
                             <i class="feather-corner-down-right text-primary fs-5"></i>
-                            <span>Post Response</span>
+                            <span>{{ __('hrms.helpdesk.post_response') }}</span>
                         </div>
                     </div>
                     <div class="p-4">
                         <form action="{{ route('hrms.helpdesk.tickets.reply', $ticket->id) }}" method="POST" enctype="multipart/form-data">
                             @csrf
                             <div class="mb-3">
-                                <textarea name="message" class="form-control" rows="4" placeholder="Write your reply, update, or resolution notes here..." required></textarea>
+                                <x-ui.odoo-form-ui type="textarea" name="message" rows="4" :placeholder="__('hrms.helpdesk.placeholder_reply')" :required="true" />
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label text-dark fw-semibold mb-1" style="font-size: 13px;">Attach Files (optional)</label>
-                                <input type="file" name="attachments[]" class="form-control form-control-sm" multiple>
+                                <x-ui.odoo-form-ui type="file" :label="__('hrms.helpdesk.field_attach_files_optional')" name="attachments[]" multiple />
                             </div>
 
                             @if($canManage)
                                 <div class="mb-3">
-                                    <x-ui.checkbox label="Internal HR Note Only" name="is_internal_note" value="1" id="internalNoteSwitch" />
+                                    <x-ui.checkbox :label="__('hrms.helpdesk.field_internal_hr_note_only')" name="is_internal_note" value="1" id="internalNoteSwitch" />
                                 </div>
                             @endif
 
                             <x-ui.button type="submit" variant="primary" icon="feather-send" class="w-100 fw-bold">
-                                Post Reply
+                                {{ __('hrms.helpdesk.btn_post_reply') }}
                             </x-ui.button>
                         </form>
                     </div>
@@ -512,7 +515,7 @@
                     <div class="ticket-card-header">
                         <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
                             <i class="feather-star text-warning fs-5"></i>
-                            <span>Satisfaction Survey (CSAT)</span>
+                            <span>{{ __('hrms.helpdesk.csat_card_title') }}</span>
                         </div>
                     </div>
                     <div class="p-4">
@@ -523,7 +526,7 @@
                                         <i class="feather-star {{ $i <= $ticket->rating->rating ? 'fill-warning text-warning' : 'text-muted' }}"></i>
                                     @endfor
                                 </div>
-                                <div class="fw-bold text-dark fs-6">{{ $ticket->rating->rating }} / 5 Stars</div>
+                                <div class="fw-bold text-dark fs-6">{{ __('hrms.helpdesk.csat_rating_summary', ['rating' => $ticket->rating->rating]) }}</div>
                                 @if($ticket->rating->feedback)
                                     <p class="text-muted small mt-2 fst-italic mb-0">"{{ $ticket->rating->feedback }}"</p>
                                 @endif
@@ -532,25 +535,25 @@
                             <form action="{{ route('hrms.helpdesk.tickets.csat', $ticket->id) }}" method="POST">
                                 @csrf
                                 <div class="mb-3">
-                                    <x-ui.odoo-form-ui type="select" label="Rate Resolution Quality" name="rating" :required="true">
-                                        <option value="5">⭐⭐⭐⭐⭐ 5 - Excellent</option>
-                                        <option value="4">⭐⭐⭐⭐ 4 - Good</option>
-                                        <option value="3">⭐⭐⭐ 3 - Satisfactory</option>
-                                        <option value="2">⭐⭐ 2 - Poor</option>
-                                        <option value="1">⭐ 1 - Very Bad</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.helpdesk.field_rate_quality')" name="rating" :required="true">
+                                        <option value="5">{{ __('hrms.helpdesk.rating_5_stars') }}</option>
+                                        <option value="4">{{ __('hrms.helpdesk.rating_4_stars') }}</option>
+                                        <option value="3">{{ __('hrms.helpdesk.rating_3_stars') }}</option>
+                                        <option value="2">{{ __('hrms.helpdesk.rating_2_stars') }}</option>
+                                        <option value="1">{{ __('hrms.helpdesk.rating_1_stars') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="mb-3">
-                                    <textarea name="feedback" class="form-control" rows="2" placeholder="Optional feedback comments..." style="font-size: 13px;"></textarea>
+                                    <x-ui.odoo-form-ui type="textarea" name="feedback" rows="2" :placeholder="__('hrms.helpdesk.placeholder_csat_feedback')" />
                                 </div>
                                 <x-ui.button type="submit" variant="warning" class="w-100 fw-bold text-dark">
-                                    Submit Rating
+                                    {{ __('hrms.helpdesk.btn_submit_rating') }}
                                 </x-ui.button>
                             </form>
                         @else
                             <div class="text-center py-3 text-muted">
                                 <i class="feather-clock fs-3 mb-2 d-block"></i>
-                                <p class="small mb-0">Awaiting satisfaction rating from ticket requester.</p>
+                                <p class="small mb-0">{{ __('hrms.helpdesk.awaiting_csat_feedback') }}</p>
                             </div>
                         @endif
                     </div>

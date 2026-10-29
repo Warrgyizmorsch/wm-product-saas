@@ -61,7 +61,7 @@
                                     </a>
                                 </td>
                                 <td>
-                                    <x-ui.badge soft variant="light" class="border px-2 py-1 text-dark">
+                                    <x-ui.badge soft variant="secondary" class="border px-2 py-1 fs-11 text-wrap text-break text-start d-inline-block text-dark" style="white-space: normal; line-height: 1.35; max-width: 100%;">
                                         {{ $pPlan->category?->name ?? ($pPlan->reason_category ? __($pPlan->reason_category) : __('hrms.employees.tbl_performance')) }}
                                     </x-ui.badge>
                                 </td>
@@ -83,7 +83,7 @@
                                 </td>
                                 <td class="text-center">
                                     <x-ui.badge soft :variant="$badgeVariant" class="px-2.5 py-1 text-uppercase fs-11 fw-bold">
-                                        {{ __(ucwords(str_replace('_', ' ', (string) $pPlan->status))) }}
+                                        {{ __('hrms.pip.status_' . $pPlan->status) }}
                                     </x-ui.badge>
                                 </td>
                                 <td class="pe-3 text-end">

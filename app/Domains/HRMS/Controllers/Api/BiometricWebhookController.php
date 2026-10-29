@@ -37,8 +37,10 @@ class BiometricWebhookController extends Controller
         $syncedCount = 0;
         foreach ($validated['logs'] as $log) {
             $bioId = (string) $log['biometric_id'];
-            $employee = Employee::where(function ($q) use ($bioId) {
-                $q->where('employee_id', $bioId);
+            $cleanBio = str_replace('-', '', $bioId);
+            $employee = Employee::where(function ($q) use ($bioId, $cleanBio) {
+                $q->where('employee_id', $bioId)
+                  ->orWhereRaw("REPLACE(employee_id, '-', '') = ?", [$cleanBio]);
                 if (is_numeric($bioId)) {
                     $q->orWhere('id', (int) $bioId);
                 }
@@ -117,14 +119,18 @@ class BiometricWebhookController extends Controller
                 continue;
             }
 
-            $biometricId = trim($parts[0]);
-            $timestampStr = trim($parts[1]);
-            $stateVal = isset($parts[2]) ? (int) trim($parts[2]) : 0;
+            // Strip standard ADMS key prefixes if present (e.g., USERID=101, CHECKTIME=..., CHECKTYPE=...)
+            $biometricId = preg_replace('/^(USERID|pin|id)=/i', '', trim($parts[0]));
+            $timestampStr = preg_replace('/^(CHECKTIME|time|date)=/i', '', trim($parts[1]));
+            $stateRaw = isset($parts[2]) ? preg_replace('/^(CHECKTYPE|state|status)=/i', '', trim($parts[2])) : '0';
+            $stateVal = is_numeric($stateRaw) ? (int) $stateRaw : 0;
 
+            $cleanBioId = str_replace('-', '', $biometricId);
             $employee = Employee::withoutGlobalScopes()
                 ->where('tenant_id', $device->tenant_id)
-                ->where(function ($q) use ($biometricId) {
-                    $q->where('employee_id', $biometricId);
+                ->where(function ($q) use ($biometricId, $cleanBioId) {
+                    $q->where('employee_id', $biometricId)
+                      ->orWhereRaw("REPLACE(employee_id, '-', '') = ?", [$cleanBioId]);
                     if (is_numeric($biometricId)) {
                         $q->orWhere('id', (int) $biometricId);
                     }
@@ -136,8 +142,8 @@ class BiometricWebhookController extends Controller
             }
 
             $punchType = 'auto';
-            if ($stateVal === 0) $punchType = 'in';
-            elseif ($stateVal === 1) $punchType = 'out';
+            if ($stateVal === 0 || strtoupper((string) $stateRaw) === 'I') $punchType = 'in';
+            elseif ($stateVal === 1 || strtoupper((string) $stateRaw) === 'O') $punchType = 'out';
             elseif ($stateVal === 2) $punchType = 'break_out';
             elseif ($stateVal === 3) $punchType = 'break_in';
 

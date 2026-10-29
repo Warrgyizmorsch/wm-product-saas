@@ -88,7 +88,7 @@ class HelpdeskKbController extends Controller
         ]);
 
         return redirect()->route('hrms.helpdesk.kb.index')
-            ->with('success', 'Knowledge Base article created successfully.');
+            ->with('success', __('hrms.helpdesk.flash_kb_created'));
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -111,7 +111,7 @@ class HelpdeskKbController extends Controller
         ]);
 
         return redirect()->route('hrms.helpdesk.kb.index')
-            ->with('success', 'Knowledge Base article updated successfully.');
+            ->with('success', __('hrms.helpdesk.flash_kb_updated'));
     }
 
     public function destroy(int $id): RedirectResponse
@@ -121,7 +121,7 @@ class HelpdeskKbController extends Controller
         $this->kbRepository->deleteArticle($id);
 
         return redirect()->route('hrms.helpdesk.kb.index')
-            ->with('success', 'Knowledge Base article deleted successfully.');
+            ->with('success', __('hrms.helpdesk.flash_kb_deleted'));
     }
 
     /**

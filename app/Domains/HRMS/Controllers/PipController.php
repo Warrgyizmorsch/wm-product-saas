@@ -121,7 +121,7 @@ class PipController extends Controller
         $plan = $this->pipRepository->storePlan($validated, $tenantId);
 
         return redirect()->route('hrms.pip.show', $plan->id)
-            ->with('success', "Performance Improvement Plan #{$plan->pip_number} created successfully.");
+            ->with('success', __('hrms.pip.plan_created'));
     }
 
     /**
@@ -170,7 +170,7 @@ class PipController extends Controller
 
         $this->pipRepository->updatePlan($id, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'PIP details updated.');
+        return redirect()->back()->with('success', __('hrms.pip.plan_updated'));
     }
 
     /**
@@ -184,7 +184,7 @@ class PipController extends Controller
 
         $this->pipRepository->deletePlan($id, $tenantId);
 
-        return redirect()->route('hrms.pip.index')->with('success', 'PIP record deleted successfully.');
+        return redirect()->route('hrms.pip.index')->with('success', __('hrms.pip.plan_deleted'));
     }
 
     /**
@@ -207,7 +207,7 @@ class PipController extends Controller
 
         $this->pipRepository->storeObjective($pipId, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'SMART Objective added to PIP.');
+        return redirect()->back()->with('success', __('hrms.pip.objective_added'));
     }
 
     /**
@@ -231,7 +231,7 @@ class PipController extends Controller
 
         $this->pipRepository->updateObjective($objectiveId, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'Objective updated successfully.');
+        return redirect()->back()->with('success', __('hrms.pip.objective_updated'));
     }
 
     /**
@@ -249,7 +249,7 @@ class PipController extends Controller
 
         $this->pipRepository->updateObjective($objectiveId, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'Objective status updated.');
+        return redirect()->back()->with('success', __('hrms.pip.objective_status_updated'));
     }
 
     /**
@@ -264,7 +264,7 @@ class PipController extends Controller
         $targetId = $objectiveId ?: $pipId;
         $this->pipRepository->deleteObjective((int)$targetId, $tenantId);
 
-        return redirect()->back()->with('success', 'Objective deleted.');
+        return redirect()->back()->with('success', __('hrms.pip.objective_deleted'));
     }
 
     /**
@@ -299,7 +299,7 @@ class PipController extends Controller
 
         $this->pipRepository->storeCheckin($pipId, $validated, auth()->id(), $tenantId);
 
-        return redirect()->back()->with('success', 'Milestone check-in review logged successfully.');
+        return redirect()->back()->with('success', __('hrms.pip.checkin_added'));
     }
 
     /**
@@ -327,7 +327,7 @@ class PipController extends Controller
 
         $this->pipRepository->updateCheckin((int)$targetId, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'Milestone check-in updated successfully.');
+        return redirect()->back()->with('success', __('hrms.pip.checkin_updated'));
     }
 
     /**
@@ -343,7 +343,7 @@ class PipController extends Controller
 
         $this->pipRepository->deleteCheckin((int)$targetId, $tenantId);
 
-        return redirect()->back()->with('success', 'Milestone check-in log deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.pip.checkin_deleted'));
     }
 
     /**
@@ -372,7 +372,7 @@ class PipController extends Controller
 
         $this->pipRepository->conclude($pipId, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'PIP final evaluation and conclusion recorded successfully.');
+        return redirect()->back()->with('success', __('hrms.pip.evaluation_completed'));
     }
 
     /**
@@ -398,7 +398,7 @@ class PipController extends Controller
 
         $this->pipRepository->acknowledge($id, $validated['signature_data'], $tenantId);
 
-        return redirect()->back()->with('success', 'PIP digital acknowledgement recorded.');
+        return redirect()->back()->with('success', __('hrms.pip.acknowledged_success'));
     }
 
     /**
@@ -418,7 +418,7 @@ class PipController extends Controller
 
         $this->pipRepository->storeCategory($validated, $tenantId);
 
-        return redirect()->back()->with('success', 'PIP Category added.');
+        return redirect()->back()->with('success', __('hrms.pip.category_created'));
     }
 
     public function storeTemplate(Request $request): RedirectResponse
@@ -446,7 +446,7 @@ class PipController extends Controller
 
         $this->pipRepository->storeTemplate($validated, $tenantId);
 
-        return redirect()->back()->with('success', 'PIP Policy Template added.');
+        return redirect()->back()->with('success', __('hrms.pip.template_created'));
     }
 
     public function destroyCategory(mixed $category): RedirectResponse
@@ -460,7 +460,7 @@ class PipController extends Controller
             $cat->delete();
         }
 
-        return redirect()->back()->with('success', 'PIP Category deleted.');
+        return redirect()->back()->with('success', __('hrms.pip.category_deleted'));
     }
 
     public function destroyTemplate(mixed $template): RedirectResponse
@@ -474,6 +474,6 @@ class PipController extends Controller
             $tmpl->delete();
         }
 
-        return redirect()->back()->with('success', 'PIP Policy Template deleted.');
+        return redirect()->back()->with('success', __('hrms.pip.template_deleted'));
     }
 }

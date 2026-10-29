@@ -37,10 +37,22 @@ class Feedback360ApiController extends Controller
 
     private function resolveContext(): array
     {
-        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id ?? 1;
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? auth()->user()?->tenant_id;
         $user = auth()->user();
 
+        if (!$tenantId) {
+            abort(response()->json(['success' => false, 'message' => 'Unauthorized tenant context.'], 403));
+        }
+
         return [(int) $tenantId, $user];
+    }
+
+    private function checkAdmin(?\App\Models\User $user, int $tenantId): ?JsonResponse
+    {
+        if (!$this->feedbackRepository->isHrAdminUser($user, $tenantId)) {
+            return $this->sendError('Access denied. Administrative privileges required.', 403);
+        }
+        return null;
     }
 
     /**
@@ -193,6 +205,9 @@ class Feedback360ApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'name'             => 'required|string|max:255',
@@ -226,6 +241,9 @@ class Feedback360ApiController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'name'                       => 'required|string|max:255',
@@ -274,7 +292,10 @@ class Feedback360ApiController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteCycle($id, $tenantId);
@@ -291,6 +312,9 @@ class Feedback360ApiController extends Controller
     public function launch(Request $request, int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'status' => 'required|in:draft,nomination,in_progress,review,completed,closed',
@@ -315,6 +339,9 @@ class Feedback360ApiController extends Controller
     public function addParticipants(Request $request, int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'employee_ids'   => 'required|array',
@@ -338,6 +365,9 @@ class Feedback360ApiController extends Controller
     public function bulkRemind(int $id): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $count = $this->feedbackRepository->bulkRemind($id, $tenantId, $user);
@@ -387,10 +417,10 @@ class Feedback360ApiController extends Controller
      */
     public function destroyNomination(int $nominationId): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
 
         try {
-            $this->feedbackRepository->deleteNomination($nominationId, $tenantId);
+            $this->feedbackRepository->deleteNomination($nominationId, $tenantId, $user);
 
             return $this->sendSuccess(null, 'Rater successfully removed from feedback roster.');
         } catch (Exception $e) {
@@ -638,6 +668,9 @@ class Feedback360ApiController extends Controller
     public function storeCompetency(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'name'                      => 'required|string|max:150',
@@ -660,7 +693,10 @@ class Feedback360ApiController extends Controller
 
     public function destroyCompetency(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteCompetency($id, $tenantId);
@@ -674,6 +710,9 @@ class Feedback360ApiController extends Controller
     public function storeQuestion(Request $request): JsonResponse
     {
         [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         $request->validate([
             'question_text'        => 'required|string|max:500',
@@ -697,7 +736,10 @@ class Feedback360ApiController extends Controller
 
     public function destroyQuestion(int $id): JsonResponse
     {
-        [$tenantId] = $this->resolveContext();
+        [$tenantId, $user] = $this->resolveContext();
+        if ($forbidden = $this->checkAdmin($user, $tenantId)) {
+            return $forbidden;
+        }
 
         try {
             $this->feedbackRepository->deleteQuestion($id, $tenantId);

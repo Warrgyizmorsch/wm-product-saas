@@ -76,7 +76,7 @@ class HelpdeskTicketController extends Controller
         }
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', "Helpdesk Ticket #{$ticket->ticket_number} created successfully.");
+            ->with('success', __('hrms.helpdesk.flash_ticket_created', ['number' => $ticket->ticket_number]));
     }
 
     public function show(int $id): View
@@ -126,7 +126,7 @@ class HelpdeskTicketController extends Controller
         }
         $categories = HelpdeskCategory::where('tenant_id', $tenantId)->where('is_active', true)->get();
 
-        return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'canUpdate', 'currentEmployee', 'isOwnTicket', 'agents', 'categories'));
+        return view('modules.hrms.helpdesk.show', compact('ticket', 'canManage', 'canUpdate', 'currentEmployee', 'isOwnTicket', 'agents', 'categories', 'isSuperAdmin'));
     }
 
     public function reply(Request $request, int $id): RedirectResponse
@@ -141,7 +141,7 @@ class HelpdeskTicketController extends Controller
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
         if ($ticket->status === 'closed') {
-            return redirect()->back()->with('error', 'Cannot post replies to a closed ticket.');
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_cannot_reply_closed'));
         }
 
         $user = auth()->user();
@@ -160,7 +160,7 @@ class HelpdeskTicketController extends Controller
         }
 
         if ($request->boolean('is_internal_note') && !$canManage) {
-            return redirect()->back()->with('error', 'Only authorized HR staff can post internal notes.');
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_internal_note_unauthorized'));
         }
 
         $files = $request->file('attachments');
@@ -190,7 +190,7 @@ class HelpdeskTicketController extends Controller
         }
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', $request->boolean('is_internal_note') ? 'Internal note added.' : 'Reply posted successfully.');
+            ->with('success', $request->boolean('is_internal_note') ? __('hrms.helpdesk.flash_internal_note_added') : __('hrms.helpdesk.flash_reply_posted'));
     }
 
     public function updateStatus(Request $request, int $id): RedirectResponse
@@ -204,18 +204,32 @@ class HelpdeskTicketController extends Controller
 
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
-        app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement(auth()->user(), $ticket);
+        $user = auth()->user();
+        $isSuperAdmin = $user && (strtolower($user->role ?? '') === 'super_admin'
+            || strtolower($user->role ?? '') === 'super-admin'
+            || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
+            || $user->is_admin);
 
+        $wasClosed = $ticket->status === 'closed';
+
+        // Option 3: Lock on Closed - only Super Admin can reopen or modify a closed ticket
+        if ($wasClosed && !$isSuperAdmin) {
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_ticket_closed_locked'));
+        }
+
+        app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement($user, $ticket);
+
+        $newStatus = $request->input('status');
         $this->ticketRepository->updateTicketStatus(
             $ticket,
-            $request->input('status'),
+            $newStatus,
             $request->input('assigned_to'),
             $request->input('priority')
         );
 
         // Notify employee on status change
         if ($ticket->employee) {
-            $statusLabel = ucfirst(str_replace('_', ' ', $request->input('status')));
+            $statusLabel = ucfirst(str_replace('_', ' ', $newStatus));
             \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $ticket->employee,
                 title: "Ticket #{$ticket->ticket_number} Updated",
@@ -226,7 +240,7 @@ class HelpdeskTicketController extends Controller
             );
         }
 
-        if ($request->input('status') === 'resolved') {
+        if ($newStatus === 'resolved') {
             try {
                 \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.resolved', [
                     'tenant_id'   => $ticket->tenant_id,
@@ -240,8 +254,10 @@ class HelpdeskTicketController extends Controller
             }
         }
 
+        $isReopened = $wasClosed && $newStatus !== 'closed';
+
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', 'Ticket updated successfully.');
+            ->with('success', $isReopened ? __('hrms.helpdesk.flash_ticket_reopened') : __('hrms.helpdesk.flash_ticket_updated'));
     }
 
     public function submitCsat(Request $request, int $id): RedirectResponse
@@ -255,12 +271,12 @@ class HelpdeskTicketController extends Controller
         $ticket = HelpdeskTicket::where('tenant_id', $tenantId)->findOrFail($id);
 
         if (!in_array($ticket->status, ['resolved', 'closed'])) {
-            return redirect()->back()->with('error', 'Satisfaction feedback can only be submitted for resolved or closed tickets.');
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_csat_resolved_only'));
         }
 
         $employee = Employee::resolveForUser(auth()->user());
         if (!$employee || (int)$employee->id !== (int)$ticket->employee_id) {
-            return redirect()->back()->with('error', 'Only the employee who raised the ticket can submit satisfaction feedback.');
+            return redirect()->back()->with('error', __('hrms.helpdesk.flash_csat_owner_only'));
         }
 
         HelpdeskSatisfactionRating::updateOrCreate(
@@ -272,7 +288,7 @@ class HelpdeskTicketController extends Controller
         );
 
         return redirect()->route('hrms.helpdesk.tickets.show', $ticket->id)
-            ->with('success', 'Thank you for your feedback!');
+            ->with('success', __('hrms.helpdesk.flash_csat_thank_you'));
     }
 
     public function downloadAttachment(int $ticketId, int $attachmentId)

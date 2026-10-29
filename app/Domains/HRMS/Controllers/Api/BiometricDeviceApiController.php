@@ -371,6 +371,17 @@ class BiometricDeviceApiController extends Controller
             ], "Device at {$ip}:{$port} is online and connected successfully!");
         }
 
+        // If direct TCP socket is blocked by NAT/Firewall but device recently sent an ADMS heartbeat
+        if ($device->last_ping_at && $device->last_ping_at->gt(now()->subMinutes(15))) {
+            return $this->sendSuccess([
+                'connected' => true,
+                'mode'      => 'adms_push',
+                'ip'        => $ip,
+                'port'      => $port,
+                'last_ping' => $device->last_ping_at->toIso8601String(),
+            ], "Direct TCP socket ({$ip}:{$port}) is unreachable (private LAN/NAT), but device is ONLINE and actively communicating via Cloud ADMS!");
+        }
+
         return $this->sendError("Unable to reach {$ip}:{$port} directly (" . ($errstr ?: 'Connection timed out') . "). If behind NAT, configure Cloud ADMS Push Mode.", 200, [
             'connected' => false,
             'mode'      => 'direct_tcp',

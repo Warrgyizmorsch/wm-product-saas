@@ -183,7 +183,7 @@ class BroadcastRepository implements BroadcastRepositoryInterface
             $hasAccess = $broadcast->target_type === 'all'
                 || ($employee && $broadcast->receipts()->where('employee_id', $employee->id)->exists());
             if (!$hasAccess) {
-                abort(403, 'You are not authorized to view this targeted announcement.');
+                abort(403, __('hrms.broadcasts.unauthorized_view'));
             }
         }
 
@@ -292,7 +292,7 @@ class BroadcastRepository implements BroadcastRepositoryInterface
 
         if (!$employee) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'comment' => ['An associated employee profile is required to post comments.'],
+                'comment' => [__('hrms.broadcasts.err_employee_required_to_comment')],
             ]);
         }
 

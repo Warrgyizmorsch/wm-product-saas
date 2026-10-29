@@ -67,6 +67,9 @@ class Feedback360Participant extends BaseModel
 
     /**
      * Compute and cache overall scores across reviewer categories.
+     * Complies with standard 360 multi-rater platform assessment guidelines:
+     * - Self evaluation is isolated in self_score for Perception Gap analysis.
+     * - Overall score is computed from others (Manager + Peers + Direct Reports) to maintain objective validity.
      */
     public function recalculateScores(): void
     {
@@ -78,6 +81,17 @@ class Feedback360Participant extends BaseModel
             ->get();
 
         if ($completedNoms->isEmpty()) {
+            $this->self_score          = null;
+            $this->manager_score       = null;
+            $this->peer_score          = null;
+            $this->direct_report_score = null;
+            $this->overall_score       = null;
+
+            if ($this->status === 'completed') {
+                $this->status = 'in_progress';
+            }
+
+            $this->save();
             return;
         }
 
@@ -88,14 +102,11 @@ class Feedback360Participant extends BaseModel
             'direct_report' => [],
         ];
 
-        $allRatings = [];
-
         foreach ($completedNoms as $nom) {
             $type = $nom->reviewer_type;
             foreach ($nom->responses as $resp) {
                 if ($resp->rating_value !== null) {
                     $val = (float) $resp->rating_value;
-                    $allRatings[] = $val;
                     if (isset($byType[$type])) {
                         $byType[$type][] = $val;
                     }
@@ -107,13 +118,21 @@ class Feedback360Participant extends BaseModel
         $this->manager_score       = !empty($byType['manager']) ? round(array_sum($byType['manager']) / count($byType['manager']), 2) : null;
         $this->peer_score          = !empty($byType['peer']) ? round(array_sum($byType['peer']) / count($byType['peer']), 2) : null;
         $this->direct_report_score = !empty($byType['direct_report']) ? round(array_sum($byType['direct_report']) / count($byType['direct_report']), 2) : null;
-        $this->overall_score       = !empty($allRatings) ? round(array_sum($allRatings) / count($allRatings), 2) : null;
+
+        // Overall 360 Score is computed from non-self raters (Manager, Peers, Direct Reports)
+        $othersRatings = array_merge($byType['manager'], $byType['peer'], $byType['direct_report']);
+        $this->overall_score = !empty($othersRatings)
+            ? round(array_sum($othersRatings) / count($othersRatings), 2)
+            : null;
 
         // Auto update status if all approved nominations are completed
         $totalApproved = $this->nominations()->whereIn('status', ['approved', 'completed'])->count();
         $totalDone = $this->nominations()->where('status', 'completed')->count();
-        if ($totalApproved > 0 && $totalDone >= $totalApproved && $this->status === 'in_progress') {
+
+        if ($totalApproved > 0 && $totalDone >= $totalApproved && in_array($this->status, ['nomination_pending', 'in_progress'])) {
             $this->status = 'completed';
+        } elseif ($totalApproved > 0 && $totalDone < $totalApproved && $this->status === 'completed') {
+            $this->status = 'in_progress';
         }
 
         $this->save();

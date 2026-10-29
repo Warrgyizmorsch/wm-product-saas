@@ -64,7 +64,11 @@ class Feedback360Cycle extends BaseModel
         if (empty($this->competency_ids)) {
             return collect();
         }
-        return Feedback360Competency::whereIn('id', (array) $this->competency_ids)->get();
+        $query = Feedback360Competency::whereIn('id', (array) $this->competency_ids);
+        if ($this->tenant_id) {
+            $query->where('tenant_id', $this->tenant_id);
+        }
+        return $query->get();
     }
 
     public function participants(): HasMany

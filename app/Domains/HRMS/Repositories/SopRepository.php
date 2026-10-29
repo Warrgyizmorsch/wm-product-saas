@@ -506,23 +506,37 @@ class SopRepository implements SopRepositoryInterface
             ->get();
 
         $output = fopen('php://temp', 'r+');
-        fputcsv($output, ['SOP Code', 'SOP Title', 'Category', 'Version', 'Employee ID', 'Employee Name', 'Department', 'Designation', 'Assigned Date', 'Due Date', 'Status', 'Acknowledged Date', 'Compliance Score']);
+        fputcsv($output, [
+            __('hrms.sop.th_code'),
+            __('hrms.sop.th_title'),
+            __('hrms.sop.th_category'),
+            __('hrms.sop.th_version'),
+            __('hrms.sop.csv_th_emp_code'),
+            __('hrms.sop.csv_th_emp_name'),
+            __('hrms.sop.csv_th_department'),
+            __('hrms.sop.csv_th_designation'),
+            __('hrms.sop.csv_th_assigned_date'),
+            __('hrms.sop.csv_th_due_date'),
+            __('hrms.common.status'),
+            __('hrms.sop.csv_th_signoff_timestamp'),
+            __('hrms.sop.th_compliance'),
+        ]);
 
         foreach ($assignments as $a) {
             fputcsv($output, [
-                $a->document?->code ?? 'N/A',
-                $a->document?->title ?? 'N/A',
-                $a->document?->category?->name ?? 'Uncategorized',
+                $a->document?->code ?? __('hrms.common.na'),
+                $a->document?->title ?? __('hrms.common.na'),
+                $a->document?->category?->name ?? __('hrms.sop.uncategorized'),
                 $a->document?->version ?? '1.0',
-                $a->employee?->employee_id ?? 'N/A',
-                $a->employee?->full_name ?? ($a->employee?->first_name ?? 'N/A'),
-                $a->employee?->department?->name ?? 'N/A',
-                $a->employee?->designation?->name ?? 'N/A',
-                $a->assigned_at ? Carbon::parse($a->assigned_at)->format('Y-m-d') : 'N/A',
-                $a->due_date ? Carbon::parse($a->due_date)->format('Y-m-d') : 'N/A',
+                $a->employee?->employee_id ?? __('hrms.common.na'),
+                $a->employee?->full_name ?? ($a->employee?->first_name ?? __('hrms.common.na')),
+                $a->employee?->department?->name ?? __('hrms.common.na'),
+                $a->employee?->designation?->name ?? __('hrms.common.na'),
+                $a->assigned_at ? Carbon::parse($a->assigned_at)->format('Y-m-d') : __('hrms.common.na'),
+                $a->due_date ? Carbon::parse($a->due_date)->format('Y-m-d') : __('hrms.common.na'),
                 strtoupper($a->status),
-                $a->acknowledged_at ? Carbon::parse($a->acknowledged_at)->format('Y-m-d H:i') : 'N/A',
-                $a->compliance_score ? ($a->compliance_score . '%') : 'N/A',
+                $a->acknowledged_at ? Carbon::parse($a->acknowledged_at)->format('Y-m-d H:i') : __('hrms.common.na'),
+                $a->compliance_score ? ($a->compliance_score . '%') : __('hrms.common.na'),
             ]);
         }
 
@@ -590,43 +604,43 @@ class SopRepository implements SopRepositoryInterface
         fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
 
         // Official Audit Header Block
-        fputcsv($handle, ['STANDARD OPERATING PROCEDURE (SOP) COMPLIANCE AUDIT REPORT']);
-        fputcsv($handle, ['Document Code:', $sop->code, 'Version:', $sop->version, 'Status:', strtoupper($sop->status)]);
-        fputcsv($handle, ['Document Title:', $sop->title]);
-        fputcsv($handle, ['Category:', $sop->category->name ?? 'General', 'Department:', $sop->department->name ?? 'Organization-Wide']);
-        fputcsv($handle, ['Effective Date:', $sop->effective_date ? $sop->effective_date->format('Y-m-d') : 'N/A', 'Review Interval:', $sop->review_interval_months . ' Months']);
-        fputcsv($handle, ['Total Assigned Staff:', $totalAssigned, 'Compliant Staff:', $acknowledgedCount, 'Compliance Rate:', $complianceRate . '%']);
-        fputcsv($handle, ['Report Export Date:', now()->format('Y-m-d H:i:s')]);
+        fputcsv($handle, [__('hrms.sop.csv_report_title')]);
+        fputcsv($handle, [__('hrms.sop.csv_doc_code'), $sop->code, __('hrms.sop.csv_version'), $sop->version, __('hrms.sop.csv_status'), strtoupper($sop->status)]);
+        fputcsv($handle, [__('hrms.sop.csv_doc_title'), $sop->title]);
+        fputcsv($handle, [__('hrms.sop.csv_category'), $sop->category->name ?? __('hrms.sop.cat_general'), __('hrms.sop.csv_department'), $sop->department->name ?? __('hrms.sop.organization_wide')]);
+        fputcsv($handle, [__('hrms.sop.csv_effective_date'), $sop->effective_date ? $sop->effective_date->format('Y-m-d') : __('hrms.common.na'), __('hrms.sop.csv_review_interval'), __('hrms.sop.csv_months_suffix', ['count' => $sop->review_interval_months])]);
+        fputcsv($handle, [__('hrms.sop.csv_total_assigned'), $totalAssigned, __('hrms.sop.csv_compliant_staff'), $acknowledgedCount, __('hrms.sop.csv_compliance_rate'), $complianceRate . '%']);
+        fputcsv($handle, [__('hrms.sop.csv_export_date'), now()->format('Y-m-d H:i:s')]);
         fputcsv($handle, []); // Blank separator line
 
         // Compliance Roster Column Headers
         fputcsv($handle, [
-            'Employee Code',
-            'Employee Full Name',
-            'Work Email',
-            'Department',
-            'Designation',
-            'SOP Version',
-            'Compliance Status',
-            'Assigned Date',
-            'Due Date',
-            'Sign-Off Timestamp',
-            'Sign-Off IP Address',
+            __('hrms.sop.csv_th_emp_code'),
+            __('hrms.sop.csv_th_emp_name'),
+            __('hrms.sop.csv_th_work_email'),
+            __('hrms.sop.csv_th_department'),
+            __('hrms.sop.csv_th_designation'),
+            __('hrms.sop.csv_th_sop_version'),
+            __('hrms.sop.csv_th_compliance_status'),
+            __('hrms.sop.csv_th_assigned_date'),
+            __('hrms.sop.csv_th_due_date'),
+            __('hrms.sop.csv_th_signoff_timestamp'),
+            __('hrms.sop.csv_th_signoff_ip'),
         ]);
 
         foreach ($assignments as $a) {
-            $empName = $a->employee?->full_name ?? ($a->employee?->first_name ?? 'N/A');
+            $empName = $a->employee?->full_name ?? ($a->employee?->first_name ?? __('hrms.common.na'));
             fputcsv($handle, [
                 $a->employee?->employee_id ?? ('EMP-' . ($a->employee?->id ?? $a->employee_id)),
                 $empName,
-                $a->employee?->office_email ?? ($a->employee?->personal_email ?? 'N/A'),
-                $a->employee?->department?->name ?? 'N/A',
-                $a->employee?->designation?->name ?? 'N/A',
+                $a->employee?->office_email ?? ($a->employee?->personal_email ?? __('hrms.common.na')),
+                $a->employee?->department?->name ?? __('hrms.common.na'),
+                $a->employee?->designation?->name ?? __('hrms.common.na'),
                 $a->version_assigned,
                 strtoupper($a->status),
                 $a->assigned_at ? $a->assigned_at->format('Y-m-d H:i') : '',
                 $a->due_date ? $a->due_date->format('Y-m-d') : '',
-                $a->acknowledged_at ? $a->acknowledged_at->format('Y-m-d H:i:s') : 'Pending Sign-off',
+                $a->acknowledged_at ? $a->acknowledged_at->format('Y-m-d H:i:s') : __('hrms.sop.csv_pending_signoff'),
                 $a->ip_address ?? '',
             ]);
         }
