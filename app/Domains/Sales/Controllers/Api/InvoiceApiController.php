@@ -248,6 +248,13 @@ class InvoiceApiController extends Controller
 
         event(new \App\Domains\Sales\Events\InvoicePosted($invoice));
 
+        if ($invoice->sales_order_id && $invoice->salesOrder) {
+            foreach ($invoice->salesOrder->items as $soItem) {
+                $soItem->refreshStatus();
+            }
+            $invoice->salesOrder->refreshFulfillmentStatus();
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Invoice created successfully',

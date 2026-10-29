@@ -85,9 +85,28 @@ class MaterialRequirementController extends Controller
         $warehouses = Warehouse::query()->where('status', 'active')->orderBy('name')->get();
         $defaultWarehouseId = Warehouse::where('tenant_id', $delivery->tenant_id)->orderBy('is_default', 'desc')->first()?->id ?? 1;
 
+        $productIds = $delivery->items->pluck('product_id')->filter()->unique()->toArray();
+        $allStocks = \App\Domains\Inventory\Models\ProductWarehouseStock::query()
+            ->whereIn('product_id', $productIds)
+            ->get()
+            ->groupBy('product_id');
+
         foreach ($delivery->items as $item) {
             $warehouseId = $item->warehouse_id ?: $defaultWarehouseId;
             $item->available_qty = $warehouseId ? StockService::getAvailableStock($item->product_id, $warehouseId) : 0;
+
+            $pStocks = $allStocks->get($item->product_id, collect());
+            $breakdown = [];
+            foreach ($warehouses as $w) {
+                $pws = $pStocks->firstWhere('warehouse_id', $w->id);
+                $avail = $pws ? max(0.0, (float)$pws->available_qty) : 0.0;
+                $breakdown[$w->id] = [
+                    'warehouse_id'   => $w->id,
+                    'warehouse_name' => $w->name,
+                    'available_qty'  => $avail,
+                ];
+            }
+            $item->warehouse_breakdown = $breakdown;
         }
 
         $itemAllocations = [];
@@ -248,4 +267,34 @@ class MaterialRequirementController extends Controller
 
         return redirect()->route('sales.dispatches.show', $dispatchOrder->id)->with('success', "Dispatch Order {$dispatchOrder->dispatch_number} created successfully!");
     }
+
+    public function releaseForDispatch(int $deliveryId, Request $request): RedirectResponse
+    {
+        $delivery = MaterialRequirement::with(['items.product', 'salesOrder'])->findOrFail($deliveryId);
+
+        $selectedItemIds = $request->input('selected_items', []);
+        if (is_string($selectedItemIds)) {
+            $selectedItemIds = explode(',', $selectedItemIds);
+        }
+        $selectedItemIds = array_map('intval', array_filter((array) $selectedItemIds));
+
+        $itemWarehouses = (array) $request->input('item_warehouses', []);
+        $releaseQuantities = (array) $request->input('release_quantities', []);
+
+        try {
+            $result = $this->deliveryService->releaseForDispatch($delivery, $selectedItemIds, $itemWarehouses, $releaseQuantities);
+            $releasedCount = $result['released_count'] ?? count($selectedItemIds);
+            $fullyReleasedCount = $result['fully_released_count'] ?? $releasedCount;
+            $totalCount = $result['total_count'] ?? count($delivery->items);
+
+            if ($fullyReleasedCount === $totalCount) {
+                return back()->with('success', "Material Requirement {$delivery->requirement_number} is now 100% fully released for dispatch! All items are active in Pending Dispatches.");
+            } else {
+                return back()->with('success', "Released {$releasedCount} item(s) for dispatch! The released stock is now active in Pending Dispatches. Remaining shortage items stay in requirement queue for indent/transfer.");
+            }
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
 }
+

@@ -108,6 +108,7 @@ Route::prefix('inventory')
         Route::get('material-requirements/{delivery}', [MaterialRequirementController::class, 'show'])->name('material-requirements.show');
         Route::post('material-requirements/{delivery}/ship', [MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
         Route::post('material-requirements/{delivery}/cancel', [MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
+        Route::post('material-requirements/{delivery}/release', [MaterialRequirementController::class, 'releaseForDispatch'])->name('material-requirements.release');
 
         Route::post('material-requirements/items/{itemId}/warehouse', [MaterialRequirementController::class, 'updateWarehouse'])->name('material-requirements.update-warehouse');
         Route::post('material-requirements/items/{itemId}/reserve', [MaterialRequirementController::class, 'reserveQty'])->name('material-requirements.reserve-qty');
@@ -155,6 +156,7 @@ Route::prefix('inventory')
         Route::get('dispatches/{dispatch}', [DispatchOrderController::class, 'show'])->name('dispatches.show');
         Route::post('dispatches/{dispatch}/confirm', [DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');
         Route::post('dispatches/{dispatch}/ship', [DispatchOrderController::class, 'ship'])->name('dispatches.ship');
+        Route::post('dispatches/{dispatch}/cancel', [DispatchOrderController::class, 'cancel'])->name('dispatches.cancel');
     });
 
 Route::post('products/quick-create', [ProductController::class, 'quickCreate'])

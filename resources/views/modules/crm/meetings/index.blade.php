@@ -356,8 +356,25 @@
                 </div>
                 <div class="modal-body text-center p-3 bg-light">
                     <img id="meetingSelfieViewImg" src="" alt="Selfie" class="img-fluid rounded border shadow-sm"
-                        style="max-height: 400px; object-fit: contain;">
-                    <div id="meetingSelfieViewLocation" class="mt-2 text-muted fs-11"></div>
+                        style="max-height: 380px; object-fit: contain;">
+                    <div id="meetingSelfieErrorMsg" class="d-none py-4 text-muted">
+                        <i class="feather-image text-secondary fs-32 d-block mb-2"></i>
+                        <span class="fs-12">Unable to display selfie image</span>
+                    </div>
+
+                    <div id="meetingSelfieInfoBox" class="mt-2.5 p-2.5 bg-white rounded-3 border text-start shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="fw-bold fs-11 text-dark d-flex align-items-center gap-1">
+                                <i class="feather-map-pin text-primary fs-12"></i> Actual Verification Location:
+                            </span>
+                            <span id="meetingSelfieStatusBadge" class="badge bg-soft-success text-success fs-10 fw-semibold"></span>
+                        </div>
+                        <div id="meetingSelfieViewLocation" class="text-secondary fs-12 fw-medium mb-1"></div>
+                        <div class="d-flex align-items-center justify-content-between text-muted fs-11 pt-1 border-top flex-wrap gap-1">
+                            <span id="meetingSelfieViewGPS"></span>
+                            <span id="meetingSelfieViewTime"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -365,6 +382,14 @@
 
     @push('scripts')
         <script>
+            // Initialize Bootstrap Tooltips for note and location popups
+            document.addEventListener('DOMContentLoaded', function () {
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                    new bootstrap.Tooltip(tooltipTriggerEl, { html: true });
+                });
+            });
+
             // Live Search Filter for Meeting Table Rows (Instant Client-side Filter + Server Submit on Enter)
             const searchInput = document.getElementById('meetingLiveSearch');
             const clearBtn = document.getElementById('clearMeetingSearch');
@@ -409,12 +434,55 @@
                 });
             }
 
-            // View selfie photo in modal
-            window.crmOpenSelfieModal = function (url, location) {
+            // View selfie photo in modal with actual status verification location
+            window.crmOpenSelfieModal = function (url, location, gps, time, status) {
+                if (url && typeof url === 'string') {
+                    while (url.includes('/storage/storage/')) {
+                        url = url.replace('/storage/storage/', '/storage/');
+                    }
+                }
                 const img = document.getElementById('meetingSelfieViewImg');
                 const loc = document.getElementById('meetingSelfieViewLocation');
-                if (img) img.src = url;
-                if (loc) loc.textContent = location ? ('Location: ' + location) : '';
+                const errMsg = document.getElementById('meetingSelfieErrorMsg');
+                const gpsEl = document.getElementById('meetingSelfieViewGPS');
+                const timeEl = document.getElementById('meetingSelfieViewTime');
+                const badgeEl = document.getElementById('meetingSelfieStatusBadge');
+                const infoBox = document.getElementById('meetingSelfieInfoBox');
+
+                if (errMsg) errMsg.classList.add('d-none');
+                if (img) {
+                    img.classList.remove('d-none');
+                    img.onerror = function () {
+                        this.classList.add('d-none');
+                        if (errMsg) errMsg.classList.remove('d-none');
+                    };
+                    img.src = url || '';
+                }
+
+                if (loc) {
+                    loc.textContent = location || (gps ? ('GPS: ' + gps) : 'Location captured during selfie verification');
+                }
+                if (gpsEl) {
+                    if (gps) {
+                        gpsEl.innerHTML = '<a href="https://maps.google.com/?q=' + encodeURIComponent(gps) + '" target="_blank" class="text-primary text-decoration-none hover-underline"><i class="feather-navigation me-1 fs-10"></i>' + gps + ' <i class="feather-external-link fs-9"></i></a>';
+                    } else {
+                        gpsEl.innerHTML = '';
+                    }
+                }
+                if (timeEl) {
+                    timeEl.innerHTML = time ? ('<i class="feather-clock text-muted me-1 fs-10"></i>' + time) : '';
+                }
+                if (badgeEl) {
+                    if (status) {
+                        badgeEl.textContent = status;
+                        const isMismatch = status.toLowerCase().includes('mismatch');
+                        badgeEl.className = 'badge ' + (isMismatch ? 'bg-soft-danger text-danger border border-danger-subtle' : 'bg-soft-success text-success border border-success-subtle') + ' fs-10 fw-semibold';
+                        badgeEl.classList.remove('d-none');
+                    } else {
+                        badgeEl.classList.add('d-none');
+                    }
+                }
+
                 const modal = new bootstrap.Modal(document.getElementById('meetingSelfieViewModal'));
                 modal.show();
             };

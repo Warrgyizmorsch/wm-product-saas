@@ -203,4 +203,35 @@ class MaterialRequirementApiController extends Controller
             'data'    => $delivery->fresh(),
         ]);
     }
+
+    /**
+     * POST /api/inventory/material-requirements/{id}/release
+     * Release Material Requirement for Dispatch.
+     */
+    public function release(Request $request, int $id): JsonResponse
+    {
+        $delivery = MaterialRequirement::with(['items.product', 'salesOrder'])->find($id);
+        if (!$delivery) {
+            return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
+        }
+
+        $selectedItemIds = (array) $request->input('selected_items', []);
+        $itemWarehouses = (array) $request->input('item_warehouses', []);
+        $releaseQuantities = (array) $request->input('release_quantities', []);
+
+        try {
+            $result = $this->requirementService->releaseForDispatch($delivery, $selectedItemIds, $itemWarehouses, $releaseQuantities);
+            return response()->json([
+                'success' => true,
+                'message' => "Material requirement {$delivery->requirement_number} successfully released for dispatch.",
+                'data'    => $delivery->fresh(['items']),
+                'details' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
 }

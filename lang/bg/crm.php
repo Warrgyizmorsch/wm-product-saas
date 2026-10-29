@@ -2118,5 +2118,6 @@ return array (
   'view_credit_note' => 'Преглед на кредитното известие',
   'cancellation_reason' => 'Причина за анулиране',
   'credit_note_date' => 'Дата на кредитното известие',
+  'view_material_requirement' => 'Преглед на материално изискване',
 );
 

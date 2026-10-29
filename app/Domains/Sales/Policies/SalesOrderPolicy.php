@@ -69,4 +69,9 @@ class SalesOrderPolicy
             'owner_id' => $order->sales_person_id,
         ]);
     }
+
+    public function shortClose(User $user, SalesOrder $order): bool
+    {
+        return $this->cancel($user, $order);
+    }
 }

@@ -37,6 +37,12 @@ class LeadFollowup extends Model
         'latitude',
         'longitude',
         'location_address',
+        'checkin_latitude',
+        'checkin_longitude',
+        'checkin_address',
+        'checkin_distance_meters',
+        'checkin_status',
+        'checkin_at',
         'selfie_path',
         'location_verified_at',
     ];
@@ -48,6 +54,10 @@ class LeadFollowup extends Model
         'is_google_meet' => 'boolean',
         'latitude' => 'float',
         'longitude' => 'float',
+        'checkin_latitude' => 'float',
+        'checkin_longitude' => 'float',
+        'checkin_distance_meters' => 'integer',
+        'checkin_at' => 'datetime',
         'location_verified_at' => 'datetime',
     ];
 
@@ -65,7 +75,12 @@ class LeadFollowup extends Model
             return $this->selfie_path;
         }
 
-        return asset($this->selfie_path);
+        $path = ltrim($this->selfie_path, '/');
+        while (str_starts_with($path, 'storage/')) {
+            $path = substr($path, 8);
+        }
+
+        return asset('storage/' . $path);
     }
 
     /**

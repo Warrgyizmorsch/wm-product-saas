@@ -80,7 +80,7 @@ class InvoiceController extends Controller
         $allSalesOrders = SalesOrder::with(['customer', 'items.product', 'items.warehouse', 'invoices' => function($q) {
             $q->where('status', '!=', 'Cancelled')->with('items');
         }])
-        ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced'])
+        ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced', 'Partially Delivered', 'Delivered'])
         ->latest()->get();
 
         $salesOrders = $allSalesOrders->filter(function ($so) {
@@ -90,29 +90,16 @@ class InvoiceController extends Controller
         })->values();
 
         // Fetch Dispatch Orders that have status Confirmed, Shipped, Dispatched, or Delivered and have unbilled quantities remaining
-        $allDispatchOrders = \App\Domains\Sales\Models\DispatchOrder::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'materialRequirement'])
+        $allDispatchOrders = \App\Domains\Sales\Models\DispatchOrder::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'materialRequirement', 'invoice'])
             ->whereIn('status', ['Confirmed', 'Shipped', 'Dispatched', 'Delivered'])
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
             if (!empty($do->invoice_id) || in_array($do->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled'])) {
-                return false;
-            }
-
-            // Check if an active non-cancelled invoice exists for this dispatch order's material_requirement_id
-            if ($do->material_requirement_id) {
-                $hasInvoice = Invoice::where('status', '!=', 'Cancelled')
-                    ->where(function($q) use ($do) {
-                        $q->where('material_requirement_id', $do->material_requirement_id);
-                        if ($do->invoice_id) {
-                            $q->orWhere('id', $do->invoice_id);
-                        }
-                    })
-                    ->exists();
-
-                if ($hasInvoice) {
-                    return false;
+                if ($do->invoice && $do->invoice->status === 'Cancelled') {
+                    return true;
                 }
+                return false;
             }
 
             return true;
@@ -133,6 +120,10 @@ class InvoiceController extends Controller
         if ($requestedMode === 'dispatch' || $requestedMode === 'dispatch_order') {
             $mode = 'dispatch_order';
         } elseif ($requestedMode === 'sales_order' || $requestedMode === 'so') {
+            $mode = 'sales_order';
+        }
+
+        if ($salesOrderId && !$dispatchOrderId) {
             $mode = 'sales_order';
         }
 
@@ -171,10 +162,11 @@ class InvoiceController extends Controller
             }
         }
 
-        $latest = Invoice::latest('id')->first();
+        $tenantId = require_tenant_id();
+        $latest = Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('INV-', '', $latest->invoice_number)) + 1 : 1;
         $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
-        while (Invoice::where('invoice_number', $nextInvoiceNumber)->exists()) {
+        while (Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('invoice_number', $nextInvoiceNumber)->exists()) {
             $nextSeq++;
             $nextInvoiceNumber = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
         }
@@ -271,9 +263,13 @@ class InvoiceController extends Controller
                     ->where('sales_order_item_id', $soItem->id)
                     ->sum('quantity');
 
-                $unbilledQty = max(0, $orderedQty - $alreadyInvoiced);
+                $alreadyReturned = \App\Domains\Sales\Models\SalesReturnItem::whereHas('salesReturn', fn($q) => $q->where('sales_order_id', $salesOrder->id)->where('status', 'Completed')->whereNull('invoice_id'))
+                    ->where('product_id', $soItem->product_id)
+                    ->sum('quantity');
+
+                $unbilledQty = max(0, $orderedQty - $alreadyInvoiced - $alreadyReturned);
                 if ($unbilledQty <= 0.0001) {
-                    continue; // Skip items already fully invoiced
+                    continue; // Skip items already fully invoiced or returned
                 }
 
                 $unitPrice = round(convert_from_base(floatval($soItem->unit_price)), 2);
@@ -349,6 +345,17 @@ class InvoiceController extends Controller
                 $query->where('branch_id', $branchId);
             }
         });
+
+        if (!empty($request->invoice_number) && Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('invoice_number', $request->invoice_number)->exists()) {
+            $latest = Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->latest('id')->first();
+            $nextSeq = $latest ? intval(str_replace('INV-', '', $latest->invoice_number)) + 1 : 1;
+            $newInvNum = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            while (Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('invoice_number', $newInvNum)->exists()) {
+                $nextSeq++;
+                $newInvNum = 'INV-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+            }
+            $request->merge(['invoice_number' => $newInvNum]);
+        }
 
         $validated = $request->validate([
             'sales_order_id'          => ['nullable', 'exists:sales_orders,id'],
@@ -614,9 +621,24 @@ class InvoiceController extends Controller
             foreach ($unallocatedAdvances as $allocation) {
                 if ($remainingBalance <= 0) break;
 
-                $applyAmount = min($allocation->allocated_amount, $remainingBalance);
+                $originalAllocated = (float) $allocation->allocated_amount;
+                $applyAmount = min($originalAllocated, $remainingBalance);
+
+                if ($applyAmount < $originalAllocated) {
+                    $remainder = $originalAllocated - $applyAmount;
+                    PaymentAllocation::create([
+                        'tenant_id'           => $allocation->tenant_id,
+                        'company_id'          => $allocation->company_id,
+                        'branch_id'           => $allocation->branch_id,
+                        'customer_payment_id' => $allocation->customer_payment_id,
+                        'sales_order_id'      => $allocation->sales_order_id,
+                        'invoice_id'          => null,
+                        'allocated_amount'    => $remainder,
+                    ]);
+                }
+
                 $allocation->update([
-                    'invoice_id' => $invoice->id,
+                    'invoice_id'       => $invoice->id,
                     'allocated_amount' => $applyAmount,
                 ]);
 
@@ -627,6 +649,20 @@ class InvoiceController extends Controller
 
             return $invoice;
         });
+
+        if ($request->filled('dispatch_order_id')) {
+            $do = \App\Domains\Sales\Models\DispatchOrder::find($request->input('dispatch_order_id'));
+            if ($do && empty($do->invoice_id)) {
+                $do->update(['invoice_id' => $invoice->id]);
+            }
+        }
+
+        if ($salesOrder) {
+            foreach ($salesOrder->items as $soItem) {
+                $soItem->refreshStatus();
+            }
+            $salesOrder->refreshFulfillmentStatus();
+        }
 
         event(new InvoicePosted($invoice));
 
@@ -944,6 +980,13 @@ class InvoiceController extends Controller
 
             return $journal;
         });
+
+        if ($inv->sales_order_id && $inv->salesOrder) {
+            foreach ($inv->salesOrder->items as $soItem) {
+                $soItem->refreshStatus();
+            }
+            $inv->salesOrder->refreshFulfillmentStatus();
+        }
 
         return redirect()->route('sales.invoices.show', $inv->id)
             ->with('success', "Financial Credit Note {$journal->journal_number} created successfully. Invoice {$inv->invoice_number} has been cancelled without altering warehouse inventory.");

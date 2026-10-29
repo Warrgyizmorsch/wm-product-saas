@@ -61,8 +61,9 @@
         $dispatches = $dispatches ?? collect();
         $pendingSalesOrdersCount = $pendingSalesOrdersCount ?? (is_countable($pendingSalesOrders) ? count($pendingSalesOrders) : 0);
         $allDispatchesCount = $allDispatchesCount ?? (is_countable($dispatches) ? count($dispatches) : 0);
-        $currentTab = $activeTab ?? request('tab', 'pending');
-        $isPendingActive = ($currentTab === 'pending' || (!request()->has('tab') && $pendingSalesOrdersCount > 0));
+        $currentTab = request('tab', $activeTab ?? 'pending');
+        $isAllDispatches = in_array($currentTab, ['all', 'all-dispatches', 'all_dispatches', 'dispatches']);
+        $isPendingActive = !$isAllDispatches && ($currentTab === 'pending' || $currentTab === 'pending-dispatches' || (!request()->has('tab') && $pendingSalesOrdersCount > 0));
     @endphp
 
     <div class="erp-single-panel">
@@ -123,7 +124,7 @@
         </div>
 
         <!-- Horizontal 2 Tabs Navigation -->
-        <x-ui.horizontal-tabs id="dispatchesTabNav" class="mb-3" :tabs="[
+        <x-ui.horizontal-tabs id="dispatchesTabNav" class="mb-3" :syncUrl="true" :tabs="[
             [
                 'id' => 'tab-pending-dispatches',
                 'label' => __('crm.tab_pending_dispatches') . (($pendingSalesOrdersCount ?? 0) > 0 ? ' (' . $pendingSalesOrdersCount . ')' : ''),
@@ -180,6 +181,13 @@
                                                 <span class="text-muted fs-11">
                                                     <i class="feather-calendar me-1 fs-10"></i>{{ $so->order_date ? $so->order_date->format('d M Y') : $so->created_at?->format('d M Y') }}
                                                 </span>
+                                                @if ($mr = $so->materialRequirements?->first())
+                                                    <div class="mt-1">
+                                                        <a href="{{ route('inventory.material-requirements.show', $mr->id) }}" class="badge bg-soft-success text-success border border-success-subtle fs-10 fw-semibold text-decoration-none">
+                                                            <i class="feather-check-circle me-1 fs-9"></i>{{ $mr->requirement_number }} • Released
+                                                        </a>
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </td>
@@ -581,6 +589,7 @@
                                             @if ($dispatch->status === 'Pending')
                                                 <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm_{{ $dispatch->id }}" class="d-inline">
                                                     @csrf
+                                                    <input type="hidden" name="redirect_to" value="{{ request()->fullUrlWithQuery(['tab' => 'all-dispatches']) }}">
                                                     <x-ui.button type="button" variant="soft-success" size="xs" icon="feather-check-circle" class="fw-bold fs-11 text-nowrap" style="padding: 8px 8px !important;" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm_dispatch') }}' }, function() { document.getElementById('confirmDispatchForm_{{ $dispatch->id }}').submit(); })">
                                                         {{ __('crm.confirm') }}
                                                     </x-ui.button>
@@ -603,6 +612,7 @@
                                                     <li>
                                                         <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchFormDropdown_{{ $dispatch->id }}">
                                                             @csrf
+                                                            <input type="hidden" name="redirect_to" value="{{ request()->fullUrlWithQuery(['tab' => 'all-dispatches']) }}">
                                                             <button type="button" class="dropdown-item text-success fw-semibold" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm_dispatch') }}' }, function() { document.getElementById('confirmDispatchFormDropdown_{{ $dispatch->id }}').submit(); })">
                                                                 <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('crm.confirm_dispatch') }}
                                                             </button>

@@ -653,6 +653,8 @@
                         $ribbonClass = match($invoice->status) {
                             'Paid' => 'ribbon-paid',
                             'Partially Paid' => 'ribbon-partially-paid',
+                            'Credited' => 'ribbon-cancelled',
+                            'Partially Credited' => 'ribbon-partially-paid',
                             'Posted' => 'ribbon-posted',
                             'Sent' => 'ribbon-posted',
                             'Cancelled' => 'ribbon-cancelled',
@@ -660,12 +662,14 @@
                         };
 
                         $statusLabel = match($invoice->status) {
-                            'Paid' => __('crm.status_paid'),
-                            'Partially Paid' => __('crm.status_partially_paid'),
-                            'Posted' => __('crm.status_posted'),
-                            'Sent' => __('crm.status_posted'),
-                            'Cancelled' => __('crm.status_cancelled'),
-                            default => __('crm.status_draft'),
+                            'Paid' => __('crm.status_paid') ?: 'Paid',
+                            'Partially Paid' => __('crm.status_partially_paid') ?: 'Partially Paid',
+                            'Credited' => 'Credited',
+                            'Partially Credited' => 'Partially Credited',
+                            'Posted' => __('crm.status_posted') ?: 'Posted',
+                            'Sent' => __('crm.status_posted') ?: 'Sent',
+                            'Cancelled' => __('crm.status_cancelled') ?: 'Cancelled',
+                            default => __('crm.status_draft') ?: 'Draft',
                         };
                     @endphp
                     <div class="ribbon-inner {{ $ribbonClass }}">

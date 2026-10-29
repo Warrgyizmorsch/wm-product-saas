@@ -439,7 +439,8 @@
                     <form method="GET" action="{{ route('crm.deals.index') }}" class="d-inline">
                         <x-ui.filter :label="__('crm.filter')" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>
-                                {{ __('crm.filter_options') }}</h6>
+                                {{ __('crm.filter_options') }}
+                            </h6>
                             <div class="mb-3">
                                 <label
                                     class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
@@ -453,7 +454,8 @@
                                     <option value="">{{ __('crm.all_stages') }}</option>
                                     @foreach($dealStatuses as $st)
                                         <option value="{{ $st->name }}" {{ request('stage') === $st->name ? 'selected' : '' }}>
-                                            {{ $st->name }}</option>
+                                            {{ $st->name }}
+                                        </option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
@@ -1124,7 +1126,8 @@
                 </div>
                 <div>
                     <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="assignDealOffcanvasTitle">
-                        {{ __('crm.assign_deal_owner') }}</h5>
+                        {{ __('crm.assign_deal_owner') }}
+                    </h5>
                     <span class="text-muted fs-11" id="assignDealOffcanvasSubtitle">{{ __('crm.select_sales_rep') }}</span>
                 </div>
             </div>
@@ -1198,7 +1201,8 @@
                 </div>
                 <div>
                     <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0" id="dealFollowupOffcanvasTitle">
-                        {{ __('crm.edit_followup') }}</h5>
+                        {{ __('crm.edit_followup') }}
+                    </h5>
                     <span class="text-muted fs-11">{{ __('crm.log_interaction_next_followup') }}</span>
                 </div>
             </div>
@@ -1271,7 +1275,7 @@
                                 <div class="col-6">
                                     <x-ui.modal-form-ui type="select" name="next_activity_type"
                                         id="dealOffcanvasNextActivityTypeIndex" :label="__('crm.activity_type')"
-                                        :searchable="true">
+                                        :searchable="true" onchange="if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'deal_index_next', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                                         @foreach(['Call', 'Meeting', 'Demo', 'Email', 'WhatsApp'] as $actOpt)
                                             <option value="{{ $actOpt }}">{{ __('crm.activity_types.' . $actOpt) ?? $actOpt }}
                                             </option>
@@ -1284,7 +1288,8 @@
                                         :searchable="true">
                                         @foreach(['15', '30', '45', '60', '90', '120'] as $durOpt)
                                             <option value="{{ $durOpt }}" @selected($durOpt === '30')>
-                                                {{ __('crm.duration_options.' . $durOpt) ?? ($durOpt . ' Mins') }}</option>
+                                                {{ __('crm.duration_options.' . $durOpt) ?? ($durOpt . ' Mins') }}
+                                            </option>
                                         @endforeach
                                     </x-ui.modal-form-ui>
                                 </div>
@@ -1293,6 +1298,14 @@
                             <x-ui.modal-form-ui type="input" inputType="datetime-local" name="next_followup_date"
                                 id="dealOffcanvasNextFollowupDateIndex"
                                 :label="__('crm.next_followup_datetime_optional')" />
+
+                            @include('modules.crm.partials.meeting-location-field', [
+                                'idPrefix' => 'deal_index_next',
+                                'label' => 'Next Meeting Venue Location',
+                                'addressFieldName' => 'next_location_address',
+                                'latFieldName' => 'next_latitude',
+                                'lngFieldName' => 'next_longitude'
+                            ])
 
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
@@ -1352,11 +1365,18 @@
 
                     <x-ui.modal-form-ui type="select" name="schedule_type" id="dealOffcanvasScheduleType"
                         :label="__('crm.activity_type')" :searchable="true"
-                        onchange="$('#dealOffcanvasFollowupType').val(this.value)">
+                        onchange="$('#dealOffcanvasFollowupType').val(this.value); if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'deal_index_schedule', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                         @foreach(['Call', 'Meeting', 'Demo', 'Email', 'WhatsApp'] as $actOpt)
                             <option value="{{ $actOpt }}">{{ __('crm.activity_types.' . $actOpt) ?? $actOpt }}</option>
                         @endforeach
                     </x-ui.modal-form-ui>
+
+                    @include('modules.crm.partials.meeting-location-field', [
+                        'idPrefix' => 'deal_index_schedule',
+                        'addressFieldName' => 'location_address',
+                        'latFieldName' => 'latitude',
+                        'lngFieldName' => 'longitude'
+                    ])
 
                     <div class="row g-2">
                         <div class="col-6">
@@ -1368,7 +1388,8 @@
                                 :label="__('crm.duration_minutes')" :searchable="true">
                                 @foreach(['15', '30', '45', '60', '90', '120'] as $durOpt)
                                     <option value="{{ $durOpt }}" @selected($durOpt === '30')>
-                                        {{ __('crm.duration_options.' . $durOpt) ?? ($durOpt . ' Mins') }}</option>
+                                        {{ __('crm.duration_options.' . $durOpt) ?? ($durOpt . ' Mins') }}
+                                    </option>
                                 @endforeach
                             </x-ui.modal-form-ui>
                         </div>

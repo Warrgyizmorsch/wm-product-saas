@@ -170,6 +170,7 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::post('/{id}/dispatch', [MaterialRequirementApiController::class, 'dispatch'])->name('dispatch');
         Route::post('/{id}/deliver', [MaterialRequirementApiController::class, 'deliver'])->name('deliver');
         Route::post('/{id}/cancel', [MaterialRequirementApiController::class, 'cancel'])->name('cancel');
+        Route::post('/{id}/release', [MaterialRequirementApiController::class, 'release'])->name('release');
     });
 
 });

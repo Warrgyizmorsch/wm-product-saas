@@ -154,6 +154,16 @@ class SalesReturnApiController extends Controller
 
         $validated = $validator->validated();
 
+        foreach ($validated['items'] as $item) {
+            $product = Product::find($item['product_id']);
+            if ($product && $product->isService()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "{$product->name} is a Service product and cannot be physically returned to inventory. Services require a Credit Note instead.",
+                ], 422);
+            }
+        }
+
         $defaultWhId = Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first()?->id ?? 1;
 
         if (empty($validated['return_number'])) {

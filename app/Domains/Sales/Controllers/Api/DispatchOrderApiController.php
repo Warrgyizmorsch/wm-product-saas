@@ -149,8 +149,23 @@ class DispatchOrderApiController extends Controller
             ], 422);
         }
 
+        $data = $validator->validated();
+
+        if (!empty($data['sales_order_id'])) {
+            $so = \App\Domains\Sales\Models\SalesOrder::find($data['sales_order_id']);
+            if ($so && $so->materialRequirements->isNotEmpty()) {
+                $isReleased = $so->materialRequirements->contains(fn($mr) => in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched']));
+                if (!$isReleased) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cannot create dispatch order: Material Requirement {$so->materialRequirements->first()->requirement_number} has not been released by Store Incharge yet.",
+                    ], 422);
+                }
+            }
+        }
+
         try {
-            $dispatch = $this->dispatchService->createDispatchOrder($validator->validated(), Auth::id() ?? 1);
+            $dispatch = $this->dispatchService->createDispatchOrder($data, Auth::id() ?? 1);
             return response()->json([
                 'success' => true,
                 'message' => "Dispatch Order {$dispatch->dispatch_number} created successfully.",
@@ -258,6 +273,40 @@ class DispatchOrderApiController extends Controller
     }
 
     /**
+     * POST /api/sales/dispatches/{id}/cancel
+     * Cancel an active (Pending/Confirmed) Dispatch Order and release reservations.
+     */
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $dispatch   = DispatchOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispatch Order not found',
+            ], 404);
+        }
+
+        $reason = $request->input('reason', 'Cancelled via API');
+
+        try {
+            $this->dispatchService->cancelDispatchOrder($dispatch, $reason);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Dispatch Order {$dispatch->dispatch_number} cancelled and reserved inventory restored successfully.",
+                'data'    => $dispatch->fresh(['items']),
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
      * POST /api/sales/dispatches/{id}/update-tracking
      */
     public function updateTracking(Request $request, int $id): JsonResponse
@@ -340,6 +389,7 @@ class DispatchOrderApiController extends Controller
         }
 
         $dispatch->update($updateData);
+        $this->dispatchService->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
 
         return response()->json([
             'success' => true,
@@ -432,5 +482,28 @@ class DispatchOrderApiController extends Controller
             new DispatchOrderExport($tenantId, $request->all()),
             'dispatch_orders_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * GET /api/sales/dispatches/pending-sales-orders
+     * Fetch confirmed sales orders released by Store for dispatch.
+     */
+    public function pendingSalesOrders(Request $request): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $perPage = min((int)$request->input('per_page', 15), 100);
+
+        $pending = $this->dispatchRepo->getPendingSalesOrders($tenantId, $request->all(), $perPage);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $pending->items(),
+            'meta'    => [
+                'current_page' => $pending->currentPage(),
+                'last_page'    => $pending->lastPage(),
+                'per_page'     => $pending->perPage(),
+                'total'        => $pending->total(),
+            ],
+        ]);
     }
 }

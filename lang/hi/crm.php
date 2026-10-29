@@ -2123,5 +2123,6 @@ return array (
   'view_credit_note' => 'क्रेडिट नोट देखें',
   'cancellation_reason' => 'रद्द करने का कारण',
   'credit_note_date' => 'क्रेडिट नोट की तारीख',
+  'view_material_requirement' => 'सामग्री आवश्यकता देखें',
 );
 
