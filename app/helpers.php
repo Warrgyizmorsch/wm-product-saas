@@ -239,7 +239,11 @@ if (! function_exists('active_currency_info')) {
 if (! function_exists('active_currency_symbol')) {
     function active_currency_symbol(): string
     {
-        return active_currency_info()['symbol'] ?? '$';
+        // ── TEMPORARY AUDIT OVERRIDE (Work Center & Section Testing) ───────────
+        // COMMENTED OUT FOR AUDIT: Original line returned active currency symbol (e.g. ₹):
+        // return active_currency_info()['symbol'] ?? '$';
+        return '$';
+        // ────────────────────────────────────────────────────────────────────────
     }
 }
 
@@ -257,7 +261,12 @@ if (! function_exists('convert_from_base')) {
             return 0.0;
         }
 
-        return (float) $amountInBase * active_currency_rate();
+        // ── TEMPORARY AUDIT OVERRIDE (Work Center & Section Testing) ───────────
+        // COMMENTED OUT FOR AUDIT: Original line converted to active currency (multiplied by 85):
+        // return (float) $amountInBase * active_currency_rate();
+        // Return exact raw base currency value stored in database:
+        return (float) $amountInBase;
+        // ────────────────────────────────────────────────────────────────────────
     }
 }
 
@@ -268,12 +277,16 @@ if (! function_exists('convert_to_base')) {
             return 0.0;
         }
 
-        $rate = active_currency_rate();
-        if ($rate <= 0) {
-            return (float) $amountInActiveCurrency;
-        }
-
-        return (float) $amountInActiveCurrency / $rate;
+        // ── TEMPORARY AUDIT OVERRIDE (Work Center & Section Testing) ───────────
+        // COMMENTED OUT FOR AUDIT: Original lines converted from active currency to base:
+        // $rate = active_currency_rate();
+        // if ($rate <= 0) {
+        //     return (float) $amountInActiveCurrency;
+        // }
+        // return (float) $amountInActiveCurrency / $rate;
+        // Return raw value without conversion:
+        return (float) $amountInActiveCurrency;
+        // ────────────────────────────────────────────────────────────────────────
     }
 }
 
@@ -307,28 +320,36 @@ if (! function_exists('format_currency')) {
             $val = convert_from_base($amountInBase);
         }
 
-        $code = active_currency();
-        $isNegative = $val < 0;
+        // ── TEMPORARY AUDIT OVERRIDE (Work Center & Section Testing) ───────────
+        // COMMENTED OUT FOR AUDIT: Original lines applied active currency formatting and symbol:
+        // $code = active_currency();
+        // $isNegative = $val < 0;
+        // if ($code === 'INR') {
+        //     $formatted = format_indian_number($val, $decimals);
+        // } else {
+        //     $formatted = number_format(abs($val), $decimals);
+        // }
+        // if (! $includeSymbol) {
+        //     return ($isNegative ? '-' : '') . $formatted;
+        // }
+        // $info = active_currency_info();
+        // $symbol = $info['symbol'] ?? '$';
+        // $position = $info['position'] ?? 'prefix';
+        // if ($position === 'suffix') {
+        //     return ($isNegative ? '-' : '') . $formatted . ' ' . $symbol;
+        // }
+        // return ($isNegative ? '-' : '') . $symbol . $formatted;
 
-        if ($code === 'INR') {
-            $formatted = format_indian_number($val, $decimals);
-        } else {
-            $formatted = number_format(abs($val), $decimals);
-        }
+        // Display raw base value directly with standard number formatting and base '$' symbol:
+        $isNegative = $val < 0;
+        $formatted = number_format(abs($val), $decimals);
 
         if (! $includeSymbol) {
             return ($isNegative ? '-' : '') . $formatted;
         }
 
-        $info = active_currency_info();
-        $symbol = $info['symbol'] ?? '$';
-        $position = $info['position'] ?? 'prefix';
-
-        if ($position === 'suffix') {
-            return ($isNegative ? '-' : '') . $formatted . ' ' . $symbol;
-        }
-
-        return ($isNegative ? '-' : '') . $symbol . $formatted;
+        return ($isNegative ? '-' : '') . '$' . $formatted;
+        // ────────────────────────────────────────────────────────────────────────
     }
 }
 

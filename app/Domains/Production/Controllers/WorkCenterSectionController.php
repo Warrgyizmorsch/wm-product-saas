@@ -56,8 +56,7 @@ class WorkCenterSectionController extends Controller
             'name'                       => $s->name,
             'code'                       => $s->code,
             'workers_required'           => $s->workers_required,
-            'supports_manual_production' => (bool) $s->supports_manual_production,
-            'manual_capacity_per_hour'   => $s->manual_capacity_per_hour !== null ? (float) $s->manual_capacity_per_hour : null,
+            'supports_manual_production' => $s->supportsManualProduction(),
             'status'                     => $s->status,
             'label'                      => "{$s->name} ({$s->code})",
             'shifts'                     => $s->shifts->map(fn ($sh) => [

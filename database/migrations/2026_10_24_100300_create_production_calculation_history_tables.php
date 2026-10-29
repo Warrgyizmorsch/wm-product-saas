@@ -61,11 +61,13 @@ return new class extends Migration
                     ->on('tenants')
                     ->cascadeOnDelete();
 
-                $table->unsignedBigInteger('work_center_id');
-                $table->foreign('work_center_id', 'pwcsc_wc_fk')
-                    ->references('id')
-                    ->on('production_work_centers')
-                    ->cascadeOnDelete();
+                $table->unsignedBigInteger('work_center_id')->nullable();
+                if (\Illuminate\Support\Facades\DB::getDriverName() !== 'sqlite') {
+                    $table->foreign('work_center_id', 'pwcsc_wc_fk')
+                        ->references('id')
+                        ->on('production_work_centers')
+                        ->cascadeOnDelete();
+                }
 
                 $table->unsignedBigInteger('section_id');
                 $table->foreign('section_id', 'pwcsc_sec_fk')

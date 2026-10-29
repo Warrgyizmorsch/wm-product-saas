@@ -14,15 +14,22 @@ class WorkCenterSectionCalculation extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'work_center_id',
         'section_id',
         'work_center_calculation_id',
         'batch_id',
         'trigger_type',
         'capacity_per_hour',
         'daily_capacity',
+        'hourly_machine_capacity',
+        'daily_machine_capacity',
+        'hourly_manual_capacity',
+        'daily_manual_capacity',
         'labor_cost_per_hour',
         'total_daily_labor_cost',
+        'internal_labor_cost_per_hour',
+        'total_daily_internal_labor_cost',
+        'external_labor_cost_per_hour',
+        'total_daily_external_labor_cost',
         'machine_cost_per_hour',
         'total_daily_machine_cost',
         'total_daily_operating_cost',
@@ -34,8 +41,16 @@ class WorkCenterSectionCalculation extends BaseModel
     protected $casts = [
         'capacity_per_hour'             => 'float',
         'daily_capacity'                => 'float',
+        'hourly_machine_capacity'        => 'float',
+        'daily_machine_capacity'         => 'float',
+        'hourly_manual_capacity'         => 'float',
+        'daily_manual_capacity'          => 'float',
         'labor_cost_per_hour'           => 'float',
         'total_daily_labor_cost'        => 'float',
+        'internal_labor_cost_per_hour'   => 'float',
+        'total_daily_internal_labor_cost'=> 'float',
+        'external_labor_cost_per_hour'   => 'float',
+        'total_daily_external_labor_cost'=> 'float',
         'machine_cost_per_hour'         => 'float',
         'total_daily_machine_cost'      => 'float',
         'total_daily_operating_cost'    => 'float',
@@ -46,9 +61,9 @@ class WorkCenterSectionCalculation extends BaseModel
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
-    public function workCenter(): BelongsTo
+    public function getWorkCenterAttribute(): ?WorkCenter
     {
-        return $this->belongsTo(WorkCenter::class, 'work_center_id');
+        return $this->section?->workCenter ?? $this->workCenterCalculation?->workCenter;
     }
 
     public function section(): BelongsTo

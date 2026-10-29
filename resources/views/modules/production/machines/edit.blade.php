@@ -148,12 +148,17 @@
                         <div class="col-md-6">
                             <div id="rate_wrapper">
                                 <x-ui.odoo-form-ui type="input" :label="__('production.energy_rate_per_unit') . ' (' . active_currency_symbol() . ')'" name="energy_rate_per_unit" id="energy_rate_per_unit_input" inputType="number" step="0.0001" min="0" placeholder="0.00" :value="old('energy_rate_per_unit', $machine->energy_rate_per_unit ?? '0')" />
-                                <small class="form-text text-muted fs-11 d-block mt-n2 mb-3" id="rate_unit_label">Tariff cost per unit ({{ active_currency_symbol() }}/kWh)</small>
+                                <small class="form-text text-muted fs-11 d-block mt-n2 mb-3" id="rate_unit_label">Energy cost per unit ({{ active_currency_symbol() }}/kWh)</small>
                             </div>
 
                             <div>
                                 <x-ui.odoo-form-ui type="input" :label="__('production.operating_cost_per_hour') . ' (' . active_currency_symbol() . '/hr)'" name="operating_cost_per_hour" id="operating_cost_per_hour_input" inputType="number" step="0.0001" min="0" placeholder="0.00" :value="old('operating_cost_per_hour', $machine->operating_cost_per_hour ?? '0')" :required="true" />
-                                <small class="form-text text-muted fs-11 d-block mt-n2 mb-3" id="cost_help_label">Automatically computed as Consumption × Rate ({{ active_currency_symbol() }}/hr)</small>
+                                <small class="form-text text-muted fs-11 d-flex align-items-center gap-1 mt-n2 mb-3" id="cost_help_label">
+                                    <span>Automatically computed as Consumption × Rate ({{ active_currency_symbol() }}/hr).</span>
+                                    <span class="text-primary cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="Defaults to baseline energy cost (Consumption × Energy Rate). If adjusted higher, the surplus is accounted as an additional operational expense (e.g., tooling wear, lubricants, routine servicing). If adjusted lower, the difference is accounted as an applied operating grant, energy subsidy, or tariff rebate.">
+                                        <i class="feather-info"></i>
+                                    </span>
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -190,7 +195,7 @@
                 const src = getSelectedEnergySource();
                 if (src === 'electricity') {
                     if ($consumptionLabel.length) $consumptionLabel.text('Kilowatt-hours per running hour (kWh/hr)');
-                    if ($rateLabel.length) $rateLabel.text(`Tariff cost per kilowatt-hour (${currency}/kWh)`);
+                    if ($rateLabel.length) $rateLabel.text(`Energy cost per kilowatt-hour (${currency}/kWh)`);
                 } else if (src === 'petrol' || src === 'diesel') {
                     const fuelName = src === 'petrol' ? 'Petrol' : 'Diesel';
                     if ($consumptionLabel.length) $consumptionLabel.text(`${fuelName} fuel consumption in Liters/hr (L/hr)`);
@@ -242,25 +247,40 @@
                         }
                     } else {
                         // User edited costInput or page loaded / switched dropdown
-                        const diff = Math.abs(actual - expected);
-                        if (diff > 0.01) {
+                        const diff = actual - expected;
+                        if (Math.abs(diff) > 0.01) {
                             if ($costHelpLabel.length) {
-                                $costHelpLabel.html(`
-                                    <span class="text-warning fw-semibold">
-                                        <i class="feather-alert-triangle me-1"></i>Mismatch: Expected ${currency}${formattedExpected}/hr (${c} × ${r})
-                                    </span>
-                                    <a href="javascript:void(0)" class="btn-sync-cost text-primary text-decoration-underline ms-1 fs-11 fw-bold">Sync</a>
-                                `);
+                                if (diff > 0) {
+                                    const formattedDiff = formatNumber(diff);
+                                    $costHelpLabel.html(`
+                                        <span class="text-primary fw-semibold" title="Surplus is accounted as an additional operational expense (maintenance, tooling, lubricants)">
+                                            <i class="feather-info me-1"></i>Additional Expense: +${currency}${formattedDiff}/hr above baseline energy (${currency}${formattedExpected}/hr)
+                                        </span>
+                                        <a href="javascript:void(0)" class="btn-sync-cost text-secondary text-decoration-underline ms-1 fs-11 fw-bold" title="Reset to baseline energy calculation">Reset</a>
+                                    `);
+                                } else {
+                                    const formattedDiff = formatNumber(Math.abs(diff));
+                                    $costHelpLabel.html(`
+                                        <span class="text-success fw-semibold" title="Deficit is accounted as an applied operating grant, energy subsidy, or rebate">
+                                            <i class="feather-check-circle me-1"></i>Operating Grant / Subsidy: -${currency}${formattedDiff}/hr below baseline energy (${currency}${formattedExpected}/hr)
+                                        </span>
+                                        <a href="javascript:void(0)" class="btn-sync-cost text-secondary text-decoration-underline ms-1 fs-11 fw-bold" title="Reset to baseline energy calculation">Reset</a>
+                                    `);
+                                }
                             }
                         } else {
                             if ($costHelpLabel.length) {
-                                $costHelpLabel.html(`<span class="text-success"><i class="feather-check-circle me-1"></i>${getDefaultFormulaText()}</span>`);
+                                $costHelpLabel.html(`<span class="text-success"><i class="feather-check-circle me-1"></i>${getDefaultFormulaText()} = <strong>${currency}${formattedExpected}/hr</strong></span>`);
                             }
                         }
                     }
                 } else {
                     if ($costHelpLabel.length) {
-                        $costHelpLabel.text(getDefaultFormulaText());
+                        if (actual > 0) {
+                            $costHelpLabel.html(`<span class="text-muted"><i class="feather-info me-1"></i>Flat Operating Cost: <strong>${currency}${formatNumber(actual)}/hr</strong></span>`);
+                        } else {
+                            $costHelpLabel.text(getDefaultFormulaText());
+                        }
                     }
                 }
             }
@@ -308,34 +328,66 @@
 
                 if (c > 0 && r > 0) {
                     const expected = c * r;
-                    const diff = Math.abs(actual - expected);
+                    const diff = actual - expected;
 
-                    if (diff > 0.01) {
+                    if (Math.abs(diff) > 0.01) {
                         e.preventDefault();
                         e.stopImmediatePropagation();
 
                         const actualDisplay = formatNumber(actual);
                         const expectedDisplay = formatNumber(expected);
+                        const absVarianceDisplay = formatNumber(Math.abs(diff));
+                        const isAdditionalExpense = diff > 0;
+
+                        const modalTitle = isAdditionalExpense
+                            ? 'Additional Operating Expense Specified'
+                            : 'Operating Grant / Subsidy Specified';
+
+                        const modalDescription = isAdditionalExpense
+                            ? `The specified Operating Cost is higher than baseline energy consumption. The variance of <strong>+${currency}${absVarianceDisplay}/hr</strong> will be treated as an <strong>Additional Operational Expense</strong> (covering maintenance overhead, tooling wear, lubricants, or auxiliary equipment).`
+                            : `The specified Operating Cost is lower than baseline energy consumption. The variance of <strong>-${currency}${absVarianceDisplay}/hr</strong> will be treated as an applied <strong>Operating Grant, Subsidy, or Energy Tariff Incentive</strong>.`;
+
+                        const confirmBtnText = isAdditionalExpense
+                            ? 'Save with Additional Expense'
+                            : 'Save with Applied Subsidy';
 
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
-                                title: 'Operating Cost Mismatch',
+                                title: modalTitle,
                                 html: `
-                                    <p class="mb-2 text-start">The entered Operating Cost does not match the computed expense:</p>
-                                    <div class="p-3 mb-3 bg-light rounded text-start fs-12 font-monospace">
-                                        <div>• Consumption Rate: <strong>${c}</strong></div>
-                                        <div>• Cost Rate / Unit: <strong>${currency}${r}</strong></div>
-                                        <div>• Computed Cost: <strong class="text-success">${currency}${expectedDisplay}/hr</strong></div>
-                                        <div>• Entered Cost: <strong class="text-danger">${currency}${actualDisplay}/hr</strong></div>
+                                    <div class="text-start fs-12">
+                                        <p class="mb-2 text-secondary">${modalDescription}</p>
+                                        <div class="p-3 mb-3 bg-light rounded border font-monospace">
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">Hourly Consumption:</span>
+                                                <strong>${c}</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">Energy Rate per Unit:</span>
+                                                <strong>${currency}${r}</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">Baseline Energy Cost:</span>
+                                                <strong>${currency}${expectedDisplay}/hr</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between py-1 border-bottom">
+                                                <span class="text-muted">${isAdditionalExpense ? 'Additional Operating Expense:' : 'Operating Grant / Subsidy:'}</span>
+                                                <strong class="${isAdditionalExpense ? 'text-primary' : 'text-success'}">${isAdditionalExpense ? '+' : '-'}${currency}${absVarianceDisplay}/hr</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between pt-1 fw-bold fs-13">
+                                                <span class="text-dark">Final Operating Cost / Hr:</span>
+                                                <span class="text-dark">${currency}${actualDisplay}/hr</span>
+                                            </div>
+                                        </div>
+                                        <p class="mb-0 text-muted fs-11">Would you like to proceed with this custom operating cost, or reset it to the baseline energy calculation?</p>
                                     </div>
-                                    <p class="mb-0 text-muted fs-12 text-start">Do you want to proceed and save with this custom value anyway?</p>
                                 `,
-                                icon: 'warning',
+                                icon: 'info',
                                 showCancelButton: true,
                                 confirmButtonColor: '#3085d6',
                                 cancelButtonColor: '#6c757d',
-                                confirmButtonText: 'Yes, Save Anyway',
-                                cancelButtonText: 'Cancel & Correct',
+                                confirmButtonText: confirmBtnText,
+                                cancelButtonText: 'Reset to Energy Base',
                                 reverseButtons: true
                             }).then((result) => {
                                 const isConfirmed = Boolean(result && (result.isConfirmed || result.value === true || result.value));
@@ -350,10 +402,11 @@
                                 }
                             });
                         } else {
-                            const confirmed = confirm(
-                                `Warning: Operating Cost (${currency}${actualDisplay}/hr) differs from computed Consumption × Rate (${currency}${expectedDisplay}/hr).\n\nDo you want to proceed and save with this custom value anyway?`
-                            );
-                            if (confirmed) {
+                            const fallbackMsg = isAdditionalExpense
+                                ? `Notice: The specified Operating Cost (${currency}${actualDisplay}/hr) exceeds baseline energy calculation (${currency}${expectedDisplay}/hr).\n\nThe variance (+${currency}${absVarianceDisplay}/hr) will be recorded as an Additional Operational Expense.\n\nDo you wish to proceed and save with this custom operating cost?`
+                                : `Notice: The specified Operating Cost (${currency}${actualDisplay}/hr) is lower than baseline energy calculation (${currency}${expectedDisplay}/hr).\n\nThe variance (-${currency}${absVarianceDisplay}/hr) will be recorded as an applied Operating Grant or Energy Subsidy.\n\nDo you wish to proceed and save with this custom operating cost?`;
+
+                            if (confirm(fallbackMsg)) {
                                 allowCustomOperatingCost = true;
                                 HTMLFormElement.prototype.submit.call(formEl);
                             } else {

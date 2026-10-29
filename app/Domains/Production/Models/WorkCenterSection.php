@@ -31,22 +31,18 @@ class WorkCenterSection extends BaseModel
         'work_center_id',
         'name',
         'code',
-        'supports_manual_production',
-        'manual_capacity_per_hour',
         'assigned_shifts',
         'description',
         'status',
     ];
 
     protected $casts = [
-        'supports_manual_production' => 'boolean',
-        'manual_capacity_per_hour'   => 'decimal:4',
-        'assigned_shifts'            => 'array',
+        'assigned_shifts' => 'array',
     ];
 
     public function supportsManualProduction(): bool
     {
-        return (bool) $this->supports_manual_production;
+        return $this->manualProductions()->where('active', true)->exists();
     }
 
     public function getCalculationDetails(): array

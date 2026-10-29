@@ -15,18 +15,6 @@ class StoreWorkCenterSectionRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $supportsManual = filter_var($this->input('supports_manual_production'), FILTER_VALIDATE_BOOLEAN);
-        if (!$supportsManual) {
-            $this->merge([
-                'supports_manual_production' => false,
-                'manual_capacity_per_hour'   => null,
-            ]);
-        } else {
-            $this->merge([
-                'supports_manual_production' => true,
-            ]);
-        }
-
         $shifts = $this->input('shifts');
         if (is_array($shifts)) {
             $normalizedShifts = [];
@@ -65,14 +53,6 @@ class StoreWorkCenterSectionRequest extends FormRequest
                     ->where('work_center_id', $workCenterId),
             ],
             'workers_required'           => 'nullable|integer|min:1',
-            'supports_manual_production' => 'sometimes|boolean',
-            'manual_capacity_per_hour'   => [
-                Rule::requiredIf(fn () => (bool) $this->input('supports_manual_production')),
-                'nullable',
-                'numeric',
-                'gt:0',
-                'max:99999999.9999',
-            ],
             'description'                => 'nullable|string',
             'status'                     => ['required', Rule::in(WorkCenterSection::STATUSES)],
             'shifts'                     => 'required|array|min:1',
@@ -119,9 +99,6 @@ class StoreWorkCenterSectionRequest extends FormRequest
             'shifts.min'                         => 'Every section must have at least one assigned shift.',
             'shifts.*.exists'                    => 'One or more selected shifts do not exist.',
             'machine_ids.*.exists'               => 'One or more selected machines do not exist or belong to another organization.',
-            'manual_capacity_per_hour.required'  => 'Manual capacity per hour is required when manual production is enabled.',
-            'manual_capacity_per_hour.numeric'   => 'Manual capacity per hour must be a valid number.',
-            'manual_capacity_per_hour.gt'        => 'Manual capacity per hour must be greater than zero.',
         ];
     }
 }

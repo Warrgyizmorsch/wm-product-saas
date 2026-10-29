@@ -70,7 +70,8 @@ class WorkCenterService
 
     public function recalculate(WorkCenter $workCenter): WorkCenter
     {
-        $this->getWorkCenterCalculationService()->calculateAndSave($workCenter);
+        // TEMPORARY AUDIT OVERRIDE: Blocked direct recalculate. Only WC recalculateNow button should run.
+        // $this->getWorkCenterCalculationService()->calculateAndSave($workCenter);
         return $workCenter->fresh();
     }
 

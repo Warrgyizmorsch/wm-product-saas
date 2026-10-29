@@ -196,7 +196,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m3->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         $this->assertEquals(20.0, (float) $calc['unique_operating_hours']);
@@ -284,7 +284,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m2->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         // Timeline: 08:00–16:00 = 8h total unique hours
@@ -330,7 +330,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m2->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         // Operating hours: 4h (08-12) + 4h (16-20) = 8h. Gaps: 12-16 (4h) and 20-08 (12h) excluded.
@@ -391,7 +391,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$m3->id]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.machines', 'sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections.machines']);
         $calc = $this->wcCalcService->calculateCapacity($wc);
 
         // Windows:
@@ -451,7 +451,7 @@ class WorkCenterCalculationTest extends TestCase
             machine_ids: [$mB->id]
         ), $this->tenantB->id);
 
-        $calcA = $this->wcCalcService->calculateCapacity($this->workCenterA->fresh(['sections.machines', 'sections.shifts']));
+        $calcA = $this->wcCalcService->calculateCapacity($this->workCenterA->fresh(['sections.machines']));
         $this->assertEquals(100.0, (float) $calcA['capacity_per_hour']);
         $this->assertEquals(800.0, (float) $calcA['total_theoretical_capacity']);
     }
@@ -501,7 +501,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftC->id => 4]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         $this->assertEquals(6.0, (float) $calc['unique_operating_hours']);
@@ -557,7 +557,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift->id => 3]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // 3 workers @ ₹120 = ₹360/hr. 8h duration = ₹2,880 total cost. Avg: ₹360/hr.
@@ -594,7 +594,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift->id => 5]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Combined: 7 workers @ ₹150/hr = ₹1,050/hr. 8h = ₹8,400 total.
@@ -633,7 +633,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift3->id => 4] // 4*200=800
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Combined: 200 + 450 + 800 = 1,450/hr. 8h = 11,600.
@@ -671,7 +671,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftShort->id => 3] // 3*200=600/hr
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Windows:
@@ -712,7 +712,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftMorning->id => 4] // 4*100=400/hr, 8h = 3200
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Hours: 8h (morning) + 8h (night) = 16h. Gaps: 06-08 (2h) and 16-22 (6h) excluded.
@@ -738,7 +738,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shift->id => 2]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Break minutes must NOT be subtracted from duration: full 8 hours counted
@@ -775,7 +775,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftPaid->id => 2] // 2*100=200/hr, 8h = 1600
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         // Timeline: 08:00 to 20:00 = 12 unique hours.
@@ -807,7 +807,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftExplicitZero->id => 4]
         ), $this->tenantA->id);
 
-        $wc = $this->workCenterA->fresh(['sections.shifts']);
+        $wc = $this->workCenterA->fresh(['sections']);
         $calc = $this->wcCalcService->calculateLaborCost($wc);
 
         $this->assertFalse($calc['has_missing_rates']);
@@ -852,7 +852,7 @@ class WorkCenterCalculationTest extends TestCase
             shift_workers: [$shiftB->id => 2]
         ), $this->tenantB->id);
 
-        $calcA = $this->wcCalcService->calculateLaborCost($this->workCenterA->fresh(['sections.shifts']));
+        $calcA = $this->wcCalcService->calculateLaborCost($this->workCenterA->fresh(['sections']));
         $this->assertEquals(200.0, (float) $calcA['labor_cost_per_hour']);
         $this->assertEquals(1600.0, (float) $calcA['total_scheduled_labor_cost']);
     }

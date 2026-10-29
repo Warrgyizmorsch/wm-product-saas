@@ -44,13 +44,22 @@
     <style>
         .section-machines-popover,
         .section-popover {
-            max-width: 400px;
+            max-width: 440px;
             box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.15);
             border-radius: 8px;
             border: 1px solid rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        .section-table-popover {
+            max-width: 480px;
+            box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            overflow: hidden;
         }
         .section-machines-popover .popover-header,
-        .section-popover .popover-header {
+        .section-popover .popover-header,
+        .section-table-popover .popover-header {
             background-color: #f8fafc;
             border-bottom: 1px solid #e2e8f0;
             padding: 8px 12px;
@@ -58,8 +67,12 @@
         .section-machines-popover .popover-body,
         .section-popover .popover-body {
             padding: 8px 12px;
-            max-height: 260px;
+            max-height: 280px;
             overflow-y: auto;
+        }
+        .section-table-popover .popover-body {
+            padding: 0;
+            overflow: hidden;
         }
         .section-machines-badge {
             cursor: pointer;
@@ -133,11 +146,13 @@
             color: #4f46e5;
             text-decoration: none;
         }
-        .capacity-popover-trigger {
+        .capacity-popover-trigger,
+        .cost-popover-trigger {
             cursor: pointer;
             transition: all 0.15s ease-in-out;
         }
-        .capacity-popover-trigger:hover {
+        .capacity-popover-trigger:hover,
+        .cost-popover-trigger:hover {
             opacity: 0.85;
         }
 
@@ -534,7 +549,7 @@
                     <div>
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.capacity_per_hour') }}</span>
-                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="Average capacity across {{ number_format($latestSnapshot?->unique_operating_hours ?? 0, 1) }}h operational hours. Output varies by interval.">
+                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="Average capacity across {{ format_hours($latestSnapshot?->unique_operating_hours ?? 0) }} operational hours. Output varies by interval.">
                                 <i class="feather-alert-triangle me-0.5"></i>Avg / hr
                             </span>
                         </div>
@@ -559,7 +574,7 @@
                             <span class="text-muted fs-11 text-uppercase d-block fw-semibold">Operational Window</span>
                             <small class="text-muted fs-11">Unique hours across section shifts</small>
                         </div>
-                        <span class="fs-16 fw-bold text-dark font-monospace">{{ number_format($latestSnapshot?->unique_operating_hours ?? 0, 2) }} <span class="fs-11 fw-normal text-muted">hrs / day</span></span>
+                        <span class="fs-16 fw-bold text-dark font-monospace">{{ format_hours($latestSnapshot?->unique_operating_hours ?? 0, false) }} <span class="fs-11 fw-normal text-muted">hrs / day</span></span>
                     </div>
 
                     <div class="pt-1">
@@ -800,29 +815,120 @@
                                     $batchListHtml = '<div class="text-muted fs-11 fst-italic py-1 text-center"><i class="feather-info me-1"></i>No manual production batches configured</div>';
                                 }
 
-                                // Capacity Breakdown for Popover
-                                $totals = $secCalc?->calculation_details['totals'] ?? [];
-                                $machHourlyCap = (float) ($totals['hourly_machine_capacity'] ?? ($section->machines ? $section->machines->sum('capacity') : 0));
-                                $machDailyCap  = (float) ($totals['daily_machine_capacity'] ?? 0);
-                                $manHourlyCap  = (float) ($totals['hourly_manual_capacity'] ?? ($section->activeManualProductions ? $section->activeManualProductions->sum('capacity_per_hour') : 0));
-                                $manDailyCap   = (float) ($totals['daily_manual_capacity'] ?? 0);
-                                $totalDailyCap = (float) ($totals['total_daily_capacity'] ?? $dailyCap);
-                                $totalHourlyCap= (float) ($totals['total_hourly_capacity'] ?? $capPerHour);
+                                // Capacity & Operating Cost Popovers (Directly read from dedicated table columns; zero JSON decode)
+                                $machHourlyCap = (float) ($secCalc?->hourly_machine_capacity ?? $secCalc?->calculation_details['totals']['hourly_machine_capacity'] ?? 0);
+                                $machDailyCap  = (float) ($secCalc?->daily_machine_capacity ?? $secCalc?->calculation_details['totals']['daily_machine_capacity'] ?? 0);
+                                $manHourlyCap  = (float) ($secCalc?->hourly_manual_capacity ?? $secCalc?->calculation_details['totals']['hourly_manual_capacity'] ?? 0);
+                                $manDailyCap   = (float) ($secCalc?->daily_manual_capacity ?? $secCalc?->calculation_details['totals']['daily_manual_capacity'] ?? 0);
+                                $totalDailyCap = (float) ($secCalc?->daily_capacity ?? 0);
+                                $totalHourlyCap= (float) ($secCalc?->capacity_per_hour ?? 0);
 
-                                $capacityPopoverHtml = '<div class="fs-12 text-start p-1" style="min-width: 330px;">'
-                                    . '<div class="d-flex justify-content-between align-items-center gap-3 py-1 border-bottom border-light">'
-                                    . '<span class="text-muted text-nowrap me-2"><i class="feather-cpu text-secondary me-1.5"></i>Machine Cap:</span>'
-                                    . '<span class="fw-bold font-monospace text-dark text-nowrap text-end ms-auto">' . number_format($machDailyCap, 1) . ' u/d <span class="text-muted fw-normal fs-11 ms-0.5">(' . number_format($machHourlyCap, 1) . ' u/h)</span></span>'
-                                    . '</div>'
-                                    . '<div class="d-flex justify-content-between align-items-center gap-3 py-1 border-bottom border-light">'
-                                    . '<span class="text-muted text-nowrap me-2"><i class="feather-tool text-warning me-1.5"></i>Manual Batch:</span>'
-                                    . '<span class="fw-bold font-monospace text-dark text-nowrap text-end ms-auto">' . number_format($manDailyCap, 1) . ' u/d <span class="text-muted fw-normal fs-11 ms-0.5">(' . number_format($manHourlyCap, 1) . ' u/h)</span></span>'
-                                    . '</div>'
-                                    . '<div class="d-flex justify-content-between align-items-center gap-3 pt-1.5">'
-                                    . '<span class="fw-bold text-dark text-nowrap me-2"><i class="feather-bar-chart-2 text-primary me-1.5"></i>Total Cap:</span>'
-                                    . '<span class="fw-bolder font-monospace text-primary fs-13 text-nowrap text-end ms-auto">' . number_format($totalDailyCap, 1) . ' u/d <span class="text-muted fw-normal fs-11 ms-0.5">(' . number_format($totalHourlyCap, 1) . ' u/h)</span></span>'
-                                    . '</div>'
-                                    . '</div>';
+                                $dailyOperatingCost = (float) ($secCalc?->total_daily_operating_cost ?? 0);
+                                $hourlyOperatingCost = (float) ($secCalc?->total_operating_cost_per_hour ?? 0);
+                                $dailyLaborCost = (float) ($secCalc?->total_daily_labor_cost ?? 0);
+                                $hourlyLaborCost = (float) ($secCalc?->labor_cost_per_hour ?? 0);
+                                $dailyMachCost = (float) ($secCalc?->total_daily_machine_cost ?? 0);
+                                $hourlyMachCost = (float) ($secCalc?->machine_cost_per_hour ?? 0);
+
+                                $intLaborDaily = (float) ($secCalc?->total_daily_internal_labor_cost ?? $secCalc?->calculation_details['internal_labor']['total_daily_internal_labor_cost'] ?? 0);
+                                $intLaborRate = (float) ($secCalc?->internal_labor_cost_per_hour ?? $secCalc?->calculation_details['internal_labor']['average_internal_hourly_rate'] ?? 0);
+                                $extLaborDaily = (float) ($secCalc?->total_daily_external_labor_cost ?? $secCalc?->calculation_details['external_labor']['total_daily_external_labor_cost'] ?? 0);
+                                $extLaborRate = (float) ($secCalc?->external_labor_cost_per_hour ?? $secCalc?->calculation_details['external_labor']['average_external_hourly_rate'] ?? 0);
+
+                                if ($secCalc) {
+                                    // 1. Capacity Popover (Simple 3-column table)
+                                    $capacityPopoverHtml = '<div class="p-0">'
+                                        . '<table class="table table-sm table-borderless align-middle mb-0 fs-11" style="min-width: 350px;">'
+                                        . '<thead class="border-bottom text-muted fs-10 text-uppercase fw-semibold" style="background-color: #f8fafc;">'
+                                        . '<tr>'
+                                        . '<th class="py-2 ps-3 text-start">Capacity Source</th>'
+                                        . '<th class="py-2 text-end">Total Units / Day</th>'
+                                        . '<th class="py-2 pe-3 text-end">Avg Units / Hour</th>'
+                                        . '</tr>'
+                                        . '</thead>'
+                                        . '<tbody>'
+                                        . '<tr class="border-bottom border-light">'
+                                        . '<td class="py-2 ps-3 text-dark text-nowrap"><i class="feather-cpu text-secondary me-1.5"></i>Machine Output</td>'
+                                        . '<td class="py-2 text-end font-monospace fw-semibold text-dark">' . number_format($machDailyCap, 1) . ' <span class="fs-10 text-muted">u/d</span></td>'
+                                        . '<td class="py-2 pe-3 text-end font-monospace text-muted">' . number_format($machHourlyCap, 1) . ' <span class="fs-10">u/h</span></td>'
+                                        . '</tr>'
+                                        . '<tr class="border-bottom border-light">'
+                                        . '<td class="py-2 ps-3 text-dark text-nowrap"><i class="feather-tool text-warning me-1.5"></i>Manual Batches</td>'
+                                        . '<td class="py-2 text-end font-monospace fw-semibold text-dark">' . number_format($manDailyCap, 1) . ' <span class="fs-10 text-muted">u/d</span></td>'
+                                        . '<td class="py-2 pe-3 text-end font-monospace text-muted">' . number_format($manHourlyCap, 1) . ' <span class="fs-10">u/h</span></td>'
+                                        . '</tr>'
+                                        . '</tbody>'
+                                        . '<tfoot class="border-top border-light-subtle fw-bold" style="background-color: #f1f5f9;">'
+                                        . '<tr>'
+                                        . '<td class="py-2 ps-3 text-dark"><i class="feather-activity text-primary me-1.5"></i>Total Capacity</td>'
+                                        . '<td class="py-2 text-end font-monospace text-primary fw-bolder fs-12">' . number_format($totalDailyCap, 1) . ' <span class="fs-10">u/d</span></td>'
+                                        . '<td class="py-2 pe-3 text-end font-monospace text-dark">' . number_format($totalHourlyCap, 1) . ' <span class="fs-10">u/h</span></td>'
+                                        . '</tr>'
+                                        . '</tfoot>'
+                                        . '</table>'
+                                        . '</div>';
+
+                                    // 2. Cost Popover (Simple 3-column table)
+                                    $costPopoverHtml = '<div class="p-0">'
+                                        . '<table class="table table-sm table-borderless align-middle mb-0 fs-11" style="min-width: 350px;">'
+                                        . '<thead class="border-bottom text-muted fs-10 text-uppercase fw-semibold" style="background-color: #f8fafc;">'
+                                        . '<tr>'
+                                        . '<th class="py-2 ps-3 text-start">Cost Component</th>'
+                                        . '<th class="py-2 text-end">Daily Cost</th>'
+                                        . '<th class="py-2 pe-3 text-end">Hourly Cost</th>'
+                                        . '</tr>'
+                                        . '</thead>'
+                                        . '<tbody>'
+                                        . '<tr class="border-bottom border-light">'
+                                        . '<td class="py-2 ps-3 text-dark text-nowrap"><i class="feather-users text-info me-1.5"></i>Labor Cost</td>'
+                                        . '<td class="py-2 text-end font-monospace fw-bold text-dark text-nowrap">' . format_currency($dailyLaborCost) . '</td>'
+                                        . '<td class="py-2 pe-3 text-end font-monospace text-muted text-nowrap">' . format_currency($hourlyLaborCost) . '/hr</td>'
+                                        . '</tr>';
+
+                                    if ($intLaborDaily > 0 || $extLaborDaily > 0) {
+                                        $costPopoverHtml .= '<tr class="text-muted fs-10 border-bottom border-light" style="background-color: #fafbfc;">'
+                                            . '<td class="py-1 ps-4 text-secondary text-nowrap">&bull; Internal Labor</td>'
+                                            . '<td class="py-1 text-end font-monospace text-nowrap">' . format_currency($intLaborDaily) . '</td>'
+                                            . '<td class="py-1 pe-3 text-end font-monospace text-nowrap">' . format_currency($intLaborRate) . '/hr</td>'
+                                            . '</tr>'
+                                            . '<tr class="text-muted fs-10 border-bottom border-light" style="background-color: #fafbfc;">'
+                                            . '<td class="py-1 ps-4 text-secondary text-nowrap">&bull; External Workforce</td>'
+                                            . '<td class="py-1 text-end font-monospace text-nowrap">' . format_currency($extLaborDaily) . '</td>'
+                                            . '<td class="py-1 pe-3 text-end font-monospace text-nowrap">' . format_currency($extLaborRate) . '/hr</td>'
+                                            . '</tr>';
+                                    }
+
+                                    $costPopoverHtml .= '<tr class="border-bottom border-light">'
+                                        . '<td class="py-2 ps-3 text-dark text-nowrap"><i class="feather-cpu text-secondary me-1.5"></i>Machine Expense</td>'
+                                        . '<td class="py-2 text-end font-monospace fw-bold text-dark text-nowrap">' . format_currency($dailyMachCost) . '</td>'
+                                        . '<td class="py-2 pe-3 text-end font-monospace text-muted text-nowrap">' . format_currency($hourlyMachCost) . '/hr</td>'
+                                        . '</tr>'
+                                        . '</tbody>'
+                                        . '<tfoot class="border-top fw-bold" style="background-color: #f1f5f9;">'
+                                        . '<tr>'
+                                        . '<td class="py-2 ps-3 text-primary text-nowrap"><i class="feather-dollar-sign me-1.5"></i>Total Operating Cost</td>'
+                                        . '<td class="py-2 text-end font-monospace text-primary fs-12 text-nowrap">' . format_currency($dailyOperatingCost) . '</td>'
+                                        . '<td class="py-2 pe-3 text-end font-monospace text-primary fs-12 text-nowrap">' . format_currency($hourlyOperatingCost) . '/hr</td>'
+                                        . '</tr>'
+                                        . '</tfoot>'
+                                        . '</table>'
+                                        . '</div>';
+                                } else {
+                                    // Simple clean warning when uncalculated (No detailed 0s table)
+                                    $capacityPopoverHtml = '<div class="p-3 text-start" style="min-width: 260px;">'
+                                        . '<div class="d-flex align-items-center gap-1.5 text-warning mb-1">'
+                                        . '<i class="feather-alert-triangle fs-14"></i><strong class="text-dark fs-12">Calculation Pending</strong>'
+                                        . '</div>'
+                                        . '<p class="text-muted fs-11 mb-0 leading-tight">Initial calculation snapshot has not been generated yet. Values will update upon recalculation.</p>'
+                                        . '</div>';
+
+                                    $costPopoverHtml = '<div class="p-3 text-start" style="min-width: 260px;">'
+                                        . '<div class="d-flex align-items-center gap-1.5 text-warning mb-1">'
+                                        . '<i class="feather-alert-triangle fs-14"></i><strong class="text-dark fs-12">Calculation Pending</strong>'
+                                        . '</div>'
+                                        . '<p class="text-muted fs-11 mb-0 leading-tight">Initial calculation snapshot has not been generated yet. Costs will compute upon recalculation.</p>'
+                                        . '</div>';
+                                }
                             @endphp
                             <tr>
                                 <!-- 1. Section Code Badge + Name -->
@@ -847,7 +953,7 @@
                                             @php
                                                 $shiftCode = $shift->code ?: strtoupper(substr($shift->name, 0, 2));
                                                 $shiftWindow = substr($shift->start_time, 0, 5) . '–' . substr($shift->end_time, 0, 5);
-                                                $shiftWorkingHrs = $shift->working_hours_formatted ?? ($shift->working_hours ? number_format($shift->working_hours, 1) . ' hrs' : '8:00 hrs');
+                                                $shiftWorkingHrs = $shift->working_hours_formatted ?? ($shift->working_hours ? format_hours($shift->working_hours) : '8.00 hrs');
                                                 $shiftTooltip = e($shift->name . ' (' . $shiftWindow . ' · ' . $shiftWorkingHrs . ')');
                                             @endphp
                                             <span class="section-shift-pill"
@@ -959,7 +1065,7 @@
                                          data-bs-trigger="hover focus"
                                          data-bs-placement="top"
                                          data-bs-html="true"
-                                         data-bs-custom-class="section-popover"
+                                         data-bs-custom-class="section-table-popover"
                                          data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-activity text-success fs-12'></i>Daily Capacity Breakdown</div>"
                                          data-bs-content="{{ $capacityPopoverHtml }}"
                                          data-bs-target="#sectionCalculationModal_{{ $section->id }}">
@@ -968,29 +1074,41 @@
                                                 {{ number_format($dailyCap, 1) }}
                                             </span>
                                             <small class="text-muted fs-10">units/day</small>
-                                            <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
-                                                    data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
-                                                    title="{{ __('production.view_calculation_breakdown') }}">
-                                                <i class="feather-info fs-11"></i>
-                                            </button>
+                                            <i class="feather-info text-primary opacity-75 fs-11 ms-1" 
+                                               role="button"
+                                               data-bs-toggle="modal" 
+                                               data-bs-target="#sectionCalculationModal_{{ $section->id }}"
+                                               title="{{ __('production.view_calculation_breakdown') }}"
+                                               style="cursor: pointer;"></i>
                                         </div>
                                         <small class="text-muted fs-10 font-monospace">Avg: {{ number_format($capPerHour, 1) }}/hr</small>
                                     </div>
                                 </td>
 
-                                <!-- 5. Daily Operating Cost -->
+                                <!-- 5. Daily Operating Cost (with Hover Breakdown Popover) -->
                                 <td class="align-middle">
-                                    <div class="d-flex flex-column gap-0.5">
+                                    <div class="d-flex flex-column align-items-start cost-popover-trigger"
+                                         role="button"
+                                         tabindex="0"
+                                         data-bs-toggle="popover"
+                                         data-bs-trigger="hover focus"
+                                         data-bs-placement="top"
+                                         data-bs-html="true"
+                                         data-bs-custom-class="section-table-popover"
+                                         data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-dollar-sign text-warning fs-12'></i>Daily Operating Cost Breakdown</div>"
+                                         data-bs-content="{{ $costPopoverHtml }}"
+                                         data-bs-target="#sectionCalculationModal_{{ $section->id }}">
                                         <div class="d-flex align-items-center gap-1.5 flex-nowrap">
                                             <span class="fw-bold font-monospace text-primary fs-12">
                                                 {{ format_currency($dailyOperatingCost) }}
                                             </span>
                                             <small class="text-muted fs-10">/day</small>
-                                            <button type="button" class="btn btn-xs btn-outline-light text-primary border-0 p-0 ms-0.5" 
-                                                    data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $section->id }}"
-                                                    title="{{ __('production.view_calculation_breakdown') }}">
-                                                <i class="feather-info fs-11"></i>
-                                            </button>
+                                            <i class="feather-info text-primary opacity-75 fs-11 ms-1" 
+                                               role="button"
+                                               data-bs-toggle="modal" 
+                                               data-bs-target="#sectionCalculationModal_{{ $section->id }}"
+                                               title="{{ __('production.view_calculation_breakdown') }}"
+                                               style="cursor: pointer;"></i>
                                         </div>
                                         <small class="text-muted fs-10 font-monospace">Labor: {{ format_currency($dailyLaborCost) }} | Mach: {{ format_currency($dailyMachCost) }}</small>
                                         @if($hasBreaks)
@@ -1633,355 +1751,7 @@
         @endcan
 
         <!-- Calculation Breakdown Modal for Section -->
-        <div class="modal fade" id="sectionCalculationModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionCalculationModalLabel_{{ $section->id }}" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-                <div class="modal-content border-0 shadow-lg rounded-3">
-                    <div class="modal-header border-bottom py-3 bg-light">
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                <i class="feather-bar-chart-2"></i>
-                            </div>
-                            <div>
-                                <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="sectionCalculationModalLabel_{{ $section->id }}">
-                                    {{ __('production.calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $section->code }}</span> ({{ $section->name }})
-                                </h5>
-                                <small class="text-muted fs-11">{{ __('production.work_center') }}: {{ $workCenter->name }} [{{ $workCenter->code }}]</small>
-                            </div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-
-                    <div class="modal-body p-4">
-                        @php
-                            $calcData = $section->getCalculationDetails();
-                            $capData = $calcData['capacity'] ?? [];
-                            $laborData = $calcData['labor_cost'] ?? [];
-                            $machinesBreakdown = $capData['machines'] ?? [];
-                            $shiftsBreakdown = $laborData['shifts'] ?? [];
-                            $windowsBreakdown = $laborData['timeline_windows'] ?? [];
-                            $totalSchedCost = (float) ($laborData['total_scheduled_labor_cost'] ?? 0);
-                            $uniqHours = (float) ($laborData['unique_operating_hours'] ?? 0);
-                            $avgLaborCost = (float) ($laborData['labor_cost_per_hour'] ?? 0);
-                            $totalCap = (float) ($capData['capacity_per_hour'] ?? 0);
-                            $cUnit = $capData['capacity_unit'] ?? __('production.units_per_hour');
-                            $hasOverlapping = (bool) ($laborData['has_overlapping_shifts'] ?? false);
-                        @endphp
-
-                        <!-- Top Summary Cards (KPIs) -->
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-3">
-                                <div class="p-3 rounded border bg-light h-100">
-                                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
-                                        <i class="feather-activity me-1 text-primary"></i>{{ __('production.capacity_per_hour') }}
-                                    </span>
-                                    <span class="fs-20 fw-bolder text-dark font-monospace d-block">
-                                        {{ number_format($totalCap, 2) }}
-                                    </span>
-                                    <small class="text-muted fs-11">{{ $cUnit }}</small>
-                                </div>
-                            </div>
-
-                            <div class="col-md-3">
-                                <div class="p-3 rounded border bg-light h-100">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fs-11 text-uppercase fw-semibold">
-                                            <i class="feather-dollar-sign me-1 text-success"></i>{{ __('production.labor_cost_per_hour') }}
-                                        </span>
-                                        @if($hasOverlapping)
-                                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill">
-                                                <i class="feather-layers me-0.5"></i>{{ __('production.overlapping_shifts') }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <span class="fs-20 fw-bolder text-primary font-monospace d-block">
-                                        {{ format_currency($avgLaborCost) }}
-                                    </span>
-                                    <small class="text-muted fs-11">per unique elapsed operating hour</small>
-                                </div>
-                            </div>
-
-                            <div class="col-md-3">
-                                <div class="p-3 rounded border bg-light h-100">
-                                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
-                                        <i class="feather-credit-card me-1 text-info"></i>{{ __('production.total_scheduled_labor_cost') }}
-                                    </span>
-                                    <span class="fs-20 fw-bolder text-dark font-monospace d-block">
-                                        {{ format_currency($totalSchedCost) }}
-                                    </span>
-                                    <small class="text-muted fs-11">Sum of all window labor costs</small>
-                                </div>
-                            </div>
-
-                            <div class="col-md-3">
-                                <div class="p-3 rounded border bg-light h-100">
-                                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-1">
-                                        <i class="feather-clock me-1 text-warning"></i>{{ __('production.unique_operating_hours') }}
-                                    </span>
-                                    <span class="fs-20 fw-bolder text-dark font-monospace d-block">
-                                        {{ number_format($uniqHours, 2) }} h
-                                    </span>
-                                    <small class="text-muted fs-11">Union of active timeline hours</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Section 1: Capacity Per Hour Breakdown -->
-                        <div class="card border shadow-none mb-4">
-                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
-                                <h6 class="fw-bold text-dark mb-0 fs-13">
-                                    <i class="feather-cpu text-primary me-1.5"></i>{{ __('production.capacity_breakdown') }}
-                                </h6>
-                                <span class="badge bg-soft-primary text-primary font-monospace fs-11">
-                                    {{ number_format($totalCap, 2) }} {{ $cUnit }}
-                                </span>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-hover mb-0 fs-12">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width: 25%">Resource Type</th>
-                                                <th style="width: 35%">Resource Name / Identifier</th>
-                                                <th style="width: 20%" class="text-end">Base Capacity</th>
-                                                <th style="width: 20%" class="text-end">Contribution / Hr</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($machinesBreakdown as $m)
-                                                <tr>
-                                                    <td class="align-middle">
-                                                        <span class="badge bg-soft-secondary text-secondary rounded-pill">
-                                                            <i class="feather-cpu me-1"></i>Machine
-                                                        </span>
-                                                    </td>
-                                                    <td class="align-middle">
-                                                        <span class="fw-bold font-monospace text-dark">[{{ $m['code'] }}]</span>
-                                                        <span class="text-dark ms-1">{{ $m['name'] }}</span>
-                                                    </td>
-                                                    <td class="align-middle text-end font-monospace">
-                                                        {{ number_format((float)$m['capacity'], 2) }} {{ $m['capacity_unit'] ?? $cUnit }}
-                                                    </td>
-                                                    <td class="align-middle text-end font-monospace fw-semibold text-dark">
-                                                        +{{ number_format((float)$m['capacity'], 2) }} {{ $cUnit }}
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="4" class="text-muted text-center py-2 fst-italic">
-                                                        {{ __('production.no_machines_assigned_zero_cap') }}
-                                                    </td>
-                                                </tr>
-                                            @endforelse
-
-                                            <!-- Manual Production Row -->
-                                            <tr class="{{ !empty($capData['manual_production']['enabled']) ? 'table-warning bg-soft-warning' : 'table-light' }}">
-                                                <td class="align-middle">
-                                                    <span class="badge bg-soft-warning text-warning rounded-pill">
-                                                        <i class="feather-user me-1"></i>Manual Production
-                                                    </span>
-                                                </td>
-                                                <td class="align-middle">
-                                                    @if(!empty($capData['manual_production']['enabled']))
-                                                        <span class="fw-bold text-dark">{{ __('production.manual_production') }}</span>
-                                                        <span class="badge bg-success text-white fs-10 px-1 py-0.2 ms-1">Enabled</span>
-                                                    @else
-                                                        <span class="text-muted">{{ __('production.manual_production') }}</span>
-                                                        <span class="badge bg-secondary text-white fs-10 px-1 py-0.2 ms-1">Disabled</span>
-                                                    @endif
-                                                </td>
-                                                <td class="align-middle text-end font-monospace text-muted">
-                                                    @if(!empty($capData['manual_production']['enabled']))
-                                                        {{ number_format((float)$capData['manual_production']['configured_capacity'], 2) }} {{ $cUnit }}
-                                                    @else
-                                                        &mdash;
-                                                    @endif
-                                                </td>
-                                                <td class="align-middle text-end font-monospace fw-semibold {{ !empty($capData['manual_production']['enabled']) ? 'text-dark' : 'text-muted' }}">
-                                                    @if(!empty($capData['manual_production']['enabled']))
-                                                        +{{ number_format((float)$capData['manual_production']['effective_capacity'], 2) }} {{ $cUnit }}
-                                                    @else
-                                                        0.00 {{ $cUnit }}
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                        <tfoot class="table-light border-top">
-                                            <tr class="fw-bold">
-                                                <td colspan="3" class="text-end text-dark">{{ __('production.total_section_capacity') }}:</td>
-                                                <td class="text-end font-monospace text-primary fs-13">
-                                                    {{ number_format($totalCap, 2) }} {{ $cUnit }}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Section 2: Shift-Level Labor Configuration -->
-                        <div class="card border shadow-none mb-4">
-                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
-                                <h6 class="fw-bold text-dark mb-0 fs-13">
-                                    <i class="feather-users text-primary me-1.5"></i>{{ __('production.shift_labor_configuration') }}
-                                </h6>
-                                <span class="text-muted fs-11">
-                                    Shift Labor Cost / Hr = Workers Required &times; Hourly Rate Per Worker
-                                </span>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-hover mb-0 fs-12">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width: 25%">Shift Name</th>
-                                                <th style="width: 20%">Operating Hours</th>
-                                                <th style="width: 15%" class="text-center">{{ __('production.shift_worker_count') }}</th>
-                                                <th style="width: 20%" class="text-end">{{ __('production.hourly_rate_per_worker') }}</th>
-                                                <th style="width: 20%" class="text-end">{{ __('production.shift_labor_cost_per_hour') }}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($shiftsBreakdown as $sh)
-                                                <tr>
-                                                    <td class="align-middle">
-                                                        <span class="fw-bold text-dark">{{ $sh['name'] }}</span>
-                                                        @if(empty($sh['hourly_labor_rate']) || (float)$sh['hourly_labor_rate'] <= 0)
-                                                            <span class="badge bg-soft-secondary text-secondary fs-10 px-1 py-0.2 ms-1" title="{{ __('production.missing_rate_note') }}">
-                                                                Rate: ₹0
-                                                            </span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="align-middle font-monospace text-muted">
-                                                        {{ $sh['start_time'] }} &ndash; {{ $sh['end_time'] }}
-                                                    </td>
-                                                    <td class="align-middle text-center">
-                                                        <span class="badge bg-soft-info text-info rounded-pill px-2 py-0.5 fw-semibold font-monospace">
-                                                            {{ $sh['workers_required'] }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="align-middle text-end font-monospace">
-                                                        {{ format_currency((float)$sh['hourly_labor_rate']) }} / worker
-                                                    </td>
-                                                    <td class="align-middle text-end font-monospace fw-bold text-dark">
-                                                        {{ format_currency((float)$sh['shift_labor_cost_per_hour']) }} / hr
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="5" class="text-muted text-center py-2 fst-italic">
-                                                        {{ __('production.no_shifts_assigned') }}
-                                                    </td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Section 3: Timeline Windows Breakdown -->
-                        <div class="card border shadow-none mb-3">
-                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
-                                <h6 class="fw-bold text-dark mb-0 fs-13">
-                                    <i class="feather-calendar text-primary me-1.5"></i>{{ __('production.timeline_windows') }}
-                                </h6>
-                                <span class="text-muted fs-11">
-                                    Discretized by shift boundaries; paid breaks included; gaps excluded
-                                </span>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-hover mb-0 fs-12">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th style="width: 22%">{{ __('production.window_range') }}</th>
-                                                <th style="width: 12%">{{ __('production.window_duration') }}</th>
-                                                <th style="width: 26%">{{ __('production.active_shifts') }}</th>
-                                                <th style="width: 12%" class="text-center">{{ __('production.active_workers') }}</th>
-                                                <th style="width: 14%" class="text-end">{{ __('production.combined_labor_rate') }}</th>
-                                                <th style="width: 14%" class="text-end">{{ __('production.window_labor_cost') }}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @forelse($windowsBreakdown as $w)
-                                                <tr class="{{ !empty($w['is_overlap']) ? 'table-warning bg-soft-warning' : '' }}">
-                                                    <td class="align-middle font-monospace fw-semibold text-dark">
-                                                        {{ $w['window'] }}
-                                                        @if(!empty($w['is_overlap']))
-                                                            <span class="badge bg-warning text-dark fs-10 px-1 py-0.2 ms-1 rounded-pill">
-                                                                Overlap
-                                                            </span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="align-middle font-monospace text-muted">
-                                                        {{ number_format((float)$w['duration_hours'], 2) }} h
-                                                    </td>
-                                                    <td class="align-middle">
-                                                        <div class="d-flex flex-wrap gap-1">
-                                                            @foreach($w['active_shift_names'] as $asn)
-                                                                <span class="badge bg-soft-primary text-primary fs-11 px-1.5 py-0.5">
-                                                                    {{ $asn }}
-                                                                </span>
-                                                            @endforeach
-                                                        </div>
-                                                    </td>
-                                                    <td class="align-middle text-center font-monospace fw-semibold">
-                                                        {{ $w['active_workers'] }}
-                                                    </td>
-                                                    <td class="align-middle text-end font-monospace">
-                                                        {{ format_currency((float)$w['combined_hourly_cost']) }} / hr
-                                                    </td>
-                                                    <td class="align-middle text-end font-monospace fw-bold text-dark">
-                                                        {{ format_currency((float)$w['window_cost']) }}
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="6" class="text-muted text-center py-2 fst-italic">
-                                                        No timeline windows generated.
-                                                    </td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                        <tfoot class="table-light border-top">
-                                            <tr class="fw-bold">
-                                                <td class="text-dark">{{ __('production.unique_operating_hours') }}:</td>
-                                                <td class="font-monospace text-primary">{{ number_format($uniqHours, 2) }} h</td>
-                                                <td colspan="3" class="text-end text-dark">{{ __('production.total_scheduled_labor_cost') }}:</td>
-                                                <td class="text-end font-monospace text-primary fs-13">{{ format_currency($totalSchedCost) }}</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Mathematical Summary Card -->
-                        <div class="p-3 bg-light rounded border d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            <div>
-                                <div class="fw-bold text-dark fs-13 mb-1">
-                                    <i class="feather-check-circle text-success me-1"></i>{{ __('production.calculation_formula_explanation') }}
-                                </div>
-                                <div class="text-muted fs-11 font-monospace">
-                                    {{ format_currency($totalSchedCost) }} &divide; {{ number_format($uniqHours, 2) }} hrs = 
-                                    <strong class="text-primary fs-12">{{ format_currency($avgLaborCost) }} / hr</strong>
-                                </div>
-                            </div>
-                            <div class="text-end">
-                                <span class="text-muted fs-11 d-block">Resulting Section Labor Cost:</span>
-                                <span class="fs-18 fw-bolder text-primary font-monospace">{{ format_currency($avgLaborCost) }} <span class="fs-11 fw-normal text-muted">/ hr</span></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-end">
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
-                            {{ __('production.close_tab') ?? 'Close' }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('modules.production.work-centers.partials.section-calculation-modal', ['section' => $section, 'workCenter' => $workCenter])
 
         <!-- Section Details Modal for Section {{ $section->id }} -->
         @php
@@ -2002,13 +1772,23 @@
 
             $secDetailsManualBatchesCount = $section->manualProductions ? $section->manualProductions->count() : 0;
 
-            $secDetailsTotals = $secDetailsCalc?->calculation_details['totals'] ?? [];
-            $secDetailsMachHourlyCap = (float) ($secDetailsTotals['hourly_machine_capacity'] ?? ($section->machines ? $section->machines->sum('capacity') : 0));
-            $secDetailsMachDailyCap  = (float) ($secDetailsTotals['daily_machine_capacity'] ?? 0);
-            $secDetailsManHourlyCap  = (float) ($secDetailsTotals['hourly_manual_capacity'] ?? ($section->activeManualProductions ? $section->activeManualProductions->sum('capacity_per_hour') : 0));
-            $secDetailsManDailyCap   = (float) ($secDetailsTotals['daily_manual_capacity'] ?? 0);
-            $secDetailsTotalDailyCap = (float) ($secDetailsTotals['total_daily_capacity'] ?? $secDetailsDailyCap);
-            $secDetailsTotalHourlyCap= (float) ($secDetailsTotals['total_hourly_capacity'] ?? $secDetailsCapPerHour);
+            $secDetailsCalcDetails = $secDetailsCalc?->calculation_details ?? [];
+            $secDetailsMach = $secDetailsCalcDetails['machinery'] ?? [];
+            $secDetailsMan  = $secDetailsCalcDetails['manual_batches'] ?? [];
+            $secDetailsFin  = $secDetailsCalcDetails['financial_summary'] ?? [];
+            $secDetailsTotals = $secDetailsCalcDetails['totals'] ?? [];
+
+            $secDetailsMachHourlyCap = $secDetailsCalc
+                ? (float) ($secDetailsCalc->hourly_machine_capacity ?? $secDetailsMach['hourly_machine_capacity'] ?? $secDetailsTotals['hourly_machine_capacity'] ?? 0)
+                : 0.0;
+            $secDetailsMachCost = $secDetailsCalc
+                ? (float) ($secDetailsCalc->machine_cost_per_hour ?? $secDetailsMach['hourly_operating_cost'] ?? 0)
+                : 0.0;
+            $secDetailsMachDailyCap  = (float) ($secDetailsCalc?->daily_machine_capacity ?? $secDetailsMach['daily_machine_capacity'] ?? $secDetailsTotals['daily_machine_capacity'] ?? 0);
+            $secDetailsManHourlyCap  = (float) ($secDetailsCalc?->hourly_manual_capacity ?? $secDetailsMan['hourly_manual_capacity'] ?? $secDetailsTotals['hourly_manual_capacity'] ?? 0);
+            $secDetailsManDailyCap   = (float) ($secDetailsCalc?->daily_manual_capacity ?? $secDetailsMan['daily_manual_capacity'] ?? $secDetailsTotals['daily_manual_capacity'] ?? 0);
+            $secDetailsTotalDailyCap = (float) ($secDetailsCalc?->daily_capacity ?? 0);
+            $secDetailsTotalHourlyCap= (float) ($secDetailsCalc?->capacity_per_hour ?? 0);
         @endphp
         <div class="modal fade section-details-modal" id="sectionDetailsModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionDetailsModalLabel_{{ $section->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
@@ -2046,17 +1826,26 @@
                                         <i class="feather-clock text-primary fs-14"></i>
                                     </div>
                                     @php
-                                        $uohTotalMin = (int) round(((float) ($secDetailsCalc?->unique_operating_hours ?? 0)) * 60);
-                                        $uohHours = intdiv($uohTotalMin, 60);
-                                        $uohMins = $uohTotalMin % 60;
-                                        $uohFormatted = sprintf('%d:%02d', $uohHours, $uohMins);
+                                        $uohHoursVal = (float) ($secDetailsCalc?->unique_operating_hours ?? 0);
+                                        if ($uohHoursVal <= 0 && $section->shifts->isNotEmpty()) {
+                                            $totalShiftMin = 0;
+                                            foreach ($section->shifts as $s) {
+                                                $totalShiftMin += (int) round(($s->working_hours ?? 8.0) * 60);
+                                            }
+                                            $uohFormatted = sprintf('%d:%02d', intdiv($totalShiftMin, 60), $totalShiftMin % 60);
+                                            $uohNote = 'Shift schedule sum (Uncalculated Fallback)';
+                                        } else {
+                                            $uohTotalMin = (int) round($uohHoursVal * 60);
+                                            $uohFormatted = sprintf('%d:%02d', intdiv($uohTotalMin, 60), $uohTotalMin % 60);
+                                            $uohNote = $section->shifts->count() . ' configured ' . \Illuminate\Support\Str::plural('shift', $section->shifts->count()) . ' (Snapshot)';
+                                        }
                                     @endphp
                                     <div class="fs-20 fw-bold text-dark font-monospace">
                                         {{ $uohFormatted }}
                                         <span class="fs-11 fw-normal text-muted">hrs/day</span>
                                     </div>
                                     <small class="text-muted fs-11 mt-1">
-                                        {{ $section->shifts->count() }} {{ \Illuminate\Support\Str::plural('Shift', $section->shifts->count()) }} configured
+                                        {{ $uohNote }}
                                     </small>
                                 </div>
                             </div>
@@ -2068,13 +1857,23 @@
                                         <span class="text-muted fs-11 text-uppercase fw-semibold">Daily Capacity</span>
                                         <i class="feather-activity text-success fs-14"></i>
                                     </div>
-                                    <div class="fs-20 fw-bold text-dark font-monospace">
-                                        {{ number_format($secDetailsDailyCap, 1) }}
-                                        <span class="fs-11 fw-normal text-muted">units/day</span>
-                                    </div>
-                                    <small class="text-muted fs-11 mt-1">
-                                        Avg {{ number_format($secDetailsCapPerHour, 1) }} units/hr
-                                    </small>
+                                    @if($secDetailsCalc)
+                                        <div class="fs-20 fw-bold text-dark font-monospace">
+                                            {{ number_format($secDetailsDailyCap, 1) }}
+                                            <span class="fs-11 fw-normal text-muted">units/day</span>
+                                        </div>
+                                        <small class="text-muted fs-11 mt-1">
+                                            Avg {{ number_format($secDetailsCapPerHour, 1) }} units/hr
+                                        </small>
+                                    @else
+                                        <div class="my-auto py-1">
+                                            <div class="d-flex align-items-center gap-1.5 text-warning mb-0.5">
+                                                <i class="feather-alert-triangle fs-12"></i>
+                                                <strong class="text-dark fs-12">Calculation Pending</strong>
+                                            </div>
+                                            <small class="text-muted fs-10 d-block leading-tight">Initial calculation snapshot has not been generated yet. Values will update upon recalculation.</small>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
 
@@ -2085,12 +1884,22 @@
                                         <span class="text-muted fs-11 text-uppercase fw-semibold">Daily Operating Cost</span>
                                         <i class="feather-dollar-sign text-warning fs-14"></i>
                                     </div>
-                                    <div class="fs-20 fw-bold text-primary font-monospace">
-                                        {{ format_currency($secDetailsDailyOperatingCost) }}
-                                    </div>
-                                    <small class="text-muted fs-11 mt-1">
-                                        {{ format_currency($secDetailsHourlyOperatingCost) }}/hr
-                                    </small>
+                                    @if($secDetailsCalc)
+                                        <div class="fs-20 fw-bold text-primary font-monospace">
+                                            {{ format_currency($secDetailsDailyOperatingCost) }}
+                                        </div>
+                                        <small class="text-muted fs-11 mt-1">
+                                            {{ format_currency($secDetailsHourlyOperatingCost) }}/hr
+                                        </small>
+                                    @else
+                                        <div class="my-auto py-1">
+                                            <div class="d-flex align-items-center gap-1.5 text-warning mb-0.5">
+                                                <i class="feather-alert-triangle fs-12"></i>
+                                                <strong class="text-dark fs-12">Calculation Pending</strong>
+                                            </div>
+                                            <small class="text-muted fs-10 d-block leading-tight">Initial calculation snapshot has not been generated yet. Values will update upon recalculation.</small>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
 
@@ -2191,7 +2000,7 @@
                                                     $shExtCount = (int) ($section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('shift_id', $sh->id)->where('active', true)->sum('number_of_external_workers') : 0);
                                                     $shEmpCount = (int) ($section->employeeAssignments ? $section->employeeAssignments->where('active', true)->filter(fn($a) => ($a->employee?->shift_id ?? $a->shift_id) == $sh->id)->count() : 0);
                                                     $shCode = $sh->code ?: strtoupper(substr($sh->name, 0, 2));
-                                                    $shWorkingDuration = $sh->working_hours_formatted ?? ($sh->working_hours ? number_format($sh->working_hours, 1) . ' hrs' : '8:00 hrs');
+                                                    $shWorkingDuration = $sh->working_hours_formatted ?? ($sh->working_hours ? format_hours($sh->working_hours) : '8.00 hrs');
                                                 @endphp
                                                 <tr>
                                                     <td>
@@ -2217,6 +2026,44 @@
                                                 </tr>
                                             @endforelse
                                         </tbody>
+                                        @if($section->shifts && $section->shifts->isNotEmpty())
+                                            @php
+                                                $totalNetHours = 0;
+                                                $allStartTimes = [];
+                                                $allEndTimes = [];
+                                                $totalShiftEmp = 0;
+                                                $totalShiftExt = 0;
+                                                foreach ($section->shifts as $sh) {
+                                                    $totalNetHours += (float) ($sh->working_hours ?? 8.0);
+                                                    if ($sh->start_time) $allStartTimes[] = substr($sh->start_time, 0, 5);
+                                                    if ($sh->end_time) $allEndTimes[] = substr($sh->end_time, 0, 5);
+                                                    $totalShiftExt += (int) ($section->externalWorkerAllocations ? $section->externalWorkerAllocations->where('shift_id', $sh->id)->where('active', true)->sum('number_of_external_workers') : 0);
+                                                    $totalShiftEmp += (int) ($section->employeeAssignments ? $section->employeeAssignments->where('active', true)->filter(fn($a) => ($a->employee?->shift_id ?? $a->shift_id) == $sh->id)->count() : 0);
+                                                }
+                                                sort($allStartTimes);
+                                                sort($allEndTimes);
+                                                $earliestStart = $allStartTimes[0] ?? '--:--';
+                                                $latestEnd = end($allEndTimes) ?: '--:--';
+                                            @endphp
+                                            <tfoot class="table-light border-top">
+                                                <tr class="fw-bold">
+                                                    <td colspan="2" class="text-dark">
+                                                        <i class="feather-calendar text-primary me-1"></i>Combined Schedule Total:
+                                                    </td>
+                                                    <td class="font-monospace text-muted">
+                                                        {{ $earliestStart }} &ndash; {{ $latestEnd }}
+                                                        <span class="fs-10 text-muted fw-normal ms-1">({{ count($section->shifts) }} shifts)</span>
+                                                    </td>
+                                                    <td class="font-monospace text-dark fw-bold">
+                                                        {{ format_hours($totalNetHours) }}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-info text-info font-monospace fs-10 px-1.5 py-0.5 me-1">{{ $totalShiftEmp }} Emp</span>
+                                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-1.5 py-0.5">{{ $totalShiftExt }} Ext</span>
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        @endif
                                     </table>
                                 </div>
                             </div>
@@ -2260,11 +2107,15 @@
                                             @endforelse
                                         </tbody>
                                         @if($section->machines && $section->machines->isNotEmpty())
+                                            @php
+                                                $machTableTotalCap = (float) $section->machines->sum('capacity');
+                                                $machTableTotalCost = (float) $section->machines->sum('operating_cost_per_hour');
+                                            @endphp
                                             <tfoot class="table-light border-top">
                                                 <tr class="fw-bold">
                                                     <td colspan="3" class="text-dark">Total Machine Output:</td>
-                                                    <td class="font-monospace text-success">{{ number_format($secDetailsMachHourlyCap, 1) }} u/h</td>
-                                                    <td class="font-monospace text-primary">{{ format_currency($secDetailsMachCost) }}/hr</td>
+                                                    <td class="font-monospace text-success">{{ number_format($machTableTotalCap, 1) }} u/h</td>
+                                                    <td class="font-monospace text-primary">{{ format_currency($machTableTotalCost) }}/hr</td>
                                                 </tr>
                                             </tfoot>
                                         @endif
@@ -2405,12 +2256,51 @@
                                                 </tr>
                                             @endforelse
                                         </tbody>
+                                        @if($section->manualProductions && $section->manualProductions->isNotEmpty())
+                                            @php
+                                                $totBatchEmp = 0;
+                                                $totBatchExt = 0;
+                                                foreach($section->manualProductions as $b) {
+                                                    $totBatchEmp += (int) ($b->employees ? $b->employees->count() : 0);
+                                                    $totBatchExt += (int) ($b->externalAllocations ? $b->externalAllocations->sum('number_of_external_workers') : 0);
+                                                }
+                                            @endphp
+                                            <tfoot class="table-light border-top fw-bold">
+                                                <tr>
+                                                    <td colspan="2" class="text-dark"><i class="feather-tool text-warning me-1"></i>Total Manual Batch Output:</td>
+                                                    <td>
+                                                        @if($secDetailsCalc)
+                                                            <div class="font-monospace text-dark fw-bold">{{ number_format($secDetailsManDailyCap, 1) }} <small class="text-muted fw-normal">u/d</small></div>
+                                                            <small class="text-muted fs-11" title="Total Averaged Manual Output across all section operating hours">
+                                                                Avg: <span class="text-dark font-monospace fw-semibold">{{ number_format($secDetailsManHourlyCap, 1) }} u/h</span>
+                                                            </small>
+                                                        @else
+                                                            <div class="font-monospace text-muted fw-semibold">0.0 <small class="text-muted fw-normal">u/d</small></div>
+                                                            <small class="text-muted fs-10 fst-italic">Pending calculation</small>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-info text-info font-monospace fs-10 px-1.5 py-0.5 me-1">{{ $totBatchEmp }} Emp</span>
+                                                        <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-1.5 py-0.5">{{ $totBatchExt }} Ext</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-soft-success text-success rounded-pill px-2 py-0.5 fs-10">Active</span>
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        @endif
                                     </table>
                                 </div>
                             </div>
 
                             <!-- Pane 5: Cost & Capacity -->
                             <div class="tab-pane fade" id="sec-cost-pane-{{ $section->id }}" role="tabpanel">
+                                @if(!$secDetailsCalc)
+                                    <div class="alert alert-soft-warning py-2 px-3 fs-12 mb-3 d-flex align-items-center gap-2 rounded-2 border border-warning-subtle">
+                                        <i class="feather-alert-triangle fs-15 text-warning flex-shrink-0"></i>
+                                        <span><strong>Calculation Pending:</strong> Initial calculation snapshot has not been generated yet. Values will update upon recalculation.</span>
+                                    </div>
+                                @endif
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <div class="card border rounded-3 p-3 shadow-none mb-0">
@@ -2582,7 +2472,7 @@
                             </div>
                             <small class="text-muted fs-11">
                                 Snapshot Recorded: {{ $latestSnapshot ? $latestSnapshot->created_at->format('Y-m-d H:i:s') : 'None yet' }}
-                                &bull; Unique Operating Hours: <span class="font-monospace fw-semibold text-dark">{{ number_format($wcUniqOperatingHours, 2) }} hrs</span>
+                                &bull; Unique Operating Hours: <span class="font-monospace fw-semibold text-dark">{{ format_hours($wcUniqOperatingHours) }}</span>
                             </small>
                         </div>
                     </div>
@@ -2751,7 +2641,7 @@
                                                     </td>
                                                     <td>
                                                         <span class="badge bg-soft-secondary text-secondary font-monospace">
-                                                            {{ $interval['duration_minutes'] ?? 0 }}m ({{ number_format($durHrs, 2) }}h)
+                                                            {{ $interval['duration_minutes'] ?? 0 }}m ({{ format_hours($durHrs) }})
                                                         </span>
                                                     </td>
                                                     <td>
@@ -2816,7 +2706,7 @@
                                                 <tr>
                                                     <td><span class="font-monospace fw-bold text-dark">{{ $secB['code'] ?? '—' }}</span></td>
                                                     <td class="fw-semibold text-dark">{{ $secB['name'] ?? '—' }}</td>
-                                                    <td><span class="badge bg-soft-secondary text-secondary font-monospace">{{ number_format($secB['operating_hours'] ?? 0, 2) }} hrs</span></td>
+                                                    <td><span class="badge bg-soft-secondary text-secondary font-monospace">{{ format_hours($secB['operating_hours'] ?? 0) }}</span></td>
                                                     <td class="text-end font-monospace fw-bold text-dark">{{ number_format($secB['daily_capacity'] ?? 0, 1) }} units</td>
                                                     <td class="text-end font-monospace text-primary fw-semibold">{{ format_currency($secB['total_daily_labor_cost'] ?? 0) }}</td>
                                                     <td class="text-end font-monospace text-warning fw-semibold">{{ format_currency($secB['total_daily_machine_cost'] ?? 0) }}</td>
@@ -2893,7 +2783,7 @@
                                         <div class="col-md-4">
                                             <div class="p-2 border rounded bg-light">
                                                 <span class="text-muted fs-10 text-uppercase d-block fw-semibold">Unique Operating Hours</span>
-                                                <span class="fs-16 fw-bold font-monospace text-dark">{{ number_format($wcUniqOperatingHours, 2) }} hrs</span>
+                                                <span class="fs-16 fw-bold font-monospace text-dark">{{ format_hours($wcUniqOperatingHours) }}</span>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -4203,7 +4093,7 @@
                                                 <span class="badge bg-white text-muted border font-monospace fs-10 internal-pool-count-label"></span>
                                             </div>
                                             <!-- Scrollable Checkbox List -->
-                                            <div class="workers-scroll-list border rounded p-2 bg-light-subtle" id="internalList_{{ $section->id }}" style="height: 250px; max-height: 250px; overflow-y: auto;">
+                                            <div class="workers-scroll-list border rounded p-2 bg-light-subtle" id="internalList_{{ $section->id }}" style="min-height: 90px; max-height: 200px; overflow-y: auto;">
                                                 @forelse($secInternalAssignments as $assignment)
                                                     @php
                                                         $emp = $assignment->employee;
@@ -4298,7 +4188,7 @@
                                                 <span class="badge bg-white text-muted border font-monospace fs-10 external-pool-count-label"></span>
                                             </div>
                                             <!-- Scrollable Checkbox List -->
-                                            <div class="workers-scroll-list border rounded p-2 bg-light-subtle" id="externalList_{{ $section->id }}" style="height: 250px; max-height: 250px; overflow-y: auto;">
+                                            <div class="workers-scroll-list border rounded p-2 bg-light-subtle" id="externalList_{{ $section->id }}" style="min-height: 90px; max-height: 200px; overflow-y: auto;">
                                                 @forelse($secExtAllocs as $alloc)
                                                     @php
                                                         $pg = $alloc->payGrade;
@@ -4841,14 +4731,35 @@
                     filterWorkersByShiftAndSearch($modal);
                 });
 
-                // Initialize Bootstrap popovers for machine & resource badges
-                if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
-                    $('[data-bs-toggle="popover"]').each(function () {
-                        if (!bootstrap.Popover.getInstance(this)) {
-                            new bootstrap.Popover(this, { sanitize: false });
+                // Initialize Bootstrap popovers for machine, resource badges, and breakdown tables
+                function initSectionPopovers() {
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+                        if (bootstrap.Tooltip && bootstrap.Tooltip.Default && bootstrap.Tooltip.Default.allowList) {
+                            var allowedTableTags = ['table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th'];
+                            allowedTableTags.forEach(function(tag) {
+                                bootstrap.Tooltip.Default.allowList[tag] = ['class', 'style', 'title', 'colspan', 'rowspan'];
+                            });
+                            if (bootstrap.Tooltip.Default.allowList['*'] && bootstrap.Tooltip.Default.allowList['*'].indexOf('style') === -1) {
+                                bootstrap.Tooltip.Default.allowList['*'].push('style');
+                            }
                         }
-                    });
+                        $('[data-bs-toggle="popover"]').each(function () {
+                            var existing = bootstrap.Popover.getInstance(this);
+                            if (existing) {
+                                existing.dispose();
+                            }
+                            new bootstrap.Popover(this, { 
+                                sanitize: false,
+                                html: true,
+                                trigger: 'hover focus'
+                            });
+                        });
+                    }
                 }
+                initSectionPopovers();
+                $(window).on('load', function() {
+                    initSectionPopovers();
+                });
 
                 // Initialize Bootstrap tooltips for shift badges
                 if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
@@ -4886,8 +4797,8 @@
                     }
                 });
 
-                // Capacity Popover: click to open calculation breakdown modal
-                $(document).on('click', '.capacity-popover-trigger', function(e) {
+                // Capacity & Cost Popovers: click to open calculation breakdown modal
+                $(document).on('click', '.capacity-popover-trigger, .cost-popover-trigger', function(e) {
                     if ($(e.target).closest('button[data-bs-toggle="modal"]').length) return;
                     e.preventDefault();
                     if (typeof bootstrap !== 'undefined') {

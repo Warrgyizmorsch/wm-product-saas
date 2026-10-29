@@ -296,7 +296,7 @@ class WorkCenterController extends Controller
         Gate::authorize('update', $workCenter);
 
         try {
-            $snapshot = $engine->recalculateNow($workCenter, auth()->id());
+            $snapshot = $engine->recalculateNow($workCenter, 'manual');
             $msg = "Work Center '{$workCenter->name}' recalculated successfully. Daily Capacity: {$snapshot->daily_capacity} units.";
             if (request()->wantsJson()) {
                 return response()->json(['success' => true, 'message' => $msg, 'snapshot' => $snapshot]);
@@ -342,10 +342,11 @@ class WorkCenterController extends Controller
         Gate::authorize('view', $workCenter);
 
         $latestSnapshot = $workCenter->latestCalculation;
-        if (!$latestSnapshot) {
-            $calcService = app(\App\Domains\Production\Services\WorkCenterCalculationService::class);
-            $latestSnapshot = $calcService->calculateAndSave($workCenter);
-        }
+        // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on calculationDetails GET request.
+        // if (!$latestSnapshot) {
+        //     $calcService = app(\App\Domains\Production\Services\WorkCenterCalculationService::class);
+        //     $latestSnapshot = $calcService->calculateAndSave($workCenter);
+        // }
 
         return response()->json([
             'success'  => true,
@@ -353,3 +354,4 @@ class WorkCenterController extends Controller
         ]);
     }
 }
+

@@ -56,7 +56,7 @@ class WorkCenterActivityLogger
 
         return $this->log(
             tenantId: (int) $calculation->tenant_id,
-            workCenterId: (int) $calculation->work_center_id,
+            workCenterId: (int) ($calculation->section?->work_center_id ?? $calculation->workCenterCalculation?->work_center_id ?? 0),
             sectionId: (int) $calculation->section_id,
             userId: $userId,
             eventType: 'section_calculation_completed',

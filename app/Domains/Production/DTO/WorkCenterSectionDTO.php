@@ -14,8 +14,8 @@ class WorkCenterSectionDTO
         public readonly array   $shift_ids = [],
         public readonly array   $shift_workers = [],
         public readonly ?array  $machine_ids = null,
-        public readonly ?bool   $supports_manual_production = null,
-        public readonly ?float  $manual_capacity_per_hour = null,
+        public readonly mixed   $supports_manual_production = null,
+        public readonly mixed   $manual_capacity_per_hour = null,
     ) {}
 
     public static function fromArray(array $data): self
@@ -25,21 +25,6 @@ class WorkCenterSectionDTO
             $machineIds = isset($data['machine_ids']) && is_array($data['machine_ids'])
                 ? array_values(array_unique(array_filter(array_map('intval', (array) $data['machine_ids']))))
                 : [];
-        }
-
-        $supportsManual = array_key_exists('supports_manual_production', $data)
-            ? filter_var($data['supports_manual_production'], FILTER_VALIDATE_BOOLEAN)
-            : null;
-
-        $manualCapacity = null;
-        if ($supportsManual === true) {
-            $manualCapacity = (isset($data['manual_capacity_per_hour']) && is_numeric($data['manual_capacity_per_hour']))
-                ? (float) $data['manual_capacity_per_hour']
-                : null;
-        } elseif ($supportsManual === false) {
-            $manualCapacity = null;
-        } elseif (array_key_exists('manual_capacity_per_hour', $data) && is_numeric($data['manual_capacity_per_hour'])) {
-            $manualCapacity = (float) $data['manual_capacity_per_hour'];
         }
 
         $shiftIds = [];
@@ -60,23 +45,21 @@ class WorkCenterSectionDTO
         $workersRequired = max(1, (int) ($data['workers_required'] ?? 1));
 
         return new self(
-            work_center_id:             (int) ($data['work_center_id'] ?? 0),
-            name:                       trim($data['name'] ?? ''),
-            code:                       strtoupper(trim($data['code'] ?? '')),
-            workers_required:           $workersRequired,
-            description:                $data['description'] ?? null,
-            status:                     $data['status'] ?? 'active',
-            shift_ids:                  $shiftIds,
-            shift_workers:              [],
-            machine_ids:                $machineIds,
-            supports_manual_production: $supportsManual,
-            manual_capacity_per_hour:   $manualCapacity,
+            work_center_id:   (int) ($data['work_center_id'] ?? 0),
+            name:             trim($data['name'] ?? ''),
+            code:             strtoupper(trim($data['code'] ?? '')),
+            workers_required: $workersRequired,
+            description:      $data['description'] ?? null,
+            status:           $data['status'] ?? 'active',
+            shift_ids:        $shiftIds,
+            shift_workers:    [],
+            machine_ids:      $machineIds,
         );
     }
 
     public function toArray(): array
     {
-        $arr = [
+        return [
             'work_center_id'  => $this->work_center_id,
             'name'            => $this->name,
             'code'            => $this->code,
@@ -84,12 +67,5 @@ class WorkCenterSectionDTO
             'description'     => $this->description,
             'status'          => $this->status,
         ];
-
-        if ($this->supports_manual_production !== null) {
-            $arr['supports_manual_production'] = $this->supports_manual_production;
-            $arr['manual_capacity_per_hour']   = $this->manual_capacity_per_hour;
-        }
-
-        return $arr;
     }
 }

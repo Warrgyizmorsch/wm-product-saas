@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production & Work Center - Entity Relationship Diagram</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-canvas: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --accent-blue: #38bdf8;
+            --accent-green: #4ade80;
+            --accent-purple: #c084fc;
+            --accent-amber: #fbbf24;
+            --accent-orange: #fb923c;
+            --accent-rose: #f43f5e;
+            --accent-teal: #2dd4bf;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 30px 24px 80px;
+        }
+
+        .header {
+            max-width: 1760px;
+            margin: 0 auto 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header .badge {
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-blue);
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-weight: 600;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .view-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-view {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-view:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+            border-color: #64748b;
+        }
+
+        .btn-view.active {
+            background: rgba(56, 189, 248, 0.2);
+            color: var(--accent-blue);
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .diagram-container {
+            max-width: 1760px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(540px, 1fr));
+            gap: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .table-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .table-card:hover {
+            border-color: #64748b;
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--card-border);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .card-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .table-card-body {
+            overflow-x: auto;
+            width: 100%;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+        }
+
+        .table-card-body::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .table-card-body::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .table-card-body::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        .table-card-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        .table-content {
+            width: 100%;
+            min-width: 520px;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .table-content th {
+            text-align: left;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.4);
+            color: #cbd5e1;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--card-border);
+            white-space: nowrap;
+        }
+
+        .table-content th:nth-child(1),
+        .table-content td:nth-child(1) {
+            width: 38%;
+            min-width: 180px;
+        }
+
+        .table-content th:nth-child(2),
+        .table-content td:nth-child(2) {
+            width: 22%;
+            min-width: 105px;
+        }
+
+        .table-content th:nth-child(3),
+        .table-content td:nth-child(3) {
+            width: 40%;
+            min-width: 195px;
+        }
+
+        .table-content td {
+            padding: 8px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            vertical-align: middle;
+            word-wrap: break-word;
+        }
+
+        .table-content tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-content tr:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .col-name {
+            font-weight: 600;
+            color: #f1f5f9;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            word-break: break-all;
+        }
+
+        .col-type {
+            color: #94a3b8;
+            font-size: 11px;
+        }
+
+        .col-meta {
+            text-align: left;
+            font-size: 11px;
+            color: #e2e8f0;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+        }
+
+        .tag-pk {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fde047;
+            border: 1px solid rgba(251, 191, 36, 0.4);
+        }
+
+        .tag-fk {
+            background: rgba(56, 189, 248, 0.2);
+            color: #7dd3fc;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+        }
+
+        .fk-link {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.12);
+            padding: 2px 7px;
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            font-weight: 600;
+            font-size: 11px;
+            display: inline-block;
+            word-break: break-all;
+        }
+
+        .fk-link:hover {
+            background: rgba(56, 189, 248, 0.25);
+            color: #ffffff;
+        }
+
+        /* Color accents for cards */
+        .card-core { border-top: 4px solid var(--accent-blue); }
+        .card-core .card-title { color: var(--accent-blue); }
+
+        .card-machinery { border-top: 4px solid var(--accent-teal); }
+        .card-machinery .card-title { color: var(--accent-teal); }
+
+        .card-shifts { border-top: 4px solid var(--accent-green); }
+        .card-shifts .card-title { color: var(--accent-green); }
+
+        .card-manual { border-top: 4px solid var(--accent-amber); }
+        .card-manual .card-title { color: var(--accent-amber); }
+
+        .card-personnel { border-top: 4px solid var(--accent-purple); }
+        .card-personnel .card-title { color: var(--accent-purple); }
+
+        .card-calc { border-top: 4px solid var(--accent-orange); }
+        .card-calc .card-title { color: var(--accent-orange); }
+
+        .relationship-banner {
+            max-width: 1760px;
+            margin: 0 auto 30px;
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .rel-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .rel-node {
+            padding: 8px 14px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .rel-arrow {
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>
+                <span>🏭 Production & Work Center Schema</span>
+                <span class="badge">Live MySQL Schema</span>
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+                Complete relational architecture for Work Centers, Sections, Machinery, Shifts, Manual Batches, and Snapshot Calculations.
+            </p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div class="view-controls">
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Layout:</span>
+                <button class="btn-view active" id="btnGrid" onclick="setViewMode('grid')">⊞ Multi-Column</button>
+                <button class="btn-view" id="btnSingle" onclick="setViewMode('single')">⊟ Full-Width Single Col</button>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item"><span class="legend-dot" style="background: var(--accent-blue)"></span> Core Structure</div>
+                <div class="legend-item"><span class="legend-dot" style="background: var(--accent-teal)"></span> Machinery</div>
+                <div class="legend-item"><span class="legend-dot" style="background: var(--accent-green)"></span> Shifts</div>
+                <div class="legend-item"><span class="legend-dot" style="background: var(--accent-amber)"></span> Manual Batches</div>
+                <div class="legend-item"><span class="legend-dot" style="background: var(--accent-purple)"></span> Personnel</div>
+                <div class="legend-item"><span class="legend-dot" style="background: var(--accent-orange)"></span> Snapshot History</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visual Relationship Flowchart Banner -->
+    <div class="relationship-banner">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px;">
+            High-Level Relational Hierarchy (1 : N)
+        </div>
+        <div class="rel-flow">
+            <div class="rel-node" style="border-color: var(--accent-blue); color: var(--accent-blue);">
+                🏢 production_work_centers
+            </div>
+            <div class="rel-arrow">1 : N ➔</div>
+            <div class="rel-node" style="border-color: var(--accent-blue); color: var(--accent-blue);">
+                📑 production_work_center_sections
+            </div>
+            <div class="rel-arrow">1 : N ➔</div>
+            <div class="rel-node" style="border-color: var(--accent-teal); color: var(--accent-teal);">
+                ⚙️ production_machines
+            </div>
+            <div class="rel-node" style="border-color: var(--accent-amber); color: var(--accent-amber);">
+                📦 manual_productions
+            </div>
+            <div class="rel-node" style="border-color: var(--accent-purple); color: var(--accent-purple);">
+                👥 workers (Internal + Ext)
+            </div>
+            <div class="rel-arrow">1 : N ➔</div>
+            <div class="rel-node" style="border-color: var(--accent-orange); color: var(--accent-orange);">
+                📊 section_calculations (Snapshots)
+            </div>
+        </div>
+    </div>
+
+    <div class="diagram-container" id="diagramContainer">
+
+        <!-- 1. production_work_centers -->
+        <div class="table-card card-core">
+            <div class="card-header">
+                <span class="card-title">🏢 production_work_centers</span>
+                <span class="card-meta">Parent Entity</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> tenant_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">tenants(id)</span></td></tr>
+                        <tr><td><span class="col-name">code</span></td><td>varchar(191)</td><td class="col-meta">Unique code</td></tr>
+                        <tr><td><span class="col-name">name</span></td><td>varchar(191)</td><td class="col-meta">Work Center Name</td></tr>
+                        <tr><td><span class="col-name">work_center_type</span></td><td>varchar(100)</td><td class="col-meta">Nullable</td></tr>
+                        <tr><td><span class="col-name">location</span></td><td>varchar(191)</td><td class="col-meta">Nullable</td></tr>
+                        <tr><td><span class="col-name">status</span></td><td>varchar(191)</td><td class="col-meta">'active'</td></tr>
+                        <tr><td><span class="col-name">overhead_cost</span></td><td>decimal(12,4)</td><td class="col-meta">Daily Overhead</td></tr>
+                        <tr><td><span class="col-name">calculation_countdown_minutes</span></td><td>int(10)</td><td class="col-meta">Debounce (e.g. 10m)</td></tr>
+                        <tr><td><span class="col-name">calculation_countdown_end_at</span></td><td>timestamp</td><td class="col-meta">Timer Expiration</td></tr>
+                        <tr><td><span class="col-name">pending_calculation_section_ids</span></td><td>longtext</td><td class="col-meta">JSON [1, 2]</td></tr>
+                        <tr><td><span class="col-name">is_calculation_running</span></td><td>tinyint(1)</td><td class="col-meta">Concurrency Mutex</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> production_calendar_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">production_calendars(id)</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 2. production_work_center_sections -->
+        <div class="table-card card-core">
+            <div class="card-header">
+                <span class="card-title">📑 production_work_center_sections</span>
+                <span class="card-meta">Child of Work Center</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> tenant_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">tenants(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> work_center_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">production_work_centers(id)</span></td></tr>
+                        <tr><td><span class="col-name">code</span></td><td>varchar(50)</td><td class="col-meta">Section Code</td></tr>
+                        <tr><td><span class="col-name">name</span></td><td>varchar(191)</td><td class="col-meta">Section Name</td></tr>
+                        <tr><td><span class="col-name">status</span></td><td>varchar(50)</td><td class="col-meta">'active'</td></tr>
+                        <tr><td><span class="col-name">assigned_shifts</span></td><td>longtext</td><td class="col-meta">JSON [1, 2] Shift IDs</td></tr>
+                        <tr><td><span class="col-name">supports_manual_production</span></td><td>tinyint(1)</td><td class="col-meta">Legacy Toggle (0/1)</td></tr>
+                        <tr><td><span class="col-name">manual_capacity_per_hour</span></td><td>decimal(12,4)</td><td class="col-meta">Legacy Static Speed</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3. production_machines -->
+        <div class="table-card card-machinery">
+            <div class="card-header">
+                <span class="card-title">⚙️ production_machines</span>
+                <span class="card-meta">Section Hardware</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> section_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_sections(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> asset_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">assets(id)</span></td></tr>
+                        <tr><td><span class="col-name">code</span> / <span class="col-name">name</span></td><td>varchar(191)</td><td class="col-meta">Identifier</td></tr>
+                        <tr><td><span class="col-name">capacity</span></td><td>decimal(12,4)</td><td class="col-meta">Base units / hr</td></tr>
+                        <tr><td><span class="col-name">energy_source</span></td><td>enum(...)</td><td class="col-meta">electric / fuel</td></tr>
+                        <tr><td><span class="col-name">consumption_per_hour</span></td><td>decimal(10,4)</td><td class="col-meta">Power (kW / L)</td></tr>
+                        <tr><td><span class="col-name">energy_rate_per_unit</span></td><td>decimal(10,4)</td><td class="col-meta">Price per unit</td></tr>
+                        <tr><td><span class="col-name">operating_cost_per_hour</span></td><td>decimal(12,4)</td><td class="col-meta">Total Hourly Opex</td></tr>
+                        <tr><td><span class="col-name">status</span> / <span class="col-name">current_state</span></td><td>varchar(191)</td><td class="col-meta">'active' / 'Idle'</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4. production_shifts -->
+        <div class="table-card card-shifts">
+            <div class="card-header">
+                <span class="card-title">⏰ production_shifts</span>
+                <span class="card-meta">Work Timelines</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> tenant_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">tenants(id)</span></td></tr>
+                        <tr><td><span class="col-name">code</span> / <span class="col-name">name</span></td><td>varchar(191)</td><td class="col-meta">Shift Identifier</td></tr>
+                        <tr><td><span class="col-name">start_time</span></td><td>time</td><td class="col-meta">Clock Start (e.g. 06:00)</td></tr>
+                        <tr><td><span class="col-name">end_time</span></td><td>time</td><td class="col-meta">Clock End (e.g. 18:00)</td></tr>
+                        <tr><td><span class="col-name">break_minutes</span></td><td>int(11)</td><td class="col-meta">Unpaid Break (mins)</td></tr>
+                        <tr><td><span class="col-name">active</span></td><td>tinyint(1)</td><td class="col-meta">1 = Active</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 5. production_section_manual_productions -->
+        <div class="table-card card-manual">
+            <div class="card-header">
+                <span class="card-title">📦 section_manual_productions</span>
+                <span class="card-meta">Shift-Anchored Batches</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> section_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_sections(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> shift_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">production_shifts(id)</span></td></tr>
+                        <tr><td><span class="col-name">batch_name</span></td><td>varchar(191)</td><td class="col-meta">Team / Batch Name</td></tr>
+                        <tr><td><span class="col-name">capacity_per_hour</span></td><td>decimal(12,4)</td><td class="col-meta">Batch Speed (u/h)</td></tr>
+                        <tr><td><span class="col-name">active</span></td><td>tinyint(1)</td><td class="col-meta">1 = Active</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 6. production_section_manual_production_employees -->
+        <div class="table-card card-manual">
+            <div class="card-header">
+                <span class="card-title">🔗 manual_production_employees</span>
+                <span class="card-meta">Batch Employee Pivot</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> manual_production_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">section_manual_productions(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> work_center_employee_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_employees(id)</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 7. production_work_center_employees -->
+        <div class="table-card card-personnel">
+            <div class="card-header">
+                <span class="card-title">👥 work_center_employees</span>
+                <span class="card-meta">Internal Staff Assignment</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> work_center_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">production_work_centers(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> section_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_sections(id)</span> <em>(NULL = WC Staff)</em></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> employee_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">employees(id)</span> <em>(HRMS CTC & Shift)</em></td></tr>
+                        <tr><td><span class="col-name">active</span></td><td>tinyint(1)</td><td class="col-meta">1 = Active</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 8. production_external_worker_allocations -->
+        <div class="table-card card-personnel">
+            <div class="card-header">
+                <span class="card-title">👷 external_worker_allocations</span>
+                <span class="card-meta">Contractor Allocations</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> section_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_sections(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> shift_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">production_shifts(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> pay_grade_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">external_pay_grades(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> manual_production_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">section_manual_productions(id)</span> <em>(Nullable)</em></td></tr>
+                        <tr><td><span class="col-name">number_of_external_workers</span></td><td>int(10)</td><td class="col-meta">Headcount allocated</td></tr>
+                        <tr><td><span class="col-name">active</span></td><td>tinyint(1)</td><td class="col-meta">1 = Active</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 9. production_external_worker_pay_grades -->
+        <div class="table-card card-personnel">
+            <div class="card-header">
+                <span class="card-title">💰 external_worker_pay_grades</span>
+                <span class="card-meta">Labor Rate Tier</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name">name</span> / <span class="col-name">code</span></td><td>varchar</td><td class="col-meta">e.g. Helper Tier 1</td></tr>
+                        <tr><td><span class="col-name">hourly_rate</span></td><td>decimal(15,4)</td><td class="col-meta">Cost per worker/hr</td></tr>
+                        <tr><td><span class="col-name">active</span></td><td>tinyint(1)</td><td class="col-meta">1 = Active</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 10. production_work_center_section_calculations -->
+        <div class="table-card card-calc">
+            <div class="card-header">
+                <span class="card-title">📊 section_calculations</span>
+                <span class="card-meta">Immutable Section Snapshot</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> section_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_sections(id)</span></td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> work_center_calculation_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">work_center_calculations(id)</span></td></tr>
+                        <tr><td><span class="col-name">batch_id</span></td><td>char(36)</td><td class="col-meta">UUID Batch Sync</td></tr>
+                        <tr><td><span class="col-name">capacity_per_hour</span></td><td>decimal(12,4)</td><td class="col-meta">Machine + Manual Speed</td></tr>
+                        <tr><td><span class="col-name">daily_capacity</span></td><td>decimal(14,4)</td><td class="col-meta">Output Units/Day</td></tr>
+                        <tr><td><span class="col-name">labor_cost_per_hour</span></td><td>decimal(12,4)</td><td class="col-meta">Average Hourly Rate</td></tr>
+                        <tr><td><span class="col-name">total_daily_labor_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Internal + External Daily</td></tr>
+                        <tr><td><span class="col-name">machine_cost_per_hour</span></td><td>decimal(12,4)</td><td class="col-meta">Hourly Machine Opex</td></tr>
+                        <tr><td><span class="col-name">total_daily_machine_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Machine Daily Opex</td></tr>
+                        <tr><td><span class="col-name">total_daily_operating_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Labor + Machine Daily</td></tr>
+                        <tr><td><span class="col-name">unique_operating_hours</span></td><td>decimal(8,4)</td><td class="col-meta">Section Operating Hours</td></tr>
+                        <tr><td><span class="col-name">calculation_details</span></td><td>longtext</td><td class="col-meta">JSON Audit Trail</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 11. production_work_center_calculations -->
+        <div class="table-card card-calc">
+            <div class="card-header">
+                <span class="card-title">📈 work_center_calculations</span>
+                <span class="card-meta">Immutable Parent WC Snapshot</span>
+            </div>
+            <div class="table-card-body">
+                <table class="table-content">
+                    <thead><tr><th>Field</th><th>Type</th><th>Ref / Constraint</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="col-name"><span class="tag tag-pk">PK</span> id</span></td><td>bigint(20)</td><td class="col-meta">Auto-increment</td></tr>
+                        <tr><td><span class="col-name"><span class="tag tag-fk">FK</span> work_center_id</span></td><td>bigint(20)</td><td class="col-meta"><span class="fk-link">production_work_centers(id)</span></td></tr>
+                        <tr><td><span class="col-name">batch_id</span></td><td>char(36)</td><td class="col-meta">UUID Batch Sync</td></tr>
+                        <tr><td><span class="col-name">trigger_type</span></td><td>varchar(50)</td><td class="col-meta">manual / countdown_timer</td></tr>
+                        <tr><td><span class="col-name">daily_capacity</span></td><td>decimal(14,4)</td><td class="col-meta">Total Rollup Output</td></tr>
+                        <tr><td><span class="col-name">total_daily_labor_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Sections + WC Direct Staff</td></tr>
+                        <tr><td><span class="col-name">total_daily_machine_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Total Machine Daily</td></tr>
+                        <tr><td><span class="col-name">overhead_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Daily Overhead</td></tr>
+                        <tr><td><span class="col-name">total_daily_cost</span></td><td>decimal(14,4)</td><td class="col-meta">Labor + Machine + Overhead</td></tr>
+                        <tr><td><span class="col-name">unique_operating_hours</span></td><td>decimal(8,4)</td><td class="col-meta">WC Operating Window</td></tr>
+                        <tr><td><span class="col-name">calculation_details</span></td><td>longtext</td><td class="col-meta">JSON Rollup Details</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function setViewMode(mode) {
+            const container = document.getElementById('diagramContainer');
+            const btnGrid = document.getElementById('btnGrid');
+            const btnSingle = document.getElementById('btnSingle');
+
+            if (mode === 'single') {
+                container.style.gridTemplateColumns = '1fr';
+                btnSingle.classList.add('active');
+                btnGrid.classList.remove('active');
+            } else {
+                container.style.gridTemplateColumns = 'repeat(auto-fit, minmax(540px, 1fr))';
+                btnGrid.classList.add('active');
+                btnSingle.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

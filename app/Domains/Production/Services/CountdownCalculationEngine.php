@@ -19,8 +19,14 @@ class CountdownCalculationEngine
      */
     public function isCountdownActive(WorkCenter $workCenter): bool
     {
+        // TEMPORARILY COMMENTED OUT FOR TESTING: Debounce timer disabled.
+        // Recalculations run on-demand via the "Recalculate" button click.
+        return false;
+
+        /*
         return !empty($workCenter->calculation_countdown_end_at)
             && now()->lt($workCenter->calculation_countdown_end_at);
+        */
     }
 
     /**
@@ -40,6 +46,9 @@ class CountdownCalculationEngine
      */
     public function triggerCountdown(WorkCenter $workCenter, ?int $sectionId = null): void
     {
+        // TEMPORARILY COMMENTED OUT FOR TESTING: Debounce logic disabled.
+        // Recalculations are triggered on-demand via the "Recalculate" button.
+        /*
         $pending = is_array($workCenter->pending_calculation_section_ids)
             ? $workCenter->pending_calculation_section_ids
             : [];
@@ -88,6 +97,7 @@ class CountdownCalculationEngine
                 ]
             );
         }
+        */
     }
 
     /**

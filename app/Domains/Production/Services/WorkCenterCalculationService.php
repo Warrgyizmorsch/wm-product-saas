@@ -63,7 +63,9 @@ class WorkCenterCalculationService
             $totalSectionDailyMach  += (float) ($secCalc['total_daily_machine_cost'] ?? 0.0);
             $totalSectionHourlyMach += (float) ($secCalc['machine_cost_per_hour'] ?? 0.0);
 
-            $secShifts = $secCalc['calculation_details']['operating_hours']['shifts'] ?? [];
+            $secShifts = $secCalc['calculation_details']['operating_timeline']['shifts'] 
+                ?? $secCalc['calculation_details']['operating_hours']['shifts'] 
+                ?? [];
             foreach ($secShifts as $s) {
                 $allShiftsAcrossSections[$s['id']] = $s;
             }

@@ -41,10 +41,6 @@ class WorkCenterSectionService
 
         return DB::transaction(function () use ($dto, $tenantId, $workCenter) {
             $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
-            if (!array_key_exists('supports_manual_production', $data)) {
-                $data['supports_manual_production'] = false;
-                $data['manual_capacity_per_hour'] = null;
-            }
             $section = $this->repository->create($data);
             $this->repository->syncShifts($section, $dto->shift_ids, $tenantId);
 
@@ -54,11 +50,11 @@ class WorkCenterSectionService
             }
 
             $fresh = $section->fresh(['workCenter', 'machines']);
-            $this->calculationService->calculateAndSave($fresh);
-
-            if ($workCenter) {
-                app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
-            }
+            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on section creation.
+            // $this->calculationService->calculateAndSave($fresh);
+            // if ($workCenter) {
+            //     app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
+            // }
 
             return $fresh;
         });
@@ -100,11 +96,11 @@ class WorkCenterSectionService
             }
 
             $fresh = $updated->fresh(['workCenter', 'machines']);
-            $this->calculationService->calculateAndSave($fresh);
-
-            if ($workCenter) {
-                app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
-            }
+            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on section edit.
+            // $this->calculationService->calculateAndSave($fresh);
+            // if ($workCenter) {
+            //     app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
+            // }
 
             return $fresh;
         });
@@ -113,10 +109,11 @@ class WorkCenterSectionService
     public function recalculate(WorkCenterSection $section): WorkCenterSection
     {
         $fresh = $section->fresh(['workCenter', 'machines']);
-        $this->calculationService->calculateAndSave($fresh);
-        if ($fresh->workCenter) {
-            app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
-        }
+        // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation.
+        // $this->calculationService->calculateAndSave($fresh);
+        // if ($fresh->workCenter) {
+        //     app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
+        // }
         return $fresh;
     }
 
@@ -149,11 +146,11 @@ class WorkCenterSectionService
             ]);
 
             $fresh = $updated->fresh(['workCenter', 'machines']);
-            $this->calculationService->calculateAndSave($fresh);
-
-            if ($fresh->workCenter) {
-                app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
-            }
+            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on manual production update.
+            // $this->calculationService->calculateAndSave($fresh);
+            // if ($fresh->workCenter) {
+            //     app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
+            // }
 
             return $fresh;
         });
@@ -189,9 +186,10 @@ class WorkCenterSectionService
             $deleted = $this->repository->delete($id);
 
             // 5. Recalculate parent work center
-            if ($deleted && $workCenter) {
-                app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
-            }
+            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on section delete.
+            // if ($deleted && $workCenter) {
+            //     app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
+            // }
 
             return (bool) $deleted;
         });
