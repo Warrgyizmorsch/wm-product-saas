@@ -22,7 +22,7 @@ class QuotationApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
+        $companyId = company_id() ?? $user?->company_id;
         $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
@@ -417,5 +417,153 @@ class QuotationApiController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
         $pdf->setOption('isPhpEnabled', true);
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
+    }
+
+    /**
+     * PATCH /api/crm/quotations/{id}/status
+     */
+    public function updateStatus(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status'           => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted,Won'],
+            'rejection_reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Validation error.', 'errors' => $validator->errors()], 422);
+        }
+
+        $newStatus = $request->input('status');
+        $oldStatus = $quotation->status;
+        $updateFields = ['status' => $newStatus];
+        if ($request->filled('rejection_reason')) {
+            $updateFields['rejection_reason'] = $request->input('rejection_reason');
+        }
+
+        $this->quotationRepo->update($quotation, $updateFields);
+
+        if ($quotation->lead_id && $oldStatus !== $newStatus && ($lead = \App\Domains\CRM\Models\Lead::find($quotation->lead_id))) {
+            $logMsg = "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to '{$newStatus}'";
+            if (!empty($updateFields['rejection_reason'])) {
+                $logMsg .= " (Reason: {$updateFields['rejection_reason']})";
+            }
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $lead, 'quotation_status_changed', $oldStatus, $newStatus,
+                $logMsg
+            );
+        }
+
+        $this->quotationService->handleQuotationStatusChange($quotation, $newStatus, $quotation->lead_id);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Quotation status updated to {$newStatus} successfully.",
+            'data'    => $quotation->fresh(['items.product', 'lead', 'crmAccount', 'deal']),
+        ]);
+    }
+
+    /**
+     * POST /api/crm/quotations/{id}/convert
+     * Accept quotation and convert to Customer (or attach to existing Customer).
+     */
+    public function convert(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::with(['lead', 'items'])->find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'conversion_mode'      => 'nullable|string|in:existing,create_new',
+            'existing_customer_id' => 'required_if:conversion_mode,existing|nullable|integer|exists:customers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Validation error.', 'errors' => $validator->errors()], 422);
+        }
+
+        [$tenantId] = $this->resolveTenantContext();
+        $mode = $request->input('conversion_mode', 'create_new');
+
+        if ($mode === 'existing') {
+            $customer = \App\Domains\CRM\Models\Customer::find($request->input('existing_customer_id'));
+            $account = \App\Domains\CRM\Models\CrmAccount::where('tenant_id', $tenantId)->where('customer_id', $customer->id)->first();
+            if (!$account) {
+                $account = \App\Domains\CRM\Models\CrmAccount::create([
+                    'tenant_id'   => $tenantId,
+                    'customer_id' => $customer->id,
+                    'name'        => $customer->name,
+                    'email'       => $customer->email,
+                    'phone'       => $customer->phone,
+                    'gstin'       => $customer->gstin,
+                    'status'      => 'active',
+                    'owner_id'    => auth()->id() ?: 1,
+                ]);
+            }
+
+            $quotation->update([
+                'status'         => 'Accepted',
+                'crm_account_id' => $account->id,
+            ]);
+
+            $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Quotation #{$quotation->quotation_number} accepted and attached to existing customer '{$customer->name}'.",
+                'data'    => [
+                    'quotation' => $quotation->fresh(['items.product', 'lead', 'crmAccount', 'deal']),
+                    'customer'  => $customer,
+                    'account'   => $account,
+                ],
+            ]);
+        } else {
+            $quotation->update(['status' => 'Accepted']);
+            $this->quotationService->handleQuotationStatusChange($quotation, 'Accepted', $quotation->lead_id);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Quotation #{$quotation->quotation_number} accepted and converted to new Customer.",
+                'data'    => $quotation->fresh(['items.product', 'lead', 'crmAccount', 'deal']),
+            ]);
+        }
+    }
+
+    /**
+     * POST /api/crm/quotations/{id}/duplicate
+     */
+    public function duplicate(Request $request, int $id): JsonResponse
+    {
+        $quotation = Quotation::with('items')->find($id);
+        if (!$quotation) {
+            return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
+        }
+
+        [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
+
+        $newQuotationNo = $this->quotationService->getNextQuotationNumber();
+        $copy = $quotation->replicate();
+        $copy->quotation_number = $newQuotationNo;
+        $copy->status = 'Draft';
+        $copy->quotation_date = now()->toDateString();
+        $copy->expiry_date = now()->addDays(30)->toDateString();
+        $copy->save();
+
+        foreach ($quotation->items as $item) {
+            $itemCopy = $item->replicate();
+            $itemCopy->quotation_id = $copy->id;
+            $itemCopy->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Quotation duplicated successfully as {$copy->quotation_number}.",
+            'data'    => $copy->load(['items.product', 'lead', 'crmAccount']),
+        ], 201);
     }
 }

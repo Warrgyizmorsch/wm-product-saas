@@ -84,6 +84,7 @@ Route::prefix('api/purchase')->name('api.purchase.')->group(function () {
         Route::post('/{id}/remind', [PurchaseOrderApiController::class, 'remind'])->name('remind');
         Route::post('/{id}/convert-to-grn', [PurchaseOrderApiController::class, 'convertToGrn'])->name('convert-to-grn');
         Route::post('/{id}/convert-to-bill', [PurchaseOrderApiController::class, 'convertToBill'])->name('convert-to-bill');
+        Route::get('/{id}/download-pdf', [PurchaseOrderApiController::class, 'downloadPdf'])->name('download-pdf');
         Route::delete('/{id}', [PurchaseOrderApiController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/restore', [PurchaseOrderApiController::class, 'restore'])->name('restore');
     });
@@ -96,6 +97,7 @@ Route::prefix('api/purchase')->name('api.purchase.')->group(function () {
         Route::get('/', [GoodsReceiptNoteApiController::class, 'index'])->name('index');
         Route::post('/', [GoodsReceiptNoteApiController::class, 'store'])->name('store');
         Route::get('/{id}', [GoodsReceiptNoteApiController::class, 'show'])->name('show');
+        Route::get('/{id}/download-pdf', [GoodsReceiptNoteApiController::class, 'downloadPdf'])->name('download-pdf');
         Route::patch('/{id}/status', [GoodsReceiptNoteApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/approve', [GoodsReceiptNoteApiController::class, 'approve'])->name('approve');
     });
@@ -120,6 +122,7 @@ Route::prefix('api/purchase')->name('api.purchase.')->group(function () {
         Route::get('/', [VendorBillApiController::class, 'index'])->name('index');
         Route::post('/', [VendorBillApiController::class, 'store'])->name('store');
         Route::get('/{id}', [VendorBillApiController::class, 'show'])->name('show');
+        Route::get('/{id}/download-pdf', [VendorBillApiController::class, 'downloadPdf'])->name('download-pdf');
         Route::patch('/{id}/status', [VendorBillApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/apply-advance', [VendorBillApiController::class, 'applyAdvance'])->name('apply-advance');
         Route::delete('/{id}', [VendorBillApiController::class, 'destroy'])->name('destroy');

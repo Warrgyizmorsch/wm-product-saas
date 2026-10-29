@@ -41,10 +41,6 @@ class BranchResolver
             }
         }
 
-        if ($request->is('api/*') || $request->expectsJson()) {
-            return null;
-        }
-
         $default = Branch::query()
             ->where('company_id', $companyId)
             ->where('is_default', true)

@@ -197,6 +197,9 @@ Route::prefix('api/crm')
             Route::delete('/{id}', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/approve', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'approve'])->name('approve');
             Route::post('/{id}/reject', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'reject'])->name('reject');
+            Route::patch('/{id}/status', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'updateStatus'])->name('status');
+            Route::post('/{id}/convert', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'convert'])->name('convert');
+            Route::post('/{id}/duplicate', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'duplicate'])->name('duplicate');
             Route::post('/{id}/send-email', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'sendEmail'])->name('send-email');
             Route::post('/{id}/send-whatsapp', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'sendWhatsApp'])->name('send-whatsapp');
             Route::get('/{id}/download', [\App\Domains\CRM\Controllers\Api\QuotationApiController::class, 'downloadPdf'])->name('download');

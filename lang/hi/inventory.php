@@ -720,4 +720,20 @@ return array (
   'view_material_requirement' => 'सामग्री आवश्यकता देखें',
   'units' => 'यूनिट',
   'item_count' => ':count आइटम|:count आइटम',
+
+  // Remnants Modals
+  'split_remnant' => 'अवशेष विभाजित करें',
+  'split_remnant_help' => 'उपलब्ध: :avail :uom. विभाजन भौतिक स्टॉक को उत्पादन उपभोग के बिना एक नई अवशेष संपत्ति में विभाजित करता है।',
+  'cut_off_length' => 'कट-ऑफ लंबाई (मिमी)',
+  'cut_off_help' => 'मूल भाग शेष रखता है; विभाजित भाग को कट लंबाई प्राप्त होती है।',
+  'quantity_to_split' => 'विभाजित करने हेतु मात्रा',
+  'child_remnant_rack' => 'विभाजित अवशेष रैक / स्थान',
+  'notes_reason' => 'नोट्स / कारण',
+  'reason_split_placeholder' => 'भौतिक ऑफकट विभाजन का कारण...',
+  'execute_split' => 'विभाजन निष्पादित करें',
+  'mark_remnant_scrap' => 'अवशेष को अनुपयोगी स्क्रैप के रूप में चिह्नित करें',
+  'scrap_remnant_help' => 'यह स्थायी रूप से अवशेष :code को स्क्रैप के रूप में चिह्नित करेगा और उपलब्ध इन्वेंट्री को शून्य कर देगा।',
+  'scrap_reason' => 'स्क्रैप का कारण',
+  'scrap_reason_placeholder' => 'उदा. अत्यधिक जंग, मुड़ा हुआ, अनुपयोगी',
+  'confirm_scrap' => 'स्क्रैप की पुष्टि करें',
 );

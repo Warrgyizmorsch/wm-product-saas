@@ -1338,31 +1338,31 @@
             <div class="modal-content shadow-lg rounded-3 border-0">
                 <div class="modal-header bg-warning-subtle text-warning-emphasis border-bottom">
                     <h5 class="modal-title fw-bold text-dark d-flex align-items-center" id="dupModalHeaderTitle">
-                        <i class="feather-alert-triangle me-2 text-warning fs-4"></i>Existing Customer Found!
+                        <i class="feather-alert-triangle me-2 text-warning fs-4"></i>{{ __('crm.existing_customer_found') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div id="dupModalNotice" class="mb-3">
                         <p class="text-muted fs-13 mb-0">
-                            System detected an existing record matching <strong id="dupMatchedByText" class="text-dark"></strong>.
+                            {!! __('crm.system_detected_existing_record', ['matched' => '<strong id="dupMatchedByText" class="text-dark"></strong>']) !!}
                         </p>
                     </div>
 
                     <div class="card border border-light-subtle rounded-3 p-3 bg-light mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="fw-bold text-primary mb-0" id="dupAccountNameText">Company Name</h6>
+                            <h6 class="fw-bold text-primary mb-0" id="dupAccountNameText">{{ __('crm.company_name_label') }}</h6>
                             <span class="badge bg-white text-dark border font-monospace" id="dupAccountGstinText">GSTIN</span>
                         </div>
                         <div class="row g-2 fs-12 text-muted mt-1">
                             <div class="col-6" id="dupRevenueContainer">
-                                <span><i class="feather-dollar-sign me-1 text-success"></i>Revenue: <strong id="dupAccountRevenueText" class="text-success">{{ active_currency_symbol() }}0.00</strong></span>
+                                <span><i class="feather-dollar-sign me-1 text-success"></i>{{ __('crm.revenue_label') }}: <strong id="dupAccountRevenueText" class="text-success">{{ active_currency_symbol() }}0.00</strong></span>
                             </div>
                             <div class="col-6" id="dupDealsContainer">
-                                <span><i class="feather-layers me-1 text-info"></i>Active: <strong id="dupAccountDealsText" class="text-dark">0 Deals</strong></span>
+                                <span><i class="feather-layers me-1 text-info"></i>{{ __('crm.active') ?? 'Active' }}: <strong id="dupAccountDealsText" class="text-dark">0 Deals</strong></span>
                             </div>
                             <div class="col-12 mt-1" id="dupDateContainer">
-                                <span><i class="feather-calendar me-1 text-primary"></i>Date: <strong id="dupAccountLastPurchaseText" class="text-dark">N/A</strong></span>
+                                <span><i class="feather-calendar me-1 text-primary"></i>{{ __('crm.date_label') }}: <strong id="dupAccountLastPurchaseText" class="text-dark">N/A</strong></span>
                             </div>
                         </div>
                     </div>

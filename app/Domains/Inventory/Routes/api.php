@@ -171,6 +171,13 @@ Route::prefix('api/inventory')->name('api.inventory.')->group(function () {
         Route::post('/{id}/deliver', [MaterialRequirementApiController::class, 'deliver'])->name('deliver');
         Route::post('/{id}/cancel', [MaterialRequirementApiController::class, 'cancel'])->name('cancel');
         Route::post('/{id}/release', [MaterialRequirementApiController::class, 'release'])->name('release');
+        Route::post('/{id}/ship', [MaterialRequirementApiController::class, 'ship'])->name('ship');
+
+        // Item-level material requirement actions
+        Route::patch('/items/{itemId}/warehouse', [MaterialRequirementApiController::class, 'updateWarehouse'])->name('items.warehouse');
+        Route::post('/items/{itemId}/reserve', [MaterialRequirementApiController::class, 'reserveQty'])->name('items.reserve');
+        Route::post('/items/{itemId}/indent', [MaterialRequirementApiController::class, 'mockIndent'])->name('items.indent');
+        Route::post('/items/{itemId}/mo', [MaterialRequirementApiController::class, 'mockMo'])->name('items.mo');
     });
 
 });

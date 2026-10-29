@@ -721,4 +721,20 @@ return array (
   'view_material_requirement' => 'View Material Requirement',
   'units' => 'units',
   'item_count' => ':count Item|:count Items',
+
+  // Remnants Modals
+  'split_remnant' => 'Split Remnant',
+  'split_remnant_help' => 'Available: :avail :uom. Splitting divides physical stock into a new remnant asset without production consumption.',
+  'cut_off_length' => 'Cut Off Length (mm)',
+  'cut_off_help' => 'Parent retains remainder; child receives cut length.',
+  'quantity_to_split' => 'Quantity to Split Off',
+  'child_remnant_rack' => 'Child Remnant Rack / Location',
+  'notes_reason' => 'Notes / Reason',
+  'reason_split_placeholder' => 'Reason for physical offcut split...',
+  'execute_split' => 'Execute Split',
+  'mark_remnant_scrap' => 'Mark Remnant as Unusable Scrap',
+  'scrap_remnant_help' => 'This will permanently mark remnant :code as scrapped and zero out available inventory.',
+  'scrap_reason' => 'Scrap Reason',
+  'scrap_reason_placeholder' => 'e.g. Severe corrosion, bent, unusable',
+  'confirm_scrap' => 'Confirm Scrap',
 );

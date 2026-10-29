@@ -2381,7 +2381,7 @@
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-light py-2.5 px-3 border-bottom">
                 <h6 class="modal-title fw-bold text-dark fs-14" id="applyAdvanceModalLabel">
-                    <i class="feather-check-circle text-success me-1.5"></i>Apply Advance / Reconcile Payment
+                    <i class="feather-check-circle text-success me-1.5"></i>{{ __('crm.apply_advance_reconcile') }}
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -2390,36 +2390,36 @@
                 <div class="modal-body p-3 fs-12">
                     <div class="p-2.5 bg-light rounded border mb-3">
                         <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted">Invoice Total:</span>
+                            <span class="text-muted">{{ __('crm.invoice_total_label') }}:</span>
                             <strong class="text-dark">{{ format_currency($invoice->total_amount) }}</strong>
                         </div>
                         <div class="d-flex justify-content-between mb-1">
-                            <span class="text-muted">Already Paid:</span>
+                            <span class="text-muted">{{ __('crm.already_paid_label') }}:</span>
                             <span class="text-success fw-bold">{{ format_currency($invoice->amount_paid) }}</span>
                         </div>
                         <div class="d-flex justify-content-between pt-1 border-top">
-                            <span class="text-muted fw-bold">Current Balance Due:</span>
+                            <span class="text-muted fw-bold">{{ __('crm.current_balance_due') }}:</span>
                             <strong class="text-danger fs-14 font-monospace">{{ format_currency($invoice->balance_due) }}</strong>
                         </div>
                     </div>
 
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label fw-bold text-dark fs-12 mb-0">Select Advance Payment</label>
-                            <span class="badge bg-soft-primary text-primary fs-11" id="advAvailBadge">Available: {{ format_currency($totalAvailAdvance) }}</span>
+                            <label class="form-label fw-bold text-dark fs-12 mb-0">{{ __('crm.select_advance_payment') }}</label>
+                            <span class="badge bg-soft-primary text-primary fs-11" id="advAvailBadge">{{ __('crm.available_label') }}: {{ format_currency($totalAvailAdvance) }}</span>
                         </div>
                         <select name="selected_source" id="advanceSourceSelect" class="form-select form-select-sm" required>
                             @if(!empty($availableAdvances))
                                 @foreach($availableAdvances as $adv)
                                     <option value="allocation:{{ $adv->id }}" data-avail="{{ (float)$adv->allocated_amount }}">
-                                        Sales Order Advance: {{ $adv->payment?->payment_number ?? 'Payment' }} (Avail: {{ format_currency($adv->allocated_amount) }})
+                                        {{ __('crm.sales_order_advance') }}: {{ $adv->payment?->payment_number ?? 'Payment' }} ({{ __('crm.available_label') }}: {{ format_currency($adv->allocated_amount) }})
                                     </option>
                                 @endforeach
                             @endif
                             @if(!empty($unallocatedPayments))
                                 @foreach($unallocatedPayments as $up)
                                     <option value="payment:{{ $up->customer_payment_id }}" data-avail="{{ (float)$up->allocated_amount }}">
-                                        Customer Credit: {{ $up->payment?->payment_number ?? 'Payment' }} (Avail: {{ format_currency($up->allocated_amount) }})
+                                        {{ __('crm.customer_credit') }}: {{ $up->payment?->payment_number ?? 'Payment' }} ({{ __('crm.available_label') }}: {{ format_currency($up->allocated_amount) }})
                                     </option>
                                 @endforeach
                             @endif
@@ -2430,17 +2430,17 @@
                     </div>
 
                     <div class="mb-2">
-                        <label class="form-label fw-bold text-dark fs-12">Amount to Apply (₹)</label>
+                        <label class="form-label fw-bold text-dark fs-12">{{ __('crm.amount_to_apply') }} ({{ active_currency_symbol() }})</label>
                         <input type="number" step="0.01" min="0.01" name="amount" id="advanceApplyAmountInput" class="form-control form-control-sm font-monospace fw-bold" required>
                         <div class="form-text fs-11 text-muted">
-                            You can apply the full amount or a partial amount. Any remaining advance remains available for future invoices.
+                            {{ __('crm.advance_apply_help') }}
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer py-2 px-3 bg-light border-top">
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
                     <button type="submit" class="btn btn-sm btn-success fw-bold px-3">
-                        <i class="feather-check me-1"></i>Confirm & Apply
+                        <i class="feather-check me-1"></i>{{ __('crm.confirm_apply') }}
                     </button>
                 </div>
             </form>

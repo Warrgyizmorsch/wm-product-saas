@@ -24,8 +24,8 @@ class SalesOrderApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -866,5 +866,88 @@ class SalesOrderApiController extends Controller
             new \App\Exports\SalesOrderExport($tenantId, $request->all()),
             'sales_orders_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * POST /api/sales/orders/{id}/convert-to-project
+     */
+    public function convertToProject(Request $request, int $id, \App\Domains\Sales\Services\SalesOrderProjectBridgeService $bridgeService): JsonResponse
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Sales Order not found'], 404);
+        }
+
+        $this->authorize('view', $order);
+        $this->authorize('create', \App\Domains\Projects\Models\Project::class);
+
+        if (in_array($order->status, ['Draft', 'Cancelled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Draft or Cancelled Sales Orders cannot be converted to a Delivery Project.'
+            ], 422);
+        }
+
+        if ($order->projects()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A Delivery Project has already been created for this Sales Order.'
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'project_name'   => 'nullable|string|max:255',
+            'manager_id'     => 'nullable|integer|exists:users,id',
+            'start_date'     => 'nullable|date',
+            'end_date'       => 'nullable|date|after_or_equal:start_date',
+            'budget_amount'  => 'nullable|numeric|min:0',
+            'cost_center_id' => 'nullable|integer|exists:cost_centers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Validation error', 'errors' => $validator->errors()], 422);
+        }
+
+        $validated = $validator->validated();
+        $customData = array_filter([
+            'name'           => $validated['project_name'] ?? null,
+            'manager_id'     => $validated['manager_id'] ?? null,
+            'start_date'     => $validated['start_date'] ?? null,
+            'end_date'       => $validated['end_date'] ?? null,
+            'budget_amount'  => $validated['budget_amount'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
+        ]);
+
+        try {
+            $project = $bridgeService->convertSalesOrderToProject($order, $customData);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Delivery Project {$project->project_code} created successfully from Sales Order {$order->sales_order_number}.",
+                'data'    => $project,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * GET /api/sales/orders/{id}/download-pdf
+     */
+    public function downloadPdf(int $id)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = SalesOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Sales Order not found'], 404);
+        }
+
+        $this->authorize('view', $order);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.orders.pdf', compact('order'));
+        return $pdf->download("SalesOrder_{$order->sales_order_number}.pdf");
     }
 }

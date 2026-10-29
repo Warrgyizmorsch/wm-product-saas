@@ -197,9 +197,9 @@ class DealActivityApiController extends Controller
 
         $verificationData = $this->followupService->extractVerificationPayload($request);
 
-        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
-        $companyId = $deal->company_id ?? 1;
-        $branchId = $deal->branch_id;
+        $tenantId = $deal->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id);
+        $companyId = $deal->company_id ?? (company_id() ?? auth()->user()?->company_id);
+        $branchId = $deal->branch_id ?? (branch_id() ?? auth()->user()?->branch_id);
 
         $taggedUserIds = !empty($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
         $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : null;
