@@ -400,6 +400,7 @@
                             <div>
                                 <span class="text-muted">Weighted Avg Capacity:</span>
                                 <strong class="text-success font-monospace ms-1">{{ number_format($hourlyManualCap, 1) }} units/hr</strong>
+                                <i class="feather-info text-muted ms-1 cursor-pointer" title="It is average production per hour throughout section shifts. Formula: {{ number_format($dailyManualCap, 1) }} units / {{ format_hours($uniqHours) }} = {{ number_format($hourlyManualCap, 1) }} u/h" data-bs-toggle="tooltip"></i>
                             </div>
                             <div>
                                 <span class="text-muted">Peak Concurrent Capacity:</span>
@@ -458,7 +459,10 @@
                                     <tfoot class="table-light border-top fw-bold">
                                         <tr>
                                             <td colspan="2">Total Manual Production:</td>
-                                            <td class="text-end font-monospace text-success">Avg {{ number_format($hourlyManualCap, 1) }} u/h</td>
+                                            <td class="text-end font-monospace text-success">
+                                                Avg {{ number_format($hourlyManualCap, 1) }} u/h
+                                                <i class="feather-info text-muted ms-1 cursor-pointer" title="It is average production per hour throughout section shifts. Formula: {{ number_format($dailyManualCap, 1) }} units / {{ format_hours($uniqHours) }} = {{ number_format($hourlyManualCap, 1) }} u/h" data-bs-toggle="tooltip"></i>
+                                            </td>
                                             <td></td>
                                             <td class="text-end font-monospace text-dark">{{ number_format($dailyManualCap, 1) }} units/day</td>
                                             <td></td>
@@ -721,85 +725,198 @@
                                 <thead class="table-light position-sticky top-0 shadow-sm" style="z-index: 1;">
                                     <tr>
                                         <th style="width: 5%">#</th>
-                                        <th style="width: 25%">Category</th>
-                                        <th style="width: 35%">Metric Name</th>
+                                        <th style="width: 22%">Category</th>
+                                        <th style="width: 38%">Metric Name</th>
                                         <th style="width: 35%" class="text-end">Current Computed Value</th>
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    @php
+                                        $auditMetricsMeta = [
+                                            1 => ['name' => 'Shifts Count', 'cat' => 'Operating Timeline', 'type' => 'Collected', 'source' => 'Section Shifts Configuration', 'formula' => 'Count of active assigned shifts', 'desc' => 'Total active production shifts scheduled for this section.'],
+                                            2 => ['name' => 'Total Shift Clock Hours', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Section Shift Times', 'formula' => 'Sum of individual shift durations (End Time - Start Time)', 'desc' => 'Gross cumulative clock hours across all shifts before overlap elimination.'],
+                                            3 => ['name' => 'Unique Operating Hours', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Elapsed operating hours after merging all overlapping shift intervals', 'desc' => 'Actual unique hours the section is active within the 24-hour day.'],
+                                            4 => ['name' => 'Shift Overlap Hours', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Total Shift Clock Hours - Unique Operating Hours', 'desc' => 'Hours during which multiple shifts run simultaneously.'],
+                                            5 => ['name' => 'Has Overlapping Shifts', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Shift Overlap Hours > 0', 'desc' => 'Indicates whether any scheduled shifts share common clock hours.'],
+                                            6 => ['name' => 'Operational Window Start', 'cat' => 'Operating Timeline', 'type' => 'Collected', 'source' => 'Shift Schedule Registry', 'formula' => 'Earliest start time among all active shifts', 'desc' => 'Clock time when this section begins operating for the day.'],
+                                            7 => ['name' => 'Operational Window End', 'cat' => 'Operating Timeline', 'type' => 'Collected', 'source' => 'Shift Schedule Registry', 'formula' => 'Latest end time among all active shifts', 'desc' => 'Clock time when this section finishes daily operations.'],
+                                            8 => ['name' => 'Has Inactive Gaps', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Inactive Gap Hours > 0 within operating window', 'desc' => 'Indicates whether there are unstaffed idle gaps between shifts.'],
+                                            9 => ['name' => 'Inactive Gap Hours', 'cat' => 'Operating Timeline', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => '(Operational Window Duration) - (Unique Operating Hours)', 'desc' => 'Total idle clock hours between scheduled shifts.'],
+
+                                            10 => ['name' => 'Active Machines Count', 'cat' => 'Machinery', 'type' => 'Collected', 'source' => 'Section Machine Assignments', 'formula' => 'Count of active assigned machines', 'desc' => 'Total operational machines currently assigned to this section.'],
+                                            11 => ['name' => 'Inactive Machines Count', 'cat' => 'Machinery', 'type' => 'Collected', 'source' => 'Section Machine Assignments', 'formula' => 'Count of disabled / offline assigned machines', 'desc' => 'Machines assigned to this section that are temporarily inactive.'],
+                                            12 => ['name' => 'Hourly Machine Capacity', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Engineering Specifications', 'formula' => 'Sum of hourly rated capacities of all active machines', 'desc' => 'Combined output capacity in units produced per running machine hour.'],
+                                            13 => ['name' => 'Daily Machine Capacity', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Hourly Capacity & Shift Hours', 'formula' => 'Sum of (Active Machine Hourly Capacity * Operating Shift Hours)', 'desc' => 'Total units produced by machinery across all scheduled shifts.'],
+                                            14 => ['name' => 'Sum Energy Consumption / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Electrical Ratings', 'formula' => 'Sum of power consumption (kW) across all active machines', 'desc' => 'Total electrical power consumed per hour by all running machines.'],
+                                            15 => ['name' => 'Calculated Base Cost / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Energy & Electricity Tariffs', 'formula' => 'Sum of (Machine Power kW * Electricity Cost per kWh)', 'desc' => 'Base electricity and fuel running expense per hour.'],
+                                            16 => ['name' => 'Total Additional Cost / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Maintenance & Consumables Rates', 'formula' => 'Sum of hourly consumables, tooling, and maintenance charges', 'desc' => 'Additional hourly operating expenses beyond electricity.'],
+                                            17 => ['name' => 'Total Deductibles / hr', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machine Subsidies & Energy Credits', 'formula' => 'Sum of hourly credits, offsets, or operational rebates', 'desc' => 'Hourly financial deductions applied to machine operation.'],
+                                            18 => ['name' => 'Hourly Machine Expense', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machinery Cost Engine', 'formula' => 'Base Cost/hr + Additional Cost/hr - Deductibles/hr', 'desc' => 'Net total operating expense per hour for all active machines.'],
+                                            19 => ['name' => 'Total Daily Machine Expense', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machinery Cost Engine & Shift Intervals', 'formula' => 'Sum of (Hourly Machine Expense * Shift Operating Hours)', 'desc' => 'Total expense incurred to run machinery for the entire day.'],
+                                            20 => ['name' => 'Machine Cost Per Unit', 'cat' => 'Machinery', 'type' => 'Calculated', 'source' => 'Machinery Cost & Capacity Engine', 'formula' => 'Total Daily Machine Expense / Daily Machine Capacity', 'desc' => 'Direct machinery cost allocated to each machine-produced unit.'],
+
+                                            21 => ['name' => 'Active Manual Batches', 'cat' => 'Manual Batches', 'type' => 'Collected', 'source' => 'Manual Batch Configurations', 'formula' => 'Count of active manual production setups', 'desc' => 'Number of operational manual stations/lines configured in this section.'],
+                                            22 => ['name' => 'Inactive Manual Batches', 'cat' => 'Manual Batches', 'type' => 'Collected', 'source' => 'Manual Batch Configurations', 'formula' => 'Count of disabled manual production setups', 'desc' => 'Manual stations currently deactivated or on hold.'],
+                                            23 => ['name' => 'Daily Manual Capacity', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Manual Batch Hourly Rates & Shift Hours', 'formula' => 'Sum of (Manual Batch Speed/hr * Assigned Shift Duration Hours)', 'desc' => 'Total units produced manually across all scheduled shifts.'],
+                                            24 => ['name' => 'Hourly Manual Capacity [Weighted Avg]', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Manual Production Engine', 'formula' => 'Daily Manual Capacity / Section Unique Operating Hours', 'desc' => 'Average manual output per hour across the section operating window.'],
+                                            25 => ['name' => 'Peak Hourly Manual Capacity', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Maximum manual throughput achieved in any single clock interval', 'desc' => 'Peak manual production speed when multiple manual shifts overlap.'],
+                                            26 => ['name' => 'Shift Manual Capacities Subtotals', 'cat' => 'Manual Batches', 'type' => 'Calculated', 'source' => 'Shift Roster & Batch Allocations', 'formula' => 'Breakdown of manual capacity generated within each specific shift', 'desc' => 'Subtotal of manual units produced mapped per shift.'],
+
+                                            27 => ['name' => 'Internal Employees Count', 'cat' => 'Internal Labor', 'type' => 'Collected', 'source' => 'HRMS Employee Master', 'formula' => 'Count of salaried internal employees assigned to this section', 'desc' => 'Total company personnel assigned to work in this section.'],
+                                            28 => ['name' => 'Total Monthly Salary', 'cat' => 'Internal Labor', 'type' => 'Collected', 'source' => 'HRMS Payroll (CTC)', 'formula' => 'Sum of monthly salaries (CTC) of all assigned internal employees', 'desc' => 'Combined gross monthly payroll expense for section employees.'],
+                                            29 => ['name' => 'Total Daily Salary [CTC/30]', 'cat' => 'Internal Labor', 'type' => 'Calculated', 'source' => 'Statutory Daily Payroll Proration', 'formula' => 'Total Monthly Salary / 30 calendar days', 'desc' => 'Daily internal payroll burn based on standard 30-day month.'],
+                                            30 => ['name' => 'Total Daily Internal Cost', 'cat' => 'Internal Labor', 'type' => 'Calculated', 'source' => 'Internal Labor Engine', 'formula' => 'Sum of allocated daily salaries across assigned section shifts', 'desc' => 'Total daily internal employee payroll allocated to this section.'],
+                                            31 => ['name' => 'Average Internal Hourly Rate', 'cat' => 'Internal Labor', 'type' => 'Calculated', 'source' => 'Internal Labor Engine', 'formula' => 'Total Daily Internal Cost / Unique Operating Hours', 'desc' => 'Average internal wage expense per operating hour.'],
+                                            32 => ['name' => 'Shift Internal Hourly Rates', 'cat' => 'Internal Labor', 'type' => 'Calculated', 'source' => 'Shift Staffing Allocation', 'formula' => 'Breakdown of internal hourly wages incurred during each shift', 'desc' => 'Hourly internal payroll burn mapped to individual shifts.'],
+                                            33 => ['name' => 'Peak Internal Hourly Rate', 'cat' => 'Internal Labor', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Maximum internal wage expense during peak shift overlap', 'desc' => 'Highest internal labor expense per hour when shifts overlap.'],
+                                            34 => ['name' => 'Internal Labor Cost Per Unit', 'cat' => 'Internal Labor', 'type' => 'Calculated', 'source' => 'Labor & Capacity Engine', 'formula' => 'Total Daily Internal Cost / Total Daily Capacity', 'desc' => 'Internal salaried labor cost allocated per unit produced.'],
+
+                                            35 => ['name' => 'External Allocations Count', 'cat' => 'External Labor', 'type' => 'Collected', 'source' => 'External Worker Pay Grade Allocations', 'formula' => 'Count of active external contractor allocation records', 'desc' => 'Number of contractor labor allocation groups assigned to shifts.'],
+                                            36 => ['name' => 'Total External Headcount', 'cat' => 'External Labor', 'type' => 'Collected', 'source' => 'External Worker Rostering', 'formula' => 'Sum of contractor worker counts assigned across shifts', 'desc' => 'Total external contractor workers deployed across all shifts.'],
+                                            37 => ['name' => 'Total Daily External Cost', 'cat' => 'External Labor', 'type' => 'Calculated', 'source' => 'External Labor Engine', 'formula' => 'Sum of (Contractor Workers * Hourly Pay Grade * Shift Hours)', 'desc' => 'Total daily contractor wages incurred across all shifts.'],
+                                            38 => ['name' => 'Average External Hourly Rate', 'cat' => 'External Labor', 'type' => 'Calculated', 'source' => 'External Labor Engine', 'formula' => 'Total Daily External Cost / Unique Operating Hours', 'desc' => 'Average contractor wage expense per running hour.'],
+                                            39 => ['name' => 'Shift External Hourly Rates', 'cat' => 'External Labor', 'type' => 'Calculated', 'source' => 'Shift External Allocations', 'formula' => 'Sum of (Workers in Shift * Hourly Pay Grade Rate)', 'desc' => 'Contractor hourly burn rate mapped to each individual shift.'],
+                                            40 => ['name' => 'Peak External Hourly Rate', 'cat' => 'External Labor', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Maximum contractor expense in any single operating interval', 'desc' => 'Highest contractor labor expense per hour during peak shift overlap.'],
+                                            41 => ['name' => 'External Labor Cost Per Unit', 'cat' => 'External Labor', 'type' => 'Calculated', 'source' => 'Labor & Capacity Engine', 'formula' => 'Total Daily External Cost / Total Daily Capacity', 'desc' => 'Contractor labor expense allocated to each unit produced.'],
+
+                                            42 => ['name' => 'Total Daily Labor Cost', 'cat' => 'Combined Labor', 'type' => 'Calculated', 'source' => 'Labor Cost Engine', 'formula' => 'Total Daily Internal Cost + Total Daily External Cost', 'desc' => 'Combined daily expense for all salaried and hourly personnel.'],
+                                            43 => ['name' => 'Total Average Hourly Labor Rate', 'cat' => 'Combined Labor', 'type' => 'Calculated', 'source' => 'Labor Cost Engine', 'formula' => 'Total Daily Labor Cost / Unique Operating Hours', 'desc' => 'Blended workforce expense per operating hour throughout the day.'],
+                                            44 => ['name' => 'Peak Hourly Labor Rate', 'cat' => 'Combined Labor', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Highest combined labor burn rate across all timeline intervals', 'desc' => 'Maximum total labor expense per hour during peak staffing overlap.'],
+                                            45 => ['name' => 'Total Labor Cost Per Unit', 'cat' => 'Combined Labor', 'type' => 'Calculated', 'source' => 'Labor & Capacity Engine', 'formula' => 'Total Daily Labor Cost / Total Daily Capacity', 'desc' => 'Total labor expense (internal + external) absorbed per unit produced.'],
+
+                                            46 => ['name' => 'Total Daily Capacity', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Production Capacity Engine', 'formula' => 'Daily Machine Capacity + Daily Manual Capacity', 'desc' => 'Total combined units produced per day by machines and manual stations.'],
+                                            47 => ['name' => 'Total Hourly Capacity [Weighted Avg]', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Production Capacity Engine', 'formula' => 'Total Daily Capacity / Unique Operating Hours', 'desc' => 'Average production output per hour across the section operating window.'],
+                                            48 => ['name' => 'Peak Total Hourly Capacity', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Maximum combined hourly output across all operating intervals', 'desc' => 'Peak units per hour when maximum machines and manual stations overlap.'],
+                                            49 => ['name' => 'Total Daily Operating Cost', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Financial Roll-Up Engine', 'formula' => 'Total Daily Labor Cost + Total Daily Machine Expense', 'desc' => 'Total direct daily operational cost to run this production section.'],
+                                            50 => ['name' => 'Total Hourly Operating Cost [Weighted Avg]', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Financial Roll-Up Engine', 'formula' => 'Total Daily Operating Cost / Unique Operating Hours', 'desc' => 'Average operational burn rate per hour across the operating day.'],
+                                            51 => ['name' => 'Peak Total Hourly Operating Cost', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Timeline Interval Engine', 'formula' => 'Highest combined hourly burn rate across all timeline intervals', 'desc' => 'Peak hourly operating cost during maximum machine and staffing overlap.'],
+                                            52 => ['name' => 'Cost Per Unit', 'cat' => 'Financial Summary', 'type' => 'Calculated', 'source' => 'Financial Roll-Up Engine', 'formula' => 'Total Daily Operating Cost / Total Daily Capacity', 'desc' => 'Total direct manufacturing cost required to produce one finished unit.'],
+                                        ];
+
+                                        $renderAuditMetricRow = function($idx, $valHtml) use ($auditMetricsMeta) {
+                                            $meta = $auditMetricsMeta[$idx] ?? [
+                                                'name' => 'Metric #' . $idx,
+                                                'cat' => 'General',
+                                                'type' => 'Calculated',
+                                                'source' => 'Calculation Engine',
+                                                'formula' => '',
+                                                'desc' => ''
+                                            ];
+                                            $isCalc = ($meta['type'] ?? '') === 'Calculated';
+                                            $badgeClass = $isCalc ? 'bg-soft-primary text-primary' : 'bg-soft-success text-success';
+                                            
+                                            $popoverContent = '<div class="p-1">'
+                                                . '<div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">'
+                                                . '<span class="badge ' . $badgeClass . ' fs-10 fw-semibold text-uppercase">' . e($meta['type']) . '</span>'
+                                                . '<span class="text-muted fs-11 fst-italic ms-2 text-end">' . e($meta['source']) . '</span>'
+                                                . '</div>';
+                                            
+                                            if (!empty($meta['formula'])) {
+                                                $popoverContent .= '<div class="mb-2">'
+                                                    . '<span class="text-muted fs-11 d-block fw-semibold mb-1">Formula / Logic:</span>'
+                                                    . '<code class="d-block bg-light p-1 rounded text-dark fs-11 font-monospace">' . e($meta['formula']) . '</code>'
+                                                    . '</div>';
+                                            }
+                                            
+                                            if (!empty($meta['desc'])) {
+                                                $popoverContent .= '<div class="text-secondary fs-11">' . e($meta['desc']) . '</div>';
+                                            }
+                                            $popoverContent .= '</div>';
+
+                                            $popoverData = 'data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true" data-bs-custom-class="metric-audit-popover" data-bs-title="' . e($meta['name']) . '" data-bs-content="' . e($popoverContent) . '"';
+
+                                            return '<tr>'
+                                                . '<td class="text-muted">' . $idx . '</td>'
+                                                . '<td class="text-muted">' . e($meta['cat']) . '</td>'
+                                                . '<td>'
+                                                . '<div class="d-inline-flex align-items-center">'
+                                                . '<span>' . e($meta['name']) . '</span>'
+                                                . '<a href="javascript:void(0)" class="text-primary ms-1 text-decoration-none audit-metric-popover-trigger" ' . $popoverData . ' tabindex="0" role="button" aria-label="Details for ' . e($meta['name']) . '">'
+                                                . '<i class="feather-info" style="font-size: 13px; vertical-align: middle;"></i>'
+                                                . '</a>'
+                                                . '</div>'
+                                                . '</td>'
+                                                . '<td class="text-end font-monospace">' . $valHtml . '</td>'
+                                                . '</tr>';
+                                        };
+                                    @endphp
+
                                     <!-- Category 1: Operating Timeline -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">1. Operating Timeline & Shift Windows</td></tr>
-                                    <tr><td>1</td><td>Operating Timeline</td><td>Shifts Count</td><td class="text-end font-monospace">{{ $opTimeline['shifts_count'] ?? 0 }} shifts</td></tr>
-                                    <tr><td>2</td><td>Operating Timeline</td><td>Total Shift Clock Hours</td><td class="text-end font-monospace">{{ format_hours($opTimeline['total_shift_clock_hours'] ?? 0) }}</td></tr>
-                                    <tr><td>3</td><td>Operating Timeline</td><td>Unique Operating Hours</td><td class="text-end font-monospace fw-bold text-primary">{{ format_hours($uniqHours) }}</td></tr>
-                                    <tr><td>4</td><td>Operating Timeline</td><td>Shift Overlap Hours</td><td class="text-end font-monospace text-warning">{{ format_hours($overlapHours) }}</td></tr>
-                                    <tr><td>5</td><td>Operating Timeline</td><td>Has Overlapping Shifts</td><td class="text-end font-monospace">{{ $hasOverlap ? 'Yes' : 'No' }}</td></tr>
-                                    <tr><td>6</td><td>Operating Timeline</td><td>Operational Window Start</td><td class="text-end font-monospace">{{ $opTimeline['operational_window_start'] ?? 'None' }}</td></tr>
-                                    <tr><td>7</td><td>Operating Timeline</td><td>Operational Window End</td><td class="text-end font-monospace">{{ $opTimeline['operational_window_end'] ?? 'None' }}</td></tr>
-                                    <tr><td>8</td><td>Operating Timeline</td><td>Has Inactive Gaps</td><td class="text-end font-monospace">{{ $hasGaps ? 'Yes' : 'No' }}</td></tr>
-                                    <tr><td>9</td><td>Operating Timeline</td><td>Inactive Gap Hours</td><td class="text-end font-monospace">{{ format_hours($gapHours) }}</td></tr>
+                                    {!! $renderAuditMetricRow(1, ($opTimeline['shifts_count'] ?? 0) . ' shifts') !!}
+                                    {!! $renderAuditMetricRow(2, format_hours($opTimeline['total_shift_clock_hours'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(3, '<span class="fw-bold text-primary">' . format_hours($uniqHours) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(4, '<span class="text-warning">' . format_hours($overlapHours) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(5, $hasOverlap ? '<span class="badge bg-soft-warning text-warning">Yes</span>' : '<span class="badge bg-soft-success text-success">No</span>') !!}
+                                    {!! $renderAuditMetricRow(6, $opTimeline['operational_window_start'] ?? 'None') !!}
+                                    {!! $renderAuditMetricRow(7, $opTimeline['operational_window_end'] ?? 'None') !!}
+                                    {!! $renderAuditMetricRow(8, $hasGaps ? '<span class="badge bg-soft-warning text-warning">Yes</span>' : '<span class="badge bg-soft-success text-success">No</span>') !!}
+                                    {!! $renderAuditMetricRow(9, format_hours($gapHours)) !!}
 
                                     <!-- Category 2: Machinery -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">2. Machinery Capacity & Operating Cost</td></tr>
-                                    <tr><td>10</td><td>Machinery</td><td>Active Machines Count</td><td class="text-end font-monospace">{{ $machData['active_machines_count'] ?? 0 }}</td></tr>
-                                    <tr><td>11</td><td>Machinery</td><td>Inactive Machines Count</td><td class="text-end font-monospace">{{ $machData['inactive_machines_count'] ?? 0 }}</td></tr>
-                                    <tr><td>12</td><td>Machinery</td><td>Hourly Machine Capacity</td><td class="text-end font-monospace text-success">{{ number_format($machData['hourly_machine_capacity'] ?? 0, 1) }} u/h</td></tr>
-                                    <tr><td>13</td><td>Machinery</td><td>Daily Machine Capacity</td><td class="text-end font-monospace text-success fw-bold">{{ number_format($dailyMachCap, 1) }} units</td></tr>
-                                    <tr><td>14</td><td>Machinery</td><td>Sum Energy Consumption / hr</td><td class="text-end font-monospace">{{ number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) }} kW</td></tr>
-                                    <tr><td>15</td><td>Machinery</td><td>Calculated Base Cost / hr</td><td class="text-end font-monospace">{{ format_currency($machData['calculated_machine_base_cost_per_hour'] ?? 0) }}/hr</td></tr>
-                                    <tr><td>16</td><td>Machinery</td><td>Total Additional Cost / hr</td><td class="text-end font-monospace text-warning">+{{ format_currency($machData['total_machine_additional_cost_per_hour'] ?? 0) }}/hr</td></tr>
-                                    <tr><td>17</td><td>Machinery</td><td>Total Deductibles / hr</td><td class="text-end font-monospace text-success">-{{ format_currency($machData['total_machine_deductibles_per_hour'] ?? 0) }}/hr</td></tr>
-                                    <tr><td>18</td><td>Machinery</td><td>Hourly Machine Expense</td><td class="text-end font-monospace text-primary">{{ format_currency($hourlyMachCost) }}/hr</td></tr>
-                                    <tr><td>19</td><td>Machinery</td><td>Total Daily Machine Expense</td><td class="text-end font-monospace fw-bold text-dark">{{ format_currency($dailyMachCost) }}</td></tr>
-                                    <tr><td>20</td><td>Machinery</td><td>Machine Cost Per Unit</td><td class="text-end font-monospace">{{ format_currency($machData['machine_cost_per_unit'] ?? 0) }} / unit</td></tr>
+                                    {!! $renderAuditMetricRow(10, (string) ($machData['active_machines_count'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(11, (string) ($machData['inactive_machines_count'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(12, '<span class="text-success">' . number_format($machData['hourly_machine_capacity'] ?? 0, 1) . ' u/h</span>') !!}
+                                    {!! $renderAuditMetricRow(13, '<span class="text-success fw-bold">' . number_format($dailyMachCap, 1) . ' units</span>') !!}
+                                    {!! $renderAuditMetricRow(14, number_format($machData['sum_machine_consumption_per_hour'] ?? 0, 2) . ' kW') !!}
+                                    {!! $renderAuditMetricRow(15, format_currency($machData['calculated_machine_base_cost_per_hour'] ?? 0) . '/hr') !!}
+                                    {!! $renderAuditMetricRow(16, '<span class="text-warning">+' . format_currency($machData['total_machine_additional_cost_per_hour'] ?? 0) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(17, '<span class="text-success">-' . format_currency($machData['total_machine_deductibles_per_hour'] ?? 0) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(18, '<span class="text-primary">' . format_currency($hourlyMachCost) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(19, '<span class="fw-bold text-dark">' . format_currency($dailyMachCost) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(20, format_currency($machData['machine_cost_per_unit'] ?? 0) . ' / unit') !!}
 
                                     <!-- Category 3: Manual Batches -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">3. Manual Batch Production</td></tr>
-                                    <tr><td>21</td><td>Manual Batches</td><td>Active Manual Batches</td><td class="text-end font-monospace">{{ $batchData['active_manual_batches_count'] ?? 0 }}</td></tr>
-                                    <tr><td>22</td><td>Manual Batches</td><td>Inactive Manual Batches</td><td class="text-end font-monospace">{{ $batchData['inactive_manual_batches_count'] ?? 0 }}</td></tr>
-                                    <tr><td>23</td><td>Manual Batches</td><td>Daily Manual Capacity</td><td class="text-end font-monospace text-success fw-bold">{{ number_format($dailyManualCap, 1) }} units</td></tr>
-                                    <tr><td>24</td><td>Manual Batches</td><td>Hourly Manual Capacity [Weighted Avg]</td><td class="text-end font-monospace text-success">{{ number_format($hourlyManualCap, 1) }} u/h</td></tr>
-                                    <tr><td>25</td><td>Manual Batches</td><td>Peak Hourly Manual Capacity</td><td class="text-end font-monospace text-primary">{{ number_format($batchData['peak_hourly_manual_capacity'] ?? 0, 1) }} u/h</td></tr>
-                                    <tr><td>26</td><td>Manual Batches</td><td>Shift Manual Capacities Subtotals</td><td class="text-end font-monospace">{{ count($batchData['shift_manual_capacities'] ?? []) }} shifts mapped</td></tr>
+                                    {!! $renderAuditMetricRow(21, (string) ($batchData['active_manual_batches_count'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(22, (string) ($batchData['inactive_manual_batches_count'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(23, '<span class="text-success fw-bold">' . number_format($dailyManualCap, 1) . ' units</span>') !!}
+                                    {!! $renderAuditMetricRow(24, '<span class="text-success">' . number_format($hourlyManualCap, 1) . ' u/h</span>') !!}
+                                    {!! $renderAuditMetricRow(25, '<span class="text-primary">' . number_format($batchData['peak_hourly_manual_capacity'] ?? 0, 1) . ' u/h</span>') !!}
+                                    {!! $renderAuditMetricRow(26, count($batchData['shift_manual_capacities'] ?? []) . ' shifts mapped') !!}
 
                                     <!-- Category 4: Internal Labor -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">4. Internal Employee Labor (Salaried Staff)</td></tr>
-                                    <tr><td>27</td><td>Internal Labor</td><td>Internal Employees Count</td><td class="text-end font-monospace">{{ $intLabor['internal_employees_count'] ?? 0 }}</td></tr>
-                                    <tr><td>28</td><td>Internal Labor</td><td>Total Monthly Salary</td><td class="text-end font-monospace">{{ format_currency($intLabor['total_internal_monthly_salary'] ?? 0) }}</td></tr>
-                                    <tr><td>29</td><td>Internal Labor</td><td>Total Daily Salary [CTC/30]</td><td class="text-end font-monospace">{{ format_currency($intLabor['total_internal_daily_salary'] ?? 0) }}</td></tr>
-                                    <tr><td>30</td><td>Internal Labor</td><td>Total Daily Internal Cost</td><td class="text-end font-monospace fw-bold text-dark">{{ format_currency($dailyInternalCost) }}</td></tr>
-                                    <tr><td>31</td><td>Internal Labor</td><td>Average Internal Hourly Rate</td><td class="text-end font-monospace text-primary">{{ format_currency($avgInternalRate) }}/hr</td></tr>
-                                    <tr><td>32</td><td>Internal Labor</td><td>Shift Internal Hourly Rates</td><td class="text-end font-monospace">{{ count($intLabor['shift_internal_hourly_rates'] ?? []) }} shifts mapped</td></tr>
-                                    <tr><td>33</td><td>Internal Labor</td><td>Peak Internal Hourly Rate</td><td class="text-end font-monospace text-danger">{{ format_currency($intLabor['peak_internal_hourly_rate'] ?? 0) }}/hr</td></tr>
-                                    <tr><td>34</td><td>Internal Labor</td><td>Internal Labor Cost Per Unit</td><td class="text-end font-monospace">{{ format_currency($intLabor['internal_labor_cost_per_unit'] ?? 0) }} / unit</td></tr>
+                                    {!! $renderAuditMetricRow(27, (string) ($intLabor['internal_employees_count'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(28, format_currency($intLabor['total_internal_monthly_salary'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(29, format_currency($intLabor['total_internal_daily_salary'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(30, '<span class="fw-bold text-dark">' . format_currency($dailyInternalCost) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(31, '<span class="text-primary">' . format_currency($avgInternalRate) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(32, count($intLabor['shift_internal_hourly_rates'] ?? []) . ' shifts mapped') !!}
+                                    {!! $renderAuditMetricRow(33, '<span class="text-danger">' . format_currency($intLabor['peak_internal_hourly_rate'] ?? 0) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(34, format_currency($intLabor['internal_labor_cost_per_unit'] ?? 0) . ' / unit') !!}
 
                                     <!-- Category 5: External Labor -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">5. External Contractor Labor (Hourly Staff)</td></tr>
-                                    <tr><td>35</td><td>External Labor</td><td>External Allocations Count</td><td class="text-end font-monospace">{{ $extLabor['external_allocations_count'] ?? 0 }}</td></tr>
-                                    <tr><td>36</td><td>External Labor</td><td>Total External Headcount</td><td class="text-end font-monospace">{{ $extLabor['total_external_headcount'] ?? 0 }} workers</td></tr>
-                                    <tr><td>37</td><td>External Labor</td><td>Total Daily External Cost</td><td class="text-end font-monospace fw-bold text-dark">{{ format_currency($dailyExternalCost) }}</td></tr>
-                                    <tr><td>38</td><td>External Labor</td><td>Average External Hourly Rate</td><td class="text-end font-monospace text-primary">{{ format_currency($avgExternalRate) }}/hr</td></tr>
-                                    <tr><td>39</td><td>External Labor</td><td>Shift External Hourly Rates</td><td class="text-end font-monospace">{{ count($extLabor['shift_external_hourly_rates'] ?? []) }} shifts mapped</td></tr>
-                                    <tr><td>40</td><td>External Labor</td><td>Peak External Hourly Rate</td><td class="text-end font-monospace text-danger">{{ format_currency($extLabor['peak_external_hourly_rate'] ?? 0) }}/hr</td></tr>
-                                    <tr><td>41</td><td>External Labor</td><td>External Labor Cost Per Unit</td><td class="text-end font-monospace">{{ format_currency($extLabor['external_labor_cost_per_unit'] ?? 0) }} / unit</td></tr>
+                                    {!! $renderAuditMetricRow(35, (string) ($extLabor['external_allocations_count'] ?? 0)) !!}
+                                    {!! $renderAuditMetricRow(36, ($extLabor['total_external_headcount'] ?? 0) . ' workers') !!}
+                                    {!! $renderAuditMetricRow(37, '<span class="fw-bold text-dark">' . format_currency($dailyExternalCost) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(38, '<span class="text-primary">' . format_currency($avgExternalRate) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(39, count($extLabor['shift_external_hourly_rates'] ?? []) . ' shifts mapped') !!}
+                                    {!! $renderAuditMetricRow(40, '<span class="text-danger">' . format_currency($extLabor['peak_external_hourly_rate'] ?? 0) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(41, format_currency($extLabor['external_labor_cost_per_unit'] ?? 0) . ' / unit') !!}
 
                                     <!-- Category 6: Combined Labor -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">6. Combined Labor Metrics</td></tr>
-                                    <tr><td>42</td><td>Combined Labor</td><td>Total Daily Labor Cost</td><td class="text-end font-monospace fw-bold text-primary">{{ format_currency($dailyLaborCost) }}</td></tr>
-                                    <tr><td>43</td><td>Combined Labor</td><td>Total Average Hourly Labor Rate</td><td class="text-end font-monospace">{{ format_currency($avgLaborRate) }}/hr</td></tr>
-                                    <tr><td>44</td><td>Combined Labor</td><td>Peak Hourly Labor Rate</td><td class="text-end font-monospace text-danger fw-bold">{{ format_currency($peakLaborRate) }}/hr</td></tr>
-                                    <tr><td>45</td><td>Combined Labor</td><td>Total Labor Cost Per Unit</td><td class="text-end font-monospace">{{ format_currency($combLabor['total_labor_cost_per_unit'] ?? 0) }} / unit</td></tr>
+                                    {!! $renderAuditMetricRow(42, '<span class="fw-bold text-primary">' . format_currency($dailyLaborCost) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(43, format_currency($avgLaborRate) . '/hr') !!}
+                                    {!! $renderAuditMetricRow(44, '<span class="text-danger fw-bold">' . format_currency($peakLaborRate) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(45, format_currency($combLabor['total_labor_cost_per_unit'] ?? 0) . ' / unit') !!}
 
                                     <!-- Category 7: Financial Summary -->
                                     <tr class="table-secondary fw-bold"><td colspan="4">7. Total Financial & Production Summary</td></tr>
-                                    <tr><td>46</td><td>Financial Summary</td><td>Total Daily Capacity</td><td class="text-end font-monospace text-success fw-bold">{{ number_format($dailyCap, 1) }} units</td></tr>
-                                    <tr><td>47</td><td>Financial Summary</td><td>Total Hourly Capacity [Weighted Avg]</td><td class="text-end font-monospace text-success">{{ number_format($avgHourlyCap, 1) }} u/h</td></tr>
-                                    <tr><td>48</td><td>Financial Summary</td><td>Peak Total Hourly Capacity</td><td class="text-end font-monospace text-primary fw-bold">{{ number_format($peakHourlyCap, 1) }} u/h</td></tr>
-                                    <tr><td>49</td><td>Financial Summary</td><td>Total Daily Operating Cost</td><td class="text-end font-monospace text-primary fw-bolder">{{ format_currency($dailyCost) }}</td></tr>
-                                    <tr><td>50</td><td>Financial Summary</td><td>Total Hourly Operating Cost [Weighted Avg]</td><td class="text-end font-monospace">{{ format_currency($avgHourlyCost) }}/hr</td></tr>
-                                    <tr><td>51</td><td>Financial Summary</td><td>Peak Total Hourly Operating Cost</td><td class="text-end font-monospace text-danger fw-bold">{{ format_currency($peakHourlyCost) }}/hr</td></tr>
-                                    <tr><td>52</td><td>Financial Summary</td><td>Cost Per Unit</td><td class="text-end font-monospace text-dark fw-bolder">{{ format_currency($costPerUnit) }} / unit</td></tr>
+                                    {!! $renderAuditMetricRow(46, '<span class="text-success fw-bold">' . number_format($dailyCap, 1) . ' units</span>') !!}
+                                    {!! $renderAuditMetricRow(47, '<span class="text-success">' . number_format($avgHourlyCap, 1) . ' u/h</span>') !!}
+                                    {!! $renderAuditMetricRow(48, '<span class="text-primary fw-bold">' . number_format($peakHourlyCap, 1) . ' u/h</span>') !!}
+                                    {!! $renderAuditMetricRow(49, '<span class="text-primary fw-bolder">' . format_currency($dailyCost) . '</span>') !!}
+                                    {!! $renderAuditMetricRow(50, format_currency($avgHourlyCost) . '/hr') !!}
+                                    {!! $renderAuditMetricRow(51, '<span class="text-danger fw-bold">' . format_currency($peakHourlyCost) . '/hr</span>') !!}
+                                    {!! $renderAuditMetricRow(52, '<span class="text-dark fw-bolder">' . format_currency($costPerUnit) . ' / unit</span>') !!}
                                 </tbody>
+                            </table>
+                        </div>
+                    </div>
                             </table>
                         </div>
                     </div>

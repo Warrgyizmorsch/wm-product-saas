@@ -57,21 +57,46 @@
             border: 1px solid rgba(0, 0, 0, 0.08);
             overflow: hidden;
         }
+        .wc-breakdown-popover {
+            width: 350px !important;
+            min-width: 330px !important;
+            max-width: 360px !important;
+            box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        .metric-audit-popover {
+            max-width: 380px;
+            box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
         .section-machines-popover .popover-header,
         .section-popover .popover-header,
-        .section-table-popover .popover-header {
+        .section-table-popover .popover-header,
+        .metric-audit-popover .popover-header {
             background-color: #f8fafc;
             border-bottom: 1px solid #e2e8f0;
             padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .wc-breakdown-popover .popover-header {
+            display: none !important;
         }
         .section-machines-popover .popover-body,
-        .section-popover .popover-body {
+        .section-popover .popover-body,
+        .metric-audit-popover .popover-body {
             padding: 8px 12px;
             max-height: 280px;
             overflow-y: auto;
         }
-        .section-table-popover .popover-body {
-            padding: 0;
+        .section-table-popover .popover-body,
+        .wc-breakdown-popover .popover-body {
+            padding: 0 !important;
             overflow: hidden;
         }
         .section-machines-badge {
@@ -462,7 +487,7 @@
 
         <!-- Profile / Metrics Layout -->
         <div class="row g-4 mb-4 pb-4 border-bottom">
-            <!-- Left Info Panel -->
+            <!-- Left Info Panel (Column 1) -->
             <div class="col-md-4 border-end">
                 <div class="text-center py-3">
                     <div class="avatar-text avatar-xl bg-soft-primary text-primary mx-auto mb-3 rounded-circle" style="width: 80px; height: 80px; font-size: 32px; display: flex; align-items: center; justify-content: center;">
@@ -470,7 +495,7 @@
                     </div>
                     <h4 class="fw-bold text-dark mb-1">{{ $workCenter->name }}</h4>
                     <span class="fs-13 fw-semibold text-muted text-uppercase">{{ $workCenter->code }}</span>
-                    <div class="mt-3">
+                    <div class="mt-2">
                         @if ($workCenter->isActive())
                             <span class="badge bg-soft-success text-success px-3 py-1.5 rounded-pill">{{ __('production.active_operating') }}</span>
                         @else
@@ -479,120 +504,262 @@
                     </div>
                 </div>
 
-                <div class="d-flex flex-column gap-3 mt-4 px-3">
+                <div class="d-flex flex-column gap-2 mt-2.5 px-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.work_center_type') }}:</span>
+                        <span class="text-muted fs-12">{{ __('production.work_center_type') }}:</span>
                         <span class="fw-bold text-dark text-uppercase fs-12">
                             {{ config('production.work_center_types')[$workCenter->work_center_type] ?? $workCenter->work_center_type ?? 'N/A' }}
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.physical_location') }}:</span>
-                        <span class="fw-semibold text-dark">{{ $workCenter->location ?? '—' }}</span>
+                        <span class="text-muted fs-12">{{ __('production.physical_location') }}:</span>
+                        <span class="fw-semibold text-dark fs-12">{{ $workCenter->location ?? '—' }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.created_date') }}:</span>
-                        <span class="fw-semibold text-dark">{{ $workCenter->created_at->format('Y-m-d') }}</span>
+                        <span class="text-muted fs-12">{{ __('production.created_date') }}:</span>
+                        <span class="fw-semibold text-dark fs-12">{{ $workCenter->created_at->format('Y-m-d') }}</span>
                     </div>
-                    @php
-                        $wcDirectEmps = $workCenter->employeeAssignments 
-                            ? $workCenter->employeeAssignments->whereNull('section_id')->where('active', true) 
-                            : collect();
-                        $wcAssignedEmpCount = $wcDirectEmps->count();
 
-                        if ($wcAssignedEmpCount > 0) {
-                            $wcEmpListHtml = '<ul class=\'list-unstyled mb-0 fs-12\'>';
-                            foreach ($wcDirectEmps as $assign) {
-                                $emp = $assign->employee;
-                                $empCode = $emp?->employee_id ?? ('EMP-' . ($emp?->id ?? $assign->employee_id));
-                                $empName = $emp?->full_name ?? $emp?->name ?? 'Employee #' . $assign->employee_id;
-                                $wcEmpListHtml .= '<li class=\'py-1 border-bottom border-light d-flex align-items-center gap-1\'>'
-                                    . '<i class=\'feather-user text-primary fs-11\'></i>'
-                                    . '<span class=\'fw-bold font-monospace text-dark\'>[' . e($empCode) . ']</span> '
-                                    . '<span class=\'text-dark\'>' . e($empName) . '</span>'
-                                    . '</li>';
+                    @php
+                        $directStaffService = app(\App\Domains\Production\Services\WorkCenterCalculationService::class);
+                        $liveDirectStaffData = $directStaffService->calculateDirectStaffLabor($workCenter);
+                        $liveDirectStaffEmployees = $liveDirectStaffData['employees'] ?? [];
+                        $liveDirectStaffTotal = (float) ($liveDirectStaffData['total_daily_cost'] ?? 0.0);
+                        $liveDirectStaffCount = count($liveDirectStaffEmployees);
+
+                        $wcEmpListHtml = '<div class="card border-0 shadow-none mb-0 overflow-hidden" style="width: 350px; max-width: 360px;">'
+                            . '<div class="card-header bg-soft-primary py-1.5 px-3 border-bottom d-flex justify-content-between align-items-center">'
+                            . '<span class="text-dark fw-bold fs-11 text-uppercase"><i class="feather-users text-primary me-1.5"></i>DIRECT ASSIGNED STAFF (' . $liveDirectStaffCount . ')</span>'
+                            . ($liveDirectStaffTotal > 0 
+                                ? '<span class="badge bg-white text-primary border border-primary-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace">' . format_currency($liveDirectStaffTotal) . ' / day</span>' 
+                                : '<span class="badge bg-white text-secondary border fs-10 px-2 py-0.5 rounded-pill font-monospace">' . $liveDirectStaffCount . ' Personnel</span>')
+                            . '</div>'
+                            . '<div class="card-body bg-white p-2.5">'
+                            . '<div class="text-muted fs-11 mb-1.5">Personnel directly allocated to this work center:</div>'
+                            . '<div class="d-flex flex-column gap-1 fs-11">';
+
+                        if ($liveDirectStaffCount > 0) {
+                            foreach ($liveDirectStaffEmployees as $empData) {
+                                $empCode   = $empData['employee_code'] ?? 'EMP';
+                                $empName   = $empData['name'] ?? 'Employee';
+                                $empRole   = $empData['role'] ?? 'Staff';
+                                $empDaily  = (float) ($empData['daily_salary'] ?? $empData['daily_cost'] ?? 0);
+                                $empHourly = (float) ($empData['hourly_rate'] ?? 0);
+
+                                $wcEmpListHtml .= '<div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">'
+                                    . '<div class="text-truncate me-2" style="max-width: 62%;">'
+                                    . '<div class="text-dark text-truncate">'
+                                    . '<span class="font-monospace fw-semibold text-primary">[' . e($empCode) . ']</span> '
+                                    . '<span class="fw-semibold text-dark">' . e($empName) . '</span>'
+                                    . '</div>'
+                                    . '<div class="text-muted fs-10 text-truncate">' . e($empRole) . '</div>'
+                                    . '</div>'
+                                    . '<div class="text-end flex-shrink-0">'
+                                    . '<div class="font-monospace fw-bold text-dark fs-11">' . format_currency($empDaily) . ' <small class="text-muted fw-normal">/ day</small></div>'
+                                    . ($empHourly > 0 ? '<div class="text-muted font-monospace fs-10">' . format_currency($empHourly) . ' / hr</div>' : '')
+                                    . '</div>'
+                                    . '</div>';
                             }
-                            $wcEmpListHtml .= '</ul>';
                         } else {
-                            $wcEmpListHtml = '<div class=\'text-muted fs-11 fst-italic py-1 text-center\'>'
-                                . '<i class=\'feather-info text-muted me-1\'></i>' . e(__('production.no_employees_assigned'))
+                            $wcEmpListHtml .= '<div class="text-muted fst-italic py-2 text-center">'
+                                . '<i class="feather-info text-muted me-1"></i>' . e(__('production.no_employees_assigned') ?? 'No direct personnel assigned')
                                 . '</div>';
                         }
+                        $wcEmpListHtml .= '</div></div></div>';
                     @endphp
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.assigned_employees') }}:</span>
-                        <span class="badge bg-soft-secondary text-secondary rounded-pill px-2.5 py-1 fs-12"
-                              role="button"
-                              tabindex="0"
-                              data-bs-toggle="popover"
-                              data-bs-trigger="hover focus"
-                              data-bs-placement="top"
-                              data-bs-html="true"
-                              data-bs-custom-class="section-machines-popover"
-                              data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-users text-primary fs-12'></i>{{ __('production.assigned_employees') }} ({{ $wcAssignedEmpCount }})</div>"
-                              data-bs-content="{{ $wcEmpListHtml }}">
-                            <i class="feather-users me-1 fs-11"></i>{{ $wcAssignedEmpCount }}
-                        </span>
+
+                    <!-- Direct Assigned Staff Card with Hover Popover (Live Calculated Total) -->
+                    <div class="card border rounded-3 shadow-none mt-2.5 overflow-hidden capacity-popover-trigger"
+                         role="button"
+                         tabindex="0"
+                         data-bs-toggle="popover"
+                         data-bs-trigger="hover focus"
+                         data-bs-placement="top"
+                         data-bs-html="true"
+                         data-bs-custom-class="wc-breakdown-popover"
+                         data-bs-content="{{ $wcEmpListHtml }}">
+                        <div class="card-body bg-light p-2.5 d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-1.5">
+                                <i class="feather-users text-primary fs-13"></i>
+                                <span class="fw-bold fs-11 text-uppercase text-dark">Direct Assigned Staff ({{ $liveDirectStaffCount }})</span>
+                            </div>
+                            @if($liveDirectStaffTotal > 0)
+                                <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2 py-1">
+                                    {{ format_currency($liveDirectStaffTotal) }}/day
+                                </span>
+                            @else
+                                <span class="badge bg-soft-secondary text-secondary font-monospace fs-10 px-2 py-0.5">{{ $liveDirectStaffCount }} Assigned</span>
+                            @endif
+                        </div>
                     </div>
+
+                    <!-- Purpose & Operational Notes Card -->
+                    @if ($workCenter->description)
+                        <div class="card border rounded-3 shadow-none mt-2.5 overflow-hidden">
+                            <div class="card-header bg-light py-1.5 px-3 border-bottom d-flex align-items-center">
+                                <span class="text-dark fw-bold fs-11 text-uppercase"><i class="feather-file-text text-primary me-1.5"></i>{{ __('production.purpose_notes') ?? 'Purpose & Operational Notes' }}</span>
+                            </div>
+                            <div class="card-body bg-white p-2.5">
+                                <p class="mb-0 fs-12 text-muted" style="white-space: pre-line;">{{ $workCenter->description }}</p>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
 
-            <!-- Capacity Panel -->
+            <!-- Capacity Panel (Column 2) -->
             <div class="col-md-4 border-end">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0">{{ __('production.wc_metrics') }}</h5>
+                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-activity text-primary me-1.5"></i>{{ __('production.wc_metrics') }}</h5>
                     @if($latestSnapshot)
                         <span class="badge bg-soft-success text-success fs-10 font-monospace">Snapshot #{{ $latestSnapshot->id }}</span>
                     @endif
                 </div>
-                <div class="d-flex flex-column gap-3 py-1 px-1">
-                    <div>
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('production.capacity_per_hour') }}</span>
-                            <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 rounded-pill" title="Average capacity across {{ format_hours($latestSnapshot?->unique_operating_hours ?? 0) }} operational hours. Output varies by interval.">
-                                <i class="feather-alert-triangle me-0.5"></i>Avg / hr
-                            </span>
-                        </div>
-                        <div class="d-flex align-items-baseline gap-2">
-                            <span class="fs-22 fw-bold text-dark font-monospace">
-                                {{ number_format($latestSnapshot?->capacity_per_hour ?? 0, 2) }}
-                            </span>
-                            <span class="fs-12 text-muted">units / hr</span>
-                        </div>
-                    </div>
 
-                    <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="text-dark fw-bold fs-12 text-uppercase d-block">Daily Production Capacity</span>
-                            <small class="text-muted fs-11">Total theoretical daily output</small>
-                        </div>
-                        <span class="fs-20 fw-bolder text-primary font-monospace">{{ number_format($latestSnapshot?->daily_capacity ?? 0, 1) }} <span class="fs-11 fw-normal text-muted">units</span></span>
-                    </div>
+                @php
+                    $activeSections = $workCenter->sections ? $workCenter->sections->where('status', 'active') : collect();
 
-                    <div class="d-flex justify-content-between align-items-center pb-2 border-bottom">
-                        <div>
-                            <span class="text-muted fs-11 text-uppercase d-block fw-semibold">Operational Window</span>
-                            <small class="text-muted fs-11">Unique hours across section shifts</small>
-                        </div>
-                        <span class="fs-16 fw-bold text-dark font-monospace">{{ format_hours($latestSnapshot?->unique_operating_hours ?? 0, false) }} <span class="fs-11 fw-normal text-muted">hrs / day</span></span>
-                    </div>
+                    // 1. Hourly Capacity Popover
+                    $wcHourlyCapPopoverHtml = '<div class="card border-0 shadow-none mb-0 overflow-hidden" style="width: 350px; max-width: 360px;">'
+                        . '<div class="card-header bg-soft-warning py-1.5 px-3 border-bottom d-flex justify-content-between align-items-center">'
+                        . '<span class="text-dark fw-bold fs-11 text-uppercase text-nowrap"><i class="feather-clock text-warning me-1.5"></i>Hourly Capacity</span>'
+                        . '<span class="badge bg-white text-warning border border-warning-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace text-nowrap">' . number_format($latestSnapshot?->capacity_per_hour ?? 0, 1) . ' u/h</span>'
+                        . '</div>'
+                        . '<div class="card-body bg-white p-2.5">'
+                        . '<div class="text-muted fs-11 mb-1.5">Section contribution to average hourly speed:</div>'
+                        . '<div class="d-flex flex-column gap-1 fs-11">';
 
-                    <div class="pt-1">
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1"><i class="feather-calendar me-1"></i>Production Calendar</span>
-                        <span class="fs-13 fw-semibold text-dark">
-                            @if ($workCenter->calendar)
-                                <span class="badge bg-soft-primary text-primary fs-11"><i class="feather-calendar me-1"></i>{{ $workCenter->calendar->name }}</span>
-                            @else
-                                <span class="text-muted fs-12 fst-italic">Default Factory Calendar</span>
-                            @endif
+                    if ($activeSections->isNotEmpty()) {
+                        foreach ($activeSections as $sec) {
+                            $sCalc = $sec->latestCalculation;
+                            $sCapHr = (float) ($sCalc?->capacity_per_hour ?? 0);
+                            $wcHourlyCapPopoverHtml .= '<div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">'
+                                . '<span class="text-dark text-truncate me-2" style="max-width: 62%;">'
+                                . '<span class="font-monospace fw-semibold text-primary">[' . e($sec->code) . ']</span> ' . e($sec->name)
+                                . '</span>'
+                                . '<span class="font-monospace fw-bold text-dark flex-shrink-0">' . number_format($sCapHr, 1) . ' <small class="text-muted fw-normal">u/h</small></span>'
+                                . '</div>';
+                        }
+                    } else {
+                        $wcHourlyCapPopoverHtml .= '<span class="text-muted fst-italic">No active sections</span>';
+                    }
+                    $wcHourlyCapPopoverHtml .= '</div></div></div>';
+
+                    // 2. Daily Output Popover
+                    $wcDailyCapPopoverHtml = '<div class="card border-0 shadow-none mb-0 overflow-hidden" style="width: 350px; max-width: 360px;">'
+                        . '<div class="card-header bg-soft-success py-1.5 px-3 border-bottom d-flex justify-content-between align-items-center">'
+                        . '<span class="text-dark fw-bold fs-11 text-uppercase text-nowrap"><i class="feather-box text-success me-1.5"></i>Daily Output</span>'
+                        . '<span class="badge bg-white text-success border border-success-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace text-nowrap">' . number_format($latestSnapshot?->daily_capacity ?? 0, 1) . ' units</span>'
+                        . '</div>'
+                        . '<div class="card-body bg-white p-2.5">'
+                        . '<div class="text-muted fs-11 mb-1.5">Section contribution to total daily output:</div>'
+                        . '<div class="d-flex flex-column gap-1 fs-11">';
+
+                    if ($activeSections->isNotEmpty()) {
+                        foreach ($activeSections as $sec) {
+                            $sCalc = $sec->latestCalculation;
+                            $sDailyCap = (float) ($sCalc?->daily_capacity ?? 0);
+                            $wcDailyCapPopoverHtml .= '<div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">'
+                                . '<span class="text-dark text-truncate me-2" style="max-width: 62%;">'
+                                . '<span class="font-monospace fw-semibold text-success">[' . e($sec->code) . ']</span> ' . e($sec->name)
+                                . '</span>'
+                                . '<span class="font-monospace fw-bold text-dark flex-shrink-0">' . number_format($sDailyCap, 1) . ' <small class="text-muted fw-normal">units</small></span>'
+                                . '</div>';
+                        }
+                    } else {
+                        $wcDailyCapPopoverHtml .= '<span class="text-muted fst-italic">No active sections</span>';
+                    }
+                    $wcDailyCapPopoverHtml .= '</div></div></div>';
+                @endphp
+
+                <!-- 1. Work Center Capacity per Hour Card (With Hover Popover) -->
+                <div class="card border rounded-3 shadow-none mb-3 overflow-hidden capacity-popover-trigger"
+                     role="button"
+                     tabindex="0"
+                     data-bs-toggle="popover"
+                     data-bs-trigger="hover focus"
+                     data-bs-placement="top"
+                     data-bs-html="true"
+                     data-bs-target="#workCenterCalculationModal"
+                     data-bs-custom-class="wc-breakdown-popover"
+                     data-bs-content="{{ $wcHourlyCapPopoverHtml }}">
+                    <div class="card-header bg-soft-warning bg-opacity-50 py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="text-dark fw-bold fs-11 text-uppercase"><i class="feather-clock text-warning me-1"></i>Capacity / Hour</span>
+                        <span class="badge bg-white text-warning border border-warning-subtle fs-10 px-2 py-0.5 rounded-pill" title="Average capacity across {{ format_hours($latestSnapshot?->unique_operating_hours ?? 0) }} operational hours.">
+                            <i class="feather-alert-triangle me-0.5"></i>Avg / hr
                         </span>
+                    </div>
+                    <div class="card-body bg-white p-3 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-baseline gap-1.5">
+                            <span class="fs-22 fw-bold text-primary font-monospace">
+                                {{ number_format($latestSnapshot?->capacity_per_hour ?? 0, 1) }}
+                            </span>
+                            <span class="fs-11 text-muted">units / hr</span>
+                        </div>
+                        <span class="badge bg-soft-secondary text-secondary fs-11 font-monospace">
+                            <i class="feather-grid me-1 text-primary"></i>{{ $activeSections->count() }} Sections <i class="feather-chevron-right ms-0.5 fs-10"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 2. Work Center Daily Capacity Card (With Hover Popover) -->
+                <div class="card border rounded-3 shadow-none mb-3 overflow-hidden capacity-popover-trigger"
+                     role="button"
+                     tabindex="0"
+                     data-bs-toggle="popover"
+                     data-bs-trigger="hover focus"
+                     data-bs-placement="top"
+                     data-bs-html="true"
+                     data-bs-target="#workCenterCalculationModal"
+                     data-bs-custom-class="wc-breakdown-popover"
+                     data-bs-content="{{ $wcDailyCapPopoverHtml }}">
+                    <div class="card-header bg-soft-success bg-opacity-50 py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="text-dark fw-bold fs-11 text-uppercase"><i class="feather-box text-success me-1"></i>Daily Production Capacity</span>
+                        <span class="badge bg-white text-success border border-success-subtle fs-10 px-2 py-0.5 rounded-pill">Total Output</span>
+                    </div>
+                    <div class="card-body bg-white p-3 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-baseline gap-1.5">
+                            <span class="fs-22 fw-bold text-success font-monospace">
+                                {{ number_format($latestSnapshot?->daily_capacity ?? 0, 1) }}
+                            </span>
+                            <span class="fs-11 text-muted">units / day</span>
+                        </div>
+                        <span class="badge bg-soft-secondary text-secondary fs-11 font-monospace">
+                            <i class="feather-grid me-1 text-success"></i>{{ $activeSections->count() }} Sections <i class="feather-chevron-right ms-0.5 fs-10"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 3. Operational Schedule & Window Card (Direct Card) -->
+                <div class="card border rounded-3 shadow-none mb-0 overflow-hidden">
+                    <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="text-dark fw-bold fs-11 text-uppercase"><i class="feather-calendar text-primary me-1"></i>Operational Schedule</span>
+                        <small class="text-muted fs-10">Across section shifts</small>
+                    </div>
+                    <div class="card-body bg-white p-3 d-flex flex-column gap-2 fs-12">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted fs-11 text-uppercase">Operating Window</span>
+                            <span class="fs-13 fw-bold text-dark font-monospace">{{ format_hours($latestSnapshot?->unique_operating_hours ?? 0, false) }} <span class="fs-10 fw-normal text-muted">hrs / day</span></span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="text-muted fs-11 text-uppercase">Production Calendar</span>
+                            <span class="fs-12 fw-semibold text-dark">
+                                @if ($workCenter->calendar)
+                                    <span class="badge bg-soft-primary text-primary fs-10"><i class="feather-calendar me-0.5"></i>{{ $workCenter->calendar->name }}</span>
+                                @else
+                                    <span class="text-muted fs-11 fst-italic">Default Factory Calendar</span>
+                                @endif
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Operating Cost Structure Panel -->
+            <!-- Operating Cost Structure Panel (Column 3) -->
             <div class="col-md-4">
-                <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_cost_structure') }}</h5>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-dollar-sign text-primary me-1.5"></i>{{ __('production.wc_cost_structure') }}</h5>
+                </div>
                 @php
                     $laborCostHour = (float) ($latestSnapshot?->labor_cost_per_hour ?? 0.0);
                     $laborCostDaily = (float) ($latestSnapshot?->total_daily_labor_cost ?? 0.0);
@@ -601,50 +768,146 @@
                     $overheadFlat = (float) ($latestSnapshot?->overhead_cost ?? $workCenter->overhead_cost ?? 0);
                     $totalDailyCost = (float) ($latestSnapshot?->total_daily_cost ?? ($overheadFlat + $laborCostDaily + $machCostDaily));
                     $totalCostHour = (float) ($latestSnapshot?->total_cost_per_hour ?? ($latestSnapshot?->unique_operating_hours > 0 ? $totalDailyCost / $latestSnapshot->unique_operating_hours : 0));
+                    $wcCostPerUnitVal = (float) ($latestSnapshot?->cost_per_unit ?? ($latestSnapshot?->daily_capacity > 0 ? $totalDailyCost / $latestSnapshot->daily_capacity : 0));
+                    $directStaffDailyCost = (float) ($latestSnapshot?->direct_staff_daily_labor_cost ?? 0);
+                    $snapDirectStaffList = $latestSnapshot?->calculation_details['direct_work_center_staff']['employees'] 
+                        ?? $latestSnapshot?->calculation_details['direct_personnel']['employees'] 
+                        ?? [];
+                    $snapDirectStaffCount = count($snapDirectStaffList);
+
+                    // 3. Daily Labor Popover
+                    $wcDailyLaborPopoverHtml = '<div class="card border-0 shadow-none mb-0 overflow-hidden" style="width: 350px; max-width: 360px;">'
+                        . '<div class="card-header bg-soft-primary py-1.5 px-3 border-bottom d-flex justify-content-between align-items-center">'
+                        . '<span class="text-dark fw-bold fs-11 text-uppercase text-nowrap"><i class="feather-users text-primary me-1.5"></i>Labor Breakdown</span>'
+                        . '<span class="badge bg-white text-primary border border-primary-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace text-nowrap">' . format_currency($laborCostDaily) . '</span>'
+                        . '</div>'
+                        . '<div class="card-body bg-white p-2.5">'
+                        . '<div class="text-muted fs-11 mb-1.5">Section & direct personnel labor contributions:</div>'
+                        . '<div class="d-flex flex-column gap-1 fs-11">';
+
+                    foreach ($activeSections as $sec) {
+                        $sLabor = (float) ($sec->latestCalculation?->total_daily_labor_cost ?? 0);
+                        $wcDailyLaborPopoverHtml .= '<div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">'
+                            . '<span class="text-dark text-truncate me-2" style="max-width: 62%;">'
+                            . '<span class="font-monospace fw-semibold text-primary">[' . e($sec->code) . ']</span> ' . e($sec->name)
+                            . '</span>'
+                            . '<span class="font-monospace fw-semibold text-primary flex-shrink-0">' . format_currency($sLabor) . '</span>'
+                            . '</div>';
+                    }
+                    if ($snapDirectStaffCount > 0 || $directStaffDailyCost > 0) {
+                        $wcDailyLaborPopoverHtml .= '<div class="d-flex justify-content-between align-items-center pt-1.5 mt-1 border-top border-light-subtle">'
+                            . '<span class="text-dark fw-semibold text-truncate me-2" style="max-width: 62%;">'
+                            . '<i class="feather-user-check me-1 text-primary"></i>Direct Personnel' . ($snapDirectStaffCount > 0 ? ' (' . $snapDirectStaffCount . ')' : '')
+                            . '</span>'
+                            . '<span class="font-monospace fw-bold text-primary flex-shrink-0">' . format_currency($directStaffDailyCost) . '</span>'
+                            . '</div>';
+                    }
+                    $wcDailyLaborPopoverHtml .= '</div></div></div>';
+
+                    // 4. Daily Machinery Popover
+                    $wcDailyMachPopoverHtml = '<div class="card border-0 shadow-none mb-0 overflow-hidden" style="width: 350px; max-width: 360px;">'
+                        . '<div class="card-header bg-soft-warning py-1.5 px-3 border-bottom d-flex justify-content-between align-items-center">'
+                        . '<span class="text-dark fw-bold fs-11 text-uppercase text-nowrap"><i class="feather-cpu text-warning me-1.5"></i>Machinery Breakdown</span>'
+                        . '<span class="badge bg-white text-warning border border-warning-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace text-nowrap">' . format_currency($machCostDaily) . '</span>'
+                        . '</div>'
+                        . '<div class="card-body bg-white p-2.5">'
+                        . '<div class="text-muted fs-11 mb-1.5">Section machinery power and operating expenses:</div>'
+                        . '<div class="d-flex flex-column gap-1 fs-11">';
+
+                    foreach ($activeSections as $sec) {
+                        $sMach = (float) ($sec->latestCalculation?->total_daily_machine_cost ?? 0);
+                        $wcDailyMachPopoverHtml .= '<div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light-subtle">'
+                            . '<span class="text-dark text-truncate me-2" style="max-width: 62%;">'
+                            . '<span class="font-monospace fw-semibold text-dark">[' . e($sec->code) . ']</span> ' . e($sec->name)
+                            . '</span>'
+                            . '<span class="font-monospace fw-semibold text-warning flex-shrink-0">' . format_currency($sMach) . '</span>'
+                            . '</div>';
+                    }
+                    $wcDailyMachPopoverHtml .= '</div></div></div>';
                 @endphp
-                <div class="d-flex flex-column gap-2 py-1 px-1">
-                    <div class="d-flex justify-content-between align-items-center pb-1.5 border-bottom">
-                        <div>
-                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block">Daily Labor Cost</span>
-                            <small class="text-muted fs-10">Avg: {{ format_currency($laborCostHour) }} / hr</small>
-                        </div>
-                        <span class="fs-16 fw-bold text-primary font-monospace">{{ format_currency($laborCostDaily) }} <span class="fs-10 fw-normal text-muted">/ day</span></span>
-                    </div>
 
-                    <div class="d-flex justify-content-between align-items-center pb-1.5 border-bottom">
-                        <div>
-                            <span class="text-muted fs-11 text-uppercase fw-semibold d-block">Daily Machinery Expense</span>
-                            <small class="text-muted fs-10">Energy & fuel operating costs</small>
-                        </div>
-                        <span class="fs-16 fw-bold text-warning font-monospace">{{ format_currency($machCostDaily) }} <span class="fs-10 fw-normal text-muted">/ day</span></span>
+                <!-- 1. Daily Labor Cost Card (With Hover Popover) -->
+                <div class="card border rounded-3 shadow-none mb-3 overflow-hidden cost-popover-trigger"
+                     role="button"
+                     tabindex="0"
+                     data-bs-toggle="popover"
+                     data-bs-trigger="hover focus"
+                     data-bs-placement="top"
+                     data-bs-html="true"
+                     data-bs-target="#workCenterCalculationModal"
+                     data-bs-custom-class="wc-breakdown-popover"
+                     data-bs-content="{{ $wcDailyLaborPopoverHtml }}">
+                    <div class="card-header bg-soft-primary bg-opacity-50 py-2 px-3 border-bottom d-flex justify-content-between align-items-center gap-2">
+                        <span class="text-muted fs-11 text-uppercase fw-bold text-dark text-nowrap"><i class="feather-users text-primary me-1"></i>Daily Labor Cost</span>
+                        <span class="badge bg-white text-primary border border-primary-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace text-nowrap">Avg: {{ format_currency($laborCostHour) }} / hr</span>
                     </div>
-
-                    <div class="d-flex justify-content-between align-items-center pb-1.5 border-bottom">
-                        <div>
-                            <span class="text-muted fs-11 text-uppercase d-block fw-semibold">{{ __('production.overhead_cost_rate') }}</span>
-                            <small class="text-muted fs-10">Fixed daily facility overhead</small>
-                        </div>
-                        <span class="fs-16 fw-bold text-dark font-monospace">{{ format_currency($overheadFlat) }} <span class="fs-10 fw-normal text-muted">/ day</span></span>
+                    <div class="card-body bg-white p-3 d-flex justify-content-between align-items-center">
+                        <span class="fs-20 fw-bold text-primary font-monospace">{{ format_currency($laborCostDaily) }} <span class="fs-11 fw-normal text-muted">/ day</span></span>
+                        <span class="badge bg-soft-secondary text-secondary fs-11 font-monospace">
+                            <i class="feather-pie-chart me-1 text-primary"></i>Breakdown <i class="feather-chevron-right ms-0.5 fs-10"></i>
+                        </span>
                     </div>
+                </div>
 
-                    <div class="p-2.5 rounded bg-light border d-flex justify-content-between align-items-center mt-1">
+                <!-- 2. Daily Machinery Expense Card (With Hover Popover) -->
+                <div class="card border rounded-3 shadow-none mb-3 overflow-hidden cost-popover-trigger"
+                     role="button"
+                     tabindex="0"
+                     data-bs-toggle="popover"
+                     data-bs-trigger="hover focus"
+                     data-bs-placement="top"
+                     data-bs-html="true"
+                     data-bs-target="#workCenterCalculationModal"
+                     data-bs-custom-class="wc-breakdown-popover"
+                     data-bs-content="{{ $wcDailyMachPopoverHtml }}">
+                    <div class="card-header bg-soft-warning bg-opacity-50 py-2 px-3 border-bottom d-flex justify-content-between align-items-center gap-2">
+                        <span class="text-muted fs-11 text-uppercase fw-bold text-dark text-nowrap"><i class="feather-cpu text-warning me-1"></i>Daily Machinery Expense</span>
+                        <span class="badge bg-white text-warning border border-warning-subtle fs-10 px-2 py-0.5 rounded-pill font-monospace text-nowrap">Avg: {{ format_currency($machCostHour) }} / hr</span>
+                    </div>
+                    <div class="card-body bg-white p-3 d-flex justify-content-between align-items-center">
+                        <span class="fs-20 fw-bold text-warning font-monospace">{{ format_currency($machCostDaily) }} <span class="fs-11 fw-normal text-muted">/ day</span></span>
+                        <span class="badge bg-soft-secondary text-secondary fs-11 font-monospace">
+                            <i class="feather-pie-chart me-1 text-warning"></i>Breakdown <i class="feather-chevron-right ms-0.5 fs-10"></i>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 3. Facility Overhead Card (Direct Card) -->
+                <div class="card border rounded-3 shadow-none mb-3 overflow-hidden">
+                    <div class="card-header bg-light py-2 px-3 border-bottom d-flex justify-content-between align-items-center gap-2">
+                        <span class="text-dark fw-bold fs-11 text-uppercase text-nowrap"><i class="feather-home text-secondary me-1"></i>Facility Overhead</span>
+                        <small class="text-muted fs-10 text-nowrap">Fixed daily</small>
+                    </div>
+                    <div class="card-body bg-white p-2.5 d-flex justify-content-between align-items-center">
+                        <span class="text-muted fs-11">Facility operational cost</span>
+                        <span class="fs-13 fw-bold font-monospace text-dark">{{ format_currency($overheadFlat) }} <span class="fs-10 text-muted fw-normal">/ day</span></span>
+                    </div>
+                </div>
+
+                <!-- 4. Total Daily Operating Cost Card (Direct Card) -->
+                <div class="card border border-primary-subtle rounded-3 shadow-none mb-0 overflow-hidden">
+                    <div class="card-header bg-soft-primary py-2 px-3 border-bottom border-primary-subtle d-flex justify-content-between align-items-center gap-2">
+                        <span class="text-dark fw-bold fs-11 text-uppercase text-nowrap"><i class="feather-check-circle text-primary me-1.5"></i>TOTAL DAILY COST</span>
+                        <span class="badge bg-primary text-white fs-10 px-2.5 py-1 rounded-pill font-monospace text-nowrap">Effective: {{ format_currency($totalCostHour) }} / hr</span>
+                    </div>
+                    <div class="card-body bg-white p-3 d-flex justify-content-between align-items-center">
                         <div>
-                            <span class="text-dark fw-bold fs-12 text-uppercase d-block">Total Daily Cost</span>
-                            <small class="text-muted fs-11">Effective: {{ format_currency($totalCostHour) }} / hr</small>
+                            <div class="d-flex align-items-baseline gap-1">
+                                <span class="fs-22 fw-bolder text-primary font-monospace">{{ format_currency($totalDailyCost) }}</span>
+                                <span class="fs-11 text-muted">/ day</span>
+                            </div>
                         </div>
-                        <span class="fs-18 fw-bolder text-primary font-monospace">{{ format_currency($totalDailyCost) }} <span class="fs-11 fw-normal text-muted">/ day</span></span>
+                        @if($wcCostPerUnitVal > 0)
+                            <div class="text-end">
+                                <span class="badge bg-soft-success text-success border border-success-subtle font-monospace fs-11 px-2.5 py-1">
+                                    <i class="feather-tag me-1"></i>{{ format_currency($wcCostPerUnitVal) }} / unit
+                                </span>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Description Section -->
-        @if ($workCenter->description)
-            <div class="mb-4 pb-4 border-bottom">
-                <h5 class="fw-bold text-dark mb-2">{{ __('production.purpose_notes') }}</h5>
-                <p class="mb-0 fs-13 text-muted" style="white-space: pre-line;">{{ $workCenter->description }}</p>
-            </div>
-        @endif
 
         <!-- Assigned Shifts Section -->
         <div class="mb-4 pb-4 border-bottom">
@@ -2271,8 +2534,9 @@
                                                     <td>
                                                         @if($secDetailsCalc)
                                                             <div class="font-monospace text-dark fw-bold">{{ number_format($secDetailsManDailyCap, 1) }} <small class="text-muted fw-normal">u/d</small></div>
-                                                            <small class="text-muted fs-11" title="Total Averaged Manual Output across all section operating hours">
+                                                            <small class="text-muted fs-11" title="It is average production per hour throughout section shifts. Formula: {{ number_format($secDetailsManDailyCap, 1) }} units / {{ format_hours($uohHoursVal) }} = {{ number_format($secDetailsManHourlyCap, 1) }} u/h" data-bs-toggle="tooltip">
                                                                 Avg: <span class="text-dark font-monospace fw-semibold">{{ number_format($secDetailsManHourlyCap, 1) }} u/h</span>
+                                                                <i class="feather-info text-muted ms-0.5" style="font-size: 10px;"></i>
                                                             </small>
                                                         @else
                                                             <div class="font-monospace text-muted fw-semibold">0.0 <small class="text-muted fw-normal">u/d</small></div>
@@ -2336,7 +2600,10 @@
                                                 <span class="fw-bold font-monospace text-dark fs-13">{{ number_format($secDetailsMachDailyCap, 1) }} u/d <span class="text-muted fw-normal fs-11">({{ number_format($secDetailsMachHourlyCap, 1) }} u/h)</span></span>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                <span class="text-muted fs-12">Manual Daily Capacity:</span>
+                                                <span class="text-muted fs-12 d-flex align-items-center gap-1">
+                                                    Manual Daily Capacity:
+                                                    <i class="feather-info text-muted fs-11 cursor-pointer" title="It is average production per hour throughout section shifts. Formula: {{ number_format($secDetailsManDailyCap, 1) }} units / {{ format_hours($uohHoursVal) }} = {{ number_format($secDetailsManHourlyCap, 1) }} u/h" data-bs-toggle="tooltip"></i>
+                                                </span>
                                                 <span class="fw-bold font-monospace text-dark fs-13">{{ number_format($secDetailsManDailyCap, 1) }} u/d <span class="text-muted fw-normal fs-11">({{ number_format($secDetailsManHourlyCap, 1) }} u/h)</span></span>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -2446,9 +2713,10 @@
         $wcTotalCostPerHour = (float) ($latestSnapshot?->total_cost_per_hour ?? 0);
         $wcUniqOperatingHours = (float) ($latestSnapshot?->unique_operating_hours ?? 0);
 
-        $wcSectionsBreakdown = $wcDetails['sections'] ?? [];
-        $wcDirectStaff = $wcDetails['direct_personnel']['employees'] ?? [];
-        $wcDirectStaffDaily = (float) ($wcDetails['direct_personnel']['total_daily_cost'] ?? 0);
+        $wcSectionsBreakdown = $wcDetails['sections_contribution'] ?? $wcDetails['sections'] ?? [];
+        $wcDirectStaff = $wcDetails['direct_work_center_staff']['employees'] ?? $wcDetails['direct_personnel']['employees'] ?? [];
+        $wcDirectStaffDaily = (float) ($latestSnapshot?->direct_staff_daily_labor_cost ?? $wcDetails['direct_work_center_staff']['total_daily_cost'] ?? $wcDetails['direct_personnel']['total_daily_cost'] ?? 0);
+        $wcCostPerUnit = (float) ($latestSnapshot?->cost_per_unit ?? $wcDetails['totals']['cost_per_unit'] ?? ($wcDailyCap > 0 ? $wcTotalDailyCost / $wcDailyCap : 0));
         $wcTimelineIntervals = $wcDetails['timeline_intervals'] ?? [];
         $wcTimelineGaps = $wcDetails['timeline_gaps'] ?? [];
     @endphp
@@ -2704,9 +2972,9 @@
                                         <tbody>
                                             @forelse($wcSectionsBreakdown as $secB)
                                                 <tr>
-                                                    <td><span class="font-monospace fw-bold text-dark">{{ $secB['code'] ?? '—' }}</span></td>
-                                                    <td class="fw-semibold text-dark">{{ $secB['name'] ?? '—' }}</td>
-                                                    <td><span class="badge bg-soft-secondary text-secondary font-monospace">{{ format_hours($secB['operating_hours'] ?? 0) }}</span></td>
+                                                    <td><span class="font-monospace fw-bold text-dark">{{ $secB['section_code'] ?? $secB['code'] ?? '—' }}</span></td>
+                                                    <td class="fw-semibold text-dark">{{ $secB['section_name'] ?? $secB['name'] ?? '—' }}</td>
+                                                    <td><span class="badge bg-soft-secondary text-secondary font-monospace">{{ format_hours($secB['unique_operating_hours'] ?? $secB['operating_hours'] ?? 0) }}</span></td>
                                                     <td class="text-end font-monospace fw-bold text-dark">{{ number_format($secB['daily_capacity'] ?? 0, 1) }} units</td>
                                                     <td class="text-end font-monospace text-primary fw-semibold">{{ format_currency($secB['total_daily_labor_cost'] ?? 0) }}</td>
                                                     <td class="text-end font-monospace text-warning fw-semibold">{{ format_currency($secB['total_daily_machine_cost'] ?? 0) }}</td>
@@ -2746,10 +3014,20 @@
                                         <tbody>
                                             @forelse($wcDirectStaff as $dst)
                                                 <tr>
-                                                    <td class="fw-semibold text-dark"><i class="feather-user me-1 text-muted"></i>{{ $dst['name'] ?? '—' }}</td>
-                                                    <td class="font-monospace text-muted">{{ format_currency($dst['monthly_ctc'] ?? 0) }} / mo</td>
-                                                    <td class="font-monospace fw-bold text-primary">{{ format_currency($dst['daily_cost'] ?? 0) }} / day</td>
-                                                    <td class="text-muted fs-11">Floating Station Personnel</td>
+                                                    <td class="fw-semibold text-dark">
+                                                        <i class="feather-user me-1 text-muted"></i>{{ $dst['name'] ?? '—' }}
+                                                        @if(!empty($dst['employee_code']))
+                                                            <span class="badge bg-soft-dark text-dark font-monospace fs-10 ms-1">{{ $dst['employee_code'] }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="font-monospace text-muted">{{ format_currency($dst['monthly_ctc'] ?? $dst['hrms_net_monthly_salary'] ?? 0) }} / mo</td>
+                                                    <td class="font-monospace fw-bold text-primary">
+                                                        {{ format_currency($dst['daily_cost'] ?? $dst['daily_salary'] ?? 0) }} / day
+                                                        @if(!empty($dst['hourly_rate']))
+                                                            <small class="text-muted d-block fs-10 fw-normal">({{ format_currency($dst['hourly_rate']) }} / hr)</small>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-muted fs-11">{{ $dst['role'] ?? 'Floating Station Personnel' }}</td>
                                                 </tr>
                                             @empty
                                                 <tr>
@@ -4902,7 +5180,7 @@
                     });
                 }
 
-                // Initialize visible modal selects on modal shown
+                // Initialize visible modal selects and popovers on modal shown
                 $(document).on('shown.bs.modal', '.modal', function () {
                     var $modal = $(this);
                     $modal.find('[data-select2-selector]').each(function() {
@@ -4911,6 +5189,14 @@
                             initModalSelect2($sel, $modal);
                         }
                     });
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Popover) {
+                        $modal.find('[data-bs-toggle="popover"]').each(function() {
+                            var p = bootstrap.Popover.getInstance(this);
+                            if (!p) {
+                                new bootstrap.Popover(this, { sanitize: false, html: true, trigger: 'hover focus' });
+                            }
+                        });
+                    }
                 });
 
                 // Section Personnel Modal: Target tab activation and Select2 re-initialization on tab switch

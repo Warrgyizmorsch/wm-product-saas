@@ -38,6 +38,10 @@ All items will be queued here and implemented together in a clean batch once rev
 | **ISSUE-14** | Format Time/Hours Consistently Across Modals & Views via `format_hours()` (`16.30 hrs` vs raw `.5`) | **Applied** | `section-calculation-modal.blade.php`, `show.blade.php`, `SectionCalculationService.php`, `helpers.php` |
 | **ISSUE-15** | Section Calculation Modal: Timeline Intervals Not Generated for Unstaffed / Machine-Only Sections | **Applied** | `SectionCalculationService.php` |
 | **ISSUE-16** | Table Column Optimization for Popovers & Cost/Capacity Tab (Dedicated Columns vs JSON) | **Applied** | Migration, `WorkCenterSectionCalculation.php`, `SectionCalculationService.php`, `show.blade.php` |
+| **ISSUE-17** | Section Details & Calculation Modals: Add Explanatory Tooltip & Formula for Average Hourly Manual Capacity | **Applied** | `show.blade.php`, `section-calculation-modal.blade.php` |
+| **ISSUE-18** | Work Center Level Calculation Engine Rework (Average Capacity / hr, Multi-WC Direct Staff Allocation, Flat Overhead) | **Applied** | `WorkCenterCalculationService.php`, `show.blade.php`, `WorkCenterCalculation.php`, Migration |
+| **ISSUE-19** | Section Calculation Modal (Audit Metrics Tab): Add Explanatory Info Popovers `(i)` for All 52 Audit Metrics (Source / Formula in Plain Language) | **Applied** | `section-calculation-modal.blade.php`, `show.blade.php` |
+| **ISSUE-20** | Work Center Hero Panel (3-Column Layout): Redesign to Display Inline Section Capacity/Cost Contributions & Direct Personnel Rates (Zero-Hover UI) | **Applied** | `show.blade.php` |
 
 > **Live Work Center URL:** `http://127.0.0.1:8000/production/work-centers/1`
 
@@ -737,6 +741,123 @@ Schema::table('production_work_center_section_calculations', function (Blueprint
 2. **Model Fillable & Casts**: Add the 8 fields to `WorkCenterSectionCalculation::$fillable` and `$casts` as `decimal:4`.
 3. **Calculation Service**: In `SectionCalculationService::calculateAndSave()`, map the 8 fields from `$calc['calculation_details']` directly into the database insert payload.
 4. **View Consumption (`show.blade.php`)**: Update popovers and Cost & Capacity tab to read directly from `$secCalc->hourly_machine_capacity`, `$secCalc->total_daily_internal_labor_cost`, etc., with backward-compatibility fallbacks to JSON for historical records.
+
+---
+
+### ISSUE-17: Section Details & Calculation Modals: Add Explanatory Tooltip & Formula for Average Hourly Manual Capacity
+* **Date Logged:** 2026-10-29
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `show.blade.php` (Section Details modal) & `section-calculation-modal.blade.php` (Calculation Breakdown modal)
+
+#### 1. Issue Description
+When a manual batch has a target speed (e.g., 55.0 u/h) on an 8-hour shift, but the section operates for 16.5 hours across multiple shifts, the section-wide hourly manual capacity displays as a diluted/averaged rate (e.g., 26.7 u/h = 440 units / 16.5 hrs). Without contextual explanation, users frequently confuse this diluted number with the individual batch's target speed and assume a calculation error.
+
+#### 2. Agreed Solution
+Wherever average hourly manual capacity is displayed (Section Details Modal Pane 4 footer, Pane 5 Capacity Breakdown, Calculation Breakdown Modal top KPI cards, and Category 3 Audit Metrics table), attach an informative tooltip and badge:
+1. **Explanation / Reason**: *"It is average production per hour throughout section shifts."*
+2. **Formula Context**: *"Total Daily Manual Output / Section Operating Hours"* (with dynamic numbers, e.g. `440.0 units / 16.5 hrs = 26.7 u/h`).
+
+#### 3. Implemented Changes
+- Added tooltip and warning icon on Pane 4 footer & Pane 5 in [`resources/views/modules/production/work-centers/show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php).
+- Added contextual badge and dynamic formula tooltip in [`resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php).
+
+---
+
+### ISSUE-18: Work Center Level Calculation Engine Rework (Average Capacity / hr, Multi-WC Direct Staff Allocation, Flat Overhead)
+* **Date Logged:** 2026-10-29
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `WorkCenterCalculationService.php`, `show.blade.php`, `WorkCenterCalculation.php`
+
+#### 1. Issue Description
+1. **Capacity per Hour**: The current Work Center calculation engine simply sums the hourly capacities of all active sections (`Section 1 + Section 2 = 80 u/h`). This reflects concurrent peak speed, not the true average hourly production across the Work Center's operating window.
+2. **Direct Personnel Labor Allocation**: Direct employees (assigned to the Work Center with `section_id IS NULL`, like supervisors or maintenance leads) are currently assigned 100% of their daily salary to a single Work Center, even if they oversee multiple Work Centers simultaneously. Additionally, their hourly rate does not account for their assigned shift duration.
+3. **Overhead Cost Hourly Rate**: Work Center calculates a derived hourly overhead rate (`overhead / hours`), which is unnecessary clutter; overhead should remain a flat daily cost rolled directly into the Total Daily Operating Cost.
+4. **Modal Data Key Mismatch**: The Work Center Calculation Breakdown Modal in `show.blade.php` attempts to read `$wcDetails['sections']` and `$wcDetails['direct_personnel']`, while the service stores them as `sections_contribution` and `direct_work_center_staff`, leaving tables blank.
+
+#### 2. Agreed Solution
+1. **Average Hourly Capacity**:
+   $$\text{Work Center Capacity Per Hour} = \frac{\text{Work Center Daily Capacity}}{\text{Work Center Unique Operating Hours}}$$
+2. **Direct Staff Multi-Work Center Split**:
+   - Query `production_work_center_employees` to count how many active Work Centers the employee is assigned to (`active_wc_count`).
+   - Base Daily Salary: `Monthly CTC / 30`.
+   - Allocated Daily Cost for this Work Center: `Base Daily Salary / active_wc_count`.
+   - Staff Hourly Rate: `Allocated Daily Cost / Employee Predefined Shift Duration Hours`.
+3. **Flat Overhead Integration**:
+   - Keep overhead as a flat daily amount (`overhead_cost`).
+   - Total Daily Operating Cost = `Total Daily Labor + Total Daily Machinery + Daily Overhead`.
+   - Total Cost Per Hour = `Total Daily Operating Cost / Work Center Unique Operating Hours`.
+4. **Dedicated Database Columns for Zero-JSON Reads**:
+   - Add 2 lean columns to `production_work_center_calculations` via migration:
+     * `direct_staff_daily_labor_cost` (`decimal(14,4)`): Stores total allocated daily salary of unassigned Work Center employees so Column 3 in the Hero panel reads directly from the database without decoding JSON.
+     * `cost_per_unit` (`decimal(12,4)`): Stores $\text{Total Daily Cost} / \text{Daily Capacity}$.
+   - Update `WorkCenterCalculation` model `$fillable` and `$casts`.
+5. **Fix Modal Key Alignment**:
+   - Align blade variables to read `sections_contribution` and `direct_work_center_staff`.
+
+#### 3. Implemented Changes
+- Ran database migration [`database/migrations/2026_10_29_000002_add_direct_labor_and_unit_cost_to_work_center_calculations_table.php`](file:///c:/xampp/htdocs/wm-product-saas/database/migrations/2026_10_29_000002_add_direct_labor_and_unit_cost_to_work_center_calculations_table.php).
+- Updated [`app/Domains/Production/Models/WorkCenterCalculation.php`](file:///c:/xampp/htdocs/wm-product-saas/app/Domains/Production/Models/WorkCenterCalculation.php) `$fillable` and `$casts`.
+- Updated [`app/Domains/Production/Services/WorkCenterCalculationService.php`](file:///c:/xampp/htdocs/wm-product-saas/app/Domains/Production/Services/WorkCenterCalculationService.php) with average capacity across operating window, multi-WC direct staff allocation, flat overhead, and compatibility aliases.
+
+---
+
+### ISSUE-19: Section Calculation Modal (Audit Metrics Tab): Add Explanatory Info Popovers `(i)` for All 52 Audit Metrics (Source / Formula in Plain Language)
+* **Date Logged:** 2026-10-29
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php` (Audit Metrics Tab)
+
+#### 1. Issue Description
+In the Section Calculation Breakdown Modal (`Audit Metrics` tab), the 52-metric table lists metric names and computed values across 7 categories. Users cannot see how each individual metric is derived, whether it is directly collected from inputs or calculated via a formula, leading to ambiguity during audits.
+
+#### 2. Agreed Solution
+1. **Interactive Info Icon `(i)`**: Add an info icon next to every metric name in the "METRIC NAME" column (matching the UI popover pattern in Photo 3).
+2. **Hover Popover Content**:
+   - **For Calculated Metrics**: Show the exact mathematical formula in plain language (e.g., `Total Daily Operating Cost / Total Daily Production Capacity`, `Base Daily Salary / Shift Clock Hours`).
+   - **For Collected / Sourced Metrics**: Show a clear 1-line plain English description of where the data originates (e.g., *"Assigned shift schedule selected in section profile"*, *"Rated nameplate speed entered in machine profile"*, *"Base monthly salary from HRMS employee record"*), completely avoiding raw database column names (like `energy_rate_per_unit` or `production_machines.capacity`).
+3. **Structured Mapping Dictionary**: Build a clean helper dictionary in the template or service mapping each of the 52 metric keys to its friendly source explanation or formula.
+
+#### 3. Implemented Changes
+- Added `$auditMetricsMeta` definition mapping all 52 metrics to clean sources, mathematical formulas, and plain-English explanations in [`resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php).
+- Rendered interactive `(i)` info icons with Bootstrap hover popovers styled via `.metric-audit-popover` in [`resources/views/modules/production/work-centers/show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php).
+
+---
+
+### ISSUE-20: Work Center Hero Panel (3-Column Layout): Redesign to Display Inline Section Capacity/Cost Contributions & Direct Personnel Rates (Zero-Hover UI)
+* **Date Logged:** 2026-10-29
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/show.blade.php` (Lines 463–640)
+
+#### 1. Issue Description
+In the top hero section of the Work Center view (`show.blade.php`), high-level numbers are displayed without breakdown details. Direct personnel are tucked behind a tiny popover button showing only employee names without their hourly cost or daily allocation. Capacity and costs show total numbers with no inline visibility into individual section contributions, forcing users to click or hover across multiple screens.
+
+#### 2. Agreed Solution
+Implement a scalable hybrid architecture for the 3-column Hero profile panel:
+1. **Column 1 (Identity & Direct Assigned Staff Card)**:
+   - Preserves the clean profile layout with identity parameters.
+   - Includes a dedicated card for `Direct Assigned Staff (count)` showing the total allocated daily salary badge (`$XX.XX/day`).
+   - Hover popover reveals employee code, full name, role/designation, allocated daily salary, and hourly wage rate (without shift clutter).
+2. **Column 2 (Capacity & Parameter Metrics - Hybrid Hover & Direct Cards)**:
+   - **Capacity / Hour Card**: Shows major KPI (`Avg / hr` speed). Hovering displays the styled breakdown card showing each section's contribution.
+   - **Daily Production Capacity Card**: Shows major KPI (`Total Output`). Hovering displays the styled breakdown card showing each section's daily units.
+   - **Operational Schedule Card**: Kept directly on the page showing Operating Window (`XX.XX hrs / day`) and Production Calendar.
+3. **Column 3 (Operating Cost Structure - Hybrid Hover & Direct Cards)**:
+   - **Daily Labor Cost Card**: Shows major KPI (`Total Daily Labor` & `Avg $/hr`). Hovering displays the styled breakdown card showing each section's labor and direct personnel costs.
+   - **Daily Machinery Expense Card**: Shows major KPI (`Total Daily Machinery` & `Avg $/hr`). Hovering displays each section's machinery expense.
+   - **Facility Overhead Card**: Kept directly on the page showing flat facility daily expense.
+   - **Total Daily Operating Cost Card**: Kept directly on the page with effective hourly cost and green unit cost badge (`$XX.XX / unit`).
+4. **Click Interactivity**: Clicking on any of the capacity or cost cards smoothly opens `#workCenterCalculationModal`.
+
+#### 3. Implemented Changes
+- Implemented the hybrid architecture in [`resources/views/modules/production/work-centers/show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php).
+- Configured hover popovers (`.wc-breakdown-popover`) containing rich card layouts for hourly capacity, daily output, labor costs, and machine expenses.
+- Scaled hover popovers to 80%–90% of column width (`width: 350px !important; max-width: 360px !important;`) and reduced vertical spacing (`py-1.5` header, `p-2.5` body, `py-1` rows) for a compact, balanced feel.
+- Column 1: Configured compact profile layout (`gap-2 mt-2.5`), live direct staff labor calculation, and moved the "Purpose & Operational Notes" description card directly into the lower empty space of Column 1 below Direct Assigned Staff, eliminating the extra full-width section below the hero grid.
+- Columns 2 & 3: Retain snapshot-driven architecture reading directly from `$latestSnapshot` columns without JSON overhead.
+- Total Daily Cost Card: Corrected header to `TOTAL DAILY COST` with `text-nowrap` on title and effective hourly badge, eliminating awkward two-line text wrapping.
 
 ---
 
