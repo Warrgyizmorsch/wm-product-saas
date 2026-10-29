@@ -28,7 +28,7 @@ class TenantFormUiTest extends TestCase
             'name' => 'platform.tenants.manage', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'manage',
         ]);
 
-        $role = Role::create(['name' => 'Super Admin', 'slug' => 'super_admin', 'level' => 1]);
+        $role = Role::create(['name' => 'Super Admin', 'slug' => 'super_admin', 'level' => 1, 'is_system' => true]);
 
         RolePermission::create([
             'role_id' => $role->id,

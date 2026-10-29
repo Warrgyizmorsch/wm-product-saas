@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Edit Plan | SaaS ERP')
+@section('title', 'Edit Plan | Platform Console')
 @section('page-title', 'Edit Plan')
-@section('breadcrumb', 'Platform / Plans / Edit')
+@section('breadcrumb', 'Plans / Edit')
 
 @section('page-actions')
     <x-ui.button href="{{ route('platform.plans.index') }}" variant="light" icon="feather-arrow-left">

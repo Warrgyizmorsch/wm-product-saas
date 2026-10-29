@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Demo Requests | Tenant Console')
+@section('title', 'Demo Requests | Platform Console')
 @section('page-title', 'Demo Requests')
-@section('breadcrumb', 'Tenant Console / Demo Requests')
+@section('breadcrumb', 'Demo Requests')
 
 @push('styles')
     <style>

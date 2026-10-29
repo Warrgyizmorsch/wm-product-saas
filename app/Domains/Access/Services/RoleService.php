@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 class RoleService
 {
     /** Slugs only the platform's system roles may carry (AccessService treats them as platform admin). */
-    public const RESERVED_SLUGS = ['super_admin', 'admin'];
+    public const RESERVED_SLUGS = ['super_admin', 'admin', ...Role::PLATFORM_STAFF_SLUGS];
 
     /** A tenant role named "Admin" gets slug "admin-role", never a reserved one. */
     private function tenantSlug(string $slug): string

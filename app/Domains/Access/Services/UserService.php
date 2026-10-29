@@ -196,5 +196,12 @@ class UserService
             403,
             'Only a super admin can assign the super admin role.'
         );
+
+        abort_if(
+            $tenantId !== null
+                && $roles->contains(fn (Role $role) => $role->tenant_id === null && in_array($role->slug, Role::PLATFORM_STAFF_SLUGS, true)),
+            403,
+            'Platform staff roles cannot be given to a workspace user.'
+        );
     }
 }

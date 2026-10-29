@@ -131,7 +131,8 @@ class SettingsAuthorizationTest extends TestCase
         foreach (self::credentialScreens() as [$route]) {
             $this->withHeader('X-Tenant', $this->tenantA->slug)
                 ->get(route($route))
-                ->assertRedirect(route('login'));
+                // Platform-owner screens live in the /admin console, which has its own sign-in.
+                ->assertRedirect(str_starts_with(route($route, absolute: false), '/admin/') ? route('admin.login') : route('login'));
         }
     }
 }

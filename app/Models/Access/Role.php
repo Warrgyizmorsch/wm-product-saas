@@ -13,6 +13,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Role extends Model
 {
+    /**
+     * Roles for the SaaS owner's own staff (accounts with no tenant). Their grants
+     * are SCOPE_PLATFORM, so they must never be handed to a tenant's user.
+     */
+    public const PLATFORM_STAFF_SLUGS = ['platform_sales', 'platform_support', 'platform_finance'];
+
     protected $fillable = [
         'tenant_id',
         'name',

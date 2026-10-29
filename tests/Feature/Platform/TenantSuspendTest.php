@@ -29,9 +29,12 @@ class TenantSuspendTest extends TestCase
         UserRole::create(['user_id' => $this->admin->id, 'role_id' => Role::query()->whereNull('tenant_id')->where('slug', 'super_admin')->firstOrFail()->id, 'tenant_id' => null]);
     }
 
-    public function test_the_workspace_you_are_in_cannot_be_suspended(): void
+    public function test_your_own_home_workspace_cannot_be_suspended(): void
     {
-        $this->actingAs($this->admin)
+        $homeAdmin = User::create(['tenant_id' => $this->current->id, 'name' => 'Home', 'email' => 'home@acme.test', 'password' => bcrypt('password')]);
+        UserRole::create(['user_id' => $homeAdmin->id, 'role_id' => Role::query()->whereNull('tenant_id')->where('slug', 'super_admin')->firstOrFail()->id, 'tenant_id' => $this->current->id]);
+
+        $this->actingAs($homeAdmin)
             ->patch(route('platform.tenants.status', $this->current), ['status' => Tenant::STATUS_SUSPENDED])
             ->assertRedirect(route('platform.tenants.index'))
             ->assertSessionHas('error');
