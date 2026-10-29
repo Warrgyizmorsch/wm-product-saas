@@ -2124,5 +2124,6 @@ return array (
   'view_credit_note' => 'View Credit Note',
   'cancellation_reason' => 'Cancellation Reason',
   'credit_note_date' => 'Credit Note Date',
+  'view_material_requirement' => 'View Material Requirement',
 );
 

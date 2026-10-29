@@ -104,13 +104,25 @@ class SalesOrderApiController extends Controller
         }
 
         // Sorting
-        $sortBy  = $request->input('sort_by', 'id');
+        $sortBy  = $request->input('sort_by', 'order_date');
         $sortDir = strtolower($request->input('sort_direction', 'desc')) === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['id', 'sales_order_number', 'order_date', 'shipment_date', 'status', 'total_amount', 'created_at'];
-        if (in_array($sortBy, $allowedSorts, true)) {
-            $query->orderBy($sortBy, $sortDir);
+        if ($sortBy === 'order_date') {
+            $query->orderBy('order_date', $sortDir)
+                  ->orderBy('sales_order_number', $sortDir === 'asc' ? 'asc' : 'desc')
+                  ->orderBy('id', $sortDir === 'asc' ? 'asc' : 'desc');
+        } elseif ($sortBy === 'sales_order_number') {
+            $query->orderBy('sales_order_number', $sortDir)
+                  ->orderBy('order_date', 'desc')
+                  ->orderBy('id', $sortDir);
+        } elseif (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir)
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('order_date', 'desc')
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         }
 
         $perPage = min((int)$request->input('per_page', 15), 100);

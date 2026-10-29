@@ -397,25 +397,6 @@
                 <i class="feather-edit me-1 text-muted"></i>{{ __('crm.edit') ?? 'Edit' }}
             </a>
         @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped', 'In Fulfillment']))
-            @php
-                $soMr = $order->materialRequirements->first();
-            @endphp
-            @if ($soMr)
-                @if ($soMr->status === 'Released')
-                    <a href="{{ route('inventory.material-requirements.show', $soMr->id) }}"
-                        class="btn btn-sm btn-outline-success fw-semibold px-2.5 d-print-none"
-                        title="Material Requirement Released for Dispatch">
-                        <i class="feather-check-circle me-1 text-success"></i>MR Released
-                    </a>
-                @elseif (in_array($soMr->status, ['Pending', 'Draft', 'Processing', 'Partially Ready']))
-                    <a href="{{ route('inventory.material-requirements.show', $soMr->id) }}"
-                        class="btn btn-sm btn-outline-warning fw-semibold px-2.5 d-print-none"
-                        title="Material Requirement Pending Store Release">
-                        <i class="feather-clock me-1 text-warning"></i>MR Pending Release
-                    </a>
-                @endif
-            @endif
-
             @if ($hasUnbilledQty)
                 <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id, 'mode' => 'sales_order']) }}"
                     class="btn btn-sm btn-primary fw-bold px-3 d-print-none shadow-2xs">
@@ -445,6 +426,14 @@
                         <i class="feather-printer me-2 text-muted"></i>Print Order
                     </a>
                 </li>
+
+                @if ($order->materialRequirements && $order->materialRequirements->isNotEmpty())
+                    <li>
+                        <a class="dropdown-item py-1.5 fs-13" href="{{ route('inventory.material-requirements.show', $order->materialRequirements->first()->id) }}">
+                            <i class="feather-layers me-2 text-muted"></i>{{ __('crm.view_material_requirement') }}
+                        </a>
+                    </li>
+                @endif
 
                 @if ($order->projects && $order->projects->isNotEmpty())
                     <li><hr class="dropdown-divider my-1"></li>
@@ -1347,16 +1336,12 @@
                                             elseif ($dispatch->status === 'Cancelled')
                                                 $dispBadge = 'bg-soft-danger text-danger';
 
+                                            $isAllOrderBilled = ($grandTotal > 0 && ($grandTotal - $totalInvoicedAmount) <= 0.01);
                                             $isDispatchInvoiced = false;
-                                            if ($dispatch->status === 'Invoiced' || !empty($dispatch->invoice_id)) {
+                                            if ($dispatch->status === 'Invoiced' || (!empty($dispatch->invoice_id) && $dispatch->invoice?->status !== 'Cancelled')) {
                                                 $isDispatchInvoiced = true;
-                                            } elseif (!$hasUnbilledQty) {
+                                            } elseif ($isAllOrderBilled) {
                                                 $isDispatchInvoiced = true;
-                                            } elseif ($order->invoices) {
-                                                $isDispatchInvoiced = $order->invoices->where('status', '!=', 'Cancelled')->contains(function ($inv) use ($dispatch) {
-                                                    return ($dispatch->invoice_id && $inv->id == $dispatch->invoice_id)
-                                                        || ($dispatch->material_requirement_id && $inv->material_requirement_id == $dispatch->material_requirement_id);
-                                                });
                                             }
                                         @endphp
                                         <tr>

@@ -167,6 +167,7 @@ class MaterialRequirementItem extends Model
         $ordered = (float) ($this->quantity_ordered > 0 ? $this->quantity_ordered : $this->quantity);
         $delivered = $this->delivered_qty;
         $dispatched = $this->dispatched_qty;
+        $released = (float) ($this->quantity_released ?? 0);
         $reserved = (float) $this->quantity_reserved;
 
         if ($ordered > 0 && $delivered >= $ordered) {
@@ -177,6 +178,10 @@ class MaterialRequirementItem extends Model
             return 'Dispatched';
         } elseif ($dispatched > 0) {
             return 'Partially Dispatched';
+        } elseif ($ordered > 0 && $released >= $ordered) {
+            return 'Released';
+        } elseif ($released > 0) {
+            return 'Partially Ready';
         } elseif ($reserved >= $ordered && $ordered > 0) {
             return 'Reserved';
         } elseif ($reserved > 0) {

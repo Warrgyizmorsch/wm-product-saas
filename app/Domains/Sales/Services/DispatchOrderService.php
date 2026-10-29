@@ -167,7 +167,7 @@ class DispatchOrderService
 
         if ($finalSalesOrderId) {
             $so = \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId);
-            if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment'])) {
+            if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
                 throw new Exception("Sales Order {$so->sales_order_number} must be Confirmed before creating a Dispatch Order.");
             }
             if ($so && $so->hasOnlyServices()) {
@@ -504,9 +504,7 @@ class DispatchOrderService
 
             $dispatch->update(['status' => 'Confirmed']);
 
-            if ($dispatch->materialRequirement) {
-                $dispatch->materialRequirement->update(['status' => 'Processing']);
-            }
+            $this->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
 
             return $dispatch;
         });
@@ -689,19 +687,6 @@ class DispatchOrderService
                 'cancellation_reason' => $reason,
             ]);
 
-            // Re-evaluate Material Requirement status
-            if ($dispatch->materialRequirement) {
-                $mr = $dispatch->materialRequirement;
-                $allCancelled = true;
-                foreach ($mr->items as $mi) {
-                    if ((float)$mi->dispatched_qty > 0) {
-                        $allCancelled = false;
-                        break;
-                    }
-                }
-                $mr->update(['status' => $allCancelled ? 'Draft' : 'Processing']);
-            }
-
             // Re-evaluate Sales Order status
             if ($dispatch->salesOrder) {
                 $dispatch->salesOrder->refreshFulfillmentStatus();
@@ -761,6 +746,11 @@ class DispatchOrderService
                 }
             }
 
+            $totalReserved = (float) $physicalItems->sum(fn($i) => (float)$i->quantity_reserved);
+            $hasWaitingPurchase = $physicalItems->contains(fn($i) => in_array($i->status, ['Waiting Purchase', 'Partially PR Raised']));
+            $hasWaitingProduction = $physicalItems->contains(fn($i) => $i->status === 'Waiting Production');
+            $allPending = $physicalItems->every(fn($i) => in_array($i->status, ['Pending', 'Draft']) && (float)$i->quantity_reserved == 0 && (float)$i->quantity_released == 0 && (float)$i->dispatched_qty == 0 && (float)$i->delivered_qty == 0);
+
             // Sync MR document status
             if ($totalOrdered > 0 && $totalDelivered >= $totalOrdered) {
                 $mrStatus = 'Delivered';
@@ -772,10 +762,14 @@ class DispatchOrderService
                 $mrStatus = 'Partially Dispatched';
             } elseif ($totalOrdered > 0 && $totalReleased >= $totalOrdered) {
                 $mrStatus = 'Released';
-            } elseif ($totalReleased > 0) {
+            } elseif ($totalReleased > 0 || $totalReserved > 0) {
                 $mrStatus = 'Partially Ready';
+            } elseif ($hasWaitingPurchase || $hasWaitingProduction) {
+                $mrStatus = 'Processing';
+            } elseif ($allPending) {
+                $mrStatus = 'Pending';
             } else {
-                $mrStatus = $mr->status ?: 'Pending';
+                $mrStatus = $mr->status ?: 'Processing';
             }
 
             if ($mr->status !== $mrStatus) {

@@ -66,10 +66,10 @@ class DispatchOrderRepository
     {
         return MaterialRequirement::with(['salesOrder.customer', 'items.product'])
             ->whereHas('salesOrder', function ($q) {
-                $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment']);
+                $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
             })
             ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
-            ->whereIn('status', ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed'])
+            ->whereIn('status', ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Partially Dispatched', 'Partially Delivered'])
             ->latest()
             ->get()
             ->filter(function ($mr) {
@@ -90,9 +90,9 @@ class DispatchOrderRepository
             'items.warehouse',
         ])
         ->whereHas('salesOrder', function ($q) {
-            $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment']);
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
         })
-        ->whereIn('status', ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Partially Dispatched', 'Dispatched'])
+        ->whereIn('status', ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Partially Dispatched', 'Dispatched', 'Partially Delivered'])
         ->latest()
         ->get()
         ->filter(function ($mr) {
@@ -108,7 +108,7 @@ class DispatchOrderRepository
     {
         $salesOrdersQuery = \App\Domains\Sales\Models\SalesOrder::query()
             ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment'])
+            ->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])
             ->with([
                 'customer',
                 'materialRequirements',
@@ -157,7 +157,8 @@ class DispatchOrderRepository
             $hasMr = $mrs && $mrs->isNotEmpty();
             if ($hasMr) {
                 $isReleased = $mrs->contains(function ($mr) {
-                    return in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched']);
+                    return in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched', 'Partially Dispatched', 'Partially Delivered'])
+                        || $mr->items->contains(fn($i) => (float)($i->quantity_released ?? 0) > 0);
                 });
                 if (!$isReleased) {
                     continue; // Skip until Store Incharge releases this requirement
@@ -182,7 +183,7 @@ class DispatchOrderRepository
 
                     // If an MR exists, only show items that have been released by Store Incharge!
                     $releasedQty = (float)($matchingMrItem?->quantity_released ?? 0);
-                    $isItemReleased = in_array($matchingMrItem?->status, ['Released', 'Picked', 'Packed', 'Dispatched']) || $releasedQty > 0;
+                    $isItemReleased = in_array($matchingMrItem?->status, ['Released', 'Picked', 'Packed', 'Dispatched', 'Partially Dispatched', 'Partially Delivered']) || $releasedQty > 0;
 
                     if (!$isItemReleased) {
                         continue; // Skip unreleased shortage items!
@@ -251,7 +252,7 @@ class DispatchOrderRepository
     public function getPendingSalesOrdersCount(int $tenantId): int
     {
         $allOrders = \App\Domains\Sales\Models\SalesOrder::where('tenant_id', $tenantId)
-            ->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment'])
+            ->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])
             ->with(['items.product', 'materialRequirements'])
             ->get();
 
@@ -275,7 +276,8 @@ class DispatchOrderRepository
             $hasMr = $mrs && $mrs->isNotEmpty();
             if ($hasMr) {
                 $isReleased = $mrs->contains(function ($mr) {
-                    return in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched']);
+                    return in_array($mr->status, ['Released', 'Ready', 'Partially Ready', 'Picked', 'Packed', 'Dispatched', 'Partially Dispatched', 'Partially Delivered'])
+                        || $mr->items->contains(fn($i) => (float)($i->quantity_released ?? 0) > 0);
                 });
                 if (!$isReleased) {
                     continue; // Skip until Store Incharge releases this requirement

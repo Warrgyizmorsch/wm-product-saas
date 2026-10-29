@@ -359,20 +359,14 @@ class MaterialRequirementService
             }
 
             // 3. Update overall MR status based on physical items
-            $delivery->load('items');
+            $delivery->load('items.product');
+            $this->updateOverallDeliveryStatus($delivery);
+
             $allPhysical = $delivery->items->filter(fn ($i) => !($i->product && $i->product->isService()));
             $fullyReleasedCount = $allPhysical->filter(function ($i) {
                 $ordered = (float) ($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity);
                 return (float) ($i->quantity_released ?? 0) >= $ordered;
             })->count();
-
-            $partiallyReleasedCount = $allPhysical->filter(fn ($i) => (float) ($i->quantity_released ?? 0) > 0)->count();
-
-            if ($fullyReleasedCount === $allPhysical->count()) {
-                $delivery->update(['status' => 'Released']);
-            } elseif ($partiallyReleasedCount > 0) {
-                $delivery->update(['status' => 'Partially Ready']);
-            }
 
             return [
                 'released_count'       => $releasedCount,
@@ -449,36 +443,70 @@ class MaterialRequirementService
 
     public function updateOverallDeliveryStatus(MaterialRequirement $delivery): void
     {
-        $items = $delivery->items()->get();
-        if ($items->isEmpty()) return;
-
-        $allDelivered = true;
-        $allDispatched = true;
-        $allPacked = true;
-        $allPicked = true;
-        $allReady = true;
-        $allPending = true;
-        $anyReadyOrReserved = false;
-
-        foreach ($items as $item) {
-            $status = $item->status;
-            if ($status !== 'Delivered') $allDelivered = false;
-            if ($status !== 'Dispatched') $allDispatched = false;
-            if ($status !== 'Packed') $allPacked = false;
-            if ($status !== 'Picked') $allPicked = false;
-            if ($status !== 'Ready' && $status !== 'Reserved') $allReady = false;
-            if ($status !== 'Pending') $allPending = false;
-            if ($status === 'Reserved' || $status === 'Ready') $anyReadyOrReserved = true;
+        if ($delivery->status === 'Cancelled') {
+            return;
         }
 
-        if ($allDelivered) $delivery->update(['status' => 'Delivered']);
-        elseif ($allDispatched) $delivery->update(['status' => 'Dispatched']);
-        elseif ($allPacked) $delivery->update(['status' => 'Packed']);
-        elseif ($allPicked) $delivery->update(['status' => 'Picked']);
-        elseif ($allReady) $delivery->update(['status' => 'Ready']);
-        elseif ($delivery->status === 'Released') $delivery->update(['status' => 'Released']);
-        elseif ($allPending) $delivery->update(['status' => 'Pending']);
-        elseif ($anyReadyOrReserved) $delivery->update(['status' => 'Partially Ready']);
-        else $delivery->update(['status' => 'Processing']);
+        $delivery->loadMissing(['items.product', 'salesOrder']);
+        $items = $delivery->items;
+        if ($items->isEmpty()) return;
+
+        $physicalItems = $items->filter(fn($i) => !($i->product && $i->product->isService()));
+        if ($physicalItems->isEmpty()) {
+            $physicalItems = $items;
+        }
+
+        $totalOrdered = (float) $physicalItems->sum(fn($i) => (float)($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity));
+        $totalDelivered = (float) $physicalItems->sum(fn($i) => (float)$i->delivered_qty);
+        $totalDispatched = (float) $physicalItems->sum(fn($i) => (float)$i->dispatched_qty);
+        $totalReleased = (float) $physicalItems->sum(fn($i) => (float)($i->quantity_released ?? 0));
+        $totalReserved = (float) $physicalItems->sum(fn($i) => (float)$i->quantity_reserved);
+
+        $hasWaitingPurchase = $physicalItems->contains(fn($i) => in_array($i->status, ['Waiting Purchase', 'Partially PR Raised']));
+        $hasWaitingProduction = $physicalItems->contains(fn($i) => $i->status === 'Waiting Production');
+        $allPending = $physicalItems->every(fn($i) => in_array($i->status, ['Pending', 'Draft']) && (float)$i->quantity_reserved == 0 && (float)$i->quantity_released == 0 && (float)$i->dispatched_qty == 0 && (float)$i->delivered_qty == 0);
+
+        // Determine Document Status based on fulfillment lifecycle (never regress delivery/dispatch milestones)
+        if ($totalOrdered > 0 && $totalDelivered >= $totalOrdered) {
+            $status = 'Delivered';
+        } elseif ($totalDelivered > 0) {
+            $status = 'Partially Delivered';
+        } elseif ($totalOrdered > 0 && $totalDispatched >= $totalOrdered) {
+            $status = 'Dispatched';
+        } elseif ($totalDispatched > 0) {
+            $status = 'Partially Dispatched';
+        } elseif ($totalOrdered > 0 && $totalReleased >= $totalOrdered) {
+            $status = 'Released';
+        } elseif ($totalReleased > 0 || $totalReserved > 0) {
+            $status = 'Partially Ready';
+        } elseif ($hasWaitingPurchase || $hasWaitingProduction) {
+            $status = 'Processing';
+        } elseif ($allPending) {
+            $status = 'Pending';
+        } else {
+            $status = 'Processing';
+        }
+
+        if ($delivery->status !== $status) {
+            $delivery->update(['status' => $status]);
+        }
+
+        // Also update Sales Order status if applicable
+        if ($delivery->sales_order_id) {
+            $so = $delivery->salesOrder ?? \App\Domains\Sales\Models\SalesOrder::withoutGlobalScopes()->find($delivery->sales_order_id);
+            if ($so) {
+                if ($totalOrdered > 0 && $totalDelivered >= $totalOrdered) {
+                    $so->update(['status' => 'Delivered']);
+                } elseif ($totalDelivered > 0) {
+                    $so->update(['status' => 'Partially Delivered']);
+                } elseif ($totalOrdered > 0 && $totalDispatched >= $totalOrdered) {
+                    $so->update(['status' => 'Shipped']);
+                } elseif ($totalDispatched > 0) {
+                    $so->update(['status' => 'Partially Shipped']);
+                } else {
+                    $so->refreshFulfillmentStatus();
+                }
+            }
+        }
     }
 }

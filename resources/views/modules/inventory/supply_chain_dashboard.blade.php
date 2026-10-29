@@ -193,6 +193,115 @@
     </div>
 </div>
 
+{{-- Pending Material Requirements (Store Release) --}}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card stretch stretch-full border-0 shadow-sm">
+            <div class="card-header p-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="avatar-text avatar-md bg-soft-warning text-warning rounded-3">
+                        <i class="feather-layers fs-16"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="fw-bold mb-0 text-dark fs-14">
+                                {{ __('inventory.pending_material_requirements') }}
+                            </h5>
+                            <span class="badge bg-soft-warning text-warning fs-11 fw-bold px-2 py-0.5">
+                                {{ $pendingMaterialRequirementsCount }} {{ __('inventory.pending') }}
+                            </span>
+                        </div>
+                        <span class="fs-11 text-muted">{{ __('inventory.pending_demands_subtext') }}</span>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <x-ui.button href="{{ route('inventory.material-requirements.index', ['status' => 'Pending']) }}" variant="soft-primary" icon="feather-arrow-right" iconPosition="right" class="fs-11 py-1 px-2.5">
+                        {{ __('inventory.view_all_requirements') }} ({{ $totalMaterialRequirementsCount }})
+                    </x-ui.button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 fs-12">
+                        <thead class="bg-light-50 text-muted fs-11 text-uppercase">
+                            <tr>
+                                <th class="ps-3">{{ __('crm.requirement_number') }}</th>
+                                <th>{{ __('crm.sales_order') }}</th>
+                                <th>{{ __('crm.customer') }}</th>
+                                <th>{{ __('crm.date') }}</th>
+                                <th class="text-center">{{ __('inventory.items') }}</th>
+                                <th class="text-center">{{ __('ui.status') }}</th>
+                                <th class="text-end pe-3">{{ __('inventory.action') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($pendingMaterialRequirements as $mr)
+                                @php
+                                    $mrBadge = match($mr->status) {
+                                        'Delivered' => 'bg-soft-success text-success',
+                                        'Partially Delivered', 'Partially Dispatched', 'Partially Ready', 'Processing' => 'bg-soft-info text-info',
+                                        'Dispatched', 'Released' => 'bg-soft-primary text-primary',
+                                        'Draft' => 'bg-soft-secondary text-secondary',
+                                        default => 'bg-soft-warning text-warning',
+                                    };
+                                    $itemCount = $mr->items ? $mr->items->count() : 0;
+                                    $totalQty = $mr->items ? (float)$mr->items->sum('quantity') : 0;
+                                @endphp
+                                <tr>
+                                    <td class="ps-3">
+                                        <a href="{{ route('inventory.material-requirements.show', $mr->id) }}" class="fw-bold text-primary font-monospace">
+                                            <i class="feather-layers me-1 fs-11 text-warning"></i>{{ $mr->requirement_number }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        @if($mr->salesOrder)
+                                            <a href="{{ route('sales.orders.show', $mr->sales_order_id) }}" class="fw-semibold text-dark font-monospace">
+                                                {{ $mr->salesOrder->sales_order_number }}
+                                            </a>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="fw-semibold text-dark">{{ $mr->salesOrder?->customer?->name ?? ($mr->salesOrder?->customer?->company_name ?? '—') }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="text-dark">{{ ($mr->requirement_date ?? $mr->created_at)?->format('d M Y') }}</div>
+                                        <small class="text-muted fs-10">{{ ($mr->created_at ?? $mr->requirement_date)?->diffForHumans() }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark font-monospace border px-2 py-1 fs-11">
+                                            {{ trans_choice('inventory.item_count', $itemCount) }} ({{ number_format($totalQty, 0) }} {{ __('inventory.units') }})
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge {{ $mrBadge }} fs-10 fw-bold text-uppercase px-2 py-0.5">
+                                            {{ $mr->status }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <a href="{{ route('inventory.material-requirements.show', $mr->id) }}" class="btn btn-xs btn-outline-warning fw-semibold px-2.5 py-1">
+                                            <i class="feather-external-link me-1"></i>{{ __('inventory.release_store') }}
+                                        </a>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted fs-12">
+                                        <i class="feather-check-circle text-success fs-20 d-block mb-1"></i>
+                                        {{ __('inventory.no_pending_material_requirements') }}
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Low Stock Warning & Supply Chain Transactions Row --}}
 <div class="row g-3">
     {{-- Low Stock & Reorder Alert List --}}
@@ -262,6 +371,7 @@
                 </h5>
                 <x-ui.horizontal-tabs id="orderTabNav" :tabs="[
                     ['id' => 'tab-recent-so', 'label' => __('crm.sales_orders'), 'active' => true, 'icon' => 'feather-shopping-cart'],
+                    ['id' => 'tab-recent-mr', 'label' => __('inventory.material_req'), 'active' => false, 'icon' => 'feather-layers'],
                     ['id' => 'tab-recent-po', 'label' => __('purchase.purchase_orders'), 'active' => false, 'icon' => 'feather-shopping-bag'],
                     ['id' => 'tab-recent-grn', 'label' => __('purchase.goods_receipts'), 'active' => false, 'icon' => 'feather-package'],
                 ]" class="border-0 p-0" />
@@ -300,6 +410,45 @@
                                     @empty
                                         <tr>
                                             <td colspan="3" class="text-center py-4 text-muted fs-12">{{ __('inventory.no_recent_sales_orders') }}</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {{-- Tab: Recent Material Requirements --}}
+                    <div class="tab-pane fade" id="tab-recent-mr">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 fs-12">
+                                <thead class="bg-light-50 text-muted fs-11 text-uppercase">
+                                    <tr>
+                                        <th class="ps-3">{{ __('crm.requirement_number') }}</th>
+                                        <th>{{ __('ui.status') }}</th>
+                                        <th class="text-end pe-3">{{ __('crm.date') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($recentMaterialRequirements as $rmr)
+                                        <tr>
+                                            <td class="ps-3">
+                                                <a href="{{ route('inventory.material-requirements.show', $rmr->id) }}" class="fw-bold text-primary font-monospace">
+                                                    {{ $rmr->requirement_number }}
+                                                </a>
+                                                <div class="fs-10 text-muted">SO: {{ $rmr->salesOrder?->sales_order_number ?? '—' }}</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge {{ in_array($rmr->status, ['Released', 'Completed']) ? 'bg-soft-success text-success' : 'bg-soft-warning text-warning' }} fs-10 fw-semibold text-uppercase">
+                                                    {{ $rmr->status }}
+                                                </span>
+                                            </td>
+                                            <td class="text-end pe-3 fs-11 text-muted">
+                                                {{ ($rmr->requirement_date ?? $rmr->created_at)?->format('d M Y') }}
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="text-center py-4 text-muted fs-12">{{ __('inventory.no_recent_material_requirements') }}</td>
                                         </tr>
                                     @endforelse
                                 </tbody>

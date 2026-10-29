@@ -55,6 +55,7 @@
         @if ($dispatch->status === 'Pending')
             <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm" class="d-inline">
                 @csrf
+                <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
                 <button type="button" class="btn btn-sm btn-success fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" onclick="confirmAction({ title: '{{ __('crm.confirm_dispatch_order') }}', message: '{{ __('crm.confirm_dispatch') }} {{ $dispatch->dispatch_number }}?', variant: 'success', confirmText: '{{ __('crm.confirm') }}' }, function() { document.getElementById('confirmDispatchForm').submit(); })">
                     <i class="feather-check-circle me-1"></i> {{ __('crm.confirm_do') }}
                 </button>
@@ -62,6 +63,7 @@
         @elseif ($dispatch->status === 'Confirmed')
             <form action="{{ route('sales.dispatches.ship', $dispatch->id) }}" method="POST" id="shipDispatchForm" class="d-inline">
                 @csrf
+                <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
                 <button type="button" class="btn btn-sm btn-primary fw-semibold px-2.5 py-1 fs-12 text-nowrap shadow-2xs" onclick="confirmAction({ title: '{{ __('crm.ship_outward') }}', message: '{{ __('crm.ship_outward') }} {{ $dispatch->dispatch_number }}?', variant: 'primary', confirmText: '{{ __('crm.ship_outward') }}' }, function() { document.getElementById('shipDispatchForm').submit(); })">
                     <i class="feather-truck me-1"></i> {{ __('crm.ship_outward') }}
                 </button>

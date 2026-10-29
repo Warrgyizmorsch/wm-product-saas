@@ -476,11 +476,11 @@
 
                                         $lineBadge = 'secondary';
                                         if ($displayStatus === 'Delivered')                    $lineBadge = 'success';
-                                        elseif (in_array($displayStatus, ['Reserved', 'Ready']))  $lineBadge = 'success';
+                                        elseif (in_array($displayStatus, ['Reserved', 'Ready', 'Released']))  $lineBadge = 'success';
                                         elseif ($displayStatus === 'Waiting Purchase')         $lineBadge = 'warning';
                                         elseif ($displayStatus === 'Partially PR Raised')      $lineBadge = 'info';
                                         elseif ($displayStatus === 'Waiting Production')       $lineBadge = 'danger';
-                                        elseif (in_array($displayStatus, ['Partially Reserved', 'Partially Dispatched', 'Partially Delivered'])) $lineBadge = 'info';
+                                        elseif (in_array($displayStatus, ['Partially Reserved', 'Partially Ready', 'Partially Dispatched', 'Partially Delivered'])) $lineBadge = 'info';
                                         elseif ($displayStatus === 'Picked')                   $lineBadge = 'primary';
                                         elseif ($displayStatus === 'Packed')                   $lineBadge = 'info';
                                         elseif ($displayStatus === 'Dispatched')               $lineBadge = 'primary';

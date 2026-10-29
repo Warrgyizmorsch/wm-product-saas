@@ -80,7 +80,7 @@ class InvoiceController extends Controller
         $allSalesOrders = SalesOrder::with(['customer', 'items.product', 'items.warehouse', 'invoices' => function($q) {
             $q->where('status', '!=', 'Cancelled')->with('items');
         }])
-        ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced'])
+        ->whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped', 'Invoiced', 'Partially Delivered', 'Delivered'])
         ->latest()->get();
 
         $salesOrders = $allSalesOrders->filter(function ($so) {
@@ -90,29 +90,16 @@ class InvoiceController extends Controller
         })->values();
 
         // Fetch Dispatch Orders that have status Confirmed, Shipped, Dispatched, or Delivered and have unbilled quantities remaining
-        $allDispatchOrders = \App\Domains\Sales\Models\DispatchOrder::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'materialRequirement'])
+        $allDispatchOrders = \App\Domains\Sales\Models\DispatchOrder::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'materialRequirement', 'invoice'])
             ->whereIn('status', ['Confirmed', 'Shipped', 'Dispatched', 'Delivered'])
             ->latest()->get();
 
         $dispatchOrders = $allDispatchOrders->filter(function ($do) {
             if (!empty($do->invoice_id) || in_array($do->status, ['Invoiced', 'Fully Invoiced', 'Completed', 'Cancelled'])) {
-                return false;
-            }
-
-            // Check if an active non-cancelled invoice exists for this dispatch order's material_requirement_id
-            if ($do->material_requirement_id) {
-                $hasInvoice = Invoice::where('status', '!=', 'Cancelled')
-                    ->where(function($q) use ($do) {
-                        $q->where('material_requirement_id', $do->material_requirement_id);
-                        if ($do->invoice_id) {
-                            $q->orWhere('id', $do->invoice_id);
-                        }
-                    })
-                    ->exists();
-
-                if ($hasInvoice) {
-                    return false;
+                if ($do->invoice && $do->invoice->status === 'Cancelled') {
+                    return true;
                 }
+                return false;
             }
 
             return true;

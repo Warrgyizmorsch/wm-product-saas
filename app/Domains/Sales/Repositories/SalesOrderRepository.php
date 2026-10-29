@@ -59,7 +59,9 @@ class SalesOrderRepository
     {
         return SalesOrder::query()
             ->with(['customer', 'salesPerson'])
-            ->latest()
+            ->orderBy('order_date', 'desc')
+            ->orderBy('sales_order_number', 'desc')
+            ->orderBy('id', 'desc')
             ->get();
     }
 
@@ -85,13 +87,25 @@ class SalesOrderRepository
         }
 
         $sortBy = $filters['sort_by'] ?? 'order_date';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
+        $sortOrder = strtolower($filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['sales_order_number', 'order_date', 'total_amount', 'status'];
 
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
+        if ($sortBy === 'order_date') {
+            $query->orderBy('order_date', $sortOrder)
+                  ->orderBy('sales_order_number', $sortOrder === 'asc' ? 'asc' : 'desc')
+                  ->orderBy('id', $sortOrder === 'asc' ? 'asc' : 'desc');
+        } elseif ($sortBy === 'sales_order_number') {
+            $query->orderBy('sales_order_number', $sortOrder)
+                  ->orderBy('order_date', 'desc')
+                  ->orderBy('id', $sortOrder);
+        } elseif (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortOrder)
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('order_date', 'desc')
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         }
 
         return $query->paginate($perPage)->withQueryString();
