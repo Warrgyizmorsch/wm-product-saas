@@ -146,7 +146,7 @@ class WorkCenterCalculationService
                 'flat_daily_amount'      => $overheadDailyCost,
                 'note'                   => 'Direct flat daily operating expense entered in Work Center form',
             ],
-            'timeline_matrix'       => $this->buildTimelineMatrix($sectionDetails, $allShiftsAcrossSections, $sectionCalculationResults),
+            'timeline_matrix'       => $this->buildTimelineMatrix($sectionDetails, $allShiftsAcrossSections, $sectionCalculationResults ?? []),
             'totals' => [
                 'total_daily_capacity'         => $wcDailyCapacity,
                 'total_hourly_capacity'        => $wcHourlyCapacity,
@@ -462,7 +462,7 @@ class WorkCenterCalculationService
     /**
      * Build 2D Shift x Section timeline matrix for executive overview.
      */
-    protected function buildTimelineMatrix(array $sectionDetails, array $allShiftsAcrossSections, array $sectionCalculationResults): array
+    protected function buildTimelineMatrix(array $sectionDetails, array $allShiftsAcrossSections, ?array $sectionCalculationResults = []): array
     {
         $shifts = array_values($allShiftsAcrossSections);
         usort($shifts, fn($a, $b) => ($a['start_minute'] ?? 0) <=> ($b['start_minute'] ?? 0));

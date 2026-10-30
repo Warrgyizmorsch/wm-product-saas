@@ -12,29 +12,27 @@ use Illuminate\Support\Facades\Auth;
 class WorkCenterActivityLogger
 {
     /**
-     * Log a Work Center or Section activity event.
+     * Log a Work Center or Section calculation snapshot event.
      */
     public function log(
         int $tenantId,
         int $workCenterId,
         ?int $sectionId,
         ?int $userId,
-        string $eventType,
-        string $entityType,
-        ?int $entityId,
-        string $description,
-        ?array $properties = null
+        string $calculationType,
+        ?int $snapshotId,
+        ?string $batchId,
+        string $description
     ): WorkCenterActivityLog {
         return WorkCenterActivityLog::create([
-            'tenant_id'      => $tenantId,
-            'work_center_id' => $workCenterId,
-            'section_id'     => $sectionId,
-            'user_id'        => $userId ?: (Auth::check() ? Auth::id() : null),
-            'event_type'     => $eventType,
-            'entity_type'    => $entityType,
-            'entity_id'      => $entityId,
-            'description'    => $description,
-            'properties'     => $properties,
+            'tenant_id'        => $tenantId,
+            'work_center_id'   => $workCenterId,
+            'section_id'       => $sectionId,
+            'user_id'          => $userId ?: (Auth::check() ? Auth::id() : null),
+            'calculation_type' => $calculationType,
+            'snapshot_id'      => $snapshotId,
+            'batch_id'         => $batchId,
+            'description'      => $description,
         ]);
     }
 
@@ -45,13 +43,15 @@ class WorkCenterActivityLogger
         WorkCenterSectionCalculation $calculation,
         ?int $userId = null
     ): WorkCenterActivityLog {
-        $sectionName = $calculation->section ? $calculation->section->name : "Section #{$calculation->section_id}";
+        $section = $calculation->section;
+        $sectionName = $section?->name ?? "Section #{$calculation->section_id}";
+        $sectionCode = $section?->code ?? "SEC-{$calculation->section_id}";
+
         $description = sprintf(
-            'Section calculation completed for %s: Daily Cap: %s, Daily Cost: $%s (%s)',
+            '%s [%s] snapshot #%d calculated',
             $sectionName,
-            number_format($calculation->daily_capacity, 2),
-            number_format($calculation->total_daily_operating_cost, 2),
-            $calculation->trigger_type
+            $sectionCode,
+            $calculation->id
         );
 
         return $this->log(
@@ -59,23 +59,10 @@ class WorkCenterActivityLogger
             workCenterId: (int) ($calculation->section?->work_center_id ?? $calculation->workCenterCalculation?->work_center_id ?? 0),
             sectionId: (int) $calculation->section_id,
             userId: $userId,
-            eventType: 'section_calculation_completed',
-            entityType: 'WorkCenterSectionCalculation',
-            entityId: (int) $calculation->id,
-            description: $description,
-            properties: [
-                'batch_id'                      => $calculation->batch_id,
-                'trigger_type'                  => $calculation->trigger_type,
-                'capacity_per_hour'             => $calculation->capacity_per_hour,
-                'daily_capacity'                => $calculation->daily_capacity,
-                'labor_cost_per_hour'           => $calculation->labor_cost_per_hour,
-                'total_daily_labor_cost'        => $calculation->total_daily_labor_cost,
-                'machine_cost_per_hour'         => $calculation->machine_cost_per_hour,
-                'total_daily_machine_cost'      => $calculation->total_daily_machine_cost,
-                'total_daily_operating_cost'    => $calculation->total_daily_operating_cost,
-                'total_operating_cost_per_hour' => $calculation->total_operating_cost_per_hour,
-                'unique_operating_hours'        => $calculation->unique_operating_hours,
-            ]
+            calculationType: 'section',
+            snapshotId: (int) $calculation->id,
+            batchId: $calculation->batch_id,
+            description: $description
         );
     }
 
@@ -86,13 +73,15 @@ class WorkCenterActivityLogger
         WorkCenterCalculation $calculation,
         ?int $userId = null
     ): WorkCenterActivityLog {
-        $wcName = $calculation->workCenter ? $calculation->workCenter->name : "Work Center #{$calculation->work_center_id}";
+        $workCenter = $calculation->workCenter;
+        $wcName = $workCenter?->name ?? "Work Center #{$calculation->work_center_id}";
+        $wcCode = $workCenter?->code ?? "WC-{$calculation->work_center_id}";
+
         $description = sprintf(
-            'Work Center rollup calculation completed for %s: Daily Cap: %s, Total Daily Cost: $%s (%s)',
+            '%s [%s] snapshot #%d calculated',
             $wcName,
-            number_format($calculation->daily_capacity, 2),
-            number_format($calculation->total_daily_cost, 2),
-            $calculation->trigger_type
+            $wcCode,
+            $calculation->id
         );
 
         return $this->log(
@@ -100,30 +89,15 @@ class WorkCenterActivityLogger
             workCenterId: (int) $calculation->work_center_id,
             sectionId: null,
             userId: $userId,
-            eventType: 'work_center_calculation_completed',
-            entityType: 'WorkCenterCalculation',
-            entityId: (int) $calculation->id,
-            description: $description,
-            properties: [
-                'batch_id'                 => $calculation->batch_id,
-                'trigger_type'             => $calculation->trigger_type,
-                'impacted_section_ids'     => $calculation->impacted_section_ids,
-                'capacity_per_hour'        => $calculation->capacity_per_hour,
-                'daily_capacity'           => $calculation->daily_capacity,
-                'labor_cost_per_hour'      => $calculation->labor_cost_per_hour,
-                'total_daily_labor_cost'   => $calculation->total_daily_labor_cost,
-                'machine_cost_per_hour'    => $calculation->machine_cost_per_hour,
-                'total_daily_machine_cost' => $calculation->total_daily_machine_cost,
-                'overhead_cost'            => $calculation->overhead_cost,
-                'total_daily_cost'         => $calculation->total_daily_cost,
-                'total_cost_per_hour'      => $calculation->total_cost_per_hour,
-                'unique_operating_hours'   => $calculation->unique_operating_hours,
-            ]
+            calculationType: 'work_center',
+            snapshotId: (int) $calculation->id,
+            batchId: $calculation->batch_id,
+            description: $description
         );
     }
 
     /**
-     * Log resource mutation (e.g. employee assigned, machine mapped, shift altered).
+     * Log generic activity or resource change.
      */
     public function logResourceChange(
         int $tenantId,
@@ -141,11 +115,10 @@ class WorkCenterActivityLogger
             workCenterId: $workCenterId,
             sectionId: $sectionId,
             userId: $userId,
-            eventType: $eventType,
-            entityType: $entityType,
-            entityId: $entityId,
-            description: $description,
-            properties: $properties
+            calculationType: str_contains(strtolower($eventType), 'section') ? 'section' : 'work_center',
+            snapshotId: $entityId,
+            batchId: $properties['batch_id'] ?? null,
+            description: $description
         );
     }
 }

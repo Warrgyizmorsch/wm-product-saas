@@ -42,6 +42,12 @@ All items will be queued here and implemented together in a clean batch once rev
 | **ISSUE-18** | Work Center Level Calculation Engine Rework (Average Capacity / hr, Multi-WC Direct Staff Allocation, Flat Overhead) | **Applied** | `WorkCenterCalculationService.php`, `show.blade.php`, `WorkCenterCalculation.php`, Migration |
 | **ISSUE-19** | Section Calculation Modal (Audit Metrics Tab): Add Explanatory Info Popovers `(i)` for All 52 Audit Metrics (Source / Formula in Plain Language) | **Applied** | `section-calculation-modal.blade.php`, `show.blade.php` |
 | **ISSUE-20** | Work Center Hero Panel (3-Column Layout): Redesign to Display Inline Section Capacity/Cost Contributions & Direct Personnel Rates (Zero-Hover UI) | **Applied** | `show.blade.php` |
+| **ISSUE-21** | Work Center Calculation Modal (Timeline Tab): 24-Hour Visual Coverage Bar & Shift x Section Production & Cost Matrix | **Applied** | `show.blade.php` |
+| **ISSUE-22** | Work Center Calculation Modal (Contributing Sections Tab): Card Hierarchy Reorder & Grand Total Cost Reconciliation | **Applied** | `show.blade.php` |
+| **ISSUE-23** | Work Center Calculation Modal (Direct Personnel & Overhead Tab): Reorder Hierarchy, Burden Summary & Overhead Breakdown | **Applied** | `show.blade.php` |
+| **ISSUE-24** | Work Center Calculation Modal: Replace Raw Snapshot JSON with 47-Metric Work Center Audit Table & Complete Raw JSON Removal | **Applied** | `show.blade.php` |
+| **ISSUE-25** | Work Center Calculation Modal: 3x2 KPI Header Grid (Combined Output, Unit Cost, 24/7 Hours) | **Applied** | `show.blade.php` |
+| **ISSUE-26** | Work Center Activity & Audit Logs Table Rework (Granular Per-Snapshot Schema, Explicit `snapshot_id`, Simplified Descriptions & Direct Historical Drill-Down) | **Applied** | Migration, `WorkCenterActivityLog.php`, `WorkCenterActivityLogger.php`, `show.blade.php` |
 
 > **Live Work Center URL:** `http://127.0.0.1:8000/production/work-centers/1`
 
@@ -1062,6 +1068,69 @@ Restructure the top KPI header into a spacious 3 &times; 2 grid (6 cards total) 
   - Added labor reconciliation sub-line in Card 6 breaking down Sections Labor vs Direct Station Staff.
 
 #### 4. Impacted Files
+* `resources/views/modules/production/work-centers/show.blade.php`
+* `docs/calculation_audit_issues_tracker.md`
+
+---
+
+### ISSUE-26: Work Center Activity & Audit Logs Table Rework (Granular Per-Snapshot Schema, Explicit `snapshot_id`, Simplified Descriptions & Direct Historical Drill-Down)
+* **Date Logged:** 2026-10-30
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** Database Schema (`production_work_center_activity_logs`), `WorkCenterActivityLog.php`, `WorkCenterActivityLogger.php`, `show.blade.php` (Tab 4: Activity & Audit History)
+
+#### 1. Issue Description & User Requirements
+The user reviewed the Activity & Audit History table in the Work Center view and clarified the exact operational logging requirements:
+1. **Primary Purpose**: Log completion of a calculation each time a snapshot calculation finishes, capturing when it happened (timestamp), which user triggered it, and the resulting snapshot ID.
+2. **Granular Per-Snapshot Logging Flow**:
+   - When multiple sections and the Work Center are recalculated (e.g., 3 sections modified):
+     * The system must record **one log entry per section calculation** indicating that specific section's snapshot calculation with its unique `snapshot_id`.
+     * Then, upon completing the Work Center rollup calculation, record **one single log entry for the Work Center** with its unique `snapshot_id`.
+     * If 3 sections change: 3 section records + 1 Work Center record = 4 records in sequence sharing the same calculation batch.
+   - If only the Work Center was calculated (e.g., direct personnel or flat overhead changed without section alterations):
+     * Record **1 single log entry for the Work Center** with its `snapshot_id`.
+3. **Simplified Description Format**:
+   - Keep descriptions clean and human-readable, storing the entity name and code:
+     * Section record: `"{section_name} [{section_code}] snapshot #{snapshot_id} calculated"`
+     * Work Center record: `"{work_center_name} [{work_center_code}] snapshot #{snapshot_id} calculated"`
+4. **Historical Snapshot Access & Traceability**:
+   - The user must be able to view the log and, directly from each log row, click a button to inspect that snapshot:
+     * Section log row &rarr; Quick drill-down button `[View Snapshot #ID ↗]` opening that section's audit breakdown.
+     * Work Center log row &rarr; Quick drill-down button `[View Snapshot #ID ↗]` opening the Work Center audit modal.
+5. **Database Table Evaluation & Cleanup**:
+   - The existing table `production_work_center_activity_logs` contained polymorphic developer-centric column names (`entity_type`, `entity_id`, `event_type`) and a redundant JSON `properties` column.
+   - The template also had a display bug where `$log->action_type` was referenced instead of `$log->event_type`, leaving the "ACTION TYPE" badge completely blank.
+
+#### 2. Agreed Architectural Solution
+1. **Database Migration (`rework_production_work_center_activity_logs_table`)**:
+   - Add explicit columns:
+     - `calculation_type` (`VARCHAR(30)`): `'section'` or `'work_center'`.
+     - `snapshot_id` (`BIGINT UNSIGNED`): explicit snapshot ID.
+     - `batch_id` (`VARCHAR(64)`, nullable): calculation batch UUID linking all granular section snapshots to the parent rollup snapshot.
+   - Backfill existing data (`snapshot_id = entity_id`, `calculation_type = 'section' | 'work_center'`, `batch_id = properties->batch_id`).
+   - Safely drop deprecated polymorphic columns (`entity_type`, `entity_id`, `event_type`, `properties`) and outdated indexes.
+   - Add optimized indexes on `['tenant_id', 'work_center_id', 'calculation_type']`, `['snapshot_id']`, and `['batch_id']`.
+2. **Model Update (`WorkCenterActivityLog.php`)**:
+   - Update `$fillable` array to `['tenant_id', 'work_center_id', 'section_id', 'user_id', 'calculation_type', 'snapshot_id', 'batch_id', 'description']`.
+   - Add dedicated relationships: `sectionCalculation()`, `workCenterCalculation()`, `workCenter()`, `section()`, and `user()`.
+3. **Logger Service Update (`WorkCenterActivityLogger.php`)**:
+   - Update `logSectionCalculationCompleted()` and `logWorkCenterCalculationCompleted()` to generate the standardized simple description and write to `calculation_type`, `snapshot_id`, and `batch_id`.
+4. **UI Improvements (`show.blade.php`)**:
+   - Fix the blank badge: Render clear, styled badges:
+     - `Section Calculation` (`bg-soft-success text-success`)
+     - `Work Center Rollup` (`bg-soft-primary text-primary`)
+   - Add Batch ID tag for grouping multi-section calculation runs.
+   - Add direct **`[View Snapshot #ID ↗]`** action button on each row for instantaneous historical inspection.
+   - Section Details Modal Header Clean-up: Removed the cluttered inline description string from the modal header subtitle, giving it a dedicated **Purpose & Operational Notes** card in the modal body directly above the 4 KPI metric cards.
+   - **Header Button Replacement & "View All Logs" Modal (`#allActivityLogsModal`)**:
+     * Replaced `[Inspect Full Snapshot]` button in the Activity & Audit History header with `[View All Logs (N)]`.
+     * Main page table maintains clean presentation by displaying the 10 most recent activity logs, with a card footer link (`View all N activity & audit logs →`) if total logs exceed 10.
+     * Created `#allActivityLogsModal` (Bootstrap modal-xl, scrollable, sticky table header) presenting the complete, unfiltered audit trail ordered chronologically (newest first) with snapshot inspection quick actions.
+
+#### 3. Impacted Files
+* `database/migrations/2026_10_30_000001_rework_production_work_center_activity_logs_table.php`
+* `app/Domains/Production/Models/WorkCenterActivityLog.php`
+* `app/Domains/Production/Services/WorkCenterActivityLogger.php`
 * `resources/views/modules/production/work-centers/show.blade.php`
 * `docs/calculation_audit_issues_tracker.md`
 

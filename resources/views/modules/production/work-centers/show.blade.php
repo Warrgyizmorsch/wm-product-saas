@@ -565,7 +565,10 @@
                                 . '<i class="feather-info text-muted me-1"></i>' . e(__('production.no_employees_assigned') ?? 'No direct personnel assigned')
                                 . '</div>';
                         }
-                        $wcEmpListHtml .= '</div></div></div>';
+                        $wcEmpListHtml .= '</div></div>'
+                            . '<div class="card-footer bg-light py-1.5 px-3 border-top text-center" style="cursor: pointer;">'
+                            . '<span class="text-primary fw-semibold fs-11"><i class="feather-user-check me-1"></i>Click to Manage & Assign Personnel &rarr;</span>'
+                            . '</div></div>';
                     @endphp
 
                     <!-- Direct Assigned Staff Card with Hover Popover (Live Calculated Total) -->
@@ -577,19 +580,24 @@
                          data-bs-placement="top"
                          data-bs-html="true"
                          data-bs-custom-class="wc-breakdown-popover"
-                         data-bs-content="{{ $wcEmpListHtml }}">
+                         data-bs-content="{{ $wcEmpListHtml }}"
+                         data-bs-target="#workCenterEmployeesModal"
+                         title="Click to assign or manage internal employees">
                         <div class="card-body bg-light p-2.5 d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center gap-1.5">
                                 <i class="feather-users text-primary fs-13"></i>
                                 <span class="fw-bold fs-11 text-uppercase text-dark">Direct Assigned Staff ({{ $liveDirectStaffCount }})</span>
                             </div>
-                            @if($liveDirectStaffTotal > 0)
-                                <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2 py-1">
-                                    {{ format_currency($liveDirectStaffTotal) }}/day
-                                </span>
-                            @else
-                                <span class="badge bg-soft-secondary text-secondary font-monospace fs-10 px-2 py-0.5">{{ $liveDirectStaffCount }} Assigned</span>
-                            @endif
+                            <div class="d-flex align-items-center gap-1.5">
+                                @if($liveDirectStaffTotal > 0)
+                                    <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2 py-1">
+                                        {{ format_currency($liveDirectStaffTotal) }}/day
+                                    </span>
+                                @else
+                                    <span class="badge bg-soft-secondary text-secondary font-monospace fs-10 px-2 py-0.5">{{ $liveDirectStaffCount }} Assigned</span>
+                                @endif
+                                <i class="feather-arrow-up-right text-muted fs-11" title="Click to manage assigned employees"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -1462,7 +1470,7 @@
                 </x-ui.odoo-form-ui>
             </div>
         <!-- Work Center Activity & Audit Logs Section -->
-        <div class="mb-2">
+        <div class="mt-5 pt-3 border-top mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
                     <h5 class="fw-bold text-dark mb-0">
@@ -1470,8 +1478,8 @@
                     </h5>
                     <small class="text-muted">Real-time log of debounce triggers, calculation rollups, manual batch changes, and configuration updates</small>
                 </div>
-                <button type="button" class="btn btn-xs btn-outline-primary" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal">
-                    <i class="feather-file-text me-1"></i>Inspect Full Snapshot
+                <button type="button" class="btn btn-xs btn-outline-primary" data-bs-toggle="modal" data-bs-target="#allActivityLogsModal">
+                    <i class="feather-list me-1"></i>View All Logs ({{ $workCenter->activityLogs()->count() }})
                 </button>
             </div>
 
@@ -1480,10 +1488,12 @@
                     <table class="table table-sm table-hover align-middle mb-0 fs-12">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 18%">Timestamp</th>
-                                <th style="width: 18%">Action Type</th>
-                                <th style="width: 44%">Description</th>
-                                <th style="width: 20%">Initiated By</th>
+                                <th style="width: 16%">Timestamp</th>
+                                <th style="width: 15%">Calculation Level</th>
+                                <th style="width: 37%">Description</th>
+                                <th style="width: 12%">Batch Run</th>
+                                <th style="width: 12%">Initiated By</th>
+                                <th style="width: 8%" class="text-end">Snapshot</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1494,22 +1504,27 @@
                                         <small class="text-muted d-block fs-10">({{ $log->created_at->diffForHumans() }})</small>
                                     </td>
                                     <td>
-                                        @php
-                                            $badgeClass = match($log->action_type) {
-                                                'calculation_completed' => 'bg-soft-success text-success',
-                                                'countdown_armed', 'countdown_reset' => 'bg-soft-warning text-warning',
-                                                'manual_bypass' => 'bg-soft-primary text-primary',
-                                                'duration_updated' => 'bg-soft-info text-info',
-                                                'section_modified' => 'bg-soft-secondary text-secondary',
-                                                default => 'bg-light text-dark',
-                                            };
-                                        @endphp
-                                        <span class="badge {{ $badgeClass }} font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
-                                            {{ str_replace('_', ' ', $log->action_type) }}
-                                        </span>
+                                        @if($log->calculation_type === 'section')
+                                            <span class="badge bg-soft-success text-success font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                <i class="feather-layers me-1"></i>Section Calc
+                                            </span>
+                                        @else
+                                            <span class="badge bg-soft-primary text-primary font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                <i class="feather-box me-1"></i>WC Rollup
+                                            </span>
+                                        @endif
                                     </td>
-                                    <td class="text-dark">
+                                    <td class="text-dark fw-medium">
                                         {{ $log->description }}
+                                    </td>
+                                    <td>
+                                        @if($log->batch_id)
+                                            <span class="badge bg-light text-muted font-monospace fs-10 border" title="Calculation Batch: {{ $log->batch_id }}">
+                                                <i class="feather-git-commit me-0.5 text-primary"></i>#{{ substr($log->batch_id, 0, 8) }}
+                                            </span>
+                                        @else
+                                            <span class="text-muted fs-10 fst-italic">—</span>
+                                        @endif
                                     </td>
                                     <td>
                                         @if($log->user)
@@ -1518,10 +1533,23 @@
                                             <span class="text-muted fst-italic"><i class="feather-cpu me-1 fs-11"></i>Automated System</span>
                                         @endif
                                     </td>
+                                    <td class="text-end">
+                                        @if($log->calculation_type === 'section' && $log->section_id)
+                                            <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 font-monospace fs-10" data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $log->section_id }}" title="View Section Snapshot #{{ $log->snapshot_id }}">
+                                                #{{ $log->snapshot_id }} ↗
+                                            </button>
+                                        @elseif($log->calculation_type === 'work_center')
+                                            <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 font-monospace fs-10" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal" title="View Work Center Snapshot #{{ $log->snapshot_id }}">
+                                                #{{ $log->snapshot_id }} ↗
+                                            </button>
+                                        @else
+                                            <span class="text-muted fs-10">—</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="text-center py-4 text-muted fst-italic">
+                                    <td colspan="6" class="text-center py-4 text-muted fst-italic">
                                         <i class="feather-info me-1"></i>No activity logs recorded yet. Calculations or modifications will generate audit logs automatically.
                                     </td>
                                 </tr>
@@ -1529,6 +1557,13 @@
                         </tbody>
                     </table>
                 </div>
+                @if($workCenter->activityLogs()->count() > 10)
+                    <div class="card-footer bg-light py-2 text-center border-top">
+                        <button type="button" class="btn btn-xs btn-link text-primary text-decoration-none fw-semibold" data-bs-toggle="modal" data-bs-target="#allActivityLogsModal">
+                            <i class="feather-list me-1"></i>View all {{ $workCenter->activityLogs()->count() }} activity & audit logs &rarr;
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -2070,15 +2105,26 @@
                             <div class="w-100 text-muted fs-12 mt-0.5">
                                 Work Center: <span class="fw-semibold text-dark">{{ $workCenter->name }}</span>
                                 <span class="badge bg-soft-primary text-primary font-monospace ms-1">{{ $workCenter->code }}</span>
-                                @if($section->description)
-                                    &bull; <span class="fst-italic">{{ $section->description }}</span>
-                                @endif
                             </div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
 
                     <div class="modal-body p-4">
+                        @if ($section->description)
+                            <!-- Section Purpose & Operational Notes Card -->
+                            <div class="card border rounded-3 shadow-none mb-3 overflow-hidden">
+                                <div class="card-header bg-light py-1.5 px-3 border-bottom d-flex align-items-center">
+                                    <span class="text-dark fw-bold fs-11 text-uppercase">
+                                        <i class="feather-file-text text-primary me-1.5"></i>{{ __('production.purpose_notes') ?? 'Purpose & Operational Notes' }}
+                                    </span>
+                                </div>
+                                <div class="card-body bg-white p-2.5">
+                                    <p class="mb-0 fs-12 text-muted" style="white-space: pre-line; line-height: 1.5;">{{ $section->description }}</p>
+                                </div>
+                            </div>
+                        @endif
+
                         <!-- Top 4 KPI Metric Cards -->
                         <div class="row g-3 mb-4">
                             <!-- 1. Operating Window -->
@@ -3742,27 +3788,66 @@
                                     <table class="table table-sm table-hover align-middle mb-0 fs-12">
                                         <thead class="table-light">
                                             <tr>
-                                                <th style="width: 20%">Timestamp</th>
-                                                <th style="width: 20%">Action</th>
-                                                <th style="width: 40%">Description</th>
-                                                <th style="width: 20%">User</th>
+                                                <th style="width: 16%">Timestamp</th>
+                                                <th style="width: 15%">Calculation Level</th>
+                                                <th style="width: 37%">Description</th>
+                                                <th style="width: 12%">Batch Run</th>
+                                                <th style="width: 12%">User</th>
+                                                <th style="width: 8%" class="text-end">Snapshot</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @forelse($workCenter->activityLogs()->latest()->take(20)->get() as $log)
                                                 <tr>
-                                                    <td class="font-monospace text-muted fs-11">{{ $log->created_at->format('Y-m-d H:i:s') }}</td>
-                                                    <td>
-                                                        <span class="badge bg-soft-secondary text-secondary font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
-                                                            {{ str_replace('_', ' ', $log->action_type) }}
-                                                        </span>
+                                                    <td class="font-monospace text-muted fs-11">
+                                                        {{ $log->created_at->format('Y-m-d H:i:s') }}
+                                                        <small class="text-muted d-block fs-10">({{ $log->created_at->diffForHumans() }})</small>
                                                     </td>
-                                                    <td class="text-dark">{{ $log->description }}</td>
-                                                    <td>{{ $log->user ? $log->user->name : 'System Automation' }}</td>
+                                                    <td>
+                                                        @if($log->calculation_type === 'section')
+                                                            <span class="badge bg-soft-success text-success font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                                <i class="feather-layers me-1"></i>Section Calc
+                                                            </span>
+                                                        @else
+                                                            <span class="badge bg-soft-primary text-primary font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                                <i class="feather-box me-1"></i>WC Rollup
+                                                            </span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-dark fw-medium">{{ $log->description }}</td>
+                                                    <td>
+                                                        @if($log->batch_id)
+                                                            <span class="badge bg-light text-muted font-monospace fs-10 border" title="Calculation Batch: {{ $log->batch_id }}">
+                                                                <i class="feather-git-commit me-0.5 text-primary"></i>#{{ substr($log->batch_id, 0, 8) }}
+                                                            </span>
+                                                        @else
+                                                            <span class="text-muted fs-10 fst-italic">—</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($log->user)
+                                                            <span class="fw-semibold text-dark"><i class="feather-user me-1 text-muted fs-11"></i>{{ $log->user->name }}</span>
+                                                        @else
+                                                            <span class="text-muted fst-italic"><i class="feather-cpu me-1 fs-11"></i>Automated System</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-end">
+                                                        @if($log->calculation_type === 'section' && $log->section_id)
+                                                            <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 font-monospace fs-10" data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $log->section_id }}" title="View Section Snapshot #{{ $log->snapshot_id }}">
+                                                                #{{ $log->snapshot_id }} ↗
+                                                            </button>
+                                                        @elseif($log->calculation_type === 'work_center')
+                                                            <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 font-monospace fs-10" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal" title="View Work Center Snapshot #{{ $log->snapshot_id }}">
+                                                                #{{ $log->snapshot_id }} ↗
+                                                            </button>
+                                                        @else
+                                                            <span class="text-muted fs-10">—</span>
+                                                        @endif
+                                                    </td>
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="4" class="text-center py-3 text-muted fst-italic">No activity logs recorded.</td>
+                                                    <td colspan="6" class="text-center py-4 text-muted fst-italic">No activity logs recorded.</td>
                                                 </tr>
                                             @endforelse
                                         </tbody>
@@ -4334,6 +4419,118 @@
             </div>
         @endforeach
     @endforeach
+
+    <!-- All Activity & Audit Logs Modal -->
+    <div class="modal fade" id="allActivityLogsModal" tabindex="-1" aria-labelledby="allActivityLogsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <div class="modal-header border-bottom py-3 bg-light">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                            <i class="feather-activity"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="allActivityLogsModalLabel">
+                                    Activity & Audit History &mdash; <span class="font-monospace text-primary">{{ $workCenter->code }}</span> ({{ $workCenter->name }})
+                                </h5>
+                                <span class="badge bg-soft-primary text-primary font-monospace fs-11">{{ $workCenter->activityLogs()->count() }} Total Logs</span>
+                            </div>
+                            <div class="text-muted fs-11 mt-0.5">
+                                Complete historical audit trail of calculations, rollups, and system changes
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body p-0">
+                    <div class="table-responsive" style="max-height: 65vh;">
+                        <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 16%" class="ps-3">Timestamp</th>
+                                    <th style="width: 14%">Calculation Level</th>
+                                    <th style="width: 38%">Description</th>
+                                    <th style="width: 12%">Batch Run</th>
+                                    <th style="width: 12%">Initiated By</th>
+                                    <th style="width: 8%" class="text-end pe-3">Snapshot</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($workCenter->activityLogs()->latest()->get() as $log)
+                                    <tr>
+                                        <td class="font-monospace text-muted fs-11 ps-3">
+                                            {{ $log->created_at->format('Y-m-d H:i:s') }}
+                                            <small class="text-muted d-block fs-10">({{ $log->created_at->diffForHumans() }})</small>
+                                        </td>
+                                        <td>
+                                            @if($log->calculation_type === 'section')
+                                                <span class="badge bg-soft-success text-success font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                    <i class="feather-layers me-1"></i>Section Calc
+                                                </span>
+                                            @else
+                                                <span class="badge bg-soft-primary text-primary font-monospace fs-10 text-uppercase px-2 py-0.5 rounded-pill">
+                                                    <i class="feather-box me-1"></i>WC Rollup
+                                                </span>
+                                            @endif
+                                        </td>
+                                        <td class="text-dark fw-medium">
+                                            {{ $log->description }}
+                                        </td>
+                                        <td>
+                                            @if($log->batch_id)
+                                                <span class="badge bg-light text-muted font-monospace fs-10 border" title="Calculation Batch: {{ $log->batch_id }}">
+                                                    <i class="feather-git-commit me-0.5 text-primary"></i>#{{ substr($log->batch_id, 0, 8) }}
+                                                </span>
+                                            @else
+                                                <span class="text-muted fs-10 fst-italic">—</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($log->user)
+                                                <span class="fw-semibold text-dark"><i class="feather-user me-1 text-muted fs-11"></i>{{ $log->user->name }}</span>
+                                            @else
+                                                <span class="text-muted fst-italic"><i class="feather-cpu me-1 fs-11"></i>Automated System</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            @if($log->calculation_type === 'section' && $log->section_id)
+                                                <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 font-monospace fs-10" data-bs-toggle="modal" data-bs-target="#sectionCalculationModal_{{ $log->section_id }}" title="View Section Snapshot #{{ $log->snapshot_id }}">
+                                                    #{{ $log->snapshot_id }} ↗
+                                                </button>
+                                            @elseif($log->calculation_type === 'work_center')
+                                                <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 font-monospace fs-10" data-bs-toggle="modal" data-bs-target="#workCenterCalculationModal" title="View Work Center Snapshot #{{ $log->snapshot_id }}">
+                                                    #{{ $log->snapshot_id }} ↗
+                                                </button>
+                                            @else
+                                                <span class="text-muted fs-10">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted fst-italic">
+                                            <i class="feather-info me-1"></i>No activity logs recorded yet. Calculations or modifications will generate audit logs automatically.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between align-items-center">
+                    <span class="text-muted fs-11">
+                        Showing all {{ $workCenter->activityLogs()->count() }} activity & audit log records ordered chronologically (newest first).
+                    </span>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Work Center-Level Internal Employee Assignment Modal -->
     <div class="modal fade wc-employees-modal" id="workCenterEmployeesModal" tabindex="-1" aria-labelledby="workCenterEmployeesModalLabel" aria-hidden="true">
@@ -6027,6 +6224,19 @@
                                 bootstrap.Modal.getOrCreateInstance($m[0]).show();
                             }
                         }
+                    }
+                });
+
+                // Also allow clicking inside the direct assigned staff popover to open workCenterEmployeesModal
+                $(document).on('click', '.wc-breakdown-popover', function(e) {
+                    var $trigger = $('[data-bs-target="#workCenterEmployeesModal"]');
+                    if ($trigger.length && typeof bootstrap !== 'undefined') {
+                        var popover = bootstrap.Popover.getInstance($trigger[0]);
+                        if (popover) popover.hide();
+                    }
+                    var $m = $('#workCenterEmployeesModal');
+                    if ($m.length) {
+                        bootstrap.Modal.getOrCreateInstance($m[0]).show();
                     }
                 });
 

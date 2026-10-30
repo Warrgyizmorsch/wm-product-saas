@@ -18,15 +18,10 @@ class WorkCenterActivityLog extends BaseModel
         'work_center_id',
         'section_id',
         'user_id',
-        'event_type',
-        'entity_type',
-        'entity_id',
+        'calculation_type',
+        'snapshot_id',
+        'batch_id',
         'description',
-        'properties',
-    ];
-
-    protected $casts = [
-        'properties' => 'array',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -44,5 +39,15 @@ class WorkCenterActivityLog extends BaseModel
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function sectionCalculation(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSectionCalculation::class, 'snapshot_id');
+    }
+
+    public function workCenterCalculation(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterCalculation::class, 'snapshot_id');
     }
 }
