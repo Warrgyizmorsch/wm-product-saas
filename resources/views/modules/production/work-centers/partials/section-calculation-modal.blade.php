@@ -917,9 +917,6 @@
                             </table>
                         </div>
                     </div>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             </div>
 

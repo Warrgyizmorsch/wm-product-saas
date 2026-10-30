@@ -861,7 +861,218 @@ Implement a scalable hybrid architecture for the 3-column Hero profile panel:
 
 ---
 
+### ISSUE-21: Work Center Calculation Modal (Timeline Tab): Replace Empty 1,440-Minute Intervals with 24-Hour Visual Coverage Bar & Shift x Section Operating Matrix
+* **Date Logged:** 2026-10-30
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/show.blade.php` (`#wc-intervals-pane`) & `WorkCenterCalculationService.php`
+
+#### 1. Issue Description & Context
+In the Work Center Level Calculation Breakdown Modal, Tab 1 ("Timeline Intervals") currently displays an empty table stating *"No timeline intervals calculated"*. Unlike SectionCalculationService (which performs minute-by-minute discrete timeline slicing within a single section), WorkCenterCalculationService aggregates cross-section scalar totals and union operating windows, leaving this table blank.
+Furthermore, displaying granular shift-level resource and worker rosters at the Work Center level is redundant because full machine and worker details already exist in each section's own calculation breakdown modal.
+
+#### 2. Agreed Architectural Solution
+Implement a practical, executive-level 2D operational matrix paired with a top visual coverage bar:
+1. **24-Hour Visual Coverage Bar (Mini-Gantt)**:
+   - Positioned at the top of the tab, displaying a 24-hour horizontal track (`00:00 – 24:00`) for each contributing section.
+   - Visually differentiates active running windows from off-hours (idle) time (e.g., CNC Milling running 24/7 across all 3 shifts, vs. Robotic Welding running 16.30 hrs with 7.5 hrs idle).
+   - Shows the peak concurrency window (`06:00 – 22:30`) where all sections run simultaneously.
+2. **2D Shift &times; Section Operating Matrix**:
+   - **Shifts as Rows**: Each plant shift (Morning Shift `06:00–14:30`, Evening Shift `14:00–22:30/23:00`, Night Shift `22:00–06:30`) with time window and duration.
+   - **Sections as Column Headers**: Each column represents one contributing section (e.g. `[SEC-CNC-01]`, `[SEC-WLD-02]`, `[SF]`).
+   - **Intersection Cells**:
+     - When Active: Displays `Active` (or `Solo Running`) badge, shift output units, shift operating cost, and unit cost.
+     - When Inactive: Displays `Off-Hours (Idle)` with `$0 cost • 0 output`.
+   - **Rightmost Column (Shift Combined)**: Sums combined output and combined operating cost for all sections running in that shift.
+3. **Table Footers (`<tfoot>`)**:
+   - Sums each section vertically across the day: Total Daily Units, Total Daily Cost, and Unit Cost.
+   - Grand totals for all contributing sections: `7,171.0 units` and `$164,678.87`.
+4. **Reconciliation Card**:
+   - Omitted from Tab 1 to avoid redundancy, as comprehensive 4-card reconciliation is hosted in Tab 2 (Contributing Sections).
+
+#### 3. Implemented Changes
+- Added `buildTimelineMatrix()` in [`app/Domains/Production/Services/WorkCenterCalculationService.php`](file:///c:/xampp/htdocs/wm-product-saas/app/Domains/Production/Services/WorkCenterCalculationService.php) to build the structured Shift $\times$ Section matrix and store it in `calculation_details['timeline_matrix']`.
+- Updated [`resources/views/modules/production/work-centers/show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php):
+  - Tab title changed to `Timeline Matrix (N Shifts)`.
+  - **Modernized 24-Hour Visual Coverage Bar (Mini-Gantt)**:
+    - **Shift Code Only**: Segments now display shift codes only (`SH-MORN`, `SH-EVN`, `SH-NGHT`, `MRN`) instead of full strings, preventing clipping on narrow overnight wrap segments. Full details (name, hours, window) are available via tooltip.
+    - **Industrial UI Upgrade**: Multi-tone gradient color styling based on shift time (Morning blue, Evening indigo, Night purple), crisp white segment divider borders, subtle inner shadows, 7 vertical hour gridlines (at 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00), and an authentic diagonal idle hatch pattern for off-hours intervals.
+  - **Space-Optimized Shift &times; Section Production & Cost Matrix**:
+    - **Section Codes Only**: Column headers now display section codes only in soft primary badges (`[SEC-CNC-01]`, `[SEC-WLD-02]`, `[SF]`) with full names in hover tooltips, eliminating awkward multi-line text truncation and saving horizontal space.
+    - **Shift Codes Only**: Operating shift rows display shift codes prominently in soft dark badges (`SH-MORN`, `MRN`) alongside the time window and duration, saving significant vertical and horizontal real estate.
+  - Added table totals footer (`<tfoot>`) summing vertical section outputs and costs. (The bottom reconciliation card was removed per user request, as full labor & expense reconciliation is presented in comprehensive detail in Tab 2 Contributing Sections).
+  - Included a fallback parser to build the matrix and tracks on the fly for existing snapshots.
+
+---
+
+### ISSUE-22: Work Center Calculation Modal (Contributing Sections Tab): Add Daily/Hourly Metric Pairs, Unit Cost, Drill-Down Links, Totals Footer, and Labor Reconciliation Strip
+* **Date Logged:** 2026-10-30
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/show.blade.php` (`#wc-sections-pane`) & `WorkCenterCalculationService.php`
+
+#### 1. Issue Description & Context
+In the Work Center Level Calculation Breakdown Modal, Tab 2 ("Contributing Sections") displays a roll-up table with columns for Code, Section Name, Operating Hours, Daily Capacity, Daily Labor Cost, and Daily Machine Cost.
+The table currently ends abruptly on the last section row with no table footer (`<tfoot>`), lacks total operating costs and cost per unit for each section, omits average hourly capacity and labor rate metrics present in the section details header, and offers no reconciliation explanation for the difference between total section labor ($163,826.67) and total Work Center labor ($249,160.00).
+
+#### 2. Agreed Architectural Solution
+Refactor `#wc-sections-pane` into an audit-grade section roll-up table:
+1. **Paired Daily & Hourly Metric Columns**:
+   - **Capacity**: Daily Capacity (`3,760.0 units`) paired with sub-line Average Hourly Capacity (`156.7 u/h`).
+   - **Labor Cost**: Daily Labor Cost (`$9,056.67`) paired with sub-line Average Labor Rate (`$377.36/hr`).
+   - **Machinery Cost**: Daily Machine Expense (`$504.00`) paired with sub-line Machine Rate (`$21.00/hr`).
+   - **Total Operating Cost**: Total daily cost (`$9,560.67`) paired with sub-line Effective Rate (`$398.36/hr`).
+   - **Cost / Unit Badge**: Direct efficiency metric per section (`$2.54 / u`, `$23.27 / u`, `$51.32 / u`).
+2. **Interactive Section Audit Drill-Down (`↗`)**:
+   - Quick-action button on each row allowing users/auditors to open `#sectionCalculationModal_{id}` to inspect that section's complete 52-metric breakdown.
+3. **Table Footer Totals (`<tfoot>`)**:
+   - Sums all contributing sections: Total Capacity `7,171.0 units` (Avg `298.8 u/h`), Sections Labor `$163,826.67`, Sections Machinery `$852.20`, and Total Sections Cost `$164,678.87` (Avg `$22.96 / u`).
+4. **Labor & Work Center Expense Reconciliation Strip**:
+   - Placed directly below the table:
+     $$\text{Section Labor (\$163,826.67)} + \text{Direct WC Staff (\$85,333.33)} = \mathbf{\$249,160.00}\text{ Total Labor}$$
+     $$+ \text{ Machinery \& Overhead (\$852.20)} = \mathbf{\$250,012.20}\text{ Work Center Total Cost}$$
+
+#### 3. Implemented Changes
+- Refactored [`#wc-sections-pane`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php):
+  - **Summary First Hierarchy**: Reordered pane elements so the executive summary **Contributing Sections Labor & Expense Reconciliation** card sits prominently at the top (`mb-3`), followed directly by the detailed **Section Capacity & Expense Roll-Up** itemized table.
+  - Formatted each cell with paired daily totals and average hourly speeds/burn rates (Capacity, Labor, Machine, Total Cost).
+  - Added formatted Cost / Unit efficiency badge (`$X.XX / u`).
+  - Added direct drill-down button (`↗`) launching that section's 52-metric breakdown modal.
+  - Added comprehensive `<tfoot>` row summing all section capacities and costs.
+  - 4-card Labor & Expense Reconciliation Strip breaking down Section Labor vs Direct WC Personnel vs Machinery/Overhead.
+
+---
+
+### ISSUE-23: Work Center Calculation Modal (Direct Personnel & Overhead Tab): Multi-WC Allocation Transparency, Base Salary Breakdown, and Footer Totals
+* **Date Logged:** 2026-10-30
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/show.blade.php` (`#wc-direct-pane`) & `WorkCenterCalculationService.php`
+
+#### 1. Issue Description & Context
+In the Work Center Level Calculation Breakdown Modal, Tab 3 ("Direct Personnel & Overhead") lists unassigned station staff and flat overhead.
+Currently, for employees assigned across multiple Work Centers (e.g. Rohan Kulkarni, assigned across 2 Work Centers), the table displays Monthly CTC `$720,000.00` and Daily Salary `$12,000.00` under a column header labeled `DAILY SALARY (CTC / 30)`. Without an explicit allocation factor column, auditors can suspect a division error (`$720,000 / 30 = $24,000`, not `$12,000`). Additionally, the table lacks a summary footer (`<tfoot>`) summing total monthly CTC and daily allocated salaries, and does not show the station fixed cost impact per production unit.
+
+#### 2. Agreed Architectural Solution
+Refactor `#wc-direct-pane` to provide transparent multi-station allocation accounting:
+1. **Dedicated WC Allocation Column**:
+   - Displays clear allocation badges: e.g. `<span class="badge bg-soft-warning">50% (1 of 2 WCs)</span>` vs. `<span class="badge bg-soft-success">100% Dedicated</span>`.
+   - Sub-line under Monthly CTC displays unallocated base daily salary (e.g., `Base: $24,000.00/d`), making the math $24,000 \times 50\% = \$12,000.00$ immediately transparent.
+2. **Table Footer Totals (`<tfoot>`)**:
+   - Sums all direct station staff: Total Monthly HRMS CTC (`$2,920,000.00 / mo`), effective allocation percentage (`~87.4%`), and Total Daily Allocated Salary (`$85,333.33 / day` &bull; `$3,555.56 / hr` over 24h).
+3. **Station-Level Fixed Burden Callout**:
+   - Executive callout summarizing total station fixed burden (Direct Staff $85,333.33 + Overhead $0.00 = $85,333.33/day) and its direct unit cost contribution:
+     $$\mathbf{+\$11.90\text{ / unit}}\text{ across 7,171.0 total daily units}$$
+
+#### 3. Implemented Changes
+- Refactored [`#wc-direct-pane`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php):
+  - **Summary First Hierarchy**: Reordered pane elements so the executive summary **Direct Station Fixed Burden** callout sits at the top (`mb-3`), followed directly by the detailed **Direct Work Center Staff (Unassigned to any Section)** personnel table (`mb-3`), and concluding with the **Work Center Flat Overhead Integration** configuration card.
+  - Fixed snapshot key consumption: Read `$dst['active_wc_count'] ?? $dst['total_active_work_centers'] ?? 1` and `$dst['allocation_percentage'] ?? (100 / $activeWcCount)` so employees assigned across multiple Work Centers (e.g. Rohan Kulkarni and Neha Joshi, assigned to 2 WCs) accurately display `<span class="badge bg-soft-warning">50% (1 of 2 WCs)</span>` and subtitle `Assigned across 2 Work Centers` rather than incorrectly defaulting to `100% Dedicated`.
+  - Updated [`WorkCenterCalculationService.php`](file:///c:/xampp/htdocs/wm-product-saas/app/Domains/Production/Services/WorkCenterCalculationService.php) to store canonical `total_active_work_centers` and `allocation_percentage` keys directly in the calculation snapshot JSON.
+  - Added dedicated WC Allocation column with color-coded badges (`50% (1 of 2 WCs)` vs `100% Dedicated`).
+  - Added sub-line under Monthly CTC displaying base daily salary (`Base: $XX.XX/d`).
+  - Added summary `<tfoot>` row summing Monthly CTC, effective allocation percentage, and daily allocated salary with 24h hourly burn.
+  - Added station-level fixed burden callout showing fixed daily burden and unit cost impact (`+$11.90 / unit`).
+
+---
+
+### ISSUE-24: Work Center Calculation Modal: Replace Raw Snapshot JSON Tab with Structured Work Center Audit Metrics & Drill-Down Traceability to Section Audit Fields
+* **Date Logged:** 2026-10-30
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/show.blade.php` (`#wc-audit-pane`) & `section-calculation-modal.blade.php`
+
+#### 1. Issue Description & User Requirement
+In the Work Center Level Calculation Breakdown Modal, Tab 5 previously displayed "Raw Snapshot JSON" in a dark code block.
+Raw JSON dumps are difficult for non-technical operations auditors to parse. The user decided to remove the Raw JSON tab completely and replace it with a structured **Work Center Audit Metrics** view copied directly from the style and theme of the 52-metric Section Audit Metrics table in `section-calculation-modal.blade.php`, including direct traceability drill-down links to section audit fields.
+
+#### 2. Agreed Architectural Direction
+1. **Full 47-Metric Audit Table Across 8 Categories**:
+   - Mirror the sticky-header, striped, audit-grade table styling from `section-calculation-modal.blade.php`.
+   - Organize all station metrics into 8 distinct operational categories:
+     1. Operating Timeline & Plant Schedule (Metrics 1–7)
+     2. Work Center Production Capacity Roll-Up (Metrics 8–12)
+     3. Contributing Sections Labor Roll-Up (Metrics 13–18)
+     4. Direct Work Center Personnel (Station-Level Allocation) (Metrics 19–26)
+     5. Total Blended Labor & Workforce Cost (Metrics 27–31)
+     6. Machinery & Physical Asset Operating Expenses (Metrics 32–36)
+     7. Facility Overhead & Station Fixed Burden (Metrics 37–41)
+     8. Total Financial & Manufacturing Cost Summary (Metrics 42–47)
+2. **Interactive Info Popovers on Every Metric**:
+   - Add hover/focus Bootstrap popovers (`feather-info` triggers with `.metric-audit-popover` custom class) detailing:
+     - Type: `Calculated` (`bg-soft-primary`) vs. `Collected` (`bg-soft-success`)
+     - Data Source Registry
+     - Plain-language mathematical formula / logic in code block
+     - Comprehensive operational description
+3. **Traceability Links to Section Audit Fields**:
+   - For all section roll-up metrics (Active Sections, Total Daily Capacity, Section Labor, Machinery Expense, Financial Summary), provide clickable drill-down badges `[SEC-CNC-01 ↗]`, `[SEC-WLD-02 ↗]`, `[SF ↗]` that directly trigger each section's complete 52-metric breakdown modal (`#sectionCalculationModal_{id}`).
+4. **Complete Removal of Raw JSON**:
+   - The raw JSON payload block and its toggle button have been completely eliminated from the modal view, providing a 100% clean, executive audit table.
+
+#### 3. Implemented Changes
+- Updated tab header in [`show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php#L3117): Replaced `Raw Snapshot JSON` with `<i class="feather-check-circle text-success"></i> Audit Metrics (47)`.
+- Replaced `#wc-json-pane` with `#wc-audit-pane` in [`show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php#L3774):
+  - Completely removed the raw JSON pre block and any JSON toggle buttons.
+  - Added supporting computation block aggregating machine power draws, manual capacities, shift counts, peak matrix burn rates, and multi-station employee allocations.
+  - Defined `$wcAuditMetricsMeta` cataloging all 47 Work Center audit metrics with exact names, formulas, sources, and explanations.
+  - Implemented `$renderWcAuditMetricRow` generating sticky table rows with info popovers and section drill-down links.
+  - Added `shown.bs.tab` event listener ensuring popovers are initialized when switching between modal tabs.
+
+---
+
+### ISSUE-25: Work Center Calculation Modal (Top 6 KPI Summary Cards): Restructure into 3x2 Grid Aligned with Section Details (Adding Cost Per Unit & Operating Hours, Combining Daily/Hourly Capacity)
+* **Date Logged:** 2026-10-30
+* **Status:** **Applied**
+* **Reported By:** User
+* **Area:** `resources/views/modules/production/work-centers/show.blade.php` (Lines 2915–3025)
+
+#### 1. Issue Description & Context
+In the Work Center Level Calculation Breakdown Modal, the top header previously displayed 6 narrow cards in a single row (`col-md-2`).
+Daily Capacity and Average Capacity/hr occupied two separate cards, while **Cost Per Unit** (one of the most critical manufacturing KPIs, currently `$34.86 / unit`) was completely missing from the top summary cards. Furthermore, the Work Center unique operating hours (`24.00 hrs • 06:00 – 06:00`) only existed as tiny subtitle text rather than a primary operational KPI. The narrow 6-card row caused text crowding and lacked the visual hierarchy and category badges present in the Section Details modal.
+
+#### 2. Agreed Architectural Solution
+Restructure the top KPI header into a spacious 3 &times; 2 grid (6 cards total) mirroring the Section Details modal architecture:
+1. **Card 1: Daily Capacity (Output Badge - Green)**:
+   - Primary metric: `7,171.0 units/day`.
+   - Sub-metrics: `Avg: 298.8 u/h` &bull; `Peak: 360.0 u/h` (calculated dynamically from shift matrix).
+2. **Card 2: Daily Operating Cost (Opex Badge - Amber)**:
+   - Primary metric: `$250,012.20`.
+   - Sub-metrics: `Avg: $10,417.18/hr` &bull; `Window: 24.00 hrs`.
+3. **Card 3: Cost Per Unit (Efficiency Badge - Blue)**:
+   - Primary metric: `$34.86 / unit`.
+   - Sub-metrics: `Sections: $22.96` &bull; `Burden: +$11.90`.
+4. **Card 4: Operating Hours (Schedule Badge - Purple/Green)**:
+   - Primary metric: `24.00 hrs/day`.
+   - Sub-metrics: `Window: 06:00 – 06:00` &bull; `3 Active Sections` (`Full 24/7` badge).
+5. **Card 5: Machinery Expense (Asset Opex Badge - Orange)**:
+   - Primary metric: `$852.20 / day`.
+   - Sub-metrics: `Rate: $35.51/hr` &bull; `Share: 0.3%` of total daily opex.
+6. **Card 6: Total Labor Cost (Blended Labor Badge - Cyan)**:
+   - Primary metric: `$249,160.00 / day`.
+   - Sub-metrics: `Sections: $163.8k` &bull; `Direct Staff: $85.3k`.
+
+#### 3. Implemented Changes
+- Refactored the top summary cards grid in [`resources/views/modules/production/work-centers/show.blade.php`](file:///c:/xampp/htdocs/wm-product-saas/resources/views/modules/production/work-centers/show.blade.php):
+  - Converted the layout from 6 single-row narrow cards (`col-md-2`) to a 3 &times; 2 grid (`col-md-4 col-sm-6`), aligning typography, card heights (`d-flex flex-column justify-content-between`), and category badges with the Section Calculation modal.
+  - Added peak hourly capacity calculation (`$wcPeakHourlyCap`) across shift intervals.
+  - Added operational window string derivation (`$wcOpWindowStr`) from shifts: Correctly recognizes 24.00 continuous hours (e.g. `06:00 – 06:00`), resolving the previous erroneous `06:00 – 23:00` display caused by naive min/max string comparisons that dropped overnight wrap shifts.
+  - Added direct calculation of sections cost per unit (`$wcSecCostPerUnit`) and direct burden per unit (`$stationFixedBurdenPerUnit`) for Card 3.
+  - Implemented dynamic badges for Operating Hours (`Full 24/7` vs `N Shifts`).
+  - Added percentage share calculation for Machinery Expense (`Share: X.X%`).
+  - Added labor reconciliation sub-line in Card 6 breaking down Sections Labor vs Direct Station Staff.
+
+#### 4. Impacted Files
+* `resources/views/modules/production/work-centers/show.blade.php`
+* `docs/calculation_audit_issues_tracker.md`
+
+---
+
 <!-- Additional issues will be appended below as they are reported -->
+
+
+
+
+
 
 
 

@@ -146,6 +146,7 @@ class WorkCenterCalculationService
                 'flat_daily_amount'      => $overheadDailyCost,
                 'note'                   => 'Direct flat daily operating expense entered in Work Center form',
             ],
+            'timeline_matrix'       => $this->buildTimelineMatrix($sectionDetails, $allShiftsAcrossSections, $sectionCalculationResults),
             'totals' => [
                 'total_daily_capacity'         => $wcDailyCapacity,
                 'total_hourly_capacity'        => $wcHourlyCapacity,
@@ -371,7 +372,9 @@ class WorkCenterCalculationService
                 'hrms_net_monthly_salary' => $monthlySalary,
                 'monthly_ctc'             => $monthlySalary,
                 'base_daily_salary'       => $baseDailySalary,
-                'active_wc_count'         => $activeWcCount,
+                'active_wc_count'          => $activeWcCount,
+                'total_active_work_centers' => $activeWcCount,
+                'allocation_percentage'    => $activeWcCount > 0 ? round(100 / $activeWcCount, 2) : 100.0,
                 'daily_salary'            => $allocatedDailySalary,
                 'daily_cost'              => $allocatedDailySalary,
                 'shift_name'              => $shiftName,
@@ -420,12 +423,106 @@ class WorkCenterCalculationService
         $totalCoveredMinutes = count(array_filter($covered));
         $uniqueHours = round($totalCoveredMinutes / 60, 4);
 
-        $window = "{$uniqueHours} hrs operational window across sections";
+        if ($totalCoveredMinutes >= 1440 || $uniqueHours >= 24) {
+            $dayShifts = array_filter($shiftsData, fn($s) => ((int) ($s['start_minute'] ?? 0) >= 300) && ((int) ($s['start_minute'] ?? 0) < 720));
+            $earliestDayStart = !empty($dayShifts) ? min(array_column($dayShifts, 'start_time')) : '06:00';
+            $wStart = substr($earliestDayStart, 0, 5);
+            $window = "{$wStart} – {$wStart}";
+            $windowStart = $wStart;
+            $windowEnd   = $wStart;
+        } else {
+            $earliestAct = null;
+            $latestAct = null;
+            for ($m = 0; $m < 1440; $m++) {
+                if ($covered[$m]) {
+                    if ($earliestAct === null) $earliestAct = $m;
+                    $latestAct = $m;
+                }
+            }
+            if ($earliestAct !== null) {
+                $windowStart = sprintf('%02d:%02d', floor($earliestAct / 60), $earliestAct % 60);
+                $windowEnd   = sprintf('%02d:%02d', floor(($latestAct + 1) / 60), ($latestAct + 1) % 60);
+                $window = "{$windowStart} – {$windowEnd}";
+            } else {
+                $window = 'None';
+                $windowStart = 'None';
+                $windowEnd   = 'None';
+            }
+        }
 
         return [
             'unique_clock_hours'   => $uniqueHours,
             'unique_clock_minutes' => $totalCoveredMinutes,
             'operational_window'   => $window,
+            'window_start'         => $windowStart,
+            'window_end'           => $windowEnd,
+        ];
+    }
+
+    /**
+     * Build 2D Shift x Section timeline matrix for executive overview.
+     */
+    protected function buildTimelineMatrix(array $sectionDetails, array $allShiftsAcrossSections, array $sectionCalculationResults): array
+    {
+        $shifts = array_values($allShiftsAcrossSections);
+        usort($shifts, fn($a, $b) => ($a['start_minute'] ?? 0) <=> ($b['start_minute'] ?? 0));
+
+        $matrix = [];
+        foreach ($shifts as $sh) {
+            $shId = $sh['id'];
+            $durHrs = (float) ($sh['duration_hours'] ?? 0.0);
+            $shiftCombinedOutput = 0.0;
+            $shiftCombinedCost   = 0.0;
+            $activeSectionsCount = 0;
+
+            $sectionCells = [];
+            foreach ($sectionDetails as $sec) {
+                $secId = $sec['section_id'];
+                $secCalc = $sectionCalculationResults[$secId] ?? [];
+                $secShifts = $secCalc['calculation_details']['operating_timeline']['shifts']
+                    ?? $secCalc['calculation_details']['operating_hours']['shifts']
+                    ?? [];
+                $hasShift = collect($secShifts)->contains('id', $shId);
+
+                if ($hasShift) {
+                    $hourlyCap = (float) ($sec['capacity_per_hour'] ?? 0.0);
+                    $uniqHours = max(0.1, (float) ($sec['unique_operating_hours'] ?? 0.0));
+                    $hourlyCost = (float) (($sec['total_daily_operating_cost'] ?? 0.0) / $uniqHours);
+                    $shiftOutput = round($hourlyCap * $durHrs, 2);
+                    $shiftCost = round($hourlyCost * $durHrs, 2);
+                    $unitCost = $shiftOutput > 0 ? round($shiftCost / $shiftOutput, 2) : 0.0;
+
+                    $sectionCells[$secId] = [
+                        'is_active'       => true,
+                        'hourly_capacity' => $hourlyCap,
+                        'hourly_cost'     => $hourlyCost,
+                        'shift_output'    => $shiftOutput,
+                        'shift_cost'      => $shiftCost,
+                        'unit_cost'       => $unitCost,
+                    ];
+
+                    $shiftCombinedOutput += $shiftOutput;
+                    $shiftCombinedCost   += $shiftCost;
+                    $activeSectionsCount++;
+                } else {
+                    $sectionCells[$secId] = [
+                        'is_active' => false,
+                    ];
+                }
+            }
+
+            $matrix[] = [
+                'shift'                 => $sh,
+                'sections'              => $sectionCells,
+                'combined_output'       => round($shiftCombinedOutput, 2),
+                'combined_cost'         => round($shiftCombinedCost, 2),
+                'active_sections_count' => $activeSectionsCount,
+            ];
+        }
+
+        return [
+            'shifts' => $shifts,
+            'matrix' => $matrix,
         ];
     }
 
