@@ -74,16 +74,16 @@ class StockTransaction extends BaseModel
         return match ($this->reference_type) {
             'GoodsReceiptNote', 'GRN', 'Purchase Receipt' =>
                 \App\Domains\Purchase\Models\GoodsReceiptNote::where('id', $this->reference_id)->value('grn_number')
-                ?: (\App\Domains\Purchase\Models\PurchaseOrder::where('id', $this->reference_id)->value('po_number') ?: "GRN-{$this->reference_id}"),
+                ?: (\App\Domains\Purchase\Models\PurchaseOrder::where('id', $this->reference_id)->value('purchase_order_number') ?: "GRN-{$this->reference_id}"),
 
             'DispatchOrder', 'Dispatch' =>
                 \App\Domains\Sales\Models\DispatchOrder::where('id', $this->reference_id)->value('dispatch_number') ?: "DO-{$this->reference_id}",
 
             'MaterialRequirement', 'DeliveryOrder' =>
-                \App\Domains\Sales\Models\MaterialRequirement::where('id', $this->reference_id)->value('mr_number') ?: "MR-{$this->reference_id}",
+                \App\Domains\Sales\Models\MaterialRequirement::where('id', $this->reference_id)->value('requirement_number') ?: "MR-{$this->reference_id}",
 
-            'MaterialRequest' =>
-                \App\Domains\Sales\Models\MaterialRequest::where('id', $this->reference_id)->value('request_number') ?: "REQ-{$this->reference_id}",
+            'MaterialRequest', 'ProductionRequisitionSlip', 'RequisitionSlip' =>
+                \App\Domains\Production\Models\ProductionRequisitionSlip::where('id', $this->reference_id)->value('requisition_number') ?: "REQ-{$this->reference_id}",
 
             'StockTransfer', 'Transfer' =>
                 \App\Domains\Inventory\Models\StockTransfer::where('id', $this->reference_id)->value('transfer_number') ?: "TRF-{$this->reference_id}",
@@ -101,16 +101,16 @@ class StockTransaction extends BaseModel
                 \App\Domains\Sales\Models\SalesReturn::where('id', $this->reference_id)->value('return_number') ?: "RET-{$this->reference_id}",
 
             'PurchaseOrder' =>
-                \App\Domains\Purchase\Models\PurchaseOrder::where('id', $this->reference_id)->value('po_number') ?: "PO-{$this->reference_id}",
+                \App\Domains\Purchase\Models\PurchaseOrder::where('id', $this->reference_id)->value('purchase_order_number') ?: "PO-{$this->reference_id}",
 
             'PurchaseReturn' =>
                 \App\Domains\Purchase\Models\PurchaseReturn::where('id', $this->reference_id)->value('return_number') ?: "PRET-{$this->reference_id}",
 
             'ProductionOrder', 'WorkOrder', 'Manufacturing', 'Production', 'ProductionMaterial' =>
-                \App\Domains\Production\Models\ProductionOrder::where('id', $this->reference_id)->value('work_order_number') ?: "WO-{$this->reference_id}",
+                \App\Domains\Production\Models\ProductionOrder::where('id', $this->reference_id)->value('order_number') ?: "WO-{$this->reference_id}",
 
             'MaintenanceWorkOrder', 'MaintenanceSpare' =>
-                \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::where('id', $this->reference_id)->value('wo_number') ?: "MWO-{$this->reference_id}",
+                \App\Domains\Production\Models\ProductionMaintenanceWorkOrder::where('id', $this->reference_id)->value('work_order_number') ?: "MWO-{$this->reference_id}",
 
             default => "{$this->reference_type} #{$this->reference_id}",
         };

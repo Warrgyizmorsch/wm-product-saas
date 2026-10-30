@@ -1389,25 +1389,58 @@ html.app-skin-dark .erp-form-input-col .form-select {
 }
 
 .erp-thin-table th {
-    background-color: #f8fafc !important;
-    color: #475569 !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    padding: 10px 12px !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    border-top: 1px solid #e2e8f0 !important;
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    border-top: 1px solid #e2e8f0;
 }
 
 .erp-thin-table td {
-    padding: 8px 12px !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    font-size: 13px !important;
-    color: #1e293b !important;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    color: #1e293b;
 }
 
 .erp-thin-table tr:hover td {
-    background-color: #f8fafc !important;
+    background-color: #f8fafc;
+}
+
+/* Dark Mode Support for erp-thin-table */
+html.app-skin-dark .erp-thin-table th,
+body.app-skin-dark .erp-thin-table th,
+[data-bs-theme="dark"] .erp-thin-table th {
+    background-color: #162038 !important;
+    color: #94a3b8 !important;
+    border-top-color: #1e293b !important;
+    border-bottom-color: #1e293b !important;
+}
+
+html.app-skin-dark .erp-thin-table td,
+body.app-skin-dark .erp-thin-table td,
+[data-bs-theme="dark"] .erp-thin-table td {
+    color: #e2e8f0 !important;
+    border-bottom-color: #1e293b !important;
+}
+
+html.app-skin-dark .erp-thin-table tr:hover td,
+body.app-skin-dark .erp-thin-table tr:hover td,
+[data-bs-theme="dark"] .erp-thin-table tr:hover td {
+    background-color: #1c2844 !important;
+    color: #ffffff !important;
+}
+
+html.app-skin-dark .erp-thin-table .form-control,
+html.app-skin-dark .erp-thin-table .form-select,
+body.app-skin-dark .erp-thin-table .form-control,
+body.app-skin-dark .erp-thin-table .form-select {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+    border-color: #334155 !important;
 }
 
 .erp-thin-table .form-control,

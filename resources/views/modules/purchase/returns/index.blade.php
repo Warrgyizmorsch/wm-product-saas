@@ -89,13 +89,13 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="returnsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="min-width: 150px; background-color: #e8ecf1 !important;">{{ __('purchase.return_number') }}</th>
-                        <th style="min-width: 120px; background-color: #e8ecf1 !important;">{{ __('purchase.return_date') }}</th>
-                        <th style="min-width: 180px; background-color: #e8ecf1 !important;">{{ __('purchase.supplier_vendor') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.refund_amount') }}</th>
-                        <th style="min-width: 110px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="min-width: 80px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
+                    <tr>
+                        <th style="min-width: 150px;">{{ __('purchase.return_number') }}</th>
+                        <th style="min-width: 120px;">{{ __('purchase.return_date') }}</th>
+                        <th style="min-width: 180px;">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="min-width: 140px;" class="text-end pe-3">{{ __('purchase.refund_amount') }}</th>
+                        <th style="min-width: 110px;" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="min-width: 80px;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

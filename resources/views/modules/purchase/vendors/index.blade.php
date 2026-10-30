@@ -133,15 +133,15 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="vendorsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
                             <input type="checkbox" class="form-check-input" id="selectAllVendors">
                         </th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.supplier_name') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.email_address') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.phone_mobile') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('purchase.status') }}</th>
-                        <th style="width: 5%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.action') }}</th>
+                        <th>{{ __('purchase.supplier_name') }}</th>
+                        <th>{{ __('purchase.email_address') }}</th>
+                        <th>{{ __('purchase.phone_mobile') }}</th>
+                        <th>{{ __('purchase.status') }}</th>
+                        <th style="width: 5%;" class="text-end pe-3">{{ __('purchase.action') }}</th>
                     </tr>
                 </thead>
                 <tbody>

@@ -718,6 +718,17 @@ return array (
   'view_material_requirement' => 'Преглед на материално изискване',
   'units' => 'бр.',
   'item_count' => ':count артикул|:count артикула',
+  'pending_material_requests_prod' => 'Чакащи заявки за материали (Производство)',
+  'pending_prod_demands_subtext' => 'Последни производствени заявки, чакащи издаване от склад',
+  'view_all_prod_requests' => 'Вижте всички производствени заявки',
+  'issue_store' => 'Издаване от склад',
+  'no_pending_prod_material_requests' => 'Няма чакащи производствени заявки за материали.',
+  'view_all' => 'Виж всички',
+  'items_and_date' => 'Артикули и дата',
+  'release' => 'Освобождаване',
+  'issue' => 'Издаване',
+  'maintenance' => 'Поддръжка',
+  'production' => 'Производство',
 
   // Remnants Modals
   'split_remnant' => 'Разделяне на остатък',

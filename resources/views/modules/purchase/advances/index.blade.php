@@ -117,16 +117,16 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="advancesTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.advance_number') }}</th>
-                        <th style="min-width: 180px; background-color: #e8ecf1 !important;">{{ __('purchase.supplier_vendor') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.purchase_order') }}</th>
-                        <th style="min-width: 110px; background-color: #e8ecf1 !important;">{{ __('purchase.date') }}</th>
-                        <th style="min-width: 120px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.method') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.reference_utr') }}</th>
-                        <th style="min-width: 120px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.paid_amount') }}</th>
-                        <th style="min-width: 100px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.status') }}</th>
-                        <th style="min-width: 80px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
+                    <tr>
+                        <th style="min-width: 140px;">{{ __('purchase.advance_number') }}</th>
+                        <th style="min-width: 180px;">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="min-width: 140px;">{{ __('purchase.purchase_order') }}</th>
+                        <th style="min-width: 110px;">{{ __('purchase.date') }}</th>
+                        <th style="min-width: 120px;" class="text-center">{{ __('purchase.method') }}</th>
+                        <th style="min-width: 140px;">{{ __('purchase.reference_utr') }}</th>
+                        <th style="min-width: 120px;" class="text-end pe-3">{{ __('purchase.paid_amount') }}</th>
+                        <th style="min-width: 100px;" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="min-width: 80px;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

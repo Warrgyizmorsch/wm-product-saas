@@ -4,13 +4,20 @@
 
 return [
     [
-        'section' => 'workspace', 'order' => 10,
-        'label' => 'ui.executive_dashboard', 'default' => 'Executive Dashboard', 'icon' => 'feather-home',
-        'route' => 'dashboard', 'active_routes' => ['home'],
+        'section' => 'workspace',
+        'order' => 10,
+        'label' => 'ui.executive_dashboard',
+        'default' => 'Executive Dashboard',
+        'icon' => 'feather-home',
+        'route' => 'dashboard',
+        'active_routes' => ['home'],
     ],
     [
-        'section' => 'workspace', 'order' => 20, 'app' => 'admin',
-        'label' => 'Tenant Console', 'icon' => 'feather-grid',
+        'section' => 'workspace',
+        'order' => 20,
+        'app' => 'admin',
+        'label' => 'Tenant Console',
+        'icon' => 'feather-grid',
         'children' => [
             // Tenants, plans, prices, usage and the gateway live in the /admin console.
             ['label' => 'Platform Console', 'route' => 'admin.dashboard', 'permission' => 'platform.console.access'],
@@ -25,8 +32,11 @@ return [
         ],
     ],
     [
-        'section' => 'workspace', 'order' => 30,
-        'label' => 'ui.approvals_center', 'default' => 'Approvals Center', 'icon' => 'feather-check-square',
+        'section' => 'workspace',
+        'order' => 30,
+        'label' => 'ui.approvals_center',
+        'default' => 'Approvals Center',
+        'icon' => 'feather-check-square',
         'children' => [
             ['label' => 'Pending'],
             ['label' => 'Delegated'],

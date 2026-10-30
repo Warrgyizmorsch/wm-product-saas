@@ -93,6 +93,94 @@
     .modal-backdrop.zoom-backdrop-high {
         z-index: 100040 !important;
     }
+
+    /* Scoped Dark / Light Theme for Visitor Passes & Product Inquiry */
+    html:not(.app-skin-dark) .product-inquiry-box {
+        background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        border-color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .product-inquiry-box {
+        background: linear-gradient(180deg, #162038 0%, #111a2e 100%) !important;
+        border-color: #28334e !important;
+    }
+
+    html:not(.app-skin-dark) .product-items-table-wrapper {
+        background-color: #ffffff !important;
+        border-color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .product-items-table-wrapper {
+        background-color: #0f172a !important;
+        border-color: #28334e !important;
+    }
+
+    html:not(.app-skin-dark) .product-items-thead-tr {
+        background-color: #f8fafc !important;
+        color: #64748b !important;
+    }
+    html.app-skin-dark .product-items-thead-tr {
+        background-color: #162038 !important;
+        color: #94a3b8 !important;
+        border-color: #28334e !important;
+    }
+
+    html:not(.app-skin-dark) .product-inquiry-textarea {
+        background-color: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        color: #1e293b !important;
+    }
+    html.app-skin-dark .product-inquiry-textarea {
+        background-color: #0f172a !important;
+        border-color: #28334e !important;
+        color: #e2e8f0 !important;
+    }
+
+    html:not(.app-skin-dark) .product-crm-toggle-card {
+        background-color: #ffffff !important;
+        border-color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .product-crm-toggle-card {
+        background-color: #162038 !important;
+        border-color: #28334e !important;
+        color: #e2e8f0 !important;
+    }
+
+    html.app-skin-dark .offcanvas {
+        background-color: #0f172a !important;
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .offcanvas-header,
+    html.app-skin-dark .offcanvas-body {
+        border-color: #28334e !important;
+    }
+    html.app-skin-dark .offcanvas .text-dark {
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .visitor-type-card {
+        background-color: #162038;
+        border-color: #28334e;
+        color: #cbd5e1;
+    }
+    html.app-skin-dark .visitor-type-card:hover {
+        background-color: #1c2844;
+        border-color: var(--bs-primary);
+        color: #ffffff;
+    }
+    html.app-skin-dark .visitor-type-card.active {
+        background-color: color-mix(in srgb, var(--bs-primary) 20%, transparent);
+        border-color: var(--bs-primary);
+        color: #ffffff;
+    }
+    html.app-skin-dark .product-thumb-wrapper {
+        background-color: #162038 !important;
+        border-color: #28334e !important;
+    }
+    html.app-skin-dark .odoo-field-label {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .odoo-field-control {
+        color: #ffffff !important;
+        border-bottom-color: #28334e !important;
+    }
 </style>
 @endpush
 
@@ -820,7 +908,7 @@
             </div>
 
             <!-- Front Desk Product Inquiry & CRM Section -->
-            <div id="drawerProductInquiryBox" class="p-3 mb-3 rounded-3 border shadow-xs transition-all" style="background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); border-color: #e2e8f0;">
+            <div id="drawerProductInquiryBox" class="p-3 mb-3 rounded-3 border shadow-xs transition-all product-inquiry-box">
                 <div class="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom">
                     <div class="d-flex align-items-center gap-2">
                         <div class="avatar-xs bg-primary text-white rounded d-flex align-items-center justify-content-center shadow-xs" style="width: 28px; height: 28px;">
@@ -848,10 +936,10 @@
                             </button>
                         </div>
 
-                        <div class="border rounded-3 bg-white p-2 shadow-sm">
+                        <div class="border rounded-3 product-items-table-wrapper p-2 shadow-sm">
                             <table class="table table-sm table-borderless align-middle mb-0" id="drawerProductItemsTable">
                                 <thead>
-                                    <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
+                                    <tr class="border-bottom product-items-thead-tr fs-11">
                                         <th style="width: 66%; font-weight: 600;" class="py-1 ps-2">{{ __('visitor.interested_products') }}</th>
                                         <th style="width: 24%; font-weight: 600;" class="py-1 text-center">{{ __('visitor.quantity') }}</th>
                                         <th style="width: 10%; font-weight: 600;" class="py-1 text-center"></th>
@@ -912,11 +1000,11 @@
                         <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1" for="drawerInquiryNotes">
                             <i class="feather-file-text text-primary me-1"></i> {{ __('visitor.inquiry_notes') }}
                         </label>
-                        <textarea name="inquiry_notes" id="drawerInquiryNotes" class="form-control fs-12 bg-white" rows="2" placeholder="e.g. Inquired about bulk order pricing, specific custom dimensions, delivery timeframe..."></textarea>
+                        <textarea name="inquiry_notes" id="drawerInquiryNotes" class="form-control fs-12 product-inquiry-textarea" rows="2" placeholder="e.g. Inquired about bulk order pricing, specific custom dimensions, delivery timeframe..."></textarea>
                     </div>
 
                     <div class="col-12 pt-1">
-                        <div class="form-check form-switch mb-0 p-2 rounded-2 bg-white border">
+                        <div class="form-check form-switch mb-0 p-2 rounded-2 product-crm-toggle-card border">
                             <input class="form-check-input ms-0 me-2" type="checkbox" name="create_crm_lead" id="drawerCreateCrmLead" value="1">
                             <label class="form-check-label fs-12 fw-semibold text-dark cursor-pointer" for="drawerCreateCrmLead">
                                 <i class="feather-trending-up text-success me-1"></i> {{ __('visitor.auto_create_lead') }}
@@ -1369,10 +1457,10 @@
                     </button>
                 </div>
 
-                <div class="border rounded-3 bg-white p-2 shadow-sm">
+                <div class="border rounded-3 product-items-table-wrapper p-2 shadow-sm">
                     <table class="table table-sm table-borderless align-middle mb-0" id="modalProductItemsTableIndex">
                         <thead>
-                            <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
+                            <tr class="border-bottom product-items-thead-tr fs-11">
                                 <th style="width: 66%; font-weight: 600;" class="py-1 ps-2">{{ __('visitor.interested_products') }}</th>
                                 <th style="width: 24%; font-weight: 600;" class="py-1 text-center">{{ __('visitor.quantity') }}</th>
                                 <th style="width: 10%; font-weight: 600;" class="py-1 text-center"></th>

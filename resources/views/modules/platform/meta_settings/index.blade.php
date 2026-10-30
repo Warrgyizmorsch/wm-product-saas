@@ -443,13 +443,13 @@
             <div class="table-responsive">
                 <x-ui.odoo-form-ui type="table" class="mb-0">
                     <thead>
-                        <tr style="background-color: #e8ecf1 !important;">
-                            <th style="background-color: #e8ecf1 !important;" class="ps-3">{{ __('meta.col_date_time') }}</th>
-                            <th style="background-color: #e8ecf1 !important;">{{ __('meta.col_lead_name_contact') }}</th>
-                            <th style="background-color: #e8ecf1 !important;">{{ __('meta.col_meta_leadgen_form') }}</th>
-                            <th style="background-color: #e8ecf1 !important;">{{ __('meta.col_linked_crm_lead') }}</th>
-                            <th style="background-color: #e8ecf1 !important;">{{ __('meta.col_status') }}</th>
-                            <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('meta.col_actions') }}</th>
+                        <tr>
+                            <th class="ps-3">{{ __('meta.col_date_time') }}</th>
+                            <th>{{ __('meta.col_lead_name_contact') }}</th>
+                            <th>{{ __('meta.col_meta_leadgen_form') }}</th>
+                            <th>{{ __('meta.col_linked_crm_lead') }}</th>
+                            <th>{{ __('meta.col_status') }}</th>
+                            <th class="text-end pe-3">{{ __('meta.col_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="logsTableBody">

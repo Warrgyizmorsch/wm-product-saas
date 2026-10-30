@@ -12,35 +12,117 @@
             width: 100% !important;
             max-width: 100% !important;
         }
-        .barcode-preview-box {
+
+        /* Mode pills container */
+        html:not(.app-skin-dark) .barcode-mode-card {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        html.app-skin-dark .barcode-mode-card {
+            background-color: #162038;
+            border: 1px solid #28334e;
+        }
+
+        /* Studio Content Cards */
+        html:not(.app-skin-dark) .barcode-section-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+        html.app-skin-dark .barcode-section-card {
+            background-color: #162038;
+            border: 1px solid #28334e;
+        }
+
+        /* Live Preview Box */
+        html:not(.app-skin-dark) .barcode-preview-box {
             border: 2px dashed #cbd5e1;
             border-radius: 8px;
             padding: 24px;
             background: #f8fafc;
             text-align: center;
         }
-        .barcode-sticker-mock {
+        html.app-skin-dark .barcode-preview-box {
+            border: 2px dashed #28334e;
+            border-radius: 8px;
+            padding: 24px;
+            background: #0b1120;
+            text-align: center;
+        }
+
+        /* Realistic Thermal Sticker Mockup */
+        html:not(.app-skin-dark) .barcode-sticker-mock {
             background: #ffffff;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            border-radius: 6px;
-            padding: 12px 16px;
+            box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            padding: 16px 20px;
             display: inline-block;
-            min-width: 220px;
+            min-width: 230px;
+            color: #1e293b;
         }
-        .serial-list-box {
+        html.app-skin-dark .barcode-sticker-mock {
+            background: #1e293b;
+            border: 1px solid #334155;
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: inline-block;
+            min-width: 230px;
+            color: #f1f5f9;
+        }
+        html.app-skin-dark .barcode-sticker-mock .text-dark {
+            color: #f1f5f9 !important;
+        }
+        html:not(.app-skin-dark) .barcode-mock-code-box {
+            background-color: #f1f5f9;
+            border-color: #e2e8f0;
+            color: #0f172a;
+        }
+        html.app-skin-dark .barcode-mock-code-box {
+            background-color: #0f172a;
+            border-color: #28334e;
+            color: #f1f5f9;
+        }
+        html.app-skin-dark .barcode-mock-code-box .text-dark {
+            color: #f1f5f9 !important;
+        }
+
+        /* Serial List Box */
+        html:not(.app-skin-dark) .serial-list-box {
             max-height: 180px;
             overflow-y: auto;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             padding: 10px;
             background: #ffffff;
+            color: #1e293b;
+        }
+        html.app-skin-dark .serial-list-box {
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid #28334e;
+            border-radius: 6px;
+            padding: 10px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        html.app-skin-dark .serial-list-box .form-check-label {
+            color: #e2e8f0 !important;
+        }
+
+        /* Dark Mode Text & Borders */
+        html.app-skin-dark .text-dark {
+            color: #e2e8f0 !important;
+        }
+        html.app-skin-dark .border-bottom,
+        html.app-skin-dark .border-top {
+            border-color: #28334e !important;
         }
     </style>
 @endpush
 
 @section('content')
-<div class="erp-single-panel bg-white p-4">
+<div class="erp-single-panel p-4">
 
     <form action="{{ route('inventory.barcodes.print') }}" method="POST" target="_blank" id="barcodeForm">
         @csrf
@@ -58,7 +140,7 @@
             </div>
 
             <!-- Printing Mode Selector Pills -->
-            <div class="card border rounded-3 p-3 bg-light mb-4">
+            <div class="card barcode-mode-card border rounded-3 p-3 mb-4">
                 <label class="form-label fw-bold text-uppercase fs-11 text-muted mb-2">{{ __('inventory.barcode_generation_mode') }}</label>
                 <div class="d-flex gap-4 flex-wrap">
                     <div class="form-check">
@@ -79,7 +161,7 @@
             <!-- Form Grid -->
             <div class="row g-4 mb-4">
                 <div class="col-md-7">
-                    <div class="card border rounded-3 p-3 bg-white mb-3 shadow-2xs">
+                    <div class="card barcode-section-card rounded-3 p-3 mb-3 shadow-2xs">
                         <h6 class="fw-bold text-dark mb-3"><i class="feather-sliders text-primary me-2"></i>{{ __('inventory.label_specifications') }}</h6>
                         
                         <div class="mb-3">
@@ -137,14 +219,14 @@
 
                 <!-- Right Side: Live Sticker Preview -->
                 <div class="col-md-5">
-                    <div class="card border rounded-3 p-3 bg-white shadow-2xs h-100">
+                    <div class="card barcode-section-card rounded-3 p-3 shadow-2xs h-100">
                         <h6 class="fw-bold text-dark mb-3"><i class="feather-eye text-primary me-2"></i>{{ __('inventory.live_sticker_preview') }}</h6>
                         <div class="barcode-preview-box d-flex flex-column align-items-center justify-content-center h-100">
                             <div class="barcode-sticker-mock text-center" id="stickerMock">
                                 <span class="fw-bold text-dark d-block fs-12 mb-0.5" id="previewName">{{ __('inventory.select_product_preview') }}</span>
                                 <small class="text-muted fs-10 d-block mb-2" id="previewSubText">SKU: SKU-XXXX</small>
                                 
-                                <div class="my-2 py-1 bg-light rounded border px-3 d-inline-block">
+                                <div class="my-2 py-1 barcode-mock-code-box rounded border px-3 d-inline-block">
                                     <i class="feather-bar-chart-2 fs-28 text-dark d-block"></i>
                                     <span class="fs-10 font-monospace text-dark fw-bold" id="previewCode">BAR-12345678</span>
                                 </div>

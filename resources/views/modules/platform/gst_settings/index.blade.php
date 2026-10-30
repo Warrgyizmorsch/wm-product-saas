@@ -102,13 +102,13 @@
     <div class="table-responsive flex-grow-1">
         <x-ui.odoo-form-ui type="table" id="gstConfigsTable" class="mb-0">
             <thead>
-                <tr style="background-color: #e8ecf1 !important;">
-                    <th style="background-color: #e8ecf1 !important;" class="ps-3">Seller GSTIN & Legal Name</th>
-                    <th style="background-color: #e8ecf1 !important;">GSP Provider</th>
-                    <th style="background-color: #e8ecf1 !important;">Scope & Location</th>
-                    <th style="background-color: #e8ecf1 !important;">Environment</th>
-                    <th style="background-color: #e8ecf1 !important;">Status</th>
-                    <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Actions</th>
+                <tr>
+                    <th class="ps-3">Seller GSTIN & Legal Name</th>
+                    <th>GSP Provider</th>
+                    <th>Scope & Location</th>
+                    <th>Environment</th>
+                    <th>Status</th>
+                    <th class="text-end pe-3">Actions</th>
                 </tr>
             </thead>
             <tbody>
