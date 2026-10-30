@@ -721,6 +721,17 @@ return array (
   'view_material_requirement' => 'View Material Requirement',
   'units' => 'units',
   'item_count' => ':count Item|:count Items',
+  'pending_material_requests_prod' => 'Pending Material Requests (Production)',
+  'pending_prod_demands_subtext' => 'Latest shop floor requisition slips awaiting store inventory issuance',
+  'view_all_prod_requests' => 'View All Production Requests',
+  'issue_store' => 'Issue Store',
+  'no_pending_prod_material_requests' => 'No pending production material requests. All shop floor slips are fulfilled!',
+  'view_all' => 'View All',
+  'items_and_date' => 'Items & Date',
+  'release' => 'Release',
+  'issue' => 'Issue',
+  'maintenance' => 'Maintenance',
+  'production' => 'Production',
 
   // Remnants Modals
   'split_remnant' => 'Split Remnant',

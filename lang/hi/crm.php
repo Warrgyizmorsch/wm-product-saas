@@ -417,6 +417,9 @@ return array (
   'designation_role' => 'पद / भूमिका',
   'designation_placeholder' => 'उदा. क्रय प्रमुख',
   'additional_contacts' => 'अतिरिक्त संपर्क',
+  'additional_details' => 'अतिरिक्त विवरण',
+  'field' => 'फ़ील्ड',
+  'fields' => 'फ़ील्ड्स',
   'clone_contact' => 'क्लोन संपर्क',
   'contact_person_num' => 'संपर्क व्यक्ति #',
   'delete_contact' => 'संपर्क हटाएं',
@@ -2307,5 +2310,6 @@ return array (
   'active_deals_count' => 'सक्रिय: :count डील्स',
   'date_label' => 'दिनांक',
   'meetings_geo_verification' => 'भू-सत्यापन (Geo-Verification):',
+  'download_pdf' => 'PDF डाउनलोड करें',
 );
 

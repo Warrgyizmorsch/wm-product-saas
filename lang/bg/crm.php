@@ -416,6 +416,9 @@ return array (
   'designation_role' => 'Длъжност / Роля',
   'designation_placeholder' => 'напр. Ръководител покупки',
   'additional_contacts' => 'Допълнителни контакти',
+  'additional_details' => 'Допълнителни детайли',
+  'field' => 'Поле',
+  'fields' => 'Полета',
   'clone_contact' => 'КЛОНИРАЙ КОНТАКТ',
   'contact_person_num' => 'Лице за контакт #',
   'delete_contact' => 'Изтрий контакт',
@@ -2302,5 +2305,6 @@ return array (
   'active_deals_count' => 'Активни: :count сделки',
   'date_label' => 'Дата',
   'meetings_geo_verification' => 'Гео-верификация:',
+  'download_pdf' => 'Изтегляне на PDF',
 );
 

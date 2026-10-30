@@ -1,8 +1,14 @@
 @extends('layouts.duralux')
 
+@php
+    $fromApprovals = request('from') === 'approvals' || str_contains(url()->previous(), 'visitor/approvals');
+    $backRoute = $fromApprovals ? route('visitor.approvals.index') : route('visitor.index');
+    $backText = $fromApprovals ? __('visitor.back_to_approvals') : __('visitor.back_to_list');
+@endphp
+
 @section('title', __('visitor.visitor_gate_pass') . ' - ' . $pass->pass_number . ' | SaaS ERP')
 @section('page-title', __('visitor.visitor_gate_pass'))
-@section('breadcrumb', __('visitor.visitor_management') . ' > ' . __('visitor.visitor_passes') . ' > ' . $pass->pass_number)
+@section('breadcrumb', __('visitor.visitor_management') . ' > ' . ($fromApprovals ? __('visitor.my_approvals') : __('visitor.visitor_passes')) . ' > ' . $pass->pass_number)
 
 @push('styles')
 <style>
@@ -275,8 +281,8 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2 no-print">
-        <x-ui.button href="{{ route('visitor.index') }}" variant="primary" icon="feather-arrow-left">
-            {{ __('visitor.back_to_list') }}
+        <x-ui.button href="{{ $backRoute }}" variant="primary" icon="feather-arrow-left">
+            {{ $backText }}
         </x-ui.button>
         @if($pass->source_module === 'crm' && $pass->source_reference_id)
             <x-ui.button href="{{ route('crm.leads.show', $pass->source_reference_id) }}" variant="primary" icon="feather-trending-up">
@@ -451,6 +457,9 @@
                 <div class="d-flex gap-2">
                     <form action="{{ route('visitor.approvals.approve', $pass->id) }}" method="POST" class="d-inline">
                         @csrf
+                        @if($fromApprovals)
+                            <input type="hidden" name="from" value="approvals">
+                        @endif
                         <x-ui.button type="submit" variant="success" size="sm" icon="feather-check">
                             {{ __('visitor.approve') }}
                         </x-ui.button>
@@ -1089,6 +1098,9 @@
     :showFooter="false">
     <form id="rejectPassFormShow" method="POST" action="{{ route('visitor.approvals.reject', $pass->id) }}">
         @csrf
+        @if($fromApprovals)
+            <input type="hidden" name="from" value="approvals">
+        @endif
         <div class="mb-3">
             <p class="fs-13 text-dark mb-1">
                 Visitor: <strong>{{ $pass->visitor?->full_name }}</strong> ({{ $pass->pass_number }})

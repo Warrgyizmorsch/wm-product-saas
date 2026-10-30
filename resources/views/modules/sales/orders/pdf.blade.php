@@ -1,422 +1,700 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Sales Order {{ $order->sales_order_number }}</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Sales Order - {{ $order->sales_order_number }}</title>
     <style>
         @page {
-            margin: 10mm 15mm 10mm 15mm;
+            margin-top: 18mm;
+            margin-bottom: 22mm;
+            margin-left: 15mm;
+            margin-right: 15mm;
+            size: A4 portrait;
         }
+
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            color: #333;
-            font-size: 11px;
-            line-height: 1.4;
+            font-size: 10px;
+            color: #1e293b;
+            background: #ffffff;
             margin: 0;
             padding: 0;
+            line-height: 1.4;
         }
-        .container {
+
+        /* ── PERSISTENT FOOTER ON EVERY PAGE (REFRENS STYLE) ── */
+        footer.doc-page-footer {
+            position: fixed;
+            bottom: -16mm;
+            left: 0;
+            right: 0;
+            height: 14mm;
+        }
+        .footer-dashed-line {
+            border-top: 1.2px dashed #94a3b8;
+            margin-bottom: 5px;
             width: 100%;
-            margin: 0 auto;
         }
-        .header {
-            margin-bottom: 15px;
+        .footer-meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8.5px;
+            color: #64748b;
         }
-        .logo-section {
-            float: left;
-            width: 50%;
+
+        /* ── HEADER SECTION ──────────────────────── */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #cbd5e1;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
         }
-        .title-section {
-            float: right;
-            width: 50%;
-            text-align: right;
-        }
-        .clear {
-            clear: both;
-        }
-        .logo-avatar {
+        .company-avatar {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
             background-color: #1e40af;
             color: #ffffff;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            width: 38px;
-            height: 38px;
-            line-height: 38px;
             text-align: center;
-            border-radius: 4px;
-            display: inline-block;
-            margin-right: 8px;
+            line-height: 40px;
+            border-radius: 6px;
             vertical-align: middle;
         }
-        .tenant-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #1e293b;
+        .company-info {
             display: inline-block;
             vertical-align: middle;
+            padding-left: 8px;
         }
-        .order-title {
-            font-size: 20px;
+        .company-name {
+            font-size: 15px;
             font-weight: bold;
+            color: #0f172a;
+        }
+        .company-sub {
+            font-size: 9.5px;
+            color: #64748b;
+        }
+        .company-address {
+            font-size: 9.5px;
+            color: #475569;
+            margin-top: 5px;
+            line-height: 1.35;
+        }
+
+        .doc-title {
+            font-size: 18px;
+            font-weight: 900;
             color: #1e40af;
-            margin: 0 0 3px 0;
+            text-align: right;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .order-number {
+        .doc-number {
             font-size: 12px;
             font-weight: bold;
-            color: #334155;
+            color: #1e293b;
+            text-align: right;
+            margin-top: 2px;
         }
-        .status-badge {
+        .meta-table {
+            margin-left: auto;
+            margin-top: 6px;
+        }
+        .meta-table td {
+            padding: 2px 0;
             font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 10px;
+        }
+        .meta-label {
+            color: #64748b;
+            text-align: right;
+            padding-right: 6px;
+        }
+        .meta-value {
+            color: #1e293b;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        /* ── CUSTOMER & ORDER REFERENCES ─────────── */
+        .info-boxes-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 12px 0;
+            margin-left: -12px;
+            margin-right: -12px;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+        }
+        .info-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            vertical-align: top;
+            width: 50%;
+        }
+        .box-title {
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        .client-name {
+            font-size: 12.5px;
+            font-weight: bold;
+            color: #0f172a;
+            margin-bottom: 3px;
+        }
+        .client-contact {
+            font-size: 10px;
+            color: #475569;
+            margin-bottom: 5px;
+        }
+        .address-block {
+            font-size: 9.5px;
+            color: #475569;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 5px;
+            margin-top: 4px;
+            line-height: 1.35;
+        }
+
+        .ref-row {
+            width: 100%;
+            padding: 2.5px 0;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 10px;
+        }
+        .ref-row:last-child {
+            border-bottom: none;
+        }
+        .ref-label {
+            color: #64748b;
+            display: inline-block;
+            width: 44%;
+        }
+        .ref-val {
+            color: #0f172a;
             font-weight: bold;
             display: inline-block;
-            margin-top: 3px;
-            background-color: #f1f5f9;
-            color: #475569;
-        }
-        .status-confirmed { background-color: #e0f2fe; color: #0369a1; }
-        .status-shipped { background-color: #dcfce7; color: #15803d; }
-        .status-cancelled { background-color: #fee2e2; color: #b91c1c; }
-        .status-draft { background-color: #f1f5f9; color: #475569; }
-
-        .details-section {
-            margin-bottom: 15px;
-        }
-        .bill-to {
-            float: left;
-            width: 33%;
-        }
-        .schedule {
-            float: left;
-            width: 34%;
-            text-align: center;
-        }
-        .reference {
-            float: right;
-            width: 33%;
+            width: 52%;
             text-align: right;
+        }
+
+        /* ── ITEMS TABLE WITH DISTINCT COLUMN BORDERS ── */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            page-break-inside: auto;
+            border: 1px solid #cbd5e1;
+        }
+        .items-table thead {
+            display: table-header-group;
+        }
+        .items-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        .items-table th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid #cbd5e1;
+            padding: 7px 8px;
+        }
+        .items-table td {
+            padding: 7px 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 10px;
+            color: #1e293b;
+            vertical-align: top;
+        }
+        .item-title {
+            font-weight: bold;
+            color: #0f172a;
+            font-size: 10.5px;
+        }
+        .item-desc {
+            font-size: 8.5px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        /* ── SUMMARY / CALCULATIONS SECTION ──────── */
+        .calc-wrapper {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+        }
+        .calc-notes-col {
+            width: 50%;
+            vertical-align: top;
+            padding-right: 15px;
+        }
+        .calc-summary-col {
+            width: 50%;
+            vertical-align: top;
+        }
+
+        .summary-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .summary-line {
+            width: 100%;
+            padding: 3px 0;
+            font-size: 10px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .summary-lbl {
+            color: #64748b;
+            display: inline-block;
+            width: 48%;
+        }
+        .summary-num {
+            color: #0f172a;
+            font-weight: bold;
+            display: inline-block;
+            width: 50%;
+            text-align: right;
+        }
+        .total-payable-box {
+            background-color: #f1f5f9;
+            border-radius: 4px;
+            padding: 6px 8px;
+            margin-top: 6px;
+        }
+        .total-payable-lbl {
+            font-weight: bold;
+            color: #0f172a;
+            font-size: 11px;
+            display: inline-block;
+            width: 46%;
+        }
+        .total-payable-num {
+            font-weight: bold;
+            color: #1e40af;
+            font-size: 12px;
+            display: inline-block;
+            width: 52%;
+            text-align: right;
+        }
+
+        /* ── TERMS & CONDITIONS SECTION ──────────── */
+        .terms-section {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            page-break-inside: auto;
         }
         .section-label {
             font-size: 9px;
-            text-transform: uppercase;
             font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             color: #64748b;
-            margin-bottom: 3px;
-            display: block;
+            margin-bottom: 5px;
         }
-        .client-name {
-            font-size: 13px;
-            font-weight: bold;
-            color: #0f172a;
-            margin: 0 0 3px 0;
-        }
-        .client-info {
-            color: #475569;
-            margin: 1px 0;
-            font-size: 10.5px;
-        }
-        
-        .addresses-section {
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 10px 12px;
-            background-color: #ffffff;
-            margin-bottom: 15px;
-        }
-        .address-box {
-            float: left;
-            width: 50%;
-        }
-        .address-label {
+        .terms-content {
             font-size: 9px;
-            font-weight: bold;
             color: #475569;
-            text-transform: uppercase;
-            margin-bottom: 4px;
+            line-height: 1.45;
         }
-        .address-text {
-            color: #475569;
-            font-size: 11px;
-            line-height: 1.4;
-            margin: 0;
+        .terms-content p {
+            margin: 0 0 3px 0;
+            padding-top: 3px;
+            padding-bottom: 1px;
+            page-break-inside: avoid;
         }
 
-        .table-items {
+        /* ── SIGNATURE SECTION ───────────────────── */
+        .signature-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
+            margin-top: 25px;
+            padding-top: 10px;
+            border-top: 1px solid #e2e8f0;
+            page-break-inside: avoid;
         }
-        .table-items th {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            padding: 6px 8px;
-            font-size: 10px;
-            text-transform: uppercase;
+        .sig-note {
+            font-size: 9px;
             color: #64748b;
-            font-weight: bold;
-            text-align: left;
-        }
-        .table-items td {
-            border: 1px solid #e2e8f0;
-            padding: 6px 8px;
-            vertical-align: middle;
-            font-size: 11px;
-        }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        
-        .calc-box {
-            border: 1px solid #e2e8f0;
-            background-color: #ffffff;
-            border-radius: 4px;
-            padding: 10px;
-        }
-        
-        .terms-conditions-container, .terms-conditions-container p, .terms-conditions-container li {
-            font-size: 9.5px !important;
-            line-height: 1.3 !important;
-            margin: 0 0 3px 0 !important;
-            color: #475569;
-        }
-
-        .client-notes-container {
-            font-size: 9.5px !important;
-            line-height: 1.3 !important;
-            color: #475569;
-        }
-
-        .signature-section {
-            margin-top: 30px;
-        }
-        .footer-note {
-            float: left;
+            vertical-align: bottom;
             width: 60%;
-            font-size: 10px;
-            color: #64748b;
-            margin-top: 25px;
+            line-height: 1.4;
         }
-        .signature-box {
-            float: right;
-            width: 30%;
-            text-align: center;
+        .sig-space {
+            text-align: right;
+            vertical-align: bottom;
+            width: 40%;
         }
-        .signature-line {
+        .sig-line {
+            display: inline-block;
             border-top: 1px solid #94a3b8;
-            margin-top: 25px;
+            width: 160px;
+            text-align: center;
             padding-top: 4px;
-            font-size: 10px;
-            color: #64748b;
+            font-size: 9px;
+            font-weight: bold;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo-section">
-                <div class="logo-avatar">
-                    {{ strtoupper(substr(tenant() ? tenant()->name : 'E', 0, 1)) }}
-                </div>
-                <div class="tenant-name">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</div>
-            </div>
-            <div class="title-section">
-                <h1 class="order-title">SALES ORDER</h1>
-                <div class="order-number">No: {{ $order->sales_order_number }}</div>
-                @php
-                    $badgeClass = 'status-draft';
-                    if ($order->status === 'Confirmed') $badgeClass = 'status-confirmed';
-                    elseif ($order->status === 'Shipped' || $order->status === 'Partially Shipped') $badgeClass = 'status-shipped';
-                    elseif ($order->status === 'Cancelled') $badgeClass = 'status-cancelled';
-                @endphp
-                <span class="status-badge {{ $badgeClass }}">{{ $order->status }}</span>
-            </div>
-            <div class="clear"></div>
-        </div>
 
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 15px;">
-
-        <!-- Details -->
-        <div class="details-section">
-            <div class="bill-to">
-                <span class="section-label">Customer Info</span>
-                <h3 class="client-name" style="margin: 0 0 3px 0;">{{ $order->customer?->name ?? '—' }}</h3>
-                <div class="client-info"><strong style="color: #64748b;">Email:</strong> {{ $order->customer?->email ?: '—' }}</div>
-                <div class="client-info"><strong style="color: #64748b;">Phone:</strong> {{ $order->customer?->phone ?: '—' }}</div>
-            </div>
-            <div class="schedule">
-                <span class="section-label" style="text-align: center;">Order Schedule</span>
-                <div class="client-info" style="text-align: center;"><strong>Order Date:</strong> {{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</div>
-                <div class="client-info" style="text-align: center;"><strong>Est. Shipment:</strong> {{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : 'Not Scheduled' }}</div>
-                <div class="client-info" style="text-align: center;"><strong>Payment Terms:</strong> {{ \App\Domains\Platform\Models\PaymentTerm::getLabel($order->payment_terms) }}</div>
-            </div>
-            <div class="reference">
-                <span class="section-label">Reference Details</span>
-                @if($order->quotation)
-                    <div class="client-info"><strong>Quotation Ref:</strong> {{ $order->quotation->quotation_number }}</div>
-                @endif
-                <div class="client-info"><strong>Tax Mode:</strong> {{ $order->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</div>
-                @if($order->salesPerson)
-                    <div class="client-info"><strong>Sales Rep:</strong> {{ $order->salesPerson->name }}</div>
-                @endif
-            </div>
-            <div class="clear"></div>
-        </div>
-
-        <!-- Addresses Box with 6px Border Radius Curve -->
-        <div class="addresses-section">
-            <div class="address-box" style="border-right: 1px solid #e2e8f0; width: 48%; padding-right: 2%;">
-                <div class="address-label">Billing Address</div>
-                <p class="address-text">{{ $order->billing_address ?: 'No billing address provided.' }}</p>
-            </div>
-            <div class="address-box" style="width: 48%; padding-left: 2%;">
-                <div class="address-label">Shipping Address</div>
-                <p class="address-text">{{ $order->shipping_address ?: 'No shipping address provided.' }}</p>
-            </div>
-            <div class="clear"></div>
-        </div>
-
-        @php
-            $currencySymbol = active_currency_symbol();
-        @endphp
-        <!-- Items Table -->
-        <table class="table-items">
-            <thead>
-                <tr>
-                    <th class="text-center" style="width: 5%;">#</th>
-                    <th style="width: 40%;">Description of Product</th>
-                    <th style="width: 15%;">Warehouse</th>
-                    <th class="text-center" style="width: 8%;">Qty</th>
-                    <th class="text-right" style="width: 12%;">Unit Price</th>
-                    <th class="text-right" style="width: 10%;">Tax Rate</th>
-                    <th class="text-right" style="width: 10%;">Discount</th>
-                    <th class="text-right" style="width: 15%;">Amount ({{ $currencySymbol }})</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($order->items as $index => $item)
-                    <tr>
-                        <td class="text-center" style="color: #64748b;">{{ $index + 1 }}</td>
-                        <td>
-                            <strong>{{ $item->item_name }}</strong>
-                            @if($item->product?->sku)
-                                <div style="font-size: 9px; color: #64748b; margin-top: 1px;">SKU: {{ $item->product->sku }}</div>
-                            @endif
-                            @if($item->description)
-                                <div style="font-size: 9px; color: #64748b; margin-top: 1px;">{{ $item->description }}</div>
-                            @endif
-                        </td>
-                        <td>
-                            {{ $item->warehouse?->name ?: '—' }}
-                        </td>
-                        <td class="text-center">{{ $item->quantity }}</td>
-                        <td class="text-right">{{ $currencySymbol }}{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="text-right">{{ number_format($item->tax_rate, 2) }}%</td>
-                        <td class="text-right">
-                            @if($item->discount > 0)
-                                {{ $currencySymbol }}{{ number_format($item->discount, 2) }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="text-right" style="font-weight: bold;">{{ $currencySymbol }}{{ number_format($item->amount, 2) }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
+    <!-- 0. PERSISTENT FOOTER ON EVERY PAGE (REFRENS STYLE) -->
+    <footer class="doc-page-footer">
+        <div class="footer-dashed-line"></div>
+        <table class="footer-meta-table">
+            <tr>
+                <td style="text-align: left; width: 75%;">
+                    Sales Order #: <strong style="color: #0f172a;">{{ $order->sales_order_number }}</strong> &nbsp;|&nbsp;
+                    Date: {{ $order->order_date ? date('d-M-Y', strtotime($order->order_date)) : '—' }} &nbsp;|&nbsp;
+                    Customer: <strong style="color: #0f172a;">{{ $order->customer?->name ?? '—' }}</strong>
+                </td>
+                <td style="text-align: right; width: 25%;">
+                    <!-- Space reserved for Page X of Y rendered by canvas script -->
+                </td>
+            </tr>
         </table>
+    </footer>
 
-        <!-- Bottom section -->
-        <div style="margin-top: 10px; width: 100%;">
-            <!-- Calculations Box (floated right) -->
-            <div style="float: right; width: 42%;">
-                <div class="calc-box">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+    <!-- 1. HEADER SECTION -->
+    <table class="header-table">
+        <tr>
+            <td style="vertical-align: top; width: 58%;">
+                <div class="company-avatar">
+                    {{ strtoupper(substr(tenant() ? tenant()->name : 'D', 0, 1)) }}
+                </div>
+                <div class="company-info">
+                    <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
+                    <div class="company-sub">Official Corporate Sales Unit</div>
+                </div>
+                <div class="company-address">
+                    H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
+                    <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
+                    <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230
+                </div>
+            </td>
+            <td style="vertical-align: top; width: 42%; text-align: right;">
+                <div class="doc-title">SALES ORDER</div>
+                <div class="doc-number"># {{ $order->sales_order_number }}</div>
+                
+                <table class="meta-table">
+                    <tr>
+                        <td class="meta-label">Order Date:</td>
+                        <td class="meta-value">{{ $order->order_date ? date('d-M-Y', strtotime($order->order_date)) : '—' }}</td>
+                    </tr>
+                    @if($order->shipment_date)
                         <tr>
-                            <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">{{ $order->effective_tax_mode === 'inclusive' ? 'Subtotal (Incl. GST):' : 'Subtotal (Base Rate):' }}</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->subtotal, 2) }}</td>
+                            <td class="meta-label">Est. Shipment:</td>
+                            <td class="meta-value">{{ date('d-M-Y', strtotime($order->shipment_date)) }}</td>
                         </tr>
-                        @if($order->discount > 0)
-                            <tr style="color: #b91c1c;">
-                                <td style="padding: 4px 0; text-align: left; border: 0;">Discount:</td>
-                                <td style="text-align: right; font-weight: bold; padding: 4px 0; border: 0;">-{{ $currencySymbol }}{{ number_format($order->discount, 2) }}</td>
-                            </tr>
-                        @endif
-                        <tr style="border-top: 1px dashed #e2e8f0;">
-                            <td style="color: #475569; font-weight: 600; padding: 4px 0; text-align: left; border: 0;">{{ $order->effective_tax_mode === 'inclusive' ? 'Taxable Value (Excl. Tax):' : 'Taxable Amount:' }}</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ $currencySymbol }}{{ number_format($order->taxable_amount, 2) }}</td>
+                    @endif
+                    @if($order->salesPerson)
+                        <tr>
+                            <td class="meta-label">Sales Rep:</td>
+                            <td class="meta-value">{{ $order->salesPerson->name }}</td>
                         </tr>
-                        @if($order->tax_type !== 'without_tax' && $order->tax > 0)
-                            @if(($order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')
-                                <tr>
-                                    <td style="color: #64748b; padding: 3px 0; text-align: left; border: 0;">CGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
-                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax / 2, 2) }}</td>
-                                </tr>
-                                <tr>
-                                    <td style="color: #64748b; padding: 3px 0; text-align: left; border: 0;">SGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
-                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax / 2, 2) }}</td>
-                                </tr>
-                            @else
-                                <tr>
-                                    <td style="color: #64748b; padding: 3px 0; text-align: left; border: 0;">IGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
-                                    <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax, 2) }}</td>
-                                </tr>
-                            @endif
-                            <tr style="border-top: 1px dashed #e2e8f0;">
-                                <td style="color: #64748b; font-weight: 600; padding: 3px 0; text-align: left; border: 0;">Total Tax {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 3px 0; border: 0;">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') . $currencySymbol }}{{ number_format($order->tax, 2) }}</td>
-                            </tr>
+                    @endif
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <!-- 2. CUSTOMER INFO & ORDER REFERENCES -->
+    <table class="info-boxes-table">
+        <tr>
+            <!-- Left Box: Customer Info -->
+            <td class="info-box">
+                <div class="box-title">BILLED TO (CUSTOMER):</div>
+                <div class="client-name">{{ $order->customer?->name ?? '—' }}</div>
+                @if($order->customer?->email || $order->customer?->phone)
+                    <div class="client-contact">
+                        @if($order->customer?->email)
+                            {{ $order->customer->email }}
                         @endif
-                        @if($order->shipping_charges > 0)
+                        @if($order->customer?->email && $order->customer?->phone)
+                            |
+                        @endif
+                        @if($order->customer?->phone)
+                            {{ $order->customer->phone }}
+                        @endif
+                    </div>
+                @endif
+
+                @if ($order->billing_address)
+                    <div class="address-block">
+                        <strong>Billing Address:</strong><br>{{ $order->billing_address }}
+                    </div>
+                @endif
+
+                @if ($order->shipping_address && $order->shipping_address !== $order->billing_address)
+                    <div class="address-block">
+                        <strong>Shipping Address:</strong><br>{{ $order->shipping_address }}
+                    </div>
+                @endif
+            </td>
+
+            <!-- Right Box: Order References -->
+            <td class="info-box">
+                <div class="box-title">ORDER REFERENCES & SCHEDULE:</div>
+                
+                @if ($order->quotation)
+                    <div class="ref-row">
+                        <span class="ref-label">Quotation Ref:</span>
+                        <span class="ref-val" style="color: #2563eb;">{{ $order->quotation->quotation_number }}</span>
+                    </div>
+                @endif
+
+                <div class="ref-row">
+                    <span class="ref-label">Pricing Mode:</span>
+                    <span class="ref-val">{{ $order->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">Discount Option:</span>
+                    <span class="ref-val">
+                        @if($order->discount_type === 'item_wise')
+                            Line / Item Level
+                        @elseif($order->discount_type === 'without_discount')
+                            Without Discount
+                        @else
+                            Order Level
+                        @endif
+                    </span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">GST Tax Type:</span>
+                    <span class="ref-val" style="color: #0f766e;">
+                        @if(($order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')
+                            Intra-State (CGST + SGST)
+                        @else
+                            Inter-State (IGST)
+                        @endif
+                    </span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">Payment Terms:</span>
+                    <span class="ref-val">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($order->payment_terms) ?: 'Immediate Payment' }}</span>
+                </div>
+
+                <div class="ref-row">
+                    <span class="ref-label">Status:</span>
+                    <span class="ref-val">{{ $order->status }}</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- 3. ORDER LINES TABLE WITH COLUMN DIVIDERS -->
+    @php
+        $rawSymbol = active_currency_symbol();
+        $currencySymbol = ($rawSymbol === '₹' || active_currency() === 'INR') ? '&#8377;' : $rawSymbol;
+        $hasItemDiscount = $order->discount_type === 'item_wise' || $order->items->sum('discount') > 0;
+    @endphp
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 5%; text-align: center;">#</th>
+                <th style="{{ $hasItemDiscount ? 'width: 38%;' : 'width: 44%;' }}">Item & Description</th>
+                <th style="width: 12%; text-align: left;">Warehouse</th>
+                <th style="width: 8%; text-align: right;">Qty</th>
+                <th style="width: 13%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
+                @if($hasItemDiscount)
+                    <th style="width: 11%; text-align: right;">Discount ({!! $currencySymbol !!})</th>
+                @endif
+                <th style="width: 8%; text-align: right;">Tax %</th>
+                <th style="width: 14%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($order->items as $idx => $item)
+                <tr>
+                    <td style="text-align: center; color: #64748b;">{{ $idx + 1 }}</td>
+                    <td>
+                        <div class="item-title">{{ $item->item_name }}</div>
+                        @if($item->product?->sku)
+                            <div class="item-desc"><strong>SKU:</strong> {{ $item->product->sku }}</div>
+                        @endif
+                        @if($item->description)
+                            <div class="item-desc">{{ $item->description }}</div>
+                        @endif
+                    </td>
+                    <td style="text-align: left; color: #475569; font-size: 9.5px;">
+                        {{ $item->warehouse?->name ?: '—' }}
+                    </td>
+                    <td style="text-align: right; font-weight: 600;">{{ $item->quantity }}</td>
+                    <td style="text-align: right;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->unit_price), 2) }}</td>
+                    @if($hasItemDiscount)
+                        <td style="text-align: right; color: #dc2626;">{{ ($item->discount ?? 0) > 0 ? '-' . number_format((float) convert_from_base($item->discount), 2) : '—' }}</td>
+                    @endif
+                    <td style="text-align: right;">{{ number_format((float)$item->tax_rate, 2) }}%</td>
+                    <td style="text-align: right; font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->amount ?: ($item->quantity * $item->unit_price)), 2) }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+
+    <!-- 4. CALCULATIONS SECTION -->
+    <table class="calc-wrapper">
+        <tr>
+            <!-- Left: Tax Treatment Summary & Notes -->
+            <td class="calc-notes-col">
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
+                    <div style="font-size: 8.5px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 4px;">Tax Treatment & Commercials Summary</div>
+                    <table style="width: 100%; font-size: 9.5px; border-collapse: collapse;">
+                        <tr>
+                            <td style="color: #64748b; padding: 2px 0; width: 44%;">Tax Scheme:</td>
+                            <td style="font-weight: bold; color: #1e293b; padding: 2px 0;">{{ $order->effective_tax_mode === 'inclusive' ? 'Inclusive of GST' : 'Exclusive of GST (Base Rate)' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #64748b; padding: 2px 0;">Applicable GST:</td>
+                            <td style="font-weight: bold; color: #0f766e; padding: 2px 0;">
+                                @if(($order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')
+                                    CGST + SGST (Intra-State Supply)
+                                @else
+                                    IGST (Inter-State Supply)
+                                @endif
+                            </td>
+                        </tr>
+                        @if($order->freight_terms)
                             <tr>
-                                <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Shipping / Freight:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">+{{ $currencySymbol }}{{ number_format($order->shipping_charges, 2) }}</td>
+                                <td style="color: #64748b; padding: 2px 0;">Freight Terms:</td>
+                                <td style="font-weight: bold; color: #1e293b; padding: 2px 0;">{{ $order->freight_terms }}</td>
                             </tr>
                         @endif
-                        @if($order->adjustment != 0)
-                            <tr>
-                                <td style="color: #64748b; padding: 4px 0; text-align: left; border: 0;">Adjustment:</td>
-                                <td style="text-align: right; font-weight: bold; color: #1e293b; padding: 4px 0; border: 0;">{{ ($order->adjustment > 0 ? '+' : '') . $currencySymbol }}{{ number_format($order->adjustment, 2) }}</td>
-                            </tr>
-                        @endif
-                        <tr style="border-top: 1.5px solid #cbd5e1;">
-                            <td style="font-weight: bold; color: #0f172a; padding: 6px 0 0 0; font-size: 11px; text-align: left; border: 0;">Total Payable:</td>
-                            <td style="text-align: right; font-weight: bold; color: #1e40af; padding: 6px 0 0 0; font-size: 12px; border: 0;">{{ $currencySymbol }}{{ number_format($order->total_amount, 2) }}</td>
-                        </tr>
                     </table>
                 </div>
-            </div>
 
-            <!-- Terms & Conditions / Remarks (floated left) -->
-            <div style="float: left; width: 54%;">
-                @if($order->terms_conditions)
-                    <div style="margin-bottom: 12px;">
-                        <span class="section-label">Terms & Conditions</span>
-                        <div class="terms-conditions-container">{!! $order->terms_conditions !!}</div>
-                    </div>
+                @if(!empty($order->notes))
+                    <div class="section-label">Internal Notes / Remarks:</div>
+                    <div class="terms-content" style="font-style: italic; color: #64748b; margin-bottom: 8px;">{{ $order->notes }}</div>
                 @endif
+            </td>
 
-                @if($order->notes)
-                    <div>
-                        <span class="section-label">Remarks / Internal Notes</span>
-                        <div class="client-notes-container" style="white-space: pre-line;">{{ $order->notes }}</div>
+            <!-- Right: Totals Box -->
+            <td class="calc-summary-col">
+                <div class="summary-box">
+                    <div class="summary-line">
+                        <span class="summary-lbl">{{ $order->effective_tax_mode === 'inclusive' ? 'Subtotal (Incl. GST):' : 'Subtotal:' }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->subtotal), 2) }}</span>
                     </div>
-                @endif
-            </div>
-            <div class="clear"></div>
-        </div>
 
-        <!-- Signature section -->
-        <div class="signature-section">
-            <div class="footer-note">
-                For queries regarding order fulfillment or billing details, please contact us.
+                    @if($order->discount > 0)
+                        <div class="summary-line" style="color: #dc2626;">
+                            <span class="summary-lbl" style="color: #dc2626;">Discount:</span>
+                            <span class="summary-num" style="color: #dc2626;">-{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->discount), 2) }}</span>
+                        </div>
+                    @endif
+
+                    <div class="summary-line" style="color: #475569;">
+                        <span class="summary-lbl">{{ $order->effective_tax_mode === 'inclusive' ? 'Taxable Value (Excl. Tax):' : 'Taxable Amount:' }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->taxable_amount), 2) }}</span>
+                    </div>
+
+                    @if($order->tax_type !== 'without_tax' && $order->tax > 0)
+                        @if(($order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')
+                            <div class="summary-line">
+                                <span class="summary-lbl">CGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                                <span class="summary-num">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->tax / 2), 2) }}</span>
+                            </div>
+                            <div class="summary-line">
+                                <span class="summary-lbl">SGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                                <span class="summary-num">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->tax / 2), 2) }}</span>
+                            </div>
+                        @else
+                            <div class="summary-line">
+                                <span class="summary-lbl">IGST {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                                <span class="summary-num">{{ ($order->effective_tax_mode === 'inclusive' ? '' : '+') }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->tax), 2) }}</span>
+                            </div>
+                        @endif
+
+                        <div class="summary-line">
+                            <span class="summary-lbl">Total Tax {{ $order->effective_tax_mode === 'inclusive' ? '(Included)' : '' }}:</span>
+                            <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->tax), 2) }}</span>
+                        </div>
+                    @endif
+
+                    @if($order->shipping_charges > 0)
+                        <div class="summary-line">
+                            <span class="summary-lbl">Shipping / Freight:</span>
+                            <span class="summary-num">+{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->shipping_charges), 2) }}</span>
+                        </div>
+                    @endif
+
+                    @if($order->adjustment != 0)
+                        <div class="summary-line">
+                            <span class="summary-lbl">Adjustment:</span>
+                            <span class="summary-num">{{ $order->adjustment > 0 ? '+' : '' }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->adjustment), 2) }}</span>
+                        </div>
+                    @endif
+
+                    <div class="total-payable-box">
+                        <span class="total-payable-lbl">Total Payable:</span>
+                        <span class="total-payable-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($order->total_amount), 2) }}</span>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- 5. TERMS & CONDITIONS SECTION -->
+    @if($order->terms_conditions)
+        <div class="terms-section">
+            <div class="section-label">Terms & Conditions:</div>
+            <div class="terms-content">
+                {!! $order->terms_conditions !!}
             </div>
-            <div class="signature-box">
-                <div class="signature-line">Authorized Signatory</div>
-            </div>
-            <div class="clear"></div>
         </div>
-    </div>
+    @endif
+
+    <!-- 6. SIGNATURE BLOCK -->
+    <table class="signature-table">
+        <tr>
+            <td class="sig-note">
+                For any queries regarding this Sales Order, fulfillment schedule or billing, please contact us at {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}.<br>
+                Thank you for your business!
+            </td>
+            <td class="sig-space">
+                <div class="sig-line">Authorized Signatory</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- 7. INLINE CANVAS SCRIPT FOR PAGE NUMBER (Page 1 of 2, Page 2 of 2) -->
+    <script type="text/php">
+        if (isset($pdf)) {
+            $pdf->page_script(function ($pageNumber, $pageCount, $canvas, $fontMetrics) {
+                $text = "Page " . $pageNumber . " of " . $pageCount;
+                $font = $fontMetrics->getFont("Helvetica", "normal");
+                $size = 8.5;
+                $color = array(100/255, 116/255, 139/255);
+                $w = $canvas->get_width();
+                $h = $canvas->get_height();
+                $canvas->text($w - 95, $h - 24, $text, $font, $size, $color);
+            });
+        }
+    </script>
+
 </body>
 </html>

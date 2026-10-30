@@ -92,6 +92,7 @@ class PurchaseOrder extends BaseModel
         return $this->attributes['purchase_order_number'] ?? '';
     }
 
+
     public function getOrderDateAttribute()
     {
         return $this->attributes['date'] ?? null;

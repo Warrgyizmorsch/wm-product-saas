@@ -323,6 +323,158 @@
             font-size: 12px;
         }
 
+        .invoice-main-title {
+            color: #1e40af;
+        }
+
+        .invoice-avatar-box {
+            background-color: #1e40af !important;
+        }
+
+        /* ==================== DARK MODE SUPPORT FOR INVOICE SHEET ==================== */
+        html.app-skin-dark .invoice-sheet {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .invoice-main-title {
+            color: #60a5fa !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .invoice-avatar-box {
+            background-color: #2563eb !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-dark,
+        html.app-skin-dark .invoice-sheet h2,
+        html.app-skin-dark .invoice-sheet h4,
+        html.app-skin-dark .invoice-sheet h6,
+        html.app-skin-dark .invoice-sheet strong {
+            color: #f8fafc !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .text-secondary {
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .border,
+        html.app-skin-dark .invoice-sheet .border-bottom,
+        html.app-skin-dark .invoice-sheet .border-top,
+        html.app-skin-dark .invoice-sheet .border-start,
+        html.app-skin-dark .invoice-sheet .border-end {
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet hr,
+        html.app-skin-dark .invoice-sheet hr.border-slate {
+            border-color: #334155 !important;
+            opacity: 1 !important;
+        }
+
+        /* Customer Box, Dispatch Box, Bank Box, Terms Box, Summary Box */
+        html.app-skin-dark .invoice-sheet .bg-light,
+        html.app-skin-dark .invoice-sheet div[style*="background-color: #f8fafc"],
+        html.app-skin-dark .invoice-sheet .bank-details-box,
+        html.app-skin-dark .invoice-sheet .terms-box {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .summary-table-box > div {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .summary-table-box .text-dark {
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .summary-table-box .text-primary {
+            color: #60a5fa !important;
+        }
+
+        /* Line Items Table */
+        html.app-skin-dark .invoice-table th {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
+            border-top-color: #334155 !important;
+            border-bottom-color: #475569 !important;
+        }
+
+        html.app-skin-dark .invoice-table td {
+            background-color: transparent !important;
+            border-bottom-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .invoice-table td strong {
+            color: #ffffff !important;
+        }
+
+        /* GST Analysis Box & Allocations Table */
+        html.app-skin-dark .invoice-sheet .gst-summary-box,
+        html.app-skin-dark .invoice-sheet .card {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box table,
+        html.app-skin-dark .invoice-sheet .card table {
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box table th,
+        html.app-skin-dark .invoice-sheet .gst-summary-box table td,
+        html.app-skin-dark .invoice-sheet .card table th,
+        html.app-skin-dark .invoice-sheet .card table td {
+            border-color: #334155 !important;
+            color: #e2e8f0 !important;
+            background-color: transparent !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box thead,
+        html.app-skin-dark .invoice-sheet .card thead {
+            background-color: #0b1329 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box thead th,
+        html.app-skin-dark .invoice-sheet .card thead th {
+            background-color: #0b1329 !important;
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .gst-summary-box tfoot,
+        html.app-skin-dark .invoice-sheet .gst-summary-box tfoot td {
+            background-color: #0b1329 !important;
+            color: #ffffff !important;
+        }
+
+        html.app-skin-dark .invoice-sheet .table-light td {
+            background-color: rgba(30, 41, 59, 0.7) !important;
+            color: #93c5fd !important;
+        }
+
+        /* E-Invoice / E-Way Bill Stripe QR Container */
+        html.app-skin-dark .invoice-sheet .bg-white {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+        }
+
+        /* Advance Reconcile Card outside sheet */
+        html.app-skin-dark .card[style*="border-left: 5px solid #10b981"] {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+
         @media print {
             @page {
                 size: A4 portrait;
@@ -679,7 +831,7 @@
 
                 @if ($invoice->einvoice_status === 'Generated')
                     <!-- Official NIC E-Invoice Header Stripe / QR Banner -->
-                    <div class="p-2.5 mb-3 rounded border bg-light d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-left: 4px solid #16a34a !important; background-color: #f8fafc !important;">
+                    <div class="p-2.5 mb-3 rounded border bg-light einvoice-header-stripe d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-left: 4px solid #16a34a !important;">
                         <div class="d-flex align-items-center gap-3">
                             <div class="bg-white p-1 rounded border shadow-2xs" role="button" data-bs-toggle="modal" data-bs-target="#viewEInvoiceQrModal" title="Click to View Full Size QR Code">
                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={{ urlencode($invoice->signed_qrcode ?: $invoice->irn) }}" alt="E-Invoice QR" style="width: 78px; height: 78px; display: block;">
@@ -719,7 +871,7 @@
                 <div class="row align-items-start pb-4 border-bottom mb-4">
                     <div class="col-7">
                         <div class="d-flex align-items-center mb-3">
-                            <div class="avatar-text bg-primary text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0; background-color: #1e40af !important;">
+                            <div class="avatar-text invoice-avatar-box text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0;">
                                 {{ strtoupper(substr(tenant() ? tenant()->name : 'ERP', 0, 1)) }}
                             </div>
                             <div>
@@ -735,7 +887,7 @@
                     </div>
 
                     <div class="col-5 text-end">
-                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">{{ __('crm.tax_invoice') }}</h2>
+                        <h2 class="invoice-main-title fw-black text-uppercase tracking-wide mb-1" style="font-size: 22px; letter-spacing: 1px;">{{ __('crm.tax_invoice') }}</h2>
                         <div class="fs-14 fw-bold text-dark"># {{ $invoice->invoice_number }}</div>
                         
                         <div class="mt-3 fs-12 text-secondary">
@@ -980,7 +1132,7 @@
 
                     <!-- Right: Subtotal Calculations -->
                     <div class="col-5 summary-table-box ms-auto">
-                        <div class="p-3 rounded-3 border bg-light text-dark" style="border-color: #cbd5e1 !important; background-color: #f8fafc !important;">
+                        <div class="p-3 rounded-3 border bg-light text-dark">
 
                             <!-- 1. Subtotal -->
                             <div class="d-flex justify-content-between align-items-center mb-2 fs-12">

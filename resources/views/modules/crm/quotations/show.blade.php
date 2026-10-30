@@ -54,7 +54,11 @@
             </span>
         @endif
 
-        @if ($quotation->status === 'Accepted')
+        @if ($quotation->salesOrder)
+            <a href="{{ route('sales.orders.show', $quotation->salesOrder->id) }}" class="btn btn-sm btn-primary fw-bold px-3">
+                <i class="feather-shopping-bag me-1.5"></i>View Sales Order ({{ $quotation->salesOrder->sales_order_number }})
+            </a>
+        @elseif ($quotation->status === 'Accepted')
             @php
                 $deal = $quotation->crmDeal;
                 $hasCustomer = !empty($deal?->account?->customer_id)

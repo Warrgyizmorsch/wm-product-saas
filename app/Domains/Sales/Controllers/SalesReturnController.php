@@ -390,6 +390,16 @@ class SalesReturnController extends Controller
         return view('modules.sales.returns.show', compact('return'));
     }
 
+    public function downloadPdf(int $id)
+    {
+        $return = $this->returnRepo->find($id);
+        if (!$return) abort(404, 'Sales Return / Credit Note not found.');
+        $this->authorize('view', $return);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.returns.pdf', compact('return'));
+        return $pdf->download("Credit_Note_{$return->return_number}.pdf");
+    }
+
     public function approve(int $id): RedirectResponse
     {
         $returnOrder = $this->returnRepo->find($id);

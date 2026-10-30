@@ -123,15 +123,15 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="pendingBillsTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.grn_number') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.po_number') }}</th>
-                        <th style="min-width: 170px; background-color: #e8ecf1 !important;">{{ __('purchase.supplier_vendor') }}</th>
-                        <th style="min-width: 140px; background-color: #e8ecf1 !important;">{{ __('purchase.warehouse') }}</th>
-                        <th style="min-width: 110px; background-color: #e8ecf1 !important;">{{ __('purchase.receipt_date') }}</th>
-                        <th style="min-width: 90px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.received_qty') }}</th>
-                        <th style="min-width: 110px; background-color: #e8ecf1 !important;" class="text-center">{{ __('purchase.billing_status') }}</th>
-                        <th style="min-width: 160px; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
+                    <tr>
+                        <th style="min-width: 140px;">{{ __('purchase.grn_number') }}</th>
+                        <th style="min-width: 140px;">{{ __('purchase.po_number') }}</th>
+                        <th style="min-width: 170px;">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="min-width: 140px;">{{ __('purchase.warehouse') }}</th>
+                        <th style="min-width: 110px;">{{ __('purchase.receipt_date') }}</th>
+                        <th style="min-width: 90px;" class="text-center">{{ __('purchase.received_qty') }}</th>
+                        <th style="min-width: 110px;" class="text-center">{{ __('purchase.billing_status') }}</th>
+                        <th style="min-width: 160px;" class="text-end pe-3">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

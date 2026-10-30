@@ -417,6 +417,9 @@ return array (
   'designation_role' => 'Designation / Role',
   'designation_placeholder' => 'e.g. Purchase Head',
   'additional_contacts' => 'Additional Contacts',
+  'additional_details' => 'Additional Details',
+  'field' => 'Field',
+  'fields' => 'Fields',
   'clone_contact' => 'CLONE CONTACT',
   'contact_person_num' => 'Contact Person #',
   'delete_contact' => 'Delete Contact',
@@ -2308,5 +2311,6 @@ return array (
   'active_deals_count' => 'Active: :count Deals',
   'date_label' => 'Date',
   'meetings_geo_verification' => 'Geo-Verification:',
+  'download_pdf' => 'Download PDF',
 );
 

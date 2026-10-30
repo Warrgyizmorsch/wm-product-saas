@@ -9,8 +9,8 @@
         <i class="feather feather-arrow-left"></i>
     </a>
 
-    <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3 d-print-none">
-        <i class="feather-printer me-1.5"></i>{{ __('crm.print') }}
+    <a href="{{ route('sales.returns.download', $return->id) }}" class="btn btn-sm btn-primary fw-bold px-3">
+        <i class="feather-download me-1.5"></i>{{ __('crm.download_pdf') }}
     </a>
 
     @if (in_array($return->status, ['Pending', 'Draft']))
@@ -105,6 +105,102 @@
             font-weight: 700;
         }
 
+        .return-avatar-box {
+            background-color: #1e40af !important;
+        }
+
+        .return-main-title {
+            color: #1e40af;
+        }
+
+        /* ── Light Mode Explicit Styles ── */
+        html:not(.app-skin-dark) .return-sheet {
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
+            color: #1e293b !important;
+        }
+        html:not(.app-skin-dark) .return-sheet .text-dark {
+            color: #0f172a !important;
+        }
+        html:not(.app-skin-dark) .return-sheet .text-muted {
+            color: #64748b !important;
+        }
+        html:not(.app-skin-dark) .return-sheet .text-secondary {
+            color: #475569 !important;
+        }
+        html:not(.app-skin-dark) .return-sheet .bg-light,
+        html:not(.app-skin-dark) .return-sheet [class*="bg-light"] {
+            background-color: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        /* ── Dark Mode Support ── */
+        html.app-skin-dark .return-sheet {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+        }
+
+        html.app-skin-dark .return-sheet .return-main-title {
+            color: #60a5fa !important;
+        }
+
+        html.app-skin-dark .return-sheet .return-avatar-box {
+            background-color: #2563eb !important;
+        }
+
+        html.app-skin-dark .return-sheet .text-dark,
+        html.app-skin-dark .return-sheet h2,
+        html.app-skin-dark .return-sheet h4,
+        html.app-skin-dark .return-sheet h6,
+        html.app-skin-dark .return-sheet strong {
+            color: #f8fafc !important;
+        }
+
+        html.app-skin-dark .return-sheet .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        html.app-skin-dark .return-sheet .text-secondary {
+            color: #cbd5e1 !important;
+        }
+
+        html.app-skin-dark .return-sheet .border,
+        html.app-skin-dark .return-sheet .border-bottom,
+        html.app-skin-dark .return-sheet .border-top {
+            border-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .return-sheet .bg-light,
+        html.app-skin-dark .return-sheet [class*="bg-light"],
+        html.app-skin-dark .return-sheet [class*="bg-opacity"] {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+
+        html.app-skin-dark .return-sheet .return-table thead th {
+            background-color: #0b1329 !important;
+            color: #94a3b8 !important;
+            border-top-color: #1e293b !important;
+            border-bottom-color: #334155 !important;
+        }
+
+        html.app-skin-dark .return-sheet .return-table tbody td {
+            border-bottom-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        html.app-skin-dark .return-sheet .return-table tbody tr:hover {
+            background-color: #1e293b !important;
+        }
+
+        html.app-skin-dark .return-sheet .return-table tfoot td {
+            background-color: #0b1329 !important;
+            border-top-color: #334155 !important;
+            color: #f8fafc !important;
+        }
+
         /* ── Print Styles ───────────────────────────────── */
         @media print {
             @page {
@@ -156,6 +252,33 @@
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 background: #ffffff !important;
+                color: #000000 !important;
+            }
+
+            .return-sheet .return-main-title {
+                color: #1e40af !important;
+            }
+
+            .return-sheet .return-avatar-box {
+                background-color: #1e40af !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .return-sheet .text-dark,
+            .return-sheet h2,
+            .return-sheet h4,
+            .return-sheet h6,
+            .return-sheet strong {
+                color: #000000 !important;
+            }
+
+            .return-sheet .text-muted {
+                color: #555555 !important;
+            }
+
+            .return-sheet .text-secondary {
+                color: #333333 !important;
             }
 
             .return-sheet .bg-light,
@@ -163,11 +286,28 @@
             .return-sheet [class*="bg-opacity"] {
                 background-color: #ffffff !important;
                 background: #ffffff !important;
+                border-color: #cccccc !important;
             }
 
             .return-sheet .rounded.border,
-            .return-sheet .border {
-                border-color: #e2e8f0 !important;
+            .return-sheet .border,
+            .return-sheet .border-top,
+            .return-sheet .border-bottom {
+                border-color: #cccccc !important;
+            }
+
+            .return-sheet .return-table thead th,
+            .return-sheet .return-table tfoot td {
+                background-color: #f1f5f9 !important;
+                color: #000000 !important;
+                border-color: #cccccc !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .return-sheet .return-table tbody td {
+                color: #000000 !important;
+                border-bottom-color: #e2e8f0 !important;
             }
 
             .d-print-none,
@@ -208,7 +348,7 @@
                 <div class="row align-items-start pb-4 border-bottom mb-4">
                     <div class="col-7">
                         <div class="d-flex align-items-center mb-3">
-                            <div class="avatar-text text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0; background-color: #1e40af !important;">
+                            <div class="avatar-text return-avatar-box text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0;">
                                 {{ strtoupper(substr(tenant() ? tenant()->name : 'R', 0, 1)) }}
                             </div>
                             <div>
@@ -224,7 +364,7 @@
                     </div>
 
                     <div class="col-5 text-end">
-                        <h2 class="fw-black text-uppercase tracking-wide mb-1" style="color: #1e40af; font-size: 22px; letter-spacing: 1px;">{{ __('crm.credit_note') }}</h2>
+                        <h2 class="return-main-title fw-black text-uppercase tracking-wide mb-1" style="font-size: 22px; letter-spacing: 1px;">{{ __('crm.credit_note') }}</h2>
                         <div class="fs-14 fw-bold text-dark"># {{ $return->return_number }}</div>
                         
                         <div class="mt-3 fs-12 text-secondary">

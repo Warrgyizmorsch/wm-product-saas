@@ -4,8 +4,11 @@
 
 return [
     [
-        'section' => 'platform_admin', 'order' => 10,
-        'label' => 'ui.access_control', 'default' => 'Access Control', 'icon' => 'feather-shield',
+        'section' => 'platform_admin',
+        'order' => 10,
+        'label' => 'ui.access_control',
+        'default' => 'Access Control',
+        'icon' => 'feather-shield',
         'children' => [
             ['label' => 'Users', 'route' => 'access.users.index', 'permission' => 'access.users.manage'],
             ['label' => 'Roles', 'route' => 'access.roles.index', 'permission' => 'access.roles.manage'],
@@ -14,8 +17,10 @@ return [
         ],
     ],
     [
-        'section' => 'platform_admin', 'order' => 20,
-        'label' => 'Automation', 'icon' => 'feather-zap',
+        'section' => 'platform_admin',
+        'order' => 20,
+        'label' => 'Automation',
+        'icon' => 'feather-zap',
         'children' => [
             ['label' => 'Notification Master', 'route' => 'platform.notification-rules.index'],
             ['label' => 'Workflows'],
@@ -25,8 +30,10 @@ return [
         ],
     ],
     [
-        'section' => 'platform_admin', 'order' => 30,
-        'label' => 'Audit & Settings', 'icon' => 'feather-settings',
+        'section' => 'platform_admin',
+        'order' => 30,
+        'label' => 'Audit & Settings',
+        'icon' => 'feather-settings',
         'children' => [
             ['label' => 'Audit Logs', 'route' => 'access.audit-log.index', 'permission' => 'audit.logs.view'],
             ['label' => 'Localization'],

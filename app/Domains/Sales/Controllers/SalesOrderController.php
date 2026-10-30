@@ -58,10 +58,17 @@ class SalesOrderController extends Controller
         $prefillQuotation = null;
         if ($request->has('quotation_id')) {
             $prefillQuotation = Quotation::query()
-                ->with(['items.product', 'lead', 'crmAccount', 'crmDeal.account', 'crmDeal.contact'])
+                ->with(['items.product', 'lead', 'crmAccount', 'crmDeal.account', 'crmDeal.contact', 'salesOrder'])
                 ->find($request->input('quotation_id'));
 
             if ($prefillQuotation) {
+                // If quotation already converted, redirect to the existing sales order to prevent duplicates
+                if ($prefillQuotation->salesOrder) {
+                    return redirect()
+                        ->route('sales.orders.show', $prefillQuotation->salesOrder->id)
+                        ->with('info', "Quotation {$prefillQuotation->quotation_number} has already been converted to Sales Order {$prefillQuotation->salesOrder->sales_order_number}.");
+                }
+
                 // Ensure customer object & ID are resolved/synced for the quotation
                 $prefillCustomer = $prefillQuotation->customer;
                 if (!$prefillCustomer) {
@@ -81,7 +88,8 @@ class SalesOrderController extends Controller
 
         $quotations = Quotation::query()
             ->where('is_current', true)
-            ->whereIn('status', ['Accepted', 'Converted', 'Won'])
+            ->whereIn('status', ['Accepted', 'Won'])
+            ->whereDoesntHave('salesOrder')
             ->latest()
             ->get()
             ->filter(fn($q) => !empty($q->customer));
@@ -140,6 +148,15 @@ class SalesOrderController extends Controller
             'items.*.product_id.required' => 'Please select a valid Product from the dropdown for each item line.',
             'items.*.product_id.exists' => 'The selected product does not exist in inventory.',
         ]);
+
+        if (!empty($validated['quotation_id'])) {
+            $existingOrder = SalesOrder::where('quotation_id', $validated['quotation_id'])->first();
+            if ($existingOrder) {
+                return back()->withInput()->withErrors([
+                    'quotation_id' => "This quotation has already been converted to Sales Order {$existingOrder->sales_order_number}."
+                ]);
+            }
+        }
 
         $order = $this->salesOrders->create($validated, $request->input('items', []));
 

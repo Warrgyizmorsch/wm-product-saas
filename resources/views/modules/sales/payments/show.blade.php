@@ -9,8 +9,8 @@
         <i class="feather feather-arrow-left"></i>
     </a>
 
-    <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3 d-print-none">
-        <i class="feather-printer me-1.5"></i>Print
+    <a href="{{ route('sales.payments.download', $payment->id) }}" class="btn btn-sm btn-primary fw-bold px-3">
+        <i class="feather-download me-1.5"></i>{{ __('crm.download_pdf') }}
     </a>
 
     @if ($payment->status === 'Draft')
@@ -29,7 +29,7 @@
     .pay-sheet {
         max-width: 900px;
         margin: 0 auto;
-        background: #fff;
+        background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         box-shadow: 0 4px 6px -1px rgba(0,0,0,.05);
@@ -37,6 +37,53 @@
         position: relative;
         overflow: hidden;
         font-family: 'Inter', system-ui, sans-serif;
+        color: #1e293b;
+    }
+
+    .pay-main-title {
+        color: #0284c7;
+    }
+
+    .pay-avatar-box {
+        background-color: #0284c7 !important;
+    }
+
+    .pay-customer-avatar {
+        background-color: #0284c7 !important;
+    }
+
+    .link-icon-box {
+        background-color: #e0f2fe !important;
+    }
+
+    .link-icon-box i {
+        color: #0284c7 !important;
+    }
+
+    .pay-notes-box {
+        background-color: #f8fafc !important;
+        border-color: #e2e8f0 !important;
+    }
+
+    /* ── Light Mode Explicit Styles ───────── */
+    html:not(.app-skin-dark) .pay-sheet {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        color: #1e293b !important;
+    }
+    html:not(.app-skin-dark) .pay-sheet .text-dark {
+        color: #0f172a !important;
+    }
+    html:not(.app-skin-dark) .pay-sheet .text-muted {
+        color: #64748b !important;
+    }
+    html:not(.app-skin-dark) .pay-sheet .text-secondary {
+        color: #475569 !important;
+    }
+    html:not(.app-skin-dark) .pay-sheet .bg-light,
+    html:not(.app-skin-dark) .pay-sheet [class*="bg-light"] {
+        background-color: #f8fafc !important;
+        border-color: #e2e8f0 !important;
     }
 
     /* ── Corner Ribbon ───────────────────── */
@@ -88,6 +135,114 @@
     }
     .no-alloc i { font-size: 36px; display: block; margin-bottom: 8px; opacity: .4; }
 
+    /* ==================== DARK MODE SUPPORT FOR PAYMENT RECEIPT ==================== */
+    html.app-skin-dark .pay-sheet {
+        background-color: #0f172a !important;
+        border-color: #1e293b !important;
+        color: #e2e8f0 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+    }
+
+    html.app-skin-dark .pay-sheet .pay-main-title {
+        color: #38bdf8 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .pay-avatar-box {
+        background-color: #0284c7 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .pay-customer-avatar {
+        background-color: #0284c7 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .text-dark,
+    html.app-skin-dark .pay-sheet h2,
+    html.app-skin-dark .pay-sheet h4,
+    html.app-skin-dark .pay-sheet h6,
+    html.app-skin-dark .pay-sheet strong {
+        color: #f8fafc !important;
+    }
+
+    html.app-skin-dark .pay-sheet .text-muted {
+        color: #94a3b8 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .text-secondary {
+        color: #cbd5e1 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .border,
+    html.app-skin-dark .pay-sheet .border-bottom,
+    html.app-skin-dark .pay-sheet .border-top {
+        border-color: #1e293b !important;
+    }
+
+    html.app-skin-dark .pay-sheet .bg-light,
+    html.app-skin-dark .pay-sheet [class*="bg-light"],
+    html.app-skin-dark .pay-sheet [class*="bg-opacity"] {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .alloc-table thead th {
+        background: #0b1329 !important;
+        color: #94a3b8 !important;
+        border-top-color: #1e293b !important;
+        border-bottom-color: #334155 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .alloc-table tbody td {
+        border-bottom-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .alloc-table tbody tr:hover {
+        background: #1e293b !important;
+    }
+
+    html.app-skin-dark .pay-sheet .alloc-table tfoot td {
+        background: #0b1329 !important;
+        border-top-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+
+    html.app-skin-dark .pay-sheet .alloc-table .text-dark {
+        color: #f8fafc !important;
+    }
+
+    html.app-skin-dark .pay-sheet .link-icon-box {
+        background-color: rgba(2, 132, 199, 0.2) !important;
+    }
+
+    html.app-skin-dark .pay-sheet .link-icon-box i {
+        color: #38bdf8 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .pay-notes-box {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #cbd5e1 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .no-alloc {
+        color: #64748b !important;
+    }
+
+    html.app-skin-dark .pay-sheet .badge.bg-soft-info {
+        background-color: rgba(56, 189, 248, 0.15) !important;
+        color: #38bdf8 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .badge.bg-soft-warning {
+        background-color: rgba(245, 158, 11, 0.15) !important;
+        color: #fbbf24 !important;
+    }
+
+    html.app-skin-dark .pay-sheet .text-primary {
+        color: #38bdf8 !important;
+    }
+
+    /* ── Print Styles ────────────────────── */
     @media print {
         @page {
             size: A4 portrait;
@@ -138,18 +293,64 @@
             box-shadow: none !important;
             border-radius: 0 !important;
             background: #ffffff !important;
+            color: #000000 !important;
+        }
+
+        .pay-sheet .pay-main-title {
+            color: #0284c7 !important;
+        }
+
+        .pay-sheet .pay-avatar-box,
+        .pay-sheet .pay-customer-avatar {
+            background-color: #0284c7 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pay-sheet .text-dark,
+        .pay-sheet h2,
+        .pay-sheet h4,
+        .pay-sheet h6,
+        .pay-sheet strong {
+            color: #000000 !important;
+        }
+
+        .pay-sheet .text-muted {
+            color: #555555 !important;
+        }
+
+        .pay-sheet .text-secondary {
+            color: #333333 !important;
         }
 
         .pay-sheet .bg-light,
         .pay-sheet [class*="bg-light"],
-        .pay-sheet [class*="bg-opacity"] {
+        .pay-sheet [class*="bg-opacity"],
+        .pay-sheet .pay-notes-box {
             background-color: #ffffff !important;
             background: #ffffff !important;
+            border-color: #cccccc !important;
         }
 
         .pay-sheet .rounded.border,
-        .pay-sheet .border {
-            border-color: #e2e8f0 !important;
+        .pay-sheet .border,
+        .pay-sheet .border-top,
+        .pay-sheet .border-bottom {
+            border-color: #cccccc !important;
+        }
+
+        .pay-sheet .alloc-table thead th,
+        .pay-sheet .alloc-table tfoot td {
+            background: #f1f5f9 !important;
+            color: #000000 !important;
+            border-color: #cccccc !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .pay-sheet .alloc-table tbody td {
+            color: #000000 !important;
+            border-bottom-color: #e2e8f0 !important;
         }
 
         .d-print-none,
@@ -177,8 +378,8 @@
             {{-- Left : Company --}}
             <div class="col-7">
                 <div class="d-flex align-items-center mb-3">
-                    <div class="d-flex align-items-center justify-content-center fw-bold text-white fs-3 me-3"
-                         style="width:50px;height:50px;border-radius:8px;background:#0284c7;flex-shrink:0;">
+                    <div class="d-flex align-items-center justify-content-center fw-bold text-white fs-3 me-3 pay-avatar-box shadow-sm"
+                         style="width:50px;height:50px;border-radius:8px;flex-shrink:0;">
                         {{ strtoupper(substr(tenant()?->name ?? 'E', 0, 1)) }}
                     </div>
                     <div>
@@ -195,7 +396,7 @@
 
             {{-- Right : Receipt title + meta --}}
             <div class="col-5 text-end">
-                <h2 class="fw-black text-uppercase mb-1" style="color:#0284c7;font-size:22px;letter-spacing:1px;">PAYMENT RECEIPT</h2>
+                <h2 class="pay-main-title fw-black text-uppercase mb-1" style="font-size:22px;letter-spacing:1px;">PAYMENT RECEIPT</h2>
                 <div class="fs-14 fw-bold text-dark mb-3"># {{ $payment->payment_number }}</div>
 
                 <div class="fs-12 text-secondary" style="line-height:2;">
@@ -226,7 +427,7 @@
                         <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-3" style="letter-spacing: 0.5px;">Received From (Customer):</span>
                         
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-                            <div class="avatar-text bg-primary text-white fw-bold me-3 d-flex align-items-center justify-content-center rounded-3 shadow-sm" style="width: 42px; height: 42px; font-size: 16px; flex-shrink: 0; background-color: #0284c7 !important;">
+                            <div class="avatar-text pay-customer-avatar text-white fw-bold me-3 d-flex align-items-center justify-content-center rounded-3 shadow-sm" style="width: 42px; height: 42px; font-size: 16px; flex-shrink: 0;">
                                 {{ strtoupper(substr($payment->customer?->name ?: 'C', 0, 1)) }}
                             </div>
                             <div>
@@ -316,9 +517,9 @@
         <div class="border-top pt-4 mb-4">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <div class="d-flex align-items-center gap-2">
-                    <div class="d-flex align-items-center justify-content-center"
-                         style="width:28px;height:28px;border-radius:6px;background:#e0f2fe;">
-                        <i class="feather-link fs-12" style="color:#0284c7;"></i>
+                    <div class="d-flex align-items-center justify-content-center link-icon-box"
+                         style="width:28px;height:28px;border-radius:6px;">
+                        <i class="feather-link fs-12"></i>
                     </div>
                     <h6 class="fw-bold text-dark mb-0 fs-14">Invoice Allocations / Adjustments</h6>
                 </div>
@@ -397,7 +598,7 @@
         @if($payment->notes)
         <div class="border-top pt-3 mb-4">
             <div class="pay-section-title">Receipt Notes / Remarks</div>
-            <p class="fs-12 text-muted mb-0 p-3 rounded border" style="background:#f8fafc;white-space:pre-wrap;line-height:1.7;">{{ $payment->notes }}</p>
+            <p class="fs-12 text-muted mb-0 p-3 rounded border pay-notes-box" style="white-space:pre-wrap;line-height:1.7;">{{ $payment->notes }}</p>
         </div>
         @endif
 
