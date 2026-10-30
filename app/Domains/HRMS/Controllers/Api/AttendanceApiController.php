@@ -138,6 +138,12 @@ class AttendanceApiController extends Controller
         $isOwner = $employee && (int)$att->employee_id === (int)$employee->id;
         $isToday = $att->date && $att->date->isToday();
         $isActiveShift = !empty($att->check_in) && empty($att->check_out);
+        $activeBreak = $att->breaks ? $att->breaks->whereNull('break_out')->first() : null;
+        $isOnBreak = !empty($activeBreak);
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($att->employee ?? $employee);
+        $allowMultiple = (bool) ($rule?->allow_multiple_punches ?? false);
+        $canClockIn = $isOwner && $isToday && (empty($att->check_in) || (!empty($att->check_out) && $allowMultiple));
 
         return [
             'id'                  => $att->id,
@@ -154,12 +160,15 @@ class AttendanceApiController extends Controller
             'total_break_hours'   => (float) ($att->total_break_hours ?? 0),
             'formatted_work_time' => $att->formatted_work_hours,
             'formatted_break_time'=> $att->formatted_break_hours,
+            'is_on_break'         => $isOnBreak,
+            'active_break_id'     => $activeBreak?->id,
             'breaks_count'        => $att->breaks->count(),
             'capabilities'        => [
                 'can_view'          => true,
-                'can_clock_in'      => $isOwner && $isToday && empty($att->check_in),
+                'can_clock_in'      => $canClockIn,
                 'can_clock_out'     => $isOwner && ($isToday || $isActiveShift) && $isActiveShift,
-                'can_start_break'   => $isOwner && ($isToday || $isActiveShift) && $isActiveShift,
+                'can_start_break'   => $isOwner && ($isToday || $isActiveShift) && $isActiveShift && !$isOnBreak,
+                'can_end_break'     => $isOwner && ($isToday || $isActiveShift) && $isActiveShift && $isOnBreak,
                 'can_regularize'    => ($isOwner || $isHrAdmin) && !empty($att->id),
                 'can_edit'          => $isHrAdmin,
             ],
@@ -298,6 +307,47 @@ class AttendanceApiController extends Controller
 
         $paginated = $query->paginate($request->integer('per_page', 10));
 
+        $todayAttendance = Attendance::where('employee_id', $employee->id)
+            ->where('date', now()->format('Y-m-d'))
+            ->with(['employee.department', 'breaks'])
+            ->first();
+
+        $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+
+        // Overall check: 1. Approved WFH request for today -> 2. Employee profile default -> 3. Today's attendance
+        $todayStr = now()->format('Y-m-d');
+        $hasWfhToday = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $todayStr)
+            ->whereDate('end_date', '>=', $todayStr)
+            ->exists();
+
+        $empOffice = strtolower(trim((string) $employee->office));
+        $defaultLoc = $hasWfhToday ? 'wfh' : (in_array($empOffice, ['onsite', 'site', 'wfh']) ? (in_array($empOffice, ['onsite', 'site']) ? 'onsite' : 'wfh') : 'office');
+        $workLoc = $todayAttendance?->location_type ?? $defaultLoc;
+
+        $trackingSelected = $rule ? $rule->isTrackingEnabled($workLoc) : false;
+        $trackingMinutes = $trackingSelected ? $rule->getTrackingMinutes($workLoc) : null;
+        $selfieRequired = $workLoc === 'wfh'
+            ? (bool) ($rule?->wfh_selfie ?? false)
+            : ($workLoc === 'onsite' ? (bool) ($rule?->site_selfie ?? false) : false);
+
+        $trackingConfig = [
+            'enabled'                 => $trackingSelected && ($trackingMinutes ?? 0) >= 1,
+            'interval_seconds'        => $trackingMinutes ? $trackingMinutes * 60 : null,
+            'location_type'           => $workLoc,
+            'selfie_required'         => $selfieRequired,
+            'punch_allowed'           => $workLoc !== 'office' || !$rule || (bool) $rule->office_web,
+            'pause_tracking_on_break' => (bool) ($rule?->pause_tracking_on_break ?? false),
+            'office_break_geofence'   => (bool) ($rule?->office_break_geofence ?? false),
+            'allow_multiple_punches'  => (bool) ($rule?->allow_multiple_punches ?? false),
+            'location_required'       => $trackingSelected || ($workLoc === 'onsite'
+                ? (bool) ($rule?->site_location ?? false)
+                : ($workLoc === 'office'
+                    ? (bool) ($rule?->office_geofence ?? false)
+                    : (bool) (($rule?->wfh_location ?? false) || ($rule?->wfh_geofence ?? false)))),
+        ];
+
         $response = [
             'employee' => [
                 'id'            => $employee->id,
@@ -306,6 +356,8 @@ class AttendanceApiController extends Controller
                 'department'    => $employee->department?->name ?? '',
                 'designation'   => $employee->designation?->name ?? '',
             ],
+            'today_attendance' => $todayAttendance ? $this->transformAttendance($todayAttendance) : null,
+            'tracking_config'  => $trackingConfig,
             'items' => collect($paginated->items())->map(fn($att) => $this->transformAttendance($att))->values(),
             'pagination' => [
                 'current_page' => $paginated->currentPage(),

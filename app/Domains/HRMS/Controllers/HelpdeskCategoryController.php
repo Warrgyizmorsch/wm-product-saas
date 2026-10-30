@@ -65,7 +65,7 @@ class HelpdeskCategoryController extends Controller
         ]);
 
         return redirect()->route('hrms.helpdesk.categories.index')
-            ->with('success', 'Helpdesk category created successfully.');
+            ->with('success', __('hrms.helpdesk.flash_category_created'));
     }
 
     public function update(Request $request, mixed $id = null): RedirectResponse
@@ -93,7 +93,7 @@ class HelpdeskCategoryController extends Controller
         ]);
 
         return redirect()->route('hrms.helpdesk.categories.index')
-            ->with('success', 'Helpdesk category updated successfully.');
+            ->with('success', __('hrms.helpdesk.flash_category_updated'));
     }
 
     public function destroy(Request $request, mixed $id = null): RedirectResponse
@@ -105,12 +105,12 @@ class HelpdeskCategoryController extends Controller
         $category = \App\Domains\HRMS\Models\HelpdeskCategory::where('tenant_id', $tenantId)->findOrFail($categoryId);
         if ($category->tickets()->exists()) {
             return redirect()->route('hrms.helpdesk.categories.index')
-                ->with('error', 'Cannot delete this category because it has associated tickets. Reassign tickets first or mark category as inactive.');
+                ->with('error', __('hrms.helpdesk.flash_category_has_tickets'));
         }
 
         $this->kbRepository->deleteCategory($categoryId);
 
         return redirect()->route('hrms.helpdesk.categories.index')
-            ->with('success', 'Category deleted successfully.');
+            ->with('success', __('hrms.helpdesk.flash_category_deleted'));
     }
 }

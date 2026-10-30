@@ -862,7 +862,7 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         return ['success' => true, 'message' => "Job Offer marked as " . strtoupper($status)];
     }
 
-    public function convertToEmployee(JobOffer $offer, ?int $tenantId, ?string $specifiedPassword = null): array
+    public function convertToEmployee(JobOffer $offer, ?int $tenantId = null, ?string $specifiedPassword = null): array
     {
         $tenantId = $this->verifyModelTenant($offer, $tenantId);
 

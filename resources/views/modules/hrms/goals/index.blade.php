@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Goals & OKRs Management | HRMS')
-@section('page-title', 'Goals & OKRs Management')
-@section('breadcrumb', 'HRMS / Performance / Goals & OKRs')
+@section('title', __('hrms.goals.page_title_meta'))
+@section('page-title', __('hrms.goals.page_title'))
+@section('breadcrumb', __('hrms.goals.breadcrumb'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus-circle" data-bs-toggle="modal" data-bs-target="#createGoalModal" class="fw-bold">
-            Create Objective / Goal
+            {{ __('hrms.goals.create_objective_goal') }}
         </x-ui.button>
     </div>
 @endsection
@@ -91,19 +91,19 @@
             $goalTabs = [
                 [
                     'id' => 'company-goals',
-                    'label' => 'Company & Strategic',
+                    'label' => __('hrms.goals.tab_company_strategic'),
                     'active' => ($activeTab === 'company_goals'),
                     'icon' => 'feather-briefcase',
                 ],
                 [
                     'id' => 'my-team',
-                    'label' => 'My & Team Goals',
+                    'label' => __('hrms.goals.tab_my_team_goals'),
                     'active' => ($activeTab === 'my_team_goals'),
                     'icon' => 'feather-user-check',
                 ],
                 [
                     'id' => 'alignment-tree',
-                    'label' => 'Cascading Alignment Tree',
+                    'label' => __('hrms.goals.tab_alignment_tree'),
                     'active' => ($activeTab === 'alignment_tree'),
                     'icon' => 'feather-git-merge',
                 ],
@@ -111,7 +111,7 @@
             if ($isHrAdmin) {
                 $goalTabs[] = [
                     'id' => 'cycles-pillars',
-                    'label' => 'Cycles & Pillars',
+                    'label' => __('hrms.goals.tab_cycles_pillars'),
                     'active' => ($activeTab === 'cycles_pillars'),
                     'icon' => 'feather-layers',
                 ];
@@ -134,8 +134,8 @@
                 <!-- TOP TOOLBAR: TITLE + SEARCH, SORT, FILTER (RIGHT CORNER) -->
                 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-briefcase me-2 text-primary"></i> Company & Strategic Objectives</h5>
-                        <p class="text-muted fs-12 mb-0">Define and monitor top-level organization objectives and strategic pillars</p>
+                        <h5 class="fw-bold text-dark mb-0"><i class="feather-briefcase me-2 text-primary"></i> {{ __('hrms.goals.company_strategic_objectives') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.goals.company_strategic_desc') }}</p>
                     </div>
 
                     <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
@@ -148,40 +148,40 @@
                             @if(request()->filled('status')) <input type="hidden" name="status" value="{{ request('status') }}"> @endif
                             @if(request()->filled('sort')) <input type="hidden" name="sort" value="{{ request('sort') }}"> @endif
                             <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                            <input type="text" name="search" id="companyGoalSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="Search goals, owner, code, pillar..." value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                            <input type="text" name="search" id="companyGoalSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="{{ __('hrms.goals.search_placeholder') }}" value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
                         </form>
 
                         <!-- Sort Dropdown -->
-                        <x-ui.sort-dropdown label="Sort">
+                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort', 'newest') === 'newest' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('newest')">
-                                <span>Newest First</span>
+                                <span>{{ __('hrms.goals.sort_newest') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'oldest' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('oldest')">
-                                <span>Oldest First</span>
+                                <span>{{ __('hrms.goals.sort_oldest') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'progress_desc' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('progress_desc')">
-                                <span>Highest Progress</span>
+                                <span>{{ __('hrms.goals.sort_progress_desc') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'progress_asc' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('progress_asc')">
-                                <span>Lowest Progress</span>
+                                <span>{{ __('hrms.goals.sort_progress_asc') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'due_date' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('due_date')">
-                                <span>Due Date (Nearest)</span>
+                                <span>{{ __('hrms.goals.sort_due_date') }}</span>
                             </a>
                         </x-ui.sort-dropdown>
 
                         <!-- Filter Dropdown -->
-                        <x-ui.filter label="Filter" offset="0, 5">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                             <form method="GET" action="{{ route('hrms.goals.index') }}" class="goalFilterForm">
                                 <input type="hidden" name="active_tab" value="company_goals">
                                 <input type="hidden" name="sort" class="goal_sort_input" value="{{ request('sort', 'newest') }}">
                                 <input type="hidden" name="search" class="filter_search_hidden" value="{{ request('search') }}">
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Goal Cycle</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.goals.goal_cycle') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="cycle_id">
-                                        <option value="">All Goal Cycles</option>
+                                        <option value="">{{ __('hrms.goals.all_goal_cycles') }}</option>
                                         @foreach($cycles as $c)
                                             <option value="{{ $c->id }}" {{ ($selectedCycleId == $c->id && request()->has('cycle_id')) || request('cycle_id') == $c->id ? 'selected' : '' }}>
                                                 {{ $c->name }} ({{ strtoupper($c->status) }})
@@ -191,9 +191,9 @@
                                 </div>
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Strategic Pillar</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.goals.strategic_pillar') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="category_id">
-                                        <option value="">All Strategic Pillars</option>
+                                        <option value="">{{ __('hrms.goals.all_strategic_pillars') }}</option>
                                         @foreach($categories as $cat)
                                             <option value="{{ $cat->id }}" {{ request('category_id') == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
                                         @endforeach
@@ -201,32 +201,32 @@
                                 </div>
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Health Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.goals.health_status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="health_status">
-                                        <option value="">All Health Statuses</option>
-                                        <option value="on_track" {{ request('health_status') == 'on_track' ? 'selected' : '' }}>🟢 On Track</option>
-                                        <option value="at_risk" {{ request('health_status') == 'at_risk' ? 'selected' : '' }}>🟡 At Risk</option>
-                                        <option value="behind" {{ request('health_status') == 'behind' ? 'selected' : '' }}>🔴 Behind</option>
-                                        <option value="completed" {{ request('health_status') == 'completed' ? 'selected' : '' }}>🔵 Completed</option>
+                                        <option value="">{{ __('hrms.goals.all_health_statuses') }}</option>
+                                        <option value="on_track" {{ request('health_status') == 'on_track' ? 'selected' : '' }}>🟢 {{ __('hrms.goals.health_on_track') }}</option>
+                                        <option value="at_risk" {{ request('health_status') == 'at_risk' ? 'selected' : '' }}>🟡 {{ __('hrms.goals.health_at_risk') }}</option>
+                                        <option value="behind" {{ request('health_status') == 'behind' ? 'selected' : '' }}>🔴 {{ __('hrms.goals.health_behind') }}</option>
+                                        <option value="completed" {{ request('health_status') == 'completed' ? 'selected' : '' }}>🔵 {{ __('hrms.goals.health_completed') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status">
-                                        <option value="">All Statuses</option>
-                                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
-                                        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                                        <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>Closed</option>
-                                        <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>Archived</option>
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>{{ __('hrms.common.active') }}</option>
+                                        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>{{ __('hrms.goals.status_draft') }}</option>
+                                        <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>{{ __('hrms.goals.status_closed') }}</option>
+                                        <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>{{ __('hrms.goals.status_archived') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                                    <a href="{{ route('hrms.goals.index', ['active_tab' => 'company_goals']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center text-decoration-none">Reset</a>
+                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
+                                    <a href="{{ route('hrms.goals.index', ['active_tab' => 'company_goals']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center text-decoration-none">{{ __('hrms.common.reset') }}</a>
                                 </div>
                             </form>
                         </x-ui.filter>
@@ -238,20 +238,20 @@
                         <div class="p-3 bg-light rounded-circle d-inline-flex mb-3 text-muted">
                             <i class="feather-briefcase fs-36"></i>
                         </div>
-                        <h6 class="fw-bold text-dark mb-1">No Company Strategic Goals Found</h6>
-                        <p class="text-muted fs-13 mb-0">Define top-level organization objectives to cascade down to departments and teams.</p>
+                        <h6 class="fw-bold text-dark mb-1">{{ __('hrms.goals.no_company_goals_found') }}</h6>
+                        <p class="text-muted fs-13 mb-0">{{ __('hrms.goals.no_company_goals_desc') }}</p>
                     </div>
                 @else
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="companyGoalsTable">
                             <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                 <tr>
-                                    <th style="width: 140px;">Code / Horizon</th>
-                                    <th>Objective & Strategic Pillar</th>
-                                    <th style="width: 180px;">Owner / Scope</th>
-                                    <th style="width: 140px;">Key Results</th>
-                                    <th style="width: 160px;">Progress & Health</th>
-                                    <th style="width: 120px;" class="text-end pe-3">Actions</th>
+                                    <th style="width: 140px;">{{ __('hrms.goals.th_code_horizon') }}</th>
+                                    <th>{{ __('hrms.goals.th_objective_pillar') }}</th>
+                                    <th style="width: 180px;">{{ __('hrms.goals.th_owner_scope') }}</th>
+                                    <th style="width: 140px;">{{ __('hrms.goals.th_key_results') }}</th>
+                                    <th style="width: 160px;">{{ __('hrms.goals.th_progress_health') }}</th>
+                                    <th style="width: 120px;" class="text-end pe-3">{{ __('hrms.common.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="companyGoalsTableBody">
@@ -260,7 +260,7 @@
                                     <td class="align-top py-3">
                                         <div class="fw-bold text-dark fs-12">{{ $g->code }}</div>
                                         <div class="text-muted fs-11 mt-1 text-wrap" style="max-width: 130px; word-break: break-word; line-height: 1.35;">
-                                            {{ $g->cycle?->name ?? 'General' }}
+                                            {{ $g->cycle?->name ?? __('hrms.goals.general') }}
                                         </div>
                                     </td>
                                     <td class="align-top py-3">
@@ -288,11 +288,11 @@
                                     <td class="align-top py-3">
                                         @if($g->owner_type === 'company')
                                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">
-                                                <i class="feather-globe me-1"></i> Organization-Wide
+                                                <i class="feather-globe me-1"></i> {{ __('hrms.goals.scope_organization_wide') }}
                                             </span>
                                         @elseif($g->owner_type === 'department')
                                             <span class="badge bg-light text-dark border fs-11 text-wrap text-start">
-                                                <i class="feather-users me-1"></i> {{ $g->department?->name ?? 'Dept Goal' }}
+                                                <i class="feather-users me-1"></i> {{ $g->department?->name ?? __('hrms.goals.scope_dept_goal') }}
                                             </span>
                                         @else
                                             @php
@@ -311,7 +311,7 @@
                                                         @if($assignedEmps->count() > 3)
                                                             <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs bg-light text-muted" 
                                                                  style="width: 26px; height: 26px; font-size: 10px; margin-left: -8px; z-index: 5;"
-                                                                 title="+{{ $assignedEmps->count() - 3 }} more">
+                                                                 title="+{{ $assignedEmps->count() - 3 }} {{ __('hrms.goals.more') }}">
                                                                 +{{ $assignedEmps->count() - 3 }}
                                                             </div>
                                                         @endif
@@ -331,26 +331,26 @@
                                                     </span>
                                                 </div>
                                             @else
-                                                <span class="badge bg-light text-muted border fs-11">Individual</span>
+                                                <span class="badge bg-light text-muted border fs-11">{{ __('hrms.goals.scope_individual') }}</span>
                                             @endif
                                         @endif
                                     </td>
                                     <td class="align-top py-3">
                                         <span class="badge bg-light text-dark border fs-11">
-                                            <i class="feather-list me-1 text-primary"></i> {{ $g->keyResults->count() }} Key Results
+                                            <i class="feather-list me-1 text-primary"></i> {{ __('hrms.goals.key_results_count', ['count' => $g->keyResults->count()]) }}
                                         </span>
                                     </td>
                                     <td class="align-top py-3">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <span class="fw-bold fs-12 text-dark">{{ number_format($g->progress_percentage, 0) }}%</span>
                                             @if($g->health_status === 'on_track')
-                                                <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 On Track</span>
+                                                <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 {{ __('hrms.goals.health_on_track') }}</span>
                                             @elseif($g->health_status === 'at_risk')
-                                                <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 At Risk</span>
+                                                <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 {{ __('hrms.goals.health_at_risk') }}</span>
                                             @elseif($g->health_status === 'behind')
-                                                <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 Behind</span>
+                                                <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 {{ __('hrms.goals.health_behind') }}</span>
                                             @else
-                                                <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 Completed</span>
+                                                <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 {{ __('hrms.goals.health_completed') }}</span>
                                             @endif
                                         </div>
                                         <div class="progress" style="height: 5px;">
@@ -360,21 +360,21 @@
                                     </td>
                                     <td class="align-top py-3 text-end pe-3" style="white-space: nowrap;">
                                         <div class="d-flex align-items-center justify-content-end gap-1">
-                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'company_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Objective" />
+                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'company_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="{{ __('hrms.goals.view_objective') }}" />
                                             @php
                                                 $canCheckInThis = $isHrAdmin || ($currentEmployee && ($g->employee_id === $currentEmployee->id || $g->employees->contains('id', $currentEmployee->id) || ($g->owner_type === 'department' && $g->department_id === $currentEmployee->department_id)));
                                             @endphp
                                             @if($canCheckInThis)
-                                            <button type="button" class="btn btn-sm btn-light border text-primary btn-quick-check-in" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" data-goal-id="{{ $g->id }}" data-goal-title="{{ $g->title }}" data-goal-krs="{{ htmlspecialchars(json_encode($g->keyResults), ENT_QUOTES, 'UTF-8') }}" title="Quick Check-in">
+                                            <button type="button" class="btn btn-sm btn-light border text-primary btn-quick-check-in" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" data-goal-id="{{ $g->id }}" data-goal-title="{{ $g->title }}" data-goal-krs="{{ htmlspecialchars(json_encode($g->keyResults), ENT_QUOTES, 'UTF-8') }}" title="{{ __('hrms.goals.quick_check_in') }}">
                                                 <i class="feather-check-square fs-13"></i>
                                             </button>
                                             @endif
                                             @if($isHrAdmin)
-                                            <form method="POST" action="{{ route('hrms.goals.destroy', $g->id) }}" class="d-inline m-0 p-0" onsubmit="return confirm('Are you sure you want to delete this goal?')">
+                                            <form method="POST" action="{{ route('hrms.goals.destroy', $g->id) }}" class="d-inline m-0 p-0" onsubmit="return confirm('{{ __('hrms.goals.confirm_delete_goal') }}')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="active_tab" value="company_goals">
-                                                <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Goal" />
+                                                <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" title="{{ __('hrms.goals.delete_goal') }}" />
                                             </form>
                                             @endif
                                         </div>
@@ -393,8 +393,8 @@
                 <!-- TOP TOOLBAR: TITLE + SEARCH, SORT, FILTER (RIGHT CORNER) -->
                 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-user-check me-2 text-primary"></i> My & Team Objectives</h5>
-                        <p class="text-muted fs-12 mb-0">Track individual and departmental goals aligned with strategic organizational pillars</p>
+                        <h5 class="fw-bold text-dark mb-0"><i class="feather-user-check me-2 text-primary"></i> {{ __('hrms.goals.my_team_objectives') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.goals.my_team_desc') }}</p>
                     </div>
 
                     <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
@@ -407,40 +407,40 @@
                             @if(request()->filled('status')) <input type="hidden" name="status" value="{{ request('status') }}"> @endif
                             @if(request()->filled('sort')) <input type="hidden" name="sort" value="{{ request('sort') }}"> @endif
                             <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                            <input type="text" name="search" id="myTeamGoalSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="Search goals, owner, code, pillar..." value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                            <input type="text" name="search" id="myTeamGoalSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13 goal-search-input" placeholder="{{ __('hrms.goals.search_placeholder') }}" value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
                         </form>
 
                         <!-- Sort Dropdown -->
-                        <x-ui.sort-dropdown label="Sort">
+                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort', 'newest') === 'newest' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('newest')">
-                                <span>Newest First</span>
+                                <span>{{ __('hrms.goals.sort_newest') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'oldest' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('oldest')">
-                                <span>Oldest First</span>
+                                <span>{{ __('hrms.goals.sort_oldest') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'progress_desc' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('progress_desc')">
-                                <span>Highest Progress</span>
+                                <span>{{ __('hrms.goals.sort_progress_desc') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'progress_asc' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('progress_asc')">
-                                <span>Lowest Progress</span>
+                                <span>{{ __('hrms.goals.sort_progress_asc') }}</span>
                             </a>
                             <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') === 'due_date' ? 'active' : '' }}" href="javascript:void(0);" onclick="setGoalSort('due_date')">
-                                <span>Due Date (Nearest)</span>
+                                <span>{{ __('hrms.goals.sort_due_date') }}</span>
                             </a>
                         </x-ui.sort-dropdown>
 
                         <!-- Filter Dropdown -->
-                        <x-ui.filter label="Filter" offset="0, 5">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                             <form method="GET" action="{{ route('hrms.goals.index') }}" class="goalFilterForm">
                                 <input type="hidden" name="active_tab" value="my_team_goals">
                                 <input type="hidden" name="sort" class="goal_sort_input" value="{{ request('sort', 'newest') }}">
                                 <input type="hidden" name="search" class="filter_search_hidden" value="{{ request('search') }}">
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Goal Cycle</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.goals.goal_cycle') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="cycle_id">
-                                        <option value="">All Goal Cycles</option>
+                                        <option value="">{{ __('hrms.goals.all_goal_cycles') }}</option>
                                         @foreach($cycles as $c)
                                             <option value="{{ $c->id }}" {{ ($selectedCycleId == $c->id && request()->has('cycle_id')) || request('cycle_id') == $c->id ? 'selected' : '' }}>
                                                 {{ $c->name }} ({{ strtoupper($c->status) }})
@@ -450,9 +450,9 @@
                                 </div>
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Strategic Pillar</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.goals.strategic_pillar') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="category_id">
-                                        <option value="">All Strategic Pillars</option>
+                                        <option value="">{{ __('hrms.goals.all_strategic_pillars') }}</option>
                                         @foreach($categories as $cat)
                                             <option value="{{ $cat->id }}" {{ request('category_id') == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
                                         @endforeach
@@ -460,32 +460,32 @@
                                 </div>
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Health Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.goals.health_status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="health_status">
-                                        <option value="">All Health Statuses</option>
-                                        <option value="on_track" {{ request('health_status') == 'on_track' ? 'selected' : '' }}>🟢 On Track</option>
-                                        <option value="at_risk" {{ request('health_status') == 'at_risk' ? 'selected' : '' }}>🟡 At Risk</option>
-                                        <option value="behind" {{ request('health_status') == 'behind' ? 'selected' : '' }}>🔴 Behind</option>
-                                        <option value="completed" {{ request('health_status') == 'completed' ? 'selected' : '' }}>🔵 Completed</option>
+                                        <option value="">{{ __('hrms.goals.all_health_statuses') }}</option>
+                                        <option value="on_track" {{ request('health_status') == 'on_track' ? 'selected' : '' }}>🟢 {{ __('hrms.goals.health_on_track') }}</option>
+                                        <option value="at_risk" {{ request('health_status') == 'at_risk' ? 'selected' : '' }}>🟡 {{ __('hrms.goals.health_at_risk') }}</option>
+                                        <option value="behind" {{ request('health_status') == 'behind' ? 'selected' : '' }}>🔴 {{ __('hrms.goals.health_behind') }}</option>
+                                        <option value="completed" {{ request('health_status') == 'completed' ? 'selected' : '' }}>🔵 {{ __('hrms.goals.health_completed') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status">
-                                        <option value="">All Statuses</option>
-                                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
-                                        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                                        <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>Closed</option>
-                                        <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>Archived</option>
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                        <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>{{ __('hrms.common.active') }}</option>
+                                        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>{{ __('hrms.goals.status_draft') }}</option>
+                                        <option value="closed" {{ request('status') == 'closed' ? 'selected' : '' }}>{{ __('hrms.goals.status_closed') }}</option>
+                                        <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>{{ __('hrms.goals.status_archived') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                                    <a href="{{ route('hrms.goals.index', ['active_tab' => 'my_team_goals']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center text-decoration-none">Reset</a>
+                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
+                                    <a href="{{ route('hrms.goals.index', ['active_tab' => 'my_team_goals']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center text-decoration-none">{{ __('hrms.common.reset') }}</a>
                                 </div>
                             </form>
                         </x-ui.filter>
@@ -497,20 +497,20 @@
                         <div class="p-3 bg-light rounded-circle d-inline-flex mb-3 text-muted">
                             <i class="feather-user-check fs-36"></i>
                         </div>
-                        <h6 class="fw-bold text-dark mb-1">No Personal or Team Goals Found</h6>
-                        <p class="text-muted fs-13 mb-0">Create goals aligned with strategic company pillars to track and report your progress.</p>
+                        <h6 class="fw-bold text-dark mb-1">{{ __('hrms.goals.no_my_team_goals_found') }}</h6>
+                        <p class="text-muted fs-13 mb-0">{{ __('hrms.goals.no_my_team_goals_desc') }}</p>
                     </div>
                 @else
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="myTeamGoalsTable">
                             <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                 <tr>
-                                    <th style="width: 140px;">Code / Horizon</th>
-                                    <th>Objective & Strategic Pillar</th>
-                                    <th style="width: 180px;">Owner / Scope</th>
-                                    <th style="width: 140px;">Key Results</th>
-                                    <th style="width: 160px;">Progress & Health</th>
-                                    <th style="width: 120px;" class="text-end pe-3">Actions</th>
+                                    <th style="width: 140px;">{{ __('hrms.goals.th_code_horizon') }}</th>
+                                    <th>{{ __('hrms.goals.th_objective_pillar') }}</th>
+                                    <th style="width: 180px;">{{ __('hrms.goals.th_owner_scope') }}</th>
+                                    <th style="width: 140px;">{{ __('hrms.goals.th_key_results') }}</th>
+                                    <th style="width: 160px;">{{ __('hrms.goals.th_progress_health') }}</th>
+                                    <th style="width: 120px;" class="text-end pe-3">{{ __('hrms.common.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="myTeamGoalsTableBody">
@@ -519,7 +519,7 @@
                                     <td class="align-top py-3">
                                         <div class="fw-bold text-dark fs-12">{{ $g->code }}</div>
                                         <div class="text-muted fs-11 mt-1 text-wrap" style="max-width: 130px; word-break: break-word; line-height: 1.35;">
-                                            {{ $g->cycle?->name ?? 'General' }}
+                                            {{ $g->cycle?->name ?? __('hrms.goals.general') }}
                                         </div>
                                     </td>
                                     <td class="align-top py-3">
@@ -541,7 +541,7 @@
                                                 <div class="mt-1">
                                                     <span class="text-muted fs-11">
                                                         <i class="feather-corner-down-right text-primary me-1"></i>
-                                                        Aligned to: <span class="fw-semibold text-dark">{{ $g->parentGoal->title }}</span>
+                                                        {{ __('hrms.goals.aligned_to') }} <span class="fw-semibold text-dark">{{ $g->parentGoal->title }}</span>
                                                     </span>
                                                 </div>
                                             @endif
@@ -555,11 +555,11 @@
                                     <td class="align-top py-3">
                                         @if($g->owner_type === 'company')
                                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">
-                                                <i class="feather-globe me-1"></i> Organization-Wide
+                                                <i class="feather-globe me-1"></i> {{ __('hrms.goals.scope_organization_wide') }}
                                             </span>
                                         @elseif($g->owner_type === 'department')
                                             <span class="badge bg-light text-dark border fs-11 text-wrap text-start">
-                                                <i class="feather-users me-1"></i> {{ $g->department?->name ?? 'Dept Goal' }}
+                                                <i class="feather-users me-1"></i> {{ $g->department?->name ?? __('hrms.goals.scope_dept_goal') }}
                                             </span>
                                         @else
                                             @php
@@ -578,7 +578,7 @@
                                                         @if($assignedEmps->count() > 3)
                                                             <div class="avatar-initials rounded-circle border border-2 border-white shadow-xs bg-light text-muted" 
                                                                  style="width: 26px; height: 26px; font-size: 10px; margin-left: -8px; z-index: 5;"
-                                                                 title="+{{ $assignedEmps->count() - 3 }} more">
+                                                                 title="+{{ $assignedEmps->count() - 3 }} {{ __('hrms.goals.more') }}">
                                                                 +{{ $assignedEmps->count() - 3 }}
                                                             </div>
                                                         @endif
@@ -605,26 +605,26 @@
                                                     <small class="text-muted fs-11 fw-semibold">{{ $g->department->name }}</small>
                                                 </div>
                                             @else
-                                                <span class="badge bg-light text-muted border fs-11">Individual</span>
+                                                <span class="badge bg-light text-muted border fs-11">{{ __('hrms.goals.scope_individual') }}</span>
                                             @endif
                                         @endif
                                     </td>
                                     <td class="align-top py-3">
                                         <span class="badge bg-light text-dark border fs-11">
-                                            <i class="feather-list me-1 text-primary"></i> {{ $g->keyResults->count() }} Key Results
+                                            <i class="feather-list me-1 text-primary"></i> {{ __('hrms.goals.key_results_count', ['count' => $g->keyResults->count()]) }}
                                         </span>
                                     </td>
                                     <td class="align-top py-3">
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <span class="fw-bold fs-12 text-dark">{{ number_format($g->progress_percentage, 0) }}%</span>
                                             @if($g->health_status === 'on_track')
-                                                <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 On Track</span>
+                                                <span class="badge bg-success-subtle text-success fs-10 fw-semibold">🟢 {{ __('hrms.goals.health_on_track') }}</span>
                                             @elseif($g->health_status === 'at_risk')
-                                                <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 At Risk</span>
+                                                <span class="badge bg-warning-subtle text-warning fs-10 fw-semibold">🟡 {{ __('hrms.goals.health_at_risk') }}</span>
                                             @elseif($g->health_status === 'behind')
-                                                <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 Behind</span>
+                                                <span class="badge bg-danger-subtle text-danger fs-10 fw-semibold">🔴 {{ __('hrms.goals.health_behind') }}</span>
                                             @else
-                                                <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 Completed</span>
+                                                <span class="badge bg-info-subtle text-info fs-10 fw-semibold">🔵 {{ __('hrms.goals.health_completed') }}</span>
                                             @endif
                                         </div>
                                         <div class="progress" style="height: 5px;">
@@ -634,16 +634,16 @@
                                     </td>
                                     <td class="align-top py-3 text-end pe-3" style="white-space: nowrap;">
                                         <div class="d-flex align-items-center justify-content-end gap-1">
-                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Objective" />
-                                            <button type="button" class="btn btn-sm btn-light border text-primary btn-quick-check-in" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" data-goal-id="{{ $g->id }}" data-goal-title="{{ $g->title }}" data-goal-krs="{{ htmlspecialchars(json_encode($g->keyResults), ENT_QUOTES, 'UTF-8') }}" title="Quick Check-in">
+                                            <x-ui.icon-btn href="{{ route('hrms.goals.show', ['goal' => $g->id, 'from_tab' => 'my_team_goals']) }}" icon="feather-eye" variant="soft-primary" size="sm" title="{{ __('hrms.goals.view_objective') }}" />
+                                            <button type="button" class="btn btn-sm btn-light border text-primary btn-quick-check-in" data-bs-toggle="modal" data-bs-target="#quickCheckInModal" data-goal-id="{{ $g->id }}" data-goal-title="{{ $g->title }}" data-goal-krs="{{ htmlspecialchars(json_encode($g->keyResults), ENT_QUOTES, 'UTF-8') }}" title="{{ __('hrms.goals.quick_check_in') }}">
                                                 <i class="feather-check-square fs-13"></i>
                                             </button>
                                             @if($isHrAdmin)
-                                            <form method="POST" action="{{ route('hrms.goals.destroy', $g->id) }}" class="d-inline m-0 p-0" onsubmit="return confirm('Are you sure you want to delete this goal?')">
+                                            <form method="POST" action="{{ route('hrms.goals.destroy', $g->id) }}" class="d-inline m-0 p-0" onsubmit="return confirm('{{ __('hrms.goals.confirm_delete_goal') }}')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="active_tab" value="my_team_goals">
-                                                <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Goal" />
+                                                <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" title="{{ __('hrms.goals.delete_goal') }}" />
                                             </form>
                                             @endif
                                         </div>
@@ -661,12 +661,12 @@
                 <!-- TOP TOOLBAR: TITLE + BADGE -->
                 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-git-merge me-2 text-primary"></i> Cascading Alignment Tree</h5>
-                        <p class="text-muted fs-12 mb-0">Visual hierarchical mapping of how individual key results roll up to organizational objectives</p>
+                        <h5 class="fw-bold text-dark mb-0"><i class="feather-git-merge me-2 text-primary"></i> {{ __('hrms.goals.cascading_alignment_tree') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.goals.alignment_tree_desc') }}</p>
                     </div>
                     <div>
                         <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-12 fw-bold px-3 py-2">
-                            <i class="feather-layers me-1"></i> {{ count($alignmentTree) }} Root Strategic Goals
+                            <i class="feather-layers me-1"></i> {{ __('hrms.goals.root_strategic_goals_count', ['count' => count($alignmentTree)]) }}
                         </span>
                     </div>
                 </div>
@@ -676,8 +676,8 @@
                         <div class="p-3 bg-light rounded-circle d-inline-flex mb-3 text-muted">
                             <i class="feather-git-merge fs-36"></i>
                         </div>
-                        <h6 class="fw-bold text-dark mb-1">No Cascading Alignments Configured</h6>
-                        <p class="text-muted fs-13">Create company-level goals and link department/individual goals via the "Parent Goal" selector.</p>
+                        <h6 class="fw-bold text-dark mb-1">{{ __('hrms.goals.no_alignment_configured') }}</h6>
+                        <p class="text-muted fs-13">{{ __('hrms.goals.no_alignment_desc') }}</p>
                     </div>
                 @else
                     <div class="p-2">
@@ -695,7 +695,7 @@
                                         <div class="d-flex align-items-center gap-3">
                                             <div class="text-end" style="width: 140px;">
                                                 <div class="d-flex justify-content-between fs-11 mb-1">
-                                                    <span class="text-muted">Progress</span>
+                                                    <span class="text-muted">{{ __('hrms.goals.progress') }}</span>
                                                     <span class="fw-bold text-dark">{{ number_format($node['progress_percentage'], 0) }}%</span>
                                                 </div>
                                                 <div class="progress" style="height: 5px;">
@@ -762,8 +762,8 @@
                 <!-- TOP TOOLBAR: TITLE -->
                 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-layers me-2 text-primary"></i> Cycles & Strategic Pillars</h5>
-                        <p class="text-muted fs-12 mb-0">Configure performance review cycles, time horizons, and organizational focus pillars</p>
+                        <h5 class="fw-bold text-dark mb-0"><i class="feather-layers me-2 text-primary"></i> {{ __('hrms.goals.cycles_strategic_pillars') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.goals.cycles_pillars_desc') }}</p>
                     </div>
                 </div>
 
@@ -772,9 +772,9 @@
                     <div class="col-lg-6">
                         <div class="card rounded-3 shadow-sm h-100 bg-white" style="border: 1px solid #e2e8f0;">
                             <div class="card-header bg-light d-flex justify-content-between align-items-center py-2.5 border-bottom">
-                                <span class="fw-bold text-dark fs-13"><i class="feather-calendar me-1.5 text-primary"></i> Goal Cycles & Time Horizons</span>
+                                <span class="fw-bold text-dark fs-13"><i class="feather-calendar me-1.5 text-primary"></i> {{ __('hrms.goals.goal_cycles_time_horizons') }}</span>
                                 <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCycleModal">
-                                    New Cycle
+                                    {{ __('hrms.goals.new_cycle') }}
                                 </x-ui.button>
                             </div>
                             <div class="card-body p-0">
@@ -782,9 +782,9 @@
                                     <table class="table table-hover align-middle mb-0 w-100" style="table-layout: fixed;">
                                         <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                             <tr>
-                                                <th class="ps-3 py-2" style="width: 58%;">Cycle & Time Horizon</th>
-                                                <th class="py-2" style="width: 26%;">Status</th>
-                                                <th class="pe-3 py-2 text-end" style="width: 16%;">Action</th>
+                                                <th class="ps-3 py-2" style="width: 58%;">{{ __('hrms.goals.th_cycle_time_horizon') }}</th>
+                                                <th class="py-2" style="width: 26%;">{{ __('hrms.common.status') }}</th>
+                                                <th class="pe-3 py-2 text-end" style="width: 16%;">{{ __('hrms.common.action') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -802,7 +802,7 @@
                                                     </span>
                                                 </td>
                                                 <td class="pe-3 py-2.5 text-end align-middle">
-                                                    <form method="POST" action="{{ route('hrms.goals.cycle.destroy', $c->id) }}" class="d-inline" onsubmit="return confirm('Delete this cycle?')">
+                                                    <form method="POST" action="{{ route('hrms.goals.cycle.destroy', $c->id) }}" class="d-inline" onsubmit="return confirm('{{ __('hrms.goals.confirm_delete_cycle') }}')">
                                                         @csrf
                                                         @method('DELETE')
                                                         <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" />
@@ -813,7 +813,7 @@
                                             <tr>
                                                 <td colspan="3" class="text-center py-4 text-muted fs-13">
                                                     <i class="feather-calendar fs-24 d-block mb-2 text-muted opacity-50"></i>
-                                                    No goal cycles configured yet.
+                                                    {{ __('hrms.goals.no_cycles_configured') }}
                                                 </td>
                                             </tr>
                                             @endforelse
@@ -828,9 +828,9 @@
                     <div class="col-lg-6">
                         <div class="card rounded-3 shadow-sm h-100 bg-white" style="border: 1px solid #e2e8f0;">
                             <div class="card-header bg-light d-flex justify-content-between align-items-center py-2.5 border-bottom">
-                                <span class="fw-bold text-dark fs-13"><i class="feather-target me-1.5 text-primary"></i> Strategic Pillars & Categories</span>
+                                <span class="fw-bold text-dark fs-13"><i class="feather-target me-1.5 text-primary"></i> {{ __('hrms.goals.strategic_pillars_categories') }}</span>
                                 <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCategoryModal">
-                                    New Pillar
+                                    {{ __('hrms.goals.new_pillar') }}
                                 </x-ui.button>
                             </div>
                             <div class="card-body p-0">
@@ -838,9 +838,9 @@
                                     <table class="table table-hover align-middle mb-0 w-100" style="table-layout: fixed;">
                                         <thead class="table-light text-muted fs-11 text-uppercase fw-bold">
                                             <tr>
-                                                <th class="ps-3 py-2" style="width: 58%;">Strategic Pillar</th>
-                                                <th class="py-2" style="width: 26%;">Pillar Code</th>
-                                                <th class="pe-3 py-2 text-end" style="width: 16%;">Action</th>
+                                                <th class="ps-3 py-2" style="width: 58%;">{{ __('hrms.goals.th_strategic_pillar') }}</th>
+                                                <th class="py-2" style="width: 26%;">{{ __('hrms.goals.th_pillar_code') }}</th>
+                                                <th class="pe-3 py-2 text-end" style="width: 16%;">{{ __('hrms.common.action') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -854,7 +854,7 @@
                                                 </td>
                                                 <td class="py-2.5 text-muted fs-12 font-monospace align-middle">{{ $cat->code }}</td>
                                                 <td class="pe-3 py-2.5 text-end align-middle">
-                                                    <form method="POST" action="{{ route('hrms.goals.category.destroy', $cat->id) }}" class="d-inline" onsubmit="return confirm('Delete this category?')">
+                                                    <form method="POST" action="{{ route('hrms.goals.category.destroy', $cat->id) }}" class="d-inline" onsubmit="return confirm('{{ __('hrms.goals.confirm_delete_category') }}')">
                                                         @csrf
                                                         @method('DELETE')
                                                         <x-ui.icon-btn type="submit" icon="feather-trash-2" variant="soft-danger" size="sm" />
@@ -865,7 +865,7 @@
                                             <tr>
                                                 <td colspan="3" class="text-center py-4 text-muted fs-13">
                                                     <i class="feather-target fs-24 d-block mb-2 text-muted opacity-50"></i>
-                                                    No strategic pillars configured yet.
+                                                    {{ __('hrms.goals.no_pillars_configured') }}
                                                 </td>
                                             </tr>
                                             @endforelse
@@ -885,34 +885,34 @@
 <!-- ========================================================================= -->
 <!-- MODAL 1: CREATE GOAL / OBJECTIVE -->
 <!-- ========================================================================= -->
-<x-ui.modal id="createGoalModal" title="<i class='feather-plus-circle text-primary me-2'></i> Create New Objective / Goal" size="xl" :showFooter="false" :centered="true" :scrollable="true">
+<x-ui.modal id="createGoalModal" title="<i class='feather-plus-circle text-primary me-2'></i> {{ __('hrms.goals.modal_create_goal_title') }}" size="xl" :showFooter="false" :centered="true" :scrollable="true">
     <form method="POST" action="{{ route('hrms.goals.store') }}" id="createGoalForm">
         @csrf
         <x-ui.odoo-form-ui type="sheet" class="p-2">
             <!-- SECTION 1: HEADER & OBJECTIVE DEFINITION -->
             <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
                 <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width: 22px; height: 22px; font-size: 11px; background-color: var(--bs-primary, #852d3c);">1</span>
-                <h6 class="fw-bold text-dark mb-0 fs-13 text-uppercase letter-spacing-1">Objective & Classification</h6>
+                <h6 class="fw-bold text-dark mb-0 fs-13 text-uppercase letter-spacing-1">{{ __('hrms.goals.section_objective_classification') }}</h6>
             </div>
             <div class="row g-4 mb-4">
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="Objective Title" name="title" placeholder="e.g. Accelerate Enterprise SaaS Pipeline Expansion" :required="true" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.goals.objective_title') }}" name="title" placeholder="{{ __('hrms.goals.placeholder_objective_title') }}" :required="true" />
                     <!-- GOAL CYCLE WITH INLINE CUSTOM ADD -->
                     <div class="odoo-form-group mb-2">
-                        <label class="odoo-form-label">Goal Cycle</label>
+                        <label class="odoo-form-label">{{ __('hrms.goals.goal_cycle') }}</label>
                         <div class="flex-grow-1">
                             <div class="cycle-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select name="goal_cycle_id" class="odoo-form-control goal-cycle-select select2" style="width: 100%;" onchange="handleGoalCycleSelect(this)">
-                                    <option value="">Choose Goal Cycle...</option>
-                                    <option value="__custom__">+ Add Custom Goal Cycle (Type Manually)</option>
+                                    <option value="">{{ __('hrms.goals.choose_goal_cycle') }}</option>
+                                    <option value="__custom__">{{ __('hrms.goals.add_custom_goal_cycle') }}</option>
                                     @foreach($cycles as $c)
                                         <option value="{{ $c->id }}" {{ ($selectedCycleId ? $selectedCycleId == $c->id : ($c->status === 'active' || $loop->first)) ? 'selected' : '' }}>{{ $c->name }} ({{ strtoupper($c->status) }})</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="cycle-input-wrap d-none align-items-center gap-1">
-                                <input type="text" name="custom_goal_cycle" class="odoo-form-control cycle-title-input" placeholder="Type custom goal cycle name..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToGoalCycleSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                <input type="text" name="custom_goal_cycle" class="odoo-form-control cycle-title-input" placeholder="{{ __('hrms.goals.placeholder_custom_goal_cycle') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.goals.switch_back_to_list') }}" onclick="switchToGoalCycleSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -921,20 +921,20 @@
 
                     <!-- STRATEGIC PILLAR WITH INLINE CUSTOM ADD -->
                     <div class="odoo-form-group mb-2">
-                        <label class="odoo-form-label">Strategic Pillar</label>
+                        <label class="odoo-form-label">{{ __('hrms.goals.strategic_pillar') }}</label>
                         <div class="flex-grow-1">
                             <div class="pillar-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select name="goal_category_id" class="odoo-form-control goal-pillar-select select2" style="width: 100%;" onchange="handleGoalPillarSelect(this)">
-                                    <option value="">Choose Strategic Pillar...</option>
-                                    <option value="__custom__">+ Add Custom Strategic Pillar (Type Manually)</option>
+                                    <option value="">{{ __('hrms.goals.choose_strategic_pillar') }}</option>
+                                    <option value="__custom__">{{ __('hrms.goals.add_custom_strategic_pillar') }}</option>
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="pillar-input-wrap d-none align-items-center gap-1">
-                                <input type="text" name="custom_goal_category" class="odoo-form-control pillar-title-input" placeholder="Type custom strategic pillar name..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToGoalPillarSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
+                                <input type="text" name="custom_goal_category" class="odoo-form-control pillar-title-input" placeholder="{{ __('hrms.goals.placeholder_custom_strategic_pillar') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.goals.switch_back_to_list') }}" onclick="switchToGoalPillarSelect(this)" style="height: 24px; font-size: 11px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -942,17 +942,17 @@
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="Scope" name="owner_type" id="ownerTypeSelect" onchange="handleOwnerTypeChange(this.value)">
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.goals.scope') }}" name="owner_type" id="ownerTypeSelect" onchange="handleOwnerTypeChange(this.value)">
                         @if($isHrAdmin)
-                        <option value="company">Organization-Wide</option>
+                        <option value="company">{{ __('hrms.goals.scope_organization_wide') }}</option>
                         @endif
-                        <option value="department">Department</option>
-                        <option value="employee" selected>Individual Employee</option>
+                        <option value="department">{{ __('hrms.common.department') }}</option>
+                        <option value="employee" selected>{{ __('hrms.goals.scope_individual_employee') }}</option>
                     </x-ui.odoo-form-ui>
                     
                     <div id="deptSelectCol" style="display: none;">
-                        <x-ui.odoo-form-ui type="select" label="Department" name="department_id">
-                            <option value="">Choose Department...</option>
+                        <x-ui.odoo-form-ui type="select" label="{{ __('hrms.common.department') }}" name="department_id">
+                            <option value="">{{ __('hrms.goals.choose_department') }}</option>
                             @foreach($departments as $dept)
                                 <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                             @endforeach
@@ -960,7 +960,7 @@
                     </div>
 
                     <div id="empSelectCol">
-                        <x-ui.odoo-form-ui type="select" label="Employees" name="employee_ids[]" id="createGoalEmployeeSelect" :multiple="true" select2Selector="select2">
+                        <x-ui.odoo-form-ui type="select" label="{{ __('hrms.goals.employees_label') }}" name="employee_ids[]" id="createGoalEmployeeSelect" :multiple="true" select2Selector="select2">
                             @foreach($employees as $emp)
                                 <option value="{{ $emp->id }}" {{ $currentEmployee?->id == $emp->id ? 'selected' : '' }}>
                                     {{ $emp->full_name }} ({{ $emp->employee_id }})
@@ -969,26 +969,26 @@
                         </x-ui.odoo-form-ui>
                     </div>
 
-                    <x-ui.odoo-form-ui type="select" label="Parent Goal" name="parent_goal_id">
-                        <option value="">None (Top-Level Goal)</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.goals.parent_goal') }}" name="parent_goal_id">
+                        <option value="">{{ __('hrms.goals.none_top_level_goal') }}</option>
                         @foreach($parentGoalOptions as $pg)
                             <option value="{{ $pg->id }}">{{ $pg->code }} - {{ Str::limit($pg->title, 35) }}</option>
                         @endforeach
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="Priority" name="priority">
-                        <option value="low">Low Priority</option>
-                        <option value="medium" selected>Medium Priority</option>
-                        <option value="high">High Priority</option>
-                        <option value="critical">Critical / Urgent</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.goals.priority') }}" name="priority">
+                        <option value="low">{{ __('hrms.goals.priority_low') }}</option>
+                        <option value="medium" selected>{{ __('hrms.goals.priority_medium') }}</option>
+                        <option value="high">{{ __('hrms.goals.priority_high') }}</option>
+                        <option value="critical">{{ __('hrms.goals.priority_critical') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Target Due Date" name="due_date" value="{{ date('Y-m-d', strtotime('+90 days')) }}" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.goals.target_due_date') }}" name="due_date" value="{{ date('Y-m-d', strtotime('+90 days')) }}" />
                 </div>
                 <div class="col-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Context & Notes" name="description" placeholder="Provide background on why this objective matters and key expectations..." rows="2" />
+                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.goals.context_notes') }}" name="description" placeholder="{{ __('hrms.goals.placeholder_context_notes') }}" rows="2" />
                 </div>
             </div>
 
@@ -996,10 +996,10 @@
             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                 <div class="d-flex align-items-center gap-2">
                     <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width: 22px; height: 22px; font-size: 11px; background-color: var(--bs-primary, #852d3c);">2</span>
-                    <h6 class="fw-bold text-dark mb-0 fs-13 text-uppercase letter-spacing-1">Measurable Key Results (OKRs)</h6>
+                    <h6 class="fw-bold text-dark mb-0 fs-13 text-uppercase letter-spacing-1">{{ __('hrms.goals.section_key_results') }}</h6>
                 </div>
                 <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" class="border fw-semibold text-dark shadow-none" onclick="addKeyResultRow()">
-                    Add Key Result
+                    {{ __('hrms.goals.add_key_result') }}
                 </x-ui.button>
             </div>
 
@@ -1007,24 +1007,24 @@
                 <table class="odoo-table mb-0" id="keyResultsTable">
                     <thead>
                         <tr>
-                            <th style="width: 44%;">Key Result Description <span class="text-danger">*</span></th>
-                            <th style="width: 22%;">Metric Type</th>
-                            <th style="width: 14%;">Unit</th>
-                            <th class="text-end" style="width: 14%;">Target</th>
+                            <th style="width: 44%;">{{ __('hrms.goals.th_kr_description') }} <span class="text-danger">*</span></th>
+                            <th style="width: 22%;">{{ __('hrms.goals.th_metric_type') }}</th>
+                            <th style="width: 14%;">{{ __('hrms.goals.th_unit') }}</th>
+                            <th class="text-end" style="width: 14%;">{{ __('hrms.goals.th_target') }}</th>
                             <th class="text-center" style="width: 6%;"></th>
                         </tr>
                     </thead>
                     <tbody id="keyResultsContainer">
                         <tr class="kr-row">
                             <td>
-                                <input type="text" name="kr_title[]" class="odoo-table-input" placeholder="e.g. Close $100K ARR in new deals" required>
+                                <input type="text" name="kr_title[]" class="odoo-table-input" placeholder="{{ __('hrms.goals.placeholder_kr_title') }}" required>
                             </td>
                             <td>
                                 <select name="kr_metric_type[]" class="form-select odoo-table-select kr-metric-select" onchange="handleMetricTypeChange(this)">
-                                    <option value="percentage">% Percentage</option>
-                                    <option value="currency">Currency ($)</option>
-                                    <option value="numeric">Count (#)</option>
-                                    <option value="boolean_milestone">Milestone (0/1)</option>
+                                    <option value="percentage">{{ __('hrms.goals.metric_percentage') }}</option>
+                                    <option value="currency">{{ __('hrms.goals.metric_currency') }}</option>
+                                    <option value="numeric">{{ __('hrms.goals.metric_count') }}</option>
+                                    <option value="boolean_milestone">{{ __('hrms.goals.metric_milestone') }}</option>
                                 </select>
                             </td>
                             <td>
@@ -1034,7 +1034,7 @@
                                 <input type="number" step="any" name="kr_target_value[]" class="odoo-table-input text-end" placeholder="100" value="100" required>
                             </td>
                             <td class="text-center align-middle">
-                                <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn" onclick="removeKrRow(this)" title="Remove Key Result">
+                                <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn" onclick="removeKrRow(this)" title="{{ __('hrms.goals.remove_key_result') }}">
                                     <i class="feather-trash-2"></i>
                                 </button>
                             </td>
@@ -1044,8 +1044,8 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="submit" variant="primary" icon="feather-plus-circle" class="fw-bold">Create Objective</x-ui.button>
+                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-plus-circle" class="fw-bold">{{ __('hrms.goals.btn_create_objective') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>
@@ -1054,43 +1054,43 @@
 <!-- ========================================================================= -->
 <!-- MODAL 2: QUICK CHECK-IN -->
 <!-- ========================================================================= -->
-<x-ui.modal id="quickCheckInModal" title="<i class='feather-check-square text-primary me-2'></i> Log Progress Check-in" size="lg" :showFooter="false" :centered="true">
+<x-ui.modal id="quickCheckInModal" title="<i class='feather-check-square text-primary me-2'></i> {{ __('hrms.goals.modal_quick_checkin_title') }}" size="lg" :showFooter="false" :centered="true">
     <form method="POST" action="" id="quickCheckInForm">
         @csrf
         <x-ui.odoo-form-ui type="sheet" class="p-2">
             <div class="p-3 bg-light rounded-3 mb-3 border">
-                <small class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Target Objective</small>
+                <small class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">{{ __('hrms.goals.target_objective') }}</small>
                 <div class="fw-bold text-dark fs-14" id="checkInGoalTitle"></div>
             </div>
 
             <div class="row g-3 mb-3">
                 <div class="col-12" id="checkInKrSelectGroup">
-                    <x-ui.odoo-form-ui type="select" label="Target Key Result" name="goal_key_result_id" id="checkInKrSelect" onchange="updateKrInputUnit(this)">
-                        <option value="">Objective Overall Progress</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.goals.target_key_result') }}" name="goal_key_result_id" id="checkInKrSelect" onchange="updateKrInputUnit(this)">
+                        <option value="">{{ __('hrms.goals.objective_overall_progress') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="number" step="any" label="New Value" name="new_value" id="checkInNewValue" placeholder="Updated current value" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="number" step="any" label="{{ __('hrms.goals.new_value') }}" name="new_value" id="checkInNewValue" placeholder="{{ __('hrms.goals.placeholder_new_value') }}" :required="true" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" label="Health Status" name="health_status" :required="true">
-                        <option value="on_track" selected>🟢 On Track</option>
-                        <option value="at_risk">🟡 At Risk</option>
-                        <option value="behind">🔴 Behind</option>
-                        <option value="completed">🔵 Completed</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.goals.health_status') }}" name="health_status" :required="true">
+                        <option value="on_track" selected>🟢 {{ __('hrms.goals.health_on_track') }}</option>
+                        <option value="at_risk">🟡 {{ __('hrms.goals.health_at_risk') }}</option>
+                        <option value="behind">🔴 {{ __('hrms.goals.health_behind') }}</option>
+                        <option value="completed">🔵 {{ __('hrms.goals.health_completed') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Check-in Note" name="comment" placeholder="Briefly describe what progress was accomplished..." rows="2" :required="true" />
+                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.goals.check_in_note') }}" name="comment" placeholder="{{ __('hrms.goals.placeholder_check_in_note') }}" rows="2" :required="true" />
                 </div>
                 <div class="col-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Blockers / Risks" name="blockers" placeholder="Any roadblocks requiring management assistance?" rows="1" />
+                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.goals.blockers_risks') }}" name="blockers" placeholder="{{ __('hrms.goals.placeholder_blockers') }}" rows="1" />
                 </div>
             </div>
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="submit" variant="primary" icon="feather-check" class="fw-bold">Save Check-in</x-ui.button>
+                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-check" class="fw-bold">{{ __('hrms.goals.btn_save_checkin') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>
@@ -1099,27 +1099,27 @@
 <!-- ========================================================================= -->
 <!-- MODAL 3: CREATE CYCLE -->
 <!-- ========================================================================= -->
-<x-ui.modal id="createCycleModal" title="<i class='feather-calendar text-primary me-2'></i> Create Goal Cycle" size="lg" :showFooter="false" :centered="true">
+<x-ui.modal id="createCycleModal" title="<i class='feather-calendar text-primary me-2'></i> {{ __('hrms.goals.modal_create_cycle_title') }}" size="lg" :showFooter="false" :centered="true">
     <form method="POST" action="{{ route('hrms.goals.cycle.store') }}">
         @csrf
         <x-ui.odoo-form-ui type="sheet" class="p-2">
             <div class="row g-3 mb-3">
                 <div class="col-12">
-                    <x-ui.odoo-form-ui type="input" label="Cycle Name" name="name" placeholder="e.g. Q2 2026 OKR Cycle" :required="true" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.goals.cycle_name') }}" name="name" placeholder="{{ __('hrms.goals.placeholder_cycle_name') }}" :required="true" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" value="{{ date('Y-m-01') }}" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.goals.start_date') }}" name="start_date" value="{{ date('Y-m-01') }}" :required="true" />
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" value="{{ date('Y-m-t', strtotime('+3 months')) }}" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.goals.end_date') }}" name="end_date" value="{{ date('Y-m-t', strtotime('+3 months')) }}" :required="true" />
                 </div>
                 <div class="col-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Guidance and scope for this time horizon..." rows="2" />
+                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.goals.description') }}" name="description" placeholder="{{ __('hrms.goals.placeholder_cycle_desc') }}" rows="2" />
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold">Save Cycle</x-ui.button>
+                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold">{{ __('hrms.goals.btn_save_cycle') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>
@@ -1128,24 +1128,24 @@
 <!-- ========================================================================= -->
 <!-- MODAL 4: CREATE STRATEGIC PILLAR (CATEGORY) -->
 <!-- ========================================================================= -->
-<x-ui.modal id="createCategoryModal" title="<i class='feather-target text-primary me-2'></i> Create Strategic Pillar" size="lg" :showFooter="false" :centered="true">
+<x-ui.modal id="createCategoryModal" title="<i class='feather-target text-primary me-2'></i> {{ __('hrms.goals.modal_create_pillar_title') }}" size="lg" :showFooter="false" :centered="true">
     <form method="POST" action="{{ route('hrms.goals.category.store') }}">
         @csrf
         <x-ui.odoo-form-ui type="sheet" class="p-2">
             <div class="row g-3 mb-3">
                 <div class="col-md-8">
-                    <x-ui.odoo-form-ui type="input" label="Pillar Name" name="name" placeholder="e.g. Revenue & Growth" :required="true" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.goals.pillar_name') }}" name="name" placeholder="{{ __('hrms.goals.placeholder_pillar_name') }}" :required="true" />
                 </div>
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" label="Pillar Code" name="code" placeholder="e.g. REV" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.goals.pillar_code') }}" name="code" placeholder="{{ __('hrms.goals.placeholder_pillar_code') }}" />
                 </div>
                 <div class="col-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Strategic pillar focus and scope..." rows="2" />
+                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.goals.description') }}" name="description" placeholder="{{ __('hrms.goals.placeholder_pillar_desc') }}" rows="2" />
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold">Save Pillar</x-ui.button>
+                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold">{{ __('hrms.goals.btn_save_pillar') }}</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>
@@ -1164,7 +1164,7 @@
             dropdownParent: $('#createGoalModal'),
             theme: 'bootstrap-5',
             width: '100%',
-            placeholder: 'Select Employee(s)...',
+            placeholder: @json(__('hrms.goals.select_employees_placeholder')),
             allowClear: true
         });
 
@@ -1247,14 +1247,14 @@
         tr.className = 'kr-row';
         tr.innerHTML = `
             <td>
-                <input type="text" name="kr_title[]" class="odoo-table-input" placeholder="e.g. Close $100K ARR in new deals" required>
+                <input type="text" name="kr_title[]" class="odoo-table-input" placeholder="${@json(__('hrms.goals.placeholder_kr_title'))}" required>
             </td>
             <td>
                 <select name="kr_metric_type[]" class="form-select odoo-table-select kr-metric-select" onchange="handleMetricTypeChange(this)">
-                    <option value="percentage">% Percentage</option>
-                    <option value="currency">Currency ($)</option>
-                    <option value="numeric">Count (#)</option>
-                    <option value="boolean_milestone">Milestone (0/1)</option>
+                    <option value="percentage">${@json(__('hrms.goals.metric_percentage'))}</option>
+                    <option value="currency">${@json(__('hrms.goals.metric_currency'))}</option>
+                    <option value="numeric">${@json(__('hrms.goals.metric_count'))}</option>
+                    <option value="boolean_milestone">${@json(__('hrms.goals.metric_milestone'))}</option>
                 </select>
             </td>
             <td>
@@ -1264,7 +1264,7 @@
                 <input type="number" step="any" name="kr_target_value[]" class="odoo-table-input text-end" placeholder="100" value="100" required>
             </td>
             <td class="text-center align-middle">
-                <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn" onclick="removeKrRow(this)" title="Remove Key Result">
+                <button type="button" class="btn btn-icon btn-sm btn-soft-danger remove-row-btn" onclick="removeKrRow(this)" title="${@json(__('hrms.goals.remove_key_result'))}">
                     <i class="feather-trash-2"></i>
                 </button>
             </td>
@@ -1279,7 +1279,7 @@
         document.getElementById('checkInGoalTitle').textContent = title;
 
         var krSelect = document.getElementById('checkInKrSelect');
-        krSelect.innerHTML = '<option value="">Objective Overall Progress (%)</option>';
+        krSelect.innerHTML = '<option value="">' + @json(__('hrms.goals.objective_overall_progress')) + ' (%)</option>';
         if (typeof keyResults === 'string') {
             try { keyResults = JSON.parse(keyResults); } catch (e) { keyResults = []; }
         }
@@ -1287,7 +1287,7 @@
             keyResults.forEach(function(kr) {
                 var opt = document.createElement('option');
                 opt.value = kr.id;
-                opt.textContent = kr.title + ' (Current: ' + kr.current_value + ' ' + kr.unit + ' / Target: ' + kr.target_value + ' ' + kr.unit + ')';
+                opt.textContent = kr.title + ' (' + @json(__('hrms.goals.target_label', ['default' => 'Current'])) + ': ' + kr.current_value + ' ' + kr.unit + ' / ' + @json(__('hrms.goals.th_target')) + ': ' + kr.target_value + ' ' + kr.unit + ')';
                 opt.setAttribute('data-unit', kr.unit || '%');
                 opt.setAttribute('data-current', kr.current_value || '0');
                 opt.setAttribute('data-target', kr.target_value || '100');
@@ -1307,9 +1307,9 @@
         var newValInput = document.getElementById('checkInNewValue');
         if (!newValInput) return;
         if (opt && opt.getAttribute('data-unit')) {
-            newValInput.placeholder = 'Current: ' + opt.getAttribute('data-current') + ' ' + opt.getAttribute('data-unit') + ' (Target: ' + opt.getAttribute('data-target') + ')';
+            newValInput.placeholder = opt.getAttribute('data-current') + ' ' + opt.getAttribute('data-unit') + ' (' + @json(__('hrms.goals.th_target')) + ': ' + opt.getAttribute('data-target') + ')';
         } else {
-            newValInput.placeholder = 'Progress percentage (0 - 100%)';
+            newValInput.placeholder = @json(__('hrms.goals.placeholder_progress_percentage'));
         }
     }
 

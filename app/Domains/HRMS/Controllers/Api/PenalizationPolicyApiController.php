@@ -387,6 +387,10 @@ class PenalizationPolicyApiController extends Controller
         $validated['site_geofence']          = false;
         $validated['site_tracking_minutes']  = $request->filled('site_tracking_minutes') ? (int) $request->site_tracking_minutes : null;
 
+        $validated['office_break_geofence']   = $request->boolean('office_break_geofence');
+        $validated['pause_tracking_on_break'] = $request->boolean('pause_tracking_on_break');
+        $validated['allow_multiple_punches']  = $request->boolean('allow_multiple_punches');
+
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $validated['business_unit_id'] = $validated['business_unit_id'] ?: null;

@@ -111,7 +111,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-company" data-bs-toggle="modal" data-bs-target="#viewCompanyModal" data-company="{{ base64_encode($company->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
+                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-company" data-bs-toggle="modal" data-bs-target="#viewCompanyModal" data-company="{{ json_encode($company) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                              <i class="feather feather-eye"></i>
                                          </a>
                                          <x-ui.action-dropdown>
@@ -162,6 +162,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     (function() {
         function getInitials(name, fallback) {
@@ -207,7 +208,7 @@
 
         // Delegated View Trigger
         $(document).on('click', '.btn-view-company', function() {
-            let company = JSON.parse(atob(this.dataset.company));
+            let company = JSON.parse(this.dataset.company);
             
             let nameEl = document.getElementById('modal_view_company_name');
             if (nameEl) nameEl.innerText = company.company_name;
@@ -355,6 +356,7 @@
         });
     })();
 </script>
+@endpush
 
 <!-- View Company Modal -->
 <div class="modal fade" id="viewCompanyModal" tabindex="-1" aria-labelledby="viewCompanyModalLabel" aria-hidden="true">

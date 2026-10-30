@@ -1,21 +1,19 @@
 @extends('layouts.duralux')
 
-@section('title', 'Broadcast: ' . $broadcast->broadcast_number . ' | HRMS')
-@section('page-title', 'Broadcast Announcement: ' . $broadcast->broadcast_number)
-@section('breadcrumb', 'HRMS / Broadcasts / Workspace')
+@section('title', __('hrms.broadcasts.title_show', ['code' => $broadcast->broadcast_number]))
+@section('page-title', __('hrms.broadcasts.page_title_show', ['code' => $broadcast->broadcast_number]))
+@section('breadcrumb', __('hrms.broadcasts.breadcrumb_show', ['code' => $broadcast->broadcast_number]))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.broadcasts.index') }}" class="border text-dark fw-semibold">
-            Back to Broadcasts
+            {{ __('hrms.broadcasts.btn_back_to_broadcasts') }}
         </x-ui.button>
         @if($isHrAdmin)
         <x-ui.button variant="primary" icon="feather-edit" data-bs-toggle="modal" data-bs-target="#editBroadcastModal" class="fw-semibold">
-            Edit Broadcast
+            {{ __('hrms.broadcasts.btn_edit_broadcast') }}
         </x-ui.button>
-        <x-ui.button variant="danger" icon="feather-trash-2" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete broadcast {{ $broadcast->broadcast_number }}? This will remove all receipts and comments.', function() { document.getElementById('adminDeleteBcForm').submit(); }, { title: 'Delete Broadcast', confirmText: 'Yes, Delete', variant: 'danger' });" class="fw-semibold">
-            Delete Broadcast
-        </x-ui.button>
+        <x-ui.icon-btn type="button" variant="soft-danger" icon="feather-trash-2" onclick="confirmAction(@json(__('hrms.broadcasts.confirm_delete_broadcast', ['code' => $broadcast->broadcast_number])), function() { document.getElementById('adminDeleteBcForm').submit(); }, { title: @json(__('hrms.broadcasts.delete_broadcast_modal_title')), confirmText: @json(__('hrms.broadcasts.btn_yes_delete')), variant: 'danger' });" :title="__('hrms.broadcasts.btn_delete_broadcast')" style="width: 36px; height: 36px;" />
         <form id="adminDeleteBcForm" action="{{ route('hrms.broadcasts.destroy', $broadcast->id) }}" method="POST" class="d-none">
             @csrf
             @method('DELETE')
@@ -53,10 +51,167 @@
         padding-left: 1.25rem;
         margin-bottom: 0.65rem;
     }
+    #editBroadcastModal .modal-dialog {
+        max-width: 860px !important;
+    }
+    #editBroadcastModal .odoo-form-label {
+        width: auto !important;
+        min-width: 120px !important;
+        max-width: 215px !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        margin-right: 8px !important;
+    }
+    .bi-pin-angle, .bi-pin-angle-fill {
+        font-size: 13.5px;
+        line-height: 1;
+        display: inline-block;
+    }
+    .feather-pin:before {
+        content: "\f4e8" !important;
+        font-family: bootstrap-icons !important;
+        font-style: normal;
+        display: inline-block;
+    }
+    .comment-pin-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        border-radius: 6px !important;
+        border: 1px solid #e2e8f0 !important;
+        background-color: #f8fafc !important;
+        color: #475569 !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    .comment-pin-btn i,
+    .comment-pin-btn .bi-pin-angle,
+    .comment-pin-btn .bi-pin-angle-fill {
+        font-size: 14px !important;
+        line-height: 1 !important;
+        color: #475569 !important;
+        display: inline-block !important;
+        transition: color 0.15s ease-in-out !important;
+    }
+    .comment-pin-btn:hover,
+    .comment-pin-btn:focus,
+    .comment-pin-btn:active {
+        background-color: #eff6ff !important;
+        border-color: #93c5fd !important;
+        color: #2563eb !important;
+    }
+    .comment-pin-btn:hover i,
+    .comment-pin-btn:focus i,
+    .comment-pin-btn:active i,
+    .comment-pin-btn:hover *,
+    .comment-pin-btn:focus *,
+    .comment-pin-btn:active *,
+    .comment-pin-btn:hover .bi-pin-angle,
+    .comment-pin-btn:focus .bi-pin-angle,
+    .comment-pin-btn:active .bi-pin-angle {
+        color: #2563eb !important;
+    }
+    .comment-pin-btn.is-pinned {
+        background-color: #eff6ff !important;
+        border-color: #60a5fa !important;
+        color: #2563eb !important;
+    }
+    .comment-pin-btn.is-pinned i,
+    .comment-pin-btn.is-pinned *,
+    .comment-pin-btn.is-pinned .bi-pin-angle-fill {
+        color: #2563eb !important;
+    }
+    .comment-pin-btn.is-pinned:hover,
+    .comment-pin-btn.is-pinned:focus,
+    .comment-pin-btn.is-pinned:active {
+        background-color: #dbeafe !important;
+        border-color: #3b82f6 !important;
+        color: #1d4ed8 !important;
+    }
+    .comment-pin-btn.is-pinned:hover i,
+    .comment-pin-btn.is-pinned:focus i,
+    .comment-pin-btn.is-pinned:active i,
+    .comment-pin-btn.is-pinned:hover *,
+    .comment-pin-btn.is-pinned:focus *,
+    .comment-pin-btn.is-pinned:active *,
+    .comment-pin-btn.is-pinned:hover .bi-pin-angle-fill,
+    .comment-pin-btn.is-pinned:focus .bi-pin-angle-fill,
+    .comment-pin-btn.is-pinned:active .bi-pin-angle-fill {
+        color: #1d4ed8 !important;
+    }
+
+    /* Dark mode */
+    html.app-skin-dark .comment-pin-btn {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .comment-pin-btn i {
+        color: #94a3b8 !important;
+    }
+    html.app-skin-dark .comment-pin-btn:hover,
+    html.app-skin-dark .comment-pin-btn:focus {
+        background-color: #334155 !important;
+        border-color: #64748b !important;
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .comment-pin-btn:hover i,
+    html.app-skin-dark .comment-pin-btn:focus i,
+    html.app-skin-dark .comment-pin-btn:hover *,
+    html.app-skin-dark .comment-pin-btn:focus * {
+        color: #f1f5f9 !important;
+    }
+    html.app-skin-dark .comment-pin-btn.is-pinned {
+        background-color: rgba(37, 99, 235, 0.2) !important;
+        border-color: #2563eb !important;
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .comment-pin-btn.is-pinned i,
+    html.app-skin-dark .comment-pin-btn.is-pinned * {
+        color: #60a5fa !important;
+    }
+    html.app-skin-dark .comment-pin-btn.is-pinned:hover {
+        background-color: rgba(37, 99, 235, 0.35) !important;
+        color: #93c5fd !important;
+    }
+    html.app-skin-dark .comment-pin-btn.is-pinned:hover i,
+    html.app-skin-dark .comment-pin-btn.is-pinned:hover * {
+        color: #93c5fd !important;
+    }
 </style>
 @endpush
 
 @section('content')
+@php
+    $categoryLabels = [
+        'announcement'  => __('hrms.broadcasts.category_announcement'),
+        'policy_update' => __('hrms.broadcasts.category_policy_update'),
+        'event'         => __('hrms.broadcasts.category_event'),
+        'emergency'     => __('hrms.broadcasts.category_emergency'),
+        'news'          => __('hrms.broadcasts.category_news'),
+    ];
+    $priorityLabels = [
+        'normal'    => __('hrms.broadcasts.priority_normal'),
+        'important' => __('hrms.broadcasts.priority_important'),
+        'urgent'    => __('hrms.broadcasts.priority_urgent'),
+    ];
+    $audienceLabels = [
+        'all'                => __('hrms.broadcasts.audience_all'),
+        'department'         => __('hrms.broadcasts.audience_department'),
+        'branch'             => __('hrms.broadcasts.audience_branch'),
+        'designation'        => __('hrms.broadcasts.audience_designation'),
+        'specific_employees' => __('hrms.broadcasts.audience_specific_employees'),
+    ];
+    $statusLabels = [
+        'published' => __('hrms.broadcasts.status_published'),
+        'scheduled' => __('hrms.broadcasts.status_scheduled'),
+        'draft'     => __('hrms.broadcasts.status_draft'),
+        'archived'  => __('hrms.broadcasts.status_archived'),
+    ];
+@endphp
+
 <div class="container-fluid p-0">
 
     @if(session('success'))
@@ -87,20 +242,22 @@
                                 default => 'info'
                             };
                         @endphp
-                        <x-ui.badge soft variant="{{ $prioVariant }}" class="text-capitalize fs-11">
-                            {{ $broadcast->priority }} Priority
+                        <x-ui.badge soft variant="{{ $prioVariant }}" class="fs-11">
+                            {{ __('hrms.broadcasts.priority_badge_suffix', ['priority' => $priorityLabels[$broadcast->priority] ?? $broadcast->priority]) }}
                         </x-ui.badge>
-                        <x-ui.badge soft variant="secondary" class="text-capitalize fs-11">
-                            <i class="feather-tag me-1"></i> {{ str_replace('_', ' ', $broadcast->category) }}
+                        <x-ui.badge soft variant="secondary" class="fs-11">
+                            <i class="feather-tag me-1"></i> {{ $categoryLabels[$broadcast->category] ?? str_replace('_', ' ', $broadcast->category) }}
                         </x-ui.badge>
-                        <x-ui.badge soft variant="success" class="text-capitalize fs-11">
-                            {{ $broadcast->status }}
+                        <x-ui.badge soft variant="success" class="fs-11">
+                            {{ $statusLabels[$broadcast->status] ?? $broadcast->status }}
                         </x-ui.badge>
                     </div>
                     <h4 class="fw-bold text-dark mb-1 fs-18">{{ $broadcast->title }}</h4>
                     <div class="text-muted fs-12 mt-0.5">
-                        Published by <strong class="text-dark">{{ $broadcast->creator?->name ?? 'HR Department' }}</strong> &bull;
-                        {{ $broadcast->published_at ? $broadcast->published_at->format('M d, Y h:i A') : 'N/A' }}
+                        {!! __('hrms.broadcasts.published_by', [
+                            'name' => '<strong class="text-dark">' . e($broadcast->creator?->name ?? __('hrms.broadcasts.hr_department')) . '</strong>',
+                            'date' => $broadcast->published_at ? $broadcast->published_at->format('M d, Y h:i A') : 'N/A'
+                        ]) !!}
                     </div>
                 </div>
 
@@ -111,16 +268,16 @@
                         $isAck = $userReceipt && $userReceipt->acknowledged_at;
                     @endphp
                     <div class="p-2.5 bg-white rounded border text-end">
-                        <span class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">Compliance Acknowledgement</span>
+                        <span class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">{{ __('hrms.broadcasts.compliance_acknowledgement') }}</span>
                         @if($isAck)
                             <x-ui.badge soft variant="success" class="fs-11 py-1.5 px-3">
-                                <i class="feather-check-circle me-1"></i> Acknowledged on {{ $userReceipt->acknowledged_at->format('M d, Y') }}
+                                <i class="feather-check-circle me-1"></i> {{ __('hrms.broadcasts.acknowledged_on', ['date' => $userReceipt->acknowledged_at->format('M d, Y')]) }}
                             </x-ui.badge>
                         @else
                             <form action="{{ route('hrms.broadcasts.acknowledge', $broadcast->id) }}" method="POST">
                                 @csrf
                                 <x-ui.button type="submit" variant="primary" icon="feather-check-square" size="sm" class="fw-bold px-3">
-                                    I Acknowledge & Read
+                                    {{ __('hrms.broadcasts.btn_acknowledge_read') }}
                                 </x-ui.button>
                             </form>
                         @endif
@@ -131,7 +288,9 @@
 
         <!-- BROADCAST ANNOUNCEMENT CONTENT -->
         <div class="p-3 p-md-3.5 bg-white rounded-3 border mb-3">
-            <h6 class="fw-bold text-dark mb-2.5 fs-13 border-bottom pb-2"><i class="feather-align-left me-1.5 text-primary"></i> Announcement Details</h6>
+            <h6 class="fw-bold text-dark mb-2.5 fs-13 border-bottom pb-2">
+                <i class="feather-align-left me-1.5 text-primary"></i> {{ __('hrms.broadcasts.announcement_details') }}
+            </h6>
             <div class="broadcast-body-content text-secondary mb-2">
                 {!! $broadcast->content !!}
             </div>
@@ -141,12 +300,12 @@
                     <div class="d-flex align-items-center gap-2">
                         <i class="feather-paperclip fs-16 text-primary"></i>
                         <div>
-                            <div class="fw-semibold text-dark fs-12">Attached Document</div>
-                            <small class="text-muted fs-11">Download official document for review</small>
+                            <div class="fw-semibold text-dark fs-12">{{ __('hrms.broadcasts.attached_document') }}</div>
+                            <small class="text-muted fs-11">{{ __('hrms.broadcasts.attached_document_desc') }}</small>
                         </div>
                     </div>
                     <x-ui.button href="{{ asset('storage/' . $broadcast->attachment_path) }}" target="_blank" variant="outline-primary" icon="feather-download" size="sm" class="fw-bold fs-11">
-                        Download Attachment
+                        {{ __('hrms.broadcasts.btn_download_attachment') }}
                     </x-ui.button>
                 </div>
             @endif
@@ -155,29 +314,31 @@
         @if($isHrAdmin)
         <!-- DELIVERY & ACKNOWLEDGEMENT ANALYTICS SUMMARY -->
         <div class="p-3 bg-light rounded-3 border mb-3">
-            <h6 class="fw-bold text-dark mb-2.5 fs-13"><i class="feather-pie-chart me-1.5 text-primary"></i> Read & Acknowledgement Delivery Metrics</h6>
+            <h6 class="fw-bold text-dark mb-2.5 fs-13">
+                <i class="feather-pie-chart me-1.5 text-primary"></i> {{ __('hrms.broadcasts.analytics_title') }}
+            </h6>
             <div class="row g-3">
                 <div class="col-md-3 col-6">
                     <div class="p-3 bg-white rounded border">
-                        <small class="text-muted fs-11 text-uppercase fw-semibold">Total Targeted</small>
+                        <small class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.broadcasts.stat_total_targeted') }}</small>
                         <h4 class="fw-bold text-dark mb-0 mt-1">{{ $analytics['total_targeted'] }}</h4>
                     </div>
                 </div>
                 <div class="col-md-3 col-6">
                     <div class="p-3 bg-white rounded border">
-                        <small class="text-muted fs-11 text-uppercase fw-semibold">Delivered</small>
+                        <small class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.broadcasts.stat_delivered') }}</small>
                         <h4 class="fw-bold text-info mb-0 mt-1">{{ $analytics['delivered'] }}</h4>
                     </div>
                 </div>
                 <div class="col-md-3 col-6">
                     <div class="p-3 bg-white rounded border">
-                        <small class="text-muted fs-11 text-uppercase fw-semibold">Read Rate</small>
+                        <small class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.broadcasts.stat_read_rate') }}</small>
                         <h4 class="fw-bold text-success mb-0 mt-1">{{ $analytics['read_percentage'] }}% ({{ $analytics['read'] }})</h4>
                     </div>
                 </div>
                 <div class="col-md-3 col-6">
                     <div class="p-3 bg-white rounded border">
-                        <small class="text-muted fs-11 text-uppercase fw-semibold">Acknowledged</small>
+                        <small class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.broadcasts.stat_acknowledged') }}</small>
                         <h4 class="fw-bold text-primary mb-0 mt-1">{{ $analytics['ack_percentage'] }}% ({{ $analytics['acknowledged'] }})</h4>
                     </div>
                 </div>
@@ -189,16 +350,16 @@
         @if($broadcast->allow_comments)
             <div class="p-3 p-md-3.5 bg-white rounded-3 border mb-3">
                 <h6 class="fw-bold text-dark mb-2.5 fs-13 border-bottom pb-2">
-                    <i class="feather-message-square me-1.5 text-primary"></i> Comments & Clarifications ({{ $broadcast->comments->count() }})
+                    <i class="feather-message-square me-1.5 text-primary"></i> {{ __('hrms.broadcasts.comments_title', ['count' => $broadcast->comments->count()]) }}
                 </h6>
 
                 <!-- ADD COMMENT FORM -->
                 <form action="{{ route('hrms.broadcasts.comment.store', $broadcast->id) }}" method="POST" class="mb-3">
                     @csrf
                     <div class="d-flex gap-2">
-                        <x-ui.odoo-form-ui type="textarea" name="comment_text" rows="2" placeholder="Write a comment or ask a question..." :required="true" class="flex-grow-1 mb-0" />
+                        <x-ui.odoo-form-ui type="textarea" name="comment_text" rows="2" :placeholder="__('hrms.broadcasts.placeholder_comment')" :required="true" class="flex-grow-1 mb-0" />
                         <x-ui.button type="submit" variant="primary" icon="feather-send" class="align-self-end fw-bold px-3">
-                            Post
+                            {{ __('hrms.broadcasts.btn_post_comment') }}
                         </x-ui.button>
                     </div>
                 </form>
@@ -213,25 +374,25 @@
                                         {{ strtoupper(substr($comm->employee->full_name ?? 'E', 0, 2)) }}
                                     </div>
                                     <div>
-                                        <span class="fw-bold text-dark fs-13">{{ $comm->employee->full_name ?? 'Employee' }}</span>
+                                        <span class="fw-bold text-dark fs-13">{{ $comm->employee->full_name ?? __('hrms.broadcasts.th_employee') }}</span>
                                         <small class="text-muted fs-11 ms-2">{{ $comm->created_at->diffForHumans() }}</small>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
                                     @if($comm->is_pinned)
-                                        <x-ui.badge soft variant="primary" class="fs-10"><i class="feather-pin me-1"></i> Pinned Answer</x-ui.badge>
+                                        <x-ui.badge soft variant="primary" class="fs-10"><i class="bi bi-pin-angle-fill me-1"></i> {{ __('hrms.broadcasts.pinned_answer') }}</x-ui.badge>
                                     @endif
                                     @if($isHrAdmin)
                                     <form action="{{ route('hrms.broadcasts.comment.pin', $comm->id) }}" method="POST" class="d-inline">
                                         @csrf
-                                        <x-ui.icon-btn type="submit" variant="soft-secondary" icon="feather-pin" title="Toggle Pin" />
+                                        <x-ui.icon-btn type="submit" variant="{{ $comm->is_pinned ? 'soft-primary' : 'soft-secondary' }}" icon="bi bi-pin-angle{{ $comm->is_pinned ? '-fill' : '' }}" :title="__('hrms.broadcasts.btn_toggle_pin')" class="comment-pin-btn {{ $comm->is_pinned ? 'is-pinned' : '' }}" />
                                     </form>
                                     @endif
                                     @if($isHrAdmin || ($employee && $comm->employee_id === $employee->id))
                                     <form action="{{ route('hrms.broadcasts.comment.destroy', $comm->id) }}" method="POST" class="d-inline">
                                         @csrf
                                         @method('DELETE')
-                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete Comment" />
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" :title="__('hrms.broadcasts.btn_delete_comment')" />
                                     </form>
                                     @endif
                                 </div>
@@ -244,7 +405,7 @@
                                     @foreach($comm->replies as $reply)
                                         <div class="p-2 rounded bg-white border">
                                             <div class="d-flex align-items-center gap-2 mb-1">
-                                                <span class="fw-bold text-dark fs-12">{{ $reply->employee->full_name ?? 'User' }}</span>
+                                                <span class="fw-bold text-dark fs-12">{{ $reply->employee->full_name ?? __('hrms.broadcasts.th_employee') }}</span>
                                                 <small class="text-muted fs-10">{{ $reply->created_at->diffForHumans() }}</small>
                                             </div>
                                             <p class="fs-12 text-secondary mb-0">{{ $reply->comment_text }}</p>
@@ -254,7 +415,7 @@
                             @endif
                         </div>
                     @empty
-                        <div class="text-center py-3 text-muted fs-12">No comments yet. Be the first to ask a question or comment.</div>
+                        <div class="text-center py-3 text-muted fs-12">{{ __('hrms.broadcasts.no_comments_yet') }}</div>
                     @endforelse
                 </div>
             </div>
@@ -263,16 +424,18 @@
         @if($isHrAdmin)
         <!-- AUDIT TRAIL RECEIPT TABLE -->
         <div class="p-3 bg-light rounded-3 border">
-            <h6 class="fw-bold text-dark mb-2.5 fs-13"><i class="feather-shield me-1.5 text-primary"></i> Read & Acknowledgement Audit Trail Log</h6>
+            <h6 class="fw-bold text-dark mb-2.5 fs-13">
+                <i class="feather-shield me-1.5 text-primary"></i> {{ __('hrms.broadcasts.audit_trail_title') }}
+            </h6>
             <div class="table-responsive bg-white rounded border">
                 <table class="table table-hover align-middle mb-0 fs-12">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-3 py-2.5 text-muted text-uppercase fs-10">Employee</th>
-                            <th class="py-2.5 text-muted text-uppercase fs-10">Department</th>
-                            <th class="py-2.5 text-muted text-uppercase fs-10">Read At</th>
-                            <th class="py-2.5 text-muted text-uppercase fs-10">Acknowledged At</th>
-                            <th class="py-2.5 text-muted text-uppercase fs-10">IP Address</th>
+                            <th class="ps-3 py-2.5 text-muted text-uppercase fs-10">{{ __('hrms.broadcasts.th_employee') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10">{{ __('hrms.broadcasts.th_department') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10">{{ __('hrms.broadcasts.th_read_at') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10">{{ __('hrms.broadcasts.th_acknowledged_at') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10">{{ __('hrms.broadcasts.th_ip_address') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -284,21 +447,21 @@
                                     @if($rc->read_at)
                                         <x-ui.badge soft variant="info" class="fs-10">{{ $rc->read_at->format('M d, H:i') }}</x-ui.badge>
                                     @else
-                                        <span class="text-muted fs-11">Unread</span>
+                                        <span class="text-muted fs-11">{{ __('hrms.broadcasts.unread') }}</span>
                                     @endif
                                 </td>
                                 <td>
                                     @if($rc->acknowledged_at)
                                         <x-ui.badge soft variant="success" class="fs-10">{{ $rc->acknowledged_at->format('M d, Y H:i') }}</x-ui.badge>
                                     @else
-                                        <span class="text-muted fs-11">Pending</span>
+                                        <span class="text-muted fs-11">{{ __('hrms.broadcasts.pending') }}</span>
                                     @endif
                                 </td>
                                 <td class="text-muted fs-11"><code>{{ $rc->ip_address ?? '—' }}</code></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center py-3 text-muted fs-12">No delivery audit records.</td>
+                                <td colspan="5" class="text-center py-3 text-muted fs-12">{{ __('hrms.broadcasts.no_audit_records') }}</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -312,97 +475,94 @@
 
 @if($isHrAdmin)
 <!-- EDIT BROADCAST MODAL -->
-<div class="modal fade" id="editBroadcastModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit Broadcast Announcement ({{ $broadcast->broadcast_number }})</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<x-ui.modal
+    id="editBroadcastModal"
+    :title="'<i class=\'feather-edit me-1.5 text-primary\'></i> ' . __('hrms.broadcasts.modal_edit_title', ['code' => $broadcast->broadcast_number])"
+    size="lg"
+    :centered="true"
+    :showFooter="false"
+>
+    <form action="{{ route('hrms.broadcasts.update', $broadcast->id) }}" method="POST" enctype="multipart/form-data">
+        @csrf
+        @method('PUT')
+        <div class="row g-3">
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.broadcasts.field_title')" name="title" :value="$broadcast->title" :required="true" />
             </div>
-            <form action="{{ route('hrms.broadcasts.update', $broadcast->id) }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                @method('PUT')
-                <div class="modal-body p-4">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="Announcement Title" name="title" :value="$broadcast->title" :required="true" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Category" name="category" :required="true">
-                                <option value="announcement" @selected($broadcast->category === 'announcement')>General Announcement</option>
-                                <option value="policy_update" @selected($broadcast->category === 'policy_update')>Policy Update</option>
-                                <option value="event" @selected($broadcast->category === 'event')>Company Event</option>
-                                <option value="emergency" @selected($broadcast->category === 'emergency')>Emergency Alert</option>
-                                <option value="news" @selected($broadcast->category === 'news')>News & Newsletter</option>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Priority Level" name="priority" :required="true">
-                                <option value="normal" @selected($broadcast->priority === 'normal')>Normal Priority</option>
-                                <option value="important" @selected($broadcast->priority === 'important')>Important (High Visibility)</option>
-                                <option value="urgent" @selected($broadcast->priority === 'urgent')>Urgent / Emergency Alert</option>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Target Audience Scope" name="target_type" id="editTargetTypeSelect" :required="true">
-                                <option value="all" @selected($broadcast->target_type === 'all')>All Active Employees (Company-wide)</option>
-                                <option value="department" @selected($broadcast->target_type === 'department')>By Department</option>
-                                <option value="branch" @selected($broadcast->target_type === 'branch')>By Office Branch</option>
-                                <option value="designation" @selected($broadcast->target_type === 'designation')>By Designation / Role</option>
-                                <option value="specific_employees" @selected($broadcast->target_type === 'specific_employees')>Select Specific Employees</option>
-                            </x-ui.odoo-form-ui>
-                        </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.broadcasts.field_category')" name="category" :required="true">
+                    <option value="announcement" @selected($broadcast->category === 'announcement')>{{ __('hrms.broadcasts.category_announcement') }}</option>
+                    <option value="policy_update" @selected($broadcast->category === 'policy_update')>{{ __('hrms.broadcasts.category_policy_update') }}</option>
+                    <option value="event" @selected($broadcast->category === 'event')>{{ __('hrms.broadcasts.category_event') }}</option>
+                    <option value="emergency" @selected($broadcast->category === 'emergency')>{{ __('hrms.broadcasts.category_emergency') }}</option>
+                    <option value="news" @selected($broadcast->category === 'news')>{{ __('hrms.broadcasts.category_news') }}</option>
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.broadcasts.field_priority')" name="priority" :required="true">
+                    <option value="normal" @selected($broadcast->priority === 'normal')>{{ __('hrms.broadcasts.priority_normal_opt') }}</option>
+                    <option value="important" @selected($broadcast->priority === 'important')>{{ __('hrms.broadcasts.priority_important_opt') }}</option>
+                    <option value="urgent" @selected($broadcast->priority === 'urgent')>{{ __('hrms.broadcasts.priority_urgent_opt') }}</option>
+                </x-ui.odoo-form-ui>
+            </div>
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.broadcasts.field_target_scope')" name="target_type" id="editTargetTypeSelect" :required="true">
+                    <option value="all" @selected($broadcast->target_type === 'all')>{{ __('hrms.broadcasts.audience_all') }}</option>
+                    <option value="department" @selected($broadcast->target_type === 'department')>{{ __('hrms.broadcasts.audience_department') }}</option>
+                    <option value="branch" @selected($broadcast->target_type === 'branch')>{{ __('hrms.broadcasts.audience_branch') }}</option>
+                    <option value="designation" @selected($broadcast->target_type === 'designation')>{{ __('hrms.broadcasts.audience_designation') }}</option>
+                    <option value="specific_employees" @selected($broadcast->target_type === 'specific_employees')>{{ __('hrms.broadcasts.audience_specific_employees') }}</option>
+                </x-ui.odoo-form-ui>
+            </div>
 
-                        <!-- Dynamic Target Selection Container -->
-                        <div class="col-12 {{ ($broadcast->target_type === 'all' || empty($broadcast->target_type)) ? 'd-none' : '' }}" id="editTargetSelectionContainer">
-                            <x-ui.odoo-form-ui type="select" label="Select Target Items" name="target_ids[]" id="editTargetIdsSelect" :multiple="true" :searchable="true">
-                                <!-- JS Populated -->
-                            </x-ui.odoo-form-ui>
-                        </div>
+            <!-- Dynamic Target Selection Container -->
+            <div class="col-12 {{ ($broadcast->target_type === 'all' || empty($broadcast->target_type)) ? 'd-none' : '' }}" id="editTargetSelectionContainer">
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.broadcasts.field_target_items')" name="target_ids[]" id="editTargetIdsSelect" :multiple="true" :searchable="true">
+                    <!-- JS Populated -->
+                </x-ui.odoo-form-ui>
+            </div>
 
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Announcement Content" name="content" rows="4" :value="$broadcast->content" :required="true" />
-                        </div>
+            <div class="col-12">
+                <x-ui.odoo-form-ui type="textarea" :label="__('hrms.broadcasts.field_content')" name="content" rows="4" :value="$broadcast->content" :required="true" />
+            </div>
 
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="file" label="Replace Attachment (PDF/Doc)" name="attachment" />
-                            @if($broadcast->attachment_path)
-                                <small class="text-muted fs-11 mt-1 d-block">Current: {{ basename($broadcast->attachment_path) }}</small>
-                            @endif
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="file" label="Replace Banner Graphic" name="banner_image" />
-                            @if($broadcast->banner_image_path)
-                                <small class="text-muted fs-11 mt-1 d-block">Current: {{ basename($broadcast->banner_image_path) }}</small>
-                            @endif
-                        </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="file" :label="__('hrms.broadcasts.field_replace_attachment')" name="attachment" />
+                @if($broadcast->attachment_path)
+                    <small class="text-muted fs-11 mt-1 d-block">{{ __('hrms.broadcasts.lbl_current', ['file' => basename($broadcast->attachment_path)]) }}</small>
+                @endif
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="file" :label="__('hrms.broadcasts.field_replace_banner')" name="banner_image" />
+                @if($broadcast->banner_image_path)
+                    <small class="text-muted fs-11 mt-1 d-block">{{ __('hrms.broadcasts.lbl_current', ['file' => basename($broadcast->banner_image_path)]) }}</small>
+                @endif
+            </div>
 
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="datetime-local" label="Schedule Release" name="scheduled_at" :value="$broadcast->scheduled_at ? $broadcast->scheduled_at->format('Y-m-d\TH:i') : ''" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration Date" name="expires_at" :value="$broadcast->expires_at ? $broadcast->expires_at->format('Y-m-d') : ''" />
-                        </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="datetime-local" :label="__('hrms.broadcasts.field_scheduled_at_edit')" name="scheduled_at" :value="$broadcast->scheduled_at ? $broadcast->scheduled_at->format('Y-m-d\TH:i') : ''" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.broadcasts.field_expires_at_edit')" name="expires_at" :value="$broadcast->expires_at ? $broadcast->expires_at->format('Y-m-d') : ''" />
+            </div>
 
-                        <div class="col-12 border-top pt-3 mt-2">
-                            <h6 class="fw-bold text-dark fs-12 mb-2">Delivery Channels & Interactivity Flags</h6>
-                            <div class="d-flex flex-wrap gap-4">
-                                <x-ui.checkbox label="Require Read Acknowledgement" name="is_acknowledgement_required" :checked="(bool)$broadcast->is_acknowledgement_required" />
-                                <x-ui.checkbox label="Allow Employee Comments & Q&A" name="allow_comments" :checked="(bool)$broadcast->allow_comments" />
-                                <x-ui.checkbox label="Show Dashboard Banner Alert" name="show_banner" :checked="(bool)$broadcast->show_banner" />
-                                <x-ui.checkbox label="Send Email Dispatch" name="send_email" :checked="(bool)$broadcast->send_email" />
-                            </div>
-                        </div>
-                    </div>
+            <div class="col-12 border-top pt-3 mt-2">
+                <h6 class="fw-bold text-dark fs-12 mb-2">{{ __('hrms.broadcasts.section_delivery_flags') }}</h6>
+                <div class="d-flex flex-wrap gap-4">
+                    <x-ui.checkbox :label="__('hrms.broadcasts.flag_require_ack')" name="is_acknowledgement_required" :checked="(bool)$broadcast->is_acknowledgement_required" />
+                    <x-ui.checkbox :label="__('hrms.broadcasts.flag_allow_comments')" name="allow_comments" :checked="(bool)$broadcast->allow_comments" />
+                    <x-ui.checkbox :label="__('hrms.broadcasts.flag_show_banner')" name="show_banner" :checked="(bool)$broadcast->show_banner" />
+                    <x-ui.checkbox :label="__('hrms.broadcasts.flag_send_email')" name="send_email" :checked="(bool)$broadcast->send_email" />
                 </div>
-                <div class="modal-footer border-top bg-light py-2.5">
-                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update Broadcast</x-ui.button>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
-</div>
+
+        <div class="modal-footer border-top bg-light py-2.5 px-0 mt-4 mb-n3 mx-n3">
+            <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.broadcasts.btn_cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">{{ __('hrms.broadcasts.btn_update_broadcast') }}</x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
 @endif
 
 <x-ui.confirmation-modal />
@@ -433,27 +593,27 @@
                 container.addClass('d-none');
             } else {
                 container.removeClass('d-none');
-                let labelText = 'Select Target Items';
+                let labelText = @json(__('hrms.broadcasts.field_target_items'));
                 if (val === 'department') {
-                    labelText = 'Select Departments';
+                    labelText = @json(__('hrms.broadcasts.target_departments'));
                     departments.forEach(d => {
                         const sel = initialLoad && currentTargetIds.includes(String(d.id)) ? 'selected' : '';
                         select.append(`<option value="${d.id}" ${sel}>${d.name}</option>`);
                     });
                 } else if (val === 'branch') {
-                    labelText = 'Select Office Branches';
+                    labelText = @json(__('hrms.broadcasts.target_branches'));
                     branches.forEach(b => {
                         const sel = initialLoad && currentTargetIds.includes(String(b.id)) ? 'selected' : '';
                         select.append(`<option value="${b.id}" ${sel}>${b.name}</option>`);
                     });
                 } else if (val === 'designation') {
-                    labelText = 'Select Designations';
+                    labelText = @json(__('hrms.broadcasts.target_designations'));
                     designations.forEach(ds => {
                         const sel = initialLoad && currentTargetIds.includes(String(ds.id)) ? 'selected' : '';
                         select.append(`<option value="${ds.id}" ${sel}>${ds.name}</option>`);
                     });
                 } else if (val === 'specific_employees') {
-                    labelText = 'Select Targeted Employees';
+                    labelText = @json(__('hrms.broadcasts.target_employees'));
                     employees.forEach(e => {
                         const sel = initialLoad && currentTargetIds.includes(String(e.id)) ? 'selected' : '';
                         select.append(`<option value="${e.id}" ${sel}>${e.full_name} (${e.employee_id})</option>`);

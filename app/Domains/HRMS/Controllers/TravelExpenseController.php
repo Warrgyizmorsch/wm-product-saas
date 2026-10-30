@@ -263,10 +263,7 @@ class TravelExpenseController extends Controller
             iconClass: 'feather-map-pin'
         );
 
-        $message = 'Travel request submitted successfully.';
-        if ($request->boolean('request_advance')) {
-            $message .= ' Linked cash advance request submitted.';
-        }
+        $message = __('hrms.travel_expense.msg_travel_submitted');
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'travel'])
             ->with('success', $message);
@@ -308,7 +305,7 @@ class TravelExpenseController extends Controller
                 iconClass: 'feather-check-circle'
             );
 
-            return redirect()->back()->with('success', 'Travel request approved at Level 1. Moved to Level 2 (Final) approval.');
+            return redirect()->back()->with('success', __('hrms.travel_expense.msg_travel_approved_l1'));
         }
 
         // Level 2 (Final) Approval
@@ -347,7 +344,7 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', "Travel request{$advanceMsg} approved successfully.");
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_travel_approved', ['advanceMsg' => $advanceMsg]));
     }
 
     public function rejectTravelRequest(TravelRequest $travelRequest): RedirectResponse
@@ -368,7 +365,7 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Travel request and linked cash advance rejected.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_travel_rejected'));
     }
 
     public function destroyTravelRequest(Request $request, TravelRequest $travelRequest): RedirectResponse
@@ -383,7 +380,7 @@ class TravelExpenseController extends Controller
         }
 
         if (!in_array($travelRequest->status, ['pending', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only pending or rejected travel requests can be cancelled.');
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_travel_cancel_invalid'));
         }
 
         // Delete or cancel linked pending cash advances
@@ -391,7 +388,7 @@ class TravelExpenseController extends Controller
         $travelRequest->delete();
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'travel'])
-            ->with('success', 'Travel request cancelled successfully.');
+            ->with('success', __('hrms.travel_expense.msg_travel_cancelled'));
     }
 
     // ── CASH ADVANCES ─────────────────────────────────────────────────────────
@@ -446,7 +443,7 @@ class TravelExpenseController extends Controller
         );
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'advance'])
-            ->with('success', 'Cash advance request submitted.');
+            ->with('success', __('hrms.travel_expense.msg_advance_submitted'));
     }
 
     public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
@@ -485,7 +482,7 @@ class TravelExpenseController extends Controller
                 iconClass: 'feather-check-circle'
             );
 
-            return redirect()->back()->with('success', 'Cash advance approved at Level 1. Moved to Level 2 (Final) approval.');
+            return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_approved_l1'));
         }
 
         // Level 2 (Final) Approval
@@ -508,7 +505,9 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Cash advance request approved with amount: $' . number_format($approvedAmount, 2));
+        $company = \App\Domains\HRMS\Models\Company::first();
+        $currencySymbol = self::currencySymbol($company?->currency ?? 'USD');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_approved', ['amount' => $currencySymbol . number_format($approvedAmount, 2)]));
     }
 
     public function disburseCashAdvance(CashAdvance $cashAdvance): RedirectResponse
@@ -525,7 +524,7 @@ class TravelExpenseController extends Controller
             \Illuminate\Support\Facades\Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Cash advance disbursed successfully.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_disbursed'));
     }
 
     public function rejectCashAdvance(CashAdvance $cashAdvance): RedirectResponse
@@ -545,7 +544,7 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Cash advance request rejected.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_advance_rejected'));
     }
 
     public function destroyCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
@@ -560,13 +559,13 @@ class TravelExpenseController extends Controller
         }
 
         if (!in_array($cashAdvance->status, ['pending', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only pending or rejected cash advance requests can be cancelled.');
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_advance_cancel_invalid'));
         }
 
         $cashAdvance->delete();
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'advance'])
-            ->with('success', 'Cash advance request cancelled successfully.');
+            ->with('success', __('hrms.travel_expense.msg_advance_cancelled'));
     }
 
     // ── EXPENSE REPORTS ───────────────────────────────────────────────────────
@@ -773,7 +772,7 @@ class TravelExpenseController extends Controller
         });
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report saved to drafts.');
+            ->with('success', __('hrms.travel_expense.msg_report_draft_saved'));
     }
 
     public function updateExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -791,7 +790,7 @@ class TravelExpenseController extends Controller
 
         // Enforce update only in editable states (draft, partially_approved, rejected)
         if (!in_array($expenseReport->status, ['draft', 'partially_approved', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only draft, partially approved, or rejected expense reports can be edited.');
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_report_edit_invalid'));
         }
 
         $validated = $request->validate([
@@ -1022,7 +1021,7 @@ class TravelExpenseController extends Controller
         });
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report updated successfully.');
+            ->with('success', __('hrms.travel_expense.msg_report_updated'));
     }
 
     public function submitExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -1067,7 +1066,7 @@ class TravelExpenseController extends Controller
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Expense report submitted for approval.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_submitted'));
     }
 
     public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -1107,7 +1106,7 @@ class TravelExpenseController extends Controller
                 iconClass: 'feather-check-circle'
             );
 
-            return redirect()->back()->with('success', 'Expense report approved at Level 1. Moved to Level 2 (Final) approval.');
+            return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_approved_l1'));
         }
 
         // Check for itemized claim line decisions
@@ -1347,7 +1346,9 @@ class TravelExpenseController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', 'Expense report approved with approved budget: $' . number_format($approvedAmount, 2));
+        $company = \App\Domains\HRMS\Models\Company::first();
+        $currencySymbol = self::currencySymbol($company?->currency ?? 'USD');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_approved', ['amount' => $currencySymbol . number_format($approvedAmount, 2)]));
     }
 
     public function rejectExpenseReport(ExpenseReport $expenseReport): RedirectResponse
@@ -1367,7 +1368,7 @@ class TravelExpenseController extends Controller
             );
         }
 
-        return redirect()->back()->with('success', 'Expense report rejected.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_rejected'));
     }
 
     public function payExpenseReport(ExpenseReport $expenseReport): RedirectResponse
@@ -1446,7 +1447,7 @@ class TravelExpenseController extends Controller
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
 
-        return redirect()->back()->with('success', 'Expense payout processed successfully and accounting entries updated.');
+        return redirect()->back()->with('success', __('hrms.travel_expense.msg_report_paid'));
     }
 
     public function destroyExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
@@ -1461,7 +1462,7 @@ class TravelExpenseController extends Controller
         }
 
         if (!in_array($expenseReport->status, ['draft', 'rejected'])) {
-            return redirect()->back()->with('error', 'Only draft or rejected expense reports can be deleted.');
+            return redirect()->back()->with('error', __('hrms.travel_expense.msg_report_delete_invalid'));
         }
 
         // Unlink any cash advance tied to this report
@@ -1480,7 +1481,7 @@ class TravelExpenseController extends Controller
         $expenseReport->delete();
 
         return redirect()->route('hrms.travel-expense.index', ['tab' => 'report'])
-            ->with('success', 'Expense report deleted successfully.');
+            ->with('success', __('hrms.travel_expense.msg_report_deleted'));
     }
 
     // ── EXPENSE POLICIES (MANAGED INSIDE PENALIZATION POLICY) ──────────────────
@@ -1500,7 +1501,7 @@ class TravelExpenseController extends Controller
         $expensePolicy->rules()->delete();
         $expensePolicy->delete();
         return redirect()->route('hrms.expense-policy.index')
-            ->with('success', 'Expense policy deleted successfully.');
+            ->with('success', __('hrms.travel_expense.msg_policy_deleted'));
     }
 
     public function getEmployeePolicy(Employee $employee): \Illuminate\Http\JsonResponse

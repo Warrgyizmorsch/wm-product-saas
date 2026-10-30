@@ -41,12 +41,12 @@ class DocumentController extends Controller
         $canSelfManage = $this->canSelfManage($user, $currentEmployee);
 
         if ($currentEmployee && (int) $validated['employee_id'] === (int) $currentEmployee->id && !$canSelfManage) {
-            return redirect()->back()->with('error', 'Hierarchy Conflict: You cannot upload documents for yourself in the administration registry. Please upload from your employee profile.');
+            return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_upload'));
         }
 
         $this->documentRepository->storeDocument($validated, $request, auth()->user());
 
-        return redirect()->back()->with('success', 'Document uploaded successfully.');
+        return redirect()->back()->with('success', __('hrms.documents.upload_success'));
     }
 
     public function update(Request $request, Document $document): RedirectResponse
@@ -61,7 +61,7 @@ class DocumentController extends Controller
 
         $this->documentRepository->updateDocument($document, $validated, $request);
 
-        return redirect()->back()->with('success', 'Document updated successfully.');
+        return redirect()->back()->with('success', __('hrms.documents.update_success'));
     }
 
     public function updateStatus(Request $request, Document $document): RedirectResponse
@@ -78,12 +78,12 @@ class DocumentController extends Controller
         $canSelfManage = $this->canSelfManage($user, $currentEmployee, $document);
 
         if ($currentEmployee && (int) $document->documentable_id === (int) $currentEmployee->id && !$canSelfManage) {
-            return redirect()->back()->with('error', 'Hierarchy Conflict: Self-approval is prohibited. You cannot verify or approve your own document.');
+            return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_approve'));
         }
 
         $this->documentRepository->updateStatus($document, $validated['status'], $validated['rejection_reason'] ?? null, auth()->user());
 
-        return redirect()->back()->with('success', "Document status updated to {$validated['status']}.");
+        return redirect()->back()->with('success', __('hrms.documents.status_updated', ['status' => $validated['status']]));
     }
 
     public function destroy(Document $document): RedirectResponse
@@ -92,7 +92,7 @@ class DocumentController extends Controller
 
         $this->documentRepository->deleteDocument($document);
 
-        return redirect()->back()->with('success', 'Document deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.documents.delete_success'));
     }
 
     public function bulkApprove(Request $request): RedirectResponse
@@ -114,13 +114,13 @@ class DocumentController extends Controller
                 ->where('documentable_id', $currentEmployee->id)
                 ->exists();
             if ($hasOwn) {
-                return redirect()->back()->with('error', 'Hierarchy Conflict: Self-approval is prohibited. You cannot approve your own documents.');
+                return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_approve'));
             }
         }
 
         $count = $this->documentRepository->bulkApprove($validated['document_ids'], auth()->user());
 
-        return redirect()->back()->with('success', "Successfully approved {$count} documents.");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_approve_success', ['count' => $count]));
     }
 
     public function bulkReject(Request $request): RedirectResponse
@@ -143,13 +143,13 @@ class DocumentController extends Controller
                 ->where('documentable_id', $currentEmployee->id)
                 ->exists();
             if ($hasOwn) {
-                return redirect()->back()->with('error', 'Hierarchy Conflict: Self-approval is prohibited. You cannot reject your own documents.');
+                return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_approve'));
             }
         }
 
         $count = $this->documentRepository->bulkReject($validated['document_ids'], $validated['rejection_reason'] ?? null, auth()->user());
 
-        return redirect()->back()->with('success', "Successfully rejected {$count} documents.");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_reject_success', ['count' => $count]));
     }
 
     public function bulkDelete(Request $request): RedirectResponse
@@ -163,7 +163,7 @@ class DocumentController extends Controller
 
         $count = $this->documentRepository->bulkDelete($validated['document_ids']);
 
-        return redirect()->back()->with('success', "Successfully deleted {$count} documents.");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_delete_success', ['count' => $count]));
     }
 
     /**
@@ -205,19 +205,19 @@ class DocumentController extends Controller
             $targetEmployeeIds = $targetQuery->pluck('id')->toArray();
         } else {
             if ($currentEmployee && (int) $employeeId === (int) $currentEmployee->id && !$canSelfManage) {
-                return redirect()->back()->with('error', 'Hierarchy Conflict: You cannot generate or upload documents for yourself in the administration registry. This must be handled by your supervisor or from your employee profile.');
+                return redirect()->back()->with('error', __('hrms.documents.error_hierarchy_generate'));
             }
             $targetEmployeeIds = [$employeeId];
         }
 
         if (empty($targetEmployeeIds)) {
-            return redirect()->back()->with('error', 'No employees found for this upload target.');
+            return redirect()->back()->with('error', __('hrms.documents.error_no_employees_target'));
         }
 
         if (in_array($uploadMode, ['generate', 'generate_template'], true)) {
             $docTemplate = \App\Domains\HRMS\Models\DocumentTemplate::find($request->integer('document_template_id'));
             if (!$docTemplate) {
-                return redirect()->back()->with('error', 'Document template not found.');
+                return redirect()->back()->with('error', __('hrms.documents.error_template_not_found'));
             }
 
             $templateService = app(\App\Domains\HRMS\Services\DocumentTemplateService::class);
@@ -346,7 +346,7 @@ class DocumentController extends Controller
                 $count++;
             }
 
-            return redirect()->back()->with('success', "Successfully generated {$count} document(s) from template.");
+            return redirect()->back()->with('success', __('hrms.documents.bulk_generate_success', ['count' => $count]));
         }
 
         // Standard bulk upload mode
@@ -354,7 +354,7 @@ class DocumentController extends Controller
         $docMaster = \App\Domains\HRMS\Models\DocumentMaster::find($request->input('document_master_id'));
 
         if ($docMaster?->expiry_applicable && !$request->filled('expiry_date')) {
-            return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this document.'])->withInput();
+            return redirect()->back()->withErrors(['expiry_date' => __('hrms.documents.error_expiry_required')])->withInput();
         }
 
         $baseStoredPath = $file->storeTenantFile("documents/tenant_{$tenantId}/bulk_temp", 'public');
@@ -408,7 +408,7 @@ class DocumentController extends Controller
             \Illuminate\Support\Facades\Storage::disk('public')->delete($baseStoredPath);
         }
 
-        return redirect()->back()->with('success', "Successfully uploaded document for {$count} employee(s).");
+        return redirect()->back()->with('success', __('hrms.documents.bulk_upload_success', ['count' => $count]));
     }
 
     /**

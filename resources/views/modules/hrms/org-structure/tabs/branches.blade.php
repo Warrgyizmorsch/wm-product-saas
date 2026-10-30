@@ -133,7 +133,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-branch" data-bs-toggle="modal" data-bs-target="#viewBranchModal" data-branch="{{ base64_encode($br->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-branch" data-bs-toggle="modal" data-bs-target="#viewBranchModal" data-branch="{{ json_encode($br) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         <x-ui.action-dropdown>
@@ -184,6 +184,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     (function() {
         function getInitials(name, fallback) {
@@ -198,7 +199,7 @@
 
         // Delegated View Action Trigger
         $(document).on('click', '.btn-view-branch', function() {
-            let branch = JSON.parse(atob(this.dataset.branch));
+            let branch = JSON.parse(this.dataset.branch);
             
             let nameEl = document.getElementById('modal_view_branch_name');
             if (nameEl) nameEl.innerText = branch.name;
@@ -398,6 +399,7 @@
         });
     })();
 </script>
+@endpush
 
 <!-- View Branch Modal -->
 <div class="modal fade" id="viewBranchModal" tabindex="-1" aria-labelledby="viewBranchModalLabel" aria-hidden="true">

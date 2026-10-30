@@ -1,20 +1,24 @@
 @extends('layouts.duralux')
 
-@section('title', $cycle->name . ' | 360° Feedback')
-@section('page-title', 'Feedback Cycle Dashboard')
-@section('breadcrumb', 'HRMS / 360° Feedback / Cycle Dashboard')
+@section('title', __('hrms.feedback_360.title_cycle_show', ['name' => $cycle->name]))
+@section('page-title', __('hrms.feedback_360.page_title_cycle_show'))
+@section('breadcrumb', __('hrms.feedback_360.breadcrumb_cycle_show'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.feedback360.index', ['active_tab' => 'cycles']) }}" class="border fw-semibold">
-            Back to Cycles
+            {{ __('hrms.feedback_360.btn_back_to_cycles') }}
         </x-ui.button>
-        <x-ui.button variant="light" icon="feather-bell" class="border fw-semibold" data-bs-toggle="modal" data-bs-target="#bulkRemindModal">
-            Send Reminders
-        </x-ui.button>
-        <x-ui.button variant="primary" icon="feather-user-plus" class="fw-bold" data-bs-toggle="modal" data-bs-target="#addParticipantsModal">
-            Enroll Reviewees
-        </x-ui.button>
+        @if($cycle->capabilities['can_bulk_remind'] ?? false)
+            <x-ui.button variant="light" icon="feather-bell" class="border fw-semibold" data-bs-toggle="modal" data-bs-target="#bulkRemindModal">
+                {{ __('hrms.feedback_360.btn_send_reminders') }}
+            </x-ui.button>
+        @endif
+        @if($cycle->capabilities['can_add_participants'] ?? false)
+            <x-ui.button variant="primary" icon="feather-user-plus" class="fw-bold" data-bs-toggle="modal" data-bs-target="#addParticipantsModal">
+                {{ __('hrms.feedback_360.btn_enroll_reviewees') }}
+            </x-ui.button>
+        @endif
     </div>
 @endsection
 
@@ -91,12 +95,61 @@
             flex-shrink: 0;
             display: inline-block;
         }
+        .select2-dropdown {
+            z-index: 99999 !important;
+        }
+        .select2-container--open {
+            z-index: 99999 !important;
+        }
+        [id^="addRaterModal"] .modal-content,
+        [id^="addRaterModal"] .modal-body,
+        #addParticipantsModal .modal-content,
+        #addParticipantsModal .modal-body {
+            overflow: visible !important;
+        }
     </style>
 @endpush
 
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+    <script>
+        $(document).ready(function () {
+            // Prevent Bootstrap modal from blocking focus on Select2 dropdown attached to body
+            if (typeof $.fn.modal !== 'undefined' && $.fn.modal.Constructor) {
+                $.fn.modal.Constructor.prototype._enforceFocus = function () {};
+            }
+            document.addEventListener('focusin', function (e) {
+                if (e.target && (e.target.closest('.select2-container') || e.target.closest('.select2-search__field') || e.target.closest('.select2-dropdown'))) {
+                    e.stopImmediatePropagation();
+                }
+            }, true);
+
+            // Initialize rater select2 dropdowns attached to body so options extend outside the modal
+            $(document).on('show.bs.modal shown.bs.modal', '[id^="addRaterModal"], #addParticipantsModal', function () {
+                var $modal = $(this);
+                $modal.find('.rater-select2-body').each(function () {
+                    var $select = $(this);
+                    if (!$select.hasClass('select2-hidden-accessible')) {
+                        $select.select2({
+                            theme: "bootstrap-5",
+                            width: "100%",
+                            dropdownParent: $(document.body)
+                        });
+                    }
+                });
+            });
+
+            // Close open select2 dropdown when modal hides
+            $(document).on('hide.bs.modal hidden.bs.modal', '[id^="addRaterModal"], #addParticipantsModal', function () {
+                $('.rater-select2-body').each(function () {
+                    if ($(this).data('select2')) {
+                        $(this).select2('close');
+                    }
+                });
+            });
+        });
+    </script>
 @endpush
 
 @section('content')
@@ -125,9 +178,9 @@
                     <span class="badge bg-light text-dark border"><code>{{ $cycle->code }}</code></span>
                 </div>
                 <div class="text-muted fs-13">
-                    Period: <strong>{{ $cycle->start_date->format('M d, Y') }}</strong> to <strong>{{ $cycle->end_date->format('M d, Y') }}</strong>
+                    {{ __('hrms.feedback_360.period_colon') }} <strong>{{ $cycle->start_date->format('M d, Y') }}</strong> {{ __('hrms.common.to') ?? 'to' }} <strong>{{ $cycle->end_date->format('M d, Y') }}</strong>
                     @if($cycle->submission_deadline)
-                        &bull; Submission Due: <strong class="text-danger">{{ $cycle->submission_deadline->format('M d, Y') }}</strong>
+                        &bull; {{ __('hrms.feedback_360.submission_due_colon') }} <strong class="text-danger">{{ $cycle->submission_deadline->format('M d, Y') }}</strong>
                     @endif
                 </div>
             </div>
@@ -135,18 +188,18 @@
             <!-- Stage Transition Controller -->
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <span class="badge bg-light text-muted border fs-11 py-1.5 px-2.5 rounded-pill" title="Lifecycle advances automatically on deadlines and 100% review completion. You can also manually switch stages anytime.">
-                    <i class="feather-zap text-warning me-1"></i>Auto-Progression Active
+                    <i class="feather-zap text-warning me-1"></i>{{ __('hrms.feedback_360.auto_progression_active') }}
                 </span>
-                <span class="text-muted fs-12 fw-bold text-uppercase ms-1">Stage:</span>
+                <span class="text-muted fs-12 fw-bold text-uppercase ms-1">{{ __('hrms.feedback_360.stage_colon') }}</span>
                 <div class="dropdown">
                     @php
                         $stageDetails = [
-                            'draft'       => ['label' => 'Draft', 'desc' => 'Setup & participant roster', 'dot' => '#64748b'],
-                            'nomination'  => ['label' => 'Nomination Phase', 'desc' => 'Employees nominate peer raters', 'dot' => '#0ea5e9'],
-                            'in_progress' => ['label' => 'In Progress', 'desc' => 'Feedback collection underway', 'dot' => 'var(--bs-primary)'],
-                            'review'      => ['label' => 'Manager Review', 'desc' => 'Calibration & assessment', 'dot' => '#f59e0b'],
-                            'completed'   => ['label' => 'Completed', 'desc' => 'Published & shared with reviewees', 'dot' => '#10b981'],
-                            'closed'      => ['label' => 'Closed', 'desc' => 'Cycle locked & archived', 'dot' => '#334155'],
+                            'draft'       => ['label' => __('hrms.feedback_360.stage_draft'), 'desc' => __('hrms.feedback_360.stage_draft_desc'), 'dot' => '#64748b'],
+                            'nomination'  => ['label' => __('hrms.feedback_360.stage_nomination'), 'desc' => __('hrms.feedback_360.stage_nomination_desc'), 'dot' => '#0ea5e9'],
+                            'in_progress' => ['label' => __('hrms.feedback_360.stage_in_progress'), 'desc' => __('hrms.feedback_360.stage_in_progress_desc'), 'dot' => 'var(--bs-primary)'],
+                            'review'      => ['label' => __('hrms.feedback_360.stage_review'), 'desc' => __('hrms.feedback_360.stage_review_desc'), 'dot' => '#f59e0b'],
+                            'completed'   => ['label' => __('hrms.feedback_360.stage_completed'), 'desc' => __('hrms.feedback_360.stage_completed_desc'), 'dot' => '#10b981'],
+                            'closed'      => ['label' => __('hrms.feedback_360.stage_closed'), 'desc' => __('hrms.feedback_360.stage_closed_desc'), 'dot' => '#334155'],
                         ];
                         $currentStage = $stageDetails[$cycle->status] ?? [
                             'label' => ucfirst($cycle->status),
@@ -155,35 +208,42 @@
                         ];
                     @endphp
 
-                    <button class="stage-dropdown-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="stage-dot" style="background-color: {{ $currentStage['dot'] }};"></span>
-                        <span>{{ $currentStage['label'] }}</span>
-                    </button>
+                    @if($cycle->capabilities['can_launch'] ?? false)
+                        <button class="stage-dropdown-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="stage-dot" style="background-color: {{ $currentStage['dot'] }};"></span>
+                            <span>{{ $currentStage['label'] }}</span>
+                        </button>
 
-                    <div class="dropdown-menu dropdown-menu-end stage-dropdown-menu">
-                        <div class="px-2 py-1 pb-2 border-bottom mb-2">
-                            <span class="fs-11 text-uppercase fw-bold text-muted" style="letter-spacing: 0.5px;">Update Lifecycle Stage</span>
-                        </div>
-                        
-                        @foreach($stageDetails as $stageKey => $stageInfo)
-                            <form action="{{ route('hrms.feedback360.cycles.launch', $cycle->id) }}" method="POST" class="m-0 p-0">
-                                @csrf
-                                <input type="hidden" name="status" value="{{ $stageKey }}">
-                                <button type="submit" class="stage-item-btn {{ $cycle->status === $stageKey ? 'active' : '' }}">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="stage-dot" style="background-color: {{ $stageInfo['dot'] }};"></span>
-                                        <div>
-                                            <div class="fs-13 fw-bold text-dark lh-sm">{{ $stageInfo['label'] }}</div>
-                                            <div class="fs-11 text-muted fw-normal">{{ $stageInfo['desc'] }}</div>
+                        <div class="dropdown-menu dropdown-menu-end stage-dropdown-menu">
+                            <div class="px-2 py-1 pb-2 border-bottom mb-2">
+                                <span class="fs-11 text-uppercase fw-bold text-muted" style="letter-spacing: 0.5px;">{{ __('hrms.feedback_360.update_lifecycle_stage') }}</span>
+                            </div>
+                            
+                            @foreach($stageDetails as $stageKey => $stageInfo)
+                                <form action="{{ route('hrms.feedback360.cycles.launch', $cycle->id) }}" method="POST" class="m-0 p-0">
+                                    @csrf
+                                    <input type="hidden" name="status" value="{{ $stageKey }}">
+                                    <button type="submit" class="stage-item-btn {{ $cycle->status === $stageKey ? 'active' : '' }}">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="stage-dot" style="background-color: {{ $stageInfo['dot'] }};"></span>
+                                            <div>
+                                                <div class="fs-13 fw-bold text-dark lh-sm">{{ $stageInfo['label'] }}</div>
+                                                <div class="fs-11 text-muted fw-normal">{{ $stageInfo['desc'] }}</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    @if($cycle->status === $stageKey)
-                                        <i class="feather-check text-primary fs-14 ms-2"></i>
-                                    @endif
-                                </button>
-                            </form>
-                        @endforeach
-                    </div>
+                                        @if($cycle->status === $stageKey)
+                                            <i class="feather-check text-primary fs-14 ms-2"></i>
+                                        @endif
+                                    </button>
+                                </form>
+                            @endforeach
+                        </div>
+                    @else
+                        <span class="stage-dropdown-btn" style="cursor: default;">
+                            <span class="stage-dot" style="background-color: {{ $currentStage['dot'] }};"></span>
+                            <span>{{ $currentStage['label'] }}</span>
+                        </span>
+                    @endif
                 </div>
             </div>
         </div>
@@ -193,7 +253,7 @@
             <div class="col-xl-3 col-md-6">
                 <div class="p-3 bg-light border rounded d-flex align-items-center justify-content-between">
                     <div>
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Enrolled Reviewees</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('hrms.feedback_360.kpi_enrolled_reviewees') }}</span>
                         <h4 class="fw-bold mb-0 text-dark">{{ $stats['total_participants'] }}</h4>
                     </div>
                     <div class="avatar-initials bg-primary-subtle text-primary" style="width: 40px; height: 40px; font-size: 16px;">
@@ -204,7 +264,7 @@
             <div class="col-xl-3 col-md-6">
                 <div class="p-3 bg-light border rounded d-flex align-items-center justify-content-between">
                     <div>
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Total Assignments</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('hrms.feedback_360.kpi_total_assignments') }}</span>
                         <h4 class="fw-bold mb-0 text-dark">{{ $stats['total_raters'] }}</h4>
                     </div>
                     <div class="avatar-initials bg-info-subtle text-info" style="width: 40px; height: 40px; font-size: 16px;">
@@ -215,7 +275,7 @@
             <div class="col-xl-3 col-md-6">
                 <div class="p-3 bg-light border rounded d-flex align-items-center justify-content-between">
                     <div>
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Reviews Completed</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('hrms.feedback_360.kpi_reviews_completed') }}</span>
                         <h4 class="fw-bold mb-0 text-success">{{ $stats['completed_raters'] }} <small class="fs-12 text-muted fw-normal">({{ $stats['completion_rate'] }}%)</small></h4>
                     </div>
                     <div class="avatar-initials bg-success-subtle text-success" style="width: 40px; height: 40px; font-size: 16px;">
@@ -226,7 +286,7 @@
             <div class="col-xl-3 col-md-6">
                 <div class="p-3 bg-light border rounded d-flex align-items-center justify-content-between">
                     <div>
-                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">Published Reports</span>
+                        <span class="text-muted fs-11 fw-bold text-uppercase d-block mb-1">{{ __('hrms.feedback_360.kpi_published_reports') }}</span>
                         <h4 class="fw-bold mb-0 text-primary">{{ $stats['published_reports'] }}</h4>
                     </div>
                     <div class="avatar-initials bg-primary-subtle text-primary" style="width: 40px; height: 40px; font-size: 16px;">
@@ -241,10 +301,10 @@
             <div class="mb-4 p-3 bg-light border rounded">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                        Competencies Evaluated in this Cycle ({{ $cycleCompetencies->count() }})
+                        {{ __('hrms.feedback_360.competencies_evaluated_in_cycle', ['count' => $cycleCompetencies->count()]) }}
                     </span>
                     <span class="badge bg-white text-muted border fs-11 fw-normal">
-                        {{ $questions->count() }} Total Questions
+                        {{ __('hrms.feedback_360.total_questions_badge', ['count' => $questions->count()]) }}
                     </span>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
@@ -264,8 +324,8 @@
         <!-- Participants & Rater Roster Table -->
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h6 class="fw-bold text-dark mb-0">Reviewees Roster & Feedback Status</h6>
-                <span class="text-muted fs-13">All enrolled employees with their assigned multi-directional raters.</span>
+                <h6 class="fw-bold text-dark mb-0">{{ __('hrms.feedback_360.reviewees_roster_heading') }}</h6>
+                <span class="text-muted fs-13">{{ __('hrms.feedback_360.reviewees_roster_subtitle') }}</span>
             </div>
         </div>
 
@@ -274,10 +334,10 @@
                 <div class="avatar-initials mx-auto mb-3" style="width: 50px; height: 50px; font-size: 20px;">
                     <i class="feather-users"></i>
                 </div>
-                <h6 class="fw-bold text-dark">No Reviewees Enrolled Yet</h6>
-                <p class="text-muted fs-13 mb-3">Enroll employees into this cycle to automatically assign managers and direct reports.</p>
+                <h6 class="fw-bold text-dark">{{ __('hrms.feedback_360.no_reviewees_enrolled') }}</h6>
+                <p class="text-muted fs-13 mb-3">{{ __('hrms.feedback_360.no_reviewees_desc') }}</p>
                 <x-ui.button variant="primary" icon="feather-user-plus" class="fw-bold" data-bs-toggle="modal" data-bs-target="#addParticipantsModal">
-                    Enroll Employees
+                    {{ __('hrms.feedback_360.btn_enroll_employees') }}
                 </x-ui.button>
             </div>
         @else
@@ -285,12 +345,12 @@
                 <table class="table table-hover align-middle mb-0 fs-13">
                     <thead class="table-light">
                         <tr>
-                            <th>Reviewee (Subject)</th>
-                            <th>Direct Manager</th>
-                            <th>Raters Progress</th>
-                            <th>Overall Score</th>
-                            <th>Status</th>
-                            <th class="text-end">Actions</th>
+                            <th>{{ __('hrms.feedback_360.th_reviewee_subject') }}</th>
+                            <th>{{ __('hrms.feedback_360.th_direct_manager') }}</th>
+                            <th>{{ __('hrms.feedback_360.th_raters_progress') }}</th>
+                            <th>{{ __('hrms.feedback_360.th_overall_score') }}</th>
+                            <th>{{ __('hrms.feedback_360.th_status') }}</th>
+                            <th class="text-end">{{ __('hrms.common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -310,16 +370,16 @@
                                             <a href="{{ route('hrms.feedback360.report', $p->id) }}" class="fw-bold text-dark text-decoration-none hover-primary">
                                                 {{ $p->employee?->full_name }}
                                             </a>
-                                            <span class="text-muted fs-11 d-block">{{ $p->employee?->designation->name ?? 'Staff' }} &bull; {{ $p->employee?->department->name ?? 'Dept' }}</span>
+                                            <span class="text-muted fs-11 d-block">{{ $p->employee?->designation->name ?? __('hrms.feedback_360.staff_fallback') }} &bull; {{ $p->employee?->department->name ?? __('hrms.feedback_360.team_fallback') }}</span>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="text-dark fw-semibold">{{ $p->manager?->full_name ?? 'Unassigned' }}</span>
+                                    <span class="text-dark fw-semibold">{{ $p->manager?->full_name ?? __('hrms.feedback_360.unassigned') }}</span>
                                 </td>
                                 <td style="min-width: 180px;">
                                     <div class="d-flex justify-content-between fs-11 text-muted mb-1">
-                                        <span>{{ $completedRaters }} of {{ $totalRaters }} Raters</span>
+                                        <span>{{ __('hrms.feedback_360.raters_progress_ratio', ['completed' => $completedRaters, 'total' => $totalRaters]) }}</span>
                                         <strong class="{{ $pPct === 100 ? 'text-success' : 'text-dark' }}">{{ $pPct }}%</strong>
                                     </div>
                                     <div class="progress" style="height: 6px; border-radius: 4px; background-color: #f1f5f9;">
@@ -329,7 +389,7 @@
                                         <div class="mt-1.5">
                                             <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1"
                                                   title="All raters (Self, Manager, Peers) have submitted their feedback.">
-                                                <i class="feather-check-circle" style="font-size: 11px;"></i> All {{ $totalRaters }} Reviews Completed
+                                                <i class="feather-check-circle" style="font-size: 11px;"></i> {{ __('hrms.feedback_360.all_reviews_completed', ['total' => $totalRaters]) }}
                                             </span>
                                         </div>
                                     @else
@@ -337,24 +397,27 @@
                                             @foreach($p->nominations as $nom)
                                                 @php
                                                     $typeLabel = match($nom->reviewer_type) {
-                                                        'self'          => 'Self',
-                                                        'manager'       => 'Manager',
-                                                        'direct_report' => 'Report',
-                                                        'peer'          => 'Peer',
+                                                        'self'          => __('hrms.feedback_360.rater_badge_self'),
+                                                        'manager'       => __('hrms.feedback_360.rater_badge_manager'),
+                                                        'direct_report' => __('hrms.feedback_360.rater_badge_report'),
+                                                        'peer'          => __('hrms.feedback_360.rater_badge_peer'),
                                                         default         => ucfirst($nom->reviewer_type),
                                                     };
                                                     $isDone = ($nom->status === 'completed');
                                                 @endphp
                                                 <span class="badge {{ $isDone ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-light text-muted border' }} rounded-pill px-2 py-0.5 d-inline-flex align-items-center" 
-                                                      title="{{ $typeLabel }}: {{ $nom->reviewer?->full_name }} ({{ $isDone ? 'Submitted' : 'Pending' }})" 
+                                                      title="{{ $typeLabel }}: {{ $nom->reviewer?->full_name }} ({{ $isDone ? __('hrms.feedback_360.status_submitted') : __('hrms.feedback_360.status_pending') }})" 
                                                       style="font-size: 10px; font-weight: 600;">
                                                     <i class="feather-{{ $isDone ? 'check' : 'clock' }} me-1" style="font-size: 9px;"></i>
                                                     {{ $typeLabel }}
-                                                    @if(!$isDone && $isHrAdmin && $nom->reviewer_type !== 'self')
-                                                        <form action="{{ route('hrms.feedback360.nominations.destroy', $nom->id) }}" method="POST" class="d-inline ms-1 p-0 m-0" onsubmit="return confirm('Remove {{ addslashes($nom->reviewer?->full_name ?? 'this reviewer') }} ({{ $typeLabel }}) from this review roster?');">
+                                                    @php
+                                                        $canManageRater = $isHrAdmin || ($currentEmployee && ($p->manager_id === $currentEmployee->id || $p->employee?->reporting_manager_id === $currentEmployee->id));
+                                                    @endphp
+                                                    @if(!$isDone && $canManageRater && $nom->reviewer_type !== 'self')
+                                                        <form action="{{ route('hrms.feedback360.nominations.destroy', $nom->id) }}" method="POST" class="d-inline ms-1 p-0 m-0" onsubmit="return confirm('{{ __('hrms.feedback_360.confirm_remove_rater', ['name' => addslashes($nom->reviewer?->full_name ?? 'this reviewer'), 'type' => $typeLabel]) }}');">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="border-0 bg-transparent text-danger p-0 ms-0.5" style="font-size: 11px; line-height: 1; cursor: pointer;" title="Remove this rater">
+                                                            <button type="submit" class="border-0 bg-transparent text-danger p-0 ms-0.5" style="font-size: 11px; line-height: 1; cursor: pointer;" title="{{ __('hrms.feedback_360.tooltip_remove_this_rater') }}">
                                                                 &times;
                                                             </button>
                                                         </form>
@@ -380,14 +443,23 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="d-inline-flex gap-1.5">
-                                        @if($isHrAdmin && in_array($cycle->status, ['draft', 'nomination', 'in_progress']))
-                                            <x-ui.button variant="light" size="sm" icon="feather-user-plus" class="border px-2 py-1 text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#addRaterModal{{ $p->id }}" title="Assign individual rater">
-                                                Rater
+                                        @if(($p->capabilities['can_nominate_peers'] ?? false) && in_array($cycle->status, ['draft', 'nomination', 'in_progress']))
+                                            <x-ui.button variant="light" size="sm" icon="feather-user-plus" class="border px-2 py-1 text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#addRaterModal{{ $p->id }}" :title="__('hrms.feedback_360.tooltip_assign_individual_rater')">
+                                                {{ __('hrms.feedback_360.btn_assign_individual_rater') }}
                                             </x-ui.button>
                                         @endif
-                                        <x-ui.button variant="light" size="sm" icon="feather-pie-chart" class="border px-2.5 py-1 text-primary fw-semibold" href="{{ route('hrms.feedback360.report', $p->id) }}">
-                                            360 Report
-                                        </x-ui.button>
+                                        @php
+                                            $canViewReport = ($p->status === 'published') || $isHrAdmin || ($currentEmployee && ($p->manager_id === $currentEmployee->id || $p->employee?->reporting_manager_id === $currentEmployee->id));
+                                        @endphp
+                                        @if($canViewReport)
+                                            <x-ui.button variant="light" size="sm" icon="feather-pie-chart" class="border px-2.5 py-1 text-primary fw-semibold" href="{{ route('hrms.feedback360.report', $p->id) }}">
+                                                {{ __('hrms.feedback_360.btn_360_report') }}
+                                            </x-ui.button>
+                                        @else
+                                            <button type="button" class="btn btn-sm btn-light border px-2.5 py-1 text-muted fw-semibold" disabled title="{{ __('hrms.feedback_360.tooltip_report_will_unlock') }}">
+                                                <i class="feather-lock me-1"></i> {{ __('hrms.feedback_360.pending_report_unlock') }}
+                                            </button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -403,18 +475,18 @@
 <!-- ========================================================================= -->
 <!-- MODAL: ADD PARTICIPANTS -->
 <!-- ========================================================================= -->
-<x-ui.modal id="addParticipantsModal" title="Enroll Reviewees into Cycle" size="md" :centered="true" :showFooter="false">
+<x-ui.modal id="addParticipantsModal" :title="__('hrms.feedback_360.modal_enroll_reviewees_title')" size="md" :centered="true" :scrollable="false" :showFooter="false">
     <form action="{{ route('hrms.feedback360.cycles.participants', $cycle->id) }}" method="POST">
         @csrf
-        <x-ui.modal-form-ui type="select" label="Select Employees" name="employee_ids[]" :multiple="true" :searchable="true" :required="true" helperText="The system will automatically assign self, manager, and direct-report evaluation cards.">
+        <x-ui.modal-form-ui type="select" :label="__('hrms.feedback_360.field_select_employees')" name="employee_ids[]" select2Selector="rater-select2-body" :multiple="true" :required="true" :helperText="__('hrms.feedback_360.helper_enroll_auto_cards')">
             @foreach($employees as $emp)
-                <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->designation->name ?? 'Staff' }} - {{ $emp->department->name ?? 'Team' }})</option>
+                <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->designation->name ?? __('hrms.feedback_360.staff_fallback') }} - {{ $emp->department->name ?? __('hrms.feedback_360.team_fallback') }})</option>
             @endforeach
         </x-ui.modal-form-ui>
 
         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-            <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">Enroll Selected Employees</x-ui.button>
+            <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">{{ __('hrms.feedback_360.btn_enroll_selected') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
@@ -422,16 +494,16 @@
 <!-- ========================================================================= -->
 <!-- MODAL: BULK REMIND -->
 <!-- ========================================================================= -->
-<x-ui.modal id="bulkRemindModal" title="Send Feedback Reminders" size="md" :centered="true" :showFooter="false">
+<x-ui.modal id="bulkRemindModal" :title="__('hrms.feedback_360.modal_send_reminders_title')" size="md" :centered="true" :showFooter="false">
     <form action="{{ route('hrms.feedback360.cycles.bulk-remind', $cycle->id) }}" method="POST">
         @csrf
         <p class="fs-13 text-dark">
-            This will dispatch reminder notifications to all <strong>{{ $stats['pending_raters'] }}</strong> reviewers who have not yet completed their feedback submissions.
+            {{ __('hrms.feedback_360.send_reminders_confirm_msg', ['count' => $stats['pending_raters']]) }}
         </p>
 
         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-            <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">Send Reminders Now</x-ui.button>
+            <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">{{ __('hrms.feedback_360.btn_send_reminders_now') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
@@ -445,48 +517,40 @@
         $isManagerReviewee = $directReports->isNotEmpty();
         $assignedIds = $p->nominations->pluck('reviewer_id')->toArray();
     @endphp
-    <x-ui.modal id="addRaterModal{{ $p->id }}" title="Assign Rater for {{ $p->employee?->full_name }}" size="md" :centered="true" :showFooter="false">
+    <x-ui.modal id="addRaterModal{{ $p->id }}" :title="__('hrms.feedback_360.modal_assign_rater_title', ['name' => $p->employee?->full_name])" size="md" :centered="true" :scrollable="false" :showFooter="false">
         <form action="{{ route('hrms.feedback360.participants.add-rater', $p->id) }}" method="POST">
             @csrf
 
-            <div class="mb-3">
-                <label class="form-label text-dark fs-12 fw-semibold">Relationship / Reviewer Type <span class="text-danger">*</span></label>
-                <select name="reviewer_type" class="form-select form-select-sm fs-12" required>
-                    <option value="peer" selected>Peer Reviewer (Colleague)</option>
-                    <option value="direct_report">Direct Report (Subordinate / Upward Feedback)</option>
-                    <option value="manager">Manager / Evaluator</option>
-                </select>
-                <small class="text-muted fs-11 mt-1 d-block">Determines scoring perspective in 360 gap analysis.</small>
-            </div>
+            <x-ui.modal-form-ui type="select" :label="__('hrms.feedback_360.field_relationship_type')" name="reviewer_type" :searchable="false" :required="true" :helperText="__('hrms.feedback_360.relationship_type_helper')">
+                <option value="peer" selected>{{ __('hrms.feedback_360.option_peer_colleague') }}</option>
+                <option value="direct_report">{{ __('hrms.feedback_360.option_direct_report_subordinate') }}</option>
+                <option value="manager">{{ __('hrms.feedback_360.option_manager_evaluator') }}</option>
+            </x-ui.modal-form-ui>
 
-            <div class="mb-3">
-                <label class="form-label text-dark fs-12 fw-semibold">Select Employee <span class="text-danger">*</span></label>
-                <select name="reviewer_id" class="form-select form-select-sm fs-12" required>
-                    <option value="">-- Choose Employee --</option>
-                    @if($isManagerReviewee)
-                        <optgroup label="Direct Reports (Team Members)">
-                            @foreach($directReports as $dr)
-                                <option value="{{ $dr->id }}" {{ in_array($dr->id, $assignedIds) ? 'disabled' : '' }}>
-                                    {{ $dr->full_name }} ({{ $dr->designation->name ?? 'Staff' }}) {{ in_array($dr->id, $assignedIds) ? '[Already Assigned]' : '' }}
-                                </option>
-                            @endforeach
-                        </optgroup>
-                    @endif
-                    <optgroup label="All Organization Employees">
-                        @foreach($employees as $emp)
-                            @if($emp->id !== $p->employee_id)
-                                <option value="{{ $emp->id }}" {{ in_array($emp->id, $assignedIds) ? 'disabled' : '' }}>
-                                    {{ $emp->full_name }} ({{ $emp->designation->name ?? 'Staff' }} - {{ $emp->department->name ?? 'Team' }}) {{ in_array($emp->id, $assignedIds) ? '[Already Assigned]' : '' }}
-                                </option>
-                            @endif
+            <x-ui.modal-form-ui type="select" :label="__('hrms.feedback_360.field_select_employee')" name="reviewer_ids[]" select2Selector="rater-select2-body" :multiple="true" :required="true">
+                @if($isManagerReviewee)
+                    <optgroup label="{{ __('hrms.feedback_360.optgroup_direct_reports') }}">
+                        @foreach($directReports as $dr)
+                            <option value="{{ $dr->id }}" {{ in_array($dr->id, $assignedIds) ? 'disabled' : '' }}>
+                                {{ $dr->full_name }} ({{ $dr->designation->name ?? __('hrms.feedback_360.staff_fallback') }}) {{ in_array($dr->id, $assignedIds) ? __('hrms.feedback_360.already_assigned_tag') : '' }}
+                            </option>
                         @endforeach
                     </optgroup>
-                </select>
-            </div>
+                @endif
+                <optgroup label="{{ __('hrms.feedback_360.optgroup_all_employees') }}">
+                    @foreach($employees as $emp)
+                        @if($emp->id !== $p->employee_id)
+                            <option value="{{ $emp->id }}" {{ in_array($emp->id, $assignedIds) ? 'disabled' : '' }}>
+                                {{ $emp->full_name }} ({{ $emp->designation->name ?? __('hrms.feedback_360.staff_fallback') }} - {{ $emp->department->name ?? __('hrms.feedback_360.team_fallback') }}) {{ in_array($emp->id, $assignedIds) ? __('hrms.feedback_360.already_assigned_tag') : '' }}
+                            </option>
+                        @endif
+                    @endforeach
+                </optgroup>
+            </x-ui.modal-form-ui>
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">Assign Reviewer</x-ui.button>
+                <x-ui.button variant="light" size="sm" class="border" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                <x-ui.button variant="primary" size="sm" type="submit" class="fw-bold">{{ __('hrms.feedback_360.btn_assign_reviewer') }}</x-ui.button>
             </div>
         </form>
     </x-ui.modal>

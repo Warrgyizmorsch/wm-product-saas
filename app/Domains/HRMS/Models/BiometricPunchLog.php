@@ -26,10 +26,17 @@ class BiometricPunchLog extends BaseModel
     protected static function booted()
     {
         static::created(function ($log) {
-            dispatch(new \App\Domains\HRMS\Jobs\ProcessBiometricAttendance(
-                $log->employee_id,
-                $log->punch_time->toDateString()
-            ));
+            try {
+                \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatchSync(
+                    $log->employee_id,
+                    $log->punch_time->toDateString()
+                );
+            } catch (\Throwable $e) {
+                dispatch(new \App\Domains\HRMS\Jobs\ProcessBiometricAttendance(
+                    $log->employee_id,
+                    $log->punch_time->toDateString()
+                ));
+            }
         });
     }
 
