@@ -145,6 +145,7 @@ return [
     'safety_point_3'              => 'Photography and entry into restricted areas without escort is strictly prohibited.',
     'print_pass'                  => 'Print Gate Pass',
     'back_to_list'                => 'Back to Gate Desk',
+    'back_to_approvals'           => 'Back to Approvals',
     'no_belongings'               => 'No declared equipment/belongings',
     'scan_qr'                     => 'Scan QR Pass',
     'scan_qr_desc'                => 'Point mobile or webcam scanner at the QR code for instant check-in or checkout verification.',

@@ -131,6 +131,10 @@ class VisitorApprovalController extends Controller
             ]);
         }
 
+        if ($request->input('from') === 'approvals' || str_contains(url()->previous(), 'from=approvals') || str_contains(url()->previous(), 'visitor/approvals')) {
+            return redirect()->route('visitor.approvals.index')->with('success', __('visitor.approved_success'));
+        }
+
         return redirect()->back()->with('success', __('visitor.approved_success'));
     }
 
@@ -195,6 +199,10 @@ class VisitorApprovalController extends Controller
                 'success' => true,
                 'message' => __('visitor.rejected_success'),
             ]);
+        }
+
+        if ($request->input('from') === 'approvals' || str_contains(url()->previous(), 'from=approvals') || str_contains(url()->previous(), 'visitor/approvals')) {
+            return redirect()->route('visitor.approvals.index')->with('success', __('visitor.rejected_success'));
         }
 
         return redirect()->back()->with('success', __('visitor.rejected_success'));
