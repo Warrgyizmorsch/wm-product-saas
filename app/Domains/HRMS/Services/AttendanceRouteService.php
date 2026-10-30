@@ -173,18 +173,14 @@ class AttendanceRouteService
         // 3. Compress points into Google Polyline String (~1 KB text)
         $polylineString = $this->encodePolyline($points);
 
-        // 4. Generate & Store Route Snapshot
-        $snapshotUrl = $this->generateAndSaveRouteSnapshot($attendance->id, $polylineString, $points, $totalDistanceKm, $trackingGaps);
-
-        // 5. Update attendances record with consolidated summary
+        // 4. Update attendances record with consolidated summary
         $totalPointsCount = $rawLogs->count();
         $startPoint = $points[0] ?? null;
         $endPoint = end($points) ?: null;
 
-        $attendance->update([
+        $updateFields = [
             'total_distance_km'  => round($totalDistanceKm, 2),
             'route_polyline'     => $polylineString,
-            'route_snapshot_url' => $snapshotUrl,
             'route_summary'      => [
                 'total_raw_points'        => $totalPointsCount,
                 'retained_points_count'   => count($points),
@@ -197,21 +193,23 @@ class AttendanceRouteService
                 'total_untracked_minutes' => (int) round($totalUntrackedSeconds / 60),
                 'consolidated_at'         => Carbon::now()->toIso8601String(),
             ],
-        ]);
+        ];
 
-        // 6. PURGE raw periodic logs ONLY IF snapshot and polyline were successfully saved
+        $attendance->update($updateFields);
+
+        // 5. PURGE raw periodic logs once polyline has been consolidated
         $purgedCount = 0;
-        if (!empty($snapshotUrl) && !empty($polylineString)) {
+        if (!empty($polylineString)) {
             $purgedCount = AttendanceLocationLog::where('attendance_id', $attendance->id)->delete();
         }
 
         return [
             'success'            => true,
-            'snapshot_saved'     => !empty($snapshotUrl),
+            'snapshot_saved'     => !empty($attendance->route_snapshot_url),
             'attendance_id'      => $attendance->id,
             'total_distance_km'  => round($totalDistanceKm, 2),
             'route_polyline'     => $polylineString,
-            'route_snapshot_url' => $snapshotUrl,
+            'route_snapshot_url' => $attendance->route_snapshot_url,
             'purged_rows'        => $purgedCount,
             'points_count'       => count($points),
         ];

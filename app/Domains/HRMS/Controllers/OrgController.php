@@ -77,10 +77,15 @@ class OrgController extends Controller
             'country' => 'nullable|max:100',
             'postal_code' => 'nullable|max:20',
             'status' => 'required|in:0,1',
+            'logo' => 'nullable|image|max:2048',
         ]);
 
         $validated['timezone'] = $validated['time_zone'];
         unset($validated['time_zone']);
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('companies', 'public');
+        }
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
         $this->orgRepository->storeCompany($validated);
@@ -110,10 +115,18 @@ class OrgController extends Controller
             'country' => 'nullable|max:100',
             'postal_code' => 'nullable|max:20',
             'status' => 'required|in:0,1',
+            'logo' => 'nullable|image|max:2048',
         ]);
 
         $validated['timezone'] = $validated['time_zone'];
         unset($validated['time_zone']);
+
+        if ($request->hasFile('logo')) {
+            if ($company->logo) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($company->logo);
+            }
+            $validated['logo'] = $request->file('logo')->store('companies', 'public');
+        }
 
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
         $this->orgRepository->updateCompany($company, $validated);

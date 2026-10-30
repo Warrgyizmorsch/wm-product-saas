@@ -907,9 +907,38 @@
             };
         }
 
-        // Render Leaflet map
+        // Render Leaflet map or display App Route Snapshot
         setTimeout(() => {
+            // 1. If Route Snapshot from mobile app exists, display snapshot image!
+            if (routeSnapshot && routeSnapshot !== '') {
+                if (mapWrap) {
+                    mapWrap.style.display = 'block';
+                    mapWrap.innerHTML = `
+                        <div class="position-relative w-100 rounded-3 overflow-hidden border" style="height: 250px; background: #f8fafc;">
+                            <a href="${routeSnapshot}" target="_blank" title="Click to view full snapshot in new tab">
+                                <img src="${routeSnapshot}" alt="App Route Snapshot" class="w-100 h-100 object-fit-cover d-block" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'text-center py-5 text-muted\\'>Snapshot image could not be loaded</div>';">
+                            </a>
+                            <span class="badge bg-dark bg-opacity-75 text-white position-absolute bottom-0 end-0 m-2 fs-10 px-2 py-1 rounded">
+                                <i class="feather-maximize-2 me-1"></i> App Route Snapshot
+                            </span>
+                        </div>
+                    `;
+                }
+                if (mapNone) mapNone.style.display = 'none';
+                return;
+            }
+
+            // 2. Otherwise (e.g. Web check-in/out), render Leaflet with Check-in / Check-out coordinates!
             if (hasCheckinCoords || hasCheckoutCoords || hasLocationLogs) {
+                if (mapWrap) {
+                    mapWrap.style.display = 'block';
+                    mapWrap.innerHTML = `
+                        <input type="text" id="detail_drawer_map_search" class="form-control position-absolute" style="top: 10px; right: 10px; width: 240px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; font-size: 11px; border: none !important; border-radius: 6px !important; padding: 6px 12px !important; height: 34px !important; background-color: #fff !important; outline: none !important;" placeholder="{{ __('hrms.my_attendance.search_address_placeholder') }}">
+                        <div id="detail-drawer-map" style="height: 250px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>
+                    `;
+                }
+                if (mapNone) mapNone.style.display = 'none';
+
                 if (typeof L === 'undefined') {
                     return;
                 }
