@@ -111,7 +111,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-company" data-bs-toggle="modal" data-bs-target="#viewCompanyModal" data-company="{{ base64_encode($company->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
+                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-company" data-bs-toggle="modal" data-bs-target="#viewCompanyModal" data-company="{{ json_encode($company) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                              <i class="feather feather-eye"></i>
                                          </a>
                                          <x-ui.action-dropdown>
@@ -162,6 +162,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     (function() {
         function getInitials(name, fallback) {
@@ -207,7 +208,7 @@
 
         // Delegated View Trigger
         $(document).on('click', '.btn-view-company', function() {
-            let company = JSON.parse(atob(this.dataset.company));
+            let company = JSON.parse(this.dataset.company);
             
             let nameEl = document.getElementById('modal_view_company_name');
             if (nameEl) nameEl.innerText = company.company_name;
@@ -232,6 +233,26 @@
             
             let phoneEl = document.getElementById('modal_view_phone');
             if (phoneEl) phoneEl.innerText = company.phone || 'N/A';
+
+            let webEl = document.getElementById('modal_view_website');
+            if (webEl) {
+                if (company.website) {
+                    let url = company.website.trim();
+                    let href = (url.startsWith('http://') || url.startsWith('https://')) ? url : 'https://' + url;
+                    webEl.innerHTML = `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-primary text-decoration-none">${url} <i class="feather-external-link fs-11 ms-1"></i></a>`;
+                } else {
+                    webEl.innerText = 'N/A';
+                }
+            }
+
+            let statusEl = document.getElementById('modal_view_status');
+            let statusBadgeEl = document.getElementById('modal_view_status_badge');
+            let isActive = (company.status === true || company.status === 1 || company.status === '1');
+            let statusHtml = isActive 
+                ? '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>'
+                : '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
+            if (statusEl) statusEl.innerHTML = statusHtml;
+            if (statusBadgeEl) statusBadgeEl.innerHTML = statusHtml;
             
             let currEl = document.getElementById('modal_view_currency');
             if (currEl) currEl.innerText = company.currency || 'N/A';
@@ -355,6 +376,7 @@
         });
     })();
 </script>
+@endpush
 
 <!-- View Company Modal -->
 <div class="modal fade" id="viewCompanyModal" tabindex="-1" aria-labelledby="viewCompanyModalLabel" aria-hidden="true">
@@ -370,14 +392,17 @@
                         <!-- Dynamically generated -->
                     </div>
                     <div>
-                        <h4 class="mb-1 fw-bold text-dark" id="modal_view_company_name"></h4>
+                        <div class="d-flex align-items-center gap-2">
+                            <h4 class="mb-1 fw-bold text-dark" id="modal_view_company_name"></h4>
+                            <span id="modal_view_status_badge"></span>
+                        </div>
                         <span class="fs-12 text-muted" id="modal_view_legal_name"></span>
                     </div>
                 </div>
                 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                        <div class="p-3 border rounded-3 bg-light-soft h-100" style="background-color: #f8fafc;">
                             <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.registration_info') }}</span>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.gst') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_gst"></span></div>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.pan') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_pan"></span></div>
@@ -386,10 +411,12 @@
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                        <div class="p-3 border rounded-3 bg-light-soft h-100" style="background-color: #f8fafc;">
                             <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.contact_locale') }}</span>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.email') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_email"></span></div>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.phone') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_phone"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.website') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_website"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.status') }}:</strong> <span id="modal_view_status"></span></div>
                             <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.currency') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_currency"></span></div>
                             <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.timezone') }}:</strong> <span class="fs-13 text-dark fw-bold text-truncate d-inline-block align-bottom" style="max-width: 200px;" id="modal_view_timezone"></span></div>
                         </div>

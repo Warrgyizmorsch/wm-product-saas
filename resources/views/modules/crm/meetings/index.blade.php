@@ -12,7 +12,7 @@
     @if(!empty($geoVerification['is_enabled']))
         <span class="badge bg-soft-info text-info fs-11 px-2 py-1 fw-bold border border-info-subtle"
             title="Geo-Verification is active for field meetings">
-            <i class="feather-shield fs-10"></i> Field Geo-Verified
+            <i class="feather-shield fs-10"></i> {{ __('crm.meetings_field_geo_verified') }}
         </span>
     @endif
 @endsection
@@ -20,7 +20,7 @@
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button href="{{ route('crm.meetings.index') }}" variant="light" size="sm" icon="feather-refresh-cw"
-            title="Refresh list">
+            title="{{ __('crm.refresh_list') ?: 'Refresh list' }}">
         </x-ui.button>
     </div>
 @endsection
@@ -161,42 +161,42 @@
     <div class="row g-3 mb-3">
         <div class="col-12 col-sm-6 col-xl-3">
             <x-ui.kpi-card 
-                title="Today's Schedule" 
+                :title="__('crm.meetings_todays_schedule')" 
                 :value="$counts['today'] ?? 0" 
                 icon="feather-calendar" 
                 tone="brand" 
-                subtitle="Pending meetings for today"
+                :subtitle="__('crm.meetings_pending_for_today')"
                 :href="request()->fullUrlWithQuery(['tab' => 'today', 'page' => null])"
                 :class="$activeTab === 'today' ? 'border-primary shadow-xs' : ''" />
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <x-ui.kpi-card 
-                title="Planned Meetings" 
+                :title="__('crm.meetings_planned_meetings')" 
                 :value="$counts['planned'] ?? 0" 
                 icon="feather-clock" 
                 tone="info" 
-                subtitle="Upcoming future meetings"
+                :subtitle="__('crm.meetings_upcoming_future_meetings')"
                 :href="request()->fullUrlWithQuery(['tab' => 'planned', 'page' => null])"
                 :class="$activeTab === 'planned' ? 'border-info shadow-xs' : ''" />
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <x-ui.kpi-card 
-                title="Overdue Meetings" 
+                :title="__('crm.meetings_overdue_meetings')" 
                 :value="$counts['overdue'] ?? 0" 
                 icon="feather-alert-triangle" 
                 tone="negative" 
                 valueTone="negative"
-                subtitle="Pending past scheduled date"
+                :subtitle="__('crm.meetings_pending_past_date')"
                 :href="request()->fullUrlWithQuery(['tab' => 'overdue', 'page' => null])"
                 :class="$activeTab === 'overdue' ? 'border-danger shadow-xs' : ''" />
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <x-ui.kpi-card 
-                title="Activity Logs" 
+                :title="__('crm.meetings_activity_logs')" 
                 :value="$counts['activity_logs'] ?? 0" 
                 icon="feather-check-circle" 
                 tone="positive" 
-                subtitle="Completed & updated meetings"
+                :subtitle="__('crm.meetings_completed_updated_meetings')"
                 :href="request()->fullUrlWithQuery(['tab' => 'activity_logs', 'page' => null])"
                 :class="$activeTab === 'activity_logs' ? 'border-success shadow-xs' : ''" />
         </div>
@@ -223,7 +223,7 @@
                     <i class="feather-search text-muted me-2" style="font-size: 13px;"></i>
                     <input type="text" name="search" id="meetingLiveSearch"
                         class="form-control border-0 bg-transparent p-0 fs-12 text-dark"
-                        placeholder="Search company, contact, title..." value="{{ request('search') }}" style="box-shadow: none; outline: none;">
+                        placeholder="{{ __('crm.meetings_search_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; outline: none;">
                     @if(request('search'))
                         <a href="{{ request()->fullUrlWithQuery(['search' => null, 'page' => null]) }}" id="clearMeetingSearch" class="text-muted p-0"
                             title="Clear Search" style="text-decoration: none;">
@@ -240,16 +240,16 @@
                 <!-- Sort Dropdown (Common Component: x-ui.sort-dropdown) -->
                 <x-ui.sort-dropdown :label="__('crm.sort') ?: 'Sort'">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'followup_date', 'sort_order' => 'asc', 'page' => null]) }}" class="dropdown-item {{ ($sortBy === 'followup_date' && $sortOrder === 'asc') ? 'active' : '' }}">
-                        <i class="feather-calendar me-2 fs-12"></i><span>Date (Earliest First)</span>
+                        <i class="feather-calendar me-2 fs-12"></i><span>{{ __('crm.meetings_sort_date_earliest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'followup_date', 'sort_order' => 'desc', 'page' => null]) }}" class="dropdown-item {{ ($sortBy === 'followup_date' && $sortOrder === 'desc') ? 'active' : '' }}">
-                        <i class="feather-calendar me-2 fs-12"></i><span>Date (Latest First)</span>
+                        <i class="feather-calendar me-2 fs-12"></i><span>{{ __('crm.meetings_sort_date_latest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company', 'sort_order' => 'asc', 'page' => null]) }}" class="dropdown-item {{ ($sortBy === 'company' && $sortOrder === 'asc') ? 'active' : '' }}">
-                        <i class="feather-type me-2 fs-12"></i><span>Company / Lead (A - Z)</span>
+                        <i class="feather-type me-2 fs-12"></i><span>{{ __('crm.meetings_sort_company_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company', 'sort_order' => 'desc', 'page' => null]) }}" class="dropdown-item {{ ($sortBy === 'company' && $sortOrder === 'desc') ? 'active' : '' }}">
-                        <i class="feather-type me-2 fs-12"></i><span>Company / Lead (Z - A)</span>
+                        <i class="feather-type me-2 fs-12"></i><span>{{ __('crm.meetings_sort_company_za') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
@@ -261,27 +261,27 @@
                     @if(request('sort_order'))<input type="hidden" name="sort_order" value="{{ request('sort_order') }}">@endif
 
                     <x-ui.filter :label="__('crm.filter') ?: 'Filter'" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Meetings</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.meetings_filter_title') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') ?: 'Status' }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="Pending" {{ request('status') === 'Pending' ? 'selected' : '' }}>Pending</option>
-                                <option value="Completed" {{ request('status') === 'Completed' ? 'selected' : '' }}>Connected / Completed</option>
-                                <option value="Not Connected" {{ request('status') === 'Not Connected' ? 'selected' : '' }}>Not Connected</option>
-                                <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
-                                <option value="Rescheduled" {{ request('status') === 'Rescheduled' ? 'selected' : '' }}>Rescheduled</option>
+                                <option value="">{{ __('crm.meetings_all_statuses') }}</option>
+                                <option value="Pending" {{ request('status') === 'Pending' ? 'selected' : '' }}>{{ __('crm.meetings_status_pending') }}</option>
+                                <option value="Completed" {{ request('status') === 'Completed' ? 'selected' : '' }}>{{ __('crm.meetings_status_connected') }}</option>
+                                <option value="Not Connected" {{ request('status') === 'Not Connected' ? 'selected' : '' }}>{{ __('crm.meetings_status_not_connected') }}</option>
+                                <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>{{ __('crm.meetings_status_cancelled') }}</option>
+                                <option value="Rescheduled" {{ request('status') === 'Rescheduled' ? 'selected' : '' }}>{{ __('crm.meetings_status_rescheduled') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_from') ?: 'Date From' }}</label>
                             <x-ui.odoo-form-ui type="date" name="date_from" value="{{ request('date_from') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.date_to') ?: 'Date To' }}</label>
                             <x-ui.odoo-form-ui type="date" name="date_to" value="{{ request('date_to') }}" />
                         </div>
 
@@ -293,7 +293,7 @@
                 </form>
 
                 <x-ui.button href="{{ route('crm.meetings.index', ['tab' => $activeTab]) }}" variant="light" size="sm" icon="feather-refresh-cw"
-                    title="Refresh list">
+                    title="{{ __('crm.refresh_list') ?: 'Refresh list' }}">
                 </x-ui.button>
             </div>
         </div>
@@ -303,24 +303,24 @@
             <div class="crm-status-tabs-wrapper">
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'today', 'page' => null]) }}" 
                    class="crm-status-tab {{ $activeTab === 'today' ? 'active' : '' }}">
-                    TODAY ({{ $counts['today'] ?? 0 }})
+                    {{ __('crm.meetings_tab_today') }} ({{ $counts['today'] ?? 0 }})
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'planned', 'page' => null]) }}" 
                    class="crm-status-tab {{ $activeTab === 'planned' ? 'active' : '' }}">
-                    PLANNED ({{ $counts['planned'] ?? 0 }})
+                    {{ __('crm.meetings_tab_planned') }} ({{ $counts['planned'] ?? 0 }})
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'overdue', 'page' => null]) }}" 
                    class="crm-status-tab tab-overdue {{ ($counts['overdue'] ?? 0) > 0 ? 'text-danger' : '' }} {{ $activeTab === 'overdue' ? 'active' : '' }}">
                     @if(($counts['overdue'] ?? 0) > 0)<span class="overdue-pulse me-1"></span>@endif
-                    OVERDUE ({{ $counts['overdue'] ?? 0 }})
+                    {{ __('crm.meetings_tab_overdue') }} ({{ $counts['overdue'] ?? 0 }})
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'activity_logs', 'page' => null]) }}" 
                    class="crm-status-tab {{ $activeTab === 'activity_logs' ? 'active' : '' }}">
-                    ACTIVITY LOGS ({{ $counts['activity_logs'] ?? 0 }})
+                    {{ __('crm.meetings_tab_activity_logs') }} ({{ $counts['activity_logs'] ?? 0 }})
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['tab' => 'all', 'page' => null]) }}" 
                    class="crm-status-tab {{ $activeTab === 'all' ? 'active' : '' }}">
-                    ALL ({{ $counts['total'] ?? 0 }})
+                    {{ __('crm.meetings_tab_all') }} ({{ $counts['total'] ?? 0 }})
                 </a>
             </div>
         </div>
@@ -331,11 +331,11 @@
                 'items' => $meetings, 
                 'meetings' => $meetings,
                 'emptyMessage' => match($activeTab) {
-                    'today' => 'No meetings scheduled for today.',
-                    'planned' => 'No upcoming future meetings found.',
-                    'overdue' => 'Great job! You have zero overdue meetings.',
-                    'activity_logs' => 'No completed activity logs recorded yet.',
-                    default => 'No meetings found.',
+                    'today' => __('crm.meetings_empty_today'),
+                    'planned' => __('crm.meetings_empty_planned'),
+                    'overdue' => __('crm.meetings_empty_overdue'),
+                    'activity_logs' => __('crm.meetings_empty_activity_logs'),
+                    default => __('crm.meetings_empty_default'),
                 }, 
                 'isActionable' => ($activeTab !== 'activity_logs'),
                 'isOverdue' => ($activeTab === 'overdue')
@@ -350,14 +350,31 @@
             <div class="modal-content border-0 shadow">
                 <div class="modal-header py-2.5 px-3 border-bottom">
                     <h6 class="modal-title fw-bold text-dark fs-14">
-                        <i class="feather-camera text-primary me-1.5"></i>Field Selfie Verification Photo
+                        <i class="feather-camera text-primary me-1.5"></i>{{ __('crm.meetings_selfie_verification_photo') }}
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-center p-3 bg-light">
                     <img id="meetingSelfieViewImg" src="" alt="Selfie" class="img-fluid rounded border shadow-sm"
-                        style="max-height: 400px; object-fit: contain;">
-                    <div id="meetingSelfieViewLocation" class="mt-2 text-muted fs-11"></div>
+                        style="max-height: 380px; object-fit: contain;">
+                    <div id="meetingSelfieErrorMsg" class="d-none py-4 text-muted">
+                        <i class="feather-image text-secondary fs-32 d-block mb-2"></i>
+                        <span class="fs-12">{{ __('crm.meetings_selfie_unable_to_display') }}</span>
+                    </div>
+
+                    <div id="meetingSelfieInfoBox" class="mt-2.5 p-2.5 bg-white rounded-3 border text-start shadow-2xs">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="fw-bold fs-11 text-dark d-flex align-items-center gap-1">
+                                <i class="feather-map-pin text-primary fs-12"></i> {{ __('crm.meetings_selfie_actual_location') }}
+                            </span>
+                            <span id="meetingSelfieStatusBadge" class="badge bg-soft-success text-success fs-10 fw-semibold"></span>
+                        </div>
+                        <div id="meetingSelfieViewLocation" class="text-secondary fs-12 fw-medium mb-1"></div>
+                        <div class="d-flex align-items-center justify-content-between text-muted fs-11 pt-1 border-top flex-wrap gap-1">
+                            <span id="meetingSelfieViewGPS"></span>
+                            <span id="meetingSelfieViewTime"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -365,6 +382,14 @@
 
     @push('scripts')
         <script>
+            // Initialize Bootstrap Tooltips for note and location popups
+            document.addEventListener('DOMContentLoaded', function () {
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                    new bootstrap.Tooltip(tooltipTriggerEl, { html: true });
+                });
+            });
+
             // Live Search Filter for Meeting Table Rows (Instant Client-side Filter + Server Submit on Enter)
             const searchInput = document.getElementById('meetingLiveSearch');
             const clearBtn = document.getElementById('clearMeetingSearch');
@@ -409,12 +434,55 @@
                 });
             }
 
-            // View selfie photo in modal
-            window.crmOpenSelfieModal = function (url, location) {
+            // View selfie photo in modal with actual status verification location
+            window.crmOpenSelfieModal = function (url, location, gps, time, status) {
+                if (url && typeof url === 'string') {
+                    while (url.includes('/storage/storage/')) {
+                        url = url.replace('/storage/storage/', '/storage/');
+                    }
+                }
                 const img = document.getElementById('meetingSelfieViewImg');
                 const loc = document.getElementById('meetingSelfieViewLocation');
-                if (img) img.src = url;
-                if (loc) loc.textContent = location ? ('Location: ' + location) : '';
+                const errMsg = document.getElementById('meetingSelfieErrorMsg');
+                const gpsEl = document.getElementById('meetingSelfieViewGPS');
+                const timeEl = document.getElementById('meetingSelfieViewTime');
+                const badgeEl = document.getElementById('meetingSelfieStatusBadge');
+                const infoBox = document.getElementById('meetingSelfieInfoBox');
+
+                if (errMsg) errMsg.classList.add('d-none');
+                if (img) {
+                    img.classList.remove('d-none');
+                    img.onerror = function () {
+                        this.classList.add('d-none');
+                        if (errMsg) errMsg.classList.remove('d-none');
+                    };
+                    img.src = url || '';
+                }
+
+                if (loc) {
+                    loc.textContent = location || (gps ? ('GPS: ' + gps) : 'Location captured during selfie verification');
+                }
+                if (gpsEl) {
+                    if (gps) {
+                        gpsEl.innerHTML = '<a href="https://maps.google.com/?q=' + encodeURIComponent(gps) + '" target="_blank" class="text-primary text-decoration-none hover-underline"><i class="feather-navigation me-1 fs-10"></i>' + gps + ' <i class="feather-external-link fs-9"></i></a>';
+                    } else {
+                        gpsEl.innerHTML = '';
+                    }
+                }
+                if (timeEl) {
+                    timeEl.innerHTML = time ? ('<i class="feather-clock text-muted me-1 fs-10"></i>' + time) : '';
+                }
+                if (badgeEl) {
+                    if (status) {
+                        badgeEl.textContent = status;
+                        const isMismatch = status.toLowerCase().includes('mismatch');
+                        badgeEl.className = 'badge ' + (isMismatch ? 'bg-soft-danger text-danger border border-danger-subtle' : 'bg-soft-success text-success border border-success-subtle') + ' fs-10 fw-semibold';
+                        badgeEl.classList.remove('d-none');
+                    } else {
+                        badgeEl.classList.add('d-none');
+                    }
+                }
+
                 const modal = new bootstrap.Modal(document.getElementById('meetingSelfieViewModal'));
                 modal.show();
             };

@@ -19,6 +19,15 @@ class RbacSeeder extends Seeder
 
         $this->grant($roles['super_admin'], $permissions, RolePermission::SCOPE_PLATFORM);
 
+        $platformStaff = [
+            'platform_sales' => ['platform.console.access', 'platform.leads.manage', 'platform.tenants.view'],
+            'platform_support' => ['platform.console.access', 'platform.tenants.view', 'platform.usage.view', 'platform.support.manage'],
+            'platform_finance' => ['platform.console.access', 'platform.tenants.view', 'platform.usage.view', 'platform.subscriptions.manage', 'platform.payments.view', 'platform.payments.refund'],
+        ];
+        foreach ($platformStaff as $roleSlug => $names) {
+            $this->grant($roles[$roleSlug], array_intersect_key($permissions, array_flip($names)), RolePermission::SCOPE_PLATFORM);
+        }
+
         $this->grant($roles['tenant_owner'], $permissions, RolePermission::SCOPE_TENANT);
         $this->grant($roles['company_admin'], $permissions, RolePermission::SCOPE_TENANT);
 
@@ -510,6 +519,18 @@ class RbacSeeder extends Seeder
             ['name' => 'platform.currencies.manage', 'module' => 'platform', 'entity' => 'currencies', 'action' => 'manage'],
             ['name' => 'platform.usage.view', 'module' => 'platform', 'entity' => 'usage', 'action' => 'view'],
             ['name' => 'platform.payment_gateway.manage', 'module' => 'platform', 'entity' => 'payment_gateway', 'action' => 'manage'],
+            // The /admin platform console (EnsurePlatformAdmin) and what staff can do in it.
+            ['name' => 'platform.console.access', 'module' => 'platform', 'entity' => 'console', 'action' => 'access'],
+            ['name' => 'platform.leads.manage', 'module' => 'platform', 'entity' => 'leads', 'action' => 'manage'],
+            ['name' => 'platform.tenants.view', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'view'],
+            ['name' => 'platform.tenants.impersonate', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'impersonate'],
+            ['name' => 'platform.tenants.delete', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'delete'],
+            ['name' => 'platform.subscriptions.manage', 'module' => 'platform', 'entity' => 'subscriptions', 'action' => 'manage'],
+            ['name' => 'platform.payments.view', 'module' => 'platform', 'entity' => 'payments', 'action' => 'view'],
+            ['name' => 'platform.payments.refund', 'module' => 'platform', 'entity' => 'payments', 'action' => 'refund'],
+            ['name' => 'platform.support.manage', 'module' => 'platform', 'entity' => 'support', 'action' => 'manage'],
+            ['name' => 'platform.settings.manage', 'module' => 'platform', 'entity' => 'settings', 'action' => 'manage'],
+            ['name' => 'platform.audit.view', 'module' => 'platform', 'entity' => 'audit', 'action' => 'view'],
             ['name' => 'dashboard.tenant.manage', 'module' => 'dashboard', 'entity' => 'tenant', 'action' => 'manage'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
@@ -911,6 +932,10 @@ class RbacSeeder extends Seeder
     {
         $definitions = [
             ['slug' => 'super_admin', 'name' => 'Super Admin', 'tenant_id' => null, 'level' => 1],
+            // Platform staff (Role::PLATFORM_STAFF_SLUGS) — console only, never assignable to tenant users.
+            ['slug' => 'platform_sales', 'name' => 'Platform Sales', 'tenant_id' => null, 'level' => 2],
+            ['slug' => 'platform_support', 'name' => 'Platform Support', 'tenant_id' => null, 'level' => 2],
+            ['slug' => 'platform_finance', 'name' => 'Platform Finance', 'tenant_id' => null, 'level' => 2],
             ['slug' => 'tenant_owner', 'name' => 'Tenant Owner', 'tenant_id' => null, 'level' => 10],
             ['slug' => 'company_admin', 'name' => 'Company Admin', 'tenant_id' => null, 'level' => 20],
             ['slug' => 'production_manager', 'name' => 'Production Manager', 'tenant_id' => null, 'level' => 40],

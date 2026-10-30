@@ -110,7 +110,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end align-items-center">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-bu" data-bs-toggle="modal" data-bs-target="#viewBuModal" data-bu="{{ base64_encode($unit->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-bu" data-bs-toggle="modal" data-bs-target="#viewBuModal" data-bu="{{ json_encode($unit) }}" title="{{ __('hrms.common.view') ?? 'View' }}">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         <x-ui.action-dropdown>
@@ -161,6 +161,7 @@
     </div>
 </div>
 
+@push('scripts')
 <script>
     (function() {
         // Bind company change listener for edit business unit modal
@@ -212,7 +213,7 @@
 
         // Delegated View Action Trigger
         $(document).on('click', '.btn-view-bu', function() {
-            let unit = JSON.parse(atob(this.dataset.bu));
+            let unit = JSON.parse(this.dataset.bu);
             
             let nameEl = document.getElementById('modal_view_bu_name');
             if (nameEl) nameEl.innerText = unit.name;
@@ -289,6 +290,7 @@
         });
     })();
 </script>
+@endpush
 
 <!-- View BU Modal -->
 <div class="modal fade" id="viewBuModal" tabindex="-1" aria-labelledby="viewBuModalLabel" aria-hidden="true">

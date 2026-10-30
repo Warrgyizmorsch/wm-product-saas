@@ -72,6 +72,9 @@ class LeadFollowupController extends Controller
                 'tagged_user_ids' => $validated['tagged_user_ids'] ?? null,
                 'sync_google_calendar' => $request->boolean('sync_google_calendar'),
                 'create_meet_link' => $request->boolean('create_meet_link'),
+                'latitude' => $request->filled('latitude') ? (float)$request->input('latitude') : null,
+                'longitude' => $request->filled('longitude') ? (float)$request->input('longitude') : null,
+                'location_address' => $request->input('location_address'),
             ]);
 
             try {
@@ -99,6 +102,10 @@ class LeadFollowupController extends Controller
                 $contextSuffix = "Scheduled " . $nextType . " after " . strtolower($pastType) . " interaction";
                 $nextNotes = !empty($pastNotes) ? ($pastNotes . " | " . $contextSuffix) : $contextSuffix;
 
+                $nextLat = $request->filled('next_latitude') ? (float)$request->input('next_latitude') : ($request->filled('latitude') ? (float)$request->input('latitude') : null);
+                $nextLng = $request->filled('next_longitude') ? (float)$request->input('next_longitude') : ($request->filled('longitude') ? (float)$request->input('longitude') : null);
+                $nextAddr = $request->input('next_location_address') ?: $request->input('location_address');
+
                 $this->followupService->storeFollowup($lead, [
                     'type' => $nextType,
                     'title' => $request->input('next_title') ?: ($request->input('title') ?: ("Next " . $nextType . " with " . ($lead->company_name ?: $lead->contact_person))),
@@ -110,6 +117,9 @@ class LeadFollowupController extends Controller
                     'tagged_user_ids' => $validated['tagged_user_ids'] ?? null,
                     'sync_google_calendar' => $request->has('next_sync_google_calendar') ? $request->boolean('next_sync_google_calendar') : ($request->has('sync_google_calendar') ? $request->boolean('sync_google_calendar') : false),
                     'create_meet_link' => $request->has('next_create_meet_link') ? $request->boolean('next_create_meet_link') : $request->boolean('create_meet_link'),
+                    'latitude' => $nextLat,
+                    'longitude' => $nextLng,
+                    'location_address' => $nextAddr,
                 ]);
 
                 try {
@@ -152,14 +162,24 @@ class LeadFollowupController extends Controller
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'location_address' => ['nullable', 'string', 'max:500'],
+            'checkin_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'checkin_longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'checkin_address' => ['nullable', 'string', 'max:500'],
             'selfie' => ['nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
             'selfie_base64' => ['nullable', 'string'],
         ];
 
         // Controller-side strict enforcement only when setting is enabled
         if ($isGeoVerificationEnabled && $isCompletingMeeting) {
-            $rules['latitude'] = ['required', 'numeric', 'between:-90,90'];
-            $rules['longitude'] = ['required', 'numeric', 'between:-180,180'];
+            $hasLat = $request->filled('checkin_latitude') || $request->filled('latitude') || $followup->checkin_latitude !== null || $followup->latitude !== null;
+            $hasLng = $request->filled('checkin_longitude') || $request->filled('longitude') || $followup->checkin_longitude !== null || $followup->longitude !== null;
+
+            if (!$hasLat) {
+                $rules['checkin_latitude'] = ['required', 'numeric', 'between:-90,90'];
+            }
+            if (!$hasLng) {
+                $rules['checkin_longitude'] = ['required', 'numeric', 'between:-180,180'];
+            }
 
             // Selfie is strictly required if not already uploaded/captured
             if (!$followup->selfie_path && !$request->hasFile('selfie') && !$request->filled('selfie_base64')) {
@@ -168,6 +188,8 @@ class LeadFollowupController extends Controller
         }
 
         $messages = [
+            'checkin_latitude.required' => 'Live GPS location is required to complete this meeting.',
+            'checkin_longitude.required' => 'Live GPS coordinates are required to complete this meeting.',
             'latitude.required' => 'Live GPS location is required to complete this meeting.',
             'longitude.required' => 'Live GPS coordinates are required to complete this meeting.',
             'selfie.required' => 'A live front camera selfie is required to complete this meeting.',
@@ -176,43 +198,27 @@ class LeadFollowupController extends Controller
 
         $validated = $request->validate($rules, $messages);
 
-        if ($request->filled('selfie_base64')) {
-            $base64Data = (string) $request->input('selfie_base64');
-            if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
-                $imageType = strtolower($type[1]);
-                if (in_array($imageType, ['jpeg', 'jpg', 'png', 'webp'])) {
-                    $data = substr($base64Data, strpos($base64Data, ',') + 1);
-                    $decoded = base64_decode($data);
-                    if ($decoded !== false && strlen($decoded) <= 5242880) { // Max 5MB
-                        $filename = \Illuminate\Support\Str::uuid() . '.' . ($imageType === 'jpeg' ? 'jpg' : $imageType);
-                        \Illuminate\Support\Facades\Storage::disk('public')->put('crm/selfies/' . $filename, $decoded);
-                        $validated['selfie_path'] = 'storage/crm/selfies/' . $filename;
-                        $validated['location_verified_at'] = now();
-                    }
-                }
+        $verificationData = $isGeoVerificationEnabled ? $this->followupService->extractVerificationPayload($request, $followup, $isCompletingMeeting) : [];
+        $updatePayload = array_merge($validated, $verificationData);
+
+        // Haversine Geofence audit notes
+        if ($isCompletingMeeting && $followup->latitude !== null && $followup->longitude !== null) {
+            $dist = $updatePayload['checkin_distance_meters'] ?? null;
+            $allowedRadius = (int)($settings['geofence_radius_meters'] ?? 500);
+            $statusNotes = trim($validated['notes'] ?? '');
+            if ($dist !== null && $dist <= $allowedRadius) {
+                $statusNotes .= " [Geo-Fence: Verified On-Site ({$dist}m from scheduled venue)]";
+            } elseif ($dist !== null) {
+                $distKm = round($dist / 1000, 2);
+                $statusNotes .= " [Geo-Fence Warning: Location Mismatch ({$dist}m / {$distKm}km away from venue, permitted: {$allowedRadius}m)]";
             }
-        } elseif ($request->hasFile('selfie')) {
-            $file = $request->file('selfie');
-            $filename = \Illuminate\Support\Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('crm/selfies', $filename, 'public');
-            $validated['selfie_path'] = 'storage/' . $path;
-            $validated['location_verified_at'] = now();
+            if ($statusNotes !== '') {
+                $newNotes = $followup->notes ?? '';
+                $updatePayload['notes'] = $newNotes ? ($newNotes . "\n\n[" . now()->format('Y-m-d H:i') . " Status: {$targetStatus}] " . $statusNotes) : $statusNotes;
+            }
         }
 
-        if ($request->filled('latitude')) {
-            $validated['latitude'] = (float) $request->input('latitude');
-        }
-        if ($request->filled('longitude')) {
-            $validated['longitude'] = (float) $request->input('longitude');
-        }
-        if ($request->filled('location_address')) {
-            $validated['location_address'] = $request->input('location_address');
-        }
-        if ($request->filled('latitude') && empty($validated['location_verified_at'])) {
-            $validated['location_verified_at'] = now();
-        }
-
-        $msg = $this->followupService->updateOrReschedule($followup, $validated, $request->boolean('is_reschedule'));
+        $msg = $this->followupService->updateOrReschedule($followup, $updatePayload, $request->boolean('is_reschedule'));
 
         return redirect()->back()->with('success', $msg);
     }
@@ -299,6 +305,9 @@ class LeadFollowupController extends Controller
                 'notes' => $notes,
                 'tagged_user_id' => $primaryTaggedId,
                 'tagged_user_ids' => $taggedUserIds,
+                'latitude' => $request->filled('latitude') ? (float)$request->input('latitude') : null,
+                'longitude' => $request->filled('longitude') ? (float)$request->input('longitude') : null,
+                'location_address' => $request->input('location_address'),
             ]);
 
             $syncGoogle = $request->boolean('sync_google_calendar') || $request->boolean('create_meet_link');
@@ -399,6 +408,10 @@ class LeadFollowupController extends Controller
                     $nextDateTime = \Illuminate\Support\Carbon::now();
                 }
 
+                $nextLat = $request->filled('next_latitude') ? (float)$request->input('next_latitude') : ($request->filled('latitude') ? (float)$request->input('latitude') : null);
+                $nextLng = $request->filled('next_longitude') ? (float)$request->input('next_longitude') : ($request->filled('longitude') ? (float)$request->input('longitude') : null);
+                $nextAddr = $request->input('next_location_address') ?: $request->input('location_address');
+
                 LeadFollowup::create([
                     'tenant_id' => $tenantId,
                     'crm_deal_id' => $deal->id,
@@ -409,6 +422,9 @@ class LeadFollowupController extends Controller
                     'notes' => $nextNotes,
                     'tagged_user_id' => $primaryTaggedId,
                     'tagged_user_ids' => $taggedUserIds,
+                    'latitude' => $nextLat,
+                    'longitude' => $nextLng,
+                    'location_address' => $nextAddr,
                 ]);
             }
         }
@@ -430,7 +446,7 @@ class LeadFollowupController extends Controller
         }
 
         $user = auth()->user();
-        $userId = (int)($request->input('user_id') ?: ($user?->id ?? 1));
+        $userId = (int) ($request->input('user_id') ?: ($user?->id ?? 1));
         $tenantId = $user?->tenant_id ?? (tenant_id() ?? 1);
 
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
@@ -441,25 +457,39 @@ class LeadFollowupController extends Controller
             ->where('tenant_id', $tenantId)
             ->where(function ($q) {
                 $q->where('type', 'Meeting')
-                  ->orWhereNull('type');
+                    ->orWhereNull('type');
             })
             ->where(function ($q) use ($userId) {
+                // 1. If assigned to a specific person -> only that assignee sees it in My Meetings
                 $q->where(function ($sub) use ($userId) {
-                    $sub->whereNotNull('crm_deal_id')
-                        ->whereHas('deal', function ($dq) use ($userId) {
-                            $dq->withoutGlobalScope('branch')->where('owner_id', $userId);
-                        });
+                    $sub->where('tagged_user_id', $userId)
+                        ->orWhereJsonContains('tagged_user_ids', $userId)
+                        ->orWhereJsonContains('tagged_user_ids', (string) $userId);
                 })
-                ->orWhere(function ($sub) use ($userId) {
-                    $sub->whereNotNull('lead_id')
-                        ->whereNull('crm_deal_id')
-                        ->whereHas('lead', function ($lq) use ($userId) {
-                            $lq->withoutGlobalScope('branch')->where('lead_owner_id', $userId);
+                    // 2. If unassigned -> falls back to Lead owner or Deal owner
+                    ->orWhere(function ($sub) use ($userId) {
+                    $sub->whereNull('tagged_user_id')
+                        ->where(function ($emptyCheck) {
+                            $emptyCheck->whereNull('tagged_user_ids')
+                                ->orWhere('tagged_user_ids', '[]')
+                                ->orWhere('tagged_user_ids', '');
+                        })
+                        ->where(function ($ownerSub) use ($userId) {
+                            $ownerSub->where(function ($dealSub) use ($userId) {
+                                $dealSub->whereNotNull('crm_deal_id')
+                                    ->whereHas('deal', function ($dq) use ($userId) {
+                                        $dq->withoutGlobalScope('branch')->where('owner_id', $userId);
+                                    });
+                            })
+                                ->orWhere(function ($leadSub) use ($userId) {
+                                    $leadSub->whereNotNull('lead_id')
+                                        ->whereNull('crm_deal_id')
+                                        ->whereHas('lead', function ($lq) use ($userId) {
+                                            $lq->withoutGlobalScope('branch')->where('lead_owner_id', $userId);
+                                        });
+                                });
                         });
-                })
-                ->orWhere('tagged_user_id', $userId)
-                ->orWhereJsonContains('tagged_user_ids', $userId)
-                ->orWhereJsonContains('tagged_user_ids', (string)$userId);
+                });
             });
 
         $startOfToday = now()->startOfDay();
@@ -501,23 +531,23 @@ class LeadFollowupController extends Controller
             $listingQuery->whereDate('followup_date', '<=', $dateTo);
         }
 
-        if ($search = trim((string)$request->input('search'))) {
+        if ($search = trim((string) $request->input('search'))) {
             $listingQuery->where(function ($sq) use ($search) {
                 $sq->where('title', 'like', "%{$search}%")
-                   ->orWhere('notes', 'like', "%{$search}%")
-                   ->orWhereHas('lead', function ($lq) use ($search) {
-                       $lq->withoutGlobalScope('branch')
-                          ->where('company_name', 'like', "%{$search}%")
-                          ->orWhere('contact_person', 'like', "%{$search}%")
-                          ->orWhere('phone', 'like', "%{$search}%")
-                          ->orWhere('email', 'like', "%{$search}%");
-                   })
-                   ->orWhereHas('deal', function ($dq) use ($search) {
-                       $dq->withoutGlobalScope('branch')
-                          ->where('title', 'like', "%{$search}%")
-                          ->orWhereHas('account', fn($aq) => $aq->where('name', 'like', "%{$search}%"))
-                          ->orWhereHas('contact', fn($cq) => $cq->where('name', 'like', "%{$search}%"));
-                   });
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhereHas('lead', function ($lq) use ($search) {
+                        $lq->withoutGlobalScope('branch')
+                            ->where('company_name', 'like', "%{$search}%")
+                            ->orWhere('contact_person', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('deal', function ($dq) use ($search) {
+                        $dq->withoutGlobalScope('branch')
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhereHas('account', fn($aq) => $aq->where('name', 'like', "%{$search}%"))
+                            ->orWhereHas('contact', fn($cq) => $cq->where('name', 'like', "%{$search}%"));
+                    });
             });
         }
 
@@ -527,8 +557,8 @@ class LeadFollowupController extends Controller
 
         if ($sortBy === 'company') {
             $listingQuery->leftJoin('leads', 'lead_followups.lead_id', '=', 'leads.id')
-                         ->orderBy('leads.company_name', $sortOrder)
-                         ->select('lead_followups.*');
+                ->orderBy('leads.company_name', $sortOrder)
+                ->select('lead_followups.*');
         } else {
             $listingQuery->orderBy('followup_date', $sortOrder);
         }
@@ -544,33 +574,33 @@ class LeadFollowupController extends Controller
         ])->paginate(15)->withQueryString();
 
         $paginated->through(function (LeadFollowup $item) use ($isGeoVerificationEnabled) {
-            $isMeeting = strcasecmp((string)$item->type, 'Meeting') === 0;
+            $isMeeting = strcasecmp((string) $item->type, 'Meeting') === 0;
 
             $leadData = null;
             $leadData = null;
             if ($item->lead) {
                 $l = $item->lead;
                 $leadData = [
-                    'id'              => $l->id,
-                    'lead_number'     => $l->lead_number,
-                    'company_name'    => $l->company_name,
-                    'contact_person'  => $l->contact_person,
-                    'designation'     => $l->designation,
-                    'phone'           => $l->phone ?: $l->company_phone,
-                    'email'           => $l->email ?: $l->company_email,
-                    'status'          => $l->status,
-                    'priority'        => $l->priority,
-                    'segment'         => $l->segment,
-                    'industry_type'   => $l->industry_type,
-                    'source'          => $l->source,
-                    'city'            => $l->city,
-                    'state'           => $l->state,
-                    'address'         => $l->address,
-                    'requirement'     => $l->requirement,
-                    'expected_amount' => $l->expected_amount !== null ? (float)$l->expected_amount : null,
-                    'lead_owner'      => [
-                        'id'    => $l->owner?->id ?? $l->lead_owner_id,
-                        'name'  => $l->owner?->name,
+                    'id' => $l->id,
+                    'lead_number' => $l->lead_number,
+                    'company_name' => $l->company_name,
+                    'contact_person' => $l->contact_person,
+                    'designation' => $l->designation,
+                    'phone' => $l->phone ?: $l->company_phone,
+                    'email' => $l->email ?: $l->company_email,
+                    'status' => $l->status,
+                    'priority' => $l->priority,
+                    'segment' => $l->segment,
+                    'industry_type' => $l->industry_type,
+                    'source' => $l->source,
+                    'city' => $l->city,
+                    'state' => $l->state,
+                    'address' => $l->address,
+                    'requirement' => $l->requirement,
+                    'expected_amount' => $l->expected_amount !== null ? (float) $l->expected_amount : null,
+                    'lead_owner' => [
+                        'id' => $l->owner?->id ?? $l->lead_owner_id,
+                        'name' => $l->owner?->name,
                         'email' => $l->owner?->email,
                     ],
                 ];
@@ -580,54 +610,80 @@ class LeadFollowupController extends Controller
             if ($item->deal) {
                 $d = $item->deal;
                 $dealData = [
-                    'id'              => $d->id,
-                    'deal_number'     => $d->deal_number,
-                    'title'           => $d->title,
-                    'stage'           => $d->stage,
-                    'probability'     => $d->probability,
-                    'estimated_value' => $d->estimated_value !== null ? (float)$d->estimated_value : null,
-                    'customer_name'   => $d->account?->name ?: ($d->contact?->name ?? null),
-                    'contact_name'    => $d->contact?->name ?? null,
-                    'contact_phone'   => $d->contact?->phone ?? null,
-                    'contact_email'   => $d->contact?->email ?? null,
-                    'closing_date'    => $d->closing_date ? $d->closing_date->format('d M, Y') : null,
-                    'deal_owner'      => [
-                        'id'    => $d->owner?->id ?? $d->owner_id,
-                        'name'  => $d->owner?->name,
+                    'id' => $d->id,
+                    'deal_number' => $d->deal_number,
+                    'title' => $d->title,
+                    'stage' => $d->stage,
+                    'probability' => $d->probability,
+                    'estimated_value' => $d->estimated_value !== null ? (float) $d->estimated_value : null,
+                    'customer_name' => $d->account?->name ?: ($d->contact?->name ?? null),
+                    'contact_name' => $d->contact?->name ?? null,
+                    'contact_phone' => $d->contact?->phone ?? null,
+                    'contact_email' => $d->contact?->email ?? null,
+                    'closing_date' => $d->closing_date ? $d->closing_date->format('d M, Y') : null,
+                    'deal_owner' => [
+                        'id' => $d->owner?->id ?? $d->owner_id,
+                        'name' => $d->owner?->name,
                         'email' => $d->owner?->email,
                     ],
                 ];
             }
 
-            $isGeoVerified = !empty($item->latitude) && !empty($item->longitude) && !empty($item->selfie_path);
-            $selfieUrl = !empty($item->selfie_path) ? asset('storage/' . $item->selfie_path) : null;
+            $isGeoVerified = (!empty($item->checkin_latitude) || !empty($item->latitude)) && !empty($item->selfie_path);
+            $selfieUrl = $item->selfie_url;
             $isGeoRequired = $isGeoVerificationEnabled && $isMeeting;
 
             return [
-                'id'                           => $item->id,
-                'lead_id'                      => $item->lead_id,
-                'crm_deal_id'                  => $item->crm_deal_id,
-                'type'                         => $item->type,
-                'title'                        => $item->title,
-                'notes'                        => $item->notes,
-                'status'                       => $item->status,
-                'followup_date'                => $item->followup_date ? $item->followup_date->format('Y-m-d H:i:s') : null,
-                'duration_minutes'             => $item->duration_minutes ?: 30,
-                'google_meet_link'             => $item->google_meet_link,
-                'latitude'                     => $item->latitude,
-                'longitude'                    => $item->longitude,
-                'location_address'             => $item->location_address,
-                'selfie_path'                  => $item->selfie_path,
-                'selfie_url'                   => $selfieUrl,
-                'is_geo_verified'              => $isGeoVerified,
+                'id' => $item->id,
+                'lead_id' => $item->lead_id,
+                'crm_deal_id' => $item->crm_deal_id,
+                'type' => $item->type,
+                'title' => $item->title,
+                'notes' => $item->notes,
+                'status' => $item->status,
+                'followup_date' => $item->followup_date ? $item->followup_date->format('Y-m-d H:i:s') : null,
+                'duration_minutes' => $item->duration_minutes ?: 30,
+                'google_meet_link' => $item->google_meet_link,
+                'latitude' => $item->latitude,
+                'longitude' => $item->longitude,
+                'location_address' => $item->location_address,
+                'checkin_latitude' => $item->checkin_latitude,
+                'checkin_longitude' => $item->checkin_longitude,
+                'checkin_address' => $item->checkin_address,
+                'checkin_distance_meters' => $item->checkin_distance_meters,
+                'checkin_status' => $item->checkin_status,
+                'checkin_at' => $item->checkin_at ? $item->checkin_at->format('Y-m-d H:i:s') : null,
+                'selfie_path' => $item->selfie_path,
+                'selfie_url' => $selfieUrl,
+                'is_geo_verified' => $isGeoVerified,
                 'is_geo_verification_required' => $isGeoRequired,
-                'lead'                         => $leadData,
-                'deal'                         => $dealData,
-                'tagged_user'                  => $item->taggedUser ? [
-                    'id'    => $item->taggedUser->id,
-                    'name'  => $item->taggedUser->name,
+                'lead' => $leadData,
+                'deal' => $dealData,
+                'tagged_user' => $item->taggedUser ? [
+                    'id' => $item->taggedUser->id,
+                    'name' => $item->taggedUser->name,
                     'email' => $item->taggedUser->email,
                 ] : null,
+                'tagged_users' => $item->tagged_users->map(fn($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                ])->values()->all(),
+                'assigned_to' => $item->taggedUser ? [
+                    'id' => $item->taggedUser->id,
+                    'name' => $item->taggedUser->name,
+                    'email' => $item->taggedUser->email,
+                ] : null,
+                'assigned_by' => $item->lead?->owner ? [
+                    'id' => $item->lead->owner->id,
+                    'name' => $item->lead->owner->name,
+                    'email' => $item->lead->owner->email,
+                ] : ($item->deal?->owner ? [
+                        'id' => $item->deal->owner->id,
+                        'name' => $item->deal->owner->name,
+                        'email' => $item->deal->owner->email,
+                    ] : null),
+                'is_delegated' => !empty($item->tagged_user_id),
             ];
         });
 
@@ -690,5 +746,24 @@ class LeadFollowupController extends Controller
         }
 
         return redirect()->back()->withErrors($data['errors'] ?? [])->with('error', $data['message'] ?? 'Could not reschedule meeting.');
+    }
+
+    /**
+     * Assign or delegate meeting to another sales person / team member
+     */
+    public function assignMeeting(Request $request, LeadFollowup $followup)
+    {
+        $response = app(\App\Domains\CRM\Controllers\Api\LeadFollowupApiController::class)->assignMeeting($followup);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return $response;
+        }
+
+        $data = $response->getData(true);
+        if (!empty($data['success'])) {
+            return redirect()->back()->with('success', $data['message'] ?? 'Meeting assigned successfully.');
+        }
+
+        return redirect()->back()->withErrors($data['errors'] ?? [])->with('error', $data['message'] ?? 'Could not assign meeting.');
     }
 }

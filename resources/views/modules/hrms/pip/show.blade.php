@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'PIP Workspace: ' . $pip->pip_number . ' | HRMS')
-@section('page-title', 'PIP Workspace: ' . $pip->pip_number)
-@section('breadcrumb', 'HRMS / PIP / Workspace')
+@section('title', __('hrms.pip.meta_workspace_title', ['number' => $pip->pip_number]))
+@section('page-title', __('hrms.pip.workspace_title', ['number' => $pip->pip_number]))
+@section('breadcrumb', __('hrms.pip.breadcrumb_workspace'))
 
 @section('page-actions')
     @php
@@ -13,19 +13,19 @@
     <div class="d-flex align-items-center gap-2">
         @if($canManagePip)
             <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.pip.index') }}" class="border text-dark fw-semibold">
-                Back to PIP Plans
+                {{ __('hrms.pip.back_to_plans') }}
             </x-ui.button>
         @else
             <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.employees.show', ['employee' => $pip->employee_id, 'tab' => 'pip']) }}" class="border text-dark fw-semibold">
-                Back to Profile
+                {{ __('hrms.pip.back_to_profile') }}
             </x-ui.button>
         @endif
         @if($canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
             <x-ui.button variant="primary" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#addCheckinModal" class="fw-bold">
-                Log Check-in
+                {{ __('hrms.pip.btn_log_checkin') }}
             </x-ui.button>
             <x-ui.button variant="warning" icon="feather-flag" data-bs-toggle="modal" data-bs-target="#evaluateModal" class="fw-bold text-dark">
-                Final Evaluation
+                {{ __('hrms.pip.btn_final_evaluation') }}
             </x-ui.button>
         @endif
     </div>
@@ -44,6 +44,38 @@
         justify-content: center;
         font-weight: 700;
         font-size: 18px;
+    }
+    .pip-table-fixed {
+        table-layout: fixed !important;
+        width: 100% !important;
+    }
+    .pip-table-fixed th,
+    .pip-table-fixed td {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+    .pip-table-wrapper {
+        overflow-x: hidden;
+        width: 100%;
+    }
+    @media (max-width: 767.98px) {
+        .pip-table-wrapper {
+            overflow-x: auto !important;
+        }
+        .pip-table-fixed {
+            min-width: 650px;
+        }
+    }
+    .pip-cell-icon {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        margin-right: 8px !important;
+        margin-top: 2.5px !important;
+        line-height: 1 !important;
     }
 </style>
 @endpush
@@ -88,183 +120,192 @@
                                 };
                             @endphp
                             <x-ui.badge soft variant="{{ $badgeVariant }}" class="text-capitalize">
-                                {{ str_replace('_', ' ', $pip->status) }}
+                                {{ __('hrms.pip.status_' . $pip->status) }}
                             </x-ui.badge>
                         </div>
                         <h5 class="fw-semibold text-dark mt-1 mb-0">{{ $pip->employee->full_name }}</h5>
                         <div class="text-muted fs-12 mt-1">
-                            {{ $pip->employee->designation?->name ?? 'N/A' }} &bull; {{ $pip->employee->department?->name ?? 'N/A' }} &bull; Emp ID: <code>{{ $pip->employee->employee_id }}</code>
+                            {{ $pip->employee->designation?->name ?? __('hrms.common.na') }} &bull; {{ $pip->employee->department?->name ?? __('hrms.common.na') }} &bull; {{ __('hrms.pip.emp_id_label') }} <code>{{ $pip->employee->employee_id }}</code>
                         </div>
                     </div>
                 </div>
 
                 <div class="d-flex flex-column text-end">
-                    <span class="fs-12 text-muted fw-semibold text-uppercase">Timeline</span>
+                    <span class="fs-12 text-muted fw-semibold text-uppercase">{{ __('hrms.pip.timeline') }}</span>
                     <span class="fs-14 fw-bold text-dark mt-1">
-                        {{ $pip->start_date ? $pip->start_date->format('M d, Y') : 'N/A' }} - {{ $pip->end_date ? $pip->end_date->format('M d, Y') : 'N/A' }}
+                        {{ $pip->start_date ? $pip->start_date->format('M d, Y') : __('hrms.common.na') }} - {{ $pip->end_date ? $pip->end_date->format('M d, Y') : __('hrms.common.na') }}
                     </span>
                     <small class="text-muted mt-1 fs-11">
-                        Manager: <strong class="text-dark">{{ $pip->manager?->full_name ?? 'N/A' }}</strong>
+                        {{ __('hrms.pip.manager_label') }} <strong class="text-dark">{{ $pip->manager?->full_name ?? __('hrms.common.na') }}</strong>
                     </small>
                 </div>
             </div>
-        <!-- ACKNOWLEDGEMENT STATUS BANNER -->
-        @if($pip->employee_acknowledged_at)
-            <div class="alert alert-success border-0 d-flex flex-wrap align-items-center justify-content-between p-3 rounded mb-4">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="feather-check-circle fs-18 text-success"></i>
-                    <div>
-                        <strong class="text-success fs-13">Employee Digitally Acknowledged</strong>
-                        <div class="text-muted fs-11">
-                            Acknowledged by <strong>{{ $pip->employee->full_name }}</strong> on {{ $pip->employee_acknowledged_at->format('M d, Y h:i A') }}
-                            @if($pip->employee_signature)
-                                &bull; Signature: <code>{{ $pip->employee_signature }}</code>
+
+            <!-- ACKNOWLEDGEMENT STATUS BANNER -->
+            @if($pip->employee_acknowledged_at)
+                <x-ui.alert variant="success" class="d-flex flex-wrap align-items-center justify-content-between p-3 rounded mb-4 mt-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="feather-check-circle fs-18 text-success"></i>
+                        <div>
+                            <strong class="text-success fs-13">{{ __('hrms.pip.ack_employee_acknowledged') }}</strong>
+                            <div class="text-muted fs-11">
+                                {{ __('hrms.pip.ack_by_on', ['name' => $pip->employee->full_name, 'date' => $pip->employee_acknowledged_at->format('M d, Y h:i A')]) }}
+                                @if($pip->employee_signature)
+                                    &bull; {{ __('hrms.pip.signature_label') }} <code>{{ $pip->employee_signature }}</code>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    <x-ui.badge soft variant="success" class="fs-11">{{ __('hrms.pip.status_acknowledged') }}</x-ui.badge>
+                </x-ui.alert>
+            @elseif(isset($canAcknowledge) && $canAcknowledge)
+                <x-ui.alert variant="warning" class="d-flex flex-wrap align-items-center justify-content-between gap-3 p-3 rounded mb-4 mt-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="feather-alert-triangle fs-18 text-warning"></i>
+                        <div>
+                            <strong class="text-dark fs-13">{{ __('hrms.pip.ack_action_required') }}</strong>
+                            <div class="text-muted fs-11">{{ __('hrms.pip.ack_instructions') }}</div>
+                        </div>
+                    </div>
+                    <x-ui.button variant="warning" size="sm" class="fw-bold text-dark px-3" data-bs-toggle="modal" data-bs-target="#acknowledgePipModal">
+                        <i class="feather-check-square me-1"></i> {{ __('hrms.pip.btn_acknowledge_plan') }}
+                    </x-ui.button>
+                </x-ui.alert>
+            @endif
+
+            <!-- REASON FOR PIP & CORE DEFICIENCIES -->
+            <div class="p-3 bg-white rounded border mt-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div class="flex-grow-1" style="min-width: 280px; max-width: 70%;">
+                        <h6 class="fw-bold text-dark mb-1 fs-13"><i class="feather-alert-circle me-1 text-primary"></i> {{ __('hrms.pip.reason_deficiencies') }}</h6>
+                        <p class="fs-13 text-secondary mb-0 style-line-height">{{ $pip->reason_details ?? '—' }}</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-4 border-start ps-3 flex-wrap">
+                        <div>
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold">{{ __('hrms.pip.pip_category') }}</span>
+                            <x-ui.badge soft variant="primary" class="mt-1 text-wrap text-break text-start" style="white-space: normal; line-height: 1.35; max-width: 250px;">
+                                <i class="feather-tag me-1"></i> {{ $pip->category?->name ?? __('hrms.pip.general_performance') }}
+                            </x-ui.badge>
+                        </div>
+                        @if($pip->template)
+                        <div>
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold">{{ __('hrms.pip.field_template_name') }}</span>
+                            <x-ui.badge soft variant="info" class="mt-1">
+                                <i class="feather-file-text me-1"></i> {{ $pip->template->name }}
+                            </x-ui.badge>
+                        </div>
+                        @endif
+                        <div>
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold">{{ __('hrms.pip.checkin_frequency') }}</span>
+                            <span class="fw-semibold text-dark text-capitalize mt-1 d-inline-block fs-12">
+                                <i class="feather-clock me-1 text-primary"></i> {{ __('hrms.pip.freq_' . $pip->checkin_frequency) }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold">{{ __('hrms.pip.next_checkin_due') }}</span>
+                            @if($pip->is_checkin_overdue)
+                                <x-ui.badge soft variant="danger" class="mt-1 fs-12">
+                                    <i class="feather-alert-triangle me-1"></i> {{ __('hrms.pip.checkin_overdue_badge', ['date' => $pip->next_checkin_due_date?->format('M d')]) }}
+                                </x-ui.badge>
+                            @elseif($pip->next_checkin_due_date)
+                                <span class="fw-semibold text-dark mt-1 d-inline-block fs-12">
+                                    <i class="feather-calendar me-1 text-primary"></i> {{ $pip->next_checkin_due_date->format('M d, Y') }}
+                                </span>
+                            @else
+                                <span class="text-muted fs-12 mt-1 d-inline-block">—</span>
                             @endif
                         </div>
                     </div>
                 </div>
-                <x-ui.badge soft variant="success" class="fs-11">Acknowledged</x-ui.badge>
-            </div>
-        @elseif(isset($canAcknowledge) && $canAcknowledge)
-            <div class="alert alert-warning border-0 d-flex flex-wrap align-items-center justify-content-between gap-3 p-3 rounded mb-4">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="feather-alert-triangle fs-18 text-warning"></i>
-                    <div>
-                        <strong class="text-dark fs-13">Action Required: Digital Acknowledgement Pending</strong>
-                        <div class="text-muted fs-11">Please review the PIP plan guidelines, SMART objectives, and company support details below and submit your digital acknowledgement.</div>
-                    </div>
-                </div>
-                <x-ui.button variant="warning" size="sm" class="fw-bold text-dark px-3" data-bs-toggle="modal" data-bs-target="#acknowledgePipModal">
-                    <i class="feather-check-square me-1"></i> Acknowledge Plan
-                </x-ui.button>
-            </div>
-        @endif
 
-        <!-- REASON FOR PIP & CORE DEFICIENCIES (FULL-WIDTH CARD) -->
-        <div class="p-3 bg-light rounded border mb-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                <div class="flex-grow-1" style="min-width: 280px; max-width: 70%;">
-                    <h6 class="fw-bold text-dark mb-1 fs-13"><i class="feather-alert-circle me-1 text-primary"></i> Reason for PIP & Core Deficiencies</h6>
-                    <p class="fs-13 text-secondary mb-0 style-line-height">{{ $pip->reason_details ?? '—' }}</p>
-                </div>
-                <div class="d-flex align-items-center gap-4 border-start ps-3 flex-wrap">
-                    <div>
-                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">PIP Category</span>
-                        <x-ui.badge soft variant="primary" class="mt-1">
-                            <i class="feather-tag me-1"></i> {{ $pip->category?->name ?? 'General Performance' }}
-                        </x-ui.badge>
-                    </div>
-                    @if($pip->template)
-                    <div>
-                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Policy Template</span>
-                        <x-ui.badge soft variant="info" class="mt-1">
-                            <i class="feather-file-text me-1"></i> {{ $pip->template->name }}
-                        </x-ui.badge>
-                    </div>
-                    @endif
-                    <div>
-                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Check-in Frequency</span>
-                        <span class="fw-semibold text-dark text-capitalize mt-1 d-inline-block fs-12">
-                            <i class="feather-clock me-1 text-primary"></i> {{ $pip->checkin_frequency }}
-                        </span>
-                    </div>
-                    <div>
-                        <span class="text-muted d-block fs-11 text-uppercase fw-semibold">Next Check-in Due</span>
-                        @if($pip->is_checkin_overdue)
-                            <x-ui.badge soft variant="danger" class="mt-1 fs-12">
-                                <i class="feather-alert-triangle me-1"></i> Overdue ({{ $pip->next_checkin_due_date?->format('M d') }})
-                            </x-ui.badge>
-                        @elseif($pip->next_checkin_due_date)
-                            <span class="fw-semibold text-dark mt-1 d-inline-block fs-12">
-                                <i class="feather-calendar me-1 text-primary"></i> {{ $pip->next_checkin_due_date->format('M d, Y') }}
-                            </span>
-                        @else
-                            <span class="text-muted fs-12 mt-1 d-inline-block">—</span>
+                @if($pip->support_provided || $pip->consequences || $pip->initial_notes)
+                    <div class="mt-3 pt-3 border-top row g-3">
+                        @if($pip->support_provided)
+                            <div class="col-md-4">
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-help-circle me-1 text-primary"></i> {{ __('hrms.pip.field_support') }}</span>
+                                <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->support_provided }}</p>
+                            </div>
+                        @endif
+                        @if($pip->consequences)
+                            <div class="col-md-4">
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-alert-octagon me-1 text-danger"></i> {{ __('hrms.pip.field_consequences') }}</span>
+                                <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->consequences }}</p>
+                            </div>
+                        @endif
+                        @if($pip->initial_notes)
+                            <div class="col-md-4">
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-file-text me-1 text-muted"></i> {{ __('hrms.pip.field_initial_notes') }}</span>
+                                <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->initial_notes }}</p>
+                            </div>
                         @endif
                     </div>
-                </div>
+                @endif
+
+                @if($pip->final_outcome)
+                    <div class="mt-3 pt-3 border-top">
+                        <h6 class="fw-bold text-dark mb-1 fs-11 text-uppercase">{{ __('hrms.pip.final_evaluation_outcome') }}</h6>
+                        <x-ui.badge variant="primary" class="mb-1">{{ __('hrms.pip.status_' . $pip->final_outcome) }}</x-ui.badge>
+                        <p class="fs-12 text-muted mb-0"><em>"{{ $pip->final_comments }}"</em></p>
+                    </div>
+                @endif
             </div>
-
-            @if($pip->support_provided || $pip->consequences || $pip->initial_notes)
-                <div class="mt-3 pt-3 border-top row g-3">
-                    @if($pip->support_provided)
-                        <div class="col-md-4">
-                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-help-circle me-1 text-primary"></i> Company Support & Resources</span>
-                            <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->support_provided }}</p>
-                        </div>
-                    @endif
-                    @if($pip->consequences)
-                        <div class="col-md-4">
-                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-alert-octagon me-1 text-danger"></i> Consequences of Failure</span>
-                            <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->consequences }}</p>
-                        </div>
-                    @endif
-                    @if($pip->initial_notes)
-                        <div class="col-md-4">
-                            <span class="text-muted d-block fs-11 text-uppercase fw-semibold"><i class="feather-file-text me-1 text-muted"></i> Initial Discussion Notes</span>
-                            <p class="fs-12 text-secondary mb-0 mt-1">{{ $pip->initial_notes }}</p>
-                        </div>
-                    @endif
-                </div>
-            @endif
-
-            @if($pip->final_outcome)
-                <div class="mt-3 pt-3 border-top">
-                    <h6 class="fw-bold text-dark mb-1 fs-11 text-uppercase">Final Evaluation Outcome</h6>
-                    <x-ui.badge variant="primary" class="mb-1">{{ str_replace('_', ' ', strtoupper($pip->final_outcome)) }}</x-ui.badge>
-                    <p class="fs-12 text-muted mb-0"><em>"{{ $pip->final_comments }}"</em></p>
-                </div>
-            @endif
         </div>
 
         <!-- SMART OBJECTIVES & DELIVERABLES (FULL-WIDTH CARD) -->
         <div class="p-3 bg-light rounded border mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-target me-1 text-primary"></i> SMART Objectives & Deliverables</h6>
+                <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-target me-1 text-primary"></i> {{ __('hrms.pip.smart_objectives_title') }}</h6>
                 @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
                     <x-ui.button variant="outline-primary" icon="feather-plus" size="sm" data-bs-toggle="modal" data-bs-target="#addObjectiveModal" class="fw-semibold">
-                        Add Objective
+                        {{ __('hrms.pip.btn_add_objective') }}
                     </x-ui.button>
                 @endif
             </div>
 
-            <div class="table-responsive bg-white rounded border">
-                <table class="table table-hover align-top mb-0 fs-12">
-                    <thead class="bg-light">
+            <div class="pip-table-wrapper bg-white rounded border">
+                <table class="table table-hover align-top mb-0 fs-12 pip-table-fixed">
+                    <thead class="bg-light border-bottom">
                         <tr>
-                            <th class="ps-3 py-2 text-muted text-uppercase fs-10" style="width: 28%;">Objective & Expectation</th>
-                            <th class="py-2 text-muted text-uppercase fs-10" style="width: 17%;">Benchmark / Criteria</th>
-                            <th class="py-2 text-muted text-uppercase fs-10" style="width: 25%;">Support Provided by Company</th>
-                            <th class="py-2 text-muted text-uppercase fs-10" style="width: 12%;">Status</th>
-                            <th class="text-end pe-3 py-2 text-muted text-uppercase fs-10" style="width: 18%;">Action</th>
+                            <th class="ps-3 py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 33%;">{{ __('hrms.pip.th_objective_expectation') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 24%;">{{ __('hrms.pip.th_benchmark_criteria') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 22%;">{{ __('hrms.pip.th_support_provided') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 14%;">{{ __('hrms.pip.th_objective_status') }}</th>
+                            <th class="text-end pe-3 py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 7%;">{{ __('hrms.pip.th_action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($pip->objectives as $obj)
                             <tr>
-                                <td class="ps-3 py-2.5">
-                                    <div class="fw-bold text-dark fs-12 text-break">{{ $obj->title }}</div>
+                                <td class="ps-3 py-3 align-top">
+                                    <div class="fw-bold text-dark fs-12 lh-sm mb-1 text-break">{{ $obj->title }}</div>
                                     @if($obj->description)
-                                        <div class="d-flex align-items-start gap-1.5 text-muted fs-11 mt-1">
-                                            <i class="feather-align-left text-muted flex-shrink-0 mt-0.5"></i>
-                                            <span class="text-break" style="word-break: break-word;">{{ $obj->description }}</span>
+                                        <div class="d-flex align-items-start text-secondary fs-11 lh-base mt-1" style="min-width: 0;">
+                                            <i class="feather-align-left text-muted pip-cell-icon me-2 flex-shrink-0 fs-11" style="margin-right: 8px; margin-top: 2.5px;"></i>
+                                            <span class="flex-grow-1 text-break" style="min-width: 0; word-break: break-word; white-space: normal;">{{ $obj->description }}</span>
                                         </div>
                                     @endif
                                 </td>
-                                <td class="py-2.5 text-dark fs-12 fw-medium text-break" style="word-break: break-word;">
-                                    {{ $obj->target_criteria ?? '—' }}
-                                </td>
-                                <td class="py-2.5">
-                                    @if($obj->support_provided)
-                                        <div class="d-flex align-items-start gap-2 text-dark fs-12">
-                                            <i class="feather-life-buoy text-primary flex-shrink-0 mt-0.5"></i>
-                                            <span class="text-break" style="word-break: break-word;">{{ $obj->support_provided }}</span>
+                                <td class="py-3 align-top" style="white-space: normal; word-break: break-word;">
+                                    @if($obj->target_criteria)
+                                        <div class="d-flex align-items-start text-dark fs-12 lh-base" style="min-width: 0;">
+                                            <i class="feather-target text-primary pip-cell-icon me-2 flex-shrink-0 fs-12" style="margin-right: 8px; margin-top: 2.5px;"></i>
+                                            <span class="fw-medium flex-grow-1 text-break" style="min-width: 0; word-break: break-word; white-space: normal;">{{ $obj->target_criteria }}</span>
                                         </div>
                                     @else
                                         <span class="text-muted fs-12">—</span>
                                     @endif
                                 </td>
-                                <td class="py-2.5">
+                                <td class="py-3 align-top" style="white-space: normal; word-break: break-word;">
+                                    @if($obj->support_provided)
+                                        <div class="d-flex align-items-start text-dark fs-12 lh-base" style="min-width: 0;">
+                                            <i class="feather-life-buoy text-primary pip-cell-icon me-2 flex-shrink-0 fs-12" style="margin-right: 8px; margin-top: 2.5px;"></i>
+                                            <span class="text-secondary flex-grow-1 text-break" style="min-width: 0; word-break: break-word; white-space: normal;">{{ $obj->support_provided }}</span>
+                                        </div>
+                                    @else
+                                        <span class="text-muted fs-12">—</span>
+                                    @endif
+                                </td>
+                                <td class="py-3 align-top">
                                     @php
                                         $objBadge = match($obj->status) {
                                             'achieved'           => 'success',
@@ -273,33 +314,45 @@
                                             'in_progress'        => 'primary',
                                             default              => 'secondary'
                                         };
+                                        $objIcon = match($obj->status) {
+                                            'achieved'           => 'feather-check-circle',
+                                            'partially_achieved' => 'feather-alert-circle',
+                                            'not_achieved'       => 'feather-x-circle',
+                                            'in_progress'        => 'feather-clock',
+                                            default              => 'feather-help-circle'
+                                        };
                                     @endphp
-                                    <x-ui.badge soft variant="{{ $objBadge }}" class="text-capitalize fs-10">
-                                        {{ str_replace('_', ' ', $obj->status) }}
-                                    </x-ui.badge>
-                                </td>
-                                <td class="text-end pe-3 py-2.5">
-                                    @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
-                                        <div class="d-inline-flex align-items-center gap-3">
-                                            <form action="{{ route('hrms.pip.objective.status', [$pip->id, $obj->id]) }}" method="POST" class="d-inline me-1">
+                                    <div class="d-flex flex-column align-items-start gap-1">
+                                        <x-ui.badge soft variant="{{ $objBadge }}" class="text-capitalize fs-10 px-2 py-0.5 text-nowrap d-inline-flex align-items-center gap-1">
+                                            <i class="{{ $objIcon }} fs-10"></i>
+                                            <span>{{ __('hrms.pip.obj_' . $obj->status) }}</span>
+                                        </x-ui.badge>
+                                        @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
+                                            <form action="{{ route('hrms.pip.objective.status', [$pip->id, $obj->id]) }}" method="POST" class="m-0 w-100">
                                                 @csrf
-                                                <select name="status" class="form-select form-select-sm border rounded px-2.5 py-1 fs-12 fw-semibold text-dark bg-white shadow-none d-inline-block w-auto" onchange="this.form.submit()" style="cursor: pointer; min-width: 120px;">
-                                                    <option value="pending"            @selected($obj->status === 'pending')>Pending</option>
-                                                    <option value="in_progress"        @selected($obj->status === 'in_progress')>In Progress</option>
-                                                    <option value="achieved"           @selected($obj->status === 'achieved')>Achieved</option>
-                                                    <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>Partially Achieved</option>
-                                                    <option value="not_achieved"       @selected($obj->status === 'not_achieved')>Not Achieved</option>
+                                                <select name="status" class="form-select form-select-sm py-0.5 px-1.5 fs-10 text-muted border rounded bg-white shadow-none" onchange="this.form.submit()" style="cursor: pointer; max-width: 110px;" title="{{ __('hrms.pip.update_status_tooltip') }}">
+                                                    <option value="pending"            @selected($obj->status === 'pending')>{{ __('hrms.pip.obj_pending') }}</option>
+                                                    <option value="in_progress"        @selected($obj->status === 'in_progress')>{{ __('hrms.pip.obj_in_progress') }}</option>
+                                                    <option value="achieved"           @selected($obj->status === 'achieved')>{{ __('hrms.pip.obj_achieved') }}</option>
+                                                    <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>{{ __('hrms.pip.obj_partially_achieved') }}</option>
+                                                    <option value="not_achieved"       @selected($obj->status === 'not_achieved')>{{ __('hrms.pip.obj_not_achieved') }}</option>
                                                 </select>
                                             </form>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="text-end pe-3 py-3 align-top">
+                                    @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
+                                        <div class="d-inline-flex align-items-center justify-content-end">
                                             <x-ui.action-dropdown id="objActions{{ $obj->id }}">
                                                 <li>
                                                     <a class="dropdown-item" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editObjectiveModal_{{ $obj->id }}">
-                                                        <i class="feather-edit-2 me-2 text-primary"></i>Edit Objective Details
+                                                        <i class="feather-edit-2 me-2 text-primary"></i>{{ __('hrms.pip.edit_objective_details') }}
                                                     </a>
                                                 </li>
                                                 <li>
-                                                    <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete this SMART Objective? This action cannot be undone.', function() { document.getElementById('deleteObjForm{{ $obj->id }}').submit(); }, { title: 'Delete SMART Objective', confirmText: 'Yes, Delete', variant: 'danger' });">
-                                                        <i class="feather-trash-2 me-2"></i>Delete Objective
+                                                    <a class="dropdown-item text-danger btn-delete-obj" href="javascript:void(0);" data-obj-id="{{ $obj->id }}">
+                                                        <i class="feather-trash-2 me-2"></i>{{ __('hrms.pip.delete_objective') }}
                                                     </a>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -313,52 +366,42 @@
                                     @endif
 
                                     <!-- EDIT OBJECTIVE MODAL -->
-                                    <div class="modal fade text-start" id="editObjectiveModal_{{ $obj->id }}" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content border-0 shadow">
-                                                <div class="modal-header border-bottom py-3">
-                                                    <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit SMART Objective</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <form action="{{ route('hrms.pip.objective.update', [$pip->id, $obj->id]) }}" method="POST">
-                                                    @csrf
-                                                    @method('PUT')
-                                                    <div class="modal-body p-4 text-start">
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="input" label="Objective Title" name="title" value="{{ $obj->title }}" :required="true" />
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="2" value="{{ $obj->description }}" />
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="input" label="Success Benchmark / Target Criteria" name="target_criteria" value="{{ $obj->target_criteria }}" />
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="textarea" label="Support Provided by Company" name="support_provided" rows="2" value="{{ $obj->support_provided }}" />
-                                                        </div>
-                                                        <div class="mb-0">
-                                                            <x-ui.odoo-form-ui type="select" label="Objective Status" name="status" :required="true">
-                                                                <option value="pending" @selected($obj->status === 'pending')>Pending</option>
-                                                                <option value="in_progress" @selected($obj->status === 'in_progress')>In Progress</option>
-                                                                <option value="achieved" @selected($obj->status === 'achieved')>Achieved</option>
-                                                                <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>Partially Achieved</option>
-                                                                <option value="not_achieved" @selected($obj->status === 'not_achieved')>Not Achieved</option>
-                                                            </x-ui.odoo-form-ui>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer border-top bg-light py-2.5">
-                                                        <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                                                        <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update Objective</x-ui.button>
-                                                    </div>
-                                                </form>
+                                    <x-ui.modal id="editObjectiveModal_{{ $obj->id }}" title="<i class='feather-edit me-1.5 text-primary'></i> {{ __('hrms.pip.modal_edit_objective_title') }}" size="md" :showFooter="false">
+                                        <form action="{{ route('hrms.pip.objective.update', [$pip->id, $obj->id]) }}" method="POST">
+                                            @csrf
+                                            @method('PUT')
+                                            <div class="mb-3">
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.pip.field_objective_title') }}" name="title" value="{{ $obj->title }}" :required="true" />
                                             </div>
-                                        </div>
-                                    </div>
+                                            <div class="mb-3">
+                                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.th_description') }}" name="description" rows="2" value="{{ $obj->description }}" />
+                                            </div>
+                                            <div class="mb-3">
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.pip.field_success_benchmark') }}" name="target_criteria" value="{{ $obj->target_criteria }}" />
+                                            </div>
+                                            <div class="mb-3">
+                                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.th_support_provided') }}" name="support_provided" rows="2" value="{{ $obj->support_provided }}" />
+                                            </div>
+                                            <div class="mb-0">
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.pip.th_objective_status') }}" name="status" :required="true">
+                                                    <option value="pending" @selected($obj->status === 'pending')>{{ __('hrms.pip.obj_pending') }}</option>
+                                                    <option value="in_progress" @selected($obj->status === 'in_progress')>{{ __('hrms.pip.obj_in_progress') }}</option>
+                                                    <option value="achieved" @selected($obj->status === 'achieved')>{{ __('hrms.pip.obj_achieved') }}</option>
+                                                    <option value="partially_achieved" @selected($obj->status === 'partially_achieved')>{{ __('hrms.pip.obj_partially_achieved') }}</option>
+                                                    <option value="not_achieved" @selected($obj->status === 'not_achieved')>{{ __('hrms.pip.obj_not_achieved') }}</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                                <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                                                <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">{{ __('hrms.pip.btn_update_objective') }}</x-ui.button>
+                                            </div>
+                                        </form>
+                                    </x-ui.modal>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center py-3 text-muted fs-12">No specific SMART objectives logged yet.</td>
+                                <td colspan="5" class="text-center py-3 text-muted fs-12">{{ __('hrms.pip.no_objectives_logged') }}</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -368,27 +411,27 @@
 
         <!-- 1-ON-1 MILESTONE CHECK-INS TIMELINE -->
         <div>
-            <h6 class="fw-bold text-dark mb-3 fs-14"><i class="feather-clock me-1 text-primary"></i> 1-on-1 Milestone Check-ins Timeline</h6>
+            <h6 class="fw-bold text-dark mb-3 fs-14"><i class="feather-clock me-1 text-primary"></i> {{ __('hrms.pip.milestone_checkins_title') }}</h6>
 
-            <div class="table-responsive border rounded">
-                <table class="table table-hover align-middle mb-0 fs-13">
-                    <thead class="bg-light">
+            <div class="pip-table-wrapper border rounded bg-white">
+                <table class="table table-hover align-top mb-0 fs-12 pip-table-fixed">
+                    <thead class="bg-light border-bottom">
                         <tr>
-                            <th class="ps-3 py-3 text-muted text-uppercase fs-11">Check-in Date</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Reviewer</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Status / Rating</th>
-                            <th class="py-3 text-muted text-uppercase fs-11">Feedback & Discussion Notes</th>
-                            <th class="text-end pe-3 py-3 text-muted text-uppercase fs-11">Action</th>
+                            <th class="ps-3 py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 15%;">{{ __('hrms.pip.th_checkin_date') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 15%;">{{ __('hrms.pip.th_reviewer') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 15%;">{{ __('hrms.pip.th_rating_status') }}</th>
+                            <th class="py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 48%;">{{ __('hrms.pip.th_feedback_notes') }}</th>
+                            <th class="text-end pe-3 py-2.5 text-muted text-uppercase fs-10 fw-bold" style="width: 7%;">{{ __('hrms.pip.th_action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($pip->checkins as $checkin)
                             <tr>
-                                <td class="ps-3 fw-bold text-dark">
-                                    {{ $checkin->review_date ? $checkin->review_date->format('M d, Y') : 'N/A' }}
+                                <td class="ps-3 py-3 align-top fw-bold text-dark">
+                                    {{ $checkin->review_date ? $checkin->review_date->format('M d, Y') : __('hrms.common.na') }}
                                 </td>
-                                <td>{{ $checkin->reviewer?->name ?? 'Manager' }}</td>
-                                <td>
+                                <td class="py-3 align-top text-secondary">{{ $checkin->reviewer?->name ?? __('hrms.pip.reviewer_manager') }}</td>
+                                <td class="py-3 align-top">
                                     @php
                                         $chkBadge = match($checkin->rating_status) {
                                             'on_track'  => 'success',
@@ -398,24 +441,24 @@
                                             default     => 'secondary'
                                         };
                                     @endphp
-                                    <x-ui.badge soft variant="{{ $chkBadge }}" class="text-capitalize">
-                                        {{ str_replace('_', ' ', $checkin->rating_status) }}
+                                    <x-ui.badge soft variant="{{ $chkBadge }}" class="text-capitalize fs-10 px-2 py-0.5">
+                                        {{ __('hrms.pip.rating_' . $checkin->rating_status) }}
                                     </x-ui.badge>
                                 </td>
-                                <td class="text-secondary">
+                                <td class="py-3 align-top text-secondary lh-base text-break" style="white-space: normal; word-break: break-word;">
                                     {{ $checkin->manager_comments }}
                                 </td>
-                                <td class="text-end pe-3">
+                                <td class="text-end pe-3 py-3 align-top">
                                     @if(isset($canManagePip) && $canManagePip && in_array($pip->status, ['active', 'under_review', 'extended']))
                                         <x-ui.action-dropdown id="chkActions{{ $checkin->id }}">
                                             <li>
                                                 <a class="dropdown-item" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#editCheckinModal_{{ $checkin->id }}">
-                                                    <i class="feather-edit-2 me-2 text-primary"></i>Edit Check-in
+                                                    <i class="feather-edit-2 me-2 text-primary"></i>{{ __('hrms.pip.edit_checkin') }}
                                                 </a>
                                             </li>
                                             <li>
-                                                <a class="dropdown-item text-danger" href="javascript:void(0);" onclick="confirmAction('Are you sure you want to delete this Milestone Check-in record? This action cannot be undone.', function() { document.getElementById('deleteCheckinForm{{ $checkin->id }}').submit(); }, { title: 'Delete Milestone Check-in', confirmText: 'Yes, Delete', variant: 'danger' });">
-                                                    <i class="feather-trash-2 me-2"></i>Delete Check-in Log
+                                                <a class="dropdown-item text-danger btn-delete-checkin" href="javascript:void(0);" data-chk-id="{{ $checkin->id }}">
+                                                    <i class="feather-trash-2 me-2"></i>{{ __('hrms.pip.delete_checkin_log') }}
                                                 </a>
                                             </li>
                                         </x-ui.action-dropdown>
@@ -428,62 +471,52 @@
                                     @endif
 
                                     <!-- EDIT CHECKIN MODAL -->
-                                    <div class="modal fade text-start" id="editCheckinModal_{{ $checkin->id }}" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content border-0 shadow">
-                                                <div class="modal-header border-bottom py-3">
-                                                    <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-edit me-1.5 text-primary"></i> Edit Milestone Check-in</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    <x-ui.modal id="editCheckinModal_{{ $checkin->id }}" title="<i class='feather-edit me-1.5 text-primary'></i> {{ __('hrms.pip.modal_edit_checkin_title') }}" size="md" :showFooter="false">
+                                        <form action="{{ route('hrms.pip.checkin.update', [$pip->id, $checkin->id]) }}" method="POST">
+                                            @csrf
+                                            @method('PUT')
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.pip.field_checkin_date') }}" name="checkin_date" value="{{ $checkin->review_date?->format('Y-m-d') }}" :required="true" />
                                                 </div>
-                                                <form action="{{ route('hrms.pip.checkin.update', [$pip->id, $checkin->id]) }}" method="POST">
-                                                    @csrf
-                                                    @method('PUT')
-                                                    <div class="modal-body p-4 text-start">
-                                                        <div class="row g-3 mb-3">
-                                                            <div class="col-md-6">
-                                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ $checkin->review_date?->format('Y-m-d') }}" :required="true" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
-                                                                    <option value="on_track" @selected($checkin->rating_status === 'on_track')>On Track</option>
-                                                                    <option value="off_track" @selected($checkin->rating_status === 'off_track')>Off Track</option>
-                                                                    <option value="at_risk" @selected($checkin->rating_status === 'at_risk')>At Risk</option>
-                                                                    <option value="exceeding" @selected($checkin->rating_status === 'exceeding')>Exceeding Expectations</option>
-                                                                </x-ui.odoo-form-ui>
-                                                            </div>
-                                                        </div>
-                                                        <div class="row g-3 mb-3">
-                                                            <div class="col-md-6">
-                                                                <x-ui.odoo-form-ui type="input" inputType="number" step="0.5" min="1" max="5" label="Numeric Score (1-5)" name="rating" value="{{ $checkin->rating }}" placeholder="e.g. 3.5" />
-                                                            </div>
-                                                            <div class="col-md-6">
-                                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Next Check-in Date" name="next_checkin_date" value="{{ $checkin->next_checkin_date?->format('Y-m-d') }}" />
-                                                            </div>
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="3" value="{{ $checkin->manager_comments }}" :required="true" />
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <x-ui.odoo-form-ui type="textarea" label="Concerns Noted / Blockers" name="concerns_noted" rows="2" value="{{ $checkin->concerns_noted }}" placeholder="Specific hurdles or deficiencies noted..." />
-                                                        </div>
-                                                        <div class="mb-0">
-                                                            <x-ui.odoo-form-ui type="textarea" label="Support Action Items" name="support_action_items" rows="2" value="{{ $checkin->support_action_items }}" placeholder="Agreed actions and support before next meeting..." />
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer border-top bg-light py-2.5">
-                                                        <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                                                        <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Update Check-in</x-ui.button>
-                                                    </div>
-                                                </form>
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.pip.field_progress_rating') }}" name="rating_status" :required="true">
+                                                        <option value="on_track" @selected($checkin->rating_status === 'on_track')>{{ __('hrms.pip.rating_on_track') }}</option>
+                                                        <option value="off_track" @selected($checkin->rating_status === 'off_track')>{{ __('hrms.pip.rating_off_track') }}</option>
+                                                        <option value="at_risk" @selected($checkin->rating_status === 'at_risk')>{{ __('hrms.pip.rating_at_risk') }}</option>
+                                                        <option value="exceeding" @selected($checkin->rating_status === 'exceeding')>{{ __('hrms.pip.rating_exceeding') }}</option>
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" step="0.5" min="1" max="5" label="{{ __('hrms.pip.field_numeric_score') }}" name="rating" value="{{ $checkin->rating }}" placeholder="e.g. 3.5" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.pip.field_next_checkin_date') }}" name="next_checkin_date" value="{{ $checkin->next_checkin_date?->format('Y-m-d') }}" />
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_manager_feedback') }}" name="manager_comments" rows="3" value="{{ $checkin->manager_comments }}" :required="true" />
+                                            </div>
+                                            <div class="mb-3">
+                                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_concerns_noted') }}" name="concerns_noted" rows="2" value="{{ $checkin->concerns_noted }}" placeholder="{{ __('hrms.pip.placeholder_concerns') }}" />
+                                            </div>
+                                            <div class="mb-0">
+                                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_support_action_items') }}" name="support_action_items" rows="2" value="{{ $checkin->support_action_items }}" placeholder="{{ __('hrms.pip.placeholder_support_actions') }}" />
+                                            </div>
+                                            <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                                <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                                                <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">{{ __('hrms.pip.btn_update_checkin') }}</x-ui.button>
+                                            </div>
+                                        </form>
+                                    </x-ui.modal>
                                 </td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="5" class="text-center py-4 text-muted fs-12">
-                                    No milestone check-ins recorded yet.
+                                    {{ __('hrms.pip.no_checkins_recorded') }}
                                 </td>
                             </tr>
                         @endforelse
@@ -497,152 +530,112 @@
 
 @if(isset($canManagePip) && $canManagePip)
 <!-- LOG CHECK-IN MODAL (Outside single panel) -->
-<div class="modal fade" id="addCheckinModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-check-square me-1.5 text-primary"></i> Log 1-on-1 Milestone Check-in</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<x-ui.modal id="addCheckinModal" title="<i class='feather-check-square me-1.5 text-primary'></i> {{ __('hrms.pip.modal_log_checkin_title') }}" size="md" :showFooter="false">
+    <form action="{{ route('hrms.pip.checkin.store', $pip->id) }}" method="POST">
+        @csrf
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.pip.field_checkin_date') }}" name="checkin_date" value="{{ date('Y-m-d') }}" :required="true" />
             </div>
-            <form action="{{ route('hrms.pip.checkin.store', $pip->id) }}" method="POST">
-                @csrf
-                <div class="modal-body p-4">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Check-in Date" name="checkin_date" value="{{ date('Y-m-d') }}" :required="true" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Progress Rating" name="rating_status" :required="true">
-                                <option value="on_track">On Track</option>
-                                <option value="off_track">Off Track</option>
-                                <option value="at_risk">At Risk</option>
-                                <option value="exceeding">Exceeding Expectations</option>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                    </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="number" step="0.5" min="1" max="5" label="Numeric Score (1-5)" name="rating" placeholder="e.g. 3.5" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Next Check-in Date" name="next_checkin_date" />
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="textarea" label="Manager Notes & Feedback" name="manager_comments" rows="3" placeholder="Summarize performance discussions, blockers, and agreed next steps..." :required="true" />
-                    </div>
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="textarea" label="Concerns Noted / Blockers" name="concerns_noted" rows="2" placeholder="Specific hurdles or deficiencies noted..." />
-                    </div>
-                    <div class="mb-0">
-                        <x-ui.odoo-form-ui type="textarea" label="Support Action Items" name="support_action_items" rows="2" placeholder="Agreed actions and support before next meeting..." />
-                    </div>
-                </div>
-                <div class="modal-footer border-top bg-light py-2.5">
-                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Save Check-in</x-ui.button>
-                </div>
-            </form>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.pip.field_progress_rating') }}" name="rating_status" :required="true">
+                    <option value="on_track">{{ __('hrms.pip.rating_on_track') }}</option>
+                    <option value="off_track">{{ __('hrms.pip.rating_off_track') }}</option>
+                    <option value="at_risk">{{ __('hrms.pip.rating_at_risk') }}</option>
+                    <option value="exceeding">{{ __('hrms.pip.rating_exceeding') }}</option>
+                </x-ui.odoo-form-ui>
+            </div>
         </div>
-    </div>
-</div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.5" min="1" max="5" label="{{ __('hrms.pip.field_numeric_score') }}" name="rating" placeholder="e.g. 3.5" />
+            </div>
+            <div class="col-md-6">
+                <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.pip.field_next_checkin_date') }}" name="next_checkin_date" />
+            </div>
+        </div>
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_manager_feedback') }}" name="manager_comments" rows="3" placeholder="{{ __('hrms.pip.placeholder_manager_comments') }}" :required="true" />
+        </div>
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_concerns_noted') }}" name="concerns_noted" rows="2" placeholder="{{ __('hrms.pip.placeholder_concerns') }}" />
+        </div>
+        <div class="mb-0">
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_support_action_items') }}" name="support_action_items" rows="2" placeholder="{{ __('hrms.pip.placeholder_support_actions') }}" />
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+            <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">{{ __('hrms.pip.btn_save_checkin') }}</x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
 
 <!-- FINAL EVALUATION MODAL (Outside single panel) -->
-<div class="modal fade" id="evaluateModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-flag me-1.5 text-warning"></i> Final PIP Evaluation & Closure</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ route('hrms.pip.evaluate', $pip->id) }}" method="POST">
-                @csrf
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="select" label="Evaluation Outcome" name="evaluation_outcome" id="evalOutcome" :required="true">
-                            <option value="successful_completion">Successful Completion (PIP Passed)</option>
-                            <option value="pip_extension">Extend PIP Period</option>
-                            <option value="role_reassignment">Role Reassignment / Demotion</option>
-                            <option value="termination">Initiate Employment Termination</option>
-                        </x-ui.odoo-form-ui>
-                    </div>
-                    <div class="mb-3 d-none" id="extensionDaysField">
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Extension Days" name="extension_days" value="30" min="7" max="90" placeholder="e.g. 30" />
-                        <small class="text-muted fs-11">Current end date: <strong>{{ $pip->end_date?->format('M d, Y') }}</strong>. New end date will be calculated automatically.</small>
-                    </div>
-                    <div class="mb-0">
-                        <x-ui.odoo-form-ui type="textarea" label="Final HR & Manager Remarks" name="final_remarks" rows="4" placeholder="Document overall evaluation details and official decision..." :required="true" />
-                    </div>
-                </div>
-                <div class="modal-footer border-top bg-light py-2.5">
-                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="submit" variant="warning" size="sm" class="fw-bold text-dark px-4">Submit Final Evaluation</x-ui.button>
-                </div>
-            </form>
+<x-ui.modal id="evaluateModal" title="<i class='feather-flag me-1.5 text-warning'></i> {{ __('hrms.pip.modal_final_eval_title') }}" size="md" :showFooter="false">
+    <form action="{{ route('hrms.pip.evaluate', $pip->id) }}" method="POST">
+        @csrf
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.pip.field_evaluation_outcome') }}" name="evaluation_outcome" id="evalOutcome" :required="true">
+                <option value="successful_completion">{{ __('hrms.pip.outcome_successful') }}</option>
+                <option value="pip_extension">{{ __('hrms.pip.outcome_extension') }}</option>
+                <option value="role_reassignment">{{ __('hrms.pip.outcome_role_reassignment') }}</option>
+                <option value="termination">{{ __('hrms.pip.outcome_termination') }}</option>
+            </x-ui.odoo-form-ui>
         </div>
-    </div>
-</div>
+        <div class="mb-3 d-none" id="extensionDaysField">
+            <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.pip.field_extension_days') }}" name="extension_days" value="30" min="7" max="90" placeholder="e.g. 30" />
+            <small class="text-muted fs-11">{{ __('hrms.pip.extension_current_end_date', ['date' => $pip->end_date?->format('M d, Y')]) }}</small>
+        </div>
+        <div class="mb-0">
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.field_final_remarks') }}" name="final_remarks" rows="4" placeholder="{{ __('hrms.pip.placeholder_final_remarks') }}" :required="true" />
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+            <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="warning" size="sm" class="fw-bold text-dark px-4">{{ __('hrms.pip.btn_submit_final_evaluation') }}</x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
 
 <!-- ADD OBJECTIVE MODAL -->
-<div class="modal fade" id="addObjectiveModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-target me-1.5 text-primary"></i> Add SMART Objective</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ route('hrms.pip.objective.store', $pip->id) }}" method="POST">
-                @csrf
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="input" label="Objective Title" name="title" placeholder="e.g. Improve Ticket Resolution Rate" :required="true" />
-                    </div>
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="2" placeholder="What is expected from the employee for this objective?" />
-                    </div>
-                    <div class="mb-3">
-                        <x-ui.odoo-form-ui type="input" label="Success Benchmark / Target Criteria" name="target_criteria" placeholder="e.g. Resolve 90% of tickets within SLA by end of PIP" />
-                    </div>
-                    <div class="mb-0">
-                        <x-ui.odoo-form-ui type="textarea" label="Support Provided by Company" name="support_provided" rows="2" placeholder="e.g. Daily pair-review with senior developer, training access..." />
-                    </div>
-                </div>
-                <div class="modal-footer border-top bg-light py-2.5">
-                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">Add Objective</x-ui.button>
-                </div>
-            </form>
+<x-ui.modal id="addObjectiveModal" title="<i class='feather-target me-1.5 text-primary'></i> {{ __('hrms.pip.modal_add_objective_title') }}" size="md" :showFooter="false">
+    <form action="{{ route('hrms.pip.objective.store', $pip->id) }}" method="POST">
+        @csrf
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.pip.field_objective_title') }}" name="title" placeholder="{{ __('hrms.pip.placeholder_objective_title') }}" :required="true" />
         </div>
-    </div>
-</div>
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.th_description') }}" name="description" rows="2" placeholder="{{ __('hrms.pip.placeholder_objective_desc') }}" />
+        </div>
+        <div class="mb-3">
+            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.pip.field_success_benchmark') }}" name="target_criteria" placeholder="{{ __('hrms.pip.placeholder_target_criteria') }}" />
+        </div>
+        <div class="mb-0">
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.pip.th_support_provided') }}" name="support_provided" rows="2" placeholder="{{ __('hrms.pip.placeholder_support_provided') }}" />
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+            <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" size="sm" class="fw-bold px-4">{{ __('hrms.pip.btn_add_objective') }}</x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
 @endif
 
 <!-- ACKNOWLEDGE PIP MODAL -->
-<div class="modal fade" id="acknowledgePipModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark fs-15"><i class="feather-check-square me-1.5 text-warning"></i> Employee Digital Acknowledgement</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="{{ route('hrms.pip.acknowledge', $pip->id) }}" method="POST">
-                @csrf
-                <div class="modal-body p-4">
-                    <p class="fs-13 text-secondary mb-3">
-                        I, <strong>{{ $pip->employee?->full_name }}</strong>, acknowledge that I have received and reviewed this Performance Improvement Plan (#{{ $pip->pip_number }}), understand the performance expectations, support provided, and consequences of failing to meet the required objectives.
-                    </p>
-                    <div class="mb-0">
-                        <x-ui.odoo-form-ui type="input" label="Full Legal Name / Digital Signature" name="signature_data" placeholder="Type your full name as digital signature" value="{{ $pip->employee?->full_name }}" :required="true" />
-                    </div>
-                </div>
-                <div class="modal-footer border-top bg-light py-2.5">
-                    <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">Cancel</x-ui.button>
-                    <x-ui.button type="submit" variant="warning" size="sm" class="fw-bold text-dark px-4">Submit Acknowledgement</x-ui.button>
-                </div>
-            </form>
+<x-ui.modal id="acknowledgePipModal" title="<i class='feather-check-square me-1.5 text-warning'></i> {{ __('hrms.pip.modal_ack_title') }}" size="md" :showFooter="false">
+    <form action="{{ route('hrms.pip.acknowledge', $pip->id) }}" method="POST">
+        @csrf
+        <p class="fs-13 text-secondary mb-3">
+            {{ __('hrms.pip.ack_declaration_text', ['name' => $pip->employee?->full_name, 'number' => $pip->pip_number]) }}
+        </p>
+        <div class="mb-0">
+            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.pip.field_digital_signature') }}" name="signature_data" placeholder="{{ __('hrms.pip.placeholder_digital_signature') }}" value="{{ $pip->employee?->full_name }}" :required="true" />
         </div>
-    </div>
-</div>
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+            <x-ui.button variant="secondary" size="sm" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="warning" size="sm" class="fw-bold text-dark px-4">{{ __('hrms.pip.btn_submit_acknowledgement') }}</x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
 
 <x-ui.confirmation-modal />
 
@@ -653,6 +646,26 @@
             if ($(this).parent().get(0) !== document.body) {
                 $(this).appendTo(document.body);
             }
+        });
+
+        // Delete Objective confirmation handler
+        $(document).on('click', '.btn-delete-obj', function(e) {
+            e.preventDefault();
+            const id = $(this).data('obj-id');
+            confirmAction(@json(__('hrms.pip.confirm_delete_objective')), function() {
+                const form = document.getElementById('deleteObjForm' + id);
+                if (form) form.submit();
+            }, { title: @json(__('hrms.pip.modal_delete_objective_title')), confirmText: @json(__('hrms.pip.delete_confirm_btn')), variant: 'danger' });
+        });
+
+        // Delete Checkin confirmation handler
+        $(document).on('click', '.btn-delete-checkin', function(e) {
+            e.preventDefault();
+            const id = $(this).data('chk-id');
+            confirmAction(@json(__('hrms.pip.confirm_delete_checkin')), function() {
+                const form = document.getElementById('deleteCheckinForm' + id);
+                if (form) form.submit();
+            }, { title: @json(__('hrms.pip.modal_delete_checkin_title')), confirmText: @json(__('hrms.pip.delete_confirm_btn')), variant: 'danger' });
         });
 
         // Show/hide extension days field based on evaluation outcome

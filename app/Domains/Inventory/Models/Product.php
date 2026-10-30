@@ -126,6 +126,17 @@ class Product extends BaseModel
         return 'standard';
     }
 
+    public function isService(): bool
+    {
+        return strcasecmp((string)$this->item_type, 'Service') === 0 
+            || strcasecmp((string)$this->type, 'service') === 0;
+    }
+
+    public function isGoods(): bool
+    {
+        return !$this->isService();
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'parent_id');

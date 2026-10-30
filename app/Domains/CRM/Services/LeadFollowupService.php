@@ -15,7 +15,8 @@ class LeadFollowupService
 {
     public function __construct(
         private readonly LeadFollowupRepository $followupRepo
-    ) {}
+    ) {
+    }
 
     /**
      * Store new followup, log history, and sync lead.
@@ -31,28 +32,28 @@ class LeadFollowupService
         $taggedUserIds = !empty($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
         $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : ($validated['tagged_user_id'] ?? null);
 
-        $durationMinutes = !empty($validated['duration_minutes']) ? (int)$validated['duration_minutes'] : 30;
+        $durationMinutes = !empty($validated['duration_minutes']) ? (int) $validated['duration_minutes'] : 30;
         $guestEmailsInput = !empty($validated['guest_emails']) ? trim($validated['guest_emails']) : null;
         $titleInput = !empty($validated['title']) ? trim($validated['title']) : (($validated['type'] ?? 'Scheduled Call') . " with " . ($lead->company_name ?: $lead->contact_person));
 
         $followup = $this->followupRepo->create([
-            'tenant_id'            => $lead->tenant_id ?? (tenant_id() ?? (auth()->user()?->tenant_id ?? 1)),
-            'company_id'           => $lead->company_id ?? (company_id() ?? (auth()->user()?->company_id ?? 1)),
-            'branch_id'            => $lead->branch_id ?? (branch_id() ?? (auth()->user()?->branch_id ?? null)),
-            'lead_id'              => $lead->id,
-            'followup_date'        => $followupDateTime,
-            'type'                 => $validated['type'],
-            'title'                => $titleInput,
-            'duration_minutes'     => $durationMinutes,
-            'guest_emails'         => $guestEmailsInput,
-            'status'               => $validated['status'],
-            'notes'                => $validated['notes'] ?? null,
-            'tagged_user_id'       => $primaryTaggedId,
-            'tagged_user_ids'      => $taggedUserIds,
-            'latitude'             => isset($validated['latitude']) ? (float)$validated['latitude'] : null,
-            'longitude'            => isset($validated['longitude']) ? (float)$validated['longitude'] : null,
-            'location_address'     => $validated['location_address'] ?? null,
-            'selfie_path'          => $validated['selfie_path'] ?? null,
+            'tenant_id' => $lead->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id),
+            'company_id' => $lead->company_id ?? (company_id() ?? auth()->user()?->company_id),
+            'branch_id' => $lead->branch_id ?? (branch_id() ?? auth()->user()?->branch_id),
+            'lead_id' => $lead->id,
+            'followup_date' => $followupDateTime,
+            'type' => $validated['type'],
+            'title' => $titleInput,
+            'duration_minutes' => $durationMinutes,
+            'guest_emails' => $guestEmailsInput,
+            'status' => $validated['status'],
+            'notes' => $validated['notes'] ?? null,
+            'tagged_user_id' => $primaryTaggedId,
+            'tagged_user_ids' => $taggedUserIds,
+            'latitude' => isset($validated['latitude']) ? (float) $validated['latitude'] : null,
+            'longitude' => isset($validated['longitude']) ? (float) $validated['longitude'] : null,
+            'location_address' => $validated['location_address'] ?? null,
+            'selfie_path' => $validated['selfie_path'] ?? null,
             'location_verified_at' => $validated['location_verified_at'] ?? (!empty($validated['latitude']) || !empty($validated['selfie_path']) ? now() : null),
         ]);
 
@@ -190,9 +191,12 @@ class LeadFollowupService
         }
 
         $updateData = [];
-        if (isset($validated['status'])) $updateData['status'] = $validated['status'];
-        if (isset($validated['notes'])) $updateData['notes'] = $validated['notes'];
-        if (isset($validated['type'])) $updateData['type'] = $validated['type'];
+        if (isset($validated['status']))
+            $updateData['status'] = $validated['status'];
+        if (isset($validated['notes']))
+            $updateData['notes'] = $validated['notes'];
+        if (isset($validated['type']))
+            $updateData['type'] = $validated['type'];
         if (array_key_exists('tagged_user_ids', $validated)) {
             $updateData['tagged_user_ids'] = $taggedUserIds;
             $updateData['tagged_user_id'] = $primaryTaggedId;
@@ -200,13 +204,33 @@ class LeadFollowupService
             $updateData['tagged_user_id'] = $validated['tagged_user_id'] ?: null;
         }
         if (isset($validated['followup_date'])) {
-            try { $updateData['followup_date'] = Carbon::parse($validated['followup_date']); } catch (\Exception $e) {}
+            try {
+                $updateData['followup_date'] = Carbon::parse($validated['followup_date']);
+            } catch (\Exception $e) {
+            }
         }
-        if (array_key_exists('latitude', $validated)) $updateData['latitude'] = $validated['latitude'];
-        if (array_key_exists('longitude', $validated)) $updateData['longitude'] = $validated['longitude'];
-        if (array_key_exists('location_address', $validated)) $updateData['location_address'] = $validated['location_address'];
-        if (array_key_exists('selfie_path', $validated)) $updateData['selfie_path'] = $validated['selfie_path'];
-        if (array_key_exists('location_verified_at', $validated)) $updateData['location_verified_at'] = $validated['location_verified_at'];
+        if (array_key_exists('latitude', $validated))
+            $updateData['latitude'] = $validated['latitude'];
+        if (array_key_exists('longitude', $validated))
+            $updateData['longitude'] = $validated['longitude'];
+        if (array_key_exists('location_address', $validated))
+            $updateData['location_address'] = $validated['location_address'];
+        if (array_key_exists('checkin_latitude', $validated))
+            $updateData['checkin_latitude'] = $validated['checkin_latitude'];
+        if (array_key_exists('checkin_longitude', $validated))
+            $updateData['checkin_longitude'] = $validated['checkin_longitude'];
+        if (array_key_exists('checkin_address', $validated))
+            $updateData['checkin_address'] = $validated['checkin_address'];
+        if (array_key_exists('checkin_distance_meters', $validated))
+            $updateData['checkin_distance_meters'] = $validated['checkin_distance_meters'];
+        if (array_key_exists('checkin_status', $validated))
+            $updateData['checkin_status'] = $validated['checkin_status'];
+        if (array_key_exists('checkin_at', $validated))
+            $updateData['checkin_at'] = $validated['checkin_at'];
+        if (array_key_exists('selfie_path', $validated))
+            $updateData['selfie_path'] = $validated['selfie_path'];
+        if (array_key_exists('location_verified_at', $validated))
+            $updateData['location_verified_at'] = $validated['location_verified_at'];
 
         $oldStatus = $followup->status;
         $this->followupRepo->update($followup, $updateData);
@@ -268,8 +292,8 @@ class LeadFollowupService
         $effectiveType = $activityType ?: ($existingFollowup?->type ?? 'Meeting');
         $effectiveStatus = $targetStatus ?: ($existingFollowup?->status ?? 'Completed');
 
-        $isMeeting = strcasecmp((string)$effectiveType, 'Meeting') === 0;
-        $isCompleting = in_array((string)$effectiveStatus, ['Completed', 'Not Connected']);
+        $isMeeting = strcasecmp((string) $effectiveType, 'Meeting') === 0;
+        $isCompleting = in_array((string) $effectiveStatus, ['Completed', 'Not Connected']);
 
         return $isMeeting && $isCompleting;
     }
@@ -280,7 +304,7 @@ class LeadFollowupService
     public function processSelfieUpload(Request $request): ?string
     {
         if ($request->filled('selfie_base64')) {
-            $base64Data = trim((string)$request->input('selfie_base64'));
+            $base64Data = trim((string) $request->input('selfie_base64'));
             $imageType = 'jpg';
             $data = $base64Data;
 
@@ -314,8 +338,9 @@ class LeadFollowupService
 
     /**
      * Extract verification payload from request (coordinates, address, selfie).
+     * When $isCheckin is true, coordinates are saved to checkin_* fields and scheduled venue fields are preserved.
      */
-    public function extractVerificationPayload(Request $request, ?LeadFollowup $existingFollowup = null): array
+    public function extractVerificationPayload(Request $request, ?LeadFollowup $existingFollowup = null, bool $isCheckin = false): array
     {
         $payload = [];
         $selfiePath = $this->processSelfieUpload($request);
@@ -327,26 +352,83 @@ class LeadFollowupService
             $payload['selfie_path'] = $existingFollowup->selfie_path;
         }
 
-        if ($request->filled('latitude')) {
-            $payload['latitude'] = (float)$request->input('latitude');
-        } elseif ($existingFollowup?->latitude !== null) {
-            $payload['latitude'] = $existingFollowup->latitude;
-        }
+        if ($isCheckin) {
+            // When marking meeting Connected / Not Connected, save live device GPS as checkin location
+            $liveLat = $request->input('checkin_latitude') ?? $request->input('latitude');
+            $liveLng = $request->input('checkin_longitude') ?? $request->input('longitude');
+            $liveAddress = $request->input('checkin_address') ?? $request->input('location_address');
 
-        if ($request->filled('longitude')) {
-            $payload['longitude'] = (float)$request->input('longitude');
-        } elseif ($existingFollowup?->longitude !== null) {
-            $payload['longitude'] = $existingFollowup->longitude;
-        }
-
-        if ($request->filled('location_address')) {
-            $payload['location_address'] = (string)$request->input('location_address');
-        } elseif ($existingFollowup?->location_address !== null) {
-            $payload['location_address'] = $existingFollowup->location_address;
-        }
-
-        if ((!empty($payload['latitude']) || !empty($payload['selfie_path'])) && empty($payload['location_verified_at'])) {
+            if ($liveLat !== null && $liveLat !== '') {
+                $payload['checkin_latitude'] = (float) $liveLat;
+            }
+            if ($liveLng !== null && $liveLng !== '') {
+                $payload['checkin_longitude'] = (float) $liveLng;
+            }
+            if ($liveAddress !== null && $liveAddress !== '') {
+                $payload['checkin_address'] = (string) $liveAddress;
+            }
+            $payload['checkin_at'] = now();
             $payload['location_verified_at'] = now();
+
+            // Calculate distance & verify against original scheduled venue
+            $scheduledLat = $existingFollowup?->latitude;
+            $scheduledLng = $existingFollowup?->longitude;
+            if ($scheduledLat !== null && $scheduledLng !== null && isset($payload['checkin_latitude']) && isset($payload['checkin_longitude'])) {
+                $earthRadius = 6371000; // in meters
+                $dLat = deg2rad($payload['checkin_latitude'] - $scheduledLat);
+                $dLng = deg2rad($payload['checkin_longitude'] - $scheduledLng);
+                $a = sin($dLat / 2) * sin($dLat / 2) +
+                     cos(deg2rad($scheduledLat)) * cos(deg2rad($payload['checkin_latitude'])) *
+                     sin($dLng / 2) * sin($dLng / 2);
+                $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+                $distanceMeters = (int) round($earthRadius * $c);
+
+                $tenantId = $existingFollowup->tenant_id ?? (tenant_id() ?? 1);
+                $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
+                $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
+                $allowedRadius = (int)($settings['geofence_radius_meters'] ?? 500);
+
+                $payload['checkin_distance_meters'] = $distanceMeters;
+                $payload['checkin_status'] = ($distanceMeters <= $allowedRadius)
+                    ? "Verified On-Site ({$distanceMeters}m)"
+                    : "Location Mismatch ({$distanceMeters}m away)";
+            } elseif (isset($payload['checkin_latitude'])) {
+                $payload['checkin_status'] = "GPS Logged (No Scheduled Venue)";
+            }
+
+            // CRITICAL: Preserve original scheduled venue coordinates, DO NOT overwrite!
+            if ($existingFollowup?->latitude !== null) {
+                $payload['latitude'] = $existingFollowup->latitude;
+            }
+            if ($existingFollowup?->longitude !== null) {
+                $payload['longitude'] = $existingFollowup->longitude;
+            }
+            if ($existingFollowup?->location_address !== null) {
+                $payload['location_address'] = $existingFollowup->location_address;
+            }
+        } else {
+            // Normal creation / scheduling of meeting: save into scheduled venue fields
+            if ($request->filled('latitude')) {
+                $payload['latitude'] = (float) $request->input('latitude');
+            } elseif ($existingFollowup?->latitude !== null) {
+                $payload['latitude'] = $existingFollowup->latitude;
+            }
+
+            if ($request->filled('longitude')) {
+                $payload['longitude'] = (float) $request->input('longitude');
+            } elseif ($existingFollowup?->longitude !== null) {
+                $payload['longitude'] = $existingFollowup->longitude;
+            }
+
+            if ($request->filled('location_address')) {
+                $payload['location_address'] = (string) $request->input('location_address');
+            } elseif ($existingFollowup?->location_address !== null) {
+                $payload['location_address'] = $existingFollowup->location_address;
+            }
+
+            if ((!empty($payload['latitude']) || !empty($payload['selfie_path'])) && empty($payload['location_verified_at'])) {
+                $payload['location_verified_at'] = now();
+            }
         }
 
         return $payload;

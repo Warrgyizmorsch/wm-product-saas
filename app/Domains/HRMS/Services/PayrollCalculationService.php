@@ -680,11 +680,17 @@ class PayrollCalculationService
                 $computedSalaryItems['PF']['amount'] = $pfDeduction;
                 $computedSalaryItems['PF']['calculated_value'] = $pfDeduction;
                 $computedSalaryItems['PF']['base_monthly'] = $restrictPfCeiling ? min($pfBaseBasic, $pfCeiling) * $pfRate : $pfBaseBasic * $pfRate;
+                // Wages PF was charged on (EPF wages in the ECR) and the earned
+                // Basic + DA before any ceiling (the ECR's EPS/EDLI wages cap it).
+                $computedSalaryItems['PF']['statutory_wages'] = round($pfBasis, 2);
+                $computedSalaryItems['PF']['uncapped_wages'] = round($pfEarnedBasic, 2);
             } else {
                 $computedSalaryItems['PF']['code'] = 'PF';
                 $computedSalaryItems['PF']['amount'] = 0.00;
                 $computedSalaryItems['PF']['calculated_value'] = 0.00;
                 $computedSalaryItems['PF']['base_monthly'] = 0.00;
+                $computedSalaryItems['PF']['statutory_wages'] = 0.00;
+                $computedSalaryItems['PF']['uncapped_wages'] = 0.00;
             }
         }
 
@@ -712,6 +718,8 @@ class PayrollCalculationService
                 $computedSalaryItems['ESI']['code'] = 'ESI';
                 $computedSalaryItems['ESI']['amount'] = $esiDeduction;
                 $computedSalaryItems['ESI']['calculated_value'] = $esiDeduction;
+                // Wages ESI was charged on (the ESIC return's "total monthly wages"); 0 when not covered.
+                $computedSalaryItems['ESI']['statutory_wages'] = $esiDeduction > 0 ? round($esiContributionGross, 2) : 0.00;
 
                 $baseGross = 0.00;
                 foreach ($computedSalaryItems as $code => $item) {
@@ -725,6 +733,7 @@ class PayrollCalculationService
                 $computedSalaryItems['ESI']['amount'] = 0.00;
                 $computedSalaryItems['ESI']['calculated_value'] = 0.00;
                 $computedSalaryItems['ESI']['base_monthly'] = 0.00;
+                $computedSalaryItems['ESI']['statutory_wages'] = 0.00;
             }
         }
 

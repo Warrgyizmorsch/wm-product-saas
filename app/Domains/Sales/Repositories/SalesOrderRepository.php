@@ -59,7 +59,9 @@ class SalesOrderRepository
     {
         return SalesOrder::query()
             ->with(['customer', 'salesPerson'])
-            ->latest()
+            ->orderBy('order_date', 'desc')
+            ->orderBy('sales_order_number', 'desc')
+            ->orderBy('id', 'desc')
             ->get();
     }
 
@@ -85,27 +87,52 @@ class SalesOrderRepository
         }
 
         $sortBy = $filters['sort_by'] ?? 'order_date';
-        $sortOrder = $filters['sort_order'] ?? 'desc';
+        $sortOrder = strtolower($filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $allowedSorts = ['sales_order_number', 'order_date', 'total_amount', 'status'];
 
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
+        if ($sortBy === 'order_date') {
+            $query->orderBy('order_date', $sortOrder)
+                  ->orderBy('sales_order_number', $sortOrder === 'asc' ? 'asc' : 'desc')
+                  ->orderBy('id', $sortOrder === 'asc' ? 'asc' : 'desc');
+        } elseif ($sortBy === 'sales_order_number') {
+            $query->orderBy('sales_order_number', $sortOrder)
+                  ->orderBy('order_date', 'desc')
+                  ->orderBy('id', $sortOrder);
+        } elseif (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortOrder)
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('order_date', 'desc')
+                  ->orderBy('sales_order_number', 'desc')
+                  ->orderBy('id', 'desc');
         }
 
         return $query->paginate($perPage)->withQueryString();
     }
 
     /**
-     * Confirm Sales Order and auto-generate Material Requirement.
+     * Confirm Sales Order and auto-generate Material Requirement for physical items only.
+     * Service products do not require material requisition or inventory reservation.
      */
-    public function confirmOrder(SalesOrder $order, string $nextRequirementNumber): MaterialRequirement
+    public function confirmOrder(SalesOrder $order, string $nextRequirementNumber = ''): ?MaterialRequirement
     {
         return DB::transaction(function () use ($order, $nextRequirementNumber) {
             $order->update([
                 'status' => 'Confirmed',
             ]);
+
+            // Filter out service items - in ERPs, service items do NOT generate material requirement / inventory reservation
+            $physicalItems = $order->items->filter(fn($item) => !$item->isService());
+
+            // If order has ONLY service items, NO material requirement is generated!
+            if ($physicalItems->isEmpty()) {
+                return null;
+            }
+
+            if (empty($nextRequirementNumber)) {
+                $nextRequirementNumber = app(\App\Domains\Sales\Services\MaterialRequirementService::class)->getNextRequirementNumber();
+            }
 
             $delivery = MaterialRequirement::where('sales_order_id', $order->id)->first();
             if (!$delivery) {
@@ -123,7 +150,7 @@ class SalesOrderRepository
                     ->orderBy('is_default', 'desc')
                     ->first()?->id ?? 1;
 
-                foreach ($order->items as $soItem) {
+                foreach ($physicalItems as $soItem) {
                     MaterialRequirementItem::create([
                         'tenant_id' => $order->tenant_id,
                         'company_id' => $order->company_id,
@@ -145,10 +172,91 @@ class SalesOrderRepository
     }
 
     /**
-     * Cancel Sales Order.
+     * Cancel Sales Order with cascading cleanup of open dispatch orders and reservations.
+     *
+     * @throws \Exception
      */
-    public function cancelOrder(SalesOrder $order): bool
+    public function cancelOrder(SalesOrder $order, ?string $reason = null): bool
     {
-        return $order->update(['status' => 'Cancelled']);
+        if (in_array($order->status, ['Shipped', 'Delivered'])) {
+            throw new \Exception('Cannot cancel a Shipped or Delivered Sales Order.');
+        }
+
+        if ($order->status === 'Partially Shipped') {
+            throw new \Exception('Partially Shipped orders cannot be cancelled directly. Please Short-Close the remaining backorder instead.');
+        }
+
+        return DB::transaction(function () use ($order, $reason) {
+            $dispatchService = app(\App\Domains\Sales\Services\DispatchOrderService::class);
+
+            // Cancel any open (Pending/Confirmed) dispatch orders
+            foreach ($order->dispatches as $dispatch) {
+                if (in_array($dispatch->status, ['Pending', 'Confirmed'])) {
+                    $dispatchService->cancelDispatchOrder($dispatch, 'Parent Sales Order was cancelled.');
+                }
+            }
+
+            // Cancel any active Material Requirements & release MR reservations
+            foreach ($order->materialRequirements as $mr) {
+                if ($mr->status !== 'Cancelled') {
+                    $mr->update(['status' => 'Cancelled']);
+                }
+            }
+
+            // Cancel all items and update status
+            foreach ($order->items as $item) {
+                $item->update([
+                    'cancelled_qty' => $item->quantity,
+                    'allocated_qty' => 0,
+                    'status' => 'Cancelled',
+                ]);
+            }
+
+            return $order->update([
+                'status' => 'Cancelled',
+                'closure_reason' => $reason,
+            ]);
+        });
+    }
+
+    /**
+     * Short-Close remaining unfulfilled quantity on Sales Order.
+     *
+     * @throws \Exception
+     */
+    public function shortCloseOrder(SalesOrder $order, string $reason): bool
+    {
+        if (in_array($order->status, ['Draft', 'Cancelled', 'Closed', 'Short-Closed'])) {
+            throw new \Exception("Cannot Short-Close an order in {$order->status} status.");
+        }
+
+        return DB::transaction(function () use ($order, $reason) {
+            $dispatchService = app(\App\Domains\Sales\Services\DispatchOrderService::class);
+
+            // Cancel any open un-shipped dispatch orders
+            foreach ($order->dispatches as $dispatch) {
+                if (in_array($dispatch->status, ['Pending', 'Confirmed'])) {
+                    $dispatchService->cancelDispatchOrder($dispatch, 'Parent Sales Order was short-closed.');
+                }
+            }
+
+            // Mark remaining open quantity as cancelled on each item
+            foreach ($order->items as $item) {
+                $ordered = (float) $item->quantity;
+                $dispatched = (float) $item->dispatched_qty;
+                $rem = max(0.0, $ordered - $dispatched);
+
+                $item->update([
+                    'cancelled_qty' => $rem,
+                    'allocated_qty' => 0,
+                ]);
+                $item->refreshStatus();
+            }
+
+            return $order->update([
+                'status' => 'Short-Closed',
+                'closure_reason' => $reason,
+            ]);
+        });
     }
 }

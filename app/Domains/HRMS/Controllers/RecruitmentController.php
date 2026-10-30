@@ -85,7 +85,7 @@ class RecruitmentController extends Controller
 
         $req = $this->recruitmentRepository->storeRequisition($validated, $tenantId, $employeeId, $userId);
 
-        return redirect()->back()->with('success', "Job Requisition #{$req->requisition_code} created successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_req_created', ['code' => $req->requisition_code]));
     }
 
     // Toggle/Approve Requisition Status
@@ -97,7 +97,7 @@ class RecruitmentController extends Controller
         
         $this->recruitmentRepository->updateRequisitionStatus($requisition, $request->status, auth()->id());
 
-        return redirect()->back()->with('success', "Requisition #{$requisition->requisition_code} status updated to " . strtoupper($request->status));
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_req_status_updated', ['code' => $requisition->requisition_code, 'status' => strtoupper($request->status)]));
     }
 
     // Candidates Directory with Search, Sort & Filter
@@ -134,7 +134,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $candidate = $this->recruitmentRepository->storeCandidate($validated, $request, $tenantId);
 
-        return redirect()->back()->with('success', "Candidate {$candidate->full_name} added successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_candidate_added', ['name' => $candidate->full_name]));
     }
 
     // Pipeline Kanban View
@@ -185,7 +185,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $this->recruitmentRepository->scheduleInterview($application, $validated, $tenantId);
 
-        return redirect()->back()->with('success', "Interview Round #{$request->round_number} ({$request->round_name}) scheduled successfully!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_interview_scheduled', ['round' => $request->round_number, 'name' => $request->round_name]));
     }
 
     // Submit Scorecard
@@ -205,7 +205,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $this->recruitmentRepository->submitScorecard($interview, $validated, auth()->id(), $tenantId);
 
-        return redirect()->back()->with('success', "Scorecard submitted for {$interview->round_name}!");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_scorecard_submitted', ['name' => $interview->round_name]));
     }
 
     // Create Job Offer
@@ -229,7 +229,7 @@ class RecruitmentController extends Controller
         $tenantId = function_exists('tenant_id') ? tenant_id() : null;
         $offer = $this->recruitmentRepository->createOffer($application, $validated, $request, $tenantId);
 
-        return redirect()->back()->with('success', "Job Offer #{$offer->offer_code} generated successfully. Send it to the candidate when ready.");
+        return redirect()->back()->with('success', __('hrms.recruitment.flash_offer_generated', ['code' => $offer->offer_code]));
     }
 
     // Send Job Offer Email to Candidate

@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Plan Catalog | SaaS ERP')
+@section('title', 'Plan Catalog | Platform Console')
 @section('page-title', 'Plan Catalog')
-@section('breadcrumb', 'Platform / Plans')
+@section('breadcrumb', 'Plans')
 
 @section('page-actions')
     <x-ui.button href="{{ route('platform.plans.create') }}" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createPlanModal">

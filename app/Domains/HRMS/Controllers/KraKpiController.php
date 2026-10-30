@@ -89,7 +89,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->storeCycle($validated, $tenantId);
 
-        return redirect()->back()->with('success', 'Appraisal Review Period created successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.cycle_created'));
     }
 
     /**
@@ -121,7 +121,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->updateCycle($id, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'Appraisal Review Period updated successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.cycle_updated'));
     }
 
     /**
@@ -135,7 +135,7 @@ class KraKpiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->kraKpiRepository->deleteCycle($id, $tenantId);
 
-        return redirect()->back()->with('success', 'Appraisal Cycle deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.cycle_deleted'));
     }
 
     /**
@@ -157,7 +157,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->storeKraCategory($validated, $tenantId);
 
-        return redirect()->back()->with('success', 'KRA Category added to library.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.kra_category_added'));
     }
 
     /**
@@ -171,7 +171,7 @@ class KraKpiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->kraKpiRepository->deleteKraCategory($id, $tenantId);
 
-        return redirect()->back()->with('success', 'KRA Focus Area deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.kra_category_deleted'));
     }
 
     /**
@@ -217,7 +217,7 @@ class KraKpiController extends Controller
             ]);
         }
 
-        return redirect()->back()->with('success', 'KPI Metric Master created successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.kpi_master_created'));
     }
 
     /**
@@ -231,7 +231,7 @@ class KraKpiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->kraKpiRepository->deleteKpiMaster($id, $tenantId);
 
-        return redirect()->back()->with('success', 'KPI Metric deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.kpi_master_deleted'));
     }
 
     /**
@@ -245,7 +245,7 @@ class KraKpiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->kraKpiRepository->deleteTemplate($id, $tenantId);
 
-        return redirect()->back()->with('success', 'Role KPI Template deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.template_deleted'));
     }
 
     /**
@@ -259,7 +259,7 @@ class KraKpiController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->kraKpiRepository->deletePlan($planId, $tenantId);
 
-        return redirect()->back()->with('success', 'Employee Scorecard deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.scorecard_deleted'));
     }
 
     /**
@@ -313,7 +313,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->storeTemplate($validated, $tenantId);
 
-        return redirect()->back()->with('success', 'KPI Template pack created successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.template_created'));
     }
 
     /**
@@ -367,7 +367,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->updateTemplate($id, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'Role KPI Template updated successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.template_updated'));
     }
 
     /**
@@ -417,7 +417,7 @@ class KraKpiController extends Controller
 
         $assignedCount = $this->kraKpiRepository->assignTemplateToEmployees($validated, $tenantId);
 
-        return redirect()->back()->with('success', sprintf('Successfully created/assigned %d Goal Scorecards for this cycle.', $assignedCount));
+        return redirect()->back()->with('success', __('hrms.kra_kpi.assigned_scorecards_success', ['count' => $assignedCount]));
     }
 
     /**
@@ -437,7 +437,7 @@ class KraKpiController extends Controller
 
         $canModify = $isHrOrAdmin || $isManager || ($isOwner && in_array($plan->status, ['draft', 'submitted']));
         if (!$canModify) {
-            return redirect()->back()->with('error', 'You are not authorized to add or modify KPI goals on this goal sheet.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_modify_goals'));
         }
 
         // 1. Batch Multi-Row Submission (from multi-row repeater table)
@@ -486,17 +486,17 @@ class KraKpiController extends Controller
             }
 
             if (empty($validatedItems)) {
-                return redirect()->back()->with('error', 'Please provide at least one valid KPI goal title.');
+                return redirect()->back()->with('error', __('hrms.kra_kpi.provide_valid_kpi_title'));
             }
 
             $totalSum = (float) array_sum(array_column($validatedItems, 'weightage'));
             if ($totalSum > 100.0) {
-                return redirect()->back()->with('error', "Total goal weightage cannot exceed 100% (currently {$totalSum}%). Please reduce weights before saving.");
+                return redirect()->back()->with('error', __('hrms.kra_kpi.weight_exceeds_100', ['total' => $totalSum]));
             }
 
             $count = $this->kraKpiRepository->syncGoalItems($planId, $validatedItems, $tenantId);
 
-            return redirect()->back()->with('success', "Scorecard goals and weights updated successfully ({$count} goals active).");
+            return redirect()->back()->with('success', __('hrms.kra_kpi.scorecard_goals_updated', ['count' => $count]));
         }
 
         // 2. Fallback for single-item submission
@@ -516,7 +516,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->addGoalItem($planId, $validated, $tenantId);
 
-        return redirect()->back()->with('success', 'KPI Goal added to scorecard.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.kpi_goal_added'));
     }
 
     /**
@@ -537,12 +537,12 @@ class KraKpiController extends Controller
 
         $canDelete = $isHrOrAdmin || $isManager || ($isOwner && in_array($plan->status, ['draft', 'submitted']));
         if (!$canDelete) {
-            return redirect()->back()->with('error', 'You are not authorized to remove KPI goals from this goal sheet.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_remove_goals'));
         }
 
         $this->kraKpiRepository->deleteGoalItem($itemId, $tenantId);
 
-        return redirect()->back()->with('success', 'KPI Goal removed from scorecard.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.kpi_goal_removed'));
     }
 
     /**
@@ -558,12 +558,12 @@ class KraKpiController extends Controller
         $plan = \App\Domains\HRMS\Models\EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
         $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
         if (!$isOwner && !$isHrOrAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized. Only the assigned employee can submit this goal plan.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_submit_goals'));
         }
 
         try {
             $this->kraKpiRepository->submitGoals($planId, $tenantId);
-            return redirect()->back()->with('success', 'Goals locked and submitted to Manager for approval.');
+            return redirect()->back()->with('success', __('hrms.kra_kpi.goals_submitted_success'));
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -583,12 +583,12 @@ class KraKpiController extends Controller
         $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
             || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
         if (!$isManager && !$isHrOrAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized. Only the manager or HR Admin can approve this goal plan.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_approve_goals'));
         }
 
         try {
             $this->kraKpiRepository->approveGoals($planId, $tenantId);
-            return redirect()->back()->with('success', 'Goal plan approved. Active for cycle tracking.');
+            return redirect()->back()->with('success', __('hrms.kra_kpi.goals_approved_success'));
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -611,7 +611,7 @@ class KraKpiController extends Controller
             || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
 
         if (!$isOwner && !$isManager && !$isHrOrAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized to log progress for this KPI goal.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_log_progress'));
         }
 
         $validated = $request->validate([
@@ -621,7 +621,7 @@ class KraKpiController extends Controller
 
         $this->kraKpiRepository->logProgress($itemId, $validated, auth()->id(), $tenantId);
 
-        return redirect()->back()->with('success', 'Progress check-in logged successfully.');
+        return redirect()->back()->with('success', __('hrms.kra_kpi.progress_logged_success'));
     }
 
     /**
@@ -637,7 +637,7 @@ class KraKpiController extends Controller
         $plan = \App\Domains\HRMS\Models\EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
         $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
         if (!$isOwner && !$isHrOrAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized. Only the assigned employee can submit self-appraisal.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_self_appraisal'));
         }
 
         $validated = $request->validate([
@@ -649,7 +649,7 @@ class KraKpiController extends Controller
 
         try {
             $this->kraKpiRepository->submitSelfAppraisal($planId, $validated, $tenantId);
-            return redirect()->back()->with('success', 'Self-Appraisal submitted successfully. Routed to Manager for review.');
+            return redirect()->back()->with('success', __('hrms.kra_kpi.self_appraisal_success'));
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -669,7 +669,7 @@ class KraKpiController extends Controller
         $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
             || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
         if (!$isManager && !$isHrOrAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized. Only the manager or HR Admin can submit manager appraisal.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_manager_appraisal'));
         }
 
         $validated = $request->validate([
@@ -689,7 +689,7 @@ class KraKpiController extends Controller
                 $tenantId
             );
 
-            return redirect()->back()->with('success', 'Manager Appraisal submitted successfully. Performance review is completed and finalized.');
+            return redirect()->back()->with('success', __('hrms.kra_kpi.manager_appraisal_success'));
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -711,13 +711,13 @@ class KraKpiController extends Controller
         $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
             || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
         if (!$isManager && !$isHrOrAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized. Only the manager or HR Admin can initiate PIP from an appraisal.');
+            return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_initiate_pip'));
         }
 
         $pip = $this->kraKpiRepository->triggerPip($planId, auth()->id(), $tenantId);
 
         return redirect()->route('hrms.pip.show', $pip->id)
-            ->with('success', sprintf('Performance Improvement Plan #%s generated successfully from low appraisal scores.', $pip->pip_number));
+            ->with('success', __('hrms.kra_kpi.pip_initiated_success', ['pip' => $pip->pip_number]));
     }
 
     /**

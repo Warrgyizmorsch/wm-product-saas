@@ -313,8 +313,8 @@ class SopService
                 try {
                     \App\Services\Notification\NotificationService::sendToEmployee(
                         employee: $emp,
-                        title: 'New SOP Assigned for Sign-Off',
-                        message: "You have been assigned Standard Operating Procedure: {$sop->title} ({$sop->code}).",
+                        title: __('hrms.sop.notif_assigned_title'),
+                        message: __('hrms.sop.notif_assigned_message', ['title' => $sop->title, 'code' => $sop->code]),
                         actionUrl: route('hrms.sop.show', $sop->id),
                         module: 'hrms',
                         type: 'sop_assigned',
@@ -377,8 +377,8 @@ class SopService
                 try {
                     \App\Services\Notification\NotificationService::sendToEmployee(
                         employee: $employee,
-                        title: 'New SOP Assigned for Sign-Off',
-                        message: "You have been assigned Standard Operating Procedure: {$sop->title} ({$sop->code}).",
+                        title: __('hrms.sop.notif_assigned_title'),
+                        message: __('hrms.sop.notif_assigned_message', ['title' => $sop->title, 'code' => $sop->code]),
                         actionUrl: route('hrms.sop.show', $sop->id),
                         module: 'hrms',
                         type: 'sop_assigned',
@@ -411,8 +411,8 @@ class SopService
             $doc = $assignment->document;
             $targetUrl = $doc ? route('hrms.sop.show', $doc->id) : route('hrms.sop.index');
             \App\Services\Notification\NotificationService::sendToHrAdmins(
-                'SOP Acknowledged',
-                "{$emp?->full_name} has acknowledged Standard Operating Procedure: {$doc?->title} ({$doc?->code}).",
+                __('hrms.sop.notif_acknowledged_title'),
+                __('hrms.sop.notif_acknowledged_message', ['name' => $emp?->full_name ?? __('hrms.common.employee'), 'title' => $doc?->title ?? '', 'code' => $doc?->code ?? '']),
                 $targetUrl,
                 'sop_acknowledged_hr',
                 'feather-check-circle'
@@ -439,8 +439,8 @@ class SopService
         if ($emp && $doc) {
             \App\Services\Notification\NotificationService::sendToEmployee(
                 employee: $emp,
-                title: 'Action Required: SOP Sign-Off',
-                message: "Please review and acknowledge Standard Operating Procedure: {$doc->title} ({$doc->code}).",
+                title: __('hrms.sop.notif_reminder_title'),
+                message: __('hrms.sop.notif_reminder_message', ['title' => $doc->title, 'code' => $doc->code]),
                 actionUrl: route('hrms.sop.show', $doc->id),
                 module: 'hrms',
                 type: 'sop_reminder',

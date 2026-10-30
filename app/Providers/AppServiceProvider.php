@@ -1138,6 +1138,22 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Models\Feedback360Cycle::class,
             \App\Domains\HRMS\Policies\Feedback360Policy::class
         );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Participant::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Nomination::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Competency::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\HRMS\Models\Feedback360Question::class,
+            \App\Domains\HRMS\Policies\Feedback360Policy::class
+        );
 
         // ── Fixed Asset Policies ────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(

@@ -259,6 +259,42 @@ class AccessService
      * who may edit a system role's permissions) check role membership here
      * directly instead.
      */
+    /**
+     * Whether $user may open the /admin platform console. Two kinds of account
+     * qualify: one holding the platform's own super_admin/admin system role
+     * (today's owners are tenant-bound, so tenant_id alone can't decide), and a
+     * tenant-less platform staff account granted platform.console.access. A
+     * tenant owner's SCOPE_TENANT grant of that permission never qualifies.
+     */
+    public function canUsePlatformConsole(User $user): bool
+    {
+        if ($user->isDeactivated()) {
+            return false;
+        }
+
+        if ($this->holdsPlatformAdminRole($user) || $this->legacyAdminRoleTextAllows($user, 'platform.console.access', [])) {
+            return true;
+        }
+
+        return $user->tenant_id === null && $this->allows($user, 'platform.console.access');
+    }
+
+    /**
+     * The platform's own super_admin/admin system role — never a tenant's role
+     * of the same slug (RoleService reserves those, and tenant_id is checked).
+     */
+    public function holdsPlatformAdminRole(User $user, ?int $tenantId = null): bool
+    {
+        $roleIds = $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
+
+        return $roleIds->isNotEmpty() && Role::query()
+            ->whereIn('id', $roleIds)
+            ->whereIn('slug', ['super_admin', 'admin'])
+            ->whereNull('tenant_id')
+            ->where('is_system', true)
+            ->exists();
+    }
+
     public function hasRole(User $user, string $roleSlug, ?int $tenantId = null): bool
     {
         $roleIds = $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
@@ -288,6 +324,11 @@ class AccessService
 
         if (! $this->hasRole($actor, 'super_admin')) {
             $query->where('slug', '!=', 'super_admin');
+        }
+
+        // Platform staff roles carry SCOPE_PLATFORM grants: never for a tenant's user.
+        if ($tenantId !== null) {
+            $query->where(fn ($q) => $q->whereNotNull('tenant_id')->orWhereNotIn('slug', Role::PLATFORM_STAFF_SLUGS));
         }
 
         return $query->orderBy('level')->get();

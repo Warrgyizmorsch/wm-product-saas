@@ -21,7 +21,8 @@ class SalesOrderProjectBridgeService
         protected MilestoneService $milestoneService,
         protected TaskListService $taskListService,
         protected TaskService $taskService
-    ) {}
+    ) {
+    }
 
     /**
      * Convert a Confirmed Sales Order to a delivery Project with Milestones and Tasks.

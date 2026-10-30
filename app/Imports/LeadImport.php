@@ -21,7 +21,7 @@ class LeadImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
     public function collection(Collection $rows)
     {
         $tenantId  = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
-        $companyId = company_id() ?? 1;
+        $companyId = company_id() ?? auth()->user()?->company_id;
         $branchId  = branch_id() ?? null;
 
         foreach ($rows as $index => $row) {

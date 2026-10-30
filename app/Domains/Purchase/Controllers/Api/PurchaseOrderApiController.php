@@ -24,8 +24,8 @@ class PurchaseOrderApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -684,5 +684,21 @@ class PurchaseOrderApiController extends Controller
             new \App\Exports\PurchaseOrderExport($tenantId, $request->all()),
             'purchase_orders_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * GET /api/purchase/orders/{id}/download-pdf
+     */
+    public function downloadPdf(int $id)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $order = PurchaseOrder::where('tenant_id', $tenantId)->find($id);
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Purchase Order not found'], 404);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.orders.pdf', compact('order'));
+        return $pdf->download("PurchaseOrder_{$order->purchase_order_number}.pdf");
     }
 }

@@ -90,11 +90,11 @@ class GoalController extends Controller
 
         try {
             if ($request->owner_type === 'company' && !$this->goalRepository->canManageGoals($user)) {
-                return redirect()->back()->with('error', 'You are not authorized to create organization-wide goals.')->withInput();
+                return redirect()->back()->with('error', __('hrms.goals.unauthorized_create_org_goals'))->withInput();
             }
 
             if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {
-                return redirect()->back()->with('error', 'You are not authorized to create custom cycles or strategic pillars.')->withInput();
+                return redirect()->back()->with('error', __('hrms.goals.unauthorized_create_custom_cycles'))->withInput();
             }
 
             $data = $request->all();
@@ -122,9 +122,9 @@ class GoalController extends Controller
             $goal = $this->goalRepository->storeGoal($data, $tenantId, $user);
 
             return redirect()->route('hrms.goals.show', $goal->id)
-                ->with('success', "Goal '{$goal->title}' created successfully.");
+                ->with('success', __('hrms.goals.goal_created_successfully', ['title' => $goal->title]));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to create goal: ' . $e->getMessage())->withInput();
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_create_goal', ['message' => $e->getMessage()]))->withInput();
         }
     }
 
@@ -137,7 +137,7 @@ class GoalController extends Controller
 
         $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
         if (!$this->goalRepository->canUpdateGoal($user, $goal)) {
-            return redirect()->back()->with('error', 'You are not authorized to modify this goal.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_modify_goal'));
         }
 
         $request->validate([
@@ -158,11 +158,11 @@ class GoalController extends Controller
         ]);
 
         if ($request->owner_type === 'company' && $goal->owner_type !== 'company' && !$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to change this goal to an organization-wide objective.')->withInput();
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_change_org_goal'))->withInput();
         }
 
         if (($request->filled('custom_goal_cycle') || $request->filled('custom_goal_category')) && !$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to create custom cycles or strategic pillars.')->withInput();
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_create_custom_cycles'))->withInput();
         }
 
         try {
@@ -190,9 +190,9 @@ class GoalController extends Controller
 
             $this->goalRepository->updateGoal($id, $data, $tenantId, $user);
 
-            return redirect()->back()->with('success', 'Goal updated successfully.');
+            return redirect()->back()->with('success', __('hrms.goals.goal_updated_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to update goal: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_update_goal', ['message' => $e->getMessage()]));
         }
     }
 
@@ -206,15 +206,15 @@ class GoalController extends Controller
         try {
             $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
             if (!$this->goalRepository->canDeleteGoal($user, $goal)) {
-                return redirect()->back()->with('error', 'You are not authorized to delete this goal.');
+                return redirect()->back()->with('error', __('hrms.goals.unauthorized_delete_goal'));
             }
 
             $this->goalRepository->deleteGoal($id, $tenantId);
             $activeTab = request('active_tab');
             return redirect()->route('hrms.goals.index', $activeTab ? ['active_tab' => $activeTab] : [])
-                ->with('success', 'Goal deleted successfully.');
+                ->with('success', __('hrms.goals.goal_deleted_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete goal: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_delete_goal', ['message' => $e->getMessage()]));
         }
     }
 
@@ -227,7 +227,7 @@ class GoalController extends Controller
 
         $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
         if (!$this->goalRepository->canCheckInGoal($user, $goal)) {
-            return redirect()->back()->with('error', 'You are not authorized to log check-ins for this goal.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_check_in_goal'));
         }
 
         $request->validate([
@@ -241,9 +241,9 @@ class GoalController extends Controller
         try {
             $this->goalRepository->recordCheckIn($id, $request->all(), $tenantId, $user);
 
-            return redirect()->back()->with('success', 'Progress check-in recorded successfully.');
+            return redirect()->back()->with('success', __('hrms.goals.check_in_recorded_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Check-in failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.check_in_failed', ['message' => $e->getMessage()]));
         }
     }
 
@@ -257,14 +257,14 @@ class GoalController extends Controller
         try {
             $goal = \App\Domains\HRMS\Models\Goal::where('tenant_id', $tenantId)->findOrFail($id);
             if (!$this->goalRepository->canUpdateGoal($user, $goal)) {
-                return redirect()->back()->with('error', 'You are not authorized to approve this goal.');
+                return redirect()->back()->with('error', __('hrms.goals.unauthorized_approve_goal'));
             }
 
             $this->goalRepository->approveGoal($id, $tenantId, $user);
 
-            return redirect()->back()->with('success', "Goal '{$goal->title}' approved and activated.");
+            return redirect()->back()->with('success', __('hrms.goals.goal_approved_successfully', ['title' => $goal->title]));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to approve goal: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_approve_goal', ['message' => $e->getMessage()]));
         }
     }
 
@@ -295,7 +295,7 @@ class GoalController extends Controller
         [$tenantId, $user] = $this->resolveContext();
 
         if (!$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to manage goal cycles.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_manage_cycles'));
         }
 
         $request->validate([
@@ -310,9 +310,9 @@ class GoalController extends Controller
             $this->goalRepository->storeCycle($request->all(), $tenantId, $user);
 
             return redirect()->route('hrms.goals.index', ['active_tab' => 'cycles_pillars'])
-                ->with('success', 'Goal Cycle created successfully.');
+                ->with('success', __('hrms.goals.cycle_created_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to create cycle: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_create_cycle', ['message' => $e->getMessage()]));
         }
     }
 
@@ -321,7 +321,7 @@ class GoalController extends Controller
         [$tenantId, $user] = $this->resolveContext();
 
         if (!$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to manage goal cycles.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_manage_cycles'));
         }
 
         $request->validate([
@@ -336,9 +336,9 @@ class GoalController extends Controller
             $this->goalRepository->updateCycle($id, $request->all(), $tenantId, $user);
 
             return redirect()->route('hrms.goals.index', ['active_tab' => 'cycles_pillars'])
-                ->with('success', 'Goal Cycle updated successfully.');
+                ->with('success', __('hrms.goals.cycle_updated_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to update cycle: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_update_cycle', ['message' => $e->getMessage()]));
         }
     }
 
@@ -347,15 +347,15 @@ class GoalController extends Controller
         [$tenantId, $user] = $this->resolveContext();
 
         if (!$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to manage goal cycles.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_manage_cycles'));
         }
 
         try {
             $this->goalRepository->deleteCycle($id, $tenantId);
             return redirect()->route('hrms.goals.index', ['active_tab' => 'cycles_pillars'])
-                ->with('success', 'Goal Cycle deleted successfully.');
+                ->with('success', __('hrms.goals.cycle_deleted_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete cycle: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_delete_cycle', ['message' => $e->getMessage()]));
         }
     }
 
@@ -364,7 +364,7 @@ class GoalController extends Controller
         [$tenantId, $user] = $this->resolveContext();
 
         if (!$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to manage strategic categories.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_manage_categories'));
         }
 
         $request->validate([
@@ -378,9 +378,9 @@ class GoalController extends Controller
             $this->goalRepository->storeCategory($request->all(), $tenantId, $user);
 
             return redirect()->route('hrms.goals.index', ['active_tab' => 'cycles_pillars'])
-                ->with('success', 'Strategic Pillar / Category created successfully.');
+                ->with('success', __('hrms.goals.category_created_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to create category: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_create_category', ['message' => $e->getMessage()]));
         }
     }
 
@@ -389,15 +389,15 @@ class GoalController extends Controller
         [$tenantId, $user] = $this->resolveContext();
 
         if (!$this->goalRepository->canManageGoals($user)) {
-            return redirect()->back()->with('error', 'You are not authorized to manage strategic categories.');
+            return redirect()->back()->with('error', __('hrms.goals.unauthorized_manage_categories'));
         }
 
         try {
             $this->goalRepository->deleteCategory($id, $tenantId);
             return redirect()->route('hrms.goals.index', ['active_tab' => 'cycles_pillars'])
-                ->with('success', 'Category deleted successfully.');
+                ->with('success', __('hrms.goals.category_deleted_successfully'));
         } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Failed to delete category: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.goals.failed_to_delete_category', ['message' => $e->getMessage()]));
         }
     }
 }

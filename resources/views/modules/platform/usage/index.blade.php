@@ -1,8 +1,8 @@
-@extends('layouts.duralux')
+@extends('layouts.admin')
 
-@section('title', 'Usage Limits | SaaS ERP')
+@section('title', 'Usage Limits | Platform Console')
 @section('page-title', 'Usage Limits')
-@section('breadcrumb', 'Platform / Usage Limits')
+@section('breadcrumb', 'Usage Limits')
 
 @section('content')
 

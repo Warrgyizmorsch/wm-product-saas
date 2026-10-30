@@ -1,14 +1,14 @@
 @extends('layouts.duralux')
 
-@section('title', 'KRA & KPI Performance Management | HRMS')
-@section('page-title', 'KRA & KPI Performance Management')
-@section('breadcrumb', 'HRMS / Performance / KRA & KPI')
+@section('title', __('hrms.kra_kpi.title') . ' | ' . config('app.name', 'HRMS'))
+@section('page-title', __('hrms.kra_kpi.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.kra_kpi.performance') . ' / ' . __('hrms.kra_kpi.breadcrumb_kra_kpi'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         @if($isHrOrAdmin)
             <x-ui.button variant="primary" icon="feather-user-check" data-bs-toggle="modal" data-bs-target="#assignTemplateModal" class="fw-bold">
-                Assign Goal Sheets
+                {{ __('hrms.kra_kpi.assign_goal_sheets') }}
             </x-ui.button>
         @endif
     </div>
@@ -229,27 +229,18 @@
         @php
             $mainTabs = [];
             if ($isHrOrAdmin) {
-                $mainTabs[] = ['id' => 'tab-scorecards', 'label' => 'All Scorecards', 'active' => ($activeTab === 'plans'), 'icon' => 'feather-list'];
-                $mainTabs[] = ['id' => 'tab-cycles', 'label' => 'Appraisal Cycles', 'active' => ($activeTab === 'cycles'), 'icon' => 'feather-refresh-cw'];
-                $mainTabs[] = ['id' => 'tab-library', 'label' => 'KRA & KPI Library', 'active' => ($activeTab === 'library'), 'icon' => 'feather-database'];
-                $mainTabs[] = ['id' => 'tab-templates', 'label' => 'Role Templates', 'active' => ($activeTab === 'templates'), 'icon' => 'feather-layers'];
-                if ($teamPlans->isNotEmpty()) {
-                    $mainTabs[] = ['id' => 'tab-team', 'label' => 'Team Reviews (' . $teamPlans->count() . ')', 'active' => ($activeTab === 'team'), 'icon' => 'feather-users'];
-                }
+                $mainTabs[] = ['id' => 'tab-scorecards', 'label' => __('hrms.kra_kpi.tab_all_scorecards'), 'active' => ($activeTab === 'plans'), 'icon' => 'feather-list'];
+                $mainTabs[] = ['id' => 'tab-cycles', 'label' => __('hrms.kra_kpi.tab_appraisal_cycles'), 'active' => ($activeTab === 'cycles'), 'icon' => 'feather-refresh-cw'];
+                $mainTabs[] = ['id' => 'tab-library', 'label' => __('hrms.kra_kpi.tab_library'), 'active' => ($activeTab === 'library'), 'icon' => 'feather-database'];
+                $mainTabs[] = ['id' => 'tab-templates', 'label' => __('hrms.kra_kpi.tab_role_templates'), 'active' => ($activeTab === 'templates'), 'icon' => 'feather-layers'];
                 if ($myPlan) {
-                    $mainTabs[] = ['id' => 'tab-mygoals', 'label' => 'My Active Goals', 'active' => ($activeTab === 'myplan'), 'icon' => 'feather-target'];
+                    $mainTabs[] = ['id' => 'tab-mygoals', 'label' => __('hrms.kra_kpi.tab_my_active_goals'), 'active' => ($activeTab === 'myplan'), 'icon' => 'feather-target'];
                 }
-            } elseif ($teamPlans->isNotEmpty()) {
-                $mainTabs[] = ['id' => 'tab-team', 'label' => 'Team Reviews (' . $teamPlans->count() . ')', 'active' => ($activeTab === 'team'), 'icon' => 'feather-users'];
-                if ($myPlan) {
-                    $mainTabs[] = ['id' => 'tab-mygoals', 'label' => 'My Active Goals', 'active' => ($activeTab === 'myplan'), 'icon' => 'feather-target'];
-                }
-                $mainTabs[] = ['id' => 'tab-scorecards', 'label' => 'Scorecards History', 'active' => ($activeTab === 'plans'), 'icon' => 'feather-list'];
             } else {
                 if ($myPlan) {
-                    $mainTabs[] = ['id' => 'tab-mygoals', 'label' => 'My Active Goals', 'active' => ($activeTab === 'myplan'), 'icon' => 'feather-target'];
+                    $mainTabs[] = ['id' => 'tab-mygoals', 'label' => __('hrms.kra_kpi.tab_my_active_goals'), 'active' => ($activeTab === 'myplan'), 'icon' => 'feather-target'];
                 }
-                $mainTabs[] = ['id' => 'tab-scorecards', 'label' => 'My Scorecards', 'active' => ($activeTab === 'plans' || !$myPlan), 'icon' => 'feather-list'];
+                $mainTabs[] = ['id' => 'tab-scorecards', 'label' => __('hrms.kra_kpi.tab_my_scorecards'), 'active' => ($activeTab === 'plans' || !$myPlan), 'icon' => 'feather-list'];
             }
         @endphp
 
@@ -270,62 +261,62 @@
                     <input type="hidden" name="filter_department" value="{{ request('filter_department') }}">
                     <input type="hidden" name="sort" value="{{ request('sort', 'newest') }}">
                     <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                    <input type="text" name="search" id="kraSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13" placeholder="Search by name, ID, plan #..." value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                    <input type="text" name="search" id="kraSearchInput" class="w-100 border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.kra_kpi.search_placeholder') }}" value="{{ request('search') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
                 </form>
 
                 <!-- Sort Dropdown -->
-                <x-ui.sort-dropdown label="SORT">
+                <x-ui.sort-dropdown :label="__('hrms.common.sort')">
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('sort', 'newest') === 'newest' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'newest']) }}">
-                        <span>Newest First</span>
+                        <span>{{ __('hrms.kra_kpi.sort_newest') }}</span>
                         @if(request('sort', 'newest') === 'newest') <i class="feather-check ms-3 text-primary"></i> @endif
                     </a>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('sort') === 'oldest' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'oldest']) }}">
-                        <span>Oldest First</span>
+                        <span>{{ __('hrms.kra_kpi.sort_oldest') }}</span>
                         @if(request('sort') === 'oldest') <i class="feather-check ms-3 text-primary"></i> @endif
                     </a>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('sort') === 'score_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'score_desc']) }}">
-                        <span>Highest Score First</span>
+                        <span>{{ __('hrms.kra_kpi.sort_score_desc') }}</span>
                         @if(request('sort') === 'score_desc') <i class="feather-check ms-3 text-primary"></i> @endif
                     </a>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('sort') === 'score_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'score_asc']) }}">
-                        <span>Lowest Score First</span>
+                        <span>{{ __('hrms.kra_kpi.sort_score_asc') }}</span>
                         @if(request('sort') === 'score_asc') <i class="feather-check ms-3 text-primary"></i> @endif
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Filter Dropdown -->
-                <x-ui.filter label="FILTER">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                <x-ui.filter :label="__('hrms.common.filter')">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                     <form method="GET" action="{{ route('hrms.kra-kpi.index') }}">
                         <input type="hidden" name="active_tab" value="{{ $activeTab }}">
                         <input type="hidden" name="search" value="{{ request('search') }}">
                         <input type="hidden" name="sort" value="{{ request('sort') }}">
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Appraisal Cycle</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.kra_kpi.filter_appraisal_cycle') }}</label>
                             <x-ui.odoo-form-ui type="select" name="filter_cycle">
-                                <option value="">All Cycles</option>
+                                <option value="">{{ __('hrms.kra_kpi.all_cycles') }}</option>
                                 @foreach($cycles as $c)
                                     <option value="{{ $c->id }}" @selected(request('filter_cycle') == $c->id)>{{ $c->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="filter_status">
-                                <option value="">All Statuses</option>
-                                <option value="overdue" @selected(request('filter_status') === 'overdue')>⚠️ Overdue Submissions</option>
-                                <option value="draft" @selected(request('filter_status') === 'draft')>Draft</option>
-                                <option value="submitted" @selected(request('filter_status') === 'submitted')>Goals Submitted</option>
-                                <option value="approved" @selected(request('filter_status') === 'approved')>Goals Active</option>
-                                <option value="self_reviewed" @selected(request('filter_status') === 'self_reviewed')>Self-Reviewed</option>
-                                <option value="manager_reviewed" @selected(request('filter_status') === 'manager_reviewed')>Completed Review</option>
+                                <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                <option value="overdue" @selected(request('filter_status') === 'overdue')>{{ __('hrms.kra_kpi.status_overdue') }}</option>
+                                <option value="draft" @selected(request('filter_status') === 'draft')>{{ __('hrms.kra_kpi.status_draft') }}</option>
+                                <option value="submitted" @selected(request('filter_status') === 'submitted')>{{ __('hrms.kra_kpi.status_goals_submitted') }}</option>
+                                <option value="approved" @selected(request('filter_status') === 'approved')>{{ __('hrms.kra_kpi.status_goals_active') }}</option>
+                                <option value="self_reviewed" @selected(request('filter_status') === 'self_reviewed')>{{ __('hrms.kra_kpi.status_self_reviewed') }}</option>
+                                <option value="manager_reviewed" @selected(request('filter_status') === 'manager_reviewed')>{{ __('hrms.kra_kpi.status_completed_review') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Department</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.common.department') }}</label>
                             <x-ui.odoo-form-ui type="select" name="filter_department">
-                                <option value="">All Departments</option>
+                                <option value="">{{ __('hrms.common.all_departments') }}</option>
                                 @foreach($departments as $dept)
                                     <option value="{{ $dept->id }}" @selected(request('filter_department') == $dept->id)>{{ $dept->name }}</option>
                                 @endforeach
@@ -333,8 +324,8 @@
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4 pt-2 border-top">
-                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">APPLY FILTERS</x-ui.button>
-                            <x-ui.button href="{{ route('hrms.kra-kpi.index', ['active_tab' => $activeTab]) }}" variant="light" size="sm" class="border flex-grow-1">RESET</x-ui.button>
+                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.kra_kpi.apply_filters') }}</x-ui.button>
+                            <x-ui.button href="{{ route('hrms.kra-kpi.index', ['active_tab' => $activeTab]) }}" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                         </div>
                     </form>
                 </x-ui.filter>
@@ -350,13 +341,13 @@
                     <x-ui.table hoverable>
                         <thead>
                             <tr>
-                                <th style="width: 23%;">Employee & Role</th>
-                                <th style="width: 13%;">Plan #</th>
-                                <th style="width: 22%;">Appraisal Cycle</th>
-                                <th style="width: 11%;">Goals Count</th>
-                                <th style="width: 10%;">Score & Grade</th>
-                                <th style="width: 11%;">Stage Status</th>
-                                <th style="width: 10%;" class="text-end text-nowrap actions-col">Actions</th>
+                                <th style="width: 23%;">{{ __('hrms.kra_kpi.th_employee_role') }}</th>
+                                <th style="width: 13%;">{{ __('hrms.kra_kpi.th_plan_no') }}</th>
+                                <th style="width: 22%;">{{ __('hrms.kra_kpi.th_appraisal_cycle') }}</th>
+                                <th style="width: 11%;">{{ __('hrms.kra_kpi.th_goals_count') }}</th>
+                                <th style="width: 10%;">{{ __('hrms.kra_kpi.th_score_grade') }}</th>
+                                <th style="width: 11%;">{{ __('hrms.kra_kpi.th_stage_status') }}</th>
+                                <th style="width: 10%;" class="text-end text-nowrap actions-col">{{ __('hrms.common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -368,9 +359,9 @@
                                                 {{ strtoupper(substr($plan->employee->full_name ?? 'EM', 0, 2)) }}
                                             </div>
                                             <div class="text-break" style="min-width: 0;">
-                                                <div class="fw-bold text-dark fs-13 text-wrap">{{ $plan->employee->full_name ?? 'Employee' }}</div>
+                                                <div class="fw-bold text-dark fs-13 text-wrap">{{ $plan->employee->full_name ?? __('hrms.common.employee') }}</div>
                                                 <div class="small text-muted fs-11 text-wrap lh-sm">
-                                                    {{ $plan->employee->designation->name ?? 'Designation N/A' }} &bull; {{ $plan->employee->department->name ?? 'General' }}
+                                                    {{ $plan->employee->designation->name ?? __('hrms.kra_kpi.designation_na') }} &bull; {{ $plan->employee->department->name ?? __('hrms.kra_kpi.dept_general') }}
                                                 </div>
                                             </div>
                                         </div>
@@ -382,12 +373,12 @@
                                         <div class="small text-muted fs-11">{{ $plan->created_at->format('d M Y') }}</div>
                                     </td>
                                     <td>
-                                        <div class="fw-semibold text-dark fs-12 text-wrap mb-1 lh-sm">{{ $plan->appraisalCycle->name ?? 'N/A' }}</div>
-                                        <x-ui.badge variant="secondary" soft class="fs-10 text-uppercase">{{ $plan->appraisalCycle->period_type ?? 'Annual' }}</x-ui.badge>
+                                        <div class="fw-semibold text-dark fs-12 text-wrap mb-1 lh-sm">{{ $plan->appraisalCycle->name ?? __('hrms.common.na') }}</div>
+                                        <x-ui.badge variant="secondary" soft class="fs-10 text-uppercase">{{ $plan->appraisalCycle->period_type ? ucfirst(str_replace('_', ' ', $plan->appraisalCycle->period_type)) : __('hrms.kra_kpi.period_annual') }}</x-ui.badge>
                                     </td>
                                     <td>
-                                        <div class="fw-bold text-dark">{{ $plan->items->count() }} KPIs</div>
-                                        <div class="small text-muted fs-11">Weight: {{ $plan->total_weightage }}%</div>
+                                        <div class="fw-bold text-dark">{{ __('hrms.kra_kpi.kpis_count', ['count' => $plan->items->count()]) }}</div>
+                                        <div class="small text-muted fs-11">{{ __('hrms.kra_kpi.weight_label', ['weight' => $plan->total_weightage]) }}</div>
                                     </td>
                                     <td>
                                         @if($plan->final_score !== null && in_array($plan->status, ['self_reviewed', 'manager_reviewed']))
@@ -403,17 +394,17 @@
                                                 </x-ui.badge>
                                             </div>
                                         @else
-                                            <span class="text-muted fs-12">In Progress</span>
+                                            <span class="text-muted fs-12">{{ __('hrms.kra_kpi.in_progress') }}</span>
                                         @endif
                                     </td>
                                     <td>
                                         @php
                                             $statusBadges = [
-                                                'draft' => ['secondary', 'Draft Goals'],
-                                                'submitted' => ['info', 'Goals Submitted'],
-                                                'approved' => ['primary', 'Goals Active'],
-                                                'self_reviewed' => ['warning', 'Self-Reviewed'],
-                                                'manager_reviewed' => ['success', 'Completed'],
+                                                'draft' => ['secondary', __('hrms.kra_kpi.status_draft_goals')],
+                                                'submitted' => ['info', __('hrms.kra_kpi.status_goals_submitted')],
+                                                'approved' => ['primary', __('hrms.kra_kpi.status_goals_active')],
+                                                'self_reviewed' => ['warning', __('hrms.kra_kpi.status_self_reviewed')],
+                                                'manager_reviewed' => ['success', __('hrms.kra_kpi.status_completed')],
                                             ];
                                             $st = $statusBadges[$plan->status] ?? ['secondary', $plan->status];
                                         @endphp
@@ -430,18 +421,18 @@
                                     </td>
                                     <td class="text-end text-nowrap actions-col">
                                         <div class="d-inline-flex justify-content-end align-items-center gap-1">
-                                            <x-ui.icon-btn href="{{ route('hrms.kra-kpi.show', $plan->id) }}" icon="feather-eye" variant="soft-primary" size="sm" title="View Scorecard" />
+                                            <x-ui.icon-btn href="{{ route('hrms.kra-kpi.show', $plan->id) }}" icon="feather-eye" variant="soft-primary" size="sm" :title="__('hrms.kra_kpi.view_scorecard')" />
                                             @if($isHrOrAdmin)
                                                 <form method="POST" action="{{ route('hrms.kra-kpi.plan.destroy', $plan->id) }}" id="deletePlanForm_{{ $plan->id }}" class="d-inline m-0 p-0">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Scorecard" onclick="confirmAction({ title: 'Delete Scorecard', message: 'Delete scorecard #{{ $plan->plan_number }} and all associated data?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePlanForm_{{ $plan->id }}').submit(); })" />
+                                                    <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" :title="__('hrms.kra_kpi.delete_scorecard')" onclick="confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.delete_scorecard')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_delete_scorecard', ['plan' => $plan->plan_number])) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.common.delete')) }}' }, function() { document.getElementById('deletePlanForm_{{ $plan->id }}').submit(); })" />
                                                 </form>
                                             @endif
                                             @if($isHrOrAdmin && in_array($plan->status, ['manager_reviewed']) && $plan->final_score !== null && $plan->final_score < 60 && !$plan->pip_triggered)
                                                  <form method="POST" action="{{ route('hrms.kra-kpi.trigger-pip', $plan->id) }}" id="pipTriggerForm_{{ $plan->id }}" class="d-inline m-0 p-0">
                                                      @csrf
-                                                     <x-ui.icon-btn type="button" icon="feather-alert-octagon" variant="soft-danger" size="sm" title="Bridge to PIP" onclick="confirmAction({ title: 'Initiate PIP', message: 'Initiate 60-day formal Performance Improvement Plan (PIP) for this employee?', variant: 'danger', confirmText: 'Initiate PIP' }, function() { document.getElementById('pipTriggerForm_{{ $plan->id }}').submit(); })" />
+                                                     <x-ui.icon-btn type="button" icon="feather-alert-octagon" variant="soft-danger" size="sm" :title="__('hrms.kra_kpi.bridge_to_pip')" onclick="confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.initiate_pip')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_initiate_pip')) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.kra_kpi.initiate_pip')) }}' }, function() { document.getElementById('pipTriggerForm_{{ $plan->id }}').submit(); })" />
                                                  </form>
                                             @endif
                                         </div>
@@ -451,8 +442,8 @@
                                 <tr>
                                     <td colspan="7" class="text-center py-5 text-muted">
                                         <i class="feather-inbox fs-32 d-block mb-2 text-muted"></i>
-                                        <h6 class="fw-bold mb-1">No Appraisal Scorecards Found</h6>
-                                        <p class="fs-12 mb-0">Launch an appraisal cycle or click "Assign Goal Sheets" above to generate scorecards for employees.</p>
+                                        <h6 class="fw-bold mb-1">{{ __('hrms.kra_kpi.no_scorecards_found') }}</h6>
+                                        <p class="fs-12 mb-0">{{ __('hrms.kra_kpi.no_scorecards_desc') }}</p>
                                     </td>
                                 </tr>
                             @endforelse
@@ -478,11 +469,11 @@
             <div class="tab-pane fade {{ $activeTab === 'cycles' ? 'show active' : '' }}" id="tab-cycles" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
-                        <h6 class="fw-bold text-dark mb-0">Appraisal Cycles</h6>
-                        <small class="text-muted">Manage performance appraisal cycles, evaluation periods, and review deadlines.</small>
+                        <h6 class="fw-bold text-dark mb-0">{{ __('hrms.kra_kpi.appraisal_cycles') }}</h6>
+                        <small class="text-muted">{{ __('hrms.kra_kpi.cycles_subtitle') }}</small>
                     </div>
                     <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createCycleModal" class="fw-bold">
-                        Create Appraisal Cycle
+                        {{ __('hrms.kra_kpi.create_appraisal_cycle') }}
                     </x-ui.button>
                 </div>
 
@@ -490,13 +481,13 @@
                     <x-ui.table hoverable>
                         <thead>
                             <tr>
-                                <th style="width: 26%;">Cycle Name</th>
-                                <th style="width: 11%;">Frequency</th>
-                                <th style="width: 14%;">Start Date</th>
-                                <th style="width: 14%;">End Date</th>
-                                <th style="width: 14%;">Review Due</th>
-                                <th style="width: 11%;">Scorecards</th>
-                                <th style="width: 10%;" class="text-end text-nowrap">Actions</th>
+                                <th style="width: 26%;">{{ __('hrms.kra_kpi.th_cycle_name') }}</th>
+                                <th style="width: 11%;">{{ __('hrms.kra_kpi.th_frequency') }}</th>
+                                <th style="width: 14%;">{{ __('hrms.kra_kpi.th_start_date') }}</th>
+                                <th style="width: 14%;">{{ __('hrms.kra_kpi.th_end_date') }}</th>
+                                <th style="width: 14%;">{{ __('hrms.kra_kpi.th_review_due') }}</th>
+                                <th style="width: 11%;">{{ __('hrms.kra_kpi.th_scorecards') }}</th>
+                                <th style="width: 10%;" class="text-end text-nowrap">{{ __('hrms.common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -505,11 +496,11 @@
                                     <td>
                                         <div class="fw-bold text-dark fs-13">{{ $cycle->name }}</div>
                                         @if($activeCycle?->id === $cycle->id)
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 mt-1">Current Active Cycle</span>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 mt-1">{{ __('hrms.kra_kpi.current_active_cycle') }}</span>
                                         @endif
                                     </td>
                                     <td>
-                                        <x-ui.badge variant="secondary" soft class="fs-11 text-uppercase">{{ $cycle->period_type ?? 'Monthly' }}</x-ui.badge>
+                                        <x-ui.badge variant="secondary" soft class="fs-11 text-uppercase">{{ $cycle->period_type ? ucfirst(str_replace('_', ' ', $cycle->period_type)) : __('hrms.kra_kpi.period_monthly') }}</x-ui.badge>
                                     </td>
                                     <td>
                                         <span class="text-dark fs-13">{{ $cycle->start_date ? $cycle->start_date->format('d M Y') : '—' }}</span>
@@ -521,7 +512,7 @@
                                         @if($cycle->self_review_deadline)
                                             <span class="fw-semibold text-dark fs-13">{{ $cycle->self_review_deadline->format('d M Y') }}</span>
                                             @if($cycle->self_review_deadline->isPast())
-                                                <small class="d-block text-danger fs-10">Ended</small>
+                                                <small class="d-block text-danger fs-10">{{ __('hrms.kra_kpi.review_ended') }}</small>
                                             @else
                                                 <small class="d-block text-muted fs-10">{{ $cycle->self_review_deadline->diffForHumans() }}</small>
                                             @endif
@@ -530,15 +521,15 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <span class="badge bg-light text-dark border fs-12 fw-semibold">{{ $cycle->goalPlans->count() }} Scorecards</span>
+                                        <span class="badge bg-light text-dark border fs-12 fw-semibold">{{ __('hrms.kra_kpi.scorecards_count', ['count' => $cycle->goalPlans->count()]) }}</span>
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex align-items-center justify-content-end gap-1">
-                                            <x-ui.icon-btn type="button" icon="feather-edit" variant="soft-primary" size="sm" title="Edit Cycle" data-bs-toggle="modal" data-bs-target="#editCycleModal_{{ $cycle->id }}" />
+                                            <x-ui.icon-btn type="button" icon="feather-edit" variant="soft-primary" size="sm" :title="__('hrms.kra_kpi.edit_cycle')" data-bs-toggle="modal" data-bs-target="#editCycleModal_{{ $cycle->id }}" />
                                             <form method="POST" action="{{ route('hrms.kra-kpi.cycle.destroy', $cycle->id) }}" id="deleteCycleForm_{{ $cycle->id }}" class="d-inline m-0 p-0">
                                                 @csrf
                                                 @method('DELETE')
-                                                <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Cycle" onclick="confirmAction({ title: 'Delete Appraisal Cycle', message: 'Delete appraisal cycle {{ $cycle->name }}? Any scorecards assigned to this cycle will need a new cycle assigned.', variant: 'danger', confirmText: 'Delete Cycle' }, function() { document.getElementById('deleteCycleForm_{{ $cycle->id }}').submit(); })" />
+                                                <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" :title="__('hrms.kra_kpi.delete_cycle')" onclick="confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.delete_cycle')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_delete_cycle', ['name' => $cycle->name])) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.kra_kpi.delete_cycle')) }}' }, function() { document.getElementById('deleteCycleForm_{{ $cycle->id }}').submit(); })" />
                                             </form>
                                         </div>
                                     </td>
@@ -547,8 +538,8 @@
                                 <tr>
                                     <td colspan="7" class="text-center py-5 text-muted">
                                         <i class="feather-calendar fs-32 d-block mb-2"></i>
-                                        <h6>No Appraisal Cycles Created Yet</h6>
-                                        <p class="small mb-0">Create your first monthly, quarterly, or annual appraisal cycle.</p>
+                                        <h6>{{ __('hrms.kra_kpi.no_cycles_found') }}</h6>
+                                        <p class="small mb-0">{{ __('hrms.kra_kpi.no_cycles_desc') }}</p>
                                     </td>
                                 </tr>
                             @endforelse
@@ -565,19 +556,19 @@
                         <div class="col-lg-4 col-md-5 p-3 p-lg-4 kra-kpi-divider bg-white d-flex flex-column">
                             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                                 <div class="d-flex align-items-center gap-2">
-                                    <h6 class="fw-bold text-dark mb-0">KRA Strategic Focus Areas</h6>
+                                    <h6 class="fw-bold text-dark mb-0">{{ __('hrms.kra_kpi.kra_focus_areas') }}</h6>
                                     <span class="badge bg-light text-secondary border rounded-pill px-2 py-0.5 fs-11" id="kraCountBadge">{{ $kraCategories->count() }}</span>
                                 </div>
                                 <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createKraModal" class="fw-bold text-nowrap">
-                                    Add KRA
+                                    {{ __('hrms.kra_kpi.add_kra') }}
                                 </x-ui.button>
                             </div>
 
                             <!-- KRA Searchbar (Common Platform UI style) -->
                             <div class="d-flex align-items-center bg-light border rounded px-3 py-1 mb-3" style="height: 36px !important; box-sizing: border-box !important;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" id="kraSearchInputLocal" class="w-100 border-0 bg-transparent p-0 fs-13 text-dark" placeholder="Search focus areas..." autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
-                                <button type="button" id="kraClearSearchBtn" class="btn btn-link p-0 text-muted ms-1 d-none" style="text-decoration: none; font-size: 13px; line-height: 1;" title="Clear search">
+                                <input type="text" id="kraSearchInputLocal" class="w-100 border-0 bg-transparent p-0 fs-13 text-dark" placeholder="{{ __('hrms.kra_kpi.search_focus_areas') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                                <button type="button" id="kraClearSearchBtn" class="btn btn-link p-0 text-muted ms-1 d-none" style="text-decoration: none; font-size: 13px; line-height: 1;" :title="__('hrms.kra_kpi.clear_search')">
                                     <i class="feather-x"></i>
                                 </button>
                             </div>
@@ -587,17 +578,17 @@
                                     <div class="kra-card-item px-3 py-2.5 rounded-2 d-flex justify-content-between align-items-center bg-light"
                                          data-kra-name="{{ strtolower($kra->name) }}"
                                          data-kra-id="{{ $kra->id }}"
-                                         title="Click to filter KPIs by {{ $kra->name }}">
+                                         title="{{ __('hrms.kra_kpi.click_to_filter_kpi', ['name' => $kra->name]) }}">
                                         <div class="pe-3 flex-grow-1" style="min-width: 0;">
                                             <span class="fw-bold text-dark fs-13 kra-title-text" style="word-break: break-word; line-height: 1.45; display: block;">{{ $kra->name }}</span>
                                         </div>
                                         <div class="d-flex align-items-center gap-2 pe-1 flex-shrink-0 ms-auto">
-                                            <x-ui.badge variant="primary" soft>{{ $kra->kpi_masters_count }} KPIs</x-ui.badge>
+                                            <x-ui.badge variant="primary" soft>{{ __('hrms.kra_kpi.kpis_count', ['count' => $kra->kpi_masters_count]) }}</x-ui.badge>
                                             @if($isHrOrAdmin)
                                                 <form method="POST" action="{{ route('hrms.kra-kpi.kra-category.destroy', $kra->id) }}" id="deleteKraForm_{{ $kra->id }}" class="d-inline m-0 p-0 ms-1" onclick="event.stopPropagation();">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete KRA Focus" onclick="event.stopPropagation(); confirmAction({ title: 'Delete KRA Focus Area', message: 'Delete KRA focus area and remove it from master library?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteKraForm_{{ $kra->id }}').submit(); })" />
+                                                    <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" :title="__('hrms.kra_kpi.delete_kra_focus')" onclick="event.stopPropagation(); confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.delete_kra_title')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_delete_kra')) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.common.delete')) }}' }, function() { document.getElementById('deleteKraForm_{{ $kra->id }}').submit(); })" />
                                                 </form>
                                             @endif
                                         </div>
@@ -605,9 +596,9 @@
                                 @empty
                                     <div class="text-center py-4 border rounded-2 bg-light">
                                         <i class="feather-layers text-muted fs-20 d-block mb-1"></i>
-                                        <span class="text-muted fs-12 d-block mb-2">No KRA focus areas yet.</span>
+                                        <span class="text-muted fs-12 d-block mb-2">{{ __('hrms.kra_kpi.no_kra_areas') }}</span>
                                         <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createKraModal" class="fw-bold">
-                                            Add First KRA
+                                            {{ __('hrms.kra_kpi.add_first_kra') }}
                                         </x-ui.button>
                                     </div>
                                 @endforelse
@@ -615,7 +606,7 @@
                                 <!-- No search results state for KRA -->
                                 <div id="noKraFound" class="text-center py-4 border rounded-2 bg-light d-none">
                                     <i class="feather-search text-muted fs-18 d-block mb-1"></i>
-                                    <span class="text-muted fs-12">No KRA focus areas match your search.</span>
+                                    <span class="text-muted fs-12">{{ __('hrms.kra_kpi.no_kra_match') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -624,25 +615,25 @@
                         <div class="col-lg-8 col-md-7 p-3 p-lg-4 bg-white d-flex flex-column">
                             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
                                 <div class="d-flex align-items-center gap-2">
-                                    <h6 class="fw-bold text-dark mb-0">KPI Master Metrics</h6>
+                                    <h6 class="fw-bold text-dark mb-0">{{ __('hrms.kra_kpi.kpi_master_metrics') }}</h6>
                                     <span class="badge bg-light text-secondary border rounded-pill px-2 py-0.5 fs-11" id="kpiCountBadge">{{ $kpiMasters->count() }}</span>
                                     <!-- Active Filter Pill if filtered by KRA click -->
                                     <span id="activeKraFilterBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 d-none align-items-center gap-1">
-                                        Filtered: <span id="activeKraFilterName" class="fw-bold"></span>
-                                        <i class="feather-x ms-1 cursor-pointer" id="resetKraFilterBtn" title="Clear KRA filter" style="cursor: pointer;"></i>
+                                        {{ __('hrms.kra_kpi.filtered_by') }} <span id="activeKraFilterName" class="fw-bold"></span>
+                                        <i class="feather-x ms-1 cursor-pointer" id="resetKraFilterBtn" :title="__('hrms.kra_kpi.clear_kra_filter')" style="cursor: pointer;"></i>
                                     </span>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <!-- KPI Searchbar (Common Platform UI style) -->
                                     <div class="d-flex align-items-center bg-light border rounded px-3 py-1 m-0" style="min-width: 220px; height: 36px !important; box-sizing: border-box !important;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" id="kpiSearchInputLocal" class="w-100 border-0 bg-transparent p-0 fs-13 text-dark" placeholder="Search KPI metrics..." autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
-                                        <button type="button" id="kpiClearSearchBtn" class="btn btn-link p-0 text-muted ms-1 d-none" style="text-decoration: none; font-size: 13px; line-height: 1;" title="Clear search">
+                                        <input type="text" id="kpiSearchInputLocal" class="w-100 border-0 bg-transparent p-0 fs-13 text-dark" placeholder="{{ __('hrms.kra_kpi.search_kpi_metrics') }}" autocomplete="off" style="box-shadow: none; height: 100%; outline: none;">
+                                        <button type="button" id="kpiClearSearchBtn" class="btn btn-link p-0 text-muted ms-1 d-none" style="text-decoration: none; font-size: 13px; line-height: 1;" :title="__('hrms.kra_kpi.clear_search')">
                                             <i class="feather-x"></i>
                                         </button>
                                     </div>
                                     <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createKpiMasterModal" class="fw-bold text-nowrap">
-                                        Add Metric
+                                        {{ __('hrms.kra_kpi.add_metric') }}
                                     </x-ui.button>
                                 </div>
                             </div>
@@ -651,11 +642,11 @@
                                 <table class="table table-hover align-middle mb-0" id="kpiMasterTable" style="table-layout: auto;">
                                     <thead>
                                         <tr class="text-muted fs-12 border-bottom">
-                                            <th style="white-space: normal;">KPI NAME</th>
-                                            <th style="white-space: normal;">KRA CATEGORY</th>
-                                            <th style="white-space: normal;">DIRECTION & UNIT</th>
+                                            <th style="white-space: normal;">{{ __('hrms.kra_kpi.th_kpi_name') }}</th>
+                                            <th style="white-space: normal;">{{ __('hrms.kra_kpi.th_kra_category') }}</th>
+                                            <th style="white-space: normal;">{{ __('hrms.kra_kpi.th_direction_unit') }}</th>
                                             @if($isHrOrAdmin)
-                                                <th class="text-end text-nowrap" style="width: 70px;">ACTION</th>
+                                                <th class="text-end text-nowrap" style="width: 70px;">{{ __('hrms.common.action') }}</th>
                                             @endif
                                         </tr>
                                     </thead>
@@ -668,7 +659,7 @@
                                                 data-calc="{{ strtolower(str_replace('_', ' ', $km->calculation_type)) }}" 
                                                 data-unit="{{ strtolower($km->unit) }}">
                                                 <td class="fw-bold text-dark fs-12" style="white-space: normal; word-break: break-word; max-width: 200px;">{{ $km->name }}</td>
-                                                <td style="white-space: normal;"><x-ui.badge variant="primary" soft>{{ $km->kraCategory->name ?? 'General' }}</x-ui.badge></td>
+                                                <td style="white-space: normal;"><x-ui.badge variant="primary" soft>{{ $km->kraCategory->name ?? __('hrms.kra_kpi.dept_general') }}</x-ui.badge></td>
                                                 <td style="white-space: normal;">
                                                     <div class="small text-dark text-capitalize">{{ str_replace('_', ' ', $km->calculation_type) }}</div>
                                                     <div class="text-muted fs-11">({{ $km->unit }})</div>
@@ -678,21 +669,21 @@
                                                         <form method="POST" action="{{ route('hrms.kra-kpi.kpi-master.destroy', $km->id) }}" id="deleteKmForm_{{ $km->id }}" class="d-inline m-0 p-0">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete KPI Metric" onclick="confirmAction({ title: 'Delete Master KPI', message: 'Delete master KPI metric from library?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteKmForm_{{ $km->id }}').submit(); })" />
+                                                            <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" :title="__('hrms.kra_kpi.delete_kpi_metric')" onclick="confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.delete_master_kpi')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_delete_kpi')) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.common.delete')) }}' }, function() { document.getElementById('deleteKmForm_{{ $km->id }}').submit(); })" />
                                                         </form>
                                                     </td>
                                                 @endif
                                             </tr>
                                         @empty
                                             <tr id="emptyKpiRow">
-                                                <td colspan="{{ $isHrOrAdmin ? '4' : '3' }}" class="text-center py-4 text-muted">No KPI metrics in library.</td>
+                                                <td colspan="{{ $isHrOrAdmin ? '4' : '3' }}" class="text-center py-4 text-muted">{{ __('hrms.kra_kpi.no_kpi_in_library') }}</td>
                                             </tr>
                                         @endforelse
                                         <!-- No search results state for KPI -->
                                         <tr id="noKpiFoundRow" class="d-none">
                                             <td colspan="{{ $isHrOrAdmin ? '4' : '3' }}" class="text-center py-4 text-muted fs-12">
                                                 <i class="feather-search text-muted fs-18 d-block mb-1"></i>
-                                                No KPI metrics match your search.
+                                                {{ __('hrms.kra_kpi.no_kpi_match') }}
                                             </td>
                                         </tr>
                                     </tbody>
@@ -706,9 +697,9 @@
             <!-- TAB 4: ROLE TEMPLATES -->
             <div class="tab-pane fade {{ $activeTab === 'templates' ? 'show active' : '' }}" id="tab-templates" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-dark mb-0">Role KPI Templates</h6>
+                    <h6 class="fw-bold text-dark mb-0">{{ __('hrms.kra_kpi.role_kpi_templates') }}</h6>
                     <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#createTemplateModal" class="fw-bold">
-                        Create Template
+                        {{ __('hrms.kra_kpi.create_template') }}
                     </x-ui.button>
                 </div>
                 <div class="row g-3">
@@ -719,23 +710,23 @@
                                     <div>
                                         <h6 class="fw-bold text-dark mb-0">{{ $tpl->name }}</h6>
                                         <div class="small text-muted mt-0.5 fs-11">
-                                            Dept: {{ $tpl->department->name ?? 'All Departments' }} &bull; Role: {{ $tpl->designation->name ?? 'All Roles' }}
+                                            {{ __('hrms.kra_kpi.dept_label') }} {{ $tpl->department->name ?? __('hrms.common.all_departments') }} &bull; {{ __('hrms.kra_kpi.role_label') }} {{ $tpl->designation->name ?? __('hrms.kra_kpi.all_roles') }}
                                         </div>
                                     </div>
                                     <div class="d-flex align-items-center gap-1">
-                                        <x-ui.badge variant="primary" soft>{{ $tpl->items->count() }} KPIs</x-ui.badge>
+                                        <x-ui.badge variant="primary" soft>{{ __('hrms.kra_kpi.kpis_count', ['count' => $tpl->items->count()]) }}</x-ui.badge>
                                         @if($isHrOrAdmin)
-                                            <x-ui.icon-btn type="button" icon="feather-edit" variant="soft-primary" size="sm" title="Edit Role Template" data-bs-toggle="modal" data-bs-target="#editTemplateModal_{{ $tpl->id }}" />
+                                            <x-ui.icon-btn type="button" icon="feather-edit" variant="soft-primary" size="sm" :title="__('hrms.kra_kpi.edit_role_template')" data-bs-toggle="modal" data-bs-target="#editTemplateModal_{{ $tpl->id }}" />
                                             <form method="POST" action="{{ route('hrms.kra-kpi.template.destroy', $tpl->id) }}" id="deleteTplForm_{{ $tpl->id }}" class="d-inline m-0 p-0">
                                                 @csrf
                                                 @method('DELETE')
-                                                <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Delete Role Template" onclick="confirmAction({ title: 'Delete Role Template', message: 'Delete this role template?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteTplForm_{{ $tpl->id }}').submit(); })" />
+                                                <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" :title="__('hrms.kra_kpi.delete_role_template')" onclick="confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.delete_role_template')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_delete_template')) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.common.delete')) }}' }, function() { document.getElementById('deleteTplForm_{{ $tpl->id }}').submit(); })" />
                                             </form>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="border-top pt-2 mt-auto">
-                                    <small class="text-muted d-block fs-11 mb-1">Included KPIs:</small>
+                                    <small class="text-muted d-block fs-11 mb-1">{{ __('hrms.kra_kpi.included_kpis') }}</small>
                                     <ul class="list-unstyled mb-2 fs-12">
                                         @foreach($tpl->items->take(4) as $ti)
                                             <li class="text-truncate text-muted">&bull; {{ $ti->title }} ({{ $ti->weightage }}%)</li>
@@ -743,7 +734,7 @@
                                     </ul>
                                     @if($isHrOrAdmin)
                                         <button type="button" class="btn btn-sm btn-outline-primary w-100 fw-bold d-flex align-items-center justify-content-center gap-1.5 py-1" onclick="openAssignModalForTemplate({{ $tpl->id }}, {{ $tpl->department_id ? $tpl->department_id : 'null' }})">
-                                            <i class="feather-user-check"></i> Assign to Employees
+                                            <i class="feather-user-check"></i> {{ __('hrms.kra_kpi.assign_to_employees') }}
                                         </button>
                                     @endif
                                 </div>
@@ -752,7 +743,7 @@
                     @empty
                         <div class="col-12 text-center py-5 text-muted">
                             <i class="feather-layers fs-32 d-block mb-2"></i>
-                            <h6>No Role Templates Created Yet</h6>
+                            <h6>{{ __('hrms.kra_kpi.no_templates_found') }}</h6>
                         </div>
                     @endforelse
                 </div>
@@ -764,12 +755,12 @@
             <div class="tab-pane fade {{ $activeTab === 'myplan' ? 'show active' : '' }}" id="tab-mygoals" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0">{{ $myPlan->appraisalCycle->name ?? 'Active Appraisal Cycle' }}</h5>
-                        <small class="text-muted">Plan Number: <strong>{{ $myPlan->plan_number }}</strong> &bull; Manager: {{ $myPlan->manager->full_name ?? 'Direct Manager' }}</small>
+                        <h5 class="fw-bold text-dark mb-0">{{ $myPlan->appraisalCycle->name ?? __('hrms.kra_kpi.active_cycle_default') }}</h5>
+                        <small class="text-muted">{{ __('hrms.kra_kpi.plan_number_label') }} <strong>{{ $myPlan->plan_number }}</strong> &bull; {{ __('hrms.kra_kpi.manager_label') }} {{ $myPlan->manager->full_name ?? __('hrms.kra_kpi.direct_manager') }}</small>
                     </div>
                     <div>
                         <x-ui.button variant="primary" size="sm" icon="feather-external-link" href="{{ route('hrms.kra-kpi.show', $myPlan->id) }}" class="fw-bold">
-                            Open Full Scorecard
+                            {{ __('hrms.kra_kpi.open_full_scorecard') }}
                         </x-ui.button>
                     </div>
                 </div>
@@ -779,20 +770,20 @@
                         <div class="col-md-6 col-lg-4">
                             <div class="card border shadow-sm rounded-3 h-100 p-3 bg-white">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <x-ui.badge variant="primary" soft>{{ $item->kraCategory->name ?? 'General' }}</x-ui.badge>
-                                    <span class="fw-bold text-dark fs-12">Weight: {{ $item->weightage }}%</span>
+                                    <x-ui.badge variant="primary" soft>{{ $item->kraCategory->name ?? __('hrms.kra_kpi.dept_general') }}</x-ui.badge>
+                                    <span class="fw-bold text-dark fs-12">{{ __('hrms.kra_kpi.weight_label', ['weight' => $item->weightage]) }}</span>
                                 </div>
                                 <h6 class="fw-bold text-dark mb-1">{{ $item->title }}</h6>
-                                <p class="text-muted fs-12 mb-3">{{ $item->description ?: 'Targeted functional KPI objective.' }}</p>
+                                <p class="text-muted fs-12 mb-3">{{ $item->description ?: __('hrms.kra_kpi.target_default_desc') }}</p>
 
                                 <div class="bg-light p-2.5 rounded-2 d-flex justify-content-between align-items-center mt-auto">
                                     <div>
-                                        <small class="text-muted d-block fs-10 text-uppercase">Target</small>
+                                        <small class="text-muted d-block fs-10 text-uppercase">{{ __('hrms.kra_kpi.target_label') }}</small>
                                         <span class="fw-bold text-dark fs-13">{{ $item->target }} {{ $item->unit }}</span>
                                     </div>
                                     <div class="text-end">
-                                        <small class="text-muted d-block fs-10 text-uppercase">Actual Achieved</small>
-                                        <span class="fw-bold text-primary fs-13">{{ $item->actual !== null ? $item->actual . ' ' . $item->unit : 'Not Logged' }}</span>
+                                        <small class="text-muted d-block fs-10 text-uppercase">{{ __('hrms.kra_kpi.actual_achieved') }}</small>
+                                        <span class="fw-bold text-primary fs-13">{{ $item->actual !== null ? $item->actual . ' ' . $item->unit : __('hrms.kra_kpi.not_logged') }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -802,43 +793,7 @@
             </div>
             @endif
 
-            <!-- TAB 6: TEAM REVIEWS -->
-            @if($teamPlans->isNotEmpty())
-            <div class="tab-pane fade {{ $activeTab === 'team' ? 'show active' : '' }}" id="tab-team" role="tabpanel">
-                <div class="table-responsive">
-                    <x-ui.table hoverable>
-                        <thead>
-                            <tr>
-                                <th>Employee</th>
-                                <th>Designation & Dept</th>
-                                <th>Total Goals</th>
-                                <th>Status</th>
-                                <th>Score</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($teamPlans as $tp)
-                                <tr>
-                                    <td class="fw-bold text-dark">{{ $tp->employee->full_name ?? 'Employee' }}</td>
-                                    <td>{{ $tp->employee->designation->name ?? 'N/A' }} ({{ $tp->employee->department->name ?? 'General' }})</td>
-                                    <td>{{ $tp->items->count() }} KPIs ({{ $tp->total_weightage }}%)</td>
-                                    <td>
-                                        <x-ui.badge variant="{{ in_array($tp->status, ['manager_reviewed', 'signed_off', 'calibrated']) ? 'success' : 'primary' }}" soft>{{ in_array($tp->status, ['manager_reviewed', 'signed_off', 'calibrated']) ? 'Completed' : ucfirst(str_replace('_', ' ', $tp->status)) }}</x-ui.badge>
-                                    </td>
-                                    <td class="fw-bold">{{ $tp->final_score !== null ? $tp->final_score . '%' : 'Pending' }}</td>
-                                    <td class="text-end">
-                                        <x-ui.button variant="primary" size="sm" href="{{ route('hrms.kra-kpi.show', $tp->id) }}" class="fw-bold">
-                                            Review Scorecard
-                                        </x-ui.button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </x-ui.table>
-                </div>
-            </div>
-            @endif
+
 
         </div>
     </div>
@@ -846,7 +801,7 @@
 
 <!-- MODAL: ASSIGN TEMPLATE TO EMPLOYEES (WITH INTEGRATED PERIOD CREATION) -->
 @if($isHrOrAdmin)
-<x-ui.modal id="assignTemplateModal" title="Assign KPI Goal Sheets" size="lg" :showFooter="false">
+<x-ui.modal id="assignTemplateModal" :title="__('hrms.kra_kpi.modal_assign_title')" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.assign-template') }}" id="assignGoalSheetForm">
         @csrf
         <input type="hidden" name="cycle_mode" id="cycleModeInput" value="{{ $cycles->isNotEmpty() ? 'existing' : 'new' }}">
@@ -855,19 +810,19 @@
         <div class="p-3 bg-light rounded-3 border mb-3">
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <label class="form-label fw-bold text-dark fs-12 text-uppercase mb-0">
-                    <i class="feather-calendar text-primary me-1"></i> Appraisal Review Period / Cycle <span class="text-danger">*</span>
+                    <i class="feather-calendar text-primary me-1"></i> {{ __('hrms.kra_kpi.appraisal_review_period_cycle') }} <span class="text-danger">*</span>
                 </label>
                 @if($cycles->isNotEmpty())
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-sm btn-primary fw-semibold" id="btnModeExisting" onclick="switchCycleMode('existing')">
-                            Existing Period
+                            {{ __('hrms.kra_kpi.existing_period') }}
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" id="btnModeNew" onclick="switchCycleMode('new')">
-                            + Create New Period
+                            {{ __('hrms.kra_kpi.create_new_period') }}
                         </button>
                     </div>
                 @else
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">First Period Setup</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fs-11">{{ __('hrms.kra_kpi.first_period_setup') }}</span>
                 @endif
             </div>
 
@@ -888,24 +843,24 @@
             <div id="newCycleSection" class="{{ $cycles->isNotEmpty() ? 'd-none' : '' }} mt-2">
                 <div class="row g-2">
                     <div class="col-md-8">
-                        <x-ui.odoo-form-ui type="input" label="Period / Cycle Name" name="new_cycle_name" id="newCycleNameInput" placeholder="e.g. {{ date('F Y') }} Performance Review" :value="date('F Y') . ' Performance Review'" />
+                        <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.period_cycle_name')" name="new_cycle_name" id="newCycleNameInput" placeholder="{{ __('hrms.kra_kpi.placeholder_period_name', ['month' => date('F Y')]) }}" :value="__('hrms.kra_kpi.default_period_name', ['month' => date('F Y')])" />
                     </div>
                     <div class="col-md-4">
-                        <x-ui.odoo-form-ui type="select" label="Frequency" name="period_type" id="newCyclePeriodType">
-                            <option value="monthly" selected>Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                            <option value="semi_annual">Semi-Annual</option>
-                            <option value="annual">Annual</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.frequency')" name="period_type" id="newCyclePeriodType">
+                            <option value="monthly" selected>{{ __('hrms.kra_kpi.period_monthly') }}</option>
+                            <option value="quarterly">{{ __('hrms.kra_kpi.period_quarterly') }}</option>
+                            <option value="semi_annual">{{ __('hrms.kra_kpi.period_semi_annual') }}</option>
+                            <option value="annual">{{ __('hrms.kra_kpi.period_annual') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
                     <div class="col-md-4">
-                        <x-ui.odoo-form-ui type="input" label="Start Date" name="start_date" id="newCycleStartDate" inputType="date" :value="date('Y-m-01')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.start_date')" name="start_date" id="newCycleStartDate" inputType="date" :value="date('Y-m-01')" />
                     </div>
                     <div class="col-md-4">
-                        <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" id="newCycleEndDate" inputType="date" :value="date('Y-m-t')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.end_date')" name="end_date" id="newCycleEndDate" inputType="date" :value="date('Y-m-t')" />
                     </div>
                     <div class="col-md-4">
-                        <x-ui.odoo-form-ui type="input" label="Review Due" name="self_review_deadline" id="newCycleReviewDeadline" inputType="date" :value="date('Y-m-t')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.review_due')" name="self_review_deadline" id="newCycleReviewDeadline" inputType="date" :value="date('Y-m-t')" />
                     </div>
                 </div>
             </div>
@@ -914,31 +869,31 @@
         <!-- 2. Goal Template & Target Employees -->
         <div class="row g-3">
             <div class="col-12">
-                <x-ui.odoo-form-ui type="select" label="KPI Template Pack" name="kpi_template_id" id="assignKpiTemplateSelect">
-                    <option value="">-- Custom Blank Scorecard (Add KPIs Later) --</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.kpi_template_pack')" name="kpi_template_id" id="assignKpiTemplateSelect">
+                    <option value="">{{ __('hrms.kra_kpi.custom_blank_scorecard') }}</option>
                     @foreach($kpiTemplates as $tpl)
-                        <option value="{{ $tpl->id }}">{{ $tpl->name }} ({{ $tpl->items->count() }} KPIs)</option>
+                        <option value="{{ $tpl->id }}">{{ $tpl->name }} ({{ __('hrms.kra_kpi.kpis_count', ['count' => $tpl->items->count()]) }})</option>
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="select" label="Assignment Scope" name="target_type" id="assignmentTargetType" :required="true">
-                    <option value="department">By Department</option>
-                    <option value="individual">Specific Individual Employee</option>
-                    <option value="all">All Active Employees in Company</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.assignment_scope')" name="target_type" id="assignmentTargetType" :required="true">
+                    <option value="department">{{ __('hrms.kra_kpi.scope_by_department') }}</option>
+                    <option value="individual">{{ __('hrms.kra_kpi.scope_specific_employee') }}</option>
+                    <option value="all">{{ __('hrms.kra_kpi.scope_all_employees') }}</option>
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-12" id="deptSelectWrap">
-                <x-ui.odoo-form-ui type="select" label="Choose Department" name="department_id" id="assignDepartmentSelect">
-                    <option value="">Select Department...</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.choose_department')" name="department_id" id="assignDepartmentSelect">
+                    <option value="">{{ __('hrms.kra_kpi.select_department_placeholder') }}</option>
                     @foreach($departments as $dept)
                         <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-12 d-none" id="empSelectWrap">
-                <x-ui.odoo-form-ui type="select" label="Choose Employee" name="employee_id" id="assignEmployeeSelect">
-                    <option value="">Select Employee...</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.choose_employee')" name="employee_id" id="assignEmployeeSelect">
+                    <option value="">{{ __('hrms.kra_kpi.select_employee_placeholder') }}</option>
                     @foreach($employees as $emp)
                         <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id ?? ('#' . $emp->id) }})</option>
                     @endforeach
@@ -947,166 +902,166 @@
         </div>
 
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Assign Goals</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_assign_goals') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- MODAL: CREATE APPRAISAL CYCLE -->
-<x-ui.modal id="createCycleModal" title="Create Appraisal Cycle" size="lg" :showFooter="false">
+<x-ui.modal id="createCycleModal" :title="__('hrms.kra_kpi.modal_create_cycle_title')" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.cycle.store') }}">
         @csrf
         <div class="row g-3">
             <div class="col-md-8">
-                <x-ui.odoo-form-ui type="input" label="Cycle Name" name="name" id="createCycleName" placeholder="e.g. {{ date('F Y') }} Performance Review" :value="date('F Y') . ' Performance Review'" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.cycle_name')" name="name" id="createCycleName" placeholder="{{ __('hrms.kra_kpi.placeholder_period_name', ['month' => date('F Y')]) }}" :value="__('hrms.kra_kpi.default_period_name', ['month' => date('F Y')])" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="select" label="Frequency" name="period_type" id="createCyclePeriodType">
-                    <option value="monthly" selected>Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="semi_annual">Semi-Annual</option>
-                    <option value="annual">Annual</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.frequency')" name="period_type" id="createCyclePeriodType">
+                    <option value="monthly" selected>{{ __('hrms.kra_kpi.period_monthly') }}</option>
+                    <option value="quarterly">{{ __('hrms.kra_kpi.period_quarterly') }}</option>
+                    <option value="semi_annual">{{ __('hrms.kra_kpi.period_semi_annual') }}</option>
+                    <option value="annual">{{ __('hrms.kra_kpi.period_annual') }}</option>
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Start Date" name="start_date" id="createCycleStartDate" inputType="date" :value="date('Y-m-01')" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.start_date')" name="start_date" id="createCycleStartDate" inputType="date" :value="date('Y-m-01')" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" id="createCycleEndDate" inputType="date" :value="date('Y-m-t')" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.end_date')" name="end_date" id="createCycleEndDate" inputType="date" :value="date('Y-m-t')" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Review Due" name="self_review_deadline" id="createCycleReviewDeadline" inputType="date" :value="date('Y-m-t')" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.review_due')" name="self_review_deadline" id="createCycleReviewDeadline" inputType="date" :value="date('Y-m-t')" />
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="textarea" label="Notes / Description" name="description" rows="2" placeholder="Optional notes for this appraisal cycle..." />
+                <x-ui.odoo-form-ui type="textarea" :label="__('hrms.kra_kpi.notes_description')" name="description" rows="2" placeholder="{{ __('hrms.kra_kpi.placeholder_cycle_notes') }}" />
             </div>
         </div>
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Create Cycle</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_create_cycle') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- MODALS: EDIT APPRAISAL CYCLE -->
 @foreach($cycles as $cycle)
-<x-ui.modal id="editCycleModal_{{ $cycle->id }}" title="Edit Appraisal Cycle: {{ $cycle->name }}" size="lg" :showFooter="false">
+<x-ui.modal id="editCycleModal_{{ $cycle->id }}" :title="__('hrms.kra_kpi.modal_edit_cycle_title', ['name' => $cycle->name])" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.cycle.update', $cycle->id) }}">
         @csrf
         @method('PUT')
         <div class="row g-3">
             <div class="col-md-8">
-                <x-ui.odoo-form-ui type="input" label="Cycle Name" name="name" :value="$cycle->name" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.cycle_name')" name="name" :value="$cycle->name" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="select" label="Frequency" name="period_type">
-                    <option value="monthly" {{ $cycle->period_type === 'monthly' ? 'selected' : '' }}>Monthly</option>
-                    <option value="quarterly" {{ $cycle->period_type === 'quarterly' ? 'selected' : '' }}>Quarterly</option>
-                    <option value="semi_annual" {{ $cycle->period_type === 'semi_annual' ? 'selected' : '' }}>Semi-Annual</option>
-                    <option value="annual" {{ $cycle->period_type === 'annual' ? 'selected' : '' }}>Annual</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.frequency')" name="period_type">
+                    <option value="monthly" {{ $cycle->period_type === 'monthly' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.period_monthly') }}</option>
+                    <option value="quarterly" {{ $cycle->period_type === 'quarterly' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.period_quarterly') }}</option>
+                    <option value="semi_annual" {{ $cycle->period_type === 'semi_annual' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.period_semi_annual') }}</option>
+                    <option value="annual" {{ $cycle->period_type === 'annual' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.period_annual') }}</option>
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Start Date" name="start_date" inputType="date" :value="$cycle->start_date ? $cycle->start_date->format('Y-m-d') : ''" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.start_date')" name="start_date" inputType="date" :value="$cycle->start_date ? $cycle->start_date->format('Y-m-d') : ''" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" inputType="date" :value="$cycle->end_date ? $cycle->end_date->format('Y-m-d') : ''" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.end_date')" name="end_date" inputType="date" :value="$cycle->end_date ? $cycle->end_date->format('Y-m-d') : ''" :required="true" />
             </div>
             <div class="col-md-4">
-                <x-ui.odoo-form-ui type="input" label="Review Due" name="self_review_deadline" inputType="date" :value="$cycle->self_review_deadline ? $cycle->self_review_deadline->format('Y-m-d') : ''" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.review_due')" name="self_review_deadline" inputType="date" :value="$cycle->self_review_deadline ? $cycle->self_review_deadline->format('Y-m-d') : ''" />
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="textarea" label="Notes / Description" name="description" rows="2" :value="$cycle->description" placeholder="Optional notes for this appraisal cycle..." />
+                <x-ui.odoo-form-ui type="textarea" :label="__('hrms.kra_kpi.notes_description')" name="description" rows="2" :value="$cycle->description" placeholder="{{ __('hrms.kra_kpi.placeholder_cycle_notes') }}" />
             </div>
         </div>
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Update Cycle</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_update_cycle') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 @endforeach
 
 <!-- MODAL 3: CREATE KRA FOCUS CATEGORY (ODOO FORM UI) -->
-<x-ui.modal id="createKraModal" title="Add KRA Strategic Focus Area" size="md" :showFooter="false">
+<x-ui.modal id="createKraModal" :title="__('hrms.kra_kpi.modal_create_kra_title')" size="md" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.kra-category.store') }}">
         @csrf
         <div class="row g-3">
             <div class="col-12">
-                <x-ui.odoo-form-ui type="input" label="KRA Name" name="name" placeholder="e.g. Financial & Growth" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.kra_name')" name="name" placeholder="{{ __('hrms.kra_kpi.placeholder_kra_name') }}" :required="true" />
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Description of this strategic area..." />
+                <x-ui.odoo-form-ui type="textarea" :label="__('hrms.kra_kpi.description')" name="description" rows="3" placeholder="{{ __('hrms.kra_kpi.placeholder_kra_desc') }}" />
             </div>
         </div>
         <div class="mt-3 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Save KRA</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_save_kra') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- MODAL 4: CREATE KPI MASTER METRIC (ODOO FORM UI) -->
-<x-ui.modal id="createKpiMasterModal" title="Add Standard KPI to Master Library" size="lg" :showFooter="false">
+<x-ui.modal id="createKpiMasterModal" :title="__('hrms.kra_kpi.modal_create_kpi_title')" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.kpi-master.store') }}">
         @csrf
         <div class="row g-3">
             <div class="col-12">
-                <x-ui.odoo-form-ui type="input" label="KPI Metric Name" name="name" placeholder="e.g. SLA Resolution Rate" :required="true" />
+                <x-ui.odoo-form-ui type="input" :label="__('hrms.kra_kpi.kpi_metric_name')" name="name" placeholder="{{ __('hrms.kra_kpi.placeholder_kpi_name') }}" :required="true" />
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="select" label="KRA Category" name="kra_category_id" :required="true">
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.kra_category')" name="kra_category_id" :required="true">
                     @foreach($kraCategories as $kra)
                         <option value="{{ $kra->id }}">{{ $kra->name }}</option>
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Unit of Measure" name="unit" :required="true">
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="currency">Currency (₹ / $)</option>
-                    <option value="number">Numeric Count</option>
-                    <option value="rating">Rating (1 to 5)</option>
-                    <option value="boolean">Milestone (Yes/No)</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.unit_of_measure')" name="unit" :required="true">
+                    <option value="percentage">{{ __('hrms.kra_kpi.unit_percentage') }}</option>
+                    <option value="currency">{{ __('hrms.kra_kpi.unit_currency') }}</option>
+                    <option value="number">{{ __('hrms.kra_kpi.unit_number') }}</option>
+                    <option value="rating">{{ __('hrms.kra_kpi.unit_rating') }}</option>
+                    <option value="boolean">{{ __('hrms.kra_kpi.unit_milestone') }}</option>
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Direction" name="calculation_type" :required="true">
-                    <option value="higher_is_better">Higher is Better (Sales, Uptime)</option>
-                    <option value="lower_is_better">Lower is Better (Bugs, Churn)</option>
-                    <option value="milestone">Milestone Target</option>
+                <x-ui.odoo-form-ui type="select" :label="__('hrms.kra_kpi.direction')" name="calculation_type" :required="true">
+                    <option value="higher_is_better">{{ __('hrms.kra_kpi.dir_higher') }}</option>
+                    <option value="lower_is_better">{{ __('hrms.kra_kpi.dir_lower') }}</option>
+                    <option value="milestone">{{ __('hrms.kra_kpi.dir_milestone') }}</option>
                 </x-ui.odoo-form-ui>
             </div>
             <input type="hidden" name="default_target" value="100.00">
             <input type="hidden" name="default_weightage" value="20.00">
         </div>
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Add to Library</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_add_to_library') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- MODAL 5: CREATE KPI TEMPLATE PACK (ODOO FORM UI) -->
-<x-ui.modal id="createTemplateModal" title="Create Role-Based KPI Template Pack" size="xl" :showFooter="false">
+<x-ui.modal id="createTemplateModal" title="{{ __('hrms.kra_kpi.modal_create_template_title') }}" size="xl" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.template.store') }}">
         @csrf
         <div class="row g-3">
             <div class="col-12">
-                <x-ui.odoo-form-ui type="input" label="Template Name" name="name" placeholder="e.g. Senior Software Engineer Scorecard" :required="true" />
+                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.kra_kpi.template_name') }}" name="name" placeholder="{{ __('hrms.kra_kpi.placeholder_template_name') }}" :required="true" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Department" name="department_id">
-                    <option value="">All Departments</option>
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.kra_kpi.department') }}" name="department_id">
+                    <option value="">{{ __('hrms.kra_kpi.all_departments') }}</option>
                     @foreach($departments as $dept)
                         <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Designation" name="designation_id">
-                    <option value="">All Designations</option>
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.kra_kpi.designation') }}" name="designation_id">
+                    <option value="">{{ __('hrms.kra_kpi.all_designations') }}</option>
                     @foreach($designations as $desig)
                         <option value="{{ $desig->id }}">{{ $desig->name }}</option>
                     @endforeach
@@ -1117,26 +1072,26 @@
         <div class="mt-4">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 flex-wrap gap-2">
                 <div>
-                    <h6 class="fw-bold text-dark mb-0">KPI Goals in this Template (Weightage sum should be 100%)</h6>
-                    <small class="text-muted">Select standard KPIs from library or type custom goals. Values auto-fill on selection.</small>
+                    <h6 class="fw-bold text-dark mb-0">{{ __('hrms.kra_kpi.template_goals_heading') }}</h6>
+                    <small class="text-muted">{{ __('hrms.kra_kpi.template_goals_desc_create') }}</small>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge" id="createTemplateWeightBadge">Total Weight: 100%</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge" id="createTemplateWeightBadge">{{ __('hrms.kra_kpi.total_weight_label', ['weight' => 100]) }}</span>
                     <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" id="addTemplateRowBtn" class="border fw-semibold">
-                        Add Goal Row
+                        {{ __('hrms.kra_kpi.add_goal_row') }}
                     </x-ui.button>
                 </div>
             </div>
             <x-ui.odoo-form-ui type="table">
                 <thead>
                     <tr>
-                        <th style="width: 28%;">KPI Metric / Title <span class="text-danger">*</span></th>
-                        <th style="width: 22%;">KRA Focus</th>
-                        <th style="width: 18%;">Direction</th>
-                        <th style="width: 12%;">Unit</th>
-                        <th style="width: 9%;">Target <span class="text-danger">*</span></th>
-                        <th style="width: 9%;">Weight % <span class="text-danger">*</span></th>
-                        <th style="width: 42px;" class="text-center">Action</th>
+                        <th style="width: 28%;">{{ __('hrms.kra_kpi.th_kpi_metric_title') }} <span class="text-danger">*</span></th>
+                        <th style="width: 22%;">{{ __('hrms.kra_kpi.th_kra_focus') }}</th>
+                        <th style="width: 18%;">{{ __('hrms.kra_kpi.th_direction') }}</th>
+                        <th style="width: 12%;">{{ __('hrms.kra_kpi.th_unit') }}</th>
+                        <th style="width: 9%;">{{ __('hrms.kra_kpi.th_target') }} <span class="text-danger">*</span></th>
+                        <th style="width: 9%;">{{ __('hrms.kra_kpi.th_weight') }} <span class="text-danger">*</span></th>
+                        <th style="width: 42px;" class="text-center">{{ __('hrms.kra_kpi.th_action') }}</th>
                     </tr>
                 </thead>
                 <tbody id="templateRowsTbody">
@@ -1144,8 +1099,8 @@
                         <td>
                             <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
-                                    <option value="">-- Choose Standard KPI --</option>
-                                    <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_standard_kpi') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kpi') }}</option>
                                     @foreach($kpiMasters as $km)
                                         <option value="{{ $km->name }}"
                                             data-kpi-id="{{ $km->id }}"
@@ -1161,8 +1116,8 @@
                                 </select>
                             </div>
                             <div class="kpi-input-wrap d-none align-items-center gap-1">
-                                <input type="text" name="items[0][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" name="items[0][title]" class="odoo-table-input kpi-title-input" placeholder="{{ __('hrms.kra_kpi.placeholder_custom_goal') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -1170,8 +1125,8 @@
                         <td>
                             <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
-                                    <option value="">-- Choose KRA Focus --</option>
-                                    <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_kra_focus') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kra') }}</option>
                                     @foreach($kraCategories as $kra)
                                         <option value="{{ $kra->id }}">{{ $kra->name }}</option>
                                     @endforeach
@@ -1179,14 +1134,14 @@
                             </div>
                             <div class="kra-locked-wrap d-none align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ __('hrms.kra_kpi.fixed_standard_kpi_category') }}"></i>
                                     <span class="kra-locked-text text-truncate fw-medium text-dark"></span>
                                 </div>
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ __('hrms.kra_kpi.library_badge') }}</span>
                             </div>
                             <div class="kra-input-wrap d-none align-items-center gap-1">
-                                <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ __('hrms.kra_kpi.type_custom_kra') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -1194,18 +1149,18 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[0][calculation_type]">
-                                <option value="higher_is_better">Higher is Better</option>
-                                <option value="lower_is_better">Lower is Better</option>
-                                <option value="milestone">Milestone</option>
+                                <option value="higher_is_better">{{ __('hrms.kra_kpi.dir_higher_short') }}</option>
+                                <option value="lower_is_better">{{ __('hrms.kra_kpi.dir_lower_short') }}</option>
+                                <option value="milestone">{{ __('hrms.kra_kpi.dir_milestone_short') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[0][unit]">
                                 <option value="percentage">%</option>
-                                <option value="number">Qty</option>
-                                <option value="currency">₹</option>
-                                <option value="rating">Rating (1-5)</option>
-                                <option value="boolean">Milestone</option>
+                                <option value="number">{{ __('hrms.kra_kpi.unit_qty_short') }}</option>
+                                <option value="currency">{{ __('hrms.kra_kpi.unit_currency_symbol') }}</option>
+                                <option value="rating">{{ __('hrms.kra_kpi.unit_rating_scale') }}</option>
+                                <option value="boolean">{{ __('hrms.kra_kpi.unit_milestone_label') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -1215,15 +1170,15 @@
                             <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" name="items[0][weightage]" value="50" :required="true" />
                         </td>
                         <td class="text-center">
-                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-template-row" title="Remove Goal" />
+                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-template-row" title="{{ __('hrms.kra_kpi.remove_goal') }}" />
                         </td>
                     </tr>
                     <tr>
                         <td>
                             <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
-                                    <option value="">-- Choose Standard KPI --</option>
-                                    <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_standard_kpi') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kpi') }}</option>
                                     @foreach($kpiMasters as $km)
                                         <option value="{{ $km->name }}"
                                             data-kpi-id="{{ $km->id }}"
@@ -1239,8 +1194,8 @@
                                 </select>
                             </div>
                             <div class="kpi-input-wrap d-none align-items-center gap-1">
-                                <input type="text" name="items[1][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" name="items[1][title]" class="odoo-table-input kpi-title-input" placeholder="{{ __('hrms.kra_kpi.placeholder_custom_goal') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -1248,8 +1203,8 @@
                         <td>
                             <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
-                                    <option value="">-- Choose KRA Focus --</option>
-                                    <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_kra_focus') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kra') }}</option>
                                     @foreach($kraCategories as $kra)
                                         <option value="{{ $kra->id }}">{{ $kra->name }}</option>
                                     @endforeach
@@ -1257,14 +1212,14 @@
                             </div>
                             <div class="kra-locked-wrap d-none align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ __('hrms.kra_kpi.fixed_standard_kpi_category') }}"></i>
                                     <span class="kra-locked-text text-truncate fw-medium text-dark"></span>
                                 </div>
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ __('hrms.kra_kpi.library_badge') }}</span>
                             </div>
                             <div class="kra-input-wrap d-none align-items-center gap-1">
-                                <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ __('hrms.kra_kpi.type_custom_kra') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -1272,18 +1227,18 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[1][calculation_type]">
-                                <option value="higher_is_better">Higher is Better</option>
-                                <option value="lower_is_better">Lower is Better</option>
-                                <option value="milestone">Milestone</option>
+                                <option value="higher_is_better">{{ __('hrms.kra_kpi.dir_higher_short') }}</option>
+                                <option value="lower_is_better">{{ __('hrms.kra_kpi.dir_lower_short') }}</option>
+                                <option value="milestone">{{ __('hrms.kra_kpi.dir_milestone_short') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[1][unit]">
                                 <option value="percentage">%</option>
-                                <option value="number">Qty</option>
-                                <option value="currency">₹</option>
-                                <option value="rating">Rating (1-5)</option>
-                                <option value="boolean">Milestone</option>
+                                <option value="number">{{ __('hrms.kra_kpi.unit_qty_short') }}</option>
+                                <option value="currency">{{ __('hrms.kra_kpi.unit_currency_symbol') }}</option>
+                                <option value="rating">{{ __('hrms.kra_kpi.unit_rating_scale') }}</option>
+                                <option value="boolean">{{ __('hrms.kra_kpi.unit_milestone_label') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -1293,7 +1248,7 @@
                             <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" name="items[1][weightage]" value="50" :required="true" />
                         </td>
                         <td class="text-center">
-                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-template-row" title="Remove Goal" />
+                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-template-row" title="{{ __('hrms.kra_kpi.remove_goal') }}" />
                         </td>
                     </tr>
                 </tbody>
@@ -1301,33 +1256,33 @@
         </div>
 
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Save KPI Template</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_save_template') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- EDIT ROLE TEMPLATE MODALS -->
 @foreach($kpiTemplates as $tpl)
-<x-ui.modal id="editTemplateModal_{{ $tpl->id }}" title="Edit Role Template: {{ $tpl->name }}" size="xl" :showFooter="false">
+<x-ui.modal id="editTemplateModal_{{ $tpl->id }}" title="{{ __('hrms.kra_kpi.modal_edit_template_title', ['name' => $tpl->name]) }}" size="xl" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.template.update', $tpl->id) }}">
         @csrf
         @method('PUT')
         <div class="row g-3">
             <div class="col-12">
-                <x-ui.odoo-form-ui type="input" label="Template Name" name="name" value="{{ $tpl->name }}" :required="true" />
+                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.kra_kpi.template_name') }}" name="name" value="{{ $tpl->name }}" :required="true" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Department" name="department_id">
-                    <option value="">All Departments</option>
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.kra_kpi.department') }}" name="department_id">
+                    <option value="">{{ __('hrms.kra_kpi.all_departments') }}</option>
                     @foreach($departments as $dept)
                         <option value="{{ $dept->id }}" @selected($tpl->department_id == $dept->id)>{{ $dept->name }}</option>
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="Designation" name="designation_id">
-                    <option value="">All Designations</option>
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.kra_kpi.designation') }}" name="designation_id">
+                    <option value="">{{ __('hrms.kra_kpi.all_designations') }}</option>
                     @foreach($designations as $desig)
                         <option value="{{ $desig->id }}" @selected($tpl->designation_id == $desig->id)>{{ $desig->name }}</option>
                     @endforeach
@@ -1338,26 +1293,26 @@
         <div class="mt-4">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 flex-wrap gap-2">
                 <div>
-                    <h6 class="fw-bold text-dark mb-0">KPI Goals in this Template (Weightage sum should be 100%)</h6>
-                    <small class="text-muted">Modify goal targets or weights. Total weightage should ideally equal 100%.</small>
+                    <h6 class="fw-bold text-dark mb-0">{{ __('hrms.kra_kpi.template_goals_heading') }}</h6>
+                    <small class="text-muted">{{ __('hrms.kra_kpi.template_goals_desc_edit') }}</small>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge" id="editTemplateWeightBadge_{{ $tpl->id }}">Total Weight: {{ $tpl->items->sum('weightage') }}%</span>
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge" id="editTemplateWeightBadge_{{ $tpl->id }}">{{ __('hrms.kra_kpi.total_weight_label', ['weight' => $tpl->items->sum('weightage')]) }}</span>
                     <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" class="border fw-semibold" onclick="addEditTemplateRow({{ $tpl->id }})">
-                        Add Goal Row
+                        {{ __('hrms.kra_kpi.add_goal_row') }}
                     </x-ui.button>
                 </div>
             </div>
             <x-ui.odoo-form-ui type="table">
                 <thead>
                     <tr>
-                        <th style="width: 28%;">KPI Title <span class="text-danger">*</span></th>
-                        <th style="width: 22%;">KRA Focus</th>
-                        <th style="width: 18%;">Direction</th>
-                        <th style="width: 12%;">Unit</th>
-                        <th style="width: 9%;">Target <span class="text-danger">*</span></th>
-                        <th style="width: 9%;">Weight % <span class="text-danger">*</span></th>
-                        <th style="width: 42px;" class="text-center">Action</th>
+                        <th style="width: 28%;">{{ __('hrms.kra_kpi.th_kpi_title') }} <span class="text-danger">*</span></th>
+                        <th style="width: 22%;">{{ __('hrms.kra_kpi.th_kra_focus') }}</th>
+                        <th style="width: 18%;">{{ __('hrms.kra_kpi.th_direction') }}</th>
+                        <th style="width: 12%;">{{ __('hrms.kra_kpi.th_unit') }}</th>
+                        <th style="width: 9%;">{{ __('hrms.kra_kpi.th_target') }} <span class="text-danger">*</span></th>
+                        <th style="width: 9%;">{{ __('hrms.kra_kpi.th_weight') }} <span class="text-danger">*</span></th>
+                        <th style="width: 42px;" class="text-center">{{ __('hrms.kra_kpi.th_action') }}</th>
                     </tr>
                 </thead>
                 <tbody id="editTemplateRowsTbody_{{ $tpl->id }}">
@@ -1369,8 +1324,8 @@
                             <td>
                                 <div class="kpi-select-wrap {{ $isStandardKpi ? 'd-flex' : 'd-none' }} align-items-center" style="width: 100%;">
                                     <select class="odoo-table-select odoo-select2 kpi-template-select" style="width: 100%;">
-                                        <option value="">-- Choose Standard KPI --</option>
-                                        <option value="__custom__" @selected(!$isStandardKpi)>+ Add Custom KPI (Type Manually)</option>
+                                        <option value="">{{ __('hrms.kra_kpi.choose_standard_kpi') }}</option>
+                                        <option value="__custom__" @selected(!$isStandardKpi)>{{ __('hrms.kra_kpi.add_custom_kpi') }}</option>
                                         @foreach($kpiMasters as $km)
                                             <option value="{{ $km->name }}"
                                                 data-kpi-id="{{ $km->id }}"
@@ -1387,8 +1342,8 @@
                                     </select>
                                 </div>
                                 <div class="kpi-input-wrap {{ $isStandardKpi ? 'd-none' : 'd-flex' }} align-items-center gap-1">
-                                    <input type="text" name="items[{{ $idx }}][title]" value="{{ $item->title }}" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                                    <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                    <input type="text" name="items[{{ $idx }}][title]" value="{{ $item->title }}" class="odoo-table-input kpi-title-input" placeholder="{{ __('hrms.kra_kpi.placeholder_custom_goal') }}" />
+                                    <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                         <i class="feather-list"></i>
                                     </button>
                                 </div>
@@ -1402,8 +1357,8 @@
                                 @endphp
                                 <div class="kra-select-wrap {{ $kraDisplayWrap }} align-items-center" style="width: 100%;">
                                     <select class="odoo-table-select odoo-select2 kra-template-select" style="width: 100%;">
-                                        <option value="">-- Choose KRA Focus --</option>
-                                        <option value="__custom__" @selected(!$isKnownKra && $item->kra_category_id)>+ Add Custom KRA (Type Manually)</option>
+                                        <option value="">{{ __('hrms.kra_kpi.choose_kra_focus') }}</option>
+                                        <option value="__custom__" @selected(!$isKnownKra && $item->kra_category_id)>{{ __('hrms.kra_kpi.add_custom_kra') }}</option>
                                         @foreach($kraCategories as $kra)
                                             <option value="{{ $kra->id }}" @selected($item->kra_category_id == $kra->id)>{{ $kra->name }}</option>
                                         @endforeach
@@ -1411,14 +1366,14 @@
                                 </div>
                                 <div class="kra-locked-wrap {{ $kraLockedWrap }} align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                                     <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                                        <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
-                                        <span class="kra-locked-text text-truncate fw-medium text-dark">{{ $item->kraCategory->name ?? 'Standard KRA' }}</span>
+                                        <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ __('hrms.kra_kpi.fixed_standard_kpi_category') }}"></i>
+                                        <span class="kra-locked-text text-truncate fw-medium text-dark">{{ $item->kraCategory->name ?? __('hrms.kra_kpi.standard_kra') }}</span>
                                     </div>
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ __('hrms.kra_kpi.library_badge') }}</span>
                                 </div>
                                 <div class="kra-input-wrap {{ $kraInputWrap }} align-items-center gap-1">
-                                    <input type="text" value="{{ $isKnownKra ? '' : ($item->kraCategory->name ?? '') }}" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                                    <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                    <input type="text" value="{{ $isKnownKra ? '' : ($item->kraCategory->name ?? '') }}" class="odoo-table-input kra-title-input" placeholder="{{ __('hrms.kra_kpi.type_custom_kra') }}" />
+                                    <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                         <i class="feather-list"></i>
                                     </button>
                                 </div>
@@ -1426,18 +1381,18 @@
                             </td>
                             <td>
                                 <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][calculation_type]">
-                                    <option value="higher_is_better" @selected($item->calculation_type === 'higher_is_better')>Higher is Better</option>
-                                    <option value="lower_is_better" @selected($item->calculation_type === 'lower_is_better')>Lower is Better</option>
-                                    <option value="milestone" @selected($item->calculation_type === 'milestone')>Milestone</option>
+                                    <option value="higher_is_better" @selected($item->calculation_type === 'higher_is_better')>{{ __('hrms.kra_kpi.dir_higher_short') }}</option>
+                                    <option value="lower_is_better" @selected($item->calculation_type === 'lower_is_better')>{{ __('hrms.kra_kpi.dir_lower_short') }}</option>
+                                    <option value="milestone" @selected($item->calculation_type === 'milestone')>{{ __('hrms.kra_kpi.dir_milestone_short') }}</option>
                                 </x-ui.odoo-form-ui>
                             </td>
                             <td>
                                 <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][unit]">
                                     <option value="percentage" @selected($item->unit === 'percentage')>%</option>
-                                    <option value="number" @selected($item->unit === 'number')>Qty</option>
-                                    <option value="currency" @selected($item->unit === 'currency')>₹</option>
-                                    <option value="rating" @selected($item->unit === 'rating')>Rating (1-5)</option>
-                                    <option value="boolean" @selected($item->unit === 'boolean')>Milestone</option>
+                                    <option value="number" @selected($item->unit === 'number')>{{ __('hrms.kra_kpi.unit_qty_short') }}</option>
+                                    <option value="currency" @selected($item->unit === 'currency')>{{ __('hrms.kra_kpi.unit_currency_symbol') }}</option>
+                                    <option value="rating" @selected($item->unit === 'rating')>{{ __('hrms.kra_kpi.unit_rating_scale') }}</option>
+                                    <option value="boolean" @selected($item->unit === 'boolean')>{{ __('hrms.kra_kpi.unit_milestone_label') }}</option>
                                 </x-ui.odoo-form-ui>
                             </td>
                             <td>
@@ -1447,7 +1402,7 @@
                                 <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" name="items[{{ $idx }}][weightage]" value="{{ $item->weightage }}" :required="true" />
                             </td>
                             <td class="text-center">
-                                <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-template-row" title="Remove Goal" />
+                                <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-template-row" title="{{ __('hrms.kra_kpi.remove_goal') }}" />
                             </td>
                         </tr>
                     @endforeach
@@ -1456,8 +1411,8 @@
         </div>
 
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Update KPI Template</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_update_template') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
@@ -1794,8 +1749,8 @@
         }
 
         // KPI Masters & KRA Categories Data for Dynamic Rows
-        let kraOptionsHtml = `<option value="">-- Choose KRA Focus --</option><option value="__custom__">+ Add Custom KRA (Type Manually)</option>{!! addslashes(collect($kraCategories)->map(fn($k) => "<option value='{$k->id}'>{$k->name}</option>")->implode('')) !!}`;
-        let kpiOptionsHtml = `<option value="">-- Choose Standard KPI --</option><option value="__custom__">+ Add Custom KPI (Type Manually)</option>{!! addslashes(collect($kpiMasters)->map(fn($km) => "<option value='{$km->name}' data-kpi-id='{$km->id}' data-kra-id='{$km->kra_category_id}' data-kra-name='" . addslashes($km->kraCategory->name ?? '') . "' data-calc='{$km->calculation_type}' data-unit='{$km->unit}' data-target='{$km->default_target}' data-weight='{$km->default_weightage}'>{$km->name}</option>")->implode('')) !!}`;
+        let kraOptionsHtml = `<option value="">{{ addslashes(__('hrms.kra_kpi.choose_kra_focus')) }}</option><option value="__custom__">{{ addslashes(__('hrms.kra_kpi.add_custom_kra')) }}</option>{!! addslashes(collect($kraCategories)->map(fn($k) => "<option value='{$k->id}'>{$k->name}</option>")->implode('')) !!}`;
+        let kpiOptionsHtml = `<option value="">{{ addslashes(__('hrms.kra_kpi.choose_standard_kpi')) }}</option><option value="__custom__">{{ addslashes(__('hrms.kra_kpi.add_custom_kpi')) }}</option>{!! addslashes(collect($kpiMasters)->map(fn($km) => "<option value='{$km->name}' data-kpi-id='{$km->id}' data-kra-id='{$km->kra_category_id}' data-kra-name='" . addslashes($km->kraCategory->name ?? '') . "' data-calc='{$km->calculation_type}' data-unit='{$km->unit}' data-target='{$km->default_target}' data-weight='{$km->default_weightage}'>{$km->name}</option>")->implode('')) !!}`;
 
         // Smart KPI Select Handler for Template Builder
         window.handleTemplateKpiSelect = function(selectEl) {
@@ -1847,7 +1802,7 @@
                 const opt = selectEl.options ? selectEl.selectedOptions[0] : null;
                 if (opt) {
                     const kraId = opt.dataset.kraId;
-                    const kraName = opt.dataset.kraName || (kraId && $kraSelect.find(`option[value="${kraId}"]`).text().trim()) || 'Standard KRA';
+                    const kraName = opt.dataset.kraName || (kraId && $kraSelect.find(`option[value="${kraId}"]`).text().trim()) || '{{ addslashes(__('hrms.kra_kpi.standard_kra')) }}';
                     const calc = opt.dataset.calc;
                     const unit = opt.dataset.unit;
                     const target = opt.dataset.target;
@@ -2037,13 +1992,13 @@
             if (badge) {
                 if (isBalanced) {
                     badge.className = 'badge bg-success text-white fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge';
-                    badge.innerHTML = '<i class="feather-check-circle me-1"></i> Total Weight: 100% (Balanced)';
+                    badge.innerHTML = '<i class="feather-check-circle me-1"></i> {{ addslashes(__('hrms.kra_kpi.weight_balanced')) }}';
                 } else if (total > 100) {
                     badge.className = 'badge bg-danger text-white fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge';
-                    badge.innerHTML = `<i class="feather-alert-triangle me-1"></i> Total Weight: ${total}% (Exceeds 100%!)`;
+                    badge.innerHTML = `<i class="feather-alert-triangle me-1"></i> ${'{{ addslashes(__('hrms.kra_kpi.weight_exceeds', ['total' => '___TOTAL___'])) }}'.replace('___TOTAL___', total)}`;
                 } else {
                     badge.className = 'badge bg-warning text-dark fs-12 px-2.5 py-1.5 fw-semibold weightage-total-badge';
-                    badge.innerHTML = `<i class="feather-alert-circle me-1"></i> Total Weight: ${total}% (Target: 100%)`;
+                    badge.innerHTML = `<i class="feather-alert-circle me-1"></i> ${'{{ addslashes(__('hrms.kra_kpi.weight_target', ['total' => '___TOTAL___'])) }}'.replace('___TOTAL___', total)}`;
                 }
             }
 
@@ -2055,7 +2010,7 @@
                 } else {
                     submitBtn.disabled = true;
                     submitBtn.classList.add('disabled');
-                    submitBtn.setAttribute('title', `Total weightage must be exactly 100% (Current: ${total}%)`);
+                    submitBtn.setAttribute('title', `${'{{ addslashes(__('hrms.kra_kpi.weight_must_be_100_title', ['total' => '___TOTAL___'])) }}'.replace('___TOTAL___', total)}`);
                 }
             }
         }
@@ -2082,8 +2037,8 @@
                         </select>
                     </div>
                     <div class="kpi-input-wrap d-none align-items-center gap-1">
-                        <input type="text" name="items[${uniqueIdx}][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                        <input type="text" name="items[${uniqueIdx}][title]" class="odoo-table-input kpi-title-input" placeholder="{{ addslashes(__('hrms.kra_kpi.placeholder_custom_goal')) }}" />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ addslashes(__('hrms.kra_kpi.switch_back_to_list')) }}" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                             <i class="feather-list"></i>
                         </button>
                     </div>
@@ -2096,14 +2051,14 @@
                     </div>
                     <div class="kra-locked-wrap d-none align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                         <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                            <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                            <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ addslashes(__('hrms.kra_kpi.fixed_standard_kpi_category')) }}"></i>
                             <span class="kra-locked-text text-truncate fw-medium text-dark"></span>
                         </div>
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ addslashes(__('hrms.kra_kpi.library_badge')) }}</span>
                     </div>
                     <div class="kra-input-wrap d-none align-items-center gap-1">
-                        <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                        <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ addslashes(__('hrms.kra_kpi.type_custom_kra')) }}" />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ addslashes(__('hrms.kra_kpi.switch_back_to_list')) }}" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                             <i class="feather-list"></i>
                         </button>
                     </div>
@@ -2111,18 +2066,18 @@
                 </td>
                 <td>
                     <select name="items[${uniqueIdx}][calculation_type]" class="odoo-table-select odoo-select2" style="width: 100%;">
-                        <option value="higher_is_better">Higher is Better</option>
-                        <option value="lower_is_better">Lower is Better</option>
-                        <option value="milestone">Milestone</option>
+                        <option value="higher_is_better">{{ addslashes(__('hrms.kra_kpi.dir_higher_short')) }}</option>
+                        <option value="lower_is_better">{{ addslashes(__('hrms.kra_kpi.dir_lower_short')) }}</option>
+                        <option value="milestone">{{ addslashes(__('hrms.kra_kpi.dir_milestone_short')) }}</option>
                     </select>
                 </td>
                 <td>
                     <select name="items[${uniqueIdx}][unit]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="percentage">%</option>
-                        <option value="number">Qty</option>
-                        <option value="currency">₹</option>
-                        <option value="rating">Rating (1-5)</option>
-                        <option value="boolean">Milestone</option>
+                        <option value="number">{{ addslashes(__('hrms.kra_kpi.unit_qty_short')) }}</option>
+                        <option value="currency">{{ addslashes(__('hrms.kra_kpi.unit_currency_symbol')) }}</option>
+                        <option value="rating">{{ addslashes(__('hrms.kra_kpi.unit_rating_scale')) }}</option>
+                        <option value="boolean">{{ addslashes(__('hrms.kra_kpi.unit_milestone_label')) }}</option>
                     </select>
                 </td>
                 <td>
@@ -2132,7 +2087,7 @@
                     <input type="number" step="0.01" name="items[${uniqueIdx}][weightage]" value="25" class="odoo-table-input" required />
                 </td>
                 <td class="text-center">
-                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm remove-template-row" title="Remove Goal">
+                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm remove-template-row" title="{{ addslashes(__('hrms.kra_kpi.remove_goal')) }}">
                         <i class="feather-trash-2"></i>
                     </button>
                 </td>
@@ -2168,8 +2123,8 @@
                         </select>
                     </div>
                     <div class="kpi-input-wrap d-none align-items-center gap-1">
-                        <input type="text" name="items[${uniqueIdx}][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                        <input type="text" name="items[${uniqueIdx}][title]" class="odoo-table-input kpi-title-input" placeholder="{{ addslashes(__('hrms.kra_kpi.placeholder_custom_goal')) }}" />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ addslashes(__('hrms.kra_kpi.switch_back_to_list')) }}" onclick="switchToTemplateSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                             <i class="feather-list"></i>
                         </button>
                     </div>
@@ -2182,14 +2137,14 @@
                     </div>
                     <div class="kra-locked-wrap d-none align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                         <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                            <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                            <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ addslashes(__('hrms.kra_kpi.fixed_standard_kpi_category')) }}"></i>
                             <span class="kra-locked-text text-truncate fw-medium text-dark"></span>
                         </div>
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ addslashes(__('hrms.kra_kpi.library_badge')) }}</span>
                     </div>
                     <div class="kra-input-wrap d-none align-items-center gap-1">
-                        <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                        <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ addslashes(__('hrms.kra_kpi.type_custom_kra')) }}" />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ addslashes(__('hrms.kra_kpi.switch_back_to_list')) }}" onclick="switchToTemplateKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                             <i class="feather-list"></i>
                         </button>
                     </div>
@@ -2197,18 +2152,18 @@
                 </td>
                 <td>
                     <select name="items[${uniqueIdx}][calculation_type]" class="odoo-table-select odoo-select2" style="width: 100%;">
-                        <option value="higher_is_better">Higher is Better</option>
-                        <option value="lower_is_better">Lower is Better</option>
-                        <option value="milestone">Milestone</option>
+                        <option value="higher_is_better">{{ addslashes(__('hrms.kra_kpi.dir_higher_short')) }}</option>
+                        <option value="lower_is_better">{{ addslashes(__('hrms.kra_kpi.dir_lower_short')) }}</option>
+                        <option value="milestone">{{ addslashes(__('hrms.kra_kpi.dir_milestone_short')) }}</option>
                     </select>
                 </td>
                 <td>
                     <select name="items[${uniqueIdx}][unit]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="percentage">%</option>
-                        <option value="number">Qty</option>
-                        <option value="currency">₹</option>
-                        <option value="rating">Rating (1-5)</option>
-                        <option value="boolean">Milestone</option>
+                        <option value="number">{{ addslashes(__('hrms.kra_kpi.unit_qty_short')) }}</option>
+                        <option value="currency">{{ addslashes(__('hrms.kra_kpi.unit_currency_symbol')) }}</option>
+                        <option value="rating">{{ addslashes(__('hrms.kra_kpi.unit_rating_scale')) }}</option>
+                        <option value="boolean">{{ addslashes(__('hrms.kra_kpi.unit_milestone_label')) }}</option>
                     </select>
                 </td>
                 <td>
@@ -2218,7 +2173,7 @@
                     <input type="number" step="0.01" name="items[${uniqueIdx}][weightage]" value="20" class="odoo-table-input" required />
                 </td>
                 <td class="text-center">
-                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm remove-template-row" title="Remove Goal">
+                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm remove-template-row" title="{{ addslashes(__('hrms.kra_kpi.remove_goal')) }}">
                         <i class="feather-trash-2"></i>
                     </button>
                 </td>
@@ -2249,7 +2204,7 @@
                     tr.remove();
                     updateModalWeightage(tbody);
                 } else {
-                    alert('At least one KPI goal row is required.');
+                    alert('{{ addslashes(__('hrms.kra_kpi.at_least_one_row_required')) }}');
                 }
             }
         });
@@ -2318,16 +2273,16 @@
 
             if (validRowCount === 0) {
                 e.preventDefault();
-                alert('Please add at least one KPI goal with a title or standard KPI metric.');
+                alert('{{ addslashes(__('hrms.kra_kpi.add_at_least_one_goal_msg')) }}');
                 return false;
             }
 
             if (Math.abs(totalWeight - 100.0) > 0.01) {
                 e.preventDefault();
                 if (totalWeight > 100.0) {
-                    alert(`The total weightage cannot exceed 100%.\n\nCurrent total: ${totalWeight}%.\nPlease adjust your KPI weights so the sum equals exactly 100%.`);
+                    alert(`${'{{ addslashes(__('hrms.kra_kpi.total_weight_exceed_msg', ['total' => '___TOTAL___'])) }}'.replace('___TOTAL___', totalWeight)}`);
                 } else {
-                    alert(`The template cannot be saved because the total weightage is not 100%.\n\nCurrent total: ${totalWeight}%.\nPlease adjust your KPI weights so the sum equals exactly 100%.`);
+                    alert(`${'{{ addslashes(__('hrms.kra_kpi.total_weight_not_100_msg', ['total' => '___TOTAL___'])) }}'.replace('___TOTAL___', totalWeight)}`);
                 }
                 $(this).find('input[name$="[weightage]"]').first().focus();
                 return false;
@@ -2343,7 +2298,7 @@
                     const submitBtn = this.querySelector('button[type="submit"]');
                     const originalBtnText = submitBtn.innerHTML;
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> {{ addslashes(__('hrms.kra_kpi.saving')) }}';
 
                     const formData = new FormData(this);
 
@@ -2382,13 +2337,13 @@
                             }
                             createKpiModalForm.reset();
                         } else {
-                            alert(data.message || 'Error creating KPI metric.');
+                            alert(data.message || '{{ addslashes(__('hrms.kra_kpi.error_creating_kpi')) }}');
                         }
                     })
                     .catch(err => {
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = originalBtnText;
-                        alert('Failed to save KPI metric. Please check your inputs.');
+                        alert('{{ addslashes(__('hrms.kra_kpi.failed_save_kpi')) }}');
                     });
                 }
             });
@@ -2538,7 +2493,7 @@
                 }
 
                 const kraId = item.dataset.kraId;
-                const kraTitle = item.querySelector('.kra-title-text')?.textContent.trim() || 'Selected KRA';
+                const kraTitle = item.querySelector('.kra-title-text')?.textContent.trim() || '{{ addslashes(__('hrms.kra_kpi.selected_kra')) }}';
 
                 if (selectedKraId === kraId) {
                     selectedKraId = null;

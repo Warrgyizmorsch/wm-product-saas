@@ -514,6 +514,13 @@
                         <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_pan') }}" name="pan_card_number" id="{{ $prefix }}_pan_card_number" :value="$fieldValue('pan_card_number')" placeholder="{{ __('hrms.employees.frm_pan_placeholder') }}" :errorText="$errors->first('pan_card_number')" data-field-group="employee" />
                         </div>
+                        {{-- Keys of the PF ECR and ESIC monthly return. --}}
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="UAN (PF)" name="uan_number" id="{{ $prefix }}_uan_number" :value="$fieldValue('uan_number')" placeholder="12-digit UAN" maxlength="12" :errorText="$errors->first('uan_number')" data-field-group="employee" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="ESI IP number" name="esi_ip_number" id="{{ $prefix }}_esi_ip_number" :value="$fieldValue('esi_ip_number')" placeholder="10-digit insurance number" maxlength="10" :errorText="$errors->first('esi_ip_number')" data-field-group="employee" />
+                        </div>
                     </div>
 
                     <!-- 2.5 Bank Account Details -->

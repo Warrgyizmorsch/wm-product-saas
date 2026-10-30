@@ -75,9 +75,13 @@ class DispatchOrderController extends Controller
         $prefillSalesOrder = null;
         if ($soId) {
             $prefillSalesOrder = \App\Domains\Sales\Models\SalesOrder::with(['items', 'customer'])->find($soId);
-            if ($prefillSalesOrder && !in_array($prefillSalesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+            if ($prefillSalesOrder && !in_array($prefillSalesOrder->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
                 return redirect()->route('sales.dispatches.index')
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
+            }
+            if ($prefillSalesOrder && $prefillSalesOrder->hasOnlyServices()) {
+                return redirect()->route('sales.orders.show', $prefillSalesOrder->id)
+                    ->with('info', "Sales Order {$prefillSalesOrder->sales_order_number} contains only service items. Services do not require physical dispatch or shipping and can be directly invoiced.");
             }
             if ($prefillSalesOrder) {
                 $mr = MaterialRequirement::where('sales_order_id', $prefillSalesOrder->id)->first();
@@ -85,7 +89,7 @@ class DispatchOrderController extends Controller
             }
         } elseif ($mrId) {
             $mr = MaterialRequirement::with('salesOrder.customer')->find($mrId);
-            if ($mr && $mr->salesOrder && !in_array($mr->salesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+            if ($mr && $mr->salesOrder && !in_array($mr->salesOrder->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
                 return redirect()->route('sales.dispatches.index')
                     ->with('error', 'Sales Order must be Confirmed before creating a Dispatch Order.');
             }
@@ -105,7 +109,7 @@ class DispatchOrderController extends Controller
             'items.warehouse',
         ])
         ->whereHas('salesOrder', function ($q) {
-            $q->whereIn('status', ['Confirmed', 'Partially Shipped']);
+            $q->whereIn('status', ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered']);
         })
         ->whereIn('id', $pendingDOIds)
         ->latest()
@@ -278,7 +282,7 @@ class DispatchOrderController extends Controller
         return view('modules.sales.dispatches.show', compact('dispatch'));
     }
 
-    public function confirm(int $id): RedirectResponse
+    public function confirm(Request $request, int $id): RedirectResponse
     {
         $dispatch = $this->dispatchRepo->find($id);
         if (!$dispatch) abort(404);
@@ -286,14 +290,22 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
-            return redirect()->back()
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and warehouse stock reserved successfully. Invoice creation is now enabled.");
         } catch (Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect->with('error', $e->getMessage());
         }
     }
 
-    public function ship(int $id): RedirectResponse
+    public function ship(Request $request, int $id): RedirectResponse
     {
         $dispatch = $this->dispatchRepo->find($id);
         if (!$dispatch) abort(404);
@@ -310,10 +322,18 @@ class DispatchOrderController extends Controller
                 'date' => now()->format('Y-m-d'),
             ], route('inventory.dispatches.show', $dispatch->id), $dispatch);
 
-            return redirect()->back()
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect
                 ->with('success', "Dispatch Order {$dispatch->dispatch_number} marked as Shipped (Gate Outward) and physical stock deducted from warehouse successfully.");
         } catch (Exception $e) {
-            return redirect()->back()->with('error', $e->getMessage());
+            $redirect = $request->filled('redirect_to')
+                ? redirect()->to($request->input('redirect_to'))
+                : redirect()->back();
+
+            return $redirect->with('error', $e->getMessage());
         }
     }
 
@@ -348,6 +368,9 @@ class DispatchOrderController extends Controller
 
         $dispatch->update($updateData);
 
+        // Auto sync Material Requirement and Sales Order status to Delivered / Partially Delivered
+        $this->dispatchService->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
+
         return redirect()->route('sales.dispatches.show', $dispatch->id)
             ->with('success', 'Dispatch Order status updated to Delivered successfully.');
     }
@@ -375,5 +398,22 @@ class DispatchOrderController extends Controller
 
         return redirect()->route('sales.dispatches.show', $dispatch->id)
             ->with('success', 'Tracking & logistics details updated successfully.');
+    }
+
+    public function cancel(Request $request, int $id): RedirectResponse
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('update', $dispatch);
+
+        $reason = $request->input('reason', 'Cancelled by user');
+
+        try {
+            $this->dispatchService->cancelDispatchOrder($dispatch, $reason);
+            return redirect()->route('sales.dispatches.show', $dispatch->id)
+                ->with('success', "Dispatch Order {$dispatch->dispatch_number} cancelled and reserved inventory restored to available stock.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 }

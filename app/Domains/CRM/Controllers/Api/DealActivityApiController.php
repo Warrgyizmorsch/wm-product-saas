@@ -43,18 +43,50 @@ class DealActivityApiController extends Controller
                     'is_google_meet'          => (bool)$followup->is_google_meet,
                     'google_meet_link'        => $followup->google_meet_link,
                     'guest_emails'            => $followup->guest_emails,
-                    'latitude'                => $followup->latitude ? (float)$followup->latitude : null,
-                    'longitude'               => $followup->longitude ? (float)$followup->longitude : null,
-                    'location_address'        => $followup->location_address,
-                    'selfie_path'             => $followup->selfie_path,
-                    'selfie_url'              => $followup->selfie_url,
-                    'location_verified_at'    => $followup->location_verified_at?->toIso8601String(),
-                    'tagged_users'            => $followup->tagged_users->map(fn($u) => [
+                    'latitude'                     => $followup->latitude ? (float)$followup->latitude : null,
+                    'longitude'                    => $followup->longitude ? (float)$followup->longitude : null,
+                    'location_address'             => $followup->location_address,
+                    'address'                      => $followup->location_address,
+                    'scheduled_latitude'           => $followup->latitude ? (float)$followup->latitude : null,
+                    'scheduled_longitude'          => $followup->longitude ? (float)$followup->longitude : null,
+                    'scheduled_address'            => $followup->location_address,
+                    'scheduled_venue_location'     => $followup->location_address,
+                    'checkin_latitude'             => $followup->checkin_latitude ? (float)$followup->checkin_latitude : null,
+                    'checkin_longitude'            => $followup->checkin_longitude ? (float)$followup->checkin_longitude : null,
+                    'checkin_address'              => $followup->checkin_address,
+                    'checkin_distance_meters'      => $followup->checkin_distance_meters !== null ? (int)$followup->checkin_distance_meters : null,
+                    'checkin_status'               => $followup->checkin_status,
+                    'checkin_at'                   => $followup->checkin_at?->toIso8601String(),
+                    'actual_verification_location' => !empty($followup->checkin_address) ? $followup->checkin_address : ((!empty($followup->checkin_latitude) && !empty($followup->checkin_longitude)) ? ($followup->checkin_latitude . ', ' . $followup->checkin_longitude) : null),
+                    'selfie_path'                  => $followup->selfie_path,
+                    'selfie_url'                   => $followup->selfie_url,
+                    'location_verified_at'         => $followup->location_verified_at?->toIso8601String(),
+                    'is_geo_verified'              => (!empty($followup->checkin_latitude) || !empty($followup->latitude)) && !empty($followup->selfie_path),
+                    'tagged_users'                 => $followup->tagged_users->map(fn($u) => [
                         'id'    => $u->id,
                         'name'  => $u->name,
                         'email' => $u->email,
                     ]),
-                    'created_at'              => $followup->created_at?->toIso8601String(),
+                    'tagged_user'                  => $followup->taggedUser ? [
+                        'id'    => $followup->taggedUser->id,
+                        'name'  => $followup->taggedUser->name,
+                        'email' => $followup->taggedUser->email,
+                    ] : null,
+                    'assigned_to'                  => $followup->taggedUser ? [
+                        'id'    => $followup->taggedUser->id,
+                        'name'  => $followup->taggedUser->name,
+                        'email' => $followup->taggedUser->email,
+                    ] : null,
+                    'meeting_owner'                => $followup->taggedUser ? [
+                        'id'    => $followup->taggedUser->id,
+                        'name'  => $followup->taggedUser->name,
+                        'email' => $followup->taggedUser->email,
+                    ] : ($deal->owner ? [
+                        'id'    => $deal->owner->id,
+                        'name'  => $deal->owner->name,
+                        'email' => $deal->owner->email,
+                    ] : null),
+                    'created_at'                   => $followup->created_at?->toIso8601String(),
                 ];
             });
 
@@ -165,9 +197,9 @@ class DealActivityApiController extends Controller
 
         $verificationData = $this->followupService->extractVerificationPayload($request);
 
-        $tenantId = $deal->tenant_id ?? (tenant_id() ?? 1);
-        $companyId = $deal->company_id ?? 1;
-        $branchId = $deal->branch_id;
+        $tenantId = $deal->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id);
+        $companyId = $deal->company_id ?? (company_id() ?? auth()->user()?->company_id);
+        $branchId = $deal->branch_id ?? (branch_id() ?? auth()->user()?->branch_id);
 
         $taggedUserIds = !empty($validated['tagged_user_ids']) ? array_values(array_filter($validated['tagged_user_ids'])) : null;
         $primaryTaggedId = !empty($taggedUserIds) ? $taggedUserIds[0] : null;
@@ -256,12 +288,17 @@ class DealActivityApiController extends Controller
                 'status'               => $followup->status,
                 'followup_date'        => $followup->followup_date?->toIso8601String(),
                 'google_meet_link'     => $followup->google_meet_link,
-                'latitude'             => $followup->latitude ? (float)$followup->latitude : null,
-                'longitude'            => $followup->longitude ? (float)$followup->longitude : null,
-                'location_address'     => $followup->location_address,
-                'selfie_path'          => $followup->selfie_path,
-                'selfie_url'           => $followup->selfie_url,
-                'location_verified_at' => $followup->location_verified_at?->toIso8601String(),
+                'latitude'                 => $followup->latitude ? (float)$followup->latitude : null,
+                'longitude'                => $followup->longitude ? (float)$followup->longitude : null,
+                'location_address'         => $followup->location_address,
+                'address'                  => $followup->location_address,
+                'scheduled_latitude'       => $followup->latitude ? (float)$followup->latitude : null,
+                'scheduled_longitude'      => $followup->longitude ? (float)$followup->longitude : null,
+                'scheduled_address'        => $followup->location_address,
+                'scheduled_venue_location' => $followup->location_address,
+                'selfie_path'              => $followup->selfie_path,
+                'selfie_url'               => $followup->selfie_url,
+                'location_verified_at'     => $followup->location_verified_at?->toIso8601String(),
             ],
         ], 201);
     }

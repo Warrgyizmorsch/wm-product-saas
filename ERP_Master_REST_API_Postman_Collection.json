@@ -91,7 +91,7 @@
             ]
         },
         {
-            "name": "⭐ Mobile App CRM - Meetings & Followup Status Suite",
+            "name": "\u2b50 Mobile App CRM - Meetings & Followup Status Suite",
             "description": "Targeted Mobile CRM Suite: (1) Fetch meetings by User ID or Lead ID categorized into Today, Planned, Overdue, and Activity Logs with Customer & Lead Details. (2) Update meeting status to Connected, Not Connected, Rescheduled, or Cancelled with Geo-Verification.",
             "item": [
                 {
@@ -146,8 +146,9 @@
                                 }
                             ]
                         },
-                        "description": "Send user_id (and optionally lead_id) to receive categorized meetings: Today (due today), Planned (future scheduled), Overdue (missed past due), and Activity Logs (completed history with selfie/GPS). Each meeting includes complete customer/lead information."
-                    }
+                        "description": "Send user_id (and optionally lead_id) to receive categorized meetings: Today (due today), Planned / Next Activity (future scheduled), Overdue (missed past due), and Activity Logs / Past Logs (completed history with selfie/GPS). Each meeting includes complete scheduled venue location (latitude, longitude, location_address, address, scheduled_venue_location) where the meeting is scheduled."
+                    },
+                    "description": "Fetch categorized meetings (today, planned / next_activity, overdue, activity_logs / past_logs) for the logged-in user or filtered by user_id/lead_id/deal_id. Each meeting object contains scheduled venue map location (latitude, longitude, location_address, address, scheduled_latitude, scheduled_longitude, scheduled_address, scheduled_venue_location), actual verification location from selfie check-in (checkin_latitude, checkin_longitude, checkin_address, actual_verification_location), checkin_status, checkin_distance_meters, selfie_url, meeting_owner, and assigned_to."
                 },
                 {
                     "name": "2. Get Single Meeting / Followup Details by ID",
@@ -178,7 +179,8 @@
                             ]
                         },
                         "description": "Universal Route: Fetch a single meeting or followup detail by Followup ID. Supports both Lead & Deal meetings. (Also supports nested: /api/crm/leads/{lead}/followups/{id} and /api/crm/deals/{deal}/followups/{id})"
-                    }
+                    },
+                    "description": "Universal Route: Fetch a single meeting or followup detail by Followup ID. Returns complete data: scheduled venue location (latitude, longitude, location_address), actual verification selfie location (checkin_latitude, checkin_longitude, checkin_address), checkin_status, checkin_at, distance_meters, meeting_owner, and customer/lead details."
                 },
                 {
                     "name": "3. Update Meeting Status to Connected (Universal - Lead & Deal)",
@@ -203,7 +205,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"status\": \"Connected\",\n    \"outcome\": \"Connected\",\n    \"notes\": \"Conducted in-person meeting with customer. Requirements verified.\",\n    \"latitude\": 24.601,\n    \"longitude\": 73.712,\n    \"location_address\": \"Bangalore Tech Center, Client Premise\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
+                            "raw": "{\n    \"status\": \"Connected\",\n    \"outcome\": \"Connected\",\n    \"notes\": \"Conducted in-person meeting with customer. Requirements verified.\",\n    \"checkin_latitude\": 24.5990141,\n    \"checkin_longitude\": 73.7093691,\n    \"checkin_address\": \"Gandhi Manav Kalyan Society, 19, New Bhopalpura Road, Udaipur, Rajasthan, 313011\",\n    \"latitude\": 24.5990141,\n    \"longitude\": 73.7093691,\n    \"location_address\": \"Gandhi Manav Kalyan Society, 19, New Bhopalpura Road, Udaipur, Rajasthan, 313011\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/crm/followups/7/status",
@@ -244,7 +246,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"status\": \"Not Connected\",\n    \"outcome\": \"Not Connected\",\n    \"notes\": \"Visited client premise but contact person was unavailable.\",\n    \"latitude\": 24.601,\n    \"longitude\": 73.712,\n    \"location_address\": \"Bangalore Tech Center, Client Premise\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
+                            "raw": "{\n    \"status\": \"Not Connected\",\n    \"outcome\": \"Not Connected\",\n    \"notes\": \"Visited client premise but contact person was unavailable.\",\n    \"checkin_latitude\": 24.5990141,\n    \"checkin_longitude\": 73.7093691,\n    \"checkin_address\": \"Gandhi Manav Kalyan Society, 19, New Bhopalpura Road, Udaipur, Rajasthan, 313011\",\n    \"latitude\": 24.5990141,\n    \"longitude\": 73.7093691,\n    \"location_address\": \"Gandhi Manav Kalyan Society, 19, New Bhopalpura Road, Udaipur, Rajasthan, 313011\",\n    \"selfie_base64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=\"\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/crm/followups/7/status",
@@ -341,6 +343,47 @@
                             ]
                         },
                         "description": "Universal Route: Cancel a scheduled meeting for Lead or Deal."
+                    }
+                },
+                {
+                    "name": "7. Assign / Delegate Meeting to Another User (Change Meeting Owner)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"tagged_user_id\": 2,\n    \"notes\": \"Reassigned client field meeting to technical sales executive.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/meetings/7/assign",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "meetings",
+                                "7",
+                                "assign"
+                            ]
+                        },
+                        "description": "Universal Route: Assign or delegate a meeting to another team member or sales executive. Accepts 'tagged_user_id', 'user_id', or 'meeting_owner_id'. Supported endpoints: (1) /api/crm/meetings/{id}/assign (2) /api/crm/followups/{id}/assign (3) /api/crm/leads/{lead}/followups/{id}/assign."
                     }
                 }
             ]

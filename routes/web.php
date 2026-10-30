@@ -50,6 +50,10 @@ Route::match(['post', 'options'], '/api/crm/public/lead-capture', [\App\Domains\
     ->middleware('throttle:30,1')
     ->name('api.crm.public.lead-capture');
 
+// Platform console for the SaaS owner's staff — deliberately outside the
+// `tenant` group, so no tenant is resolved and screens see every tenant.
+Route::prefix('admin')->group(app_path('Domains/Platform/Routes/admin.php'));
+
 Route::middleware(['tenant'])->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])

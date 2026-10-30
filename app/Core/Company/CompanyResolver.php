@@ -9,6 +9,17 @@ class CompanyResolver
 {
     public function resolve(Request $request, int $tenantId): ?Company
     {
+        $explicitCompanyId = $request->header('X-Company-Id') ?: ($request->header('X-Company') ?: $request->input('company_id'));
+        if ($explicitCompanyId) {
+            $company = Company::query()
+                ->where('tenant_id', $tenantId)
+                ->find($explicitCompanyId);
+
+            if ($company !== null) {
+                return $company;
+            }
+        }
+
         $sessionCompanyId = $request->hasSession() ? $request->session()->get('company_id') : null;
 
         if ($sessionCompanyId) {

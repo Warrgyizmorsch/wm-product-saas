@@ -93,7 +93,44 @@ class PipRepository implements PipRepositoryInterface
         $categoriesList = PipCategory::where('tenant_id', $tenantId)->get();
         $policyTemplatesList = PipPolicyTemplate::where('tenant_id', $tenantId)->get();
 
-        $categories = PipCategory::where('tenant_id', $tenantId)->latest('id')->paginate(10, ['*'], 'categories_page')->appends($inputs);
+        $categoriesQuery = PipCategory::where('tenant_id', $tenantId);
+
+        if ($activeTab === 'categories') {
+            if ($search) {
+                $categoriesQuery->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('code', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
+            if ($status) {
+                if ($status === 'active') {
+                    $categoriesQuery->where(function ($q) {
+                        $q->where('status', 'active')
+                          ->orWhereNull('status')
+                          ->orWhere('status', '1');
+                    });
+                } else {
+                    $categoriesQuery->where(function ($q) use ($status) {
+                        $q->where('status', $status)
+                          ->orWhere('status', '0');
+                    });
+                }
+            }
+
+            $catSort = $inputs['sort'] ?? 'newest';
+            match ($catSort) {
+                'oldest'    => $categoriesQuery->oldest('id'),
+                'name_asc'  => $categoriesQuery->orderBy('name', 'asc'),
+                'name_desc' => $categoriesQuery->orderBy('name', 'desc'),
+                default     => $categoriesQuery->latest('id'),
+            };
+        } else {
+            $categoriesQuery->latest('id');
+        }
+
+        $categories = $categoriesQuery->paginate(10, ['*'], 'categories_page')->appends($inputs);
         $policyTemplates = PipPolicyTemplate::where('tenant_id', $tenantId)->latest('id')->paginate(10, ['*'], 'templates_page')->appends($inputs);
 
         $employees = Employee::where('tenant_id', $tenantId)->orderBy('full_name')->get();

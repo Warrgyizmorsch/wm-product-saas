@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Employee Documents Registry | SaaS ERP')
-@section('page-title', 'Employee Documents')
-@section('breadcrumb', 'HRMS / Employee Documents')
+@section('title', __('hrms.documents.meta_title'))
+@section('page-title', __('hrms.documents.title'))
+@section('breadcrumb', __('hrms.documents.breadcrumb'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-upload-cloud" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" class="fw-bold text-uppercase">
-            Upload Document
+            {{ __('hrms.documents.btn_upload_document') }}
         </x-ui.button>
     </div>
 @endsection
@@ -148,7 +148,7 @@
 
             @if($errors->any())
                 <x-ui.alert variant="danger" icon="feather-alert-octagon" dismissible class="mb-3">
-                    <h6 class="fw-bold mb-2">Please fix the errors:</h6>
+                    <h6 class="fw-bold mb-2">{{ __('hrms.documents.fix_errors') }}</h6>
                     <ul class="mb-0 ps-3">
                         @foreach($errors->all() as $error)
                             <li>{{ $error }}</li>
@@ -163,14 +163,14 @@
                     $registryTabs = [
                         [
                             'id' => 'tab-employee',
-                            'label' => 'Employee Uploaded',
+                            'label' => __('hrms.documents.tab_employee_uploaded'),
                             'active' => $activeTab === 'employee',
                             'icon' => 'feather-user',
                             'url' => request()->fullUrlWithQuery(['tab' => 'employee', 'page' => null]),
                         ],
                         [
                             'id' => 'tab-hr',
-                            'label' => 'HR Uploaded',
+                            'label' => __('hrms.documents.tab_hr_uploaded'),
                             'active' => $activeTab === 'hr',
                             'icon' => 'feather-shield',
                             'url' => request()->fullUrlWithQuery(['tab' => 'hr', 'page' => null]),
@@ -184,7 +184,7 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 pb-3 border-bottom mb-4">
                     <div>
                         <h5 class="fw-bold mb-0 text-dark" style="font-size: 15px;">
-                            {{ $activeTab === 'employee' ? 'Employee Uploaded Documents' : 'HR Uploaded Documents' }}
+                            {{ $activeTab === 'employee' ? __('hrms.documents.subheading_employee') : __('hrms.documents.subheading_hr') }}
                         </h5>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -195,41 +195,41 @@
                             <!-- Search Bar -->
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 280px; max-width: 340px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search employee or document..." value="{{ request('search') }}" style="box-shadow: none; height: 32px;">
+                                <input type="text" name="search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.documents.search_placeholder') }}" value="{{ request('search') }}" style="box-shadow: none; height: 32px;">
                             </div>
 
                             <!-- Sort and Filter Group -->
                             <div class="d-flex gap-2">
                                 <!-- Sort Options -->
-                                <x-ui.sort-dropdown label="Sort">
-                                    <a class="dropdown-item py-2 {{ request('sort', 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="applySort('newest'); return false;">Newest</a>
-                                    <a class="dropdown-item py-2 {{ request('sort') === 'oldest' ? 'active' : '' }}" href="#" onclick="applySort('oldest'); return false;">Oldest</a>
-                                    <a class="dropdown-item py-2 {{ request('sort') === 'employee_asc' ? 'active' : '' }}" href="#" onclick="applySort('employee_asc'); return false;">Employee Name (A-Z)</a>
-                                    <a class="dropdown-item py-2 {{ request('sort') === 'employee_desc' ? 'active' : '' }}" href="#" onclick="applySort('employee_desc'); return false;">Employee Name (Z-A)</a>
-                                    <a class="dropdown-item py-2 {{ request('sort') === 'doc_name_asc' ? 'active' : '' }}" href="#" onclick="applySort('doc_name_asc'); return false;">Document Name (A-Z)</a>
-                                    <a class="dropdown-item py-2 {{ request('sort') === 'doc_name_desc' ? 'active' : '' }}" href="#" onclick="applySort('doc_name_desc'); return false;">Document Name (Z-A)</a>
+                                <x-ui.sort-dropdown :label="__('hrms.documents.sort')">
+                                    <a class="dropdown-item py-2 {{ request('sort', 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="applySort('newest'); return false;">{{ __('hrms.documents.sort_newest') }}</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'oldest' ? 'active' : '' }}" href="#" onclick="applySort('oldest'); return false;">{{ __('hrms.documents.sort_oldest') }}</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'employee_asc' ? 'active' : '' }}" href="#" onclick="applySort('employee_asc'); return false;">{{ __('hrms.documents.sort_employee_asc') }}</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'employee_desc' ? 'active' : '' }}" href="#" onclick="applySort('employee_desc'); return false;">{{ __('hrms.documents.sort_employee_desc') }}</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'doc_name_asc' ? 'active' : '' }}" href="#" onclick="applySort('doc_name_asc'); return false;">{{ __('hrms.documents.sort_doc_asc') }}</a>
+                                    <a class="dropdown-item py-2 {{ request('sort') === 'doc_name_desc' ? 'active' : '' }}" href="#" onclick="applySort('doc_name_desc'); return false;">{{ __('hrms.documents.sort_doc_desc') }}</a>
                                 </x-ui.sort-dropdown>
 
                                 <!-- Filter Options -->
-                                <x-ui.filter label="Filter" offset="0, 5" :reset-url="route('hrms.documents.index', ['tab' => $activeTab])">
-                                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                <x-ui.filter :label="__('hrms.documents.filter')" offset="0, 5" :reset-url="route('hrms.documents.index', ['tab' => $activeTab])">
+                                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.documents.filter_options') }}</h6>
                                     
                                     <div class="mb-3" style="min-width: 220px;">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.documents.status') }}</label>
                                         <x-ui.odoo-form-ui type="select" name="status">
-                                            <option value="">All Statuses</option>
-                                            <option value="uploaded" {{ request('status') === 'uploaded' ? 'selected' : '' }}>Pending Verification</option>
-                                            <option value="pending_signature" {{ request('status') === 'pending_signature' ? 'selected' : '' }}>Pending Signature</option>
-                                            <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
-                                            <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
-                                            <option value="requested" {{ request('status') === 'requested' ? 'selected' : '' }}>Pending Upload</option>
+                                            <option value="">{{ __('hrms.documents.all_statuses') }}</option>
+                                            <option value="uploaded" {{ request('status') === 'uploaded' ? 'selected' : '' }}>{{ __('hrms.documents.status_pending_verification') }}</option>
+                                            <option value="pending_signature" {{ request('status') === 'pending_signature' ? 'selected' : '' }}>{{ __('hrms.documents.status_pending_signature') }}</option>
+                                            <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>{{ __('hrms.documents.status_approved') }}</option>
+                                            <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.documents.status_rejected') }}</option>
+                                            <option value="requested" {{ request('status') === 'requested' ? 'selected' : '' }}>{{ __('hrms.documents.status_pending_upload') }}</option>
                                         </x-ui.odoo-form-ui>
                                     </div>
 
                                     <div class="mb-3" style="min-width: 220px;">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Category</label>
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.documents.category') }}</label>
                                         <x-ui.odoo-form-ui type="select" name="category_id">
-                                            <option value="">All Categories</option>
+                                            <option value="">{{ __('hrms.documents.all_categories') }}</option>
                                             @foreach($categories as $cat)
                                                 <option value="{{ $cat->id }}" {{ request('category_id') == $cat->id ? 'selected' : '' }}>
                                                     {{ $cat->name }}
@@ -260,12 +260,12 @@
                         <table class="table table-hover align-middle mb-0" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3" style="width: {{ $canDeleteAnyDoc ? '25%' : '27%' }};">Employee</th>
-                                    <th style="width: {{ $canDeleteAnyDoc ? '23%' : '25%' }};">Document & Category</th>
-                                    <th style="width: {{ $canDeleteAnyDoc ? '26%' : '28%' }};">File Copy</th>
-                                    <th style="width: {{ $canDeleteAnyDoc ? '16%' : '20%' }};">Status & Expiry</th>
+                                    <th class="ps-3" style="width: {{ $canDeleteAnyDoc ? '25%' : '27%' }};">{{ __('hrms.documents.th_employee') }}</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '23%' : '25%' }};">{{ __('hrms.documents.th_document_category') }}</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '26%' : '28%' }};">{{ __('hrms.documents.th_file_copy') }}</th>
+                                    <th style="width: {{ $canDeleteAnyDoc ? '16%' : '20%' }};">{{ __('hrms.documents.th_status_expiry') }}</th>
                                     @if($canDeleteAnyDoc)
-                                        <th class="text-end pe-3" style="width: 10%;">Actions</th>
+                                        <th class="text-end pe-3" style="width: 10%;">{{ __('hrms.documents.th_actions') }}</th>
                                     @endif
                                 </tr>
                             </thead>
@@ -301,7 +301,7 @@
                                                     </div>
                                                 </div>
                                             @else
-                                                <span class="text-muted fs-11">N/A</span>
+                                                <span class="text-muted fs-11">{{ __('hrms.common.na') }}</span>
                                             @endif
                                         </td>
 
@@ -310,7 +310,7 @@
                                             <div class="fw-bold text-dark fs-13 text-truncate" title="{{ $doc->name }}">{{ $doc->name }}</div>
                                             <div class="mt-1">
                                                 <x-ui.badge soft variant="secondary" class="border px-1.5 py-0.5 fs-10">
-                                                    {{ $doc->documentMaster?->category?->name ?? 'Uncategorized' }}
+                                                    {{ $doc->documentMaster?->category?->name ?? __('hrms.documents.uncategorized') }}
                                                 </x-ui.badge>
                                             </div>
                                         </td>
@@ -331,7 +331,7 @@
                                                                 @if($doc->file_size)
                                                                     {{ number_format($doc->file_size / 1024, 1) }} KB
                                                                 @else
-                                                                    N/A
+                                                                    {{ __('hrms.common.na') }}
                                                                 @endif
                                                             </small>
                                                         </div>
@@ -340,17 +340,17 @@
                                                          @php
                                                              $activeDocFile = ($doc->is_signed && $doc->signed_file_path) ? $doc->signed_file_path : $doc->file_path;
                                                          @endphp
-                                                         <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $activeDocFile) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? 'View Signed Document' : 'View Copy' }}">
+                                                         <a href="{{ $doc->is_signed ? route('hrms.employees.documents.view-signed', $doc->id) : asset('storage/' . $activeDocFile) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? __('hrms.documents.view_signed_doc') : __('hrms.documents.view_copy') }}">
                                                              <i class="{{ $doc->is_signed ? 'feather-check-circle text-success' : 'feather-eye' }} fs-11"></i>
                                                          </a>
-                                                         <a href="{{ asset('storage/' . $activeDocFile) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? 'Download Signed Copy' : 'Download Copy' }}">
+                                                         <a href="{{ asset('storage/' . $activeDocFile) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ $doc->is_signed ? __('hrms.documents.download_signed_copy') : __('hrms.documents.download_copy') }}">
                                                              <i class="feather-download fs-11"></i>
                                                          </a>
                                                      </div>
                                                 </div>
                                             @else
                                                 <span class="text-muted fs-12" style="font-style: italic; font-weight: 500; padding-left: 8px;">
-                                                    <i class="feather-slash me-1 fs-11 text-muted"></i>No file uploaded
+                                                    <i class="feather-slash me-1 fs-11 text-muted"></i>{{ __('hrms.documents.no_file_uploaded') }}
                                                 </span>
                                             @endif
                                         </td>
@@ -369,11 +369,11 @@
                                                 @if(!$doc->file_path || $isExpired)
                                                     <x-ui.badge soft variant="warning" class="border px-2.5 py-1 fs-11 d-inline-flex align-items-center gap-1" style="font-weight: 500;">
                                                         <i class="feather-clock fs-11"></i>
-                                                        Pending Upload
+                                                        {{ __('hrms.documents.status_pending_upload') }}
                                                     </x-ui.badge>
                                                 @elseif($doc->status === 'pending_signature')
                                                     <x-ui.badge soft variant="warning" class="border px-2.5 py-1 fs-11 d-inline-flex align-items-center gap-1" style="font-weight: 600;">
-                                                        <i class="feather-edit-3 fs-11"></i> Pending Signature
+                                                        <i class="feather-edit-3 fs-11"></i> {{ __('hrms.documents.status_pending_signature') }}
                                                     </x-ui.badge>
                                                 @else
                                                     @if($requiresApproval && $canManageDocStatus)
@@ -384,11 +384,11 @@
                                                                   aria-expanded="false" 
                                                                   style="color: {{ $displayStatus === 'approved' ? '#10b981' : ($displayStatus === 'rejected' ? '#ef4444' : '#00bcd4') }};">
                                                                 @if($displayStatus === 'approved')
-                                                                    Approved
+                                                                    {{ __('hrms.documents.status_approved') }}
                                                                 @elseif($displayStatus === 'rejected')
-                                                                    Rejected
+                                                                    {{ __('hrms.documents.status_rejected') }}
                                                                 @else
-                                                                    Pending Verification
+                                                                    {{ __('hrms.documents.status_pending_verification') }}
                                                                 @endif
                                                             </span>
                                                             <ul class="dropdown-menu dropdown-menu-start shadow-sm status-dropdown-menu mt-1" aria-labelledby="docStatusDropdown_{{ $doc->id }}" style="z-index: 1050;">
@@ -396,7 +396,7 @@
                                                                     <button type="button" class="dropdown-item fw-bold text-success d-flex align-items-center justify-content-between gap-2" 
                                                                             onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'approved'); return false;"
                                                                             style="background: transparent; border: none; width: 100%;">
-                                                                        Approved
+                                                                        {{ __('hrms.documents.status_approved') }}
                                                                         @if($displayStatus === 'approved')
                                                                             <i class="feather-check text-success fs-14"></i>
                                                                         @endif
@@ -406,7 +406,7 @@
                                                                     <button type="button" class="dropdown-item fw-bold text-danger d-flex align-items-center justify-content-between gap-2" 
                                                                             onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'rejected'); return false;"
                                                                             style="background: transparent; border: none; width: 100%;">
-                                                                        Rejected
+                                                                        {{ __('hrms.documents.status_rejected') }}
                                                                         @if($displayStatus === 'rejected')
                                                                             <i class="feather-check text-danger fs-14"></i>
                                                                         @endif
@@ -416,13 +416,13 @@
                                                         </div>
                                                     @else
                                                         <span class="fw-bold fs-13" style="color: #10b981; font-weight: 700; text-transform: uppercase;">
-                                                            Approved
+                                                            {{ __('hrms.documents.status_approved') }}
                                                         </span>
                                                     @endif
                                                     @if($doc->is_signed)
                                                         <div class="mt-0.5">
-                                                            <x-ui.badge soft variant="success" class="border px-1.5 py-0.5 fs-9" title="Digitally Signed on {{ $doc->signed_at?->format('d M Y, H:i') }}">
-                                                                <i class="feather-check-circle fs-9 me-0.5"></i> Signed
+                                                            <x-ui.badge soft variant="success" class="border px-1.5 py-0.5 fs-9" title="{{ __('hrms.documents.digitally_signed_on', ['date' => $doc->signed_at?->format('d M Y, H:i')]) }}">
+                                                                <i class="feather-check-circle fs-9 me-0.5"></i> {{ __('hrms.documents.badge_signed') }}
                                                             </x-ui.badge>
                                                         </div>
                                                     @endif
@@ -433,16 +433,16 @@
                                             <div class="mt-1 text-muted fs-11">
                                                 @if($doc->expiry_date)
                                                     @if($isExpired)
-                                                        <x-ui.badge soft variant="danger" class="border"><i class="feather-alert-triangle me-1"></i>Expired ({{ $doc->expiry_date->format('d M Y') }})</x-ui.badge>
+                                                        <x-ui.badge soft variant="danger" class="border"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.documents.badge_expired', ['date' => $doc->expiry_date->format('d M Y')]) }}</x-ui.badge>
                                                     @elseif($isExpiringSoon)
-                                                        <x-ui.badge soft variant="warning" class="border"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M Y') }})</x-ui.badge>
+                                                        <x-ui.badge soft variant="warning" class="border"><i class="feather-clock me-1"></i>{{ __('hrms.documents.badge_near_expiry', ['date' => $doc->expiry_date->format('d M Y')]) }}</x-ui.badge>
                                                     @else
-                                                        <span><i class="feather-clock me-1"></i>Expiry: {{ $doc->expiry_date->format('d M Y') }}</span>
+                                                        <span><i class="feather-clock me-1"></i>{{ __('hrms.documents.lbl_expiry', ['date' => $doc->expiry_date->format('d M Y')]) }}</span>
                                                     @endif
                                                 @elseif($doc->has_expiry)
-                                                    <x-ui.badge soft variant="warning" class="border"><i class="feather-alert-circle me-1"></i>Expiry Required</x-ui.badge>
+                                                    <x-ui.badge soft variant="warning" class="border"><i class="feather-alert-circle me-1"></i>{{ __('hrms.documents.badge_expiry_required') }}</x-ui.badge>
                                                 @else
-                                                    <span class="text-success"><i class="feather-check-circle me-1"></i>No Expiry</span>
+                                                    <span class="text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.documents.badge_no_expiry') }}</span>
                                                 @endif
                                             </div>
                                         </td>
@@ -467,7 +467,7 @@
                                     <tr>
                                         <td colspan="{{ $canDeleteAnyDoc ? 5 : 4 }}" class="py-5 text-center text-muted">
                                             <i class="feather-file-text fs-24 mb-2 d-block"></i>
-                                            No documents found.
+                                            {{ __('hrms.documents.empty_documents') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -477,6 +477,7 @@
 
                 <div class="mt-3" id="documentsPaginationWrapper">
                     <x-ui.pagination 
+                        :paginator="$documents"
                         :currentPage="$documents->currentPage()" 
                         :totalPages="$documents->lastPage()" 
                         :totalResults="$documents->total()" 
@@ -497,24 +498,24 @@
     </form>
 
     <!-- Upload / Generate Document Modal -->
-    <x-ui.modal id="uploadDocumentModal" title="<i class='feather-file-plus text-primary me-1'></i> Add / Generate Employee Document" size="md" :showFooter="false" :centered="true">
+    <x-ui.modal id="uploadDocumentModal" :title="'<i class=\'feather-file-plus text-primary me-1\'></i> ' . __('hrms.documents.modal_title')" size="md" :showFooter="false" :centered="true">
         <form action="{{ route('hrms.documents.bulk-upload') }}" method="POST" enctype="multipart/form-data" id="bulkUploadForm" onsubmit="return validateBulkUploadForm(event, this);">
             @csrf
             <div>
                 <!-- Mode Switcher -->
                 <div class="p-3 bg-light rounded border mb-3">
-                    <label class="form-label fw-bold text-dark fs-12 mb-2 d-block">Select Operation Mode:</label>
+                    <label class="form-label fw-bold text-dark fs-12 mb-2 d-block">{{ __('hrms.documents.select_op_mode') }}</label>
                     <div class="d-flex gap-4">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="upload_mode" id="mode_file_upload" value="file" checked onchange="toggleUploadMode(this.value)">
                             <label class="form-check-label fw-bold text-dark fs-13" for="mode_file_upload">
-                                <i class="feather-upload-cloud me-1 text-primary"></i> Upload Local File
+                                <i class="feather-upload-cloud me-1 text-primary"></i> {{ __('hrms.documents.mode_upload_file') }}
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="upload_mode" id="mode_template_gen" value="generate" onchange="toggleUploadMode(this.value)">
                             <label class="form-check-label fw-bold text-primary fs-13" for="mode_template_gen">
-                                <i class="feather-zap me-1 text-warning"></i> Generate From Document Template
+                                <i class="feather-zap me-1 text-warning"></i> {{ __('hrms.documents.mode_generate_template') }}
                             </label>
                         </div>
                     </div>
@@ -522,8 +523,8 @@
 
                 <!-- Select Employee (Dropdown) -->
                 <div class="mb-3">
-                    <x-ui.odoo-form-ui type="select" label="Select Employee" name="employee_id" id="employee_id" :required="true" select2-selector="default">
-                        <option value="all" selected>All Employees</option>
+                    <x-ui.odoo-form-ui type="select" :label="__('hrms.documents.select_employee')" name="employee_id" id="employee_id" :required="true" select2-selector="default">
+                        <option value="all" selected>{{ __('hrms.documents.all_employees') }}</option>
                         @foreach($employees as $emp)
                             <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                         @endforeach
@@ -534,8 +535,8 @@
                 <div id="section_file_upload_mode">
                     <!-- Document Category Selection -->
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="select" label="Document Category" name="document_category_id" id="document_category_id" select2-selector="default" onchange="filterTemplatesByCategory(this)">
-                            <option value="">Choose Category...</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('hrms.documents.document_category')" name="document_category_id" id="document_category_id" select2-selector="default" onchange="filterTemplatesByCategory(this)">
+                            <option value="">{{ __('hrms.documents.choose_category') }}</option>
                             @foreach($categories as $cat)
                                 <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                             @endforeach
@@ -544,8 +545,8 @@
 
                     <!-- Document Master Selection -->
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="select" label="Document Master" name="document_master_id" id="document_master_id" select2-selector="default" disabled="disabled">
-                            <option value="">Choose Master...</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('hrms.documents.document_master')" name="document_master_id" id="document_master_id" select2-selector="default" disabled="disabled">
+                            <option value="">{{ __('hrms.documents.choose_master') }}</option>
                             @foreach($templates as $tmpl)
                                 <option value="{{ $tmpl->id }}" data-category-id="{{ $tmpl->document_category_id }}" data-expiry="{{ $tmpl->expiry_applicable ? '1' : '0' }}">{{ $tmpl->name }}</option>
                             @endforeach
@@ -554,49 +555,49 @@
 
                     <!-- File Upload -->
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="file" label="File Attachment" name="file" id="modal_upload_file" />
+                        <x-ui.odoo-form-ui type="file" :label="__('hrms.documents.file_attachment')" name="file" id="modal_upload_file" />
                     </div>
 
                     <!-- Expiry Date -->
                     <div class="mb-3 d-none" id="expiry-date-container">
-                        <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" id="modal_expiry_date" inputType="date" />
+                        <x-ui.odoo-form-ui type="input" :label="__('hrms.documents.expiry_date')" name="expiry_date" id="modal_expiry_date" inputType="date" />
                     </div>
                 </div>
 
                 <!-- Section for Generate Template Mode -->
                 <div id="section_template_gen_mode" class="d-none">
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui type="select" label="Select Document Template" name="document_template_id" id="modal_document_template_id" select2-selector="default">
-                            <option value="">Select Template...</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('hrms.documents.select_doc_template')" name="document_template_id" id="modal_document_template_id" select2-selector="default">
+                            <option value="">{{ __('hrms.documents.select_template_placeholder') }}</option>
                             @foreach($documentTemplates as $dt)
                                 <option value="{{ $dt->id }}">{{ $dt->name }} ({{ $dt->code }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
-                        <small class="text-muted mt-1 d-block">Selecting a template will auto-populate live profile details for the chosen employee.</small>
+                        <small class="text-muted mt-1 d-block">{{ __('hrms.documents.template_hint') }}</small>
                     </div>
 
                     <!-- HR DIGITAL SIGNATURE SECTION -->
                     <div class="p-3 bg-white border rounded mb-3">
-                        <h6 class="fw-bold text-dark fs-13 mb-2"><i class="feather-edit-3 text-warning me-1"></i> HR / Authoriser Signature Stamp</h6>
+                        <h6 class="fw-bold text-dark fs-13 mb-2"><i class="feather-edit-3 text-warning me-1"></i> {{ __('hrms.documents.hr_sig_stamp') }}</h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="HR Signer Name" name="hr_name" value="{{ auth()->user()->name }}" placeholder="e.g. {{ auth()->user()->name }}" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.documents.hr_signer_name')" name="hr_name" value="{{ auth()->user()->name }}" :placeholder="__('hrms.documents.hr_signer_name_placeholder', ['name' => auth()->user()->name])" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="HR Designation / Title" name="hr_designation" value="HR Manager" placeholder="e.g. HR Manager / Director" />
+                                <x-ui.odoo-form-ui type="input" :label="__('hrms.documents.hr_designation')" name="hr_designation" value="HR Manager" :placeholder="__('hrms.documents.hr_designation_placeholder')" />
                             </div>
                             <div class="col-12">
                                 <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                                    <label class="form-label fw-bold fs-12 text-dark mb-0 text-nowrap">HR Signature</label>
+                                    <label class="form-label fw-bold fs-12 text-dark mb-0 text-nowrap">{{ __('hrms.documents.hr_signature') }}</label>
                                     <ul class="nav nav-pills flex-nowrap bg-light p-1 rounded-pill border gap-1" id="docHrSigInputTabs" role="tablist">
                                         <li class="nav-item">
                                             <button type="button" id="btn_doc_hr_sig_draw" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold rounded-pill active border-0 btn-primary text-nowrap" style="background-color: var(--bs-primary) !important; color: #ffffff !important;" onclick="switchDocHrSigMode('draw')">
-                                                <i class="feather-edit-2 me-1"></i> Draw Signature
+                                                <i class="feather-edit-2 me-1"></i> {{ __('hrms.documents.draw_signature') }}
                                             </button>
                                         </li>
                                         <li class="nav-item">
                                             <button type="button" id="btn_doc_hr_sig_upload" class="nav-link btn-xs py-1 px-3 fs-11 fw-bold text-secondary rounded-pill border-0 text-nowrap" onclick="switchDocHrSigMode('upload')">
-                                                <i class="feather-upload-cloud me-1"></i> Upload Image
+                                                <i class="feather-upload-cloud me-1"></i> {{ __('hrms.documents.upload_image') }}
                                             </button>
                                         </li>
                                     </ul>
@@ -607,13 +608,13 @@
                                 <div id="doc_hr_sig_draw_container">
                                     <div class="d-flex justify-content-end mb-1">
                                         <x-ui.button type="button" variant="light" size="sm" class="border btn-xs py-0.5 px-2 fs-11" onclick="clearDocHrSigCanvas()">
-                                            <i class="feather-rotate-ccw me-1"></i>Clear Canvas
+                                            <i class="feather-rotate-ccw me-1"></i>{{ __('hrms.documents.clear_canvas') }}
                                         </x-ui.button>
                                     </div>
                                     <div class="border rounded bg-white p-1 text-center position-relative" style="border-color: #cbd5e1 !important;">
                                         <canvas id="docHrSignatureCanvas" width="400" height="100" style="touch-action: none; cursor: crosshair; background: #ffffff; width: 100%; height: 100px;"></canvas>
                                     </div>
-                                    <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> Draw HR signature using mouse or touch.</small>
+                                    <small class="text-muted fs-11 mt-1 d-block"><i class="feather-info me-1"></i> {{ __('hrms.documents.draw_sig_hint') }}</small>
                                 </div>
 
                                 <!-- UPLOAD HR SIGNATURE IMAGE TAB -->
@@ -623,8 +624,8 @@
                                         <div class="form-control d-flex flex-column align-items-center justify-content-center gap-1.5 p-3 text-center" style="border: 2px dashed rgba(var(--bs-primary-rgb, 59, 130, 246), 0.3); background-color: rgba(var(--bs-primary-rgb, 59, 130, 246), 0.02); border-radius: 8px; min-height: 110px;">
                                             <div id="doc_hr_sig_upload_preview_box" class="d-flex flex-column align-items-center justify-content-center">
                                                 <i class="feather-upload-cloud mb-1" style="font-size: 24px; color: var(--bs-primary);"></i>
-                                                <span class="fw-bold text-dark fs-12 file-name-label">Click to browse or drop HR signature image</span>
-                                                <small class="text-muted fs-10 mt-0.5">PNG or JPG transparent signature images recommended</small>
+                                                <span class="fw-bold text-dark fs-12 file-name-label">{{ __('hrms.documents.upload_sig_hint') }}</span>
+                                                <small class="text-muted fs-10 mt-0.5">{{ __('hrms.documents.upload_sig_subhint') }}</small>
                                             </div>
                                         </div>
                                     </div>
@@ -635,8 +636,8 @@
                 </div>
             </div>
             <div class="d-flex align-items-center justify-content-end gap-2 pt-3 border-top mt-3">
-                <x-ui.button type="button" variant="light" class="border fw-bold text-uppercase fs-11" data-bs-dismiss="modal">Close</x-ui.button>
-                <x-ui.button type="submit" variant="primary" class="fw-bold text-uppercase fs-11" id="btn_submit_modal_action">Submit & Save</x-ui.button>
+                <x-ui.button type="button" variant="light" class="border fw-bold text-uppercase fs-11" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                <x-ui.button type="submit" variant="primary" class="fw-bold text-uppercase fs-11" id="btn_submit_modal_action">{{ __('hrms.documents.btn_submit_save') }}</x-ui.button>
             </div>
         </form>
     </x-ui.modal>
@@ -645,15 +646,23 @@
 @push('scripts')
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script>
+        const docTrans = {
+            btnGenerateSave: @json('<i class="feather-zap me-1"></i> ' . __('hrms.documents.btn_generate_save')),
+            btnSubmitUpload: @json(__('hrms.documents.btn_submit_upload')),
+            chooseTemplate: @json(__('hrms.documents.choose_template')),
+            expiryDate: @json(__('hrms.documents.expiry_date')),
+            expiryDateRequired: @json(__('hrms.documents.expiry_date') . ' <span class="text-danger">*</span>')
+        };
+
         function toggleUploadMode(mode) {
             if (mode === 'generate') {
                 $('#section_file_upload_mode').addClass('d-none');
                 $('#section_template_gen_mode').removeClass('d-none');
-                $('#btn_submit_modal_action').html('<i class="feather-zap me-1"></i> Generate & Save Document');
+                $('#btn_submit_modal_action').html(docTrans.btnGenerateSave);
             } else {
                 $('#section_file_upload_mode').removeClass('d-none');
                 $('#section_template_gen_mode').addClass('d-none');
-                $('#btn_submit_modal_action').html('Submit Upload');
+                $('#btn_submit_modal_action').html(docTrans.btnSubmitUpload);
             }
         }
 
@@ -769,7 +778,7 @@
             var $templateSelect = $('#document_master_id');
 
             // Clear template options and add placeholder
-            $templateSelect.empty().append('<option value="">Choose Template...</option>');
+            $templateSelect.empty().append('<option value="">' + docTrans.chooseTemplate + '</option>');
 
             // Reset validation/expiry state
             $templateSelect.removeClass('is-invalid');
@@ -782,7 +791,7 @@
             $expiryContainer.find('.error-msg').addClass('d-none');
             $expiryInput.val('');
             var $label = $expiryContainer.find('.odoo-form-label');
-            $label.removeClass('text-danger').html('Expiry Date');
+            $label.removeClass('text-danger').html(docTrans.expiryDate);
             $expiryInput.prop('required', false);
 
             if (!selectedCategoryId) {
@@ -826,11 +835,11 @@
 
             if (requiresExpiry) {
                 $container.removeClass('d-none');
-                $label.addClass('text-danger').html('Expiry Date <span class="text-danger">*</span>');
+                $label.addClass('text-danger').html(docTrans.expiryDateRequired);
                 $expiryInput.prop('required', true);
             } else {
                 $container.addClass('d-none');
-                $label.removeClass('text-danger').html('Expiry Date');
+                $label.removeClass('text-danger').html(docTrans.expiryDate);
                 $expiryInput.prop('required', false);
             }
         }

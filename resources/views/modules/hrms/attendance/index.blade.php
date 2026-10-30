@@ -1118,8 +1118,31 @@
 
     window.activeRowMaps = window.activeRowMaps || {};
 
-    // Initialize Leaflet Map for a specific details row
+    // Initialize Leaflet Map or display App Route Snapshot for a specific details row
     function initializeRowMap(logId, log) {
+        const mapWrap = document.getElementById(`map-wrap-${logId}`);
+        const mapNone = document.getElementById(`map-none-${logId}`);
+
+        // 1. If Route Snapshot is available from Mobile App: Show the snapshot image directly!
+        if (log.route_snapshot_url) {
+            if (mapWrap) {
+                mapWrap.style.display = 'block';
+                mapWrap.innerHTML = `
+                    <div class="position-relative w-100 rounded-3 overflow-hidden border" style="height: 220px; background: #f8fafc;">
+                        <a href="${log.route_snapshot_url}" target="_blank" title="Click to open snapshot in full size">
+                            <img src="${log.route_snapshot_url}" alt="App Route Snapshot" class="w-100 h-100 object-fit-cover d-block" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'text-center py-5 text-muted\\'>Snapshot image could not be loaded</div>';">
+                        </a>
+                        <span class="badge bg-dark bg-opacity-75 text-white position-absolute bottom-0 end-0 m-2 fs-10 px-2 py-1 rounded">
+                            <i class="feather-maximize-2 me-1"></i> App Route Snapshot
+                        </span>
+                    </div>
+                `;
+            }
+            if (mapNone) mapNone.style.display = 'none';
+            return;
+        }
+
+        // 2. Otherwise (e.g. employee checked in/out via Web): Render interactive Leaflet Map with coordinates!
         const checkinLat = parseFloat(log.check_in_latitude);
         const checkinLng = parseFloat(log.check_in_longitude);
         const checkoutLat = parseFloat(log.check_out_latitude);
@@ -1130,16 +1153,16 @@
         const hasCheckout = !isNaN(checkoutLat) && !isNaN(checkoutLng) && checkoutLat !== 0 && checkoutLng !== 0;
         const hasLogs = locationLogs.length > 0;
         
-        const mapWrap = document.getElementById(`map-wrap-${logId}`);
-        const mapNone = document.getElementById(`map-none-${logId}`);
-        
         if (!hasCheckin && !hasCheckout && !hasLogs) {
             if (mapWrap) mapWrap.style.display = 'none';
             if (mapNone) mapNone.style.display = 'block';
             return;
         }
 
-        if (mapWrap) mapWrap.style.display = 'block';
+        if (mapWrap) {
+            mapWrap.style.display = 'block';
+            mapWrap.innerHTML = `<div id="map-${logId}" class="attendance-row-map" style="height: 220px; min-height: 220px; width: 100%; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; z-index: 1;"></div>`;
+        }
         if (mapNone) mapNone.style.display = 'none';
 
         if (typeof L === 'undefined') {

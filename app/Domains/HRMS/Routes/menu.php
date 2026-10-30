@@ -100,11 +100,11 @@ return [
     ],
     [
         'section' => 'hrms', 'order' => 130,
-        'label' => 'Helpdesk', 'icon' => 'feather-life-buoy',
+        'label' => 'hrms.helpdesk.menu_title', 'icon' => 'feather-life-buoy',
         'children' => [
-            ['label' => 'Tickets', 'route' => 'hrms.helpdesk.tickets.index', 'permission' => $selfService],
-            ['label' => 'Categories', 'route' => 'hrms.helpdesk.categories.index', 'permission' => ['hrms.helpdesk.manage', 'hr.settings.manage']],
-            ['label' => 'Knowledge Base', 'route' => 'hrms.helpdesk.kb.index', 'permission' => $selfService],
+            ['label' => 'hrms.helpdesk.menu_tickets', 'route' => 'hrms.helpdesk.tickets.index', 'permission' => $selfService],
+            ['label' => 'hrms.helpdesk.menu_categories', 'route' => 'hrms.helpdesk.categories.index', 'permission' => ['hrms.helpdesk.manage', 'hr.settings.manage']],
+            ['label' => 'hrms.helpdesk.menu_kb', 'route' => 'hrms.helpdesk.kb.index', 'permission' => $selfService],
         ],
     ],
     [
@@ -112,6 +112,7 @@ return [
         'label' => 'Payroll', 'icon' => 'feather-dollar-sign',
         'children' => [
             ['label' => 'Payroll Processing', 'route' => 'hrms.payroll.index', 'permission' => [...$hrAdmin, 'hrms.payroll.manage', 'hrms.payroll_runs.view', 'hrms.payroll_runs.create', 'hr.payroll.manage']],
+            ['label' => 'PF & ESI Returns', 'route' => 'hrms.payroll.statutory-returns.index', 'permission' => [...$hrAdmin, 'hrms.payroll.manage', 'hrms.payroll_runs.view', 'hrms.payroll_runs.create', 'hr.payroll.manage']],
             ['label' => 'My Payslips', 'route' => 'hrms.payroll.mySalary', 'permission' => $selfService],
         ],
     ],

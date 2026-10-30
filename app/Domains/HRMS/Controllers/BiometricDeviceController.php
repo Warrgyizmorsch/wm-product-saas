@@ -182,6 +182,18 @@ class BiometricDeviceController extends Controller
         }
 
         $lastPing = $biometricDevice->last_ping_at ? $biometricDevice->last_ping_at->diffForHumans() : 'Never';
+
+        // If direct TCP socket is blocked by NAT/Firewall but device recently sent an ADMS heartbeat
+        if ($biometricDevice->last_ping_at && $biometricDevice->last_ping_at->gt(now()->subMinutes(15))) {
+            return response()->json([
+                'success'   => true,
+                'connected' => true,
+                'mode'      => 'adms_push',
+                'message'   => "Direct TCP socket ({$ip}:{$port}) is unreachable (private LAN/NAT), but device is ONLINE and actively communicating via Cloud ADMS! (Last heartbeat: {$lastPing})",
+                'last_ping' => $biometricDevice->last_ping_at->format('d M Y, h:i A'),
+            ]);
+        }
+
         return response()->json([
             'success'   => false,
             'connected' => false,

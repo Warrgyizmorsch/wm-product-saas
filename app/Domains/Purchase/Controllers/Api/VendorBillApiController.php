@@ -18,8 +18,8 @@ class VendorBillApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -510,5 +510,23 @@ class VendorBillApiController extends Controller
             new \App\Exports\VendorBillExport($tenantId, $request->all()),
             'vendor_bills_export_' . date('Y-m-d_His') . '.xlsx'
         );
+    }
+
+    /**
+     * GET /api/purchase/bills/{id}/download-pdf
+     */
+    public function downloadPdf(int $id)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $bill = VendorBill::where('tenant_id', $tenantId)
+            ->with(['vendor', 'purchaseOrder', 'items.product'])
+            ->find($id);
+
+        if (!$bill) {
+            return response()->json(['success' => false, 'message' => 'Vendor Bill not found'], 404);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.bills.pdf', compact('bill'));
+        return $pdf->download("Bill_{$bill->bill_number}.pdf");
     }
 }

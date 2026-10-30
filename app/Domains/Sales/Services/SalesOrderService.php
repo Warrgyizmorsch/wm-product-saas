@@ -30,22 +30,47 @@ class SalesOrderService
 
     public function getNextSalesOrderNumber(): string
     {
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $year = now()->format('Y');
-        $prefix = "{$year}-";
 
-        $latest = SalesOrder::query()
-            ->where('sales_order_number', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->first();
+        // Fetch all order numbers for this tenant matching current year (handling DB raw column and prefixed formats)
+        $allNumbers = SalesOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($year) {
+                $q->where('sales_order_number', 'like', "{$year}-%")
+                  ->orWhere('sales_order_number', 'like', "SO-{$year}-%");
+            })
+            ->pluck('sales_order_number');
 
-        $nextNum = 1;
-        if ($latest) {
-            $rawNum = $latest->getRawOriginal('sales_order_number');
-            $lastNumStr = str_replace($prefix, '', $rawNum);
-            $nextNum = intval($lastNumStr) + 1;
+        $maxNum = 0;
+        foreach ($allNumbers as $soNum) {
+            $cleanNum = preg_replace('/^(SO-)?' . $year . '-/i', '', $soNum);
+            if (is_numeric($cleanNum)) {
+                $intVal = intval($cleanNum);
+                if ($intVal > $maxNum) {
+                    $maxNum = $intVal;
+                }
+            }
         }
 
-        return 'SO-' . $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $nextNum = $maxNum + 1;
+        $nextFormatted = str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        $nextDbNumber = "{$year}-{$nextFormatted}";
+
+        // Ensure uniqueness against both raw DB format (YYYY-XXXX) and model format (SO-YYYY-XXXX)
+        while (SalesOrder::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($nextDbNumber) {
+                $q->where('sales_order_number', $nextDbNumber)
+                  ->orWhere('sales_order_number', "SO-{$nextDbNumber}");
+            })
+            ->exists()) {
+            $nextNum++;
+            $nextFormatted = str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $nextDbNumber = "{$year}-{$nextFormatted}";
+        }
+
+        return "SO-{$nextDbNumber}";
     }
 
     public function create(array $data, array $items): SalesOrder

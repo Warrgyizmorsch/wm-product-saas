@@ -328,7 +328,7 @@ class LeadImportMapperService
         $dryRun = !empty($options['dry_run']);
         
         // Resolve tenant, company, and branch context
-        $resolvedCompanyId = $companyId ?? (company_id() ?? auth()->user()?->company_id ?? \App\Models\Company::where('tenant_id', $tenantId)->value('id') ?? 1);
+        $resolvedCompanyId = $companyId ?? (company_id() ?? auth()->user()?->company_id ?? \App\Models\Company::where('tenant_id', $tenantId)->where('is_default', true)->value('id') ?? \App\Models\Company::where('tenant_id', $tenantId)->value('id'));
         $resolvedBranchId = $branchId ?? (branch_id() ?? auth()->user()?->branch_id ?? \App\Models\Branch::where('company_id', $resolvedCompanyId)->value('id') ?? null);
 
         // Locate header row & map column names to indexes

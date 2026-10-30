@@ -335,12 +335,22 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         ]);
     }
 
-    public function checkOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null): Attendance
+    public function checkOut(int $attendanceId, ?float $latitude = null, ?float $longitude = null, ?string $selfiePath = null, mixed $routeSnapshot = null): Attendance
     {
         $selfiePath = $this->uploadSelfie($selfiePath, 'out');
         $attendance = Attendance::findOrFail($attendanceId);
 
         if (!empty($attendance->check_out)) {
+            if (!empty($routeSnapshot)) {
+                try {
+                    $snapshotPath = $this->uploadRouteSnapshot($routeSnapshot, $attendance->id);
+                    if ($snapshotPath) {
+                        $attendance->update(['route_snapshot_url' => $snapshotPath]);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Could not process route snapshot for Attendance #{$attendance->id}: " . $e->getMessage());
+                }
+            }
             return $attendance;
         }
 
@@ -513,16 +523,30 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             $this->applyAttendancePenalty($employee, $attendance->date->toDateString(), 'under_hours', $totalWorkHours, $status);
         }
 
-        $attendance->update([
+        $updateData = [
             'total_break_hours' => $totalBreakHours,
             'total_work_hours' => $totalWorkHours,
             'status' => $status,
             'check_out_latitude' => $latitude,
             'check_out_longitude' => $longitude,
             'check_out_selfie_path' => $selfiePath,
-        ]);
+        ];
 
-        // Consolidate location tracking route into polyline/snapshot and purge raw logs
+        // If route snapshot was sent from mobile app (file or base64), upload and save it
+        if (!empty($routeSnapshot)) {
+            try {
+                $snapshotPath = $this->uploadRouteSnapshot($routeSnapshot, $attendance->id);
+                if ($snapshotPath) {
+                    $updateData['route_snapshot_url'] = $snapshotPath;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Could not process route snapshot for Attendance #{$attendance->id}: " . $e->getMessage());
+            }
+        }
+
+        $attendance->update($updateData);
+
+        // Consolidate location tracking route into polyline and calculate distance, purge raw logs
         try {
             app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendance);
         } catch (\Throwable $e) {
@@ -951,6 +975,98 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         return null;
     }
 
+    /**
+     * Upload or decode route snapshot image sent from mobile app.
+     */
+    public function uploadRouteSnapshot(mixed $snapshotData, int $attendanceId): ?string
+    {
+        if (empty($snapshotData)) {
+            return null;
+        }
+
+        $storageDisk = 'public';
+        $storageDir = 'attendance/routes';
+
+        try {
+            // Ensure storage directories exist in both disk and public web root
+            if (!\Illuminate\Support\Facades\Storage::disk($storageDisk)->exists($storageDir)) {
+                \Illuminate\Support\Facades\Storage::disk($storageDisk)->makeDirectory($storageDir);
+            }
+            $pubDir = public_path("storage/{$storageDir}");
+            if (!file_exists($pubDir)) {
+                @mkdir($pubDir, 0777, true);
+            }
+
+            // 1. If it's an UploadedFile
+            if ($snapshotData instanceof \Illuminate\Http\UploadedFile) {
+                if (!$snapshotData->isValid()) {
+                    \Illuminate\Support\Facades\Log::warning("uploadRouteSnapshot: Uploaded file is not valid for Attendance #{$attendanceId}.");
+                    return null;
+                }
+                $ext = strtolower($snapshotData->getClientOriginalExtension()) ?: 'png';
+                $filename = "route_{$attendanceId}_" . time() . ".{$ext}";
+                $relPath = "{$storageDir}/{$filename}";
+
+                \Illuminate\Support\Facades\Storage::disk($storageDisk)->putFileAs($storageDir, $snapshotData, $filename);
+
+                // Mirror copy to public_path in case symlinks are missing on Windows/shared hosting
+                @copy($snapshotData->getRealPath(), public_path("storage/{$relPath}"));
+
+                return $relPath;
+            }
+
+            // 2. If it's a string
+            if (is_string($snapshotData)) {
+                $trimmed = trim($snapshotData);
+                if (empty($trimmed)) {
+                    return null;
+                }
+
+                // Already a saved URL or path
+                if (str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://') || str_starts_with($trimmed, 'attendance/routes/')) {
+                    return $trimmed;
+                }
+
+                // Base64 Data URI (e.g. data:image/png;base64,iVBOR...)
+                $ext = 'png';
+                $base64Content = $trimmed;
+                if (preg_match('/^data:image\/(\w+);base64,/', $trimmed, $matches)) {
+                    $matchedExt = strtolower($matches[1]);
+                    $ext = in_array($matchedExt, ['jpeg', 'jpg']) ? 'jpg' : ($matchedExt === 'webp' ? 'webp' : 'png');
+                    $base64Content = substr($trimmed, strpos($trimmed, ',') + 1);
+                }
+
+                // Strip accidental whitespace/newlines that may occur in mobile base64 serialization
+                $base64Content = preg_replace('/\s+/', '', $base64Content);
+
+                $decoded = base64_decode($base64Content);
+                if ($decoded !== false && strlen($decoded) > 0) {
+                    // Auto-detect image format from raw magic bytes if not specified by URI
+                    if (str_starts_with($decoded, "\xFF\xD8\xFF")) {
+                        $ext = 'jpg';
+                    } elseif (str_starts_with($decoded, "\x89PNG")) {
+                        $ext = 'png';
+                    } elseif (str_starts_with($decoded, "RIFF") && strpos(substr($decoded, 0, 16), "WEBP") !== false) {
+                        $ext = 'webp';
+                    }
+
+                    $relPath = "{$storageDir}/route_{$attendanceId}_" . time() . ".{$ext}";
+                    \Illuminate\Support\Facades\Storage::disk($storageDisk)->put($relPath, $decoded);
+
+                    // Mirror to public_path in case symlinks are missing on Windows/shared hosting
+                    @file_put_contents(public_path("storage/{$relPath}"), $decoded);
+
+                    return $relPath;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("uploadRouteSnapshot failed for Attendance #{$attendanceId}: " . $e->getMessage());
+            return null;
+        }
+
+        return null;
+    }
+
     public function trackLocation(int $employeeId, float $latitude, float $longitude): array
     {
         // Find employee active checked-in shift (within last 18 hours, supports day & overnight night shifts)
@@ -999,6 +1115,17 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
         // Fetch company rule
         $rule = \App\Domains\HRMS\Models\AttendanceRule::forEmployee($employee);
+
+        // Break Telemetry Privacy Mode: Suspend tracking during authorized breaks
+        if ($rule && !empty($rule->pause_tracking_on_break) && $attendance->isOnBreak()) {
+            return [
+                'status'           => 'paused_on_break',
+                'tracking'         => false,
+                'recorded'         => false,
+                'interval_minutes' => $rule->getTrackingMinutes($locationType),
+                'message'          => 'Periodic GPS tracking is suspended while on an authorized break.',
+            ];
+        }
 
         // If location tracking is NOT checked in Attendance Rules, SKIP IT completely
         if (!$rule || !$rule->isTrackingEnabled($locationType)) {

@@ -24,9 +24,10 @@ class DemoRequestController extends Controller
             abort(401);
         }
 
-        // Only Role ID 1 (Super Admin) or platform.tenants.manage can access
-        if ($user->role_id !== 1 && ! $this->access->allows($user, 'platform.tenants.manage')) {
-            abort(403, 'Access denied. Only Super Admin can manage demo requests.');
+        // role_id 1 is just whichever role row was inserted first, not "super admin" —
+        // only the permission decides.
+        if (! $this->access->allows($user, 'platform.leads.manage')) {
+            abort(403, 'Access denied. Only platform sales staff can manage demo requests.');
         }
     }
 

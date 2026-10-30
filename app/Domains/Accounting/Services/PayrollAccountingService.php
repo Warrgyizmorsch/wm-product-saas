@@ -99,9 +99,11 @@ class PayrollAccountingService
         $recoveryByEmployee = []; // employee id => advance / loan recovered this month
         $tdsByEmployee = [];      // employee id => TDS on salary (section 192)
         $grossByEmployee = [];    // employee id => salary earned after LOP
+        $calcs = [];              // employee id => salary calculation (PF / ESI returns)
 
         foreach ($employees as $employee) {
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
+            $calcs[$employee->id] = $calc;
             $items = $calc['items'] ?? $calc['computed_components'] ?? [];
 
             $empGrossEarned = 0.00;
@@ -286,6 +288,13 @@ class PayrollAccountingService
             \Illuminate\Support\Facades\Log::warning('Payroll: could not record salary TDS in the TDS register', ['run_id' => $run->id, 'error' => $e->getMessage()]);
         }
 
+        // Same for the PF ECR / ESIC return figures; `payroll:sync-statutory` fills gaps.
+        try {
+            app(\App\Domains\HRMS\Services\PayrollStatutoryService::class)->captureRun($run, $employees, $calcs, $journal->company_id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Payroll: could not record PF / ESI return lines', ['run_id' => $run->id, 'error' => $e->getMessage()]);
+        }
+
         return $journal;
     }
 
@@ -356,6 +365,53 @@ class PayrollAccountingService
                     : \App\Domains\Accounting\Models\TdsDeduction::REASON_NORMAL,
             ]);
         }
+    }
+
+    /**
+     * PF / ESI return lines for a run posted before they were kept: recalculates
+     * each employee and saves them only if PF and ESI (employee share plus the
+     * employer contribution booked on it) still add up to what the run's
+     * journal credited to PF Payable and ESI Payable.
+     */
+    public function backfillStatutoryLines(PayrollRun $run): bool
+    {
+        $tenantId = (int) $run->tenant_id;
+        $journal = $this->journalService->activePosting($tenantId, self::ACCRUAL_REFERENCE, $run->id);
+        $pfAccount = $this->systemAccounts->get('pf_payable', $tenantId);
+        $esiAccount = $this->systemAccounts->get('esi_payable', $tenantId);
+        $expense = $this->systemAccounts->get('employer_statutory_contribution', $tenantId);
+
+        if ($journal === null || $pfAccount === null || $esiAccount === null || $expense === null) {
+            return false;
+        }
+
+        $employees = $this->runEmployees($run);
+        $calcs = [];
+        $pf = 0.00;
+        $esi = 0.00;
+        foreach ($employees as $employee) {
+            $calcs[$employee->id] = $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
+            $pf += (float) ($calc['items']['PF']['calculated_value'] ?? 0);
+            $esi += (float) ($calc['items']['ESI']['calculated_value'] ?? 0);
+        }
+
+        $expected = [$pfAccount->id => round($pf, 2), $esiAccount->id => round($esi, 2)];
+        foreach ($this->employerContributionLines(round($pf, 2), round($esi, 2), $expense, $pfAccount, $esiAccount, (string) $run->payroll_month) as $line) {
+            if (isset($expected[$line['chart_of_account_id']])) {
+                $expected[$line['chart_of_account_id']] += (float) $line['credit'];
+            }
+        }
+
+        foreach ($expected as $accountId => $amount) {
+            $posted = (float) $journal->entries()->where('chart_of_account_id', $accountId)->sum('credit');
+            if (abs(round($amount, 2) - round($posted, 2)) > 0.01) {
+                return false;
+            }
+        }
+
+        app(\App\Domains\HRMS\Services\PayrollStatutoryService::class)->captureRun($run, $employees, $calcs, $journal->company_id);
+
+        return true;
     }
 
     /**

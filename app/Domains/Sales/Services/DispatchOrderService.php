@@ -25,9 +25,16 @@ class DispatchOrderService
         $materialRequirements = $this->dispatchRepo->getAllPendingMaterialRequirements();
 
         return $materialRequirements->map(function ($requirement) {
-            $itemsData = $requirement->items->map(function ($item) {
+            $itemsData = $requirement->items->filter(function ($item) {
+                if ($item->product && $item->product->isService()) {
+                    return false;
+                }
+                $relQty = $item->quantity_released !== null ? (float) $item->quantity_released : (float) $item->quantity;
+                return $relQty > 0 || in_array($item->status, ['Released', 'Picked', 'Packed', 'Dispatched']);
+            })->map(function ($item) {
                 $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForMRItem($item->id);
-                $remainingQty = max(0, (float) $item->quantity - $alreadyDispatched);
+                $relQty = $item->quantity_released !== null ? (float) $item->quantity_released : (float) $item->quantity;
+                $remainingQty = max(0.0, $relQty - $alreadyDispatched);
                 $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
 
                 return [
@@ -39,8 +46,8 @@ class DispatchOrderService
                     'warehouse_id' => $item->warehouse_id,
                     'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
                     'available_qty' => $unreservedAvail,
-                    'quantity_ordered' => (float) $item->quantity,
-                    'ordered_qty' => (float) $item->quantity,
+                    'quantity_ordered' => $relQty,
+                    'ordered_qty' => $relQty,
                     'quantity_reserved' => (float) ($item->quantity_reserved ?? 0),
                     'already_dispatched' => $alreadyDispatched,
                     'dispatched_qty' => $alreadyDispatched,
@@ -147,18 +154,34 @@ class DispatchOrderService
 
         $req = $mrId ? MaterialRequirement::find($mrId) : ($soId ? MaterialRequirement::where('sales_order_id', $soId)->first() : null);
         $finalSalesOrderId = $soId ?? $req?->sales_order_id;
+
+        if (!$req && $finalSalesOrderId) {
+            $soForMr = \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId);
+            if ($soForMr && $soForMr->requiresMaterialRequirement()) {
+                $req = app(\App\Domains\Sales\Repositories\SalesOrderRepository::class)->confirmOrder($soForMr);
+            }
+        }
+
         $finalMrId = $req?->id ?? $mrId;
         $tenantId = require_tenant_id();
 
         if ($finalSalesOrderId) {
             $so = \App\Domains\Sales\Models\SalesOrder::find($finalSalesOrderId);
-            if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped'])) {
+            if ($so && !in_array($so->status, ['Confirmed', 'Partially Shipped', 'In Fulfillment', 'Partially Delivered'])) {
                 throw new Exception("Sales Order {$so->sales_order_number} must be Confirmed before creating a Dispatch Order.");
+            }
+            if ($so && $so->hasOnlyServices()) {
+                throw new Exception("Sales Order {$so->sales_order_number} contains only service items. Services cannot be dispatched as they do not require physical shipping.");
             }
         }
 
         // 1. Remaining ordered qty & Stock availability validation
         foreach ($validated['items'] as $item) {
+            $product = Product::find($item['product_id']);
+            if ($product && $product->isService()) {
+                throw new Exception("Product '{$product->name}' is a service item and cannot be included in physical dispatch orders.");
+            }
+
             $mrItemId = $item['material_requirement_item_id'] ?? null;
             $mrItem = $mrItemId ? MaterialRequirementItem::find($mrItemId) : null;
             if (!$mrItem && !empty($finalSalesOrderId)) {
@@ -169,10 +192,11 @@ class DispatchOrderService
 
             if ($mrItem) {
                 $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForMRItem($mrItem->id);
-                $remainingQty = max(0, (float) $mrItem->quantity - $alreadyDispatched);
+                $relQty = $mrItem->quantity_released !== null ? (float)$mrItem->quantity_released : (float)$mrItem->quantity;
+                $remainingReleased = max(0.0, $relQty - $alreadyDispatched);
 
-                if ((float) $item['quantity'] > $remainingQty) {
-                    throw new Exception("Cannot dispatch {$item['quantity']} units for '{$mrItem->product?->name}'. Maximum remaining ordered quantity is {$remainingQty}.");
+                if ((float) $item['quantity'] > $remainingReleased) {
+                    throw new Exception("Cannot dispatch {$item['quantity']} units for '{$mrItem->product?->name}'. Maximum remaining released quantity for dispatch is {$remainingReleased}.");
                 }
             }
 
@@ -334,6 +358,22 @@ class DispatchOrderService
                 }
 
                 $item->update(['status' => 'Reserved']);
+
+                // Sync allocated_qty on linked SalesOrderItem
+                $soItem = $item->salesOrderItem;
+                if (!$soItem && !empty($dispatchData['sales_order_id'])) {
+                    $soItem = \App\Domains\Sales\Models\SalesOrderItem::where('sales_order_id', $dispatchData['sales_order_id'])
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                }
+                if ($soItem) {
+                    $soItem->increment('allocated_qty', $qtyToReserve);
+                    $soItem->refreshStatus();
+                }
+            }
+
+            if ($dispatch->salesOrder) {
+                $dispatch->salesOrder->refreshFulfillmentStatus();
             }
 
             return $dispatch;
@@ -464,9 +504,7 @@ class DispatchOrderService
 
             $dispatch->update(['status' => 'Confirmed']);
 
-            if ($dispatch->materialRequirement) {
-                $dispatch->materialRequirement->update(['status' => 'Processing']);
-            }
+            $this->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
 
             return $dispatch;
         });
@@ -542,6 +580,19 @@ class DispatchOrderService
 
                 $item->update(['status' => 'Shipped']);
 
+                // Sync sales_order_items line
+                $soItem = $item->salesOrderItem;
+                if (!$soItem && $dispatch->sales_order_id) {
+                    $soItem = \App\Domains\Sales\Models\SalesOrderItem::where('sales_order_id', $dispatch->sales_order_id)
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                }
+                if ($soItem) {
+                    $soItem->decrement('allocated_qty', min((float)$soItem->allocated_qty, $qtyToDispatch));
+                    $soItem->increment('dispatched_qty', $qtyToDispatch);
+                    $soItem->refreshStatus();
+                }
+
                 if ($mrItem) {
                     $mrOrdered = (float)($mrItem->quantity_ordered > 0 ? $mrItem->quantity_ordered : $mrItem->quantity);
                     $mrDispatched = (float)$mrItem->dispatched_qty;
@@ -555,37 +606,8 @@ class DispatchOrderService
 
             $dispatch->update(['status' => 'Shipped']);
 
-            // Update linked Material Requirement document status
-            if ($dispatch->materialRequirement) {
-                $mr = $dispatch->materialRequirement;
-                $allFullyDispatched = true;
-                foreach ($mr->items as $mi) {
-                    $mOrdered = (float)($mi->quantity_ordered > 0 ? $mi->quantity_ordered : $mi->quantity);
-                    $mDispatched = (float)$mi->dispatched_qty;
-                    if ($mDispatched < $mOrdered) {
-                        $allFullyDispatched = false;
-                    }
-                }
-
-                if ($allFullyDispatched) {
-                    $mr->update(['status' => 'Dispatched']);
-                } else {
-                    $mr->update(['status' => 'Processing']);
-                }
-            }
-
-            // Update linked Sales Order status
-            if ($dispatch->salesOrder) {
-                $so = $dispatch->salesOrder;
-                $totalOrdered = $so->items->sum('quantity');
-                $totalDispatched = $this->dispatchRepo->getDispatchedQtyForSalesOrder($so->id);
-
-                if ($totalDispatched >= $totalOrdered) {
-                    $so->update(['status' => 'Shipped']);
-                } else if ($totalDispatched > 0) {
-                    $so->update(['status' => 'Partially Shipped']);
-                }
-            }
+            // Synchronize fulfillment statuses across Material Requirement, MR Items, and Sales Order
+            $this->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
 
             try {
                 app(\App\Domains\Sales\Services\SalesAccountingService::class)->postDispatchOrderCogsJournal($dispatch);
@@ -595,5 +617,182 @@ class DispatchOrderService
 
             return $dispatch;
         });
+    }
+
+    /**
+     * Cancel an active (Pending/Confirmed) Dispatch Order.
+     * Releases stock reservations, reverts SO allocated_qty, and recalculates SO status.
+     *
+     * @throws Exception
+     */
+    public function cancelDispatchOrder(DispatchOrder $dispatch, ?string $reason = null): DispatchOrder
+    {
+        if (in_array($dispatch->status, ['Shipped', 'Dispatched', 'Delivered'])) {
+            throw new Exception("Cannot cancel Dispatch Order {$dispatch->dispatch_number} because it has already been shipped.");
+        }
+
+        if ($dispatch->status === 'Cancelled') {
+            return $dispatch;
+        }
+
+        return DB::transaction(function () use ($dispatch, $reason) {
+            $tenantId = $dispatch->tenant_id ?: (tenant_id() ?? 1);
+
+            foreach ($dispatch->items as $item) {
+                $qtyReserved = (float) ($item->quantity_dispatched ?? $item->quantity_ordered);
+
+                // Release warehouse reserved stock
+                $whStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                    ->where('product_id', $item->product_id)
+                    ->where('warehouse_id', $item->warehouse_id)
+                    ->first();
+
+                if ($whStock && (float) $whStock->reserved_qty > 0) {
+                    $revertReserved = min($qtyReserved, (float) $whStock->reserved_qty);
+                    $newReserved = max(0.0, (float) $whStock->reserved_qty - $revertReserved);
+                    $whStock->update([
+                        'reserved_qty' => $newReserved,
+                        'available_qty' => max(0.0, (float) $whStock->quantity - $newReserved),
+                    ]);
+                }
+
+                // Void stock reservations tied to this DO
+                \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+                    ->where('reference_type', 'DispatchOrder')
+                    ->where('reference_id', $dispatch->id)
+                    ->where('status', 'Active')
+                    ->update([
+                        'reserved_qty' => 0,
+                        'status' => 'Cancelled',
+                    ]);
+
+                // Revert allocated_qty on SalesOrderItem
+                $soItem = $item->salesOrderItem;
+                if (!$soItem && $dispatch->sales_order_id) {
+                    $soItem = \App\Domains\Sales\Models\SalesOrderItem::where('sales_order_id', $dispatch->sales_order_id)
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                }
+
+                if ($soItem) {
+                    $soItem->decrement('allocated_qty', min((float)$soItem->allocated_qty, $qtyReserved));
+                    $soItem->refreshStatus();
+                }
+
+                $item->update(['status' => 'Cancelled']);
+            }
+
+            $dispatch->update([
+                'status' => 'Cancelled',
+                'cancellation_reason' => $reason,
+            ]);
+
+            // Re-evaluate Sales Order status
+            if ($dispatch->salesOrder) {
+                $dispatch->salesOrder->refreshFulfillmentStatus();
+            }
+
+            $this->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
+
+            return $dispatch;
+        });
+    }
+
+    /**
+     * Synchronize fulfillment statuses across Material Requirement, MR Items, and Sales Order
+     * based on actual dispatched and delivered quantities from non-cancelled Dispatch Orders.
+     */
+    public function syncFulfillmentStatuses(int $salesOrderId, ?int $materialRequirementId = null): void
+    {
+        $mrQuery = MaterialRequirement::with(['items.product'])->withoutGlobalScopes();
+        if ($materialRequirementId) {
+            $mr = $mrQuery->find($materialRequirementId);
+        } else {
+            $mr = $mrQuery->where('sales_order_id', $salesOrderId)->first();
+        }
+
+        if ($mr) {
+            $physicalItems = $mr->items->filter(fn($i) => !($i->product && $i->product->isService()));
+            $totalOrdered = (float) $physicalItems->sum(fn($i) => (float)($i->quantity_ordered > 0 ? $i->quantity_ordered : $i->quantity));
+            $totalDispatched = (float) $physicalItems->sum(fn($i) => (float)$i->dispatched_qty);
+            $totalDelivered = (float) $physicalItems->sum(fn($i) => (float)$i->delivered_qty);
+            $totalReleased = (float) $physicalItems->sum(fn($i) => (float)($i->quantity_released ?? 0));
+
+            // Sync item-level status
+            foreach ($physicalItems as $item) {
+                $itemOrdered = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
+                $itemDelivered = (float)$item->delivered_qty;
+                $itemDispatched = (float)$item->dispatched_qty;
+                $itemReleased = (float)($item->quantity_released ?? 0);
+
+                if ($itemOrdered > 0 && $itemDelivered >= $itemOrdered) {
+                    $itemStatus = 'Delivered';
+                } elseif ($itemDelivered > 0) {
+                    $itemStatus = 'Partially Delivered';
+                } elseif ($itemOrdered > 0 && $itemDispatched >= $itemOrdered) {
+                    $itemStatus = 'Dispatched';
+                } elseif ($itemDispatched > 0) {
+                    $itemStatus = 'Partially Dispatched';
+                } elseif ($itemOrdered > 0 && $itemReleased >= $itemOrdered) {
+                    $itemStatus = 'Released';
+                } elseif ($itemReleased > 0) {
+                    $itemStatus = 'Partially Ready';
+                } else {
+                    $itemStatus = $item->status ?: 'Pending';
+                }
+
+                if ($item->status !== $itemStatus) {
+                    $item->update(['status' => $itemStatus]);
+                }
+            }
+
+            $totalReserved = (float) $physicalItems->sum(fn($i) => (float)$i->quantity_reserved);
+            $hasWaitingPurchase = $physicalItems->contains(fn($i) => in_array($i->status, ['Waiting Purchase', 'Partially PR Raised']));
+            $hasWaitingProduction = $physicalItems->contains(fn($i) => $i->status === 'Waiting Production');
+            $allPending = $physicalItems->every(fn($i) => in_array($i->status, ['Pending', 'Draft']) && (float)$i->quantity_reserved == 0 && (float)$i->quantity_released == 0 && (float)$i->dispatched_qty == 0 && (float)$i->delivered_qty == 0);
+
+            // Sync MR document status
+            if ($totalOrdered > 0 && $totalDelivered >= $totalOrdered) {
+                $mrStatus = 'Delivered';
+            } elseif ($totalDelivered > 0) {
+                $mrStatus = 'Partially Delivered';
+            } elseif ($totalOrdered > 0 && $totalDispatched >= $totalOrdered) {
+                $mrStatus = 'Dispatched';
+            } elseif ($totalDispatched > 0) {
+                $mrStatus = 'Partially Dispatched';
+            } elseif ($totalOrdered > 0 && $totalReleased >= $totalOrdered) {
+                $mrStatus = 'Released';
+            } elseif ($totalReleased > 0 || $totalReserved > 0) {
+                $mrStatus = 'Partially Ready';
+            } elseif ($hasWaitingPurchase || $hasWaitingProduction) {
+                $mrStatus = 'Processing';
+            } elseif ($allPending) {
+                $mrStatus = 'Pending';
+            } else {
+                $mrStatus = $mr->status ?: 'Processing';
+            }
+
+            if ($mr->status !== $mrStatus) {
+                $mr->update(['status' => $mrStatus]);
+            }
+        }
+
+        // Sync Sales Order status
+        if ($salesOrderId) {
+            $so = \App\Domains\Sales\Models\SalesOrder::withoutGlobalScopes()->find($salesOrderId);
+            if ($so) {
+                if (isset($totalOrdered) && $totalOrdered > 0 && isset($totalDelivered) && $totalDelivered >= $totalOrdered) {
+                    $so->update(['status' => 'Delivered']);
+                } elseif (isset($totalDelivered) && $totalDelivered > 0) {
+                    $so->update(['status' => 'Partially Delivered']);
+                } elseif (isset($totalOrdered) && $totalOrdered > 0 && isset($totalDispatched) && $totalDispatched >= $totalOrdered) {
+                    $so->update(['status' => 'Shipped']);
+                } elseif (isset($totalDispatched) && $totalDispatched > 0) {
+                    $so->update(['status' => 'Partially Shipped']);
+                } else {
+                    $so->refreshFulfillmentStatus();
+                }
+            }
+        }
     }
 }

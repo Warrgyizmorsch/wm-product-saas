@@ -62,9 +62,24 @@ interface Feedback360RepositoryInterface
     public function nominatePeers(int $participantId, array $peerIds, int $tenantId, ?User $user = null, array $directReportIds = []): array;
 
     /**
+     * Resolve the employee associated with a user in the current tenant.
+     */
+    public function resolveEmployee(?User $user, int $tenantId): ?\App\Domains\HRMS\Models\Employee;
+
+    /**
+     * Determine if a user has HR Administrative privileges for 360 Feedback.
+     */
+    public function isHrAdminUser(?User $user, int $tenantId): bool;
+
+    /**
+     * Determine if a given manager is the direct supervisor of a subordinate employee.
+     */
+    public function isManagerOf(?\App\Domains\HRMS\Models\Employee $manager, ?\App\Domains\HRMS\Models\Employee $subordinate, int $tenantId): bool;
+
+    /**
      * Delete a rater nomination from a participant's feedback roster.
      */
-    public function deleteNomination(int $nominationId, int $tenantId): bool;
+    public function deleteNomination(int $nominationId, int $tenantId, ?User $user = null): bool;
 
     /**
      * Manually add an individual rater (peer, direct report, or manager) to a participant.

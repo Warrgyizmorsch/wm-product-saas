@@ -3947,68 +3947,45 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         // 30. 360° Multi-Rater Feedback Reviews & Real Scores
-        $feedbackCycle = Feedback360Cycle::create([
-            'tenant_id'                   => $tenant->id,
-            'company_id'                  => $company->id,
-            'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
-            'code'                        => '360-REV-2026-H2',
-            'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
-            'start_date'                  => Carbon::parse('2026-10-01'),
-            'end_date'                    => Carbon::parse('2026-12-31'),
-            'nomination_deadline'         => Carbon::parse('2026-10-25'),
-            'submission_deadline'         => Carbon::parse('2026-11-30'),
-            'status'                      => 'in_progress',
-            'is_peer_anonymous'           => true,
-            'is_direct_report_anonymous'  => true,
-            'min_peer_nominations'        => 2,
-            'max_peer_nominations'        => 5,
-            'allow_self_nomination'       => true,
-            'require_manager_approval'    => true,
-            'created_by'                  => $users['company_admin']->id,
-        ]);
-
-        // Competencies
+        // Seed Competencies without obsolete columns (cycle_id, code, category, weightage)
         $compTech = Feedback360Competency::create([
             'tenant_id'   => $tenant->id,
             'company_id'  => $company->id,
-            'cycle_id'    => $feedbackCycle->id,
-            'name'        => 'SaaS Architecture & Technical Excellence',
-            'code'        => 'COMP-TECH',
-            'category'    => 'Technical Excellence',
+            'name'        => 'Technical Architecture & Code Quality',
             'description' => 'Clean code standards, multi-tenant safety, performance optimization, and architectural reliability.',
-            'weightage'   => 100.00,
             'is_active'   => true,
         ]);
 
         $compTeam = Feedback360Competency::create([
             'tenant_id'   => $tenant->id,
             'company_id'  => $company->id,
-            'cycle_id'    => $feedbackCycle->id,
             'name'        => 'Team Collaboration & Mentorship',
-            'code'        => 'COMP-TEAM',
-            'category'    => 'Interpersonal',
             'description' => 'Active knowledge sharing, constructive PR code reviews, empathy, and supporting junior teammates.',
-            'weightage'   => 100.00,
             'is_active'   => true,
         ]);
 
         $compOwner = Feedback360Competency::create([
             'tenant_id'   => $tenant->id,
             'company_id'  => $company->id,
-            'cycle_id'    => $feedbackCycle->id,
             'name'        => 'Ownership & Delivery Discipline',
-            'code'        => 'COMP-OWN',
-            'category'    => 'Operational Excellence',
             'description' => 'Proactive problem resolution, taking accountability for releases, and adhering to sprint commitments.',
-            'weightage'   => 100.00,
             'is_active'   => true,
         ]);
 
-        // Questions
+        $compComm = Feedback360Competency::create([
+            'tenant_id'   => $tenant->id,
+            'company_id'  => $company->id,
+            'name'        => 'Strategic Communication & Alignment',
+            'description' => 'Clear cross-functional stakeholder communication, transparency on blockers, and aligning with business goals.',
+            'is_active'   => true,
+        ]);
+
+        $competencyIds = [$compTech->id, $compTeam->id, $compOwner->id, $compComm->id];
+
+        // Seed Questions linked to competencies (without obsolete cycle_id column)
         $qTech1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compTech->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'How effectively does this employee write scalable, clean, and well-tested backend code?',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4019,7 +3996,6 @@ class HrmsDemoSeeder extends Seeder
         $qTech2 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compTech->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'Does the employee follow multi-tenant data isolation and security best practices?',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4030,7 +4006,6 @@ class HrmsDemoSeeder extends Seeder
         $qTeam1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compTeam->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'How constructively does this person conduct peer code reviews and offer helpful guidance?',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4041,7 +4016,6 @@ class HrmsDemoSeeder extends Seeder
         $qOwner1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
             'competency_id'        => $compOwner->id,
-            'cycle_id'             => $feedbackCycle->id,
             'question_text'        => 'Takes complete ownership of assigned sub-modules and proactively communicates blockers.',
             'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
@@ -4049,108 +4023,232 @@ class HrmsDemoSeeder extends Seeder
             'sort_order'           => 4,
         ]);
 
-        $qOpen1 = Feedback360Question::create([
+        $qComm1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
-            'competency_id'        => null,
-            'cycle_id'             => $feedbackCycle->id,
-            'question_text'        => 'What is this individual\'s greatest strength and standout contribution to the team?',
-            'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
-            'question_type'        => 'text',
+            'competency_id'        => $compComm->id,
+            'question_text'        => 'Communicates complex technical concepts with clarity across cross-functional teams.',
+            'question_type'        => 'rating_scale',
             'target_reviewer_type' => 'all',
-            'is_required'          => false,
+            'is_required'          => true,
             'sort_order'           => 5,
         ]);
 
-        $qOpen2 = Feedback360Question::create([
+        $qOpen1 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
-            'competency_id'        => null,
-            'cycle_id'             => $feedbackCycle->id,
-            'question_text'        => 'What are 1-2 actionable growth areas where this person can level up?',
-            'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
+            'competency_id'        => $compTeam->id,
+            'question_text'        => 'What is this individual\'s greatest strength and standout contribution to the team?',
+            'description'          => 'Highlight key achievements, qualities, and positive behaviors.',
             'question_type'        => 'text',
             'target_reviewer_type' => 'all',
             'is_required'          => false,
             'sort_order'           => 6,
         ]);
 
-        // Target Participant: Rahul Sharma (Software Engineer)
-        $targetEmployee = $employees[14] ?? $employees[0];
-        $managerEmployee = $employees[13] ?? $employees[1];
-        $peerEmployee1 = $employees[15] ?? $employees[2];
-        $peerEmployee2 = $employees[10] ?? $employees[3];
-
-        $participant = Feedback360Participant::create([
+        $qOpen2 = Feedback360Question::create([
             'tenant_id'            => $tenant->id,
-            'cycle_id'             => $feedbackCycle->id,
-            'employee_id'          => $targetEmployee->id,
-            'manager_id'           => $managerEmployee->id,
-            'status'               => 'in_progress',
-            'self_score'           => 4.5,
-            'manager_score'        => 4.6,
-            'peer_score'           => 4.4,
-            'direct_report_score'  => null,
-            'overall_score'        => 4.5,
-            'manager_summary'      => 'Rahul has shown stellar progress in backend API architecture and high sprint velocity.',
-            'development_plan'     => 'Focus on distributed cache invalidation strategies and end-to-end integration test coverage.',
+            'competency_id'        => $compComm->id,
+            'question_text'        => 'What are 1-2 actionable growth areas where this person can level up?',
+            'description'          => 'Provide constructive, forward-looking advice for technical or leadership growth.',
+            'question_type'        => 'text',
+            'target_reviewer_type' => 'all',
+            'is_required'          => false,
+            'sort_order'           => 7,
         ]);
 
-        // Reviewer Nominations & Completed Responses
-        // 1. Self Review
-        $nomSelf = Feedback360Nomination::create([
-            'tenant_id'      => $tenant->id,
-            'cycle_id'       => $feedbackCycle->id,
-            'participant_id' => $participant->id,
-            'employee_id'    => $targetEmployee->id,
-            'reviewer_id'    => $targetEmployee->id,
-            'reviewer_type'  => 'self',
-            'status'         => 'completed',
-            'submitted_at'   => Carbon::now()->subDays(5),
+        // Feedback Cycle 1: Active In Progress 360 Review
+        $feedbackCycle = Feedback360Cycle::create([
+            'tenant_id'                   => $tenant->id,
+            'company_id'                  => $company->id,
+            'name'                        => 'Q3-Q4 360° Leadership & Peer Performance Review 2026',
+            'code'                        => '360-REV-2026-H2',
+            'description'                 => 'Comprehensive multi-rater appraisal evaluating core technical excellence, cross-functional collaboration, ownership, and client empathy.',
+            'start_date'                  => Carbon::now()->subDays(20),
+            'end_date'                    => Carbon::now()->addDays(40),
+            'nomination_deadline'         => Carbon::now()->subDays(5),
+            'submission_deadline'         => Carbon::now()->addDays(25),
+            'status'                      => 'in_progress',
+            'is_peer_anonymous'           => true,
+            'is_direct_report_anonymous'  => true,
+            'min_peer_nominations'        => 2,
+            'max_peer_nominations'        => 5,
+            'allow_self_nomination'       => true,
+            'require_manager_approval'    => true,
+            'competency_ids'              => $competencyIds,
+            'created_by'                  => $users['company_admin']->id ?? null,
         ]);
 
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'rating_value' => 5.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+        // Safely resolve participants with zero hardcoded dependency
+        $allTenantEmployees = Employee::where('tenant_id', $tenant->id)->orderBy('id')->get();
 
-        // 2. Manager Review
-        $nomManager = Feedback360Nomination::create([
-            'tenant_id'      => $tenant->id,
-            'cycle_id'       => $feedbackCycle->id,
-            'participant_id' => $participant->id,
-            'employee_id'    => $targetEmployee->id,
-            'reviewer_id'    => $managerEmployee->id,
-            'reviewer_type'  => 'manager',
-            'status'         => 'completed',
-            'submitted_at'   => Carbon::now()->subDays(2),
-        ]);
+        $targetEmployee = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'rahul@warrg.com')->orWhere('personal_email', 'rahul@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(14) ?? $allTenantEmployees->first();
 
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id, 'rating_value' => 5.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'text_response' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+        $managerEmployee = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'priya@warrg.com')->orWhere('personal_email', 'priya@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(13) ?? $allTenantEmployees->get(1) ?? $targetEmployee;
 
-        // 3. Peer Review 1
-        $nomPeer1 = Feedback360Nomination::create([
-            'tenant_id'      => $tenant->id,
-            'cycle_id'       => $feedbackCycle->id,
-            'participant_id' => $participant->id,
-            'employee_id'    => $targetEmployee->id,
-            'reviewer_id'    => $peerEmployee1->id,
-            'reviewer_type'  => 'peer',
-            'status'         => 'completed',
-            'submitted_at'   => Carbon::now()->subDay(),
-        ]);
+        $peerEmployee1 = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'accountant@warrg.com')->orWhere('office_email', 'amit@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(10) ?? $allTenantEmployees->get(2) ?? $targetEmployee;
 
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id, 'rating_value' => 4.5]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'rating_value' => 5.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'rating_value' => 4.0]);
-        Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
+        $peerEmployee2 = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'hr.manager@warrg.com')->orWhere('office_email', 'sneha@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(9) ?? $allTenantEmployees->get(3) ?? $targetEmployee;
 
-        $participant->recalculateScores();
+        $directReportEmployee = Employee::where('tenant_id', $tenant->id)
+            ->where(fn($q) => $q->where('office_email', 'readonly@warrg.com')->orWhere('office_email', 'karan@warrg.com'))
+            ->first() ?? $allTenantEmployees->get(12) ?? $allTenantEmployees->get(4) ?? $targetEmployee;
+
+        // Ensure user accounts can access 360 reviews immediately when logged in
+        $adminUser = User::where('tenant_id', $tenant->id)->where('email', 'admin@example.com')->first();
+        if ($adminUser && $targetEmployee && empty($targetEmployee->user_id)) {
+            $targetEmployee->update(['user_id' => $adminUser->id]);
+        }
+
+        // Establish manager-subordinate relationships if needed
+        if ($targetEmployee && $managerEmployee && $targetEmployee->id !== $managerEmployee->id) {
+            $targetEmployee->update(['reporting_manager_id' => $managerEmployee->id]);
+        }
+        if ($directReportEmployee && $targetEmployee && $directReportEmployee->id !== $targetEmployee->id) {
+            $directReportEmployee->update(['reporting_manager_id' => $targetEmployee->id]);
+        }
+
+        if ($targetEmployee && $managerEmployee) {
+            $participant = Feedback360Participant::create([
+                'tenant_id'            => $tenant->id,
+                'cycle_id'             => $feedbackCycle->id,
+                'employee_id'          => $targetEmployee->id,
+                'manager_id'           => $managerEmployee->id,
+                'status'               => 'in_progress',
+                'manager_summary'      => 'Rahul has shown stellar progress in backend API architecture, clean system abstractions, and high sprint velocity.',
+                'development_plan'     => 'Focus on distributed cache invalidation strategies, cross-team architecture alignment, and end-to-end integration test coverage.',
+            ]);
+
+            // 1. Self Review (Completed)
+            $nomSelf = Feedback360Nomination::create([
+                'tenant_id'      => $tenant->id,
+                'cycle_id'       => $feedbackCycle->id,
+                'participant_id' => $participant->id,
+                'employee_id'    => $targetEmployee->id,
+                'reviewer_id'    => $targetEmployee->id,
+                'reviewer_type'  => 'self',
+                'status'         => 'completed',
+                'submitted_at'   => Carbon::now()->subDays(5),
+            ]);
+
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 5.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 4.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomSelf->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Successfully refactored HRMS repository layer and improved database query execution times by 40%.']);
+
+            // 2. Manager Review (Completed)
+            $nomManager = Feedback360Nomination::create([
+                'tenant_id'      => $tenant->id,
+                'cycle_id'       => $feedbackCycle->id,
+                'participant_id' => $participant->id,
+                'employee_id'    => $targetEmployee->id,
+                'reviewer_id'    => $managerEmployee->id,
+                'reviewer_type'  => 'manager',
+                'status'         => 'completed',
+                'submitted_at'   => Carbon::now()->subDays(2),
+            ]);
+
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 5.0]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.5]);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Rahul exhibits exceptional technical grit, consistently delivering zero-defect pull requests.']);
+            Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomManager->id, 'question_id' => $qOpen2->id, 'competency_id' => $compComm->id, 'text_response' => 'Encouraged to take on lead architecture roles in upcoming cross-module services.']);
+
+            // 3. Peer Review 1 (Completed)
+            if ($peerEmployee1 && $peerEmployee1->id !== $targetEmployee->id) {
+                $nomPeer1 = Feedback360Nomination::create([
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $peerEmployee1->id,
+                    'reviewer_type'  => 'peer',
+                    'status'         => 'completed',
+                    'is_anonymous'   => true,
+                    'submitted_at'   => Carbon::now()->subDay(),
+                ]);
+
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech1->id, 'competency_id' => $compTech->id, 'rating_value' => 4.5]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTech2->id, 'competency_id' => $compTech->id, 'rating_value' => 4.0]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qTeam1->id, 'competency_id' => $compTeam->id, 'rating_value' => 5.0]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOwner1->id, 'competency_id' => $compOwner->id, 'rating_value' => 4.0]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qComm1->id, 'competency_id' => $compComm->id, 'rating_value' => 4.5]);
+                Feedback360Response::create(['tenant_id' => $tenant->id, 'nomination_id' => $nomPeer1->id, 'question_id' => $qOpen1->id, 'competency_id' => $compTeam->id, 'text_response' => 'Always approachable, provides thorough and respectful code review feedback.']);
+            }
+
+            // 4. Peer Review 2 (Pending - shows actionable item under "My Reviews to Complete")
+            if ($peerEmployee2 && $peerEmployee2->id !== $targetEmployee->id) {
+                Feedback360Nomination::create([
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $peerEmployee2->id,
+                    'reviewer_type'  => 'peer',
+                    'status'         => 'approved',
+                    'is_anonymous'   => true,
+                ]);
+            }
+
+            // 5. Direct Report Upward Review (Pending)
+            if ($directReportEmployee && $directReportEmployee->id !== $targetEmployee->id) {
+                Feedback360Nomination::create([
+                    'tenant_id'      => $tenant->id,
+                    'cycle_id'       => $feedbackCycle->id,
+                    'participant_id' => $participant->id,
+                    'employee_id'    => $targetEmployee->id,
+                    'reviewer_id'    => $directReportEmployee->id,
+                    'reviewer_type'  => 'direct_report',
+                    'status'         => 'approved',
+                    'is_anonymous'   => true,
+                ]);
+            }
+
+            // 6. Actionable Review assigned to Target Employee (evaluating Manager Priya)
+            $participantManager = Feedback360Participant::create([
+                'tenant_id'   => $tenant->id,
+                'cycle_id'    => $feedbackCycle->id,
+                'employee_id' => $managerEmployee->id,
+                'manager_id'  => null,
+                'status'      => 'in_progress',
+            ]);
+
+            Feedback360Nomination::create([
+                'tenant_id'      => $tenant->id,
+                'cycle_id'       => $feedbackCycle->id,
+                'participant_id' => $participantManager->id,
+                'employee_id'    => $managerEmployee->id,
+                'reviewer_id'    => $targetEmployee->id,
+                'reviewer_type'  => 'direct_report',
+                'status'         => 'approved',
+                'is_anonymous'   => true,
+            ]);
+
+            // 7. Pending Peer Nomination (shows under "Nomination Approvals" tab)
+            Feedback360Nomination::create([
+                'tenant_id'         => $tenant->id,
+                'cycle_id'          => $feedbackCycle->id,
+                'participant_id'    => $participant->id,
+                'employee_id'       => $targetEmployee->id,
+                'reviewer_id'       => $directReportEmployee->id,
+                'reviewer_type'     => 'peer',
+                'status'            => 'pending_approval',
+                'nominated_by'      => $targetEmployee->id,
+                'nomination_reason' => 'Collaborated closely on frontend integration.',
+            ]);
+
+            $participant->recalculateScores();
+        }
             });
         } finally {
             Schema::enableForeignKeyConstraints();

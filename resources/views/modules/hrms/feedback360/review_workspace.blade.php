@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', '360° Review: ' . $nomination->employee?->full_name . ' | HRMS')
-@section('page-title', '360° Evaluation Workspace')
-@section('breadcrumb', 'HRMS / 360° Feedback / Review Workspace')
+@section('title', __('hrms.feedback_360.title_review_workspace', ['name' => $nomination->employee?->full_name]))
+@section('page-title', __('hrms.feedback_360.page_title_review_workspace'))
+@section('breadcrumb', __('hrms.feedback_360.breadcrumb_review_workspace'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.feedback360.index', ['active_tab' => 'my_reviews']) }}" class="border fw-semibold">
-            Back to Reviews
+            {{ __('hrms.feedback_360.btn_back_to_reviews') }}
         </x-ui.button>
     </div>
 @endsection
@@ -181,10 +181,10 @@
                             <h5 class="fw-bold text-dark mb-0">{{ $nomination->employee?->full_name }}</h5>
                             @php
                                 $roleBadge = match($nomination->reviewer_type) {
-                                    'self'          => ['bg' => 'bg-primary-subtle text-primary border border-primary-subtle', 'label' => 'Self Review'],
-                                    'manager'       => ['bg' => 'bg-purple-subtle text-purple border border-purple-subtle', 'label' => 'Direct Manager Review'],
-                                    'peer'          => ['bg' => 'bg-info-subtle text-info border border-info-subtle', 'label' => 'Peer Review'],
-                                    'direct_report' => ['bg' => 'bg-success-subtle text-success border border-success-subtle', 'label' => 'Upward Feedback (Direct Report)'],
+                                    'self'          => ['bg' => 'bg-primary-subtle text-primary border border-primary-subtle', 'label' => __('hrms.feedback_360.role_self_review_full')],
+                                    'manager'       => ['bg' => 'bg-purple-subtle text-purple border border-purple-subtle', 'label' => __('hrms.feedback_360.role_manager_review_full')],
+                                    'peer'          => ['bg' => 'bg-info-subtle text-info border border-info-subtle', 'label' => __('hrms.feedback_360.role_peer_review_full')],
+                                    'direct_report' => ['bg' => 'bg-success-subtle text-success border border-success-subtle', 'label' => __('hrms.feedback_360.role_upward_feedback_full')],
                                     default         => ['bg' => 'bg-light text-dark border', 'label' => ucfirst($nomination->reviewer_type)],
                                 };
                             @endphp
@@ -193,7 +193,7 @@
                             </span>
                         </div>
                         <div class="text-muted fs-12 mt-0.5">
-                            {{ $nomination->employee?->designation->name ?? 'Staff' }} &bull; {{ $nomination->employee?->department->name ?? 'General' }} &bull; Cycle: <strong>{{ $nomination->cycle?->name }}</strong>
+                            {{ $nomination->employee?->designation->name ?? 'Staff' }} &bull; {{ $nomination->employee?->department->name ?? 'General' }} &bull; {{ __('hrms.feedback_360.cycle_label') }} <strong>{{ $nomination->cycle?->name }}</strong>
                         </div>
                     </div>
                 </div>
@@ -202,7 +202,7 @@
                 @if($nomination->is_anonymous)
                     <div class="d-inline-flex align-items-center gap-2 bg-success-subtle text-success px-3 py-1.5 rounded-pill fs-12 fw-semibold border border-success-subtle">
                         <i class="feather-shield fs-13"></i>
-                        <span>Anonymous Feedback Protected</span>
+                        <span>{{ __('hrms.feedback_360.anonymous_feedback_protected') }}</span>
                     </div>
                 @endif
             </div>
@@ -212,7 +212,7 @@
         <div class="progress-track-wrapper p-3 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-1.5">
                 <span class="fs-12 fw-bold text-dark">
-                    <i class="feather-check-circle text-primary me-1"></i> Evaluation Progress: <span id="progressText">0 / 0 Answered</span>
+                    <i class="feather-check-circle text-primary me-1"></i> {{ __('hrms.feedback_360.evaluation_progress_label') }} <span id="progressText">0 / 0</span>
                 </span>
                 <span class="fs-12 fw-bold text-primary" id="progressPercent">0%</span>
             </div>
@@ -234,7 +234,7 @@
                             <p class="text-muted fs-11 mb-0 mt-0.5">{{ $groupQuestions->first()->competency->description }}</p>
                         @endif
                     </div>
-                    <span class="badge bg-white text-muted border fs-11 fw-semibold">{{ $groupQuestions->count() }} Question{{ $groupQuestions->count() > 1 ? 's' : '' }}</span>
+                    <span class="badge bg-white text-muted border fs-11 fw-semibold">{{ trans_choice('hrms.feedback_360.questions_count_label', $groupQuestions->count(), ['count' => $groupQuestions->count()]) }}</span>
                 </div>
 
                 <div class="p-0">
@@ -261,11 +261,11 @@
                                 <div class="segmented-rating-bar mt-1">
                                     @php
                                         $levels = [
-                                            1 => 'Needs Improvement',
-                                            2 => 'Developing',
-                                            3 => 'Proficient',
-                                            4 => 'Advanced',
-                                            5 => 'Role Model',
+                                            1 => __('hrms.feedback_360.level_1_needs_improvement'),
+                                            2 => __('hrms.feedback_360.level_2_developing'),
+                                            3 => __('hrms.feedback_360.level_3_proficient'),
+                                            4 => __('hrms.feedback_360.level_4_advanced'),
+                                            5 => __('hrms.feedback_360.level_5_role_model'),
                                         ];
                                     @endphp
                                     @foreach($levels as $val => $lbl)
@@ -280,7 +280,7 @@
                                 </div>
                             @else
                                 <div class="mt-2">
-                                    <textarea name="responses[{{ $q->id }}][text]" class="form-control text-input fs-13" rows="2" placeholder="Provide specific examples, strengths, or recommendations..." {{ $q->is_required ? 'required' : '' }}>{{ $curText }}</textarea>
+                                    <textarea name="responses[{{ $q->id }}][text]" class="form-control text-input fs-13" rows="2" placeholder="{{ __('hrms.feedback_360.textarea_response_placeholder') }}" {{ $q->is_required ? 'required' : '' }}>{{ $curText }}</textarea>
                                 </div>
                             @endif
                         </div>
@@ -292,14 +292,14 @@
         <!-- Sticky Floating Submit Bar -->
         <div class="bg-white p-3 shadow-sm rounded-3 border d-flex justify-content-between align-items-center sticky-bottom mb-4">
             <span class="text-muted fs-12 d-none d-sm-inline">
-                <i class="feather-info text-primary me-1"></i> Responses auto-save when submitted. You can update answers until the feedback deadline.
+                <i class="feather-info text-primary me-1"></i> {{ __('hrms.feedback_360.auto_save_notice') }}
             </span>
             <div class="d-flex gap-2 ms-auto">
                 <x-ui.button type="submit" variant="light" size="sm" icon="feather-save" name="submit_action" value="draft" formnovalidate class="border fw-semibold">
-                    Save Draft & Exit
+                    {{ __('hrms.feedback_360.btn_save_draft_exit') }}
                 </x-ui.button>
                 <x-ui.button type="button" variant="primary" size="sm" icon="feather-send" class="fw-bold px-3.5" data-bs-toggle="modal" data-bs-target="#confirmSubmitReviewModal">
-                    Submit 360 Feedback
+                    {{ __('hrms.feedback_360.btn_submit_360_feedback') }}
                 </x-ui.button>
             </div>
         </div>
@@ -313,21 +313,20 @@
 <!-- ========================================================================= -->
 <!-- MODAL: CONFIRM 360 REVIEW SUBMISSION -->
 <!-- ========================================================================= -->
-<x-ui.modal id="confirmSubmitReviewModal" title="Submit 360° Evaluation" size="md" :centered="true" :showFooter="false">
+<x-ui.modal id="confirmSubmitReviewModal" :title="__('hrms.feedback_360.modal_submit_feedback_title')" size="md" :centered="true" :showFooter="false">
     <div class="text-center py-2">
         <div class="avatar-initials bg-primary-subtle text-primary mx-auto mb-3" style="width: 54px; height: 54px; font-size: 22px;">
             <i class="feather-send"></i>
         </div>
-        <h5 class="fw-bold text-dark mb-1.5">Submit 360° Feedback?</h5>
+        <h5 class="fw-bold text-dark mb-1.5">{{ __('hrms.feedback_360.modal_submit_feedback_heading') }}</h5>
         <p class="text-muted fs-13 mb-3">
-            You are about to submit your evaluation for <strong>{{ $nomination->employee?->full_name }}</strong>. 
-            Once confirmed, your answers will be securely recorded in the cycle dataset.
+            {{ __('hrms.feedback_360.modal_submit_feedback_msg', ['name' => $nomination->employee?->full_name]) }}
         </p>
 
         <div class="p-3 bg-light rounded-3 border mb-4 text-start">
             <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="text-muted fs-12 fw-semibold">Questions Completed:</span>
-                <span class="fw-bold fs-13 text-primary" id="modalProgressText">0 / 0 Answered</span>
+                <span class="text-muted fs-12 fw-semibold">{{ __('hrms.feedback_360.questions_completed_label') }}</span>
+                <span class="fw-bold fs-13 text-primary" id="modalProgressText">0 / 0</span>
             </div>
             <div class="progress" style="height: 5px;">
                 <div id="modalProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%;"></div>
@@ -336,10 +335,10 @@
 
         <div class="d-flex justify-content-end gap-2 border-top pt-3">
             <x-ui.button variant="light" size="sm" class="border px-3" data-bs-dismiss="modal">
-                Keep Editing
+                {{ __('hrms.feedback_360.btn_keep_editing') }}
             </x-ui.button>
             <x-ui.button variant="primary" size="sm" icon="feather-check-circle" class="fw-bold px-4" id="confirmFinalSubmitBtn">
-                Confirm & Submit
+                {{ __('hrms.feedback_360.btn_confirm_submit') }}
             </x-ui.button>
         </div>
     </div>
@@ -368,7 +367,7 @@
 
             const percent = totalQuestions > 0 ? Math.round((answered / totalQuestions) * 100) : 0;
 
-            document.getElementById('progressText').textContent = `${answered} / ${totalQuestions} Answered`;
+            document.getElementById('progressText').textContent = `${answered} / ${totalQuestions}`;
             document.getElementById('progressPercent').textContent = `${percent}%`;
             document.getElementById('progressBar').style.width = `${percent}%`;
 
@@ -404,7 +403,7 @@
                 }
 
                 confirmBtn.disabled = true;
-                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Submitting...';
+                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + @json(__('hrms.feedback_360.btn_submitting'));
                 form.submit();
             });
         }

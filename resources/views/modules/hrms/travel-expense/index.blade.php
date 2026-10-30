@@ -1,36 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Travel & Expense Management | SaaS ERP')
-@section('page-title', 'Travel & Expenses')
-@section('breadcrumb', 'HRMS / Operations / Travel & Expenses')
+@section('title', __('hrms.travel_expense.meta_title'))
+@section('page-title', __('hrms.travel_expense.page_title'))
+@section('breadcrumb', __('hrms.travel_expense.breadcrumb'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
-        /* Underlined Horizontal Tabs (matching Shift Roster & Leave module) */
-        #expenseTabs .nav-link {
-            border: none !important;
-            background-color: transparent !important;
-            color: #64748b;
-            font-weight: 500;
-            padding: 12px 20px;
-            border-bottom: 2px solid transparent !important;
-            transition: all 0.2s ease-in-out;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        #expenseTabs .nav-link:hover {
-            color: var(--bs-primary);
-        }
-        #expenseTabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-            font-weight: 600;
-        }
-
-
         /* Clean Odoo style table layouts */
         #claimsLinesTable {
             width: 100% !important;
@@ -107,23 +84,67 @@
             box-sizing: border-box !important;
             vertical-align: middle !important;
         }
-        .expense-claims-table .form-select-sm,
-        .expense-claims-table select.category-select {
-            padding-top: 5px !important;
-            padding-bottom: 5px !important;
-            padding-left: 10px !important;
-            padding-right: 32px !important;
-            line-height: 24px !important;
-            background-position: right 10px center !important;
-            background-size: 12px 10px !important;
-        }
         .expense-claims-table .form-control-sm:focus,
-        .expense-claims-table .form-select-sm:focus,
-        .expense-claims-table select.category-select:focus {
+        .expense-claims-table .form-select-sm:focus {
             border-color: #3b82f6 !important;
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15) !important;
             outline: none !important;
             transform: none !important;
+        }
+        /* Select2 Common UI elements for Expense Table */
+        .expense-claims-table .select2-container--bootstrap-5 {
+            width: 100% !important;
+            display: block !important;
+        }
+        .expense-claims-table .select2-container--bootstrap-5 .select2-selection--single {
+            height: 36px !important;
+            min-height: 36px !important;
+            border-radius: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            padding: 0 10px !important;
+            display: flex !important;
+            align-items: center !important;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+        }
+        .expense-claims-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            color: #1e293b !important;
+            font-size: 13px !important;
+            line-height: 34px !important;
+            padding-left: 0 !important;
+            padding-right: 20px !important;
+        }
+        .expense-claims-table .select2-container--bootstrap-5.select2-container--focus .select2-selection--single,
+        .expense-claims-table .select2-container--bootstrap-5 .select2-selection--single:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15) !important;
+        }
+        .expense-claims-table .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            right: 8px !important;
+            width: 20px !important;
+            height: 20px !important;
+        }
+        body .select2-container--bootstrap-5 .select2-dropdown {
+            border-color: #cbd5e1 !important;
+            border-radius: 6px !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+            z-index: 1065 !important;
+        }
+        body .select2-container--bootstrap-5 .select2-results__option {
+            font-size: 13px !important;
+            padding: 8px 12px !important;
+            color: #1e293b !important;
+        }
+        body .select2-container--bootstrap-5 .select2-results__option--highlighted {
+            background-color: var(--bs-primary, #4f46e5) !important;
+            color: #ffffff !important;
+        }
+        body .select2-container--bootstrap-5 .select2-results__option[aria-selected="true"] {
+            background-color: color-mix(in srgb, var(--bs-primary, #4f46e5) 12%, #ffffff) !important;
+            color: var(--bs-primary, #4f46e5) !important;
+            font-weight: 600 !important;
         }
         .erp-custom-file-upload .file-upload-label {
             display: inline-flex !important;
@@ -176,55 +197,66 @@
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addTravelModal" id="btnRequestTravel" class="fw-bold text-uppercase">
-            Request Travel
+            {{ __('hrms.travel_expense.btn_request_travel') }}
         </x-ui.button>
         <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAdvanceModal" id="btnRequestAdvance" class="fw-bold text-uppercase d-none">
-            Request Advance
+            {{ __('hrms.travel_expense.btn_request_advance') }}
         </x-ui.button>
         <x-ui.button type="button" variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addReportModal" id="btnFileExpenseClaim" class="fw-bold text-uppercase d-none">
-            File Expense Claim
+            {{ __('hrms.travel_expense.btn_file_expense_claim') }}
         </x-ui.button>
     </div>
 @endsection
 
 @section('content')
     @php
+        $activeTab = $activeTab ?? request('tab', 'travel');
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $expenseTabs = [
+            [
+                'id' => 'travel',
+                'label' => __('hrms.travel_expense.tab_travel_requests'),
+                'active' => ($activeTab === 'travel'),
+                'icon' => 'feather-map-pin',
+                'badge' => $travelRequests->total() ?: null,
+            ],
+            [
+                'id' => 'advance',
+                'label' => __('hrms.travel_expense.tab_cash_advances'),
+                'active' => ($activeTab === 'advance'),
+                'icon' => 'feather-dollar-sign',
+                'badge' => $cashAdvances->total() ?: null,
+            ],
+            [
+                'id' => 'report',
+                'label' => __('hrms.travel_expense.tab_expense_claims'),
+                'active' => ($activeTab === 'report'),
+                'icon' => 'feather-file-text',
+                'badge' => $expenseReports->total() ?: null,
+            ],
+        ];
     @endphp
     @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show mb-4 text-dark" role="alert">
-            <i class="feather-check-circle me-2"></i>
+        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="mb-4">
             {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        </x-ui.alert>
+    @endif
+    @if(session('error'))
+        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible class="mb-4">
+            {{ session('error') }}
+        </x-ui.alert>
     @endif
 
     {{-- Tabs Workspace --}}
     <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-        <ul class="nav gap-2 border-bottom pb-2" id="expenseTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="travel-tab" data-bs-toggle="tab" data-bs-target="#travel-pane" type="button" role="tab" aria-controls="travel-pane" aria-selected="true">
-                    <i class="feather-map me-1"></i> Travel Requests
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link text-muted" id="advance-tab" data-bs-toggle="tab" data-bs-target="#advance-pane" type="button" role="tab" aria-controls="advance-pane" aria-selected="false">
-                    <i class="feather-dollar-sign me-1"></i> Cash Advances
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link text-muted" id="report-tab" data-bs-toggle="tab" data-bs-target="#report-pane" type="button" role="tab" aria-controls="report-pane" aria-selected="false">
-                    <i class="feather-file-text me-1"></i> Expense Reports
-                </button>
-            </li>
-        </ul>
+        <x-ui.horizontal-tabs id="expenseTabs" :tabs="$expenseTabs" :syncUrl="true" syncParam="tab" class="mb-3" />
 
-        <div class="tab-content pt-3" id="expenseTabsContent">
+        <div class="tab-content pt-2" id="expenseTabsContent">
             {{-- TRAVEL REQUESTS TAB PANE --}}
-            <div class="tab-pane fade show active" id="travel-pane" role="tabpanel" aria-labelledby="travel-tab">
+            <div class="tab-pane fade {{ $activeTab === 'travel' ? 'show active' : '' }}" id="travel" role="tabpanel" aria-labelledby="travel-tab">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0">Travel Requests</h5>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.travel_expense.tab_travel_requests') }}</h5>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <form method="GET" action="{{ route('hrms.travel-expense.index') }}" class="d-flex align-items-center gap-2 m-0 flex-wrap">
@@ -233,33 +265,33 @@
                             
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" name="travel_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search requests..." value="{{ $travelSearch ?? '' }}" style="box-shadow: none; height: 32px;">
+                                <input type="text" name="travel_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.travel_expense.search_requests') }}" value="{{ $travelSearch ?? '' }}" style="box-shadow: none; height: 32px;">
                             </div>
 
-                            <x-ui.sort-dropdown label="Sort">
+                            <x-ui.sort-dropdown :label="__('hrms.travel_expense.sort')">
                                 <a class="dropdown-item py-2 d-flex align-items-center {{ ($travelSort ?? 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="setSortParam('travel', 'newest'); event.preventDefault();">
-                                    <span>Newest First</span>
+                                    <span>{{ __('hrms.travel_expense.sort_newest') }}</span>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center {{ ($travelSort ?? '') === 'oldest' ? 'active' : '' }}" href="#" onclick="setSortParam('travel', 'oldest'); event.preventDefault();">
-                                    <span>Oldest First</span>
+                                    <span>{{ __('hrms.travel_expense.sort_oldest') }}</span>
                                 </a>
                             </x-ui.sort-dropdown>
 
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter :label="__('hrms.travel_expense.filter')" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.travel_expense.filter_options') }}</h6>
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.travel_expense.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="travel_status">
-                                        <option value="" {{ ($travelStatus ?? '') === '' ? 'selected' : '' }}>All Statuses</option>
-                                        <option value="pending" {{ ($travelStatus ?? '') === 'pending' ? 'selected' : '' }}>Pending</option>
-                                        <option value="approved" {{ ($travelStatus ?? '') === 'approved' ? 'selected' : '' }}>Approved</option>
-                                        <option value="rejected" {{ ($travelStatus ?? '') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                        <option value="" {{ ($travelStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.travel_expense.all_statuses') }}</option>
+                                        <option value="pending" {{ ($travelStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_pending') }}</option>
+                                        <option value="approved" {{ ($travelStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_approved') }}</option>
+                                        <option value="rejected" {{ ($travelStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="dropdown-divider my-3"></div>
                                 <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                                    <a href="{{ route('hrms.travel-expense.index', ['tab' => 'travel']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center">Reset</a>
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.travel_expense.apply') }}</x-ui.button>
+                                    <x-ui.button href="{{ route('hrms.travel-expense.index', ['tab' => 'travel']) }}" variant="light" size="sm" class="border flex-grow-1 text-center">{{ __('hrms.travel_expense.reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
                         </form>
@@ -269,13 +301,13 @@
                     <table class="table table-hover align-middle mb-0 travel-expense-table" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3" style="width: 16%;">Employee</th>
-                                <th style="width: 18%;">Purpose</th>
-                                <th style="width: 13%;">Destination</th>
-                                <th style="width: 13%;">Dates</th>
-                                <th style="width: 12%;">Budget</th>
-                                <th class="text-center" style="width: 13%;">Status</th>
-                                <th class="text-end pe-3" style="width: 15%; min-width: 150px; white-space: nowrap;">Actions</th>
+                                <th class="ps-3" style="width: 16%;">{{ __('hrms.travel_expense.th_employee') }}</th>
+                                <th style="width: 18%;">{{ __('hrms.travel_expense.th_purpose') }}</th>
+                                <th style="width: 13%;">{{ __('hrms.travel_expense.th_destination') }}</th>
+                                <th style="width: 13%;">{{ __('hrms.travel_expense.th_dates') }}</th>
+                                <th style="width: 12%;">{{ __('hrms.travel_expense.th_budget') }}</th>
+                                <th class="text-center" style="width: 13%;">{{ __('hrms.travel_expense.th_status') }}</th>
+                                <th class="text-end pe-3" style="width: 15%; min-width: 150px; white-space: nowrap;">{{ __('hrms.travel_expense.th_actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="travelTableBody">
@@ -283,19 +315,19 @@
                                 <tr>
                                     <td class="ps-3">
                                         <div class="fw-semibold text-dark">{{ $req->employee->full_name }}</div>
-                                        <div class="text-muted fs-11">Emp ID: {{ $req->employee->employee_id }}</div>
+                                        <div class="text-muted fs-11">{{ __('hrms.travel_expense.emp_id') }}: {{ $req->employee->employee_id }}</div>
                                     </td>
                                     <td>{{ $req->purpose }}</td>
                                     <td>{{ $req->destination }}</td>
                                     <td>
                                         <div class="text-dark fw-medium">{{ $req->start_date->format('M d, Y') }} - {{ $req->end_date->format('M d, Y') }}</div>
-                                        <div class="text-muted fs-11">{{ $req->start_date->diffInDays($req->end_date) + 1 }} Days</div>
+                                        <div class="text-muted fs-11">{{ $req->start_date->diffInDays($req->end_date) + 1 }} {{ __('hrms.travel_expense.days') }}</div>
                                     </td>
                                     <td class="fw-semibold">
                                         @if($req->status === 'approved' && $req->approved_budget)
                                             @if($req->approved_budget < $req->estimated_budget)
                                                 <div class="text-success">{{ $currencySymbol }}{{ number_format($req->approved_budget, 2) }}</div>
-                                                <div class="text-muted fs-11 text-decoration-line-through">Requested: {{ $currencySymbol }}{{ number_format($req->estimated_budget, 2) }}</div>
+                                                <div class="text-muted fs-11 text-decoration-line-through">{{ __('hrms.travel_expense.requested') }}: {{ $currencySymbol }}{{ number_format($req->estimated_budget, 2) }}</div>
                                             @else
                                                 <div>{{ $currencySymbol }}{{ number_format($req->approved_budget, 2) }}</div>
                                             @endif
@@ -307,19 +339,13 @@
                                             $activeReport = $req->expenseReports->where('status', '!=', 'rejected')->first();
                                         @endphp
                                         @if($activeReport)
-                                            <div class="mt-1 fs-11 text-primary fw-bold" title="Expense Claim filed for this trip">
-                                                <i class="feather-file-text me-0.5"></i>Claimed: {{ $currencySymbol }}{{ number_format($activeReport->approved_amount ?: $activeReport->total_amount, 2) }}
+                                            <div class="mt-1 fs-11 text-primary fw-bold" title="{{ __('hrms.travel_expense.expense_claim_filed_tip') }}">
+                                                <i class="feather-file-text me-0.5"></i>{{ __('hrms.travel_expense.claimed') }}: {{ $currencySymbol }}{{ number_format($activeReport->approved_amount ?: $activeReport->total_amount, 2) }}
                                             </div>
                                         @endif
                                     </td>
                                     <td class="text-center">
-                                        @if($req->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Approved</span>
-                                        @elseif($req->status === 'rejected')
-                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 rounded-pill"><i class="feather-x-circle me-1"></i>Rejected</span>
-                                        @else
-                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Pending</span>
-                                        @endif
+                                        <x-ui.status-badge :status="$req->status" :label="__('hrms.travel_expense.status_' . $req->status)" />
 
                                         @php
                                             $linkedAdv = $req->cashAdvances->first();
@@ -327,11 +353,11 @@
                                         @if($linkedAdv)
                                             <div class="mt-1 d-flex justify-content-center">
                                                 @if($linkedAdv->status === 'pending' || $linkedAdv->status === 'l1_approved')
-                                                    <span class="badge bg-soft-warning text-dark border border-warning-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="Cash Advance Requested"><i class="feather-dollar-sign me-0.5"></i>Advance: {{ $currencySymbol }}{{ number_format($linkedAdv->amount, 2) }}</span>
+                                                    <span class="badge bg-soft-warning text-dark border border-warning-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="{{ __('hrms.travel_expense.cash_advance_requested') }}"><i class="feather-dollar-sign me-0.5"></i>{{ __('hrms.travel_expense.advance_badge') }}: {{ $currencySymbol }}{{ number_format($linkedAdv->amount, 2) }}</span>
                                                 @elseif($linkedAdv->status === 'approved' || $linkedAdv->status === 'disbursed')
-                                                    <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="Cash Advance Approved"><i class="feather-check-circle me-0.5"></i>Advance Approved</span>
+                                                    <span class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="{{ __('hrms.travel_expense.cash_advance_approved') }}"><i class="feather-check-circle me-0.5"></i>{{ __('hrms.travel_expense.advance_approved_badge') }}</span>
                                                 @elseif($linkedAdv->status === 'rejected')
-                                                    <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="Cash Advance Rejected"><i class="feather-x-circle me-0.5"></i>Advance Rejected</span>
+                                                    <span class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-0.5 fs-10 fw-semibold d-inline-flex align-items-center" title="{{ __('hrms.travel_expense.cash_advance_rejected') }}"><i class="feather-x-circle me-0.5"></i>{{ __('hrms.travel_expense.advance_rejected_badge') }}</span>
                                                 @endif
                                             </div>
                                         @endif
@@ -344,12 +370,12 @@
                                         @if(in_array($req->status, ['pending', 'l1_approved']))
                                             @if($canApproveTr)
                                                 <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap" style="white-space: nowrap;">
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 px-2.5 fw-bold fs-11 text-nowrap" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">
-                                                        Approve
-                                                    </button>
+                                                    <x-ui.button type="button" variant="soft-success" size="sm" class="py-1 px-2.5 fw-bold fs-11 text-nowrap" data-bs-toggle="modal" data-bs-target="#approveTravelModal_{{ $req->id }}">
+                                                        {{ __('hrms.travel_expense.btn_approve') }}
+                                                    </x-ui.button>
                                                     <form method="POST" action="{{ route('hrms.travel-expense.travel.reject', $req) }}" class="m-0 d-inline-block">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-nowrap">Reject</button>
+                                                        <x-ui.button type="submit" variant="soft-danger" size="sm" class="py-1 px-2.5 fw-bold fs-11 text-nowrap">{{ __('hrms.travel_expense.btn_reject') }}</x-ui.button>
                                                     </form>
                                                 </div>
                                                 <!-- Modal to Approve Travel Request with Custom Budget & Linked Cash Advance -->
@@ -359,16 +385,16 @@
                                                             <form method="POST" action="{{ route('hrms.travel-expense.travel.approve', $req) }}">
                                                                 @csrf
                                                                 <div class="modal-header">
-                                                                    <h6 class="modal-title fw-bold" id="approveTravelModalLabel_{{ $req->id }}"><i class="feather-check-circle text-success me-1"></i> Approve Travel Request</h6>
+                                                                    <h6 class="modal-title fw-bold" id="approveTravelModalLabel_{{ $req->id }}"><i class="feather-check-circle text-success me-1"></i> {{ __('hrms.travel_expense.approve_travel_title') }}</h6>
                                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                 </div>
                                                                 <div class="modal-body d-flex flex-column gap-3">
-                                                                    <p class="fs-12 text-muted mb-0">Specify the approved budget for this trip. You can also approve the requested cash advance at the same time.</p>
+                                                                    <p class="fs-12 text-muted mb-0">{{ __('hrms.travel_expense.approve_travel_desc') }}</p>
                                                                     
                                                                     <div class="p-3 bg-light rounded border">
                                                                         <div class="row g-2 fs-12">
                                                                             <div class="col-6">
-                                                                                <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">Requested Budget</span>
+                                                                                <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.requested_budget') }}</span>
                                                                                 <strong class="text-dark">{{ $currencySymbol }}{{ number_format($req->estimated_budget, 2) }}</strong>
                                                                             </div>
                                                                             @php
@@ -376,42 +402,42 @@
                                                                             @endphp
                                                                             @if($pendingAdv)
                                                                                 <div class="col-6">
-                                                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">Requested Advance</span>
+                                                                                    <span class="text-muted d-block fs-10 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.requested_advance') }}</span>
                                                                                     <strong class="text-primary">{{ $currencySymbol }}{{ number_format($pendingAdv->amount, 2) }}</strong>
                                                                                 </div>
                                                                             @endif
                                                                         </div>
                                                                     </div>
 
-                                                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Budget" name="approved_budget" value="{{ $req->estimated_budget }}" step="0.01" min="0.01" :required="true" />
+                                                                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.travel_expense.approved_budget')" name="approved_budget" value="{{ $req->estimated_budget }}" step="0.01" min="0.01" :required="true" />
 
                                                                     @if($pendingAdv)
                                                                         <div class="p-3 bg-soft-info rounded border border-info-subtle mt-1">
                                                                             <div class="form-check ps-0 d-flex align-items-center gap-2 mb-2">
                                                                                 <input class="form-check-input mt-0 ms-0" type="checkbox" name="approve_cash_advance" value="1" id="approve_advance_cb_{{ $req->id }}" checked style="float: none;" onchange="document.getElementById('advance_amt_wrapper_{{ $req->id }}').classList.toggle('d-none', !this.checked)">
                                                                                 <label class="form-check-label fw-bold fs-12 text-dark mb-0" for="approve_advance_cb_{{ $req->id }}">
-                                                                                    <i class="feather-dollar-sign text-info me-1"></i>Also Approve Linked Cash Advance
+                                                                                    <i class="feather-dollar-sign text-info me-1"></i>{{ __('hrms.travel_expense.also_approve_advance') }}
                                                                                 </label>
                                                                             </div>
                                                                             <div id="advance_amt_wrapper_{{ $req->id }}">
-                                                                                <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Advance Amount" name="approved_advance_amount" value="{{ $pendingAdv->amount }}" step="0.01" min="0.01" />
+                                                                                <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.travel_expense.approved_advance_amount')" name="approved_advance_amount" value="{{ $pendingAdv->amount }}" step="0.01" min="0.01" />
                                                                             </div>
                                                                         </div>
                                                                     @endif
                                                                 </div>
                                                                 <div class="modal-footer">
-                                                                    <button type="button" class="btn btn-light border btn-sm text-uppercase fw-bold fs-11" data-bs-dismiss="modal">Cancel</button>
-                                                                    <button type="submit" class="btn btn-success btn-sm text-uppercase fw-bold fs-11">Approve</button>
+                                                                    <x-ui.button type="button" variant="light" size="sm" class="border text-uppercase fw-bold fs-11" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
+                                                                    <x-ui.button type="submit" variant="success" size="sm" class="text-uppercase fw-bold fs-11">{{ __('hrms.travel_expense.btn_approve') }}</x-ui.button>
                                                                 </div>
-                                                            </form>
+                                                             </form>
                                                         </div>
                                                     </div>
                                                 </div>
                                             @elseif($isTrOwner && in_array($req->status, ['pending', 'rejected']))
-                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.destroy', $req) }}" class="m-0" onsubmit="return confirm('Are you sure you want to cancel this travel request?');">
+                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.destroy', $req) }}" class="m-0" onsubmit="return confirm('{{ __('hrms.travel_expense.confirm_cancel_travel') }}');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Cancel Request"><i class="feather-trash-2 me-1"></i>Cancel</button>
+                                                    <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_cancel_request') }}">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
                                                 </form>
                                             @endif
                                         @elseif($req->status === 'approved')
@@ -424,24 +450,24 @@
                                                 @if($approvedAdv && $isAdmin)
                                                     <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $approvedAdv) }}" class="m-0">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Disburse Cash Advance ({{ $currencySymbol }}{{ number_format($approvedAdv->approved_amount ?? $approvedAdv->amount, 2) }})">
-                                                            <i class="feather-credit-card me-1"></i>Disburse Advance
-                                                        </button>
+                                                        <x-ui.button type="submit" variant="success" size="sm" icon="feather-credit-card" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_disburse_advance') }} ({{ $currencySymbol }}{{ number_format($approvedAdv->approved_amount ?? $approvedAdv->amount, 2) }})">
+                                                            {{ __('hrms.travel_expense.btn_disburse_advance') }}
+                                                        </x-ui.button>
                                                     </form>
                                                 @endif
 
                                                 @if($activeUnpaidReport)
                                                     @if($activeUnpaidReport->status === 'draft')
-                                                        <span class="badge bg-secondary text-white px-2 py-1 fs-11 rounded-pill"><i class="feather-file-text me-1"></i>Claim Drafted</span>
+                                                        <span class="badge bg-secondary text-white px-2 py-1 fs-11 rounded-pill"><i class="feather-file-text me-1"></i>{{ __('hrms.travel_expense.claim_drafted') }}</span>
                                                     @elseif($activeUnpaidReport->status === 'submitted')
-                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Claim Submitted</span>
+                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>{{ __('hrms.travel_expense.claim_submitted') }}</span>
                                                     @elseif($activeUnpaidReport->status === 'partially_approved')
-                                                        <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill"><i class="feather-alert-circle me-1"></i>Partially Approved</span>
+                                                        <span class="badge bg-soft-info text-info px-2 py-1 fs-11 rounded-pill"><i class="feather-alert-circle me-1"></i>{{ __('hrms.travel_expense.partially_approved') }}</span>
                                                     @elseif($activeUnpaidReport->status === 'approved')
-                                                        <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Claim Approved</span>
+                                                        <span class="badge bg-soft-success text-success px-2 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>{{ __('hrms.travel_expense.claim_approved') }}</span>
                                                     @endif
                                                 @elseif($paidReport)
-                                                    <span class="badge bg-soft-primary text-primary px-2 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Claim Paid</span>
+                                                    <span class="badge bg-soft-primary text-primary px-2 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>{{ __('hrms.travel_expense.claim_paid') }}</span>
                                                     @php
                                                         $hasPaidSupplementaryReq = $req->expenseReports->where('status', 'paid')->filter(function($r) {
                                                             return str_contains(strtolower($r->title), 'supplementary');
@@ -450,28 +476,30 @@
                                                         $showReqSupplementary = $hasRejectedInMainReq && !$hasPaidSupplementaryReq;
                                                     @endphp
                                                     @if($showReqSupplementary && ($isTrOwner || $isAdmin))
-                                                        <button type="button" 
-                                                                class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
+                                                        <x-ui.button type="button" 
+                                                                variant="soft-primary" size="sm" icon="feather-plus"
+                                                                class="py-1 fw-bold fs-11 claim-travel-expense-btn"
                                                                 data-travel-id="{{ $req->id }}"
                                                                 data-cash-advance-id="">
-                                                            <i class="feather-plus me-1"></i>Supplementary Claim
-                                                        </button>
+                                                            {{ __('hrms.travel_expense.btn_supplementary_claim') }}
+                                                        </x-ui.button>
                                                     @endif
                                                 @elseif($isTrOwner || $isAdmin)
-                                                    <button type="button" 
-                                                            class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-travel-expense-btn"
+                                                    <x-ui.button type="button" 
+                                                            variant="soft-primary" size="sm" icon="feather-dollar-sign"
+                                                            class="py-1 fw-bold fs-11 claim-travel-expense-btn"
                                                             data-travel-id="{{ $req->id }}"
                                                             data-cash-advance-id="{{ $req->cashAdvances->whereIn('status', ['approved', 'disbursed'])->whereNull('expense_report_id')->first()?->id ?? '' }}">
-                                                        <i class="feather-dollar-sign me-1"></i>Claim Expense
-                                                    </button>
+                                                        {{ __('hrms.travel_expense.btn_claim_expense') }}
+                                                    </x-ui.button>
                                                 @endif
                                             </div>
                                         @elseif($req->status === 'rejected' && ($isTrOwner || $isAdmin))
                                             <div class="d-flex justify-content-end gap-1">
-                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.destroy', $req) }}" class="m-0" onsubmit="return confirm('Are you sure you want to delete this rejected travel request?');">
+                                                <form method="POST" action="{{ route('hrms.travel-expense.travel.destroy', $req) }}" class="m-0" onsubmit="return confirm('{{ __('hrms.travel_expense.confirm_delete_travel') }}');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Delete Request"><i class="feather-trash-2 me-1"></i>Delete</button>
+                                                    <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_delete_request') }}">{{ __('hrms.travel_expense.btn_delete') }}</x-ui.button>
                                                 </form>
                                             </div>
                                         @else
@@ -481,29 +509,22 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">No travel requests found.</td>
+                                    <td colspan="7" class="text-center text-muted py-4">{{ __('hrms.travel_expense.no_travel_requests') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
-                @if($travelRequests->hasPages())
-                    <div class="mt-4 pt-2 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="text-muted fs-12">
-                            Showing {{ $travelRequests->firstItem() ?? 0 }} to {{ $travelRequests->lastItem() ?? 0 }} of {{ $travelRequests->total() }} records
-                        </div>
-                        <div class="d-flex justify-content-end">
-                            {{ $travelRequests->links() }}
-                        </div>
-                    </div>
-                @endif
+                <div class="mt-3" id="travelPaginationWrapper">
+                    <x-ui.pagination :paginator="$travelRequests" pageParam="travel_page" tab="travel" />
+                </div>
             </div>
 
             {{-- CASH ADVANCES TAB PANE --}}
-            <div class="tab-pane fade" id="advance-pane" role="tabpanel" aria-labelledby="advance-tab">
+            <div class="tab-pane fade {{ $activeTab === 'advance' ? 'show active' : '' }}" id="advance" role="tabpanel" aria-labelledby="advance-tab">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0">Cash Advances</h5>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.travel_expense.cash_advances') }}</h5>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <form method="GET" action="{{ route('hrms.travel-expense.index') }}" class="d-flex align-items-center gap-2 m-0 flex-wrap">
@@ -512,35 +533,35 @@
                             
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" name="advance_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search advances..." value="{{ $advanceSearch ?? '' }}" style="box-shadow: none; height: 32px;">
+                                <input type="text" name="advance_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.travel_expense.search_advances') }}" value="{{ $advanceSearch ?? '' }}" style="box-shadow: none; height: 32px;">
                             </div>
 
-                            <x-ui.sort-dropdown label="Sort">
+                            <x-ui.sort-dropdown :label="__('hrms.travel_expense.sort')">
                                 <a class="dropdown-item py-2 d-flex align-items-center {{ ($advanceSort ?? 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="setSortParam('advance', 'newest'); event.preventDefault();">
-                                    <span>Newest First</span>
+                                    <span>{{ __('hrms.travel_expense.newest_first') }}</span>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center {{ ($advanceSort ?? '') === 'oldest' ? 'active' : '' }}" href="#" onclick="setSortParam('advance', 'oldest'); event.preventDefault();">
-                                    <span>Oldest First</span>
+                                    <span>{{ __('hrms.travel_expense.oldest_first') }}</span>
                                 </a>
                             </x-ui.sort-dropdown>
 
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter :label="__('hrms.travel_expense.filter')" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.travel_expense.filter_options') }}</h6>
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.travel_expense.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="advance_status">
-                                        <option value="" {{ ($advanceStatus ?? '') === '' ? 'selected' : '' }}>All Statuses</option>
-                                        <option value="pending" {{ ($advanceStatus ?? '') === 'pending' ? 'selected' : '' }}>Pending</option>
-                                        <option value="approved" {{ ($advanceStatus ?? '') === 'approved' ? 'selected' : '' }}>Approved</option>
-                                        <option value="disbursed" {{ ($advanceStatus ?? '') === 'disbursed' ? 'selected' : '' }}>Disbursed</option>
-                                        <option value="settled" {{ ($advanceStatus ?? '') === 'settled' ? 'selected' : '' }}>Settled</option>
-                                        <option value="rejected" {{ ($advanceStatus ?? '') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                        <option value="" {{ ($advanceStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.travel_expense.all_statuses') }}</option>
+                                        <option value="pending" {{ ($advanceStatus ?? '') === 'pending' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_pending') }}</option>
+                                        <option value="approved" {{ ($advanceStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_approved') }}</option>
+                                        <option value="disbursed" {{ ($advanceStatus ?? '') === 'disbursed' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_disbursed') }}</option>
+                                        <option value="settled" {{ ($advanceStatus ?? '') === 'settled' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_settled') }}</option>
+                                        <option value="rejected" {{ ($advanceStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="dropdown-divider my-3"></div>
                                 <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                                    <a href="{{ route('hrms.travel-expense.index', ['tab' => 'advance']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center">Reset</a>
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.travel_expense.btn_apply') }}</x-ui.button>
+                                    <x-ui.button href="{{ route('hrms.travel-expense.index', ['tab' => 'advance']) }}" variant="light" size="sm" class="border flex-grow-1 text-center">{{ __('hrms.travel_expense.btn_reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
                         </form>
@@ -550,11 +571,11 @@
                     <table class="table table-hover align-middle mb-0 travel-expense-table" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3" style="width: 20%;">Employee</th>
-                                <th style="width: 15%;">Amount</th>
-                                <th style="width: 35%;">Purpose / Trip</th>
-                                <th class="text-center" style="width: 12%;">Status</th>
-                                <th class="text-end pe-3" style="width: 18%; min-width: 150px; white-space: nowrap;">Actions</th>
+                                <th class="ps-3" style="width: 20%;">{{ __('hrms.travel_expense.col_employee') }}</th>
+                                <th style="width: 15%;">{{ __('hrms.travel_expense.col_amount') }}</th>
+                                <th style="width: 35%;">{{ __('hrms.travel_expense.col_purpose_trip') }}</th>
+                                <th class="text-center" style="width: 12%;">{{ __('hrms.travel_expense.col_status') }}</th>
+                                <th class="text-end pe-3" style="width: 18%; min-width: 150px; white-space: nowrap;">{{ __('hrms.travel_expense.col_actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="advanceTableBody">
@@ -567,7 +588,7 @@
                                         @if(($adv->status === 'approved' || $adv->status === 'disbursed' || $adv->status === 'settled') && $adv->approved_amount)
                                             @if($adv->approved_amount != $adv->amount)
                                                 <div class="text-success">{{ $currencySymbol }}{{ number_format($adv->approved_amount, 2) }}</div>
-                                                <div class="text-muted fs-11 text-decoration-line-through">Requested: {{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</div>
+                                                <div class="text-muted fs-11 text-decoration-line-through">{{ __('hrms.travel_expense.requested') }}: {{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</div>
                                             @else
                                                 <div>{{ $currencySymbol }}{{ number_format($adv->approved_amount, 2) }}</div>
                                             @endif
@@ -578,21 +599,11 @@
                                     <td>
                                         <div class="text-dark">{{ $adv->purpose }}</div>
                                         @if($adv->travelRequest)
-                                            <div class="text-muted fs-11"><i class="feather-map me-1"></i>Trip to {{ $adv->travelRequest->destination }} ({{ $adv->travelRequest->purpose }})</div>
+                                            <div class="text-muted fs-11"><i class="feather-map me-1"></i>{{ __('hrms.travel_expense.trip_to') }} {{ $adv->travelRequest->destination }} ({{ $adv->travelRequest->purpose }})</div>
                                         @endif
                                     </td>
                                     <td class="text-center">
-                                        @if($adv->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Approved</span>
-                                        @elseif($adv->status === 'disbursed')
-                                            <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check me-1"></i>Disbursed</span>
-                                        @elseif($adv->status === 'settled')
-                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill">Settled</span>
-                                        @elseif($adv->status === 'rejected')
-                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 rounded-pill"><i class="feather-x-circle me-1"></i>Rejected</span>
-                                        @else
-                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Pending</span>
-                                        @endif
+                                        <x-ui.status-badge :status="$adv->status" :label="__('hrms.travel_expense.status_' . $adv->status)" />
                                     </td>
                                     <td class="text-end pe-3" style="white-space: nowrap;">
                                         @php
@@ -602,18 +613,18 @@
                                         @if(in_array($adv->status, ['pending', 'l1_approved']))
                                             <div class="d-flex justify-content-end align-items-center gap-1 flex-nowrap" style="white-space: nowrap;">
                                                 @if($canApproveAdv)
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 px-2.5 fw-bold fs-11 text-nowrap" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">
-                                                        Approve
-                                                    </button>
+                                                    <x-ui.button type="button" variant="soft-success" size="sm" class="py-1 px-2.5 fw-bold fs-11 text-nowrap" data-bs-toggle="modal" data-bs-target="#approveAdvanceModal_{{ $adv->id }}">
+                                                        {{ __('hrms.travel_expense.btn_approve') }}
+                                                    </x-ui.button>
                                                     <form method="POST" action="{{ route('hrms.travel-expense.advance.reject', $adv) }}" class="m-0 d-inline-block">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-nowrap">Reject</button>
+                                                        <x-ui.button type="submit" variant="soft-danger" size="sm" class="py-1 px-2.5 fw-bold fs-11 text-nowrap">{{ __('hrms.travel_expense.btn_reject') }}</x-ui.button>
                                                     </form>
                                                 @elseif($isAdvOwner && $adv->status === 'pending')
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.destroy', $adv) }}" class="m-0 d-inline-block" onsubmit="return confirm('Are you sure you want to cancel this cash advance request?');">
+                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.destroy', $adv) }}" class="m-0 d-inline-block" onsubmit="return confirm('{{ __('hrms.travel_expense.confirm_cancel_advance') }}');">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-uppercase text-nowrap" title="Cancel Cash Advance"><i class="feather-trash-2 me-1"></i>Cancel</button>
+                                                        <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" class="py-1 px-2.5 fw-bold fs-11 text-uppercase text-nowrap" title="{{ __('hrms.travel_expense.title_cancel_advance') }}">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
                                                     </form>
                                                 @endif
                                             </div>
@@ -626,22 +637,22 @@
                                                             <form method="POST" action="{{ route('hrms.travel-expense.advance.approve', $adv) }}">
                                                                 @csrf
                                                                 <div class="modal-header">
-                                                                    <h6 class="modal-title fw-bold" id="approveAdvanceModalLabel_{{ $adv->id }}"><i class="feather-check-circle text-success me-1"></i> Approve Cash Advance</h6>
+                                                                    <h6 class="modal-title fw-bold" id="approveAdvanceModalLabel_{{ $adv->id }}"><i class="feather-check-circle text-success me-1"></i> {{ __('hrms.travel_expense.approve_advance_title') }}</h6>
                                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                 </div>
                                                                 <div class="modal-body d-flex flex-column gap-3">
-                                                                    <p class="fs-12 text-muted mb-0">Specify the approved cash advance amount. You can partially approve a lower amount or adjust as needed.</p>
+                                                                    <p class="fs-12 text-muted mb-0">{{ __('hrms.travel_expense.approve_advance_desc') }}</p>
                                                                     
                                                                     <div class="p-3 bg-light rounded border">
-                                                                        <div class="fs-11 text-muted">Requested Amount</div>
+                                                                        <div class="fs-11 text-muted">{{ __('hrms.travel_expense.requested_amount') }}</div>
                                                                         <div class="fw-bold fs-15 text-dark">{{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</div>
                                                                     </div>
 
-                                                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Approved Amount" name="approved_amount" value="{{ $adv->amount }}" step="0.01" min="1" :required="true" />
+                                                                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.travel_expense.approved_amount')" name="approved_amount" value="{{ $adv->amount }}" step="0.01" min="1" :required="true" />
                                                                 </div>
                                                                 <div class="modal-footer">
-                                                                    <button type="button" class="btn btn-light border btn-sm text-uppercase fw-bold fs-11" data-bs-dismiss="modal">Cancel</button>
-                                                                    <button type="submit" class="btn btn-success btn-sm text-uppercase fw-bold fs-11">Approve</button>
+                                                                    <x-ui.button type="button" variant="light" size="sm" class="border text-uppercase fw-bold fs-11" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
+                                                                    <x-ui.button type="submit" variant="success" size="sm" class="text-uppercase fw-bold fs-11">{{ __('hrms.travel_expense.btn_approve') }}</x-ui.button>
                                                                 </div>
                                                             </form>
                                                         </div>
@@ -653,7 +664,7 @@
                                                 <div class="d-flex justify-content-end gap-1">
                                                     <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $adv) }}" class="m-0">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11"><i class="feather-dollar-sign me-1"></i>Disburse</button>
+                                                        <x-ui.button type="submit" variant="soft-primary" size="sm" icon="feather-dollar-sign" class="py-1 fw-bold fs-11">{{ __('hrms.travel_expense.btn_disburse') }}</x-ui.button>
                                                     </form>
                                                 </div>
                                             @else
@@ -661,10 +672,10 @@
                                             @endif
                                         @elseif($adv->status === 'rejected' && ($isAdvOwner || $isAdmin))
                                             <div class="d-flex justify-content-end gap-1">
-                                                <form method="POST" action="{{ route('hrms.travel-expense.advance.destroy', $adv) }}" class="m-0" onsubmit="return confirm('Are you sure you want to delete this rejected cash advance?');">
+                                                <form method="POST" action="{{ route('hrms.travel-expense.advance.destroy', $adv) }}" class="m-0" onsubmit="return confirm('{{ __('hrms.travel_expense.confirm_delete_advance') }}');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Delete Cash Advance"><i class="feather-trash-2 me-1"></i>Delete</button>
+                                                    <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_delete_advance') }}">{{ __('hrms.travel_expense.btn_delete') }}</x-ui.button>
                                                 </form>
                                             </div>
                                         @else
@@ -674,29 +685,22 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No cash advance requests found.</td>
+                                    <td colspan="5" class="text-center text-muted py-4">{{ __('hrms.travel_expense.no_cash_advances') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
-                @if($cashAdvances->hasPages())
-                    <div class="mt-4 pt-2 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="text-muted fs-12">
-                            Showing {{ $cashAdvances->firstItem() ?? 0 }} to {{ $cashAdvances->lastItem() ?? 0 }} of {{ $cashAdvances->total() }} records
-                        </div>
-                        <div class="d-flex justify-content-end">
-                            {{ $cashAdvances->links() }}
-                        </div>
-                    </div>
-                @endif
+                <div class="mt-3" id="advancePaginationWrapper">
+                    <x-ui.pagination :paginator="$cashAdvances" pageParam="advance_page" tab="advance" />
+                </div>
             </div>
 
             {{-- EXPENSE REPORTS TAB PANE --}}
-            <div class="tab-pane fade" id="report-pane" role="tabpanel" aria-labelledby="report-tab">
+            <div class="tab-pane fade {{ $activeTab === 'report' ? 'show active' : '' }}" id="report" role="tabpanel" aria-labelledby="report-tab">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0">Expense Claims</h5>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.travel_expense.expense_claims') }}</h5>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <form method="GET" action="{{ route('hrms.travel-expense.index') }}" class="d-flex align-items-center gap-2 m-0 flex-wrap">
@@ -705,35 +709,35 @@
                             
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" name="report_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search claims..." value="{{ $reportSearch ?? '' }}" style="box-shadow: none; height: 32px;">
+                                <input type="text" name="report_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.travel_expense.search_claims') }}" value="{{ $reportSearch ?? '' }}" style="box-shadow: none; height: 32px;">
                             </div>
 
-                            <x-ui.sort-dropdown label="Sort">
+                            <x-ui.sort-dropdown :label="__('hrms.travel_expense.sort')">
                                 <a class="dropdown-item py-2 d-flex align-items-center {{ ($reportSort ?? 'newest') === 'newest' ? 'active' : '' }}" href="#" onclick="setSortParam('report', 'newest'); event.preventDefault();">
-                                    <span>Newest First</span>
+                                    <span>{{ __('hrms.travel_expense.newest_first') }}</span>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center {{ ($reportSort ?? '') === 'oldest' ? 'active' : '' }}" href="#" onclick="setSortParam('report', 'oldest'); event.preventDefault();">
-                                    <span>Oldest First</span>
+                                    <span>{{ __('hrms.travel_expense.oldest_first') }}</span>
                                 </a>
                             </x-ui.sort-dropdown>
 
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter :label="__('hrms.travel_expense.filter')" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.travel_expense.filter_options') }}</h6>
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.travel_expense.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="report_status">
-                                        <option value="" {{ ($reportStatus ?? '') === '' ? 'selected' : '' }}>All Statuses</option>
-                                        <option value="draft" {{ ($reportStatus ?? '') === 'draft' ? 'selected' : '' }}>Draft</option>
-                                        <option value="submitted" {{ ($reportStatus ?? '') === 'submitted' ? 'selected' : '' }}>Submitted</option>
-                                        <option value="approved" {{ ($reportStatus ?? '') === 'approved' ? 'selected' : '' }}>Approved</option>
-                                        <option value="paid" {{ ($reportStatus ?? '') === 'paid' ? 'selected' : '' }}>Paid</option>
-                                        <option value="rejected" {{ ($reportStatus ?? '') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                        <option value="" {{ ($reportStatus ?? '') === '' ? 'selected' : '' }}>{{ __('hrms.travel_expense.all_statuses') }}</option>
+                                        <option value="draft" {{ ($reportStatus ?? '') === 'draft' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_draft') }}</option>
+                                        <option value="submitted" {{ ($reportStatus ?? '') === 'submitted' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_submitted') }}</option>
+                                        <option value="approved" {{ ($reportStatus ?? '') === 'approved' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_approved') }}</option>
+                                        <option value="paid" {{ ($reportStatus ?? '') === 'paid' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_paid') }}</option>
+                                        <option value="rejected" {{ ($reportStatus ?? '') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.travel_expense.status_rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="dropdown-divider my-3"></div>
                                 <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                                    <a href="{{ route('hrms.travel-expense.index', ['tab' => 'report']) }}" class="btn btn-light btn-sm border flex-grow-1 text-center">Reset</a>
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.travel_expense.btn_apply') }}</x-ui.button>
+                                    <x-ui.button href="{{ route('hrms.travel-expense.index', ['tab' => 'report']) }}" variant="light" size="sm" class="border flex-grow-1 text-center">{{ __('hrms.travel_expense.btn_reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
                         </form>
@@ -743,11 +747,11 @@
                     <table class="table table-hover align-middle mb-0 travel-expense-table" style="font-size: 13px;">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3" style="width: 22%;">Employee / Title</th>
-                                <th style="width: 28%;">Claim Items</th>
-                                <th style="width: 24%;">Totals</th>
-                                <th class="text-center" style="width: 12%;">Status</th>
-                                <th class="text-end pe-3" style="width: 14%; min-width: 160px; white-space: nowrap;">Actions</th>
+                                <th class="ps-3" style="width: 22%;">{{ __('hrms.travel_expense.col_employee_title') }}</th>
+                                <th style="width: 28%;">{{ __('hrms.travel_expense.col_claim_items') }}</th>
+                                <th style="width: 24%;">{{ __('hrms.travel_expense.col_totals') }}</th>
+                                <th class="text-center" style="width: 12%;">{{ __('hrms.travel_expense.col_status') }}</th>
+                                <th class="text-end pe-3" style="width: 14%; min-width: 160px; white-space: nowrap;">{{ __('hrms.travel_expense.col_actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="reportTableBody">
@@ -755,9 +759,9 @@
                                 <tr>
                                     <td class="ps-3">
                                         <div class="fw-bold text-dark">{{ $rep->title }}</div>
-                                        <div class="text-muted fs-11">Submitted by: {{ $rep->employee->full_name }}</div>
+                                        <div class="text-muted fs-11">{{ __('hrms.travel_expense.submitted_by') }}: {{ $rep->employee->full_name }}</div>
                                         @if($rep->travelRequest)
-                                            <span class="badge bg-soft-secondary text-secondary mt-1 fs-10"><i class="feather-map me-1"></i>Trip ID: TR-{{ $rep->travelRequest->id }}</span>
+                                            <span class="badge bg-soft-secondary text-secondary mt-1 fs-10"><i class="feather-map me-1"></i>{{ __('hrms.travel_expense.trip_id') }}: TR-{{ $rep->travelRequest->id }}</span>
                                         @endif
                                     </td>
                                     <td>
@@ -767,16 +771,16 @@
                                                     <span class="fw-semibold text-primary">• {{ $claim->category->name }}</span>: {{ $currencySymbol }}{{ number_format($claim->amount, 2) }}
                                                     @if($claim->receipt_paths)
                                                         @foreach($claim->receipt_paths as $k => $rPath)
-                                                            <a href="{{ asset('storage/' . $rPath) }}" target="_blank" class="ms-1 text-info fs-10 fw-bold me-1"><i class="feather-image"></i> Receipt {{ count($claim->receipt_paths) > 1 ? ($k + 1) : '' }}</a>
+                                                            <a href="{{ asset('storage/' . $rPath) }}" target="_blank" class="ms-1 text-info fs-10 fw-bold me-1"><i class="feather-image"></i> {{ __('hrms.travel_expense.receipt') }} {{ count($claim->receipt_paths) > 1 ? ($k + 1) : '' }}</a>
                                                         @endforeach
                                                     @endif
                                                     @if(($claim->status ?? '') === 'rejected')
                                                         <div class="ms-2 mt-0.5 fs-11 text-danger fw-semibold">
-                                                            <i class="feather-x-circle me-1"></i>Rejected: <span class="fw-normal text-danger">{{ $claim->rejection_reason ?? 'Reason not specified' }}</span>
+                                                            <i class="feather-x-circle me-1"></i>{{ __('hrms.travel_expense.status_rejected') }}: <span class="fw-normal text-danger">{{ $claim->rejection_reason ?? __('hrms.travel_expense.reason_not_specified') }}</span>
                                                         </div>
                                                     @elseif(($claim->status ?? '') === 'approved' && $rep->status === 'partially_approved')
                                                         <div class="ms-2 mt-0.5 fs-10 text-success fw-semibold">
-                                                            <i class="feather-check-circle me-1"></i>Approved: {{ $currencySymbol }}{{ number_format($claim->approved_amount ?? $claim->amount, 2) }}
+                                                            <i class="feather-check-circle me-1"></i>{{ __('hrms.travel_expense.status_approved') }}: {{ $currencySymbol }}{{ number_format($claim->approved_amount ?? $claim->amount, 2) }}
                                                         </div>
                                                     @endif
                                                 </div>
@@ -835,44 +839,32 @@
 
                                         @if(($rep->status === 'approved' || $rep->status === 'paid') && $rep->approved_amount)
                                             @if($rep->approved_amount != $rep->total_amount)
-                                                <div class="fs-12 text-muted">Approved Expense: <span class="fw-bold text-success">{{ $currencySymbol }}{{ number_format($rep->approved_amount, 2) }}</span></div>
-                                                <div class="fs-11 text-muted text-decoration-line-through">Requested: {{ $currencySymbol }}{{ number_format($rep->total_amount, 2) }}</div>
+                                                <div class="fs-12 text-muted">{{ __('hrms.travel_expense.approved_expense') }}: <span class="fw-bold text-success">{{ $currencySymbol }}{{ number_format($rep->approved_amount, 2) }}</span></div>
+                                                <div class="fs-11 text-muted text-decoration-line-through">{{ __('hrms.travel_expense.requested') }}: {{ $currencySymbol }}{{ number_format($rep->total_amount, 2) }}</div>
                                             @else
-                                                <div class="fs-12 text-muted">Approved Expense: <span class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($rep->approved_amount, 2) }}</span></div>
+                                                <div class="fs-12 text-muted">{{ __('hrms.travel_expense.approved_expense') }}: <span class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($rep->approved_amount, 2) }}</span></div>
                                             @endif
-                                            <div class="fs-12 text-muted">Advance Adjusted: <span class="text-dark">{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}</span></div>
-                                            <div class="fs-12 fw-bold text-primary mt-1">Reimbursement: {{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}</div>
+                                            <div class="fs-12 text-muted">{{ __('hrms.travel_expense.advance_adjusted') }}: <span class="text-dark">{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}</span></div>
+                                            <div class="fs-12 fw-bold text-primary mt-1">{{ __('hrms.travel_expense.reimbursement') }}: {{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}</div>
                                         @else
-                                            <div class="fs-12 text-muted">Total Expense: <span class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($rep->total_amount, 2) }}</span></div>
-                                            <div class="fs-12 text-muted">Advance Adjusted: <span class="text-dark">{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}</span></div>
-                                            <div class="fs-12 fw-bold text-primary mt-1">Reimbursement: {{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}</div>
+                                            <div class="fs-12 text-muted">{{ __('hrms.travel_expense.total_expense') }}: <span class="fw-bold text-dark">{{ $currencySymbol }}{{ number_format($rep->total_amount, 2) }}</span></div>
+                                            <div class="fs-12 text-muted">{{ __('hrms.travel_expense.advance_adjusted') }}: <span class="text-dark">{{ $currencySymbol }}{{ number_format($dispAdjusted, 2) }}</span></div>
+                                            <div class="fs-12 fw-bold text-primary mt-1">{{ __('hrms.travel_expense.reimbursement') }}: {{ $currencySymbol }}{{ number_format($dispReimbursement, 2) }}</div>
                                         @endif
 
                                         @if($surplus > 0)
-                                            <div class="badge bg-soft-warning text-warning mt-1.5 fs-10 px-2 py-1 rounded-pill d-inline-flex align-items-center"><i class="feather-alert-triangle me-1"></i>Refund due: {{ $currencySymbol }}{{ number_format($surplus, 2) }}</div>
+                                            <x-ui.badge variant="warning" :soft="true" class="mt-1.5 fs-10 px-2 py-1 rounded-pill d-inline-flex align-items-center"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.travel_expense.refund_due') }}: {{ $currencySymbol }}{{ number_format($surplus, 2) }}</x-ui.badge>
                                         @endif
                                     </td>
                                     <td class="text-center">
-                                        @if($rep->status === 'draft')
-                                            <span class="badge bg-secondary text-white px-2.5 py-1 fs-11 rounded-pill">Draft</span>
-                                        @elseif(in_array($rep->status, ['submitted', 'pending', 'l1_approved']))
-                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 fs-11 rounded-pill"><i class="feather-clock me-1"></i>Submitted</span>
-                                        @elseif($rep->status === 'partially_approved')
-                                            <span class="badge bg-soft-warning text-dark px-2.5 py-1 fs-11 rounded-pill"><i class="feather-alert-circle me-1"></i>Partially Approved</span>
-                                        @elseif($rep->status === 'approved')
-                                            <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check-circle me-1"></i>Approved</span>
-                                        @elseif($rep->status === 'rejected')
-                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 fs-11 rounded-pill"><i class="feather-x-circle me-1"></i>Rejected</span>
-                                        @elseif($rep->status === 'paid')
-                                            <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 rounded-pill"><i class="feather-check me-1"></i>Paid</span>
-                                        @endif
+                                        <x-ui.status-badge :status="$rep->status" :label="__('hrms.travel_expense.status_' . $rep->status)" />
 
                                         @if($rep->status === 'approved' || $rep->status === 'paid' || $rep->status === 'partially_approved')
                                             <div class="mt-1">
                                                 @if(($rep->payout_channel ?? 'accounting') === 'payroll')
-                                                    <span class="badge bg-soft-info text-info px-1.5 py-0.5 fs-10"><i class="feather-user me-0.5"></i>Payroll</span>
+                                                    <x-ui.badge variant="info" :soft="true" class="px-1.5 py-0.5 fs-10"><i class="feather-user me-0.5"></i>{{ __('hrms.travel_expense.payroll') }}</x-ui.badge>
                                                 @else
-                                                    <span class="badge bg-soft-primary text-primary px-1.5 py-0.5 fs-10"><i class="feather-dollar-sign me-0.5"></i>Accounting</span>
+                                                    <x-ui.badge variant="primary" :soft="true" class="px-1.5 py-0.5 fs-10"><i class="feather-dollar-sign me-0.5"></i>{{ __('hrms.travel_expense.accounting') }}</x-ui.badge>
                                                 @endif
                                             </div>
                                         @endif
@@ -881,7 +873,7 @@
                                         <div class="d-flex justify-content-end gap-1">
                                             <x-ui.icon-btn type="button" variant="soft-info" size="sm" class="btn-view-report"
                                                 icon="feather-eye"
-                                                title="View Details"
+                                                :title="__('hrms.travel_expense.title_view_details')"
                                                 data-id="{{ $rep->id }}"
                                                 data-title="{{ $rep->title }}"
                                                 data-employee="{{ $rep->employee->full_name }}"
@@ -909,7 +901,7 @@
                                             @if(($isOwner || $isAdmin) && (in_array($rep->status, ['draft', 'partially_approved']) || ($rep->status === 'rejected' && !$rep->travel_request_id)))
                                                 <x-ui.icon-btn type="button" variant="soft-primary" size="sm" class="btn-edit-report"
                                                     icon="feather-edit-3"
-                                                    title="{{ in_array($rep->status, ['partially_approved', 'rejected']) ? 'Fix & Resubmit Claims' : 'Edit Report' }}"
+                                                    :title="in_array($rep->status, ['partially_approved', 'rejected']) ? __('hrms.travel_expense.title_fix_resubmit') : __('hrms.travel_expense.title_edit_report')"
                                                     data-id="{{ $rep->id }}"
                                                     data-title="{{ $rep->title }}"
                                                     data-status="{{ $rep->status }}"
@@ -925,7 +917,7 @@
                                             @if(($isOwner || $isAdmin) && $rep->status === 'draft')
                                                 <form method="POST" action="{{ route('hrms.travel-expense.report.submit', $rep) }}" class="m-0">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-primary py-1 fw-bold fs-11 text-uppercase">Submit</button>
+                                                    <x-ui.button type="submit" variant="primary" size="sm" class="py-1 fw-bold fs-11 text-uppercase">{{ __('hrms.travel_expense.btn_submit') }}</x-ui.button>
                                                 </form>
                                             @endif
 
@@ -949,26 +941,29 @@
                                             @endphp
 
                                             @if(($isOwner || $isAdmin) && $showSupplementary)
-                                                <button type="button" 
-                                                        class="btn btn-sm btn-soft-primary py-1 fw-bold fs-11 claim-supplementary-btn"
+                                                <x-ui.button type="button" 
+                                                        variant="soft-primary"
+                                                        size="sm"
+                                                        icon="feather-plus"
+                                                        class="py-1 fw-bold fs-11 claim-supplementary-btn"
                                                         data-travel-id="{{ $rep->travel_request_id }}"
                                                         data-cash-advance-id=""
                                                         data-title="Supplementary Claim - {{ $rep->travelRequest->destination ?? $rep->title }}"
-                                                        title="File a supplementary claim for additional expenses on this travel trip">
-                                                    <i class="feather-plus me-1"></i>Supplementary
-                                                </button>
+                                                        title="{{ __('hrms.travel_expense.title_file_supplementary') }}">
+                                                    {{ __('hrms.travel_expense.btn_supplementary') }}
+                                                </x-ui.button>
                                             @endif
 
                                             {{-- ADMIN ACTIONS --}}
                                             @if($canApproveRep)
                                                 @if(in_array($rep->status, ['submitted', 'pending', 'l1_approved']))
-                                                    <button type="button" class="btn btn-sm btn-soft-success py-1 px-2.5 fw-bold fs-11 text-nowrap text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">
-                                                        Review & Approve
-                                                    </button>
+                                                    <x-ui.button type="button" variant="soft-success" size="sm" class="py-1 px-2.5 fw-bold fs-11 text-nowrap text-uppercase" data-bs-toggle="modal" data-bs-target="#approveReportModal_{{ $rep->id }}">
+                                                        {{ __('hrms.travel_expense.btn_review_approve') }}
+                                                    </x-ui.button>
 
                                                     <form method="POST" action="{{ route('hrms.travel-expense.report.reject', $rep) }}" class="m-0 d-inline-block">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2.5 fw-bold fs-11 text-nowrap text-uppercase">Reject</button>
+                                                        <x-ui.button type="submit" variant="soft-danger" size="sm" class="py-1 px-2.5 fw-bold fs-11 text-nowrap text-uppercase">{{ __('hrms.travel_expense.btn_reject') }}</x-ui.button>
                                                     </form>
 
                                                     <!-- Modal to Approve Expense Report with Custom Amount & Itemized Partial Approval -->
@@ -979,22 +974,22 @@
                                                                     @csrf
                                                                     <input type="hidden" name="approved_amount" id="approve_amount_input_{{ $rep->id }}" value="{{ $rep->total_amount }}">
                                                                     <div class="modal-header">
-                                                                        <h5 class="modal-title fw-bold" id="approveReportModalLabel_{{ $rep->id }}"><i class="feather-check-square text-success me-1"></i> Review & Approve Expense Report</h5>
+                                                                        <h5 class="modal-title fw-bold" id="approveReportModalLabel_{{ $rep->id }}"><i class="feather-check-square text-success me-1"></i> {{ __('hrms.travel_expense.review_approve_report_title') }}</h5>
                                                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                                     </div>
                                                                     <div class="modal-body d-flex flex-column gap-3 text-start">
                                                                         <div class="alert alert-info border-info-subtle fs-12 mb-0 d-flex gap-2 align-items-center">
                                                                             <i class="feather-info text-info fs-15"></i>
-                                                                            <div>Select individual item decisions below (Approve/Reject). Total payout will recalculate automatically.</div>
+                                                                            <div>{{ __('hrms.travel_expense.review_approve_report_desc') }}</div>
                                                                         </div>
                                                                         <x-ui.odoo-form-ui type="table">
                                                                              <thead>
                                                                                  <tr>
-                                                                                     <th style="width: 30%;">Item / Category</th>
-                                                                                     <th style="width: 15%;">Date</th>
-                                                                                     <th style="width: 15%;">Claimed Amount</th>
-                                                                                     <th style="width: 20%;">Decision</th>
-                                                                                     <th style="width: 20%;">Rejection Reason</th>
+                                                                                     <th style="width: 30%;">{{ __('hrms.travel_expense.col_item_category') }}</th>
+                                                                                     <th style="width: 15%;">{{ __('hrms.travel_expense.col_date') }}</th>
+                                                                                     <th style="width: 15%;">{{ __('hrms.travel_expense.col_claimed_amount') }}</th>
+                                                                                     <th style="width: 20%;">{{ __('hrms.travel_expense.col_decision') }}</th>
+                                                                                     <th style="width: 20%;">{{ __('hrms.travel_expense.col_rejection_reason') }}</th>
                                                                                  </tr>
                                                                              </thead>
                                                                              <tbody>
@@ -1013,8 +1008,8 @@
                                                                                                           data-amount="{{ $cItem->amount }}"
                                                                                                           data-full-advance="{{ $fullAdvance }}"
                                                                                                           onchange="handleItemDecisionChange(this, {{ $rep->id }}, {{ $fullAdvance }})">
-                                                                                                  <option value="approved" @selected(($cItem->status ?? 'approved') !== 'rejected')>Approve</option>
-                                                                                                  <option value="rejected" @selected(($cItem->status ?? '') === 'rejected')>Reject</option>
+                                                                                                  <option value="approved" @selected(($cItem->status ?? 'approved') !== 'rejected')>{{ __('hrms.travel_expense.btn_approve') }}</option>
+                                                                                                  <option value="rejected" @selected(($cItem->status ?? '') === 'rejected')>{{ __('hrms.travel_expense.btn_reject') }}</option>
                                                                                               </select>
                                                                                               <input type="hidden" name="items[{{ $cItem->id }}][approved_amount]" id="item_approved_amt_{{ $cItem->id }}" value="{{ (($cItem->status ?? '') === 'rejected') ? 0 : $cItem->amount }}">
                                                                                           </td>
@@ -1023,7 +1018,7 @@
                                                                                                      name="items[{{ $cItem->id }}][rejection_reason]" 
                                                                                                      id="item_rejection_reason_{{ $cItem->id }}" 
                                                                                                      class="odoo-table-input item-rejection-input {{ (($cItem->status ?? '') === 'rejected') ? '' : 'd-none' }}" 
-                                                                                                     placeholder="Reason for rejection..." 
+                                                                                                     placeholder="{{ __('hrms.travel_expense.reason_placeholder') }}" 
                                                                                                      value="{{ $cItem->rejection_reason ?? '' }}" />
                                                                                           </td>
                                                                                      </tr>
@@ -1031,23 +1026,23 @@
                                                                              </tbody>
                                                                          </x-ui.odoo-form-ui>
                                                                         <div id="surplus_payroll_notice_{{ $rep->id }}" class="alert alert-warning border-warning-subtle fs-11 py-2 px-2.5 mt-1 mb-0 d-none animate__animated animate__fadeIn">
-                                                                            <i class="feather-alert-triangle me-1"></i> <strong>Surplus Refund:</strong> Since the employee took a surplus advance, the balance will be recovered via salary deduction.
+                                                                            <i class="feather-alert-triangle me-1"></i> <strong>{{ __('hrms.travel_expense.surplus_refund_label') }}:</strong> {{ __('hrms.travel_expense.surplus_refund_desc') }}
                                                                         </div>
 
                                                                         <div class="bg-light rounded border fs-12 d-flex flex-column text-dark mt-3" style="padding: 16px; gap: 10px;">
                                                                             <div class="d-flex justify-content-between align-items-center">
-                                                                                <span class="text-muted fw-medium">Calculated Approved Total & Payout:</span>
+                                                                                <span class="text-muted fw-medium">{{ __('hrms.travel_expense.calculated_approved_total') }}:</span>
                                                                                 <strong id="calc_payout_{{ $rep->id }}" class="text-primary fs-13">{{ $currencySymbol }}0.00</strong>
                                                                             </div>
                                                                             <div id="calc_surplus_wrapper_{{ $rep->id }}" class="d-flex justify-content-between align-items-center d-none text-warning fw-bold">
-                                                                                <span>Refund due to Company:</span>
+                                                                                <span>{{ __('hrms.travel_expense.refund_due_to_company') }}:</span>
                                                                                 <span id="calc_surplus_{{ $rep->id }}" class="fs-13">{{ $currencySymbol }}0.00</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                     <div class="modal-footer bg-light border-top">
-                                                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal" class="fw-bold text-uppercase">Cancel</x-ui.button>
-                                                                        <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="fw-bold text-uppercase">Approve Expense Report</x-ui.button>
+                                                                        <x-ui.button type="button" variant="secondary" data-bs-dismiss="modal" class="fw-bold text-uppercase">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
+                                                                        <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="fw-bold text-uppercase">{{ __('hrms.travel_expense.btn_approve_expense_report') }}</x-ui.button>
                                                                     </div>
                                                                 </form>
                                                             </div>
@@ -1059,15 +1054,15 @@
                                             @if($isAdmin && in_array($rep->status, ['approved', 'partially_approved']))
                                                 <form method="POST" action="{{ route('hrms.travel-expense.report.pay', $rep) }}" class="m-0">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success py-1 fw-bold fs-11 text-uppercase" title="Pay Out Approved Amount ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})"><i class="feather-credit-card me-1"></i> Pay Out</button>
+                                                    <x-ui.button type="submit" variant="success" size="sm" icon="feather-credit-card" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_pay_out') }} ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})">{{ __('hrms.travel_expense.btn_pay_out') }}</x-ui.button>
                                                 </form>
                                             @endif
 
                                             @if(in_array($rep->status, ['draft', 'rejected']) && ($isOwner || $isAdmin))
-                                                <form method="POST" action="{{ route('hrms.travel-expense.report.destroy', $rep) }}" class="m-0" onsubmit="return confirm('Are you sure you want to delete this expense report?');">
+                                                <form method="POST" action="{{ route('hrms.travel-expense.report.destroy', $rep) }}" class="m-0" onsubmit="return confirm('{{ __('hrms.travel_expense.confirm_delete_report') }}');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger py-1 fw-bold fs-11 text-uppercase" title="Delete Report"><i class="feather-trash-2 me-1"></i>Delete</button>
+                                                    <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_delete_report') }}">{{ __('hrms.travel_expense.btn_delete') }}</x-ui.button>
                                                 </form>
                                             @endif
                                         </div>
@@ -1075,22 +1070,15 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No expense reports filed.</td>
+                                    <td colspan="5" class="text-center text-muted py-4">{{ __('hrms.travel_expense.no_expense_reports') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
-                @if($expenseReports->hasPages())
-                    <div class="mt-4 pt-2 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div class="text-muted fs-12">
-                            Showing {{ $expenseReports->firstItem() ?? 0 }} to {{ $expenseReports->lastItem() ?? 0 }} of {{ $expenseReports->total() }} records
-                        </div>
-                        <div class="d-flex justify-content-end">
-                            {{ $expenseReports->links() }}
-                        </div>
-                    </div>
-                @endif
+                <div class="mt-3" id="reportPaginationWrapper">
+                    <x-ui.pagination :paginator="$expenseReports" pageParam="report_page" tab="report" />
+                </div>
             </div>
         </div>
     </div>
@@ -1103,35 +1091,35 @@
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="addTravelModalLabel">Submit Travel Request</h5>
+                        <h5 class="modal-title fw-bold" id="addTravelModalLabel">{{ __('hrms.travel_expense.submit_travel_request') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body d-flex flex-column gap-3">
                         @if(!$employee)
-                            <div class="alert alert-danger fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>Your current user session is not linked to an Employee profile. You cannot file requests on this page.</div>
+                            <x-ui.alert variant="danger" class="fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.travel_expense.session_not_linked_employee') }}</x-ui.alert>
                         @else
-                            <x-ui.odoo-form-ui type="input" label="Purpose" name="purpose" placeholder="e.g. Sales pitch to prospective client" :required="true" :errorText="$errors->first('purpose')" :value="old('purpose')" />
-                            <x-ui.odoo-form-ui type="input" label="Destination" name="destination" placeholder="e.g. Chicago office" :required="true" :errorText="$errors->first('destination')" :value="old('destination')" />
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" :required="true" :errorText="$errors->first('start_date')" :value="old('start_date')" />
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" :required="true" :errorText="$errors->first('end_date')" :value="old('end_date')" />
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="Estimated Budget ({{ $currencySymbol }})" name="estimated_budget" placeholder="0.00" step="0.01" min="0" :required="true" :errorText="$errors->first('estimated_budget')" :value="old('estimated_budget')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('hrms.travel_expense.purpose')" name="purpose" placeholder="{{ __('hrms.travel_expense.placeholder_travel_purpose') }}" :required="true" :errorText="$errors->first('purpose')" :value="old('purpose')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('hrms.travel_expense.destination')" name="destination" placeholder="{{ __('hrms.travel_expense.placeholder_travel_destination') }}" :required="true" :errorText="$errors->first('destination')" :value="old('destination')" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.travel_expense.start_date')" name="start_date" :required="true" :errorText="$errors->first('start_date')" :value="old('start_date')" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.travel_expense.end_date')" name="end_date" :required="true" :errorText="$errors->first('end_date')" :value="old('end_date')" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.travel_expense.estimated_budget') . ' (' . $currencySymbol . ')'" name="estimated_budget" placeholder="0.00" step="0.01" min="0" :required="true" :errorText="$errors->first('estimated_budget')" :value="old('estimated_budget')" />
 
                             <!-- Integrated Cash Advance Option -->
                             <div class="border-top pt-3 mt-1">
                                 <div class="form-check mb-2 d-flex align-items-center gap-2 ps-0">
                                     <input class="form-check-input mt-0 ms-0" type="checkbox" id="request_advance_toggle" name="request_advance" value="1" onchange="toggleTravelAdvanceAmount(this)" style="float: none;">
-                                    <label class="form-check-label fw-bold fs-12 text-dark mb-0" for="request_advance_toggle">Request Cash Advance for this trip</label>
+                                    <label class="form-check-label fw-bold fs-12 text-dark mb-0" for="request_advance_toggle">{{ __('hrms.travel_expense.request_cash_advance_checkbox') }}</label>
                                 </div>
                                 <div id="travel_advance_amount_wrapper" class="d-none mt-3">
-                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Advance Amount" name="advance_amount" id="travel_advance_amount_input" placeholder="0.00" step="0.01" min="1" />
+                                    <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.travel_expense.advance_amount')" name="advance_amount" id="travel_advance_amount_input" placeholder="0.00" step="0.01" min="1" />
                                 </div>
                             </div>
                         @endif
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Cancel</button>
+                        <x-ui.button type="button" variant="light" class="border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
                         @if($employee)
-                            <button type="submit" class="btn btn-primary text-uppercase fw-bold fs-12">Submit Request</button>
+                            <x-ui.button type="submit" variant="primary" class="text-uppercase fw-bold fs-12">{{ __('hrms.travel_expense.btn_submit_request') }}</x-ui.button>
                         @endif
                     </div>
                 </form>
@@ -1147,35 +1135,35 @@
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="addAdvanceModalLabel">Submit Cash Advance Request</h5>
+                        <h5 class="modal-title fw-bold" id="addAdvanceModalLabel">{{ __('hrms.travel_expense.submit_advance_request') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body d-flex flex-column gap-3">
                         @if(!$employee)
-                            <div class="alert alert-danger fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>Your current user session is not linked to an Employee profile. You cannot file requests on this page.</div>
+                            <x-ui.alert variant="danger" class="fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.travel_expense.session_not_linked_employee') }}</x-ui.alert>
                         @else
-                            <x-ui.odoo-form-ui type="select" label="Travel Request" name="travel_request_id" select2-selector="default">
-                                <option value="">Standalone / Business Expense</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('hrms.travel_expense.travel_request')" name="travel_request_id" select2-selector="default">
+                                <option value="">{{ __('hrms.travel_expense.standalone_business_expense') }}</option>
                                 @foreach($myApprovedTravelRequests as $tr)
                                     @php
                                         $hasActiveAdv = $tr->cashAdvances->whereIn('status', ['pending', 'l1_approved', 'approved', 'disbursed'])->isNotEmpty();
                                     @endphp
                                     @if(!$hasActiveAdv)
                                         <option value="{{ $tr->id }}">
-                                            {{ $tr->purpose }} (to {{ $tr->destination }}) - Budget: {{ $currencySymbol }}{{ number_format($tr->approved_budget ?? $tr->estimated_budget, 2) }}
+                                            {{ $tr->purpose }} ({{ __('hrms.travel_expense.trip_to') }} {{ $tr->destination }}) - {{ __('hrms.travel_expense.budget') }}: {{ $currencySymbol }}{{ number_format($tr->approved_budget ?? $tr->estimated_budget, 2) }}
                                         </option>
                                     @endif
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" inputType="number" label="Amount" name="amount" placeholder="0.00" step="0.01" min="1" :required="true" :errorText="$errors->first('amount')" :value="old('amount')" />
-                            <x-ui.odoo-form-ui type="input" label="Purpose" name="purpose" placeholder="e.g. Client entertainment & dinner costs" :required="true" :errorText="$errors->first('purpose')" :value="old('purpose')" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.travel_expense.col_amount')" name="amount" placeholder="0.00" step="0.01" min="1" :required="true" :errorText="$errors->first('amount')" :value="old('amount')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('hrms.travel_expense.purpose')" name="purpose" placeholder="{{ __('hrms.travel_expense.placeholder_advance_purpose') }}" :required="true" :errorText="$errors->first('purpose')" :value="old('purpose')" />
                         @endif
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Cancel</button>
+                        <x-ui.button type="button" variant="light" class="border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
                         @if($employee)
-                            <button type="submit" class="btn btn-primary text-uppercase fw-bold fs-12">Request Advance</button>
+                            <x-ui.button type="submit" variant="primary" class="text-uppercase fw-bold fs-12">{{ __('hrms.travel_expense.btn_request_advance') }}</x-ui.button>
                         @endif
                     </div>
                 </form>
@@ -1193,20 +1181,19 @@
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="addReportModalLabel">File Expense Claim Report</h5>
+                        <h5 class="modal-title fw-bold" id="addReportModalLabel">{{ __('hrms.travel_expense.file_expense_report') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body d-flex flex-column gap-3">
                         @if(!$employee)
-                            <div class="alert alert-danger fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>Your current user session is not linked to an Employee profile. You cannot file requests on this page.</div>
+                            <x-ui.alert variant="danger" class="fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.travel_expense.session_not_linked_employee') }}</x-ui.alert>
                         @else
-                            <x-ui.odoo-form-ui type="input" label="Report Title" name="title" placeholder="e.g. Sales Event Claims Aug 2026" :required="true" :errorText="$errors->first('title')" :value="old('title')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('hrms.travel_expense.report_title')" name="title" placeholder="{{ __('hrms.travel_expense.placeholder_report_title') }}" :required="true" :errorText="$errors->first('title')" :value="old('title')" />
                             
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Travel Trip</label>
-                                    <x-ui.odoo-form-ui type="select" name="travel_request_id" id="report_travel_request" select2-selector="default">
-                                        <option value="">None</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.travel_expense.travel_trip')" name="travel_request_id" id="report_travel_request" select2-selector="default">
+                                        <option value="">{{ __('hrms.travel_expense.none') }}</option>
                                         @foreach($myApprovedTravelRequests as $tr)
                                             @php
                                                 $inProgressClaim = $tr->expenseReports->whereIn('status', ['draft', 'submitted', 'l1_approved', 'approved', 'partially_approved'])->first();
@@ -1218,7 +1205,7 @@
                                                 $canClaim = !$inProgressClaim && (!$paidClaim || ($hasRejectedItemsInPaid && !$hasPaidSupplementary));
                                                 $statusNote = '';
                                                 if ($paidClaim && $hasRejectedItemsInPaid && !$hasPaidSupplementary) {
-                                                    $statusNote = ' — (Supplementary Claim)';
+                                                    $statusNote = ' — (' . __('hrms.travel_expense.btn_supplementary_claim') . ')';
                                                 }
                                             @endphp
                                             @if($canClaim)
@@ -1230,9 +1217,8 @@
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Cash Advance</label>
-                                    <x-ui.odoo-form-ui type="select" name="cash_advance_id" id="report_cash_advance" select2-selector="default">
-                                        <option value="">None</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.travel_expense.cash_advances')" name="cash_advance_id" id="report_cash_advance" select2-selector="default">
+                                        <option value="">{{ __('hrms.travel_expense.none') }}</option>
                                         @foreach($myOpenCashAdvances as $ca)
                                             <option value="{{ $ca->id }}">{{ $currencySymbol }}{{ number_format($ca->approved_amount ?? $ca->amount, 2) }} - {{ $ca->purpose }}</option>
                                         @endforeach
@@ -1244,37 +1230,37 @@
                             <div class="border-top pt-3 mt-2">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <div>
-                                        <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">Expense Claim Items *</h6>
-                                        <small class="text-muted fs-11">Attach receipts and specify expenses for reimbursement</small>
+                                        <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">{{ __('hrms.travel_expense.expense_claim_items') }} *</h6>
+                                        <small class="text-muted fs-11">{{ __('hrms.travel_expense.attach_receipts_desc') }}</small>
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-soft-primary px-2.5 py-1 text-uppercase fw-bold fs-11" id="btnAddClaimLine">
-                                        <i class="feather-plus me-1"></i> Add Row
-                                    </button>
+                                    <x-ui.button type="button" variant="soft-primary" size="sm" class="px-2.5 py-1 text-uppercase fw-bold fs-11" id="btnAddClaimLine" icon="feather-plus">
+                                        {{ __('hrms.travel_expense.btn_add_row') }}
+                                    </x-ui.button>
                                 </div>
 
                                 <div class="table-responsive">
                                     <table class="expense-claims-table" id="claimsLinesTable">
                                         <thead>
                                             <tr>
-                                                <th style="width: 25%; min-width: 190px;">Category *</th>
-                                                <th style="width: 14%; min-width: 130px;">Date *</th>
-                                                <th style="width: 15%; min-width: 120px;">Amount *</th>
-                                                <th style="width: 23%; min-width: 170px;">Merchant / Notes</th>
-                                                <th style="width: 19%; min-width: 160px;">Receipts</th>
-                                                <th style="width: 4%; min-width: 40px;" class="text-center">Action</th>
+                                                <th style="width: 25%; min-width: 190px;">{{ __('hrms.travel_expense.col_category') }} *</th>
+                                                <th style="width: 14%; min-width: 130px;">{{ __('hrms.travel_expense.col_date') }} *</th>
+                                                <th style="width: 15%; min-width: 120px;">{{ __('hrms.travel_expense.col_amount') }} *</th>
+                                                <th style="width: 23%; min-width: 170px;">{{ __('hrms.travel_expense.col_merchant_notes') }}</th>
+                                                <th style="width: 19%; min-width: 160px;">{{ __('hrms.travel_expense.col_receipts') }}</th>
+                                                <th style="width: 4%; min-width: 40px;" class="text-center">{{ __('hrms.travel_expense.col_action') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody id="claimsLinesContainer">
                                             <tr class="claim-line-row">
                                                 <td>
-                                                    <select name="claims[0][category_id]" class="form-select form-select-sm text-dark category-select" required>
-                                                        <option value="" disabled selected>Choose Category...</option>
+                                                    <select name="claims[0][category_id]" class="form-select form-select-sm text-dark category-select odoo-select2" data-select2-selector="default" required>
+                                                        <option value="" disabled selected>{{ __('hrms.travel_expense.choose_category') }}</option>
                                                         @foreach($categories as $cat)
                                                             <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                                         @endforeach
                                                     </select>
                                                     <!-- Client-side policy limit warning inline badge -->
-                                                    <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
+                                                    <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> {{ __('hrms.travel_expense.exceeds_limit') }}</div>
                                                 </td>
                                                 <td>
                                                     <input type="date" name="claims[0][date]" class="form-control form-control-sm text-dark text-center" value="{{ date('Y-m-d') }}" required>
@@ -1283,21 +1269,21 @@
                                                     <input type="number" name="claims[0][amount]" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" step="0.01" min="0.01" required>
                                                 </td>
                                                 <td>
-                                                    <input type="text" name="claims[0][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)">
-                                                    <input type="text" name="claims[0][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)">
+                                                    <input type="text" name="claims[0][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="{{ __('hrms.travel_expense.placeholder_merchant') }}">
+                                                    <input type="text" name="claims[0][desc]" class="form-control form-control-sm text-dark" placeholder="{{ __('hrms.travel_expense.placeholder_notes') }}">
                                                 </td>
                                                 <td>
                                                     <div class="erp-custom-file-upload">
                                                         <label class="file-upload-label mb-0 cursor-pointer">
                                                             <i class="feather-upload-cloud text-primary fs-14"></i>
-                                                            <span class="file-label-text text-muted">Upload Files</span>
+                                                            <span class="file-label-text text-muted">{{ __('hrms.travel_expense.upload_files') }}</span>
                                                             <input type="file" name="claims[0][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
                                                         </label>
                                                         <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
                                                     </div>
                                                 </td>
                                                 <td class="text-center">
-                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="{{ __('hrms.travel_expense.remove_row') }}">
                                                         <i class="feather-trash-2 fs-13"></i>
                                                     </button>
                                                 </td>
@@ -1309,20 +1295,20 @@
 
                             {{-- Policy Violations Banner (shown on submit if exceeded) --}}
                             <div id="addReportPolicyWarning" class="d-none">
-                                <div class="alert alert-warning border border-warning-subtle fs-12 mb-0 d-flex gap-2 align-items-start">
+                                <x-ui.alert variant="warning" class="border border-warning-subtle fs-12 mb-0 d-flex gap-2 align-items-start">
                                     <i class="feather-alert-triangle text-warning mt-0.5 fs-14"></i>
                                     <div>
-                                        <div class="fw-bold text-dark mb-1">Policy Limit Exceeded</div>
+                                        <div class="fw-bold text-dark mb-1">{{ __('hrms.travel_expense.policy_limit_exceeded') }}</div>
                                         <ul id="addReportPolicyViolationList" class="mb-0 ps-3 text-dark"></ul>
                                     </div>
-                                </div>
+                                </x-ui.alert>
                             </div>
                         @endif
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Cancel</button>
+                        <x-ui.button type="button" variant="light" class="border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
                         @if($employee)
-                            <button type="submit" class="btn btn-primary text-uppercase fw-bold fs-12">Save Draft</button>
+                            <x-ui.button type="submit" variant="primary" class="text-uppercase fw-bold fs-12">{{ __('hrms.travel_expense.btn_save_draft') }}</x-ui.button>
                         @endif
                     </div>
                 </form>
@@ -1340,29 +1326,27 @@
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="editReportModalLabel">Edit Expense Claim Report</h5>
+                        <h5 class="modal-title fw-bold" id="editReportModalLabel">{{ __('hrms.travel_expense.edit_expense_report') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body d-flex flex-column gap-3">
                         @if(!$employee)
-                            <div class="alert alert-danger fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>Your current user session is not linked to an Employee profile. You cannot file requests on this page.</div>
+                            <x-ui.alert variant="danger" class="fs-12 mb-0"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.travel_expense.session_not_linked_employee') }}</x-ui.alert>
                         @else
-                            <x-ui.odoo-form-ui type="input" label="Report Title" name="title" id="edit_report_title" placeholder="e.g. Sales Event Claims Aug 2026" :required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('hrms.travel_expense.report_title')" name="title" id="edit_report_title" placeholder="{{ __('hrms.travel_expense.placeholder_report_title') }}" :required="true" />
                             
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Travel Trip</label>
-                                    <x-ui.odoo-form-ui type="select" name="travel_request_id" id="edit_report_travel_request" select2-selector="default">
-                                        <option value="">None</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.travel_expense.travel_trip')" name="travel_request_id" id="edit_report_travel_request" select2-selector="default">
+                                        <option value="">{{ __('hrms.travel_expense.none') }}</option>
                                         @foreach($myApprovedTravelRequests as $tr)
                                             <option value="{{ $tr->id }}">{{ $tr->destination }} ({{ $tr->purpose }})</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Cash Advance</label>
-                                    <x-ui.odoo-form-ui type="select" name="cash_advance_id" id="edit_report_cash_advance" select2-selector="default">
-                                        <option value="">None</option>
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.travel_expense.cash_advances')" name="cash_advance_id" id="edit_report_cash_advance" select2-selector="default">
+                                        <option value="">{{ __('hrms.travel_expense.none') }}</option>
                                         @foreach($myOpenCashAdvances as $ca)
                                             <option value="{{ $ca->id }}">{{ $currencySymbol }}{{ number_format($ca->approved_amount ?? $ca->amount, 2) }} - {{ $ca->purpose }}</option>
                                         @endforeach
@@ -1374,24 +1358,24 @@
                             <div class="border-top pt-3 mt-2">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <div>
-                                        <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">Expense Claim Items *</h6>
-                                        <small class="text-muted fs-11">Attach receipts and specify expenses for reimbursement</small>
+                                        <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">{{ __('hrms.travel_expense.expense_claim_items') }} *</h6>
+                                        <small class="text-muted fs-11">{{ __('hrms.travel_expense.attach_receipts_desc') }}</small>
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-soft-primary px-2.5 py-1 text-uppercase fw-bold fs-11" id="btnEditAddClaimLine">
-                                        <i class="feather-plus me-1"></i> Add Row
-                                    </button>
+                                    <x-ui.button type="button" variant="soft-primary" size="sm" class="px-2.5 py-1 text-uppercase fw-bold fs-11" id="btnEditAddClaimLine" icon="feather-plus">
+                                        {{ __('hrms.travel_expense.btn_add_row') }}
+                                    </x-ui.button>
                                 </div>
 
                                 <div class="table-responsive">
                                     <table class="expense-claims-table" id="editClaimsLinesTable">
                                         <thead>
                                             <tr>
-                                                <th style="width: 25%; min-width: 190px;">Category *</th>
-                                                <th style="width: 14%; min-width: 130px;">Date *</th>
-                                                <th style="width: 15%; min-width: 120px;">Amount *</th>
-                                                <th style="width: 23%; min-width: 170px;">Merchant / Notes</th>
-                                                <th style="width: 19%; min-width: 160px;">Receipts</th>
-                                                <th style="width: 4%; min-width: 40px;" class="text-center">Action</th>
+                                                <th style="width: 25%; min-width: 190px;">{{ __('hrms.travel_expense.col_category') }} *</th>
+                                                <th style="width: 14%; min-width: 130px;">{{ __('hrms.travel_expense.col_date') }} *</th>
+                                                <th style="width: 15%; min-width: 120px;">{{ __('hrms.travel_expense.col_amount') }} *</th>
+                                                <th style="width: 23%; min-width: 170px;">{{ __('hrms.travel_expense.col_merchant_notes') }}</th>
+                                                <th style="width: 19%; min-width: 160px;">{{ __('hrms.travel_expense.col_receipts') }}</th>
+                                                <th style="width: 4%; min-width: 40px;" class="text-center">{{ __('hrms.travel_expense.col_action') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody id="editClaimsLinesContainer">
@@ -1403,20 +1387,20 @@
 
                             {{-- Policy Violations Banner (shown on submit if exceeded) --}}
                             <div id="editReportPolicyWarning" class="d-none">
-                                <div class="alert alert-warning border border-warning-subtle fs-12 mb-0 d-flex gap-2 align-items-start">
+                                <x-ui.alert variant="warning" class="border border-warning-subtle fs-12 mb-0 d-flex gap-2 align-items-start">
                                     <i class="feather-alert-triangle text-warning mt-0.5 fs-14"></i>
                                     <div>
-                                        <div class="fw-bold text-dark mb-1">Policy Limit Exceeded</div>
+                                        <div class="fw-bold text-dark mb-1">{{ __('hrms.travel_expense.policy_limit_exceeded') }}</div>
                                         <ul id="editReportPolicyViolationList" class="mb-0 ps-3 text-dark"></ul>
                                     </div>
-                                </div>
+                                </x-ui.alert>
                             </div>
                         @endif
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Cancel</button>
+                        <x-ui.button type="button" variant="light" class="border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_cancel') }}</x-ui.button>
                         @if($employee)
-                            <button type="submit" class="btn btn-primary text-uppercase fw-bold fs-12">Update Report</button>
+                            <x-ui.button type="submit" variant="primary" class="text-uppercase fw-bold fs-12">{{ __('hrms.travel_expense.btn_update_report') }}</x-ui.button>
                         @endif
                     </div>
                 </form>
@@ -1429,34 +1413,34 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="viewReportModalLabel"><i class="feather-file-text text-primary me-1"></i> Expense Claim Details</h5>
+                    <h5 class="modal-title fw-bold" id="viewReportModalLabel"><i class="feather-file-text text-primary me-1"></i> {{ __('hrms.travel_expense.expense_claim_details') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body d-flex flex-column gap-3">
                     <div class="p-3 bg-light rounded border text-dark">
                         <div class="row g-3 fs-13">
                             <div class="col-md-6">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Report Title</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.report_title') }}</span>
                                 <strong id="view_report_title" class="text-dark fs-14"></strong>
                             </div>
                             <div class="col-md-6">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Employee</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.col_employee') }}</span>
                                 <strong id="view_report_employee" class="text-dark"></strong>
                             </div>
                             <div class="col-md-6">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Travel Trip</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.travel_trip') }}</span>
                                 <span id="view_report_travel" class="text-dark fw-semibold"></span>
                             </div>
                             <div class="col-md-6">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Cash Advance</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.cash_advances') }}</span>
                                 <span id="view_report_advance" class="text-dark fw-semibold"></span>
                             </div>
                             <div class="col-md-6">
-                                 <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Status</span>
+                                 <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.status') }}</span>
                                  <span id="view_report_status" class="badge"></span>
                              </div>
                              <div class="col-md-6" id="view_report_channel_wrapper">
-                                 <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Payout Channel</span>
+                                 <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.payout_channel') }}</span>
                                  <span id="view_report_channel" class="badge"></span>
                              </div>
                         </div>
@@ -1465,15 +1449,15 @@
                     <div class="p-3 bg-soft-primary rounded border border-primary-subtle text-dark">
                         <div class="row text-center g-3 fs-13">
                             <div class="col-md-4">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Total Expenses</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.total_expenses') }}</span>
                                 <strong id="view_report_total" class="text-dark fs-15"></strong>
                             </div>
                             <div class="col-md-4 border-start border-end border-primary-subtle">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Advance Adjusted</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.advance_adjusted') }}</span>
                                 <strong id="view_report_adjusted" class="text-dark fs-15"></strong>
                             </div>
                             <div class="col-md-4">
-                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">Net Reimbursement</span>
+                                <span class="text-muted d-block fs-11 text-uppercase fw-semibold mb-0.5">{{ __('hrms.travel_expense.net_reimbursement') }}</span>
                                 <strong id="view_report_net" class="text-primary fs-16"></strong>
                             </div>
                         </div>
@@ -1483,25 +1467,25 @@
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-alert-triangle text-warning fs-18"></i>
                             <div>
-                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-0.5">Returnable Surplus (Refund due to Company)</span>
+                                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-0.5">{{ __('hrms.travel_expense.returnable_surplus') }}</span>
                                 <strong id="view_report_surplus" class="text-warning fs-15"></strong>
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <h6 class="fw-bold mb-3 fs-13"><i class="feather-list me-1 text-primary"></i> Claim Items</h6>
+                        <h6 class="fw-bold mb-3 fs-13"><i class="feather-list me-1 text-primary"></i> {{ __('hrms.travel_expense.col_claim_items') }}</h6>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0 text-dark fs-12" id="viewClaimsLinesTable" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Category</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Merchant</th>
-                                        <th>Reason / Description</th>
-                                        <th>Status</th>
-                                        <th>Receipt</th>
+                                        <th>{{ __('hrms.travel_expense.col_category') }}</th>
+                                        <th>{{ __('hrms.travel_expense.col_date') }}</th>
+                                        <th>{{ __('hrms.travel_expense.col_amount') }}</th>
+                                        <th>{{ __('hrms.travel_expense.col_merchant') }}</th>
+                                        <th>{{ __('hrms.travel_expense.col_reason_description') }}</th>
+                                        <th>{{ __('hrms.travel_expense.col_status') }}</th>
+                                        <th>{{ __('hrms.travel_expense.receipt') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1512,7 +1496,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">Close</button>
+                    <x-ui.button type="button" variant="light" class="border text-uppercase fw-bold fs-12" data-bs-dismiss="modal">{{ __('hrms.travel_expense.btn_close') }}</x-ui.button>
                 </div>
             </div>
         </div>
@@ -1523,6 +1507,40 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
+        var travelTrans = {
+            amount: "{{ __('hrms.travel_expense.col_amount') }}",
+            exceedsCategoryLimit: "{{ __('hrms.travel_expense.policy_exceeds_category_limit') }}",
+            receiptRequired: "{{ __('hrms.travel_expense.policy_receipt_required') }}",
+            above: "{{ __('hrms.travel_expense.above') }}",
+            row: "{{ __('hrms.travel_expense.row') }}",
+            fieldRequired: "{{ __('hrms.travel_expense.field_required') }}",
+            chooseCategory: "{{ __('hrms.travel_expense.choose_category') }}",
+            exceedsLimit: "{{ __('hrms.travel_expense.exceeds_limit') }}",
+            placeholderMerchant: "{{ __('hrms.travel_expense.placeholder_merchant') }}",
+            placeholderNotes: "{{ __('hrms.travel_expense.placeholder_notes') }}",
+            uploadFiles: "{{ __('hrms.travel_expense.upload_files') }}",
+            addFiles: "{{ __('hrms.travel_expense.btn_add_files') }}",
+            filesSelected: "{{ __('hrms.travel_expense.files_selected') }}",
+            fileSelected: "{{ __('hrms.travel_expense.file_selected') }}",
+            removeRow: "{{ __('hrms.travel_expense.remove_row') }}",
+            removeFile: "{{ __('hrms.travel_expense.remove_file') }}",
+            file: "{{ __('hrms.travel_expense.file') }}",
+            minOneClaimRequired: "{{ __('hrms.travel_expense.min_one_claim_required') }}",
+            rejectedByHr: "{{ __('hrms.travel_expense.rejected_by_hr') }}",
+            correctDetailsOrAmount: "{{ __('hrms.travel_expense.correct_details_or_amount') }}",
+            none: "{{ __('hrms.travel_expense.none') }}",
+            payroll: "{{ __('hrms.travel_expense.payroll') }}",
+            accounting: "{{ __('hrms.travel_expense.accounting') }}",
+            statusDraft: "{{ __('hrms.travel_expense.status_draft') }}",
+            statusSubmitted: "{{ __('hrms.travel_expense.status_submitted') }}",
+            statusApproved: "{{ __('hrms.travel_expense.status_approved') }}",
+            statusPaid: "{{ __('hrms.travel_expense.status_paid') }}",
+            statusRejected: "{{ __('hrms.travel_expense.status_rejected') }}",
+            statusPending: "{{ __('hrms.travel_expense.status_pending') }}",
+            partiallyApproved: "{{ __('hrms.travel_expense.partially_approved') }}",
+            receipt: "{{ __('hrms.travel_expense.receipt') }}"
+        };
+
         // =========================================================
         // EXPENSE POLICY VALIDATION ENGINE
         // Fetches employee policy once, validates claim rows on submit
@@ -1579,7 +1597,7 @@
 
                 // Check max_limit_per_claim
                 if (rule.max_limit_per_claim && amount > rule.max_limit_per_claim) {
-                    rowViolations.push('Amount ' + currSym + amount.toFixed(2) + ' exceeds the ' + rule.category_name + ' limit of ' + currSym + rule.max_limit_per_claim.toFixed(2));
+                    rowViolations.push(travelTrans.amount + ' ' + currSym + amount.toFixed(2) + ' ' + travelTrans.exceedsCategoryLimit.replace(':category', rule.category_name) + ' ' + currSym + rule.max_limit_per_claim.toFixed(2));
                     amountInput.style.borderBottomColor = '#f59e0b';
                     amountInput.classList.add('policy-warning-input');
                 }
@@ -1596,8 +1614,8 @@
                 var needsReceipt = rule.receipt_required
                     || (rule.receipt_required_threshold && amount > rule.receipt_required_threshold);
                 if (needsReceipt && !hasReceipt) {
-                    rowViolations.push('Receipt is required for ' + rule.category_name + ' claims' +
-                        (rule.receipt_required_threshold ? ' above ' + currSym + rule.receipt_required_threshold.toFixed(2) : ''));
+                    rowViolations.push(travelTrans.receiptRequired.replace(':category', rule.category_name) +
+                        (rule.receipt_required_threshold ? ' ' + travelTrans.above + ' ' + currSym + rule.receipt_required_threshold.toFixed(2) : ''));
                 }
 
                 if (rowViolations.length > 0) {
@@ -1608,7 +1626,7 @@
                     badge.innerHTML = '<i class="feather-alert-triangle" style="font-size: 10px;"></i> ' + rowViolations[0];
                     amountInput.parentNode.appendChild(badge);
 
-                    rowViolations.forEach(msg => violations.push('Row ' + (idx + 1) + ': ' + msg));
+                    rowViolations.forEach(msg => violations.push(travelTrans.row + ' ' + (idx + 1) + ': ' + msg));
                 }
             });
 
@@ -1685,7 +1703,7 @@
 
                     let errorEl = document.createElement('div');
                     errorEl.className = 'invalid-feedback dynamic-error-feedback d-block text-danger fs-11 mt-1 fw-semibold';
-                    errorEl.innerHTML = `<i class="feather-alert-circle me-1"></i>${labelName} is required.`;
+                    errorEl.innerHTML = `<i class="feather-alert-circle me-1"></i>${labelName} ${travelTrans.fieldRequired}`;
 
                     if (field.tagName === 'SELECT' && $(field).data('select2')) {
                         let s2Container = field.nextElementSibling;
@@ -1926,24 +1944,10 @@
                 }
             }
 
-            // Style active/inactive tab buttons dynamically & Toggle Header action buttons
+            // Toggle Header action buttons on tab switch
             const tabElList = document.querySelectorAll('button[data-bs-toggle="tab"]');
             tabElList.forEach(tabEl => {
-                tabEl.addEventListener('shown.bs.tab', event => {
-                    tabElList.forEach(el => {
-                        el.classList.remove('active');
-                        el.classList.add('text-muted');
-                    });
-                    event.target.classList.add('active');
-                    event.target.classList.remove('text-muted');
-
-                    // Update URL parameter without reload
-                    const targetId = event.target.id;
-                    const tabName = targetId.replace('-tab', '');
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('tab', tabName);
-                    window.history.replaceState({}, '', url.toString());
- 
+                tabEl.addEventListener('shown.bs.tab', () => {
                     syncHeaderButtons();
                 });
             });
@@ -1984,6 +1988,11 @@
             safeInitSelect2('#addReportModal');
             safeInitSelect2('#editReportModal');
 
+            // Re-initialize select2 with correct dimensions on modal show
+            $(document).on('shown.bs.modal', '#addTravelModal, #addAdvanceModal, #addReportModal, #editReportModal', function() {
+                safeInitSelect2(this);
+            });
+
             // Dynamic claims row addition
             let lineIndex = 1;
             const btnAddLine = document.getElementById('btnAddClaimLine');
@@ -1994,13 +2003,13 @@
                     const rowTemplate = `
                         <tr class="claim-line-row">
                             <td>
-                                <select name="claims[${lineIndex}][category_id]" class="form-select form-select-sm text-dark category-select" required>
-                                    <option value="" disabled selected>Choose Category...</option>
+                                <select name="claims[${lineIndex}][category_id]" class="form-select form-select-sm text-dark category-select odoo-select2" data-select2-selector="default" required>
+                                    <option value="" disabled selected>${travelTrans.chooseCategory}</option>
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
-                                <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
+                                <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> ${travelTrans.exceedsLimit}</div>
                             </td>
                             <td>
                                 <input type="date" name="claims[${lineIndex}][date]" class="form-control form-control-sm text-dark text-center" required value="{{ date('Y-m-d') }}">
@@ -2009,27 +2018,28 @@
                                 <input type="number" name="claims[${lineIndex}][amount]" step="0.01" min="0.01" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" required>
                             </td>
                             <td>
-                                <input type="text" name="claims[${lineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)">
-                                <input type="text" name="claims[${lineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)">
+                                <input type="text" name="claims[${lineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="${travelTrans.placeholderMerchant}">
+                                <input type="text" name="claims[${lineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="${travelTrans.placeholderNotes}">
                             </td>
                             <td>
                                 <div class="erp-custom-file-upload">
                                     <label class="file-upload-label mb-0 cursor-pointer">
                                         <i class="feather-upload-cloud text-primary fs-14"></i>
-                                        <span class="file-label-text text-muted">Upload Files</span>
+                                        <span class="file-label-text text-muted">${travelTrans.uploadFiles}</span>
                                         <input type="file" name="claims[${lineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
                                     </label>
                                     <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="${travelTrans.removeRow}">
                                     <i class="feather-trash-2 fs-13"></i>
                                 </button>
                             </td>
                         </tr>
                     `;
                     tableBody.insertAdjacentHTML('beforeend', rowTemplate);
+                    safeInitSelect2('#addReportModal');
                     lineIndex++;
                 });
             }
@@ -2040,7 +2050,7 @@
                 if (rows.length > 1) {
                     $(this).closest('tr').remove();
                 } else {
-                    alert('At least one claim line is required in an expense report.');
+                    alert(travelTrans.minOneClaimRequired);
                 }
             });
 
@@ -2073,7 +2083,7 @@
                             <i class="feather-file-text text-primary fs-11"></i>
                             <span class="fw-medium" title="${file.name}">${nameStr}</span>
                             <span class="text-muted fs-10">(${sizeStr})</span>
-                            <i class="feather-x text-danger cursor-pointer ms-1" style="font-size: 11px;" title="Remove file" onclick="removeNewSelectedFile('${rowId}', ${idx}, this)"></i>
+                            <i class="feather-x text-danger cursor-pointer ms-1" style="font-size: 11px;" title="${travelTrans.removeFile}" onclick="removeNewSelectedFile('${rowId}', ${idx}, this)"></i>
                         </span>
                     `;
                     $chipsContainer.append(chipHtml);
@@ -2084,9 +2094,9 @@
                 var hasExistingChips = $td.find('.existing-receipt-chip').length > 0;
 
                 if (totalNewCount > 0) {
-                    fileTextSpan.text(totalNewCount + (totalNewCount > 1 ? ' files selected' : ' file selected'));
+                    fileTextSpan.text(totalNewCount + ' ' + (totalNewCount > 1 ? travelTrans.filesSelected : travelTrans.fileSelected));
                 } else {
-                    fileTextSpan.text(hasExistingChips ? '+ Add Files' : 'Upload Files');
+                    fileTextSpan.text(hasExistingChips ? travelTrans.addFiles : travelTrans.uploadFiles);
                 }
             };
 
@@ -2221,8 +2231,8 @@
                         rPaths.forEach(function(p, pIdx) {
                             receiptLabelHtml += `
                                 <span class="badge bg-white text-success border border-success-subtle shadow-xs px-2 py-1 fs-11 rounded-pill d-inline-flex align-items-center me-1 mb-1 existing-receipt-chip">
-                                    <a href="/storage/${p}" target="_blank" class="text-success text-decoration-none me-1"><i class="feather-paperclip me-1"></i>File ${rPaths.length > 1 ? (pIdx + 1) : ''}</a>
-                                    <i class="feather-x cursor-pointer text-danger ms-1" style="font-size: 11px;" title="Remove file" onclick="removeExistingReceipt(this)"></i>
+                                    <a href="/storage/${p}" target="_blank" class="text-success text-decoration-none me-1"><i class="feather-paperclip me-1"></i>${travelTrans.file} ${rPaths.length > 1 ? (pIdx + 1) : ''}</a>
+                                    <i class="feather-x cursor-pointer text-danger ms-1" style="font-size: 11px;" title="${travelTrans.removeFile}" onclick="removeExistingReceipt(this)"></i>
                                     <input type="hidden" name="claims[${editLineIndex}][existing_receipts][]" value="${p}">
                                 </span>
                             `;
@@ -2233,7 +2243,7 @@
                     if ((claim.status || '').toLowerCase() === 'rejected') {
                         rejectionAlertHtml = `
                             <div class="alert alert-danger py-1 px-2 mb-1 fs-11 rounded" style="border-left: 3px solid #dc3545;">
-                                <i class="feather-alert-triangle me-1"></i><strong>Rejected by HR:</strong> ${claim.rejection_reason || 'Please correct details or amount.'}
+                                <i class="feather-alert-triangle me-1"></i><strong>${travelTrans.rejectedByHr}</strong> ${claim.rejection_reason || travelTrans.correctDetailsOrAmount}
                             </div>
                         `;
                     }
@@ -2244,13 +2254,13 @@
                             <input type="hidden" name="claims[${editLineIndex}][status]" value="${claim.status || ''}">
                             <input type="hidden" name="claims[${editLineIndex}][approved_amount]" value="${claim.approved_amount || ''}">
                             <td>
-                                <select name="claims[${editLineIndex}][category_id]" class="form-select form-select-sm text-dark category-select" required>
-                                    <option value="" disabled>Choose Category...</option>
+                                <select name="claims[${editLineIndex}][category_id]" class="form-select form-select-sm text-dark category-select odoo-select2" data-select2-selector="default" required>
+                                    <option value="" disabled>${travelTrans.chooseCategory}</option>
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat->id }}" ${claim.expense_category_id == {{ $cat->id }} ? 'selected' : ''}>{{ $cat->name }}</option>
                                     @endforeach
                                 </select>
-                                <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
+                                <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> ${travelTrans.exceedsLimit}</div>
                             </td>
                             <td>
                                 <input type="date" name="claims[${editLineIndex}][date]" class="form-control form-control-sm text-dark text-center" required value="${dateStr}">
@@ -2260,22 +2270,22 @@
                             </td>
                             <td>
                                 ${rejectionAlertHtml}
-                                <input type="text" name="claims[${editLineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)" value="${claim.merchant || ''}">
-                                <input type="text" name="claims[${editLineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)" value="${claim.description || ''}">
+                                <input type="text" name="claims[${editLineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="${travelTrans.placeholderMerchant}" value="${claim.merchant || ''}">
+                                <input type="text" name="claims[${editLineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="${travelTrans.placeholderNotes}" value="${claim.description || ''}">
                             </td>
                             <td>
                                 ${receiptLabelHtml}
                                 <div class="erp-custom-file-upload">
                                     <label class="file-upload-label mb-0 cursor-pointer">
                                         <i class="feather-upload-cloud text-primary fs-14"></i>
-                                        <span class="file-label-text text-muted">${rPaths.length > 0 ? '+ Add Files' : 'Upload Files'}</span>
+                                        <span class="file-label-text text-muted">${rPaths.length > 0 ? travelTrans.addFiles : travelTrans.uploadFiles}</span>
                                         <input type="file" name="claims[${editLineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
                                     </label>
                                     <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="${travelTrans.removeRow}">
                                     <i class="feather-trash-2 fs-13"></i>
                                 </button>
                             </td>
@@ -2284,6 +2294,7 @@
                     editTableBody.insertAdjacentHTML('beforeend', rowHtml);
                     editLineIndex++;
                 });
+                safeInitSelect2('#editReportModal');
             });
 
             // Add row inside Edit modal
@@ -2292,13 +2303,13 @@
                 var rowHtml = `
                     <tr class="edit-claim-line-row">
                         <td>
-                            <select name="claims[${editLineIndex}][category_id]" class="form-select form-select-sm text-dark category-select" required>
-                                <option value="" disabled selected>Choose Category...</option>
+                            <select name="claims[${editLineIndex}][category_id]" class="form-select form-select-sm text-dark category-select odoo-select2" data-select2-selector="default" required>
+                                <option value="" disabled selected>${travelTrans.chooseCategory}</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                                 @endforeach
                             </select>
-                            <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> Exceeds limit</div>
+                            <div class="policy-limit-badge text-danger fw-semibold mt-1 fs-11 d-none" style="letter-spacing: 0.2px;"><i class="feather-alert-triangle"></i> ${travelTrans.exceedsLimit}</div>
                         </td>
                         <td>
                             <input type="date" name="claims[${editLineIndex}][date]" class="form-control form-control-sm text-dark text-center" required value="{{ date('Y-m-d') }}">
@@ -2307,27 +2318,28 @@
                             <input type="number" name="claims[${editLineIndex}][amount]" step="0.01" min="0.01" class="form-control form-control-sm text-dark text-end claim-amount-input fw-semibold" placeholder="0.00" required>
                         </td>
                         <td>
-                            <input type="text" name="claims[${editLineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="Merchant (e.g. Uber, Hilton)">
-                            <input type="text" name="claims[${editLineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="Reason / notes (optional)">
+                            <input type="text" name="claims[${editLineIndex}][merchant]" class="form-control form-control-sm text-dark mb-1" placeholder="${travelTrans.placeholderMerchant}">
+                            <input type="text" name="claims[${editLineIndex}][desc]" class="form-control form-control-sm text-dark" placeholder="${travelTrans.placeholderNotes}">
                         </td>
                         <td>
                             <div class="erp-custom-file-upload">
                                 <label class="file-upload-label mb-0 cursor-pointer">
                                     <i class="feather-upload-cloud text-primary fs-14"></i>
-                                    <span class="file-label-text text-muted">Upload Files</span>
+                                    <span class="file-label-text text-muted">${travelTrans.uploadFiles}</span>
                                     <input type="file" name="claims[${editLineIndex}][receipts][]" multiple class="d-none odoo-table-file-input" accept="image/*,application/pdf" onchange="updateRowFileName(this)">
                                 </label>
                                 <div class="new-files-container d-flex flex-wrap gap-1 mt-1 justify-content-start"></div>
                             </div>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="Remove row">
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-edit-line p-0" style="width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="${travelTrans.removeRow}">
                                 <i class="feather-trash-2 fs-13"></i>
                             </button>
                         </td>
                     </tr>
                 `;
                 editTableBody.insertAdjacentHTML('beforeend', rowHtml);
+                safeInitSelect2('#editReportModal');
                 editLineIndex++;
             });
 
@@ -2337,7 +2349,7 @@
                 if (rows.length > 1) {
                     $(this).closest('tr').remove();
                 } else {
-                    alert('At least one claim line is required in an expense report.');
+                    alert(travelTrans.minOneClaimRequired);
                 }
             });
 
@@ -2361,8 +2373,8 @@
                 
                 document.getElementById('view_report_title').innerText = title || '';
                 document.getElementById('view_report_employee').innerText = employee || '';
-                document.getElementById('view_report_travel').innerText = travel || 'None';
-                document.getElementById('view_report_advance').innerText = advance || 'None';
+                document.getElementById('view_report_travel').innerText = travel || travelTrans.none;
+                document.getElementById('view_report_advance').innerText = advance || travelTrans.none;
                 var currSym = '{{ $currencySymbol }}';
                 document.getElementById('view_report_total').innerText = total || (currSym + '0.00');
                 document.getElementById('view_report_adjusted').innerText = adjusted || (currSym + '0.00');
@@ -2386,10 +2398,10 @@
                     channelEl.className = 'badge px-2 py-1 fs-10 ';
                     if (payoutChannel === 'payroll') {
                         channelEl.className += 'bg-soft-info text-info';
-                        channelEl.innerText = 'Payroll';
+                        channelEl.innerText = travelTrans.payroll;
                     } else {
                         channelEl.className += 'bg-soft-primary text-primary';
-                        channelEl.innerText = 'Accounting';
+                        channelEl.innerText = travelTrans.accounting;
                     }
                 } else {
                     channelWrapper.classList.add('d-none');
@@ -2411,7 +2423,15 @@
                 } else {
                     badgeEl.className += 'bg-soft-primary text-primary';
                 }
-                badgeEl.innerText = status.replace('_', ' ');
+                var statusMap = {
+                    'draft': travelTrans.statusDraft,
+                    'submitted': travelTrans.statusSubmitted,
+                    'approved': travelTrans.statusApproved,
+                    'partially_approved': travelTrans.partiallyApproved,
+                    'rejected': travelTrans.statusRejected,
+                    'paid': travelTrans.statusPaid
+                };
+                badgeEl.innerText = statusMap[status.toLowerCase()] || status.replace('_', ' ');
 
                 // Render claims table rows
                 var viewTableBody = document.querySelector('#viewClaimsLinesTable tbody');
@@ -2435,7 +2455,7 @@
                             rPaths = [claim.receipt_path];
                         }
                         if (rPaths.length > 0) {
-                            receiptHtml = rPaths.map((p, idx) => `<a href="/storage/${p}" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-2 fw-bold fs-10 me-1 mb-1"><i class="feather-image me-1"></i>Receipt ${rPaths.length > 1 ? (idx + 1) : ''}</a>`).join('');
+                            receiptHtml = rPaths.map((p, idx) => `<a href="/storage/${p}" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-2 fw-bold fs-10 me-1 mb-1"><i class="feather-image me-1"></i>${travelTrans.receipt} ${rPaths.length > 1 ? (idx + 1) : ''}</a>`).join('');
                         }
                     }
 
@@ -2443,16 +2463,16 @@
                     var itemStatusStr = (claim.status || 'pending').toLowerCase();
                     if (itemStatusStr === 'approved' || itemStatusStr === 'paid') {
                         var appAmt = (claim.approved_amount !== null && claim.approved_amount !== undefined) ? parseFloat(claim.approved_amount) : parseFloat(claim.amount);
-                        var labelText = itemStatusStr === 'paid' ? 'Paid' : 'Approved';
+                        var labelText = itemStatusStr === 'paid' ? travelTrans.statusPaid : travelTrans.statusApproved;
                         var badgeClass = itemStatusStr === 'paid' ? 'bg-soft-primary text-primary' : 'bg-soft-success text-success';
                         itemStatusHtml = `<span class="badge ${badgeClass} px-2 py-1 fs-10"><i class="feather-check-circle me-1"></i>${labelText} (${currSym}${appAmt.toFixed(2)})</span>`;
                     } else if (itemStatusStr === 'rejected') {
-                        itemStatusHtml = `<span class="badge bg-soft-danger text-danger px-2 py-1 fs-10" title="${claim.rejection_reason || ''}"><i class="feather-x-circle me-1"></i>Rejected</span>`;
+                        itemStatusHtml = `<span class="badge bg-soft-danger text-danger px-2 py-1 fs-10" title="${claim.rejection_reason || ''}"><i class="feather-x-circle me-1"></i>${travelTrans.statusRejected}</span>`;
                         if (claim.rejection_reason) {
                             itemStatusHtml += `<br><small class="text-danger fs-11" style="word-break: break-word;">${claim.rejection_reason}</small>`;
                         }
                     } else {
-                        itemStatusHtml = `<span class="badge bg-soft-warning text-warning px-2 py-1 fs-10"><i class="feather-clock me-1"></i>Pending</span>`;
+                        itemStatusHtml = `<span class="badge bg-soft-warning text-warning px-2 py-1 fs-10"><i class="feather-clock me-1"></i>${travelTrans.statusPending}</span>`;
                     }
 
                     var rowHtml = `

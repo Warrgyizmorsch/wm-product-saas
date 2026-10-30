@@ -617,20 +617,6 @@ class AttendanceController extends Controller
             
             $dayObj->check_in_selfie_path = $attRecord ? $attRecord->check_in_selfie_path : null;
             $dayObj->check_out_selfie_path = $attRecord ? $attRecord->check_out_selfie_path : null;
-            // Auto-refresh snapshot if using old watermarked image or missing
-            $hasOldSnapshot = empty($attRecord?->route_snapshot_url) 
-                || str_contains($attRecord->route_snapshot_url, '1792818237')
-                || str_contains($attRecord->route_snapshot_url, '1792821251');
-
-            if ($attRecord && !empty($attRecord->route_polyline) && $hasOldSnapshot) {
-                try {
-                    $refreshedSnapshot = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->regenerateRouteSnapshot($attRecord);
-                    if ($refreshedSnapshot) {
-                        $attRecord->route_snapshot_url = $refreshedSnapshot;
-                    }
-                } catch (\Throwable $e) {}
-            }
-
             $dayObj->check_in_longitude = $attRecord ? $attRecord->check_in_longitude : null;
             $dayObj->check_out_longitude = $attRecord ? $attRecord->check_out_longitude : null;
             $dayObj->total_distance_km = $attRecord ? (float)($attRecord->total_distance_km ?? 0) : 0;

@@ -108,7 +108,8 @@
                                     <td class="text-end">{{ format_currency((float) $row->salary) }}</td>
                                     <td class="text-end">{{ format_currency((float) $row->tds_amount) }}</td>
                                     <td class="text-end pe-3">
-                                        @if ($canExport && (float) $row->tds_amount > 0)
+                                        {{-- Also with nil TDS: employees ask for it for loans and visas. --}}
+                                        @if ($canExport)
                                             <a href="{{ route('accounting.tds.form16', ['employee' => $row->party_id, 'fy' => $fiscal_year]) }}" class="btn btn-sm btn-light border" title="Download Form 16"><i class="feather-download"></i></a>
                                         @endif
                                     </td>

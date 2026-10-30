@@ -479,6 +479,7 @@ Route::prefix('api/hrms/attendance')
         Route::post('/track-location', [AttendanceApiController::class, 'trackLocation'])->name('track-location');
         Route::get('/employee/{employee}', [AttendanceApiController::class, 'getEmployeeLocationLogs'])->name('employee-logs');
         Route::get('/{attendance}/route', [AttendanceApiController::class, 'getRoute'])->name('route');
+        Route::post('/{attendance}/snapshot', [AttendanceApiController::class, 'uploadSnapshot'])->name('snapshot');
         Route::post('/{attendance}/consolidate-route', [AttendanceApiController::class, 'consolidateRoute'])->name('consolidate-route');
         Route::post('/prune-logs', [AttendanceApiController::class, 'pruneLocationLogs'])->name('prune-logs');
     });

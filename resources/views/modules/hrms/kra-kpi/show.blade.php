@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Scorecard #' . $plan->plan_number . ' | KRA & KPI Performance')
-@section('page-title', 'Appraisal Scorecard: ' . $plan->plan_number)
-@section('breadcrumb', 'HRMS / Performance / Scorecard')
+@section('title', __('hrms.kra_kpi.scorecard_title', ['plan' => $plan->plan_number]))
+@section('page-title', __('hrms.kra_kpi.appraisal_scorecard_title', ['plan' => $plan->plan_number]))
+@section('breadcrumb', __('hrms.kra_kpi.breadcrumb_hrms_perf_scorecard'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="light" icon="feather-arrow-left" href="{{ route('hrms.kra-kpi.index') }}" class="border fw-semibold">
-            Back to Hub
+            {{ __('hrms.kra_kpi.back_to_hub') }}
         </x-ui.button>
 
         <!-- Action: Submit Goals (Employee to Evaluator) -->
@@ -15,7 +15,7 @@
             <form method="POST" action="{{ route('hrms.kra-kpi.submit-goals', $plan->id) }}" id="submitGoalsForm" class="d-inline">
                 @csrf
                 <x-ui.button type="button" variant="primary" icon="feather-send" class="fw-bold" onclick="handleSubmitGoalSheet()">
-                    Submit Goals for Approval
+                    {{ __('hrms.kra_kpi.submit_goals_for_approval') }}
                 </x-ui.button>
             </form>
         @endif
@@ -25,7 +25,7 @@
             <form method="POST" action="{{ route('hrms.kra-kpi.approve-goals', $plan->id) }}" id="approveGoalsForm" class="d-inline">
                 @csrf
                 <x-ui.button type="button" variant="success" icon="feather-check-circle" class="fw-bold" onclick="handleApproveGoalSheet()">
-                    Approve Goal Sheet
+                    {{ __('hrms.kra_kpi.approve_goal_sheet') }}
                 </x-ui.button>
             </form>
         @endif
@@ -33,7 +33,7 @@
         <!-- Action: Open Self-Appraisal Modal (Employee Only) -->
         @if(in_array($plan->status, ['approved', 'in_progress']) && $isOwner)
             <x-ui.button variant="primary" icon="feather-edit-3" data-bs-toggle="modal" data-bs-target="#selfAppraisalModal" class="fw-bold">
-                Submit Self-Appraisal
+                {{ __('hrms.kra_kpi.submit_self_appraisal') }}
             </x-ui.button>
         @endif
 
@@ -41,7 +41,7 @@
         @if(($isManager || $isHrOrAdmin) && !$isOwner)
             @if(in_array($plan->status, ['self_reviewed', 'approved']))
                 <x-ui.button variant="primary" icon="feather-award" data-bs-toggle="modal" data-bs-target="#managerAppraisalModal" class="fw-bold">
-                    Submit Evaluator Review
+                    {{ __('hrms.kra_kpi.submit_evaluator_review') }}
                 </x-ui.button>
             @endif
         @endif
@@ -231,18 +231,18 @@
                         <i class="feather-shield fs-18"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold mb-0 text-dark">Performance Improvement Plan (PIP) Active</h6>
-                        <small class="text-muted">A formal 60-day corrective coaching track was initiated for this employee based on their appraisal results.</small>
+                        <h6 class="fw-bold mb-0 text-dark">{{ __('hrms.kra_kpi.pip_active_title') }}</h6>
+                        <small class="text-muted">{{ __('hrms.kra_kpi.pip_active_desc') }}</small>
                     </div>
                 </div>
                 <div>
                     @if($activePip)
                         <x-ui.button variant="warning" size="sm" href="{{ route('hrms.pip.show', $activePip->id) }}" class="fw-bold px-3" icon="feather-external-link">
-                            View Active PIP (#{{ $activePip->pip_number }})
+                            {{ __('hrms.kra_kpi.view_active_pip', ['number' => $activePip->pip_number]) }}
                         </x-ui.button>
                     @else
                         <x-ui.button variant="warning" size="sm" href="{{ route('hrms.pip.index') }}" class="fw-bold px-3" icon="feather-external-link">
-                            View PIP Module
+                            {{ __('hrms.kra_kpi.view_pip_module') }}
                         </x-ui.button>
                     @endif
                 </div>
@@ -254,15 +254,15 @@
                         <i class="feather-alert-triangle fs-18"></i>
                     </div>
                     <div>
-                        <h6 class="fw-bold mb-0 text-danger">Critical Low Performance Detected ({{ $plan->final_score }}% - {{ $plan->final_grade }})</h6>
-                        <small class="text-danger-emphasis">This employee's appraisal score is below the organizational passing threshold (60%).</small>
+                        <h6 class="fw-bold mb-0 text-danger">{{ __('hrms.kra_kpi.critical_low_performance', ['score' => $plan->final_score, 'grade' => $plan->final_grade]) }}</h6>
+                        <small class="text-danger-emphasis">{{ __('hrms.kra_kpi.critical_low_desc') }}</small>
                     </div>
                 </div>
                 @if($isHrOrAdmin)
                     <form method="POST" action="{{ route('hrms.kra-kpi.trigger-pip', $plan->id) }}" id="triggerPipBannerForm" class="m-0">
                         @csrf
-                        <x-ui.button type="button" variant="danger" size="sm" class="fw-bold px-3" icon="feather-external-link" onclick="confirmAction({ title: 'Initiate 60-Day PIP', message: 'Initiate a 60-day formal Performance Improvement Plan (PIP) for this employee?', variant: 'danger', confirmText: 'Initiate PIP' }, function() { document.getElementById('triggerPipBannerForm').submit(); })">
-                            Initiate 60-Day PIP
+                        <x-ui.button type="button" variant="danger" size="sm" class="fw-bold px-3" icon="feather-external-link" onclick="confirmAction({ title: '{{ addslashes(__('hrms.kra_kpi.initiate_60day_pip')) }}', message: '{{ addslashes(__('hrms.kra_kpi.confirm_initiate_60day_pip')) }}', variant: 'danger', confirmText: '{{ addslashes(__('hrms.kra_kpi.initiate_60day_pip')) }}' }, function() { document.getElementById('triggerPipBannerForm').submit(); })">
+                            {{ __('hrms.kra_kpi.initiate_60day_pip') }}
                         </x-ui.button>
                     </form>
                 @endif
@@ -281,13 +281,13 @@
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1">
-                        <h4 class="fw-extrabold text-dark mb-0">{{ $plan->employee->full_name ?? 'Employee' }}</h4>
+                        <h4 class="fw-extrabold text-dark mb-0">{{ $plan->employee->full_name ?? __('hrms.common.employee') }}</h4>
                         <span class="badge bg-soft-primary text-primary fs-11">#{{ $plan->employee->employee_id ?? ('EMP-' . $plan->employee->id) }}</span>
                     </div>
                     <div class="text-muted fs-13">
-                        <strong>{{ $plan->employee->designation->name ?? 'Role N/A' }}</strong> &bull; 
-                        {{ $plan->employee->department->name ?? 'General' }} &bull; 
-                        Reporting to: <strong>{{ $plan->manager->full_name ?? ($plan->employee->reportingManager->full_name ?? 'Direct Manager') }}</strong>
+                        <strong>{{ $plan->employee->designation->name ?? __('hrms.kra_kpi.role_na') }}</strong> &bull; 
+                        {{ $plan->employee->department->name ?? __('hrms.kra_kpi.general_dept') }} &bull; 
+                        {{ __('hrms.kra_kpi.reporting_to') }} <strong>{{ $plan->manager->full_name ?? ($plan->employee->reportingManager->full_name ?? __('hrms.kra_kpi.direct_manager')) }}</strong>
                     </div>
                 </div>
             </div>
@@ -296,16 +296,16 @@
                 <!-- Status Card -->
                 @php
                     $statusBadges = [
-                        'draft' => ['secondary', 'Draft Goals'],
-                        'submitted' => ['info', 'Goals Submitted'],
-                        'approved' => ['primary', 'Goals Active'],
-                        'self_reviewed' => ['warning', 'Self-Reviewed'],
-                        'manager_reviewed' => ['success', 'Completed'],
+                        'draft' => ['secondary', __('hrms.kra_kpi.status_draft_goals')],
+                        'submitted' => ['info', __('hrms.kra_kpi.status_goals_submitted')],
+                        'approved' => ['primary', __('hrms.kra_kpi.status_goals_active')],
+                        'self_reviewed' => ['warning', __('hrms.kra_kpi.status_self_reviewed')],
+                        'manager_reviewed' => ['success', __('hrms.kra_kpi.status_completed')],
                     ];
                     $st = $statusBadges[$plan->status] ?? ['secondary', $plan->status];
                 @endphp
                 <div class="bg-light border rounded-3 px-3 py-2 text-center d-flex flex-column justify-content-between" style="min-width: 175px; min-height: 72px; box-sizing: border-box;">
-                    <span class="text-muted d-block fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">Scorecard Status</span>
+                    <span class="text-muted d-block fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">{{ __('hrms.kra_kpi.scorecard_status') }}</span>
                     <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1">
                         <x-ui.badge variant="{{ $st[0] }}" soft class="fs-11 px-2.5 py-1 text-nowrap">
                             {{ $st[1] }}
@@ -320,7 +320,7 @@
 
                 <!-- Final Score Card -->
                 <div class="bg-light border rounded-3 px-3 py-2 text-center d-flex flex-column justify-content-between" style="min-width: 175px; height: 72px; box-sizing: border-box;">
-                    <span class="text-muted d-block fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">Overall Score</span>
+                    <span class="text-muted d-block fs-10 text-uppercase fw-bold" style="letter-spacing: 0.5px;">{{ __('hrms.kra_kpi.overall_score') }}</span>
                     <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1">
                         @if($plan->final_score !== null && in_array($plan->status, ['self_reviewed', 'manager_reviewed']))
                             @php
@@ -330,11 +330,11 @@
                                 {{ $plan->final_score }}%
                             </span>
                             <span class="fw-bold fs-10 text-{{ $scoreVariant }} mt-1 lh-1 text-nowrap">
-                                {{ $plan->final_grade ?: 'Evaluated' }}
+                                {{ $plan->final_grade ?: __('hrms.kra_kpi.evaluated') }}
                             </span>
                         @else
-                            <span class="text-muted fs-13 fw-semibold lh-1">In Progress</span>
-                            <span class="text-muted fs-10 mt-1 lh-1">Pending Evaluation</span>
+                            <span class="text-muted fs-13 fw-semibold lh-1">{{ __('hrms.kra_kpi.in_progress') }}</span>
+                            <span class="text-muted fs-10 mt-1 lh-1">{{ __('hrms.kra_kpi.pending_evaluation') }}</span>
                         @endif
                     </div>
                 </div>
@@ -345,27 +345,27 @@
         <div class="row g-3 my-3">
             <div class="col-md-3 col-sm-6">
                 <div class="p-3 border rounded bg-light h-100">
-                    <small class="text-muted text-uppercase fs-10 fw-bold">Appraisal Cycle</small>
-                    <div class="fw-bold text-dark fs-14 mt-1">{{ $plan->appraisalCycle->name ?? 'Performance Review' }}</div>
+                    <small class="text-muted text-uppercase fs-10 fw-bold">{{ __('hrms.kra_kpi.th_appraisal_cycle') }}</small>
+                    <div class="fw-bold text-dark fs-14 mt-1">{{ $plan->appraisalCycle->name ?? __('hrms.kra_kpi.performance_review') }}</div>
                     <small class="text-muted fs-11">{{ $plan->appraisalCycle->start_date ? $plan->appraisalCycle->start_date->format('d M Y') : '' }} &rarr; {{ $plan->appraisalCycle->end_date ? $plan->appraisalCycle->end_date->format('d M Y') : '' }}</small>
                 </div>
             </div>
 
             <div class="col-md-3 col-sm-6">
                 <div class="p-3 border rounded bg-light h-100">
-                    <small class="text-muted text-uppercase fs-10 fw-bold">Review Due Date</small>
+                    <small class="text-muted text-uppercase fs-10 fw-bold">{{ __('hrms.kra_kpi.review_due_date') }}</small>
                     <div class="fw-bold text-dark fs-14 mt-1">
-                        {{ $plan->appraisalCycle->self_review_deadline ? $plan->appraisalCycle->self_review_deadline->format('d M Y') : ($plan->appraisalCycle->end_date ? $plan->appraisalCycle->end_date->format('d M Y') : 'End of Cycle') }}
+                        {{ $plan->appraisalCycle->self_review_deadline ? $plan->appraisalCycle->self_review_deadline->format('d M Y') : ($plan->appraisalCycle->end_date ? $plan->appraisalCycle->end_date->format('d M Y') : __('hrms.kra_kpi.end_of_cycle')) }}
                     </div>
                     <small class="fs-11">
                         @if($plan->appraisalCycle->self_review_deadline)
                             @if($plan->appraisalCycle->self_review_deadline->isPast())
-                                <span class="text-danger fw-semibold">Review Window Closed</span>
+                                <span class="text-danger fw-semibold">{{ __('hrms.kra_kpi.review_window_closed') }}</span>
                             @else
                                 <span class="text-muted">{{ $plan->appraisalCycle->self_review_deadline->diffForHumans() }}</span>
                             @endif
                         @else
-                            <span class="text-muted">Self & Evaluator Review</span>
+                            <span class="text-muted">{{ __('hrms.kra_kpi.self_evaluator_review') }}</span>
                         @endif
                     </small>
                 </div>
@@ -374,38 +374,38 @@
             <div class="col-md-3 col-sm-6">
                 <div class="p-3 border rounded bg-light h-100">
                     @if((float)$plan->total_weightage < 100)
-                        <small class="text-muted text-uppercase fs-10 fw-bold">Goal Weightage</small>
+                        <small class="text-muted text-uppercase fs-10 fw-bold">{{ __('hrms.kra_kpi.goal_weightage') }}</small>
                         <div class="fw-bold fs-14 mt-1 text-primary">
                             {{ (float)$plan->total_weightage }}% / 100%
                         </div>
-                        <small class="text-warning fs-11 fw-semibold"><i class="feather-alert-circle me-1"></i>{{ round(100 - (float)$plan->total_weightage, 2) }}% unallocated</small>
+                        <small class="text-warning fs-11 fw-semibold"><i class="feather-alert-circle me-1"></i>{{ __('hrms.kra_kpi.unallocated', ['diff' => round(100 - (float)$plan->total_weightage, 2)]) }}</small>
                     @elseif((float)$plan->total_weightage > 100)
-                        <small class="text-muted text-uppercase fs-10 fw-bold">Goal Weightage</small>
+                        <small class="text-muted text-uppercase fs-10 fw-bold">{{ __('hrms.kra_kpi.goal_weightage') }}</small>
                         <div class="fw-bold fs-14 mt-1 text-danger">
                             {{ (float)$plan->total_weightage }}% / 100%
                         </div>
-                        <small class="text-danger fs-11 fw-semibold"><i class="feather-alert-triangle me-1"></i>Exceeds by {{ round((float)$plan->total_weightage - 100, 2) }}%</small>
+                        <small class="text-danger fs-11 fw-semibold"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.kra_kpi.exceeds_by', ['diff' => round((float)$plan->total_weightage - 100, 2)]) }}</small>
                     @else
-                        <small class="text-muted text-uppercase fs-10 fw-bold">Assigned Goals</small>
+                        <small class="text-muted text-uppercase fs-10 fw-bold">{{ __('hrms.kra_kpi.assigned_goals') }}</small>
                         <div class="fw-bold text-dark fs-14 mt-1">
-                            {{ $plan->items->count() }} Key Performance {{ Str::plural('Indicator', $plan->items->count()) }}
+                            {{ __('hrms.kra_kpi.key_performance_indicators', ['count' => $plan->items->count()]) }}
                         </div>
-                        <small class="text-success fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>100% Weightage Allocated</small>
+                        <small class="text-success fs-11 fw-semibold"><i class="feather-check-circle me-1"></i>{{ __('hrms.kra_kpi.weightage_allocated_100') }}</small>
                     @endif
                 </div>
             </div>
 
             <div class="col-md-3 col-sm-6">
                 <div class="p-3 border rounded bg-light h-100">
-                    <small class="text-muted text-uppercase fs-10 fw-bold">Direct Evaluator</small>
+                    <small class="text-muted text-uppercase fs-10 fw-bold">{{ __('hrms.kra_kpi.direct_evaluator') }}</small>
                     <div class="fw-bold text-dark fs-14 mt-1">
-                        {{ $plan->manager->full_name ?? ($plan->employee->reportingManager->full_name ?? 'Assigned Manager') }}
+                        {{ $plan->manager->full_name ?? ($plan->employee->reportingManager->full_name ?? __('hrms.kra_kpi.assigned_manager')) }}
                     </div>
                     <small class="text-muted fs-11">
                         @if($plan->promotion_recommended)
-                            <span class="text-success fw-bold"><i class="feather-trending-up me-1"></i>Promotion Recommended</span>
+                            <span class="text-success fw-bold"><i class="feather-trending-up me-1"></i>{{ __('hrms.kra_kpi.promotion_recommended') }}</span>
                         @else
-                            Reporting Manager Review
+                            {{ __('hrms.kra_kpi.reporting_manager_review') }}
                         @endif
                     </small>
                 </div>
@@ -418,8 +418,8 @@
                 <div class="d-flex align-items-center gap-3">
                     <i class="feather-alert-octagon fs-18 text-danger"></i>
                     <div>
-                        <strong class="text-danger">Goal Setting Timeline Exceeded:</strong>
-                        <span class="text-dark fs-12 ms-1">The deadline for submitting and approving goals was <strong>{{ $plan->appraisalCycle->goal_setting_deadline->format('d M Y') }}</strong> ({{ $plan->appraisalCycle->goal_setting_deadline->diffForHumans() }}). Please finalize and submit your goal sheet immediately.</span>
+                        <strong class="text-danger">{{ __('hrms.kra_kpi.goal_setting_overdue_title') }}</strong>
+                        <span class="text-dark fs-12 ms-1">{{ __('hrms.kra_kpi.goal_setting_overdue_desc', ['deadline' => $plan->appraisalCycle->goal_setting_deadline->format('d M Y'), 'diff' => $plan->appraisalCycle->goal_setting_deadline->diffForHumans()]) }}</span>
                     </div>
                 </div>
             </div>
@@ -428,8 +428,8 @@
                 <div class="d-flex align-items-center gap-3">
                     <i class="feather-clock fs-18 text-warning"></i>
                     <div>
-                        <strong class="text-warning">Self-Appraisal Submission Overdue:</strong>
-                        <span class="text-dark fs-12 ms-1">The employee self-review deadline was <strong>{{ $plan->appraisalCycle->self_review_deadline->format('d M Y') }}</strong> ({{ $plan->appraisalCycle->self_review_deadline->diffForHumans() }}). Please complete your self-ratings to proceed to Manager Review.</span>
+                        <strong class="text-warning">{{ __('hrms.kra_kpi.self_review_overdue_title') }}</strong>
+                        <span class="text-dark fs-12 ms-1">{{ __('hrms.kra_kpi.self_review_overdue_desc', ['deadline' => $plan->appraisalCycle->self_review_deadline->format('d M Y'), 'diff' => $plan->appraisalCycle->self_review_deadline->diffForHumans()]) }}</span>
                     </div>
                 </div>
             </div>
@@ -440,15 +440,15 @@
                 <div class="d-flex align-items-center gap-3">
                     <i class="feather-alert-triangle fs-18 text-warning flex-shrink-0"></i>
                     <div>
-                        <strong class="text-warning">Goal Weightage Incomplete:</strong>
+                        <strong class="text-warning">{{ __('hrms.kra_kpi.goal_weightage_incomplete_title') }}</strong>
                         <span class="text-dark fs-12 ms-1">
-                            Currently allocated <strong>{{ (float)$plan->total_weightage }}%</strong> of 100% (<strong>{{ round(100 - (float)$plan->total_weightage, 2) }}%</strong> remaining). You can save draft goals freely, but total weight must reach exactly <strong>100%</strong> before the goal sheet can be approved.
+                            {{ __('hrms.kra_kpi.goal_weightage_incomplete_desc', ['weight' => (float)$plan->total_weightage, 'remaining' => round(100 - (float)$plan->total_weightage, 2)]) }}
                         </span>
                     </div>
                 </div>
                 @if($isOwner || $isManager || $isHrOrAdmin)
                     <x-ui.button variant="warning" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addGoalItemModal" class="fw-bold fs-11">
-                        Allocate Remaining {{ round(100 - (float)$plan->total_weightage, 2) }}%
+                        {{ __('hrms.kra_kpi.allocate_remaining', ['diff' => round(100 - (float)$plan->total_weightage, 2)]) }}
                     </x-ui.button>
                 @endif
             </div>
@@ -457,9 +457,9 @@
                 <div class="d-flex align-items-center gap-3">
                     <i class="feather-alert-octagon fs-18 text-danger flex-shrink-0"></i>
                     <div>
-                        <strong class="text-danger">Goal Weightage Exceeded:</strong>
+                        <strong class="text-danger">{{ __('hrms.kra_kpi.goal_weightage_exceeded_title') }}</strong>
                         <span class="text-dark fs-12 ms-1">
-                            Total weightage is <strong>{{ (float)$plan->total_weightage }}%</strong>, which exceeds 100% by <strong>{{ round((float)$plan->total_weightage - 100, 2) }}%</strong>. Please reduce individual KPI weights so the total equals 100% before approving.
+                            {{ __('hrms.kra_kpi.goal_weightage_exceeded_desc', ['weight' => (float)$plan->total_weightage, 'diff' => round((float)$plan->total_weightage - 100, 2)]) }}
                         </span>
                     </div>
                 </div>
@@ -469,11 +469,11 @@
         <!-- GOAL ITEMS & KPI SCORECARD TABLE -->
         <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
             <h5 class="fw-bold text-dark mb-0">
-                <i class="feather-target me-2 text-primary"></i> Assigned KPIs & Evaluation Rubric
+                <i class="feather-target me-2 text-primary"></i> {{ __('hrms.kra_kpi.assigned_kpis_rubric') }}
             </h5>
             @if(in_array($plan->status, ['draft', 'submitted']) && ($isOwner || $isManager || $isHrOrAdmin))
                 <x-ui.button variant="primary" size="sm" icon="feather-edit-2" data-bs-toggle="modal" data-bs-target="#addGoalItemModal" class="fw-bold">
-                    Manage KPI Goals
+                    {{ __('hrms.kra_kpi.manage_kpi_goals') }}
                 </x-ui.button>
             @endif
         </div>
@@ -482,14 +482,14 @@
             <x-ui.table hoverable>
                 <thead>
                     <tr>
-                        <th style="width: 26%;">KPI Title & Strategic Focus</th>
-                        <th style="width: 7%;" class="target-col">Target</th>
-                        <th style="width: 7%;" class="actual-col">Actual</th>
-                        <th style="width: 6%;" class="weight-col">Weight</th>
-                        <th style="width: 19%;">Self-Rating</th>
-                        <th style="width: 19%;">Evaluator Rating</th>
-                        <th style="width: 7%;" class="score-col">Score</th>
-                        <th style="width: 9%;" class="text-end text-nowrap actions-col">Actions</th>
+                        <th style="width: 26%;">{{ __('hrms.kra_kpi.th_kpi_title_focus') }}</th>
+                        <th style="width: 7%;" class="target-col">{{ __('hrms.kra_kpi.th_target') }}</th>
+                        <th style="width: 7%;" class="actual-col">{{ __('hrms.kra_kpi.th_actual') }}</th>
+                        <th style="width: 6%;" class="weight-col">{{ __('hrms.kra_kpi.th_weight') }}</th>
+                        <th style="width: 19%;">{{ __('hrms.kra_kpi.th_self_rating') }}</th>
+                        <th style="width: 19%;">{{ __('hrms.kra_kpi.th_evaluator_rating') }}</th>
+                        <th style="width: 7%;" class="score-col">{{ __('hrms.kra_kpi.th_score') }}</th>
+                        <th style="width: 9%;" class="text-end text-nowrap actions-col">{{ __('hrms.kra_kpi.th_action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -498,9 +498,9 @@
                             $unitLabel = match($item->unit) {
                                 'percentage', '%' => '%',
                                 'currency', '₹', '$' => '₹',
-                                'number', 'qty' => 'Qty',
-                                'rating' => 'Rating',
-                                'boolean' => 'Milestone',
+                                'number', 'qty' => __('hrms.kra_kpi.unit_qty_short'),
+                                'rating' => __('hrms.kra_kpi.unit_rating_scale'),
+                                'boolean' => __('hrms.kra_kpi.unit_milestone_label'),
                                 default => $item->unit,
                             };
                         @endphp
@@ -511,7 +511,7 @@
                                     <div class="small text-muted fs-11 mb-1 text-wrap text-break" style="line-height: 1.35;">{{ $item->description }}</div>
                                 @endif
                                 <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
-                                    <x-ui.badge variant="primary" soft class="fs-10 text-wrap">{{ $item->kraCategory->name ?? 'Strategic Focus' }}</x-ui.badge>
+                                    <x-ui.badge variant="primary" soft class="fs-10 text-wrap">{{ $item->kraCategory->name ?? __('hrms.kra_kpi.strategic_focus') }}</x-ui.badge>
                                     <span class="badge bg-light text-muted border fs-10 text-capitalize text-wrap">{{ str_replace('_', ' ', $item->calculation_type) }}</span>
                                 </div>
                             </td>
@@ -535,7 +535,7 @@
                                         <div class="text-muted fs-11 mt-1 text-wrap text-break" style="line-height: 1.35;">{{ $item->self_comment }}</div>
                                     @endif
                                 @else
-                                    <span class="text-muted fs-12">Not Rated</span>
+                                    <span class="text-muted fs-12">{{ __('hrms.kra_kpi.not_rated') }}</span>
                                 @endif
                             </td>
                             <td>
@@ -545,7 +545,7 @@
                                         <div class="text-muted fs-11 mt-1 text-wrap text-break" style="line-height: 1.35;">{{ $item->manager_comment }}</div>
                                     @endif
                                 @else
-                                    <span class="text-muted fs-12">Pending Review</span>
+                                    <span class="text-muted fs-12">{{ __('hrms.kra_kpi.pending_review') }}</span>
                                 @endif
                             </td>
                             <td class="score-col">
@@ -560,11 +560,11 @@
                             <td class="text-end text-nowrap actions-col" style="vertical-align: top;">
                                 <div class="d-inline-flex justify-content-end align-items-center gap-1">
                                     <!-- View Check-in History Timeline Button -->
-                                    <x-ui.icon-btn type="button" icon="feather-clock" variant="soft-info" size="sm" title="View Check-in History" data-bs-toggle="modal" data-bs-target="#historyModal{{ $item->id }}" />
+                                    <x-ui.icon-btn type="button" icon="feather-clock" variant="soft-info" size="sm" title="{{ __('hrms.kra_kpi.view_checkin_history') }}" data-bs-toggle="modal" data-bs-target="#historyModal{{ $item->id }}" />
 
                                     <!-- Log Progress Check-in Button -->
                                     @if(in_array($plan->status, ['approved', 'in_progress', 'self_reviewed']))
-                                        <x-ui.icon-btn type="button" icon="feather-trending-up" variant="soft-primary" size="sm" title="Log Progress Check-in" data-bs-toggle="modal" data-bs-target="#progressModal{{ $item->id }}" />
+                                        <x-ui.icon-btn type="button" icon="feather-trending-up" variant="soft-primary" size="sm" title="{{ __('hrms.kra_kpi.log_progress_checkin') }}" data-bs-toggle="modal" data-bs-target="#progressModal{{ $item->id }}" />
                                     @endif
 
                                     <!-- Delete Item in Draft (Owner, Manager, or HR/Admin) -->
@@ -572,27 +572,27 @@
                                         <form method="POST" action="{{ route('hrms.kra-kpi.goal-item.destroy', $item->id) }}" id="deleteGoalItemForm{{ $item->id }}" class="d-inline m-0 p-0">
                                             @csrf
                                             @method('DELETE')
-                                            <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="Remove KPI Goal" onclick="confirmAction({ title: 'Remove KPI Goal', message: 'Remove this KPI goal from the scorecard?', variant: 'danger', confirmText: 'Remove Goal' }, function() { document.getElementById('deleteGoalItemForm{{ $item->id }}').submit(); })" />
+                                            <x-ui.icon-btn type="button" icon="feather-trash-2" variant="soft-danger" size="sm" title="{{ __('hrms.kra_kpi.remove_kpi_goal') }}" onclick="confirmAction({ title: '{{ __('hrms.kra_kpi.remove_kpi_goal') }}', message: '{{ __('hrms.kra_kpi.confirm_remove_goal') }}', variant: 'danger', confirmText: '{{ __('hrms.kra_kpi.remove_goal') }}' }, function() { document.getElementById('deleteGoalItemForm{{ $item->id }}').submit(); })" />
                                         </form>
                                     @endif
                                 </div>
 
                                 <!-- MODAL: VIEW CHECK-IN HISTORY TIMELINE -->
-                                <x-ui.modal id="historyModal{{ $item->id }}" title="Check-in History: {{ $item->title }}" size="lg" :showFooter="false">
+                                <x-ui.modal id="historyModal{{ $item->id }}" title="{{ __('hrms.kra_kpi.checkin_history_title', ['title' => $item->title]) }}" size="lg" :showFooter="false">
                                     <div class="p-1">
                                         <!-- Header Summary Box -->
                                         <div class="d-flex align-items-center justify-content-between p-3 rounded-3 bg-light border mb-4 flex-wrap gap-2">
                                             <div>
-                                                <span class="fs-11 text-muted text-uppercase fw-bold d-block">Target vs Current Actual</span>
+                                                <span class="fs-11 text-muted text-uppercase fw-bold d-block">{{ __('hrms.kra_kpi.target_vs_actual') }}</span>
                                                 <div class="fw-bold fs-15 text-dark mt-0.5">
                                                     <span class="text-muted">{{ $item->target }}{{ $unitLabel === '%' ? '%' : ' ' . $unitLabel }}</span>
                                                     <i class="feather-arrow-right mx-1 text-muted fs-12"></i>
-                                                    <span class="text-primary">{{ $item->actual !== null ? $item->actual . ($unitLabel === '%' ? '%' : ' ' . $unitLabel) : 'No Progress Logged' }}</span>
+                                                    <span class="text-primary">{{ $item->actual !== null ? $item->actual . ($unitLabel === '%' ? '%' : ' ' . $unitLabel) : __('hrms.kra_kpi.no_progress_logged') }}</span>
                                                 </div>
                                             </div>
                                             <div class="d-flex align-items-center gap-2">
-                                                <x-ui.badge variant="primary" soft>Weight: {{ $item->weightage }}%</x-ui.badge>
-                                                <x-ui.badge variant="secondary" soft>{{ $item->kraCategory->name ?? 'Strategic Focus' }}</x-ui.badge>
+                                                <x-ui.badge variant="primary" soft>{{ __('hrms.kra_kpi.total_weight_label', ['weight' => $item->weightage]) }}</x-ui.badge>
+                                                <x-ui.badge variant="secondary" soft>{{ $item->kraCategory->name ?? __('hrms.kra_kpi.strategic_focus') }}</x-ui.badge>
                                             </div>
                                         </div>
 
@@ -611,7 +611,7 @@
                                                                         {{ strtoupper(substr($log->loggedBy->name ?? 'U', 0, 2)) }}
                                                                     </div>
                                                                     <div>
-                                                                        <span class="fw-bold text-dark fs-12">{{ $log->loggedBy->name ?? 'System User' }}</span>
+                                                                        <span class="fw-bold text-dark fs-12">{{ $log->loggedBy->name ?? __('hrms.kra_kpi.system_user') }}</span>
                                                                         <span class="text-muted fs-11 ms-1">&bull; {{ $log->created_at->format('d M Y, h:i A') }}</span>
                                                                     </div>
                                                                 </div>
@@ -628,7 +628,7 @@
                                                                     {{ $log->notes }}
                                                                 </div>
                                                             @else
-                                                                <div class="small text-muted fs-11 fst-italic mt-1">No additional notes provided.</div>
+                                                                <div class="small text-muted fs-11 fst-italic mt-1">{{ __('hrms.kra_kpi.no_additional_notes') }}</div>
                                                             @endif
                                                         </div>
                                                     </div>
@@ -637,32 +637,32 @@
                                         @else
                                             <div class="text-center py-4 text-muted">
                                                 <i class="feather-clock fs-32 d-block mb-2 text-muted"></i>
-                                                <h6 class="fw-bold mb-1">No Check-in History Yet</h6>
-                                                <p class="fs-12 mb-0">No periodic progress updates or check-ins have been recorded for this KPI goal.</p>
+                                                <h6 class="fw-bold mb-1">{{ __('hrms.kra_kpi.no_checkin_history_yet') }}</h6>
+                                                <p class="fs-12 mb-0">{{ __('hrms.kra_kpi.no_checkin_history_desc') }}</p>
                                             </div>
                                         @endif
 
                                         <div class="mt-4 pt-3 border-top d-flex justify-content-end">
-                                            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                                            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
                                         </div>
                                     </div>
                                 </x-ui.modal>
 
                                 <!-- MODAL: LOG PROGRESS CHECK-IN FOR THIS ITEM -->
-                                <x-ui.modal id="progressModal{{ $item->id }}" title="Log Progress: {{ $item->title }}" size="md" :showFooter="false">
+                                <x-ui.modal id="progressModal{{ $item->id }}" title="{{ __('hrms.kra_kpi.log_progress_title', ['title' => $item->title]) }}" size="md" :showFooter="false">
                                     <form method="POST" action="{{ route('hrms.kra-kpi.log-progress', $item->id) }}">
                                         @csrf
                                         <div class="row g-3">
                                             <div class="col-12">
-                                                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Current Value / Milestone Achieved ({{ $unitLabel }})" name="current_value" value="{{ $item->actual ?? $item->target }}" :required="true" helperText="Target is: {{ $item->target }} {{ $unitLabel }}" />
+                                                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="{{ __('hrms.kra_kpi.current_value_label', ['unit' => $unitLabel]) }}" name="current_value" value="{{ $item->actual ?? $item->target }}" :required="true" helperText="{{ __('hrms.kra_kpi.target_helper', ['target' => $item->target, 'unit' => $unitLabel]) }}" />
                                             </div>
                                             <div class="col-12">
-                                                <x-ui.odoo-form-ui type="textarea" label="Progress Notes / Evidence" name="notes" rows="3" placeholder="Briefly describe progress achieved..." />
+                                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.kra_kpi.progress_notes_evidence') }}" name="notes" rows="3" placeholder="{{ __('hrms.kra_kpi.placeholder_progress_notes') }}" />
                                             </div>
                                         </div>
                                         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-                                            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-                                            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Save Check-in</x-ui.button>
+                                            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                                            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_save_checkin') }}</x-ui.button>
                                         </div>
                                     </form>
                                 </x-ui.modal>
@@ -672,12 +672,12 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-target fs-32 d-block mb-2 text-muted"></i>
-                                <h6 class="fw-bold mb-1">No KPI Goals Assigned Yet</h6>
+                                <h6 class="fw-bold mb-1">{{ __('hrms.kra_kpi.no_goals_assigned_yet') }}</h6>
                                 <p class="fs-12 mb-0">
                                     @if($isManager || $isHrOrAdmin)
-                                        Click "Add KPI Goals" above to assign performance metrics to this scorecard.
+                                        {{ __('hrms.kra_kpi.manager_add_goals_tip') }}
                                     @else
-                                        Your manager or HR will assign performance goals for this appraisal cycle.
+                                        {{ __('hrms.kra_kpi.employee_wait_goals_tip') }}
                                     @endif
                                 </p>
                             </td>
@@ -692,7 +692,7 @@
             @if($plan->employee_comments)
                 <div class="col-md-4">
                     <div class="card border rounded-3 p-3 bg-light">
-                        <small class="text-muted fw-bold text-uppercase fs-10">Employee Self-Assessment Feedback</small>
+                        <small class="text-muted fw-bold text-uppercase fs-10">{{ __('hrms.kra_kpi.employee_self_assessment_feedback') }}</small>
                         <p class="text-dark fs-13 mb-0 mt-1.5">{{ $plan->employee_comments }}</p>
                     </div>
                 </div>
@@ -701,7 +701,7 @@
             @if($plan->manager_comments)
                 <div class="col-md-4">
                     <div class="card border rounded-3 p-3 bg-light">
-                        <small class="text-muted fw-bold text-uppercase fs-10">Manager Review Comments</small>
+                        <small class="text-muted fw-bold text-uppercase fs-10">{{ __('hrms.kra_kpi.manager_review_comments') }}</small>
                         <p class="text-dark fs-13 mb-0 mt-1.5">{{ $plan->manager_comments }}</p>
                     </div>
                 </div>
@@ -710,7 +710,7 @@
             @if($plan->hr_comments)
                 <div class="col-md-4">
                     <div class="card border rounded-3 p-3 bg-light">
-                        <small class="text-muted fw-bold text-uppercase fs-10">HR Normalization & Committee Notes</small>
+                        <small class="text-muted fw-bold text-uppercase fs-10">{{ __('hrms.kra_kpi.hr_normalization_notes') }}</small>
                         <p class="text-dark fs-13 mb-0 mt-1.5">{{ $plan->hr_comments }}</p>
                     </div>
                 </div>
@@ -721,16 +721,16 @@
 </div>
 
 <!-- MODAL: MANAGE KPI GOALS TO SCORECARD (MULTI-ROW REPEATER) -->
-<x-ui.modal id="addGoalItemModal" title="Manage KPI Goals & Weights" size="xl" :showFooter="false">
+<x-ui.modal id="addGoalItemModal" title="{{ __('hrms.kra_kpi.manage_kpi_goals_weights') }}" size="xl" :showFooter="false">
     <form id="addGoalItemForm" method="POST" action="{{ route('hrms.kra-kpi.goal-item.store', $plan->id) }}">
         @csrf
         <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
             <div>
-                <small class="text-muted">Review, rebalance weights, edit targets, or add new KPI goals from library or custom input.</small>
+                <small class="text-muted">{{ __('hrms.kra_kpi.manage_goals_subtitle') }}</small>
             </div>
             <div>
                 <x-ui.button type="button" variant="light" size="sm" icon="feather-plus" id="addScorecardRowBtn" class="border fw-semibold">
-                    Add Goal Row
+                    {{ __('hrms.kra_kpi.add_goal_row') }}
                 </x-ui.button>
             </div>
         </div>
@@ -738,13 +738,13 @@
         <x-ui.odoo-form-ui type="table">
             <thead>
                 <tr>
-                    <th style="width: 27%;">KPI Metric / Title <span class="text-danger">*</span></th>
-                    <th style="width: 21%;">KRA Focus</th>
-                    <th style="width: 17%;">Direction</th>
-                    <th style="width: 14%;">Unit</th>
-                    <th style="width: 10%;">Target <span class="text-danger">*</span></th>
-                    <th style="width: 11%;">Weight % <span class="text-danger">*</span></th>
-                    <th style="width: 42px;" class="text-center">Action</th>
+                    <th style="width: 27%;">{{ __('hrms.kra_kpi.th_kpi_metric_title') }} <span class="text-danger">*</span></th>
+                    <th style="width: 21%;">{{ __('hrms.kra_kpi.th_kra_focus') }}</th>
+                    <th style="width: 17%;">{{ __('hrms.kra_kpi.th_direction') }}</th>
+                    <th style="width: 14%;">{{ __('hrms.kra_kpi.th_unit') }}</th>
+                    <th style="width: 10%;">{{ __('hrms.kra_kpi.th_target') }} <span class="text-danger">*</span></th>
+                    <th style="width: 11%;">{{ __('hrms.kra_kpi.th_weight') }} <span class="text-danger">*</span></th>
+                    <th style="width: 42px;" class="text-center">{{ __('hrms.kra_kpi.th_action') }}</th>
                 </tr>
             </thead>
             <tbody id="scorecardRowsTbody">
@@ -759,8 +759,8 @@
                             <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item->id }}" />
                             <div class="kpi-select-wrap {{ $isStandard ? 'd-flex' : 'd-none' }} align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kpi-row-select" style="width: 100%;">
-                                    <option value="">-- Choose Standard KPI --</option>
-                                    <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_standard_kpi') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kpi') }}</option>
                                     @foreach($kpiMasters as $km)
                                         <option value="{{ $km->name }}"
                                             data-kpi-id="{{ $km->id }}"
@@ -777,8 +777,8 @@
                                 </select>
                             </div>
                             <div class="kpi-input-wrap {{ $isStandard ? 'd-none' : 'd-flex' }} align-items-center gap-1">
-                                <input type="text" name="items[{{ $index }}][title]" class="odoo-table-input kpi-title-input" value="{{ $item->title }}" placeholder="Type custom goal title..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToRowKpiSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" name="items[{{ $index }}][title]" class="odoo-table-input kpi-title-input" value="{{ $item->title }}" placeholder="{{ __('hrms.kra_kpi.placeholder_custom_goal') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToRowKpiSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -786,8 +786,8 @@
                         <td>
                             <div class="kra-select-wrap {{ ($isStandard && $kraCategoryName) ? 'd-none' : 'd-flex' }} align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kra-row-select" style="width: 100%;">
-                                    <option value="">-- Choose KRA Focus --</option>
-                                    <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_kra_focus') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kra') }}</option>
                                     @foreach($kraCategories as $kra)
                                         <option value="{{ $kra->id }}" {{ $item->kra_category_id == $kra->id ? 'selected' : '' }}>{{ $kra->name }}</option>
                                     @endforeach
@@ -795,14 +795,14 @@
                             </div>
                             <div class="kra-locked-wrap {{ ($isStandard && $kraCategoryName) ? 'd-flex' : 'd-none' }} align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ __('hrms.kra_kpi.fixed_standard_kpi_category') }}"></i>
                                     <span class="kra-locked-text text-truncate fw-medium text-dark">{{ $kraCategoryName }}</span>
                                 </div>
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ __('hrms.kra_kpi.library_badge') }}</span>
                             </div>
                             <div class="kra-input-wrap d-none align-items-center gap-1">
-                                <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToRowKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ __('hrms.kra_kpi.type_custom_kra') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToRowKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -810,18 +810,18 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[{{ $index }}][calculation_type]">
-                                <option value="higher_is_better" {{ $item->calculation_type === 'higher_is_better' ? 'selected' : '' }}>Higher is Better</option>
-                                <option value="lower_is_better" {{ $item->calculation_type === 'lower_is_better' ? 'selected' : '' }}>Lower is Better</option>
-                                <option value="milestone" {{ $item->calculation_type === 'milestone' ? 'selected' : '' }}>Milestone</option>
+                                <option value="higher_is_better" {{ $item->calculation_type === 'higher_is_better' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.dir_higher_short') }}</option>
+                                <option value="lower_is_better" {{ $item->calculation_type === 'lower_is_better' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.dir_lower_short') }}</option>
+                                <option value="milestone" {{ $item->calculation_type === 'milestone' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.dir_milestone_short') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[{{ $index }}][unit]">
                                 <option value="percentage" {{ in_array($item->unit, ['percentage', '%']) ? 'selected' : '' }}>%</option>
-                                <option value="number" {{ in_array($item->unit, ['number', 'qty']) ? 'selected' : '' }}>Qty</option>
-                                <option value="currency" {{ in_array($item->unit, ['currency', '₹', '$']) ? 'selected' : '' }}>₹</option>
-                                <option value="rating" {{ $item->unit === 'rating' ? 'selected' : '' }}>Rating (1-5)</option>
-                                <option value="boolean" {{ in_array($item->unit, ['boolean', 'milestone']) ? 'selected' : '' }}>Milestone</option>
+                                <option value="number" {{ in_array($item->unit, ['number', 'qty']) ? 'selected' : '' }}>{{ __('hrms.kra_kpi.unit_qty_short') }}</option>
+                                <option value="currency" {{ in_array($item->unit, ['currency', '₹', '$']) ? 'selected' : '' }}>{{ __('hrms.kra_kpi.unit_currency_symbol') }}</option>
+                                <option value="rating" {{ $item->unit === 'rating' ? 'selected' : '' }}>{{ __('hrms.kra_kpi.unit_rating_scale') }}</option>
+                                <option value="boolean" {{ in_array($item->unit, ['boolean', 'milestone']) ? 'selected' : '' }}>{{ __('hrms.kra_kpi.unit_milestone_label') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -831,7 +831,7 @@
                             <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" name="items[{{ $index }}][weightage]" value="{{ $item->weightage }}" class="row-weight-input" :required="true" />
                         </td>
                         <td class="text-center">
-                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-scorecard-row" title="Remove Goal" />
+                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-scorecard-row" title="{{ __('hrms.kra_kpi.remove_goal') }}" />
                         </td>
                     </tr>
                 @empty
@@ -839,8 +839,8 @@
                         <td>
                             <div class="kpi-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kpi-row-select" style="width: 100%;">
-                                    <option value="">-- Choose Standard KPI --</option>
-                                    <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_standard_kpi') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kpi') }}</option>
                                     @foreach($kpiMasters as $km)
                                         <option value="{{ $km->name }}"
                                             data-kpi-id="{{ $km->id }}"
@@ -856,8 +856,8 @@
                                 </select>
                             </div>
                             <div class="kpi-input-wrap d-none align-items-center gap-1">
-                                <input type="text" name="items[0][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToRowKpiSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" name="items[0][title]" class="odoo-table-input kpi-title-input" placeholder="{{ __('hrms.kra_kpi.placeholder_custom_goal') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToRowKpiSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -865,8 +865,8 @@
                         <td>
                             <div class="kra-select-wrap d-flex align-items-center" style="width: 100%;">
                                 <select class="odoo-table-select odoo-select2 kra-row-select" style="width: 100%;">
-                                    <option value="">-- Choose KRA Focus --</option>
-                                    <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+                                    <option value="">{{ __('hrms.kra_kpi.choose_kra_focus') }}</option>
+                                    <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kra') }}</option>
                                     @foreach($kraCategories as $kra)
                                         <option value="{{ $kra->id }}">{{ $kra->name }}</option>
                                     @endforeach
@@ -874,14 +874,14 @@
                             </div>
                             <div class="kra-locked-wrap d-none align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                                    <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ __('hrms.kra_kpi.fixed_standard_kpi_category') }}"></i>
                                     <span class="kra-locked-text text-truncate fw-medium text-dark"></span>
                                 </div>
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ __('hrms.kra_kpi.library_badge') }}</span>
                             </div>
                             <div class="kra-input-wrap d-none align-items-center gap-1">
-                                <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToRowKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                                <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ __('hrms.kra_kpi.type_custom_kra') }}" />
+                                <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToRowKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                                     <i class="feather-list"></i>
                                 </button>
                             </div>
@@ -889,18 +889,18 @@
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[0][calculation_type]">
-                                <option value="higher_is_better">Higher is Better</option>
-                                <option value="lower_is_better">Lower is Better</option>
-                                <option value="milestone">Milestone</option>
+                                <option value="higher_is_better">{{ __('hrms.kra_kpi.dir_higher_short') }}</option>
+                                <option value="lower_is_better">{{ __('hrms.kra_kpi.dir_lower_short') }}</option>
+                                <option value="milestone">{{ __('hrms.kra_kpi.dir_milestone_short') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
                             <x-ui.odoo-form-ui type="select" name="items[0][unit]">
                                 <option value="percentage">%</option>
-                                <option value="number">Qty</option>
-                                <option value="currency">₹</option>
-                                <option value="rating">Rating (1-5)</option>
-                                <option value="boolean">Milestone</option>
+                                <option value="number">{{ __('hrms.kra_kpi.unit_qty_short') }}</option>
+                                <option value="currency">{{ __('hrms.kra_kpi.unit_currency_symbol') }}</option>
+                                <option value="rating">{{ __('hrms.kra_kpi.unit_rating_scale') }}</option>
+                                <option value="boolean">{{ __('hrms.kra_kpi.unit_milestone_label') }}</option>
                             </x-ui.odoo-form-ui>
                         </td>
                         <td>
@@ -910,7 +910,7 @@
                             <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" name="items[0][weightage]" value="25" class="row-weight-input" :required="true" />
                         </td>
                         <td class="text-center">
-                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-scorecard-row" title="Remove Goal" />
+                            <x-ui.icon-btn variant="soft-danger" icon="feather-trash-2" size="sm" class="remove-scorecard-row" title="{{ __('hrms.kra_kpi.remove_goal') }}" />
                         </td>
                     </tr>
                 @endforelse
@@ -919,69 +919,69 @@
 
         <div class="mt-4 pt-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="d-flex align-items-center gap-2">
-                <span class="fs-12 text-muted fw-semibold">Total Scorecard Weight:</span>
+                <span class="fs-12 text-muted fw-semibold">{{ __('hrms.kra_kpi.total_scorecard_weight') }}</span>
                 <span id="scorecardTotalWeightBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle fs-12 fw-bold">--</span>
                 <small class="text-muted fs-11" id="scorecardWeightTip"></small>
             </div>
             <div class="d-flex gap-2">
-                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-                <x-ui.button type="submit" id="saveScorecardGoalsBtn" variant="primary" class="fw-bold px-4">Save Goals to Scorecard</x-ui.button>
+                <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                <x-ui.button type="submit" id="saveScorecardGoalsBtn" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.save_goals_to_scorecard') }}</x-ui.button>
             </div>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- MODAL: SELF-APPRAISAL -->
-<x-ui.modal id="selfAppraisalModal" title="Self-Appraisal Evaluation" size="lg" :showFooter="false">
+<x-ui.modal id="selfAppraisalModal" title="{{ __('hrms.kra_kpi.self_appraisal_evaluation') }}" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.self-appraisal', $plan->id) }}">
         @csrf
-        <p class="text-muted fs-13 mb-3">Rate your performance on each assigned KPI goal on a 1.0 to 5.0 scale.</p>
+        <p class="text-muted fs-13 mb-3">{{ __('hrms.kra_kpi.self_appraisal_desc') }}</p>
         <div class="d-flex flex-column gap-3">
             @foreach($plan->items as $item)
                 <div class="p-3 border rounded-2 bg-light">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="fw-bold text-dark">{{ $item->title }}</span>
-                        <span class="badge bg-white border text-muted">Target: {{ $item->target }} {{ $item->unit }}</span>
+                        <span class="badge bg-white border text-muted">{{ __('hrms.kra_kpi.target_badge', ['target' => $item->target, 'unit' => $item->unit]) }}</span>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-3">
-                            <x-ui.odoo-form-ui type="input" inputType="number" step="0.1" label="Self-Rating (1-5)" name="items[{{ $item->id }}][self_rating]" value="{{ $item->self_rating ?? 4.0 }}" :required="true" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" step="0.1" label="{{ __('hrms.kra_kpi.self_rating_label') }}" name="items[{{ $item->id }}][self_rating]" value="{{ $item->self_rating ?? 4.0 }}" :required="true" />
                         </div>
                         <div class="col-md-9">
-                            <x-ui.odoo-form-ui type="input" label="Self-Comments" name="items[{{ $item->id }}][self_comment]" value="{{ $item->self_comment }}" placeholder="Evidence of work..." />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.kra_kpi.self_comments_label') }}" name="items[{{ $item->id }}][self_comment]" value="{{ $item->self_comment }}" placeholder="{{ __('hrms.kra_kpi.placeholder_evidence') }}" />
                         </div>
                     </div>
                 </div>
             @endforeach
         </div>
         <div class="mt-3">
-            <x-ui.odoo-form-ui type="textarea" label="Overall Self-Appraisal Summary / Aspirations" name="employee_comments" rows="3" placeholder="Summary of your performance throughout this cycle..." />
+            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.kra_kpi.overall_self_summary') }}" name="employee_comments" rows="3" placeholder="{{ __('hrms.kra_kpi.placeholder_self_summary') }}" />
         </div>
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Submit Self-Appraisal</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_submit_self_appraisal') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
 
 <!-- MODAL: EVALUATOR EVALUATION -->
-<x-ui.modal id="managerAppraisalModal" title="Evaluator Review & Scoring" size="lg" :showFooter="false">
+<x-ui.modal id="managerAppraisalModal" title="{{ __('hrms.kra_kpi.evaluator_review_scoring') }}" size="lg" :showFooter="false">
     <form method="POST" action="{{ route('hrms.kra-kpi.manager-appraisal', $plan->id) }}">
         @csrf
-        <p class="text-muted fs-13 mb-3">Submit your evaluator ratings (1.0 to 5.0) and organizational core competency score.</p>
+        <p class="text-muted fs-13 mb-3">{{ __('hrms.kra_kpi.evaluator_desc') }}</p>
         <div class="d-flex flex-column gap-3">
             @foreach($plan->items as $item)
                 <div class="p-3 border rounded-2 bg-light">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="fw-bold text-dark">{{ $item->title }}</span>
-                        <span class="text-muted fs-11">Employee Self-Rating: <strong>{{ $item->self_rating ?? 'N/A' }}/5.0</strong></span>
+                        <span class="text-muted fs-11">{{ __('hrms.kra_kpi.employee_self_rating_label', ['rating' => $item->self_rating ?? 'N/A']) }}</span>
                     </div>
                     <div class="row g-2 mt-1">
                         <div class="col-md-3">
-                            <x-ui.odoo-form-ui type="input" inputType="number" step="0.1" label="Evaluator Rating (1-5)" name="items[{{ $item->id }}][manager_rating]" value="{{ $item->manager_rating ?? ($item->self_rating ?? 4.0) }}" :required="true" />
+                            <x-ui.odoo-form-ui type="input" inputType="number" step="0.1" label="{{ __('hrms.kra_kpi.evaluator_rating_label') }}" name="items[{{ $item->id }}][manager_rating]" value="{{ $item->manager_rating ?? ($item->self_rating ?? 4.0) }}" :required="true" />
                         </div>
                         <div class="col-md-9">
-                            <x-ui.odoo-form-ui type="input" label="Evaluator Feedback" name="items[{{ $item->id }}][manager_comment]" value="{{ $item->manager_comment }}" placeholder="Evaluator remarks on this goal..." />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.kra_kpi.evaluator_feedback_label') }}" name="items[{{ $item->id }}][manager_comment]" value="{{ $item->manager_comment }}" placeholder="{{ __('hrms.kra_kpi.placeholder_evaluator_remarks') }}" />
                         </div>
                     </div>
                 </div>
@@ -989,20 +989,20 @@
         </div>
         <div class="row g-3 mt-2">
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="Values & Competency Score %" name="competency_score" value="85.00" :required="true" />
+                <x-ui.odoo-form-ui type="input" inputType="number" step="0.01" label="{{ __('hrms.kra_kpi.values_competency_score') }}" name="competency_score" value="85.00" :required="true" />
             </div>
             <div class="col-md-6 d-flex align-items-center pt-3">
-                <x-ui.odoo-form-ui type="checkbox" label="Promotion Recommended" name="promotion_recommended" :checked="$plan->promotion_recommended">
-                    Recommend for Promotion / Role Upgrade
+                <x-ui.odoo-form-ui type="checkbox" label="{{ __('hrms.kra_kpi.promotion_recommended') }}" name="promotion_recommended" :checked="$plan->promotion_recommended">
+                    {{ __('hrms.kra_kpi.recommend_for_promotion') }}
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-12">
-                <x-ui.odoo-form-ui type="textarea" label="Evaluator Feedback & Growth Plan" name="manager_comments" rows="3" placeholder="Provide strategic performance remarks..." />
+                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.kra_kpi.growth_plan_label') }}" name="manager_comments" rows="3" placeholder="{{ __('hrms.kra_kpi.placeholder_growth_plan') }}" />
             </div>
         </div>
         <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">Submit Evaluator Review</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+            <x-ui.button type="submit" variant="primary" class="fw-bold px-4">{{ __('hrms.kra_kpi.btn_submit_evaluator_review') }}</x-ui.button>
         </div>
     </form>
 </x-ui.modal>
@@ -1017,11 +1017,11 @@
 
         if (itemCount === 0) {
             confirmAction({
-                title: 'No KPI Goals Assigned',
-                message: 'Cannot approve an empty goal sheet. Please assign at least one KPI goal first.',
+                title: '{{ __('hrms.kra_kpi.no_goals_assigned_title') }}',
+                message: '{{ __('hrms.kra_kpi.cannot_approve_empty_goals') }}',
                 variant: 'warning',
-                confirmText: 'Add KPI Goals',
-                cancelText: 'Close',
+                confirmText: '{{ __('hrms.kra_kpi.add_kpi_goals_btn') }}',
+                cancelText: '{{ __('hrms.common.close') }}',
                 onConfirm: function() {
                     const modalEl = document.getElementById('addGoalItemModal');
                     if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1034,11 +1034,11 @@
             const diff = Math.round(Math.abs(100 - totalWeight) * 100) / 100;
             if (totalWeight < 100) {
                 confirmAction({
-                    title: 'Goal Weightage Incomplete',
-                    message: `Total weightage is currently ${totalWeight}%. You still have ${diff}% unallocated. Total weight must equal exactly 100% before approval.`,
+                    title: '{{ __('hrms.kra_kpi.goal_weightage_incomplete_dialog_title') }}',
+                    message: '{{ __('hrms.kra_kpi.weightage_incomplete_dialog_approve') }}'.replace(':total', totalWeight).replace(':diff', diff),
                     variant: 'warning',
-                    confirmText: `Allocate Remaining ${diff}%`,
-                    cancelText: 'Close',
+                    confirmText: '{{ __('hrms.kra_kpi.allocate_remaining_btn') }}'.replace(':diff', diff),
+                    cancelText: '{{ __('hrms.common.close') }}',
                     onConfirm: function() {
                         const modalEl = document.getElementById('addGoalItemModal');
                         if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1046,10 +1046,10 @@
                 });
             } else {
                 confirmAction({
-                    title: 'Goal Weightage Exceeded',
-                    message: `Total weightage is currently ${totalWeight}%, which exceeds 100% by ${diff}%. Please reduce individual KPI weights so the total equals 100% before approving.`,
+                    title: '{{ __('hrms.kra_kpi.goal_weightage_exceeded_dialog_title') }}',
+                    message: '{{ __('hrms.kra_kpi.weightage_exceeded_dialog_approve') }}'.replace(':total', totalWeight).replace(':diff', diff),
                     variant: 'danger',
-                    confirmText: 'Understood',
+                    confirmText: '{{ __('hrms.kra_kpi.understood_btn') }}',
                     hideCancel: true
                 });
             }
@@ -1057,10 +1057,10 @@
         }
 
         confirmAction({
-            title: 'Approve & Activate Goals',
-            message: 'Approve assigned goals for this employee and activate this scorecard for progress tracking?',
+            title: '{{ __('hrms.kra_kpi.approve_activate_goals_title') }}',
+            message: '{{ __('hrms.kra_kpi.confirm_approve_goals_message') }}',
             variant: 'success',
-            confirmText: 'Approve Goals'
+            confirmText: '{{ __('hrms.kra_kpi.approve_goals_btn') }}'
         }, function() {
             document.getElementById('approveGoalsForm').submit();
         });
@@ -1072,11 +1072,11 @@
 
         if (itemCount === 0) {
             confirmAction({
-                title: 'No KPI Goals Assigned',
-                message: 'Cannot submit an empty goal sheet. Please assign at least one KPI goal first.',
+                title: '{{ __('hrms.kra_kpi.no_goals_assigned_title') }}',
+                message: '{{ __('hrms.kra_kpi.cannot_submit_empty_goals') }}',
                 variant: 'warning',
-                confirmText: 'Add KPI Goals',
-                cancelText: 'Close',
+                confirmText: '{{ __('hrms.kra_kpi.add_kpi_goals_btn') }}',
+                cancelText: '{{ __('hrms.common.close') }}',
                 onConfirm: function() {
                     const modalEl = document.getElementById('addGoalItemModal');
                     if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1089,11 +1089,11 @@
             const diff = Math.round(Math.abs(100 - totalWeight) * 100) / 100;
             if (totalWeight < 100) {
                 confirmAction({
-                    title: 'Goal Weightage Incomplete',
-                    message: `Total weightage is currently ${totalWeight}%. You still have ${diff}% unallocated. Total weight must equal exactly 100% before submission.`,
+                    title: '{{ __('hrms.kra_kpi.goal_weightage_incomplete_dialog_title') }}',
+                    message: '{{ __('hrms.kra_kpi.weightage_incomplete_dialog_submit') }}'.replace(':total', totalWeight).replace(':diff', diff),
                     variant: 'warning',
-                    confirmText: `Allocate Remaining ${diff}%`,
-                    cancelText: 'Close',
+                    confirmText: '{{ __('hrms.kra_kpi.allocate_remaining_btn') }}'.replace(':diff', diff),
+                    cancelText: '{{ __('hrms.common.close') }}',
                     onConfirm: function() {
                         const modalEl = document.getElementById('addGoalItemModal');
                         if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1101,10 +1101,10 @@
                 });
             } else {
                 confirmAction({
-                    title: 'Goal Weightage Exceeded',
-                    message: `Total weightage is currently ${totalWeight}%, which exceeds 100% by ${diff}%. Please reduce individual KPI weights so the total equals 100% before submission.`,
+                    title: '{{ __('hrms.kra_kpi.goal_weightage_exceeded_dialog_title') }}',
+                    message: '{{ __('hrms.kra_kpi.weightage_exceeded_dialog_submit') }}'.replace(':total', totalWeight).replace(':diff', diff),
                     variant: 'danger',
-                    confirmText: 'Understood',
+                    confirmText: '{{ __('hrms.kra_kpi.understood_btn') }}',
                     hideCancel: true
                 });
             }
@@ -1112,10 +1112,10 @@
         }
 
         confirmAction({
-            title: 'Submit Goals for Approval',
-            message: 'Submit your assigned KPI goals to your manager for formal approval?',
+            title: '{{ __('hrms.kra_kpi.submit_goals_approval_title') }}',
+            message: '{{ __('hrms.kra_kpi.confirm_submit_goals_message') }}',
             variant: 'primary',
-            confirmText: 'Submit Goals'
+            confirmText: '{{ __('hrms.kra_kpi.submit_goals_btn') }}'
         }, function() {
             document.getElementById('submitGoalsForm').submit();
         });
@@ -1123,8 +1123,8 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         const kpiOptionsHtml = `
-            <option value="">-- Choose Standard KPI --</option>
-            <option value="__custom__">+ Add Custom KPI (Type Manually)</option>
+            <option value="">{{ __('hrms.kra_kpi.choose_standard_kpi') }}</option>
+            <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kpi') }}</option>
             @foreach($kpiMasters as $km)
                 <option value="{{ addslashes($km->name) }}"
                     data-kpi-id="{{ $km->id }}"
@@ -1140,8 +1140,8 @@
         `;
 
         const kraOptionsHtml = `
-            <option value="">-- Choose KRA Focus --</option>
-            <option value="__custom__">+ Add Custom KRA (Type Manually)</option>
+            <option value="">{{ __('hrms.kra_kpi.choose_kra_focus') }}</option>
+            <option value="__custom__">{{ __('hrms.kra_kpi.add_custom_kra') }}</option>
             @foreach($kraCategories as $kra)
                 <option value="{{ $kra->id }}">{{ addslashes($kra->name) }}</option>
             @endforeach
@@ -1288,13 +1288,13 @@
 
             if (tip) {
                 if (total === 100) {
-                    tip.innerText = '(Balanced 100%)';
+                    tip.innerText = '{{ __('hrms.kra_kpi.balanced_100') }}';
                     tip.className = 'text-success fs-11 fw-semibold';
                 } else if (total < 100) {
-                    tip.innerText = `(${Math.round((100 - total) * 100) / 100}% remaining to reach 100%)`;
+                    tip.innerText = '{{ __('hrms.kra_kpi.remaining_to_reach_100') }}'.replace(':diff', Math.round((100 - total) * 100) / 100);
                     tip.className = 'text-muted fs-11';
                 } else {
-                    tip.innerText = `(Exceeds 100% by ${Math.round((total - 100) * 100) / 100}%)`;
+                    tip.innerText = '{{ __('hrms.kra_kpi.exceeds_100_by') }}'.replace(':diff', Math.round((total - 100) * 100) / 100);
                     tip.className = 'text-danger fs-11 fw-semibold';
                 }
             }
@@ -1303,7 +1303,7 @@
             if (saveBtn) {
                 if (total > 100) {
                     saveBtn.disabled = true;
-                    saveBtn.title = 'Total weightage cannot exceed 100%. Please reduce weights.';
+                    saveBtn.title = '{{ __('hrms.kra_kpi.weight_exceed_tooltip') }}';
                     saveBtn.classList.add('opacity-50');
                 } else {
                     saveBtn.disabled = false;
@@ -1364,7 +1364,7 @@
                 const opt = sel.options ? sel.selectedOptions[0] : null;
                 if (opt) {
                     const kraId = opt.dataset.kraId;
-                    const kraName = opt.dataset.kraName || (kraId && $kraSelect.find(`option[value="${kraId}"]`).text().trim()) || 'Standard KRA';
+                    const kraName = opt.dataset.kraName || (kraId && $kraSelect.find(`option[value="${kraId}"]`).text().trim()) || '{{ __('hrms.kra_kpi.standard_kra') }}';
                     const calc = opt.dataset.calc;
                     const unit = opt.dataset.unit;
                     const target = opt.dataset.target;
@@ -1556,8 +1556,8 @@
                         </select>
                     </div>
                     <div class="kpi-input-wrap d-none align-items-center gap-1">
-                        <input type="text" name="items[${scorecardRowIndex}][title]" class="odoo-table-input kpi-title-input" placeholder="Type custom goal title..." />
-                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToRowKpiSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                        <input type="text" name="items[${scorecardRowIndex}][title]" class="odoo-table-input kpi-title-input" placeholder="{{ __('hrms.kra_kpi.placeholder_custom_goal') }}" />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToRowKpiSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                             <i class="feather-list"></i>
                         </button>
                     </div>
@@ -1570,14 +1570,14 @@
                     </div>
                     <div class="kra-locked-wrap d-none align-items-center justify-content-between px-2 py-1 bg-light border rounded text-dark fs-12" style="height: 31px; width: 100%;">
                         <div class="d-flex align-items-center gap-1.5 text-truncate" style="min-width: 0;">
-                            <i class="feather-lock text-muted fs-11 flex-shrink-0" title="Fixed to standard KPI category"></i>
+                            <i class="feather-lock text-muted fs-11 flex-shrink-0" title="{{ __('hrms.kra_kpi.fixed_standard_kpi_category') }}"></i>
                             <span class="kra-locked-text text-truncate fw-medium text-dark"></span>
                         </div>
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">Library</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-0.5 px-1 fs-10 flex-shrink-0" style="font-size: 9px; line-height: 1.2;">{{ __('hrms.kra_kpi.library_badge') }}</span>
                     </div>
                     <div class="kra-input-wrap d-none align-items-center gap-1">
-                        <input type="text" class="odoo-table-input kra-title-input" placeholder="Type custom KRA..." />
-                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="Switch back to list" onclick="switchToRowKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
+                        <input type="text" class="odoo-table-input kra-title-input" placeholder="{{ __('hrms.kra_kpi.type_custom_kra') }}" />
+                        <button type="button" class="btn btn-sm btn-light border px-1.5 py-0 text-muted" title="{{ __('hrms.kra_kpi.switch_back_to_list') }}" onclick="switchToRowKraSelect(this)" style="height: 22px; font-size: 10px; white-space: nowrap;">
                             <i class="feather-list"></i>
                         </button>
                     </div>
@@ -1585,18 +1585,18 @@
                 </td>
                 <td>
                     <select name="items[${scorecardRowIndex}][calculation_type]" class="odoo-table-select odoo-select2" style="width: 100%;">
-                        <option value="higher_is_better">Higher is Better</option>
-                        <option value="lower_is_better">Lower is Better</option>
-                        <option value="milestone">Milestone</option>
+                        <option value="higher_is_better">{{ __('hrms.kra_kpi.dir_higher_short') }}</option>
+                        <option value="lower_is_better">{{ __('hrms.kra_kpi.dir_lower_short') }}</option>
+                        <option value="milestone">{{ __('hrms.kra_kpi.dir_milestone_short') }}</option>
                     </select>
                 </td>
                 <td>
                     <select name="items[${scorecardRowIndex}][unit]" class="odoo-table-select odoo-select2" style="width: 100%;">
                         <option value="percentage">%</option>
-                        <option value="number">Qty</option>
-                        <option value="currency">₹</option>
-                        <option value="rating">Rating (1-5)</option>
-                        <option value="boolean">Milestone</option>
+                        <option value="number">{{ __('hrms.kra_kpi.unit_qty_short') }}</option>
+                        <option value="currency">{{ __('hrms.kra_kpi.unit_currency_symbol') }}</option>
+                        <option value="rating">{{ __('hrms.kra_kpi.unit_rating_scale') }}</option>
+                        <option value="boolean">{{ __('hrms.kra_kpi.unit_milestone_label') }}</option>
                     </select>
                 </td>
                 <td>
@@ -1606,7 +1606,7 @@
                     <input type="number" step="0.01" name="items[${scorecardRowIndex}][weightage]" value="${initialRowWeight}" class="odoo-table-input row-weight-input" required />
                 </td>
                 <td class="text-center">
-                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm remove-scorecard-row" title="Remove Goal">
+                    <button type="button" class="btn erp-icon-btn erp-icon-btn--danger btn-sm remove-scorecard-row" title="{{ __('hrms.kra_kpi.remove_goal') }}">
                         <i class="feather-trash-2"></i>
                     </button>
                 </td>
@@ -1639,10 +1639,10 @@
                     updateScorecardTotalWeight();
                 } else {
                     confirmAction({
-                        title: 'Minimum Goal Required',
-                        message: 'At least one KPI goal row is required on the scorecard.',
+                        title: '{{ __('hrms.kra_kpi.minimum_goal_required_title') }}',
+                        message: '{{ __('hrms.kra_kpi.minimum_goal_required_msg') }}',
                         variant: 'warning',
-                        confirmText: 'OK',
+                        confirmText: '{{ __('hrms.common.ok') }}',
                         hideCancel: true
                     });
                 }
@@ -1684,10 +1684,10 @@
             if (!hasValidRow) {
                 e.preventDefault();
                 confirmAction({
-                    title: 'Title Required',
-                    message: 'Please select or enter at least one valid KPI goal title before saving.',
+                    title: '{{ __('hrms.kra_kpi.title_required_title') }}',
+                    message: '{{ __('hrms.kra_kpi.title_required_msg') }}',
                     variant: 'warning',
-                    confirmText: 'OK',
+                    confirmText: '{{ __('hrms.common.ok') }}',
                     hideCancel: true
                 });
                 return;
@@ -1704,10 +1704,10 @@
             if (totalWeight > 100) {
                 e.preventDefault();
                 confirmAction({
-                    title: 'Goal Weightage Exceeded',
-                    message: `Total goal weightage cannot exceed 100% (currently ${totalWeight}%). Please reduce individual weights before saving.`,
+                    title: '{{ __('hrms.kra_kpi.goal_weightage_exceeded_dialog_title') }}',
+                    message: '{{ __('hrms.kra_kpi.total_weight_exceeded_save_msg') }}'.replace(':total', totalWeight),
                     variant: 'danger',
-                    confirmText: 'Understood',
+                    confirmText: '{{ __('hrms.kra_kpi.understood_btn') }}',
                     hideCancel: true
                 });
                 return;

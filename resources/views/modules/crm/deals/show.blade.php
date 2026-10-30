@@ -3118,7 +3118,7 @@
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
                                     <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.next_activity_type') }}</label>
-                                    <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs">
+                                    <select name="next_activity_type" id="dealOffcanvasNextActivityType" class="form-select form-select-sm shadow-2xs" onchange="if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'deal_show_next', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                                         <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
                                         <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
                                         <option value="Demo">{{ __('crm.activity_types.Demo') ?? 'Demo' }}</option>
@@ -3143,6 +3143,14 @@
                                 <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.next_followup_datetime_optional') }}</label>
                                 <input type="datetime-local" name="next_followup_date" id="dealOffcanvasNextFollowupDate" class="form-control form-control-sm shadow-2xs">
                             </div>
+
+                            @include('modules.crm.partials.meeting-location-field', [
+                                'idPrefix' => 'deal_show_next',
+                                'label' => 'Next Meeting Venue Location',
+                                'addressFieldName' => 'next_location_address',
+                                'latFieldName' => 'next_latitude',
+                                'lngFieldName' => 'next_longitude'
+                            ])
 
                             <div class="p-3 my-3 bg-white rounded-3 border shadow-2xs">
                                 <div class="row g-2">
@@ -3190,7 +3198,7 @@
 
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('crm.activity_type') }} <span class="text-danger">*</span></label>
-                        <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value)">
+                        <select name="schedule_type" id="dealOffcanvasScheduleType" class="form-select form-select-sm shadow-2xs" onchange="$('#dealOffcanvasFollowupType').val(this.value); if(window.crmToggleMeetingLocation) window.crmToggleMeetingLocation(this.value, 'deal_show_schedule', {{ !empty(tenant()?->settings['field_visit_verification']) ? 'true' : 'false' }});">
                             <option value="Call">{{ __('crm.activity_types.Call') ?? 'Call' }}</option>
                             <option value="Meeting">{{ __('crm.activity_types.Meeting') ?? 'Meeting' }}</option>
                             <option value="Demo">{{ __('crm.activity_types.Demo') ?? 'Demo' }}</option>
@@ -3198,6 +3206,13 @@
                             <option value="WhatsApp">WhatsApp</option>
                         </select>
                     </div>
+
+                    @include('modules.crm.partials.meeting-location-field', [
+                        'idPrefix' => 'deal_show_schedule',
+                        'addressFieldName' => 'location_address',
+                        'latFieldName' => 'latitude',
+                        'lngFieldName' => 'longitude'
+                    ])
 
                     <div class="row g-2 mb-3">
                         <div class="col-6">
