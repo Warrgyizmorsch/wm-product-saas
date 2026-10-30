@@ -622,7 +622,7 @@
     <!-- 5. Offcanvas Drawer: Create New Visitor Pass -->
     <x-ui.drawer 
         id="newVisitorDrawer" 
-        title="<div class='d-flex align-items-center gap-2'><div class='avatar-sm bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center' style='width: 34px; height: 34px;'><i class='feather-user-plus fs-16'></i></div><div><div class='fw-bold fs-15 text-dark leading-tight'>{{ __('visitor.new_visitor_pass') }}</div><div class='fs-11 text-muted fw-normal'>Register entry & issue gate pass</div></div></div>" 
+        title="<div class='d-flex align-items-center gap-2'><div class='avatar-sm bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center' style='width: 34px; height: 34px;'><i class='feather-user-plus fs-16'></i></div><div><div class='fw-bold fs-15 text-dark leading-tight'>{{ __('visitor.new_visitor_pass') }}</div><div class='fs-11 text-muted fw-normal'>{{ __('visitor.register_entry_subtext') }}</div></div></div>" 
         scroll 
         style="--bs-offcanvas-width: min(850px, 95vw);">
 
@@ -639,13 +639,13 @@
                         <div>
                             <div class="d-flex align-items-center gap-2">
                                 <strong class="text-success-emphasis fs-13">{{ __('visitor.returning_visitor_found') }}</strong>
-                                <span class="badge bg-success text-white px-2 py-0.5 fs-10 fw-bold" id="returningVisitorVisitsTextDrawer">Visited</span>
+                                <span class="badge bg-success text-white px-2 py-0.5 fs-10 fw-bold" id="returningVisitorVisitsTextDrawer">{{ __('visitor.visited') }}</span>
                             </div>
                             <div class="fs-11 text-muted">{{ __('visitor.auto_filled_notice') }}</div>
                         </div>
                     </div>
                     <span class="badge bg-white text-success border border-success-subtle px-2.5 py-1 fs-11 fw-semibold">
-                        <i class="feather-shield text-success me-1"></i> Verified Record
+                        <i class="feather-shield text-success me-1"></i> {{ __('visitor.verified_record') }}
                     </span>
                 </div>
             </div>
@@ -668,7 +668,7 @@
                         </div>
                     </div>
                     <span class="badge bg-danger text-white px-2.5 py-1 fs-11 fw-bold text-uppercase">
-                        <i class="feather-alert-octagon me-1"></i> Blocked
+                        <i class="feather-alert-octagon me-1"></i> {{ __('visitor.blocked') }}
                     </span>
                 </div>
 
@@ -696,7 +696,7 @@
                         :label="__('visitor.visitor_type')" 
                         name="visitor_type" 
                         id="drawerVisitorTypeSelect" 
-                        :required="true"
+                        :required="true" 
                         :searchable="false">
                         <option value="Client" selected>{{ __('visitor.visitor_types.Client') }}</option>
                         <option value="Vendor">{{ __('visitor.visitor_types.Vendor') }}</option>
@@ -719,7 +719,7 @@
                             oninput="debounceVisitorLookupDrawer(this.value, 'phone')" 
                         />
                         <span id="phoneLookupSpinnerDrawer" class="text-primary fs-11 d-none fw-normal position-absolute end-0 top-50 translate-middle-y me-1" style="z-index: 5;">
-                            <i class="feather-loader icon-spin me-1"></i> Looking up...
+                            <i class="feather-loader icon-spin me-1"></i> {{ __('visitor.looking_up') }}
                         </span>
                     </div>
                 </div>
@@ -828,11 +828,11 @@
                         </div>
                         <div>
                             <strong class="text-dark fs-13 d-block leading-tight">{{ __('visitor.front_desk_inquiry') }}</strong>
-                            <span class="text-muted fs-11">Log catalog interests, quantities & CRM leads</span>
+                            <span class="text-muted fs-11">{{ __('visitor.log_interests_subtext') }}</span>
                         </div>
                     </div>
                     <div class="d-flex align-items-center gap-1.5">
-                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-bold">CRM Integration</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-bold">{{ __('visitor.crm_integration') }}</span>
                     </div>
                 </div>
 
@@ -932,7 +932,7 @@
                     <label class="odoo-field-label mb-0">
                         <i class="feather-camera text-primary me-1"></i> {{ __('visitor.live_camera_capture') }}
                     </label>
-                    <span class="badge bg-light text-muted border fs-10">Optional Badge Photo</span>
+                    <span class="badge bg-light text-muted border fs-10">{{ __('visitor.optional_badge_photo') }}</span>
                 </div>
 
                 <input type="hidden" name="photo_url" id="drawerVisitorPhotoData">
@@ -949,13 +949,13 @@
 
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary fw-semibold px-3" id="btnStartCameraDrawer" onclick="startWebcamDrawer()">
-                            <i class="feather-camera me-1"></i> Open Webcam
+                            <i class="feather-camera me-1"></i> {{ __('visitor.open_webcam') }}
                         </button>
                         <button type="button" class="btn btn-sm btn-success d-none fw-semibold px-3" id="btnCapturePhotoDrawer" onclick="captureWebcamPhotoDrawer()">
                             <i class="feather-check me-1"></i> {{ __('visitor.capture_photo') }}
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-danger d-none fw-semibold px-3" id="btnRetakePhotoDrawer" onclick="retakeWebcamPhotoDrawer()">
-                            <i class="feather-refresh-cw me-1"></i> Retake
+                            <i class="feather-refresh-cw me-1"></i> {{ __('visitor.retake') }}
                         </button>
                     </div>
                 </div>
@@ -963,13 +963,13 @@
 
             <!-- Entry Workflow & Pass Type -->
             <div class="mb-3 pb-3 border-bottom">
-                <label class="odoo-field-label mb-2">Entry Workflow</label>
+                <label class="odoo-field-label mb-2">{{ __('visitor.entry_workflow') }}</label>
                 <div class="d-flex flex-wrap gap-4 align-items-center">
                     <x-ui.radio 
                         name="drawer_action_type" 
                         id="drawerActionCheckIn" 
                         value="checkin" 
-                        label="Instant Check-in" 
+                        :label="__('visitor.instant_checkin')" 
                         :checked="true" 
                         onchange="toggleDrawerActionType(this.value)" 
                     />
@@ -977,14 +977,14 @@
                         name="drawer_action_type" 
                         id="drawerActionApproval" 
                         value="approval" 
-                        label="Host Approval" 
+                        :label="__('visitor.host_approval')" 
                         onchange="toggleDrawerActionType(this.value)" 
                     />
                     <x-ui.radio 
                         name="drawer_action_type" 
                         id="drawerActionExpected" 
                         value="expected" 
-                        label="Pre-Register" 
+                        :label="__('visitor.preregister')" 
                         onchange="toggleDrawerActionType(this.value)" 
                     />
                 </div>
@@ -999,7 +999,7 @@
                         id="toggleAdditionalVisitorFieldsBtn" 
                         onclick="toggleAdditionalVisitorFields()">
                     <i class="feather-plus-circle fs-13" id="toggleAdditionalFieldsIcon"></i>
-                    <span id="toggleAdditionalFieldsText">+ Additional Details (Vehicle, ID Proof, Assets & Safety)</span>
+                    <span id="toggleAdditionalFieldsText">{{ __('visitor.additional_details_btn') }}</span>
                 </button>
             </div>
 
@@ -1170,10 +1170,10 @@
                     <div class="col-md-12">
                         <x-ui.odoo-form-ui 
                             type="textarea" 
-                            label="Security Notes / Remarks" 
+                            :label="__('visitor.security_notes_remarks')" 
                             name="notes" 
                             id="drawerSecurityNotes" 
-                            placeholder="Any vehicle parking bay, cargo details or security remarks..." 
+                            :placeholder="__('visitor.security_notes_placeholder')" 
                             rows="2" 
                         />
                     </div>
@@ -1183,7 +1183,7 @@
             <!-- Drawer Bottom Sticky Action Bar -->
             <div class="d-flex align-items-center justify-content-between gap-2 pt-3 border-top mt-4 bg-white sticky-bottom pb-2">
                 <button type="button" class="btn btn-light border px-3 fw-semibold" data-bs-dismiss="offcanvas">
-                    <i class="feather-x me-1"></i> Cancel
+                    <i class="feather-x me-1"></i> {{ __('visitor.cancel') }}
                 </button>
                 <div class="d-flex align-items-center gap-2">
                     <button type="submit" id="drawerSubmitBtn" class="btn btn-primary px-4 fw-bold">
@@ -1202,7 +1202,9 @@
         :showFooter="false">
         <form id="visitorCheckoutForm" method="POST" action="">
             @csrf
-            <p class="fs-13 text-dark mb-3">Checking out visitor: <strong id="checkoutVisitorName"></strong></p>
+            <p class="fs-13 text-dark mb-3">
+                {!! __('visitor.checking_out_visitor', ['name' => '<strong id="checkoutVisitorName"></strong>']) !!}
+            </p>
             
             <x-ui.checkbox 
                 name="badge_returned" 
@@ -1219,9 +1221,9 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
-                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('visitor.cancel') }}</button>
                 <button type="submit" class="btn btn-danger px-3 fw-semibold">
-                    <i class="feather-log-out me-1"></i> Confirm Check-Out
+                    <i class="feather-log-out me-1"></i> {{ __('visitor.confirm_checkout') }}
                 </button>
             </div>
         </form>
@@ -1245,14 +1247,14 @@
                 </select>
             </div>
             <div class="mb-3">
-                <label class="form-label fw-bold fs-12 text-dark">Reason / Remarks</label>
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.notes_reason') ?? 'Reason / Remarks' }}</label>
                 <textarea name="extend_notes" class="form-control fs-13" rows="2" placeholder="Meeting prolonged, additional discussion..."></textarea>
             </div>
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
-                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('visitor.cancel') }}</button>
                 <button type="submit" class="btn btn-warning px-3 fw-semibold">
-                    <i class="feather-clock me-1"></i> Extend Stay
+                    <i class="feather-clock me-1"></i> {{ __('visitor.extend_stay') }}
                 </button>
             </div>
         </form>
@@ -1266,7 +1268,9 @@
         :showFooter="false">
         <form id="denyEntryForm" method="POST" action="">
             @csrf
-            <p class="fs-13 text-dark mb-2">Denying entry for: <strong id="denyVisitorName"></strong></p>
+            <p class="fs-13 text-dark mb-2">
+                {!! __('visitor.denying_entry_for', ['name' => '<strong id="denyVisitorName"></strong>']) !!}
+            </p>
             <div class="mb-3">
                 <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.rejection_reason') }} <span class="text-danger">*</span></label>
                 <textarea name="denied_reason" class="form-control fs-13" rows="3" required placeholder="Security concern, invalid authorization, restricted area..."></textarea>
@@ -1279,9 +1283,9 @@
             />
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
-                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('visitor.cancel') }}</button>
                 <button type="submit" class="btn btn-danger px-3 fw-semibold">
-                    <i class="feather-slash me-1"></i> Confirm Denial
+                    <i class="feather-slash me-1"></i> {{ __('visitor.confirm_denial') }}
                 </button>
             </div>
         </form>
@@ -1301,9 +1305,9 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
-                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('visitor.cancel') }}</button>
                 <button type="submit" class="btn btn-dark px-3 fw-semibold">
-                    <i class="feather-alert-circle me-1"></i> Submit Incident
+                    <i class="feather-alert-circle me-1"></i> {{ __('visitor.submit_incident') }}
                 </button>
             </div>
         </form>
@@ -1319,7 +1323,7 @@
             @csrf
             <div class="mb-3 p-3 bg-light rounded-3 border">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <span class="fs-11 text-muted text-uppercase fw-bold">Visitor Gate Pass</span>
+                    <span class="fs-11 text-muted text-uppercase fw-bold">{{ __('visitor.visitor_gate_pass') }}</span>
                     <span id="convertLeadPassNumber" class="badge bg-white text-dark border font-monospace fs-11"></span>
                 </div>
                 <div class="fs-14 text-dark fw-bold" id="convertLeadVisitorName"></div>
@@ -1339,18 +1343,18 @@
                 <div class="col-6">
                     <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.lead_type') }}</label>
                     <select name="lead_type" class="form-select fs-13">
-                        <option value="hot">🔥 Hot Lead</option>
-                        <option value="warm" selected>⚡ Warm Lead</option>
-                        <option value="cold">❄️ Cold Lead</option>
+                        <option value="hot">🔥 {{ __('visitor.hot_lead') }}</option>
+                        <option value="warm" selected>⚡ {{ __('visitor.warm_lead') }}</option>
+                        <option value="cold">❄️ {{ __('visitor.cold_lead') }}</option>
                     </select>
                 </div>
                 <div class="col-6">
-                    <label class="form-label fw-bold fs-12 text-dark">Priority</label>
+                    <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.priority') }}</label>
                     <select name="priority" class="form-select fs-13">
-                        <option value="Urgent">Urgent</option>
-                        <option value="High">High</option>
-                        <option value="Medium" selected>Medium</option>
-                        <option value="Low">Low</option>
+                        <option value="Urgent">{{ __('visitor.urgent') }}</option>
+                        <option value="High">{{ __('visitor.high') }}</option>
+                        <option value="Medium" selected>{{ __('visitor.medium') }}</option>
+                        <option value="Low">{{ __('visitor.low') }}</option>
                     </select>
                 </div>
             </div>
@@ -1425,18 +1429,18 @@
 
             <div class="mb-3">
                 <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.inquiry_notes') }}</label>
-                <textarea name="requirement" id="convertLeadRequirement" rows="3" class="form-control fs-13" placeholder="Enter specific customer requirements, requested quantities, or pricing discussion..."></textarea>
+                <textarea name="requirement" id="convertLeadRequirement" rows="3" class="form-control fs-13" placeholder="{{ __('visitor.inquiry_notes_placeholder') }}"></textarea>
             </div>
 
             <div class="mb-3">
-                <label class="form-label fw-bold fs-12 text-dark">Next Follow-up Date</label>
+                <label class="form-label fw-bold fs-12 text-dark">{{ __('visitor.next_followup_date') }}</label>
                 <input type="date" name="next_followup_date" class="form-control fs-13" value="{{ now()->addDays(2)->format('Y-m-d') }}">
             </div>
 
             <div class="d-flex justify-content-end gap-2 pt-3 border-top mt-4">
-                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-light border px-3" data-bs-dismiss="modal">{{ __('visitor.cancel') }}</button>
                 <button type="submit" class="btn btn-success px-3 fw-bold">
-                    <i class="feather-check-circle me-1"></i> Create CRM Lead
+                    <i class="feather-check-circle me-1"></i> {{ __('visitor.create_crm_lead_btn') }}
                 </button>
             </div>
         </form>
@@ -1452,7 +1456,7 @@
                             <i class="feather-image fs-13"></i>
                         </div>
                         <div>
-                            <h6 class="modal-title fs-14 fw-bold text-dark mb-0" id="zoomModalProductName">Product Image Preview</h6>
+                            <h6 class="modal-title fs-14 fw-bold text-dark mb-0" id="zoomModalProductName">{{ __('visitor.product_image_preview') }}</h6>
                             <small class="text-muted fs-11 font-monospace" id="zoomModalProductSku"></small>
                         </div>
                     </div>
@@ -1464,9 +1468,9 @@
                     <img id="zoomModalImage" src="" alt="Product Large Preview" class="img-fluid rounded-3 shadow-sm object-fit-contain" style="max-height: 70vh; max-width: 100%; transition: transform 0.2s ease;">
                 </div>
                 <div class="modal-footer py-2 px-3 bg-light border-top d-flex justify-content-between align-items-center">
-                    <span class="fs-11 text-muted"><i class="feather-info me-1"></i> High-resolution product catalog asset</span>
+                    <span class="fs-11 text-muted"><i class="feather-info me-1"></i> {{ __('visitor.high_res_catalog_asset') }}</span>
                     <button type="button" class="btn btn-sm btn-secondary px-3" data-bs-dismiss="modal">
-                        <i class="feather-x me-1"></i> Close
+                        <i class="feather-x me-1"></i> {{ __('crm.close') ?? 'Close' }}
                     </button>
                 </div>
             </div>

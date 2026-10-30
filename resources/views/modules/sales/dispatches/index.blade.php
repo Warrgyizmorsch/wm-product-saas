@@ -338,7 +338,7 @@
                                 <div class="card-body p-3">
                                     <div class="d-flex justify-content-between align-items-center mb-2.5">
                                         <div>
-                                            <span class="fs-10 text-uppercase fw-bold text-muted d-block">Customer Details</span>
+                                            <span class="fs-10 text-uppercase fw-bold text-muted d-block">{{ __('crm.customer_details') }}</span>
                                             <span class="fw-bold text-dark fs-13">{{ $so->customer?->name ?? '—' }}</span>
                                             @if ($so->customer?->phone)
                                                 <span class="text-muted fs-11 ms-1"><i class="feather-phone me-1 fs-10"></i>{{ $so->customer->phone }}</span>
@@ -374,7 +374,7 @@
                             {{-- Section Heading --}}
                             <div class="d-flex align-items-center justify-content-between mb-3">
                                 <h6 class="fw-bold text-dark mb-0 fs-12 text-uppercase letter-spacing-1">
-                                    <i class="feather-layers me-1.5 text-primary"></i>Dispatches Created ({{ $dispCount }})
+                                    <i class="feather-layers me-1.5 text-primary"></i>{{ __('crm.dispatches_created') }} ({{ $dispCount }})
                                 </h6>
                                 @if ($dispCount > 0)
                                     <span class="badge bg-soft-primary text-primary fs-11">{{ $dispCount }} Record{{ $dispCount > 1 ? 's' : '' }}</span>
@@ -414,7 +414,7 @@
                                                 {{-- Dispatched Items Breakdown --}}
                                                 <div class="bg-light p-2.5 rounded border border-gray-100 mb-2.5 fs-12">
                                                     <div class="d-flex justify-content-between text-muted fs-11 mb-1 pb-1 border-bottom">
-                                                        <span class="fw-semibold text-dark">Items Dispatched:</span>
+                                                        <span class="fw-semibold text-dark">{{ __('crm.items_dispatched') }}:</span>
                                                         <span><i class="feather-calendar me-1 fs-10"></i>{{ $disp->dispatch_date ? $disp->dispatch_date->format('d M Y') : ($disp->created_at ? $disp->created_at->format('d M Y') : 'N/A') }}</span>
                                                     </div>
                                                     @forelse ($disp->items as $dItem)
@@ -435,7 +435,7 @@
                                                         <i class="feather-truck me-1 text-primary fs-11"></i>
                                                         <span class="fw-medium text-dark">{{ $disp->shipping_agent ?: ($disp->carrier ?: 'Standard Delivery') }}</span>
                                                         @if ($disp->vehicle_number)
-                                                            <span class="ms-1 font-monospace text-muted">({{ $disp->vehicle_number }})</span>
+                                                             <span class="ms-1 font-monospace text-muted">({{ $disp->vehicle_number }})</span>
                                                         @endif
                                                     </div>
                                                     <div class="d-flex align-items-center gap-2" style="gap: 8px !important;">
@@ -443,12 +443,12 @@
                                                            target="_blank" 
                                                            class="btn btn-sm btn-light border px-2.5 py-1 fs-11 text-secondary fw-semibold" 
                                                            title="{{ __('crm.delivery_challan_pdf') ?? 'Challan' }}">
-                                                            <i class="feather-printer me-1 fs-10"></i>Challan
+                                                            <i class="feather-printer me-1 fs-10"></i>{{ __('crm.challan') }}
                                                         </a>
                                                         <a href="{{ route('sales.dispatches.show', $disp->id) }}" 
                                                            class="btn btn-sm btn-primary px-3 py-1 fs-11 fw-bold" 
                                                            title="{{ __('crm.view_dispatch') }}">
-                                                            <i class="feather-eye me-1 fs-10"></i>View Details
+                                                            <i class="feather-eye me-1 fs-10"></i>{{ __('crm.view_details') }}
                                                         </a>
                                                     </div>
                                                 </div>
@@ -459,10 +459,10 @@
                             @else
                                 <div class="p-5 text-center text-muted border rounded-3 bg-light my-3">
                                     <i class="feather-inbox d-block mb-3 text-muted fs-32 opacity-50"></i>
-                                    <h6 class="fw-bold text-dark mb-1">No Dispatches Created Yet</h6>
-                                    <p class="fs-12 text-muted mb-3">No dispatch orders have been created for this sales order so far.</p>
+                                    <h6 class="fw-bold text-dark mb-1">{{ __('crm.no_dispatches_created_yet') }}</h6>
+                                    <p class="fs-12 text-muted mb-3">{{ __('crm.no_dispatches_msg') }}</p>
                                     <a href="{{ route('sales.dispatches.create', ['sales_order_id' => $so->id]) }}" class="btn btn-sm btn-primary fw-bold px-3">
-                                        <i class="feather-truck me-1.5"></i>Create First Dispatch
+                                        <i class="feather-truck me-1.5"></i>{{ __('crm.create_first_dispatch') }}
                                     </a>
                                 </div>
                             @endif
@@ -472,12 +472,12 @@
                         {{-- Drawer Footer --}}
                         <div class="offcanvas-footer bg-light p-3 px-4 border-top d-flex align-items-center justify-content-between">
                             <a href="{{ route('sales.orders.show', $so->id) }}" class="btn btn-sm btn-light border text-muted">
-                                <i class="feather-file-text me-1"></i>View Sales Order
+                                <i class="feather-file-text me-1"></i>{{ __('crm.view_sales_order') }}
                             </a>
                             <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="offcanvas">Close</button>
+                                <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="offcanvas">{{ __('crm.close') }}</button>
                                 <a href="{{ route('sales.dispatches.create', ['sales_order_id' => $so->id]) }}" class="btn btn-sm btn-primary fw-bold">
-                                    <i class="feather-truck me-1"></i>New Dispatch
+                                    <i class="feather-truck me-1"></i>{{ __('crm.new_dispatch') }}
                                 </a>
                             </div>
                         </div>

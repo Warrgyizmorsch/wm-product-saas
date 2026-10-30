@@ -194,7 +194,16 @@ $masterDefinitions = [
     @if(isset($masterDefinitions[$masterKey]))
         @php $def = $masterDefinitions[$masterKey]; @endphp
         @if($masterKey === 'contact' || $masterKey === 'account' || \Illuminate\Support\Facades\Route::has($def['route']))
-        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" :title="$masterKey === 'account' ? __('crm.create_new_account_title') : ($masterKey === 'customer' ? __('crm.quick_create_customer') : ($masterKey === 'contact' ? (__('crm.quick_create') . ' ' . __('crm.contact_person')) : ('Quick Create ' . $def['label'])))" size="{{ in_array($masterKey, ['product', 'contact', 'customer', 'account']) ? 'lg' : '' }}">
+        <x-ui.modal id="quickCreateModal_{{ $masterKey }}" :title="match($masterKey) {
+            'account' => __('crm.create_new_account_title'),
+            'customer' => __('crm.quick_create_customer'),
+            'contact' => __('crm.quick_create') . ' ' . __('crm.contact_person'),
+            'product' => __('crm.quick_create_product'),
+            'warehouse' => __('crm.quick_create_warehouse'),
+            'uom' => __('crm.quick_create_uom'),
+            'routing' => __('crm.quick_create_routing'),
+            default => __('crm.quick_create') . ' ' . $def['label']
+        }" size="{{ in_array($masterKey, ['product', 'contact', 'customer', 'account']) ? 'lg' : '' }}">
             @if($masterKey === 'product')
                 <!-- Handcrafted Premium Product Modal layout matching Inventory Create screen section headers -->
                 <div data-action="{{ route('products.quick-create') }}"
@@ -204,12 +213,12 @@ $masterDefinitions = [
                     <div class="row g-4 text-dark fs-13">
                         <!-- Column 1: Primary Details -->
                         <div class="col-md-6 border-end-md">
-                            <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>Primary Details</h6>
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-1.5"></i>{{ __('crm.primary_details') }}</h6>
                             
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
-                                label="Product Name"
+                                :label="__('crm.product_name')"
                                 name="name"
                                 placeholder="e.g. Steel Sheet"
                                 :required="true"
@@ -218,7 +227,7 @@ $masterDefinitions = [
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
-                                label="SKU / Item Code"
+                                :label="__('crm.sku_item_code')"
                                 name="sku"
                                 placeholder="e.g. RM-STEEL-01"
                                 :required="true"
@@ -226,30 +235,30 @@ $masterDefinitions = [
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Product Type"
+                                :label="__('crm.product_type')"
                                 name="type"
                                 :required="true"
                             >
-                                <option value="finished_good">Finished Good (Sales/Assembly)</option>
-                                <option value="semi_finished" selected>Semi Finished Product (Sub-Assembly)</option>
-                                <option value="raw_material">Raw Material</option>
-                                <option value="component">Component / Hardware</option>
-                                <option value="service">Service</option>
+                                <option value="finished_good">{{ __('crm.finished_good_opt') }}</option>
+                                <option value="semi_finished" selected>{{ __('crm.semi_finished_opt') }}</option>
+                                <option value="raw_material">{{ __('crm.raw_material_opt') }}</option>
+                                <option value="component">{{ __('crm.component_opt') }}</option>
+                                <option value="service">{{ __('crm.service_opt') }}</option>
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Source Method"
+                                :label="__('crm.source_method')"
                                 name="supplier_method"
                                 :required="true"
                             >
-                                <option value="buy" selected>Trade (Purchase / Procurement)</option>
-                                <option value="manufacture">Manufacture (Produce)</option>
+                                <option value="buy" selected>{{ __('crm.trade_buy_opt') }}</option>
+                                <option value="manufacture">{{ __('crm.manufacture_produce_opt') }}</option>
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Unit (UOM)"
+                                :label="__('crm.unit_uom')"
                                 name="uom_id"
                                 :required="true"
                             >
@@ -260,10 +269,10 @@ $masterDefinitions = [
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Pref. Vendor"
+                                :label="__('crm.pref_vendor')"
                                 name="preferred_vendor_id"
                             >
-                                <option value="">Select Preferred Supplier...</option>
+                                <option value="">{{ __('crm.select_pref_supplier') }}</option>
                                 @foreach($vendorOptions as $val => $lbl)
                                     <option value="{{ $val }}">{{ $lbl }}</option>
                                 @endforeach
@@ -272,13 +281,13 @@ $masterDefinitions = [
 
                         <!-- Column 2: Pricing & Accounts -->
                         <div class="col-md-6">
-                            <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-1.5"></i>Pricing &amp; Accounts</h6>
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-1.5"></i>{{ __('crm.pricing_accounts') }}</h6>
 
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="number"
                                 step="0.01"
-                                label="Cost Price"
+                                :label="__('crm.cost_price')"
                                 name="unit_cost"
                                 value="0.00"
                                 placeholder="0.00"
@@ -288,7 +297,7 @@ $masterDefinitions = [
                                 type="input"
                                 inputType="number"
                                 step="0.01"
-                                label="Selling Price"
+                                :label="__('crm.selling_price_label')"
                                 name="selling_price"
                                 value="0.00"
                                 placeholder="0.00"
@@ -296,20 +305,20 @@ $masterDefinitions = [
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Valuation"
+                                :label="__('crm.valuation_label')"
                                 name="inventory_valuation_method"
                                 :required="true"
                             >
-                                <option value="FIFO" selected>FIFO (First-In, First-Out)</option>
-                                <option value="Weighted Average">Weighted Average</option>
+                                <option value="FIFO" selected>{{ __('crm.valuation_fifo') }}</option>
+                                <option value="Weighted Average">{{ __('crm.valuation_weighted_avg') }}</option>
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Sales Account"
+                                :label="__('crm.sales_account_label')"
                                 name="sales_account"
                             >
-                                <option value="" selected>Select Sales Account</option>
+                                <option value="" selected>{{ __('crm.select_sales_account') }}</option>
                                 @foreach($salesAccountOptions as $val => $lbl)
                                     <option value="{{ $val }}">{{ $lbl }}</option>
                                 @endforeach
@@ -317,10 +326,10 @@ $masterDefinitions = [
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Purchase Acc."
+                                :label="__('crm.purchase_account_label')"
                                 name="purchase_account"
                             >
-                                <option value="" selected>Select Purchase Account</option>
+                                <option value="" selected>{{ __('crm.select_purchase_account') }}</option>
                                 @foreach($purchaseAccountOptions as $val => $lbl)
                                     <option value="{{ $val }}">{{ $lbl }}</option>
                                 @endforeach
@@ -328,10 +337,10 @@ $masterDefinitions = [
 
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Inventory Acc."
+                                :label="__('crm.inventory_account_label')"
                                 name="inventory_account"
                             >
-                                <option value="" selected>Select Inventory Account</option>
+                                <option value="" selected>{{ __('crm.select_inventory_account') }}</option>
                                 @foreach($inventoryAccountOptions as $val => $lbl)
                                     <option value="{{ $val }}">{{ $lbl }}</option>
                                 @endforeach
@@ -350,7 +359,7 @@ $masterDefinitions = [
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
-                                label="Contact Name"
+                                :label="__('crm.contact_name_label')"
                                 name="name"
                                 placeholder="e.g. John Doe"
                                 :required="true"
@@ -360,7 +369,7 @@ $masterDefinitions = [
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="text"
-                                label="Designation / Role"
+                                :label="__('crm.designation_role_label')"
                                 name="designation"
                                 placeholder="e.g. Purchase Manager / Doctor"
                             />
@@ -369,7 +378,7 @@ $masterDefinitions = [
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="tel"
-                                label="Mobile / Phone"
+                                :label="__('crm.mobile_phone_label')"
                                 name="phone"
                                 placeholder="02240001122"
                                 oninput="this.value = this.value.replace(/[^0-9]/g, '')"
@@ -379,7 +388,7 @@ $masterDefinitions = [
                             <x-ui.odoo-form-ui
                                 type="input"
                                 inputType="email"
-                                label="Email Address"
+                                :label="__('crm.email_address')"
                                 name="email"
                                 placeholder="e.g. john.doe@gmail.com"
                             />
@@ -644,7 +653,16 @@ $masterDefinitions = [
                 <button type="button"
                         class="btn btn-primary btn-save-master"
                         data-form="quickCreateForm_{{ $masterKey }}">
-                    {{ $masterKey === 'account' ? __('crm.save_account') : ($masterKey === 'customer' ? __('crm.save_customer') : ($masterKey === 'contact' ? __('crm.save_contact') : ('Save ' . $def['label']))) }}
+                    {{ match($masterKey) {
+                        'account' => __('crm.save_account'),
+                        'customer' => __('crm.save_customer'),
+                        'contact' => __('crm.save_contact'),
+                        'product' => __('crm.save_product'),
+                        'warehouse' => __('crm.save_warehouse'),
+                        'uom' => __('crm.save_uom'),
+                        'routing' => __('crm.save_routing'),
+                        default => __('crm.save_master', ['master' => $def['label']])
+                    } }}
                 </button>
             </x-slot>
         </x-ui.modal>

@@ -29,8 +29,8 @@ class DispatchOrderApiController extends Controller
     {
         $user      = auth()->user();
         $tenantId  = $user?->tenant_id  ?? (tenant_id() ?? 1);
-        $companyId = $user?->company_id ?? (company_id() ?? 1);
-        $branchId  = $user?->branch_id  ?? (branch_id() ?? null);
+        $companyId = company_id() ?? $user?->company_id;
+        $branchId  = branch_id() ?? $user?->branch_id;
 
         return [(int)$tenantId, (int)$companyId, $branchId ? (int)$branchId : null];
     }
@@ -505,5 +505,23 @@ class DispatchOrderApiController extends Controller
                 'total'        => $pending->total(),
             ],
         ]);
+    }
+
+    /**
+     * GET /api/sales/dispatches/{id}/download-pdf
+     */
+    public function downloadPdf(int $id)
+    {
+        [$tenantId] = $this->resolveTenantContext();
+        $dispatch = DispatchOrder::where('tenant_id', $tenantId)
+            ->with(['salesOrder.customer', 'customer', 'transporter', 'items.product', 'items.warehouse'])
+            ->find($id);
+
+        if (!$dispatch) {
+            return response()->json(['success' => false, 'message' => 'Dispatch Order not found'], 404);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.dispatches.pdf', compact('dispatch'));
+        return $pdf->download("DispatchOrder_{$dispatch->dispatch_number}.pdf");
     }
 }

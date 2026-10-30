@@ -234,4 +234,167 @@ class MaterialRequirementApiController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * PATCH /api/inventory/material-requirements/items/{itemId}/warehouse
+     */
+    public function updateWarehouse(Request $request, int $itemId): JsonResponse
+    {
+        $item = MaterialRequirementItem::find($itemId);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        $warehouseId = (int) $request->input('warehouse_id');
+        $item->update(['warehouse_id' => $warehouseId]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Warehouse updated for item successfully.',
+            'available_qty' => \App\Domains\Inventory\Services\StockService::getAvailableStock($item->product_id, $warehouseId),
+            'data' => $item->fresh(['warehouse', 'product']),
+        ]);
+    }
+
+    /**
+     * POST /api/inventory/material-requirements/items/{itemId}/reserve
+     */
+    public function reserveQty(Request $request, int $itemId): JsonResponse
+    {
+        $item = MaterialRequirementItem::with('materialRequirement')->find($itemId);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        $qtyToReserve = (float) $request->input('quantity_reserve', $request->input('quantity', 0));
+        if ($qtyToReserve <= 0) {
+            return response()->json(['success' => false, 'message' => 'Reserve quantity must be greater than 0.'], 422);
+        }
+
+        try {
+            $this->requirementService->reserveQty($item, $qtyToReserve);
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully reserved {$qtyToReserve} unit(s).",
+                'data'    => $item->fresh(['product', 'warehouse']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * POST /api/inventory/material-requirements/items/{itemId}/indent
+     */
+    public function mockIndent(Request $request, int $itemId): JsonResponse
+    {
+        $item = MaterialRequirementItem::with('materialRequirement')->find($itemId);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        $qtyToRequest = (float) $request->input('quantity_request', $request->input('quantity', 0));
+        if ($qtyToRequest <= 0) {
+            return response()->json(['success' => false, 'message' => 'Quantity to request must be greater than 0.'], 422);
+        }
+
+        try {
+            $this->requirementService->createPurchaseRequisition(
+                $item,
+                $qtyToRequest,
+                $request->input('warehouse_id'),
+                $request->input('notes'),
+                $request->input('expected_date')
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => "Purchase Requisition successfully generated for {$qtyToRequest} unit(s).",
+                'data'    => $item->fresh(['product', 'warehouse']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * POST /api/inventory/material-requirements/items/{itemId}/mo
+     */
+    public function mockMo(Request $request, int $itemId): JsonResponse
+    {
+        $item = MaterialRequirementItem::with('materialRequirement')->find($itemId);
+        if (!$item) {
+            return response()->json(['success' => false, 'message' => "Item #{$itemId} not found."], 404);
+        }
+
+        $orderedQty = (float) ($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
+        $shortageQty = max(0, $orderedQty - (float) $item->quantity_reserved);
+        $qtyToMfg = (float) $request->input('quantity_mfg', $request->input('quantity', $shortageQty > 0 ? $shortageQty : $orderedQty));
+
+        if ($qtyToMfg <= 0) {
+            return response()->json(['success' => false, 'message' => 'Quantity to manufacture must be greater than 0.'], 422);
+        }
+
+        try {
+            $this->requirementService->createProductionRequest($item, $qtyToMfg, $request->input('notes'));
+            return response()->json([
+                'success' => true,
+                'message' => "Manufacturing Request submitted successfully for {$qtyToMfg} unit(s). Line status set to Waiting Production.",
+                'data'    => $item->fresh(['product', 'warehouse']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * POST /api/inventory/material-requirements/{id}/ship
+     */
+    public function ship(Request $request, int $id): JsonResponse
+    {
+        $delivery = MaterialRequirement::with('items.product')->find($id);
+        if (!$delivery) {
+            return response()->json(['success' => false, 'message' => "Material requirement #{$id} not found."], 404);
+        }
+
+        $allocations = (array) $request->input('allocations', []);
+        foreach ($delivery->items as $item) {
+            if (!$item->product_id || $item->product?->type === 'Service') continue;
+
+            if ($item->product?->track_serial_number) {
+                $serials = array_filter(array_map('trim', $allocations[$item->id]['serials'] ?? []));
+                if (count($serials) != (int) $item->quantity) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Please select exactly ' . (int)$item->quantity . ' serial number(s) for item: ' . $item->product->name
+                    ], 422);
+                }
+
+                $validCount = \App\Domains\Inventory\Models\SerialNumber::query()
+                    ->where('product_id', $item->product_id)
+                    ->where('warehouse_id', $item->warehouse_id)
+                    ->whereIn('status', ['Available', 'Reserved'])
+                    ->whereIn('serial_number', $serials)
+                    ->count();
+
+                if ($validCount != count($serials)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "One or more selected serial numbers for product '{$item->product->name}' are invalid or already sold."
+                    ], 422);
+                }
+            }
+        }
+
+        try {
+            $this->requirementService->ship($delivery, $allocations);
+            return response()->json([
+                'success' => true,
+                'message' => "Material Requirement {$delivery->requirement_number} shipped successfully. Inventory updated.",
+                'data'    => $delivery->fresh(['items']),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+    }
 }

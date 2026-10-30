@@ -51,6 +51,8 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
         Route::post('/{id}/short-close', [SalesOrderApiController::class, 'shortClose'])->name('short-close');
         Route::post('/{id}/convert-to-invoice', [SalesOrderApiController::class, 'convertToInvoice'])->name('convert-to-invoice');
         Route::post('/{id}/convert-to-dispatch', [SalesOrderApiController::class, 'convertToDispatch'])->name('convert-to-dispatch');
+        Route::post('/{id}/convert-to-project', [SalesOrderApiController::class, 'convertToProject'])->name('convert-to-project');
+        Route::get('/{id}/download-pdf', [SalesOrderApiController::class, 'downloadPdf'])->name('download-pdf');
         Route::delete('/{id}', [SalesOrderApiController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/restore', [SalesOrderApiController::class, 'restore'])->name('restore');
     });
@@ -62,6 +64,7 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
         Route::get('/', [InvoiceApiController::class, 'index'])->name('index');
         Route::post('/', [InvoiceApiController::class, 'store'])->name('store');
         Route::get('/{id}', [InvoiceApiController::class, 'show'])->name('show');
+        Route::get('/{id}/download-pdf', [InvoiceApiController::class, 'downloadPdf'])->name('download-pdf');
         Route::patch('/{id}/status', [InvoiceApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/post', [InvoiceApiController::class, 'post'])->name('post');
         Route::post('/{id}/pay', [InvoiceApiController::class, 'pay'])->name('pay');
@@ -100,6 +103,7 @@ Route::prefix('api/sales')->name('api.sales.')->group(function () {
         Route::get('/', [DispatchOrderApiController::class, 'index'])->name('index');
         Route::post('/', [DispatchOrderApiController::class, 'store'])->name('store');
         Route::get('/{id}', [DispatchOrderApiController::class, 'show'])->name('show');
+        Route::get('/{id}/download-pdf', [DispatchOrderApiController::class, 'downloadPdf'])->name('download-pdf');
         Route::patch('/{id}/status', [DispatchOrderApiController::class, 'updateStatus'])->name('status');
         Route::post('/{id}/confirm', [DispatchOrderApiController::class, 'confirm'])->name('confirm');
         Route::post('/{id}/ship', [DispatchOrderApiController::class, 'ship'])->name('ship');

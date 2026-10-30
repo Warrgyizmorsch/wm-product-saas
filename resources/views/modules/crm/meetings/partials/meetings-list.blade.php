@@ -8,20 +8,20 @@
             style="width: 52px; height: 52px;">
             <i class="feather-calendar fs-22"></i>
         </div>
-        <h6 class="fw-bold text-dark mb-1">{{ $emptyMessage ?? 'No meetings found in this view.' }}</h6>
-        <p class="text-muted fs-12 mb-0">Scheduled meetings for leads and deals assigned to you will appear here.</p>
+        <h6 class="fw-bold text-dark mb-1">{{ $emptyMessage ?? __('crm.meetings_empty_default') }}</h6>
+        <p class="text-muted fs-12 mb-0">{{ __('crm.meetings_empty_desc') }}</p>
     </div>
 @else
     <div class="table-responsive">
         <x-ui.odoo-form-ui type="table" class="mb-0">
             <thead>
                 <tr>
-                    <th style="width: 12%;">TIME</th>
-                    <th style="width: 20%;">LEAD / CLIENT</th>
-                    <th style="width: 26%;">MEETING & REMARKS</th>
-                    <th style="width: 24%;">LOCATION (PLAN & VISIT)</th>
-                    <th style="width: 11%;">STATUS</th>
-                    <th style="width: 7%;" class="text-end pe-4">ACTIONS</th>
+                    <th style="width: 12%;">{{ __('crm.meetings_th_time') }}</th>
+                    <th style="width: 20%;">{{ __('crm.meetings_th_lead_client') }}</th>
+                    <th style="width: 26%;">{{ __('crm.meetings_th_meeting_remarks') }}</th>
+                    <th style="width: 24%;">{{ __('crm.meetings_th_location') }}</th>
+                    <th style="width: 11%;">{{ __('crm.meetings_th_status') }}</th>
+                    <th style="width: 7%;" class="text-end pe-4">{{ __('crm.meetings_th_actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -63,7 +63,7 @@
                                     </span>
                                     @if(!empty($isOverdue))
                                         <div class="mt-0.5">
-                                            <span class="badge bg-danger text-white fs-9 px-1.5 py-0.2 rounded-pill">Overdue</span>
+                                            <span class="badge bg-danger text-white fs-9 px-1.5 py-0.2 rounded-pill">{{ __('crm.meetings_overdue_badge') }}</span>
                                         </div>
                                     @endif
                                 </div>
@@ -147,7 +147,7 @@
                                             <a href="javascript:void(0)" class="text-primary fw-semibold fs-10 text-decoration-none hover-underline flex-shrink-0 ms-0.5"
                                                 data-bs-toggle="modal" data-bs-target="#noteModal_{{ $item['id'] }}"
                                                 onclick="event.stopPropagation();">
-                                                More
+                                                {{ __('crm.meetings_more_link') }}
                                             </a>
                                         @endif
                                     </div>
@@ -159,7 +159,7 @@
                                                 <div class="modal-content border-0 shadow-lg">
                                                     <div class="modal-header py-2.5 px-3 border-bottom bg-light">
                                                         <h6 class="modal-title fs-13 fw-bold text-dark d-flex align-items-center gap-1.5 mb-0">
-                                                            <i class="feather-file-text text-primary"></i> Meeting Summary & Notes
+                                                            <i class="feather-file-text text-primary"></i> {{ __('crm.meetings_notes_modal_title') }}
                                                         </h6>
                                                         <button type="button" class="btn-close fs-10" data-bs-dismiss="modal" aria-label="Close"></button>
                                                     </div>
@@ -168,7 +168,7 @@
                                                             <div class="d-flex align-items-center justify-content-between mb-1.5">
                                                                 <span class="fw-bold text-dark fs-13">{{ $item['title'] ?: 'Field Meeting' }}</span>
                                                                 <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-10">
-                                                                    {{ $item['duration_minutes'] ?? 30 }} mins
+                                                                    {{ $item['duration_minutes'] ?? 30 }} {{ __('crm.meetings_mins') }}
                                                                 </span>
                                                             </div>
                                                             <div class="fs-11 text-muted mb-1">
@@ -178,7 +178,7 @@
                                                                 <div class="fs-11 text-muted d-flex align-items-start gap-1 mb-1">
                                                                     <i class="feather-map-pin text-primary mt-0.5 flex-shrink-0 fs-11"></i>
                                                                     <div>
-                                                                        <strong class="text-dark">Scheduled Venue:</strong>
+                                                                        <strong class="text-dark">{{ __('crm.meetings_scheduled_venue') }}</strong>
                                                                         <span>{{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}</span>
                                                                     </div>
                                                                 </div>
@@ -187,10 +187,10 @@
                                                                 <div class="fs-11 text-muted d-flex align-items-start gap-1">
                                                                     <i class="feather-navigation text-success mt-0.5 flex-shrink-0 fs-11"></i>
                                                                     <div>
-                                                                        <strong class="text-dark">Visited At:</strong>
+                                                                        <strong class="text-dark">{{ __('crm.meetings_visited_at') }}</strong>
                                                                         <span>{{ $item['checkin_address'] ?: ($item['checkin_latitude'] . ', ' . $item['checkin_longitude']) }}</span>
                                                                         @if(!empty($item['checkin_distance_meters']))
-                                                                            <span class="badge bg-soft-info text-info border border-info-subtle ms-1 fs-10">{{ $item['checkin_distance_meters'] }}m distance</span>
+                                                                            <span class="badge bg-soft-info text-info border border-info-subtle ms-1 fs-10">{{ $item['checkin_distance_meters'] }}m {{ __('crm.meetings_distance_label') }}</span>
                                                                         @endif
                                                                     </div>
                                                                 </div>
@@ -198,7 +198,7 @@
                                                         </div>
 
                                                         <div class="mb-2">
-                                                            <label class="fs-11 fw-bold text-muted text-uppercase mb-1 d-block" style="letter-spacing: 0.3px;">Notes & Remarks</label>
+                                                            <label class="fs-11 fw-bold text-muted text-uppercase mb-1 d-block" style="letter-spacing: 0.3px;">{{ __('crm.meetings_notes_and_remarks') }}</label>
                                                             <div class="p-3 rounded-2 border-start border-3 border-primary bg-light-subtle border-top border-end border-bottom fs-12 text-dark lh-base" style="white-space: pre-wrap; word-break: break-word;">
                                                                 {{ $displayNoteText }}
                                                             </div>
@@ -208,13 +208,13 @@
                                                             <div class="mt-2.5 p-2 rounded-2 fs-11 d-flex align-items-center gap-1.5 {{ str_contains($geoFenceTag, 'Mismatch') ? 'bg-danger-subtle text-danger border border-danger-subtle' : 'bg-success-subtle text-success border border-success-subtle' }}">
                                                                 <i class="feather-shield flex-shrink-0 fs-12"></i>
                                                                 <div>
-                                                                    <strong>Geo-Audit Log:</strong> {{ $geoFenceTag }}
+                                                                    <strong>{{ __('crm.meetings_geo_audit_log') }}</strong> {{ $geoFenceTag }}
                                                                 </div>
                                                             </div>
                                                         @endif
                                                     </div>
                                                     <div class="modal-footer py-2 px-3 bg-light border-top">
-                                                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ __('crm.close') ?: 'Close' }}</button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -253,7 +253,7 @@
                                         data-bs-toggle="tooltip" data-bs-placement="top"
                                         title="Scheduled Venue: {{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}">
                                         <i class="feather-map-pin text-primary fs-11 flex-shrink-0"></i>
-                                        <span class="text-muted fs-11 flex-shrink-0">Plan:</span>
+                                        <span class="text-muted fs-11 flex-shrink-0">{{ __('crm.meetings_plan_label') }}</span>
                                         <a href="https://maps.google.com/?q={{ $item['latitude'] ?? '' }},{{ $item['longitude'] ?? '' }}" target="_blank" rel="noopener noreferrer"
                                             class="text-dark fw-medium fs-11 text-truncate hover-underline text-decoration-none">
                                             {{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}
@@ -262,7 +262,7 @@
                                 @else
                                     <div class="text-muted fs-11 d-flex align-items-center gap-1">
                                         <i class="feather-map-pin text-muted fs-10 flex-shrink-0"></i>
-                                        <span class="text-muted fs-11">No venue scheduled</span>
+                                        <span class="text-muted fs-11">{{ __('crm.meetings_no_venue_scheduled') }}</span>
                                     </div>
                                 @endif
 
@@ -277,7 +277,7 @@
                                         data-bs-toggle="tooltip" data-bs-placement="top"
                                         title="Actual Visit: {{ $item['checkin_address'] ?: ($item['checkin_latitude'] . ', ' . $item['checkin_longitude']) }} ({{ $item['checkin_status'] }})">
                                         <i class="feather-navigation {{ $isMismatch ? 'text-danger' : 'text-success' }} fs-11 flex-shrink-0"></i>
-                                        <span class="{{ $isMismatch ? 'text-danger' : 'text-success' }} fs-11 fw-semibold flex-shrink-0">Visit:</span>
+                                        <span class="{{ $isMismatch ? 'text-danger' : 'text-success' }} fs-11 fw-semibold flex-shrink-0">{{ __('crm.meetings_visit_label') }}</span>
                                         <a href="https://maps.google.com/?q={{ $item['checkin_latitude'] ?? '' }},{{ $item['checkin_longitude'] ?? '' }}" target="_blank" rel="noopener noreferrer"
                                             class="text-dark fw-medium fs-11 text-truncate hover-underline text-decoration-none flex-grow-1" style="min-width: 0;">
                                             {{ $item['checkin_address'] ?: ($item['checkin_latitude'] . ', ' . $item['checkin_longitude']) }}
@@ -291,7 +291,7 @@
                                 @elseif($isPending && $isGeoRequired)
                                     <div class="text-muted fs-11 d-flex align-items-center gap-1">
                                         <i class="feather-shield text-info fs-10 flex-shrink-0"></i>
-                                        <span class="text-muted fs-10">Geo check-in required</span>
+                                        <span class="text-muted fs-10">{{ __('crm.meetings_geo_checkin_required') }}</span>
                                     </div>
                                 @endif
                             </div>
@@ -305,31 +305,31 @@
                                         <span
                                             class="badge bg-soft-success text-success border border-success-subtle px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 rounded">
                                             <span class="rounded-circle bg-success d-inline-block"
-                                                style="width: 6px; height: 6px;"></span> Connected
+                                                style="width: 6px; height: 6px;"></span> {{ __('crm.meetings_status_connected') }}
                                         </span>
                                     @elseif($isNotConnected)
                                         <span
                                             class="badge bg-soft-warning text-warning border border-warning-subtle px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 rounded">
                                             <span class="rounded-circle bg-warning d-inline-block"
-                                                style="width: 6px; height: 6px;"></span> Not Connected
+                                                style="width: 6px; height: 6px;"></span> {{ __('crm.meetings_status_not_connected') }}
                                         </span>
                                     @elseif($isCancelled)
                                         <span
                                             class="badge bg-soft-danger text-danger border border-danger-subtle px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 rounded">
                                             <span class="rounded-circle bg-danger d-inline-block"
-                                                style="width: 6px; height: 6px;"></span> Cancelled
+                                                style="width: 6px; height: 6px;"></span> {{ __('crm.meetings_status_cancelled') }}
                                         </span>
                                     @elseif($isRescheduled)
                                         <span
                                             class="badge bg-soft-info text-info border border-info-subtle px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 rounded">
                                             <span class="rounded-circle bg-info d-inline-block"
-                                                style="width: 6px; height: 6px;"></span> Rescheduled
+                                                style="width: 6px; height: 6px;"></span> {{ __('crm.meetings_status_rescheduled') }}
                                         </span>
                                     @else
                                         <span
                                             class="badge bg-soft-primary text-primary border border-primary-subtle px-2 py-0.5 fs-11 fw-semibold d-inline-flex align-items-center gap-1 rounded">
                                             <span class="rounded-circle bg-primary d-inline-block"
-                                                style="width: 6px; height: 6px;"></span> Pending
+                                                style="width: 6px; height: 6px;"></span> {{ __('crm.meetings_status_pending') }}
                                         </span>
                                     @endif
                                 </div>
@@ -337,16 +337,16 @@
                                 @if(!empty($item['is_geo_verified']))
                                     @php
                                         $actualLoc = !empty($item['checkin_address']) 
-                                            ? $item['checkin_address'] 
-                                            : ((!empty($item['checkin_latitude']) && !empty($item['checkin_longitude'])) 
-                                                ? ('GPS: ' . round($item['checkin_latitude'], 5) . ', ' . round($item['checkin_longitude'], 5)) 
-                                                : '');
+                                             ? $item['checkin_address'] 
+                                             : ((!empty($item['checkin_latitude']) && !empty($item['checkin_longitude'])) 
+                                                 ? ('GPS: ' . round($item['checkin_latitude'], 5) . ', ' . round($item['checkin_longitude'], 5)) 
+                                                 : '');
                                         $actualGps = (!empty($item['checkin_latitude']) && !empty($item['checkin_longitude'])) 
-                                            ? (round($item['checkin_latitude'], 5) . ',' . round($item['checkin_longitude'], 5)) 
-                                            : '';
+                                             ? (round($item['checkin_latitude'], 5) . ',' . round($item['checkin_longitude'], 5)) 
+                                             : '';
                                         $actualTime = !empty($item['checkin_at']) 
-                                            ? \Illuminate\Support\Carbon::parse($item['checkin_at'])->format('d M, Y - h:i A') 
-                                            : '';
+                                             ? \Illuminate\Support\Carbon::parse($item['checkin_at'])->format('d M, Y - h:i A') 
+                                             : '';
                                         $actualStatus = $item['checkin_status'] ?? 'Verified';
                                         $isMismatch = str_contains($actualStatus, 'Mismatch');
                                     @endphp
@@ -366,7 +366,7 @@
                                                 class="badge bg-soft-success text-success border border-success-subtle fs-10 fw-semibold px-2 py-0.5 cursor-pointer d-inline-flex align-items-center gap-1 rounded"
                                                 onclick="crmOpenSelfieModal('{{ $item['selfie_url'] }}', '{{ addslashes($actualLoc) }}', '{{ addslashes($actualGps) }}', '{{ addslashes($actualTime) }}', '{{ addslashes($actualStatus) }}')"
                                                 title="Click to view field selfie proof">
-                                                <i class="feather-shield fs-9"></i> Verified
+                                                <i class="feather-shield fs-9"></i> {{ __('crm.meetings_verified_badge') }}
                                                 @if(!empty($item['selfie_url']))
                                                     <i class="feather-camera fs-9 ms-0.5 opacity-75"></i>
                                                 @endif
@@ -378,7 +378,7 @@
                                         <span
                                             class="badge bg-light text-muted border fs-10 px-2 py-0.5 d-inline-flex align-items-center gap-1 rounded"
                                             title="Field Geo-Verification Required">
-                                            <i class="feather-map-pin text-info fs-9"></i> Geo-Req
+                                            <i class="feather-map-pin text-info fs-9"></i> {{ __('crm.meetings_geo_req_badge') }}
                                         </span>
                                     </div>
                                 @endif
@@ -391,21 +391,21 @@
                                 <x-slot:extraActions>
                                     @if($isPending)
                                         {{-- Connected Icon Button --}}
-                                        <button type="button" class="action-dropdown-btn text-success" title="Mark as Connected"
+                                        <button type="button" class="action-dropdown-btn text-success" title="{{ __('crm.meetings_mark_connected') }}"
                                             data-bs-toggle="modal" data-bs-target="#meetingModal_{{ $item['id'] }}_Connected"
                                             onclick="crmInitVisitModal('{{ $item['id'] }}', 'Connected')">
                                             <i class="feather-check text-success"></i>
                                         </button>
 
                                         {{-- Not Connected Icon Button --}}
-                                        <button type="button" class="action-dropdown-btn text-warning" title="Mark as Not Connected"
+                                        <button type="button" class="action-dropdown-btn text-warning" title="{{ __('crm.meetings_mark_not_connected') }}"
                                             data-bs-toggle="modal" data-bs-target="#meetingModal_{{ $item['id'] }}_NotConnected"
                                             onclick="crmInitVisitModal('{{ $item['id'] }}', 'NotConnected')">
                                             <i class="feather-phone-off text-warning"></i>
                                         </button>
 
                                         {{-- Reschedule Icon Button --}}
-                                        <button type="button" class="action-dropdown-btn text-info" title="Reschedule Meeting"
+                                        <button type="button" class="action-dropdown-btn text-info" title="{{ __('crm.meetings_reschedule') }}"
                                             data-bs-toggle="modal" data-bs-target="#meetingRescheduleModal_{{ $item['id'] }}">
                                             <i class="feather-calendar text-info"></i>
                                         </button>
@@ -426,7 +426,7 @@
                                                 $actionActualStatus = $item['checkin_status'] ?? 'Verified';
                                             @endphp
                                             <button type="button" class="action-dropdown-btn text-success"
-                                                title="View Verification Selfie"
+                                                title="{{ __('crm.meetings_view_selfie') }}"
                                                 onclick="crmOpenSelfieModal('{{ $item['selfie_url'] }}', '{{ addslashes($actionActualLoc) }}', '{{ addslashes($actionActualGps) }}', '{{ addslashes($actionActualTime) }}', '{{ addslashes($actionActualStatus) }}')">
                                                 <i class="feather-image text-success"></i>
                                             </button>
@@ -439,13 +439,13 @@
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item py-1.5 text-primary"
                                             data-bs-toggle="modal" data-bs-target="#meetingAssignModal_{{ $item['id'] }}">
-                                            <i class="feather-user-plus me-2 text-primary fs-12"></i>Assign to Colleague
+                                            <i class="feather-user-plus me-2 text-primary fs-12"></i>{{ __('crm.meetings_assign_to_colleague') }}
                                         </a>
                                     </li>
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item py-1.5 text-danger" data-bs-toggle="modal"
                                             data-bs-target="#meetingCancelModal_{{ $item['id'] }}">
-                                            <i class="feather-x-circle me-2 text-danger fs-12"></i>Cancel Meeting
+                                            <i class="feather-x-circle me-2 text-danger fs-12"></i>{{ __('crm.meetings_cancel_meeting') }}
                                         </a>
                                     </li>
                                     <div class="dropdown-divider my-1"></div>
@@ -455,14 +455,14 @@
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item py-1.5 text-success"
                                             data-bs-toggle="offcanvas" data-bs-target="#meetingEntityOffcanvas_{{ $item['id'] }}">
-                                            <i class="feather-briefcase me-2 text-success fs-12"></i>View Deal
+                                            <i class="feather-briefcase me-2 text-success fs-12"></i>{{ __('crm.meetings_view_deal') }}
                                         </a>
                                     </li>
                                 @elseif($lead && !empty($lead['id']))
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item py-1.5 text-primary"
                                             data-bs-toggle="offcanvas" data-bs-target="#meetingEntityOffcanvas_{{ $item['id'] }}">
-                                            <i class="feather-user me-2 text-primary fs-12"></i>View Lead
+                                            <i class="feather-user me-2 text-primary fs-12"></i>{{ __('crm.meetings_view_lead') }}
                                         </a>
                                     </li>
                                 @endif
@@ -508,7 +508,7 @@
                     <div>
                         <h5 class="offcanvas-title fw-bold text-dark fs-14 mb-0"
                             id="meetingEntityOffcanvasLabel_{{ $item['id'] }}">
-                            {{ $deal ? 'Deal Details' : 'Lead Details' }}
+                            {{ $deal ? __('crm.meetings_deal_details') : __('crm.meetings_lead_details') }}
                         </h5>
                         <span class="badge bg-white text-muted border font-monospace fs-10 px-1.5 py-0.5 mt-0.5">
                             {{ $deal ? ($deal['deal_number'] ?? ('DL-' . $deal['id'])) : ($lead['lead_number'] ?? ('LD-' . $lead['id'])) }}
@@ -571,7 +571,7 @@
                 {{-- 2. Basic Information List --}}
                 <div class="border rounded-3 p-3 mb-3">
                     <h6 class="fs-11 text-uppercase fw-bold text-muted mb-2.5 d-flex align-items-center gap-1">
-                        <i class="feather-file-text text-primary"></i> Basic Information
+                        <i class="feather-file-text text-primary"></i> {{ __('crm.meetings_basic_information') }}
                     </h6>
                     <div class="row g-2 fs-12">
                         @if($deal)
@@ -638,7 +638,7 @@
                 {{-- 3. Associated Meeting Details --}}
                 <div class="border rounded-3 p-3 bg-light-subtle">
                     <h6 class="fs-11 text-uppercase fw-bold text-muted mb-2.5 d-flex align-items-center gap-1">
-                        <i class="feather-calendar text-primary"></i> Current Meeting Info
+                        <i class="feather-calendar text-primary"></i> {{ __('crm.meetings_current_meeting_info') }}
                     </h6>
                     <div class="d-flex flex-column gap-2 fs-12">
                         <div class="d-flex justify-content-between align-items-center">
@@ -772,7 +772,7 @@
                                 @if(!empty($geoFenceTag))
                                     <div class="mt-1.5 p-1.5 px-2 rounded fs-11 {{ str_contains($geoFenceTag, 'Mismatch') ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success' }} d-flex align-items-center gap-1">
                                         <i class="feather-shield fs-11 flex-shrink-0"></i>
-                                        <span><strong>Geo-Verification:</strong> {{ $geoFenceTag }}</span>
+                                        <span><strong>{{ __('crm.meetings_geo_verification') }}</strong> {{ $geoFenceTag }}</span>
                                     </div>
                                 @endif
                             </div>
@@ -783,18 +783,18 @@
 
             <div class="offcanvas-footer border-top bg-light p-3 d-flex justify-content-between align-items-center">
                 <button type="button" class="btn btn-sm btn-light border px-3" data-bs-dismiss="offcanvas">
-                    Close
+                    {{ __('crm.close') ?? 'Close' }}
                 </button>
                 @if($isPending)
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-info text-white" data-bs-dismiss="offcanvas"
                             data-bs-toggle="modal" data-bs-target="#meetingRescheduleModal_{{ $item['id'] }}">
-                            <i class="feather-calendar me-1"></i> Reschedule
+                            <i class="feather-calendar me-1"></i> {{ __('crm.meetings_reschedule') }}
                         </button>
                         <button type="button" class="btn btn-sm btn-success" data-bs-dismiss="offcanvas" data-bs-toggle="modal"
                             data-bs-target="#meetingModal_{{ $item['id'] }}_Connected"
                             onclick="crmInitVisitModal('{{ $item['id'] }}', 'Connected')">
-                            <i class="feather-check me-1"></i> Mark Connected
+                            <i class="feather-check me-1"></i> {{ __('crm.meetings_mark_connected') }}
                         </button>
                     </div>
                 @endif
@@ -814,7 +814,7 @@
 
                             <div class="modal-header py-2.5 px-3 border-bottom bg-soft-success">
                                 <h6 class="modal-title fw-bold text-success fs-14">
-                                    <i class="feather-check-circle me-1.5"></i>Mark Meeting as Connected
+                                    <i class="feather-check-circle me-1.5"></i>{{ __('crm.meetings_modal_connected_title') }}
                                 </h6>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
                                     onclick="crmStopCamera('{{ $item['id'] }}', 'Connected')"></button>
@@ -822,7 +822,7 @@
 
                             <div class="modal-body p-3">
                                 <p class="text-muted fs-12 mb-3">
-                                    Confirming that you connected/conducted the meeting with <strong>{{ $clientCompany }}</strong>.
+                                    {!! __('crm.meetings_modal_connected_desc', ['client' => '<strong>' . e($clientCompany) . '</strong>']) !!}
                                 </p>
 
                                 @if($isGeoRequired)
@@ -839,7 +839,7 @@
                                         @if(!empty($item['location_address']) || !empty($item['latitude']))
                                             <div class="p-2 mb-2 bg-white rounded border border-light-subtle fs-11">
                                                 <div class="text-muted fs-10 text-uppercase fw-semibold mb-0.5">
-                                                    <i class="feather-map-pin text-primary me-1"></i>Scheduled Venue:
+                                                    <i class="feather-map-pin text-primary me-1"></i>{{ __('crm.meetings_scheduled_venue') }}
                                                 </div>
                                                 <div class="fw-semibold text-dark text-truncate" title="{{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}">
                                                     {{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}
@@ -854,7 +854,7 @@
                                         <!-- GPS Location Box -->
                                         <div class="mb-3">
                                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">Live Location GPS <span
+                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">{{ __('crm.meetings_live_location_gps') }} <span
                                                         class="text-danger">*</span></label>
                                                 <span id="loc_badge_{{ $item['id'] }}_Connected"
                                                     class="badge bg-secondary-subtle text-muted fs-10">
@@ -869,12 +869,12 @@
                                                         style="width: 8px; height: 8px; flex-shrink: 0;"></span>
                                                     <span id="loc_text_{{ $item['id'] }}_Connected"
                                                         class="text-muted text-truncate fs-12">
-                                                        Click Fetch GPS to capture live location
+                                                        {{ __('crm.meetings_click_fetch_gps') }}
                                                     </span>
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-outline-primary flex-shrink-0"
                                                     onclick="crmCaptureLocation('{{ $item['id'] }}', 'Connected')">
-                                                    <i class="feather-crosshair me-1"></i>Fetch GPS
+                                                    <i class="feather-crosshair me-1"></i>{{ __('crm.meetings_fetch_gps_btn') }}
                                                 </button>
                                             </div>
                                             <div id="loc_error_{{ $item['id'] }}_Connected" class="text-danger fs-11 mt-1 d-none">
@@ -885,7 +885,7 @@
                                         <!-- Live Selfie Box -->
                                         <div>
                                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">Live Front Camera Selfie
+                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">{{ __('crm.meetings_live_selfie_label') }}
                                                     <span class="text-danger">*</span></label>
                                                 <span id="selfie_badge_{{ $item['id'] }}_Connected"
                                                     class="badge {{ !empty($item['selfie_url']) ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted' }} fs-10">
@@ -899,7 +899,7 @@
                                                 class="border rounded-2 p-3 text-center bg-white">
                                                 <x-ui.button type="button" variant="primary" size="sm" icon="feather-camera"
                                                     onclick="crmStartCamera('{{ $item['id'] }}', 'Connected')">
-                                                    Open Camera to Take Selfie
+                                                    {{ __('crm.meetings_open_camera_btn') }}
                                                 </x-ui.button>
                                             </div>
 
@@ -911,11 +911,11 @@
                                                 <div class="mt-2 d-flex justify-content-center gap-2">
                                                     <x-ui.button type="button" variant="success" size="sm" icon="feather-camera"
                                                         onclick="crmTakeSnapshot('{{ $item['id'] }}', 'Connected')">
-                                                        Capture Photo
+                                                        {{ __('crm.meetings_capture_photo_btn') }}
                                                     </x-ui.button>
                                                     <x-ui.button type="button" variant="light" size="sm"
                                                         onclick="crmStopCamera('{{ $item['id'] }}', 'Connected')">
-                                                        Cancel
+                                                        {{ __('crm.cancel') ?: 'Cancel' }}
                                                     </x-ui.button>
                                                 </div>
                                             </div>
@@ -928,7 +928,7 @@
                                                 <div class="mt-2">
                                                     <button type="button" class="btn btn-xs btn-outline-secondary"
                                                         onclick="crmRetakePhoto('{{ $item['id'] }}', 'Connected')">
-                                                        <i class="feather-refresh-cw me-1"></i>Retake Photo
+                                                        <i class="feather-refresh-cw me-1"></i>{{ __('crm.meetings_retake_photo_btn') }}
                                                     </button>
                                                 </div>
                                             </div>
@@ -940,19 +940,19 @@
                                 @endif
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">Discussion Summary / Meeting Notes</label>
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_discussion_summary') }}</label>
                                     <textarea name="notes" class="form-control fs-12" rows="3"
-                                        placeholder="Enter meeting outcomes, decisions, or action items...">{{ $item['notes'] ?? '' }}</textarea>
+                                        placeholder="{{ __('crm.meetings_discussion_placeholder') }}">{{ $item['notes'] ?? '' }}</textarea>
                                 </div>
                             </div>
 
                             <div class="modal-footer py-2 px-3 border-top bg-light">
                                 <x-ui.button type="button" variant="light" size="sm" data-bs-dismiss="modal"
                                     onclick="crmStopCamera('{{ $item['id'] }}', 'Connected')">
-                                    Cancel
+                                    {{ __('crm.cancel') ?: 'Cancel' }}
                                 </x-ui.button>
                                 <x-ui.button type="submit" variant="success" size="sm" icon="feather-check">
-                                    Mark as Connected
+                                    {{ __('crm.meetings_mark_connected') }}
                                 </x-ui.button>
                             </div>
                         </form>
@@ -972,7 +972,7 @@
 
                             <div class="modal-header py-2.5 px-3 border-bottom bg-soft-warning">
                                 <h6 class="modal-title fw-bold text-dark fs-14">
-                                    <i class="feather-phone-off text-warning me-1.5"></i>Mark as Not Connected
+                                    <i class="feather-phone-off text-warning me-1.5"></i>{{ __('crm.meetings_modal_not_connected_title') }}
                                 </h6>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
                                     onclick="crmStopCamera('{{ $item['id'] }}', 'NotConnected')"></button>
@@ -980,7 +980,7 @@
 
                             <div class="modal-body p-3">
                                 <p class="text-muted fs-12 mb-3">
-                                    Meeting could not take place (e.g. client unavailable, premise locked, etc.).
+                                    {{ __('crm.meetings_modal_not_connected_desc') }}
                                 </p>
 
                                 @if($isGeoRequired)
@@ -997,7 +997,7 @@
                                         @if(!empty($item['location_address']) || !empty($item['latitude']))
                                             <div class="p-2 mb-2 bg-white rounded border border-light-subtle fs-11">
                                                 <div class="text-muted fs-10 text-uppercase fw-semibold mb-0.5">
-                                                    <i class="feather-map-pin text-primary me-1"></i>Scheduled Venue:
+                                                    <i class="feather-map-pin text-primary me-1"></i>{{ __('crm.meetings_scheduled_venue') }}
                                                 </div>
                                                 <div class="fw-semibold text-dark text-truncate" title="{{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}">
                                                     {{ $item['location_address'] ?: ($item['latitude'] . ', ' . $item['longitude']) }}
@@ -1011,7 +1011,7 @@
 
                                         <div class="mb-3">
                                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">Live Location GPS <span
+                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">{{ __('crm.meetings_live_location_gps') }} <span
                                                         class="text-danger">*</span></label>
                                                 <span id="loc_badge_{{ $item['id'] }}_NotConnected"
                                                     class="badge bg-secondary-subtle text-muted fs-10">
@@ -1026,12 +1026,12 @@
                                                         style="width: 8px; height: 8px; flex-shrink: 0;"></span>
                                                     <span id="loc_text_{{ $item['id'] }}_NotConnected"
                                                         class="text-muted text-truncate fs-12">
-                                                        Click Fetch GPS to capture live location
+                                                        {{ __('crm.meetings_click_fetch_gps') }}
                                                     </span>
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-outline-primary flex-shrink-0"
                                                     onclick="crmCaptureLocation('{{ $item['id'] }}', 'NotConnected')">
-                                                    <i class="feather-crosshair me-1"></i>Fetch GPS
+                                                    <i class="feather-crosshair me-1"></i>{{ __('crm.meetings_fetch_gps_btn') }}
                                                 </button>
                                             </div>
                                             <div id="loc_error_{{ $item['id'] }}_NotConnected" class="text-danger fs-11 mt-1 d-none">
@@ -1041,7 +1041,7 @@
 
                                         <div>
                                             <div class="d-flex align-items-center justify-content-between mb-1">
-                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">Live Front Camera Selfie
+                                                <label class="form-label fs-11 fw-semibold text-secondary mb-0">{{ __('crm.meetings_live_selfie_label') }}
                                                     <span class="text-danger">*</span></label>
                                                 <span id="selfie_badge_{{ $item['id'] }}_NotConnected"
                                                     class="badge {{ !empty($item['selfie_url']) ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted' }} fs-10">
@@ -1055,7 +1055,7 @@
                                                 class="border rounded-2 p-3 text-center bg-white">
                                                 <x-ui.button type="button" variant="primary" size="sm" icon="feather-camera"
                                                     onclick="crmStartCamera('{{ $item['id'] }}', 'NotConnected')">
-                                                    Open Camera to Take Selfie
+                                                    {{ __('crm.meetings_open_camera_btn') }}
                                                 </x-ui.button>
                                             </div>
 
@@ -1068,11 +1068,11 @@
                                                 <div class="mt-2 d-flex justify-content-center gap-2">
                                                     <x-ui.button type="button" variant="warning" size="sm" icon="feather-camera"
                                                         onclick="crmTakeSnapshot('{{ $item['id'] }}', 'NotConnected')">
-                                                        Capture Photo
+                                                        {{ __('crm.meetings_capture_photo_btn') }}
                                                     </x-ui.button>
                                                     <x-ui.button type="button" variant="light" size="sm"
                                                         onclick="crmStopCamera('{{ $item['id'] }}', 'NotConnected')">
-                                                        Cancel
+                                                        {{ __('crm.cancel') ?: 'Cancel' }}
                                                     </x-ui.button>
                                                 </div>
                                             </div>
@@ -1085,7 +1085,7 @@
                                                 <div class="mt-2">
                                                     <button type="button" class="btn btn-xs btn-outline-secondary"
                                                         onclick="crmRetakePhoto('{{ $item['id'] }}', 'NotConnected')">
-                                                        <i class="feather-refresh-cw me-1"></i>Retake Photo
+                                                        <i class="feather-refresh-cw me-1"></i>{{ __('crm.meetings_retake_photo_btn') }}
                                                     </button>
                                                 </div>
                                             </div>
@@ -1097,19 +1097,19 @@
                                 @endif
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">Reason / Notes</label>
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_notes_and_remarks') }}</label>
                                     <textarea name="notes" class="form-control fs-12" rows="3"
-                                        placeholder="e.g. Visited client office, contact person was on leave...">{{ $item['notes'] ?? '' }}</textarea>
+                                        placeholder="{{ __('crm.meetings_not_connected_placeholder') }}">{{ $item['notes'] ?? '' }}</textarea>
                                 </div>
                             </div>
 
                             <div class="modal-footer py-2 px-3 border-top bg-light">
                                 <x-ui.button type="button" variant="light" size="sm" data-bs-dismiss="modal"
                                     onclick="crmStopCamera('{{ $item['id'] }}', 'NotConnected')">
-                                    Cancel
+                                    {{ __('crm.cancel') ?: 'Cancel' }}
                                 </x-ui.button>
                                 <x-ui.button type="submit" variant="warning" size="sm" icon="feather-check">
-                                    Mark as Not Connected
+                                    {{ __('crm.meetings_mark_not_connected') }}
                                 </x-ui.button>
                             </div>
                         </form>
@@ -1125,37 +1125,37 @@
                             @csrf
                             <div class="modal-header py-2.5 px-3 border-bottom bg-soft-info">
                                 <h6 class="modal-title fw-bold text-info fs-14">
-                                    <i class="feather-repeat me-1.5"></i>Reschedule Meeting
+                                    <i class="feather-repeat me-1.5"></i>{{ __('crm.meetings_reschedule_modal_title') }}
                                 </h6>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
 
                             <div class="modal-body p-3">
                                 <p class="text-muted fs-12 mb-3">
-                                    Current scheduled time:
+                                    {{ __('crm.meetings_current_scheduled_time') }}
                                     <strong>{{ $dueDate ? $dueDate->format('d M Y, h:i A') : 'N/A' }}</strong>
                                 </p>
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">New Date & Time <span
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_new_date_time') }} <span
                                             class="text-danger">*</span></label>
                                     <input type="datetime-local" name="followup_date" class="form-control fs-12" required
                                         value="{{ date('Y-m-d\TH:i', strtotime('+1 day 10:00')) }}">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">Reschedule Reason / Notes</label>
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_reschedule_reason') }}</label>
                                     <textarea name="notes" class="form-control fs-12" rows="2"
-                                        placeholder="e.g. Rescheduled as per client request...">{{ $item['notes'] ?? '' }}</textarea>
+                                        placeholder="{{ __('crm.meetings_reschedule_placeholder') }}">{{ $item['notes'] ?? '' }}</textarea>
                                 </div>
                             </div>
 
                             <div class="modal-footer py-2 px-3 border-top bg-light">
                                 <x-ui.button type="button" variant="light" size="sm" data-bs-dismiss="modal">
-                                    Cancel
+                                    {{ __('crm.cancel') ?: 'Cancel' }}
                                 </x-ui.button>
                                 <x-ui.button type="submit" variant="info" size="sm" icon="feather-check">
-                                    Confirm Reschedule
+                                    {{ __('crm.meetings_confirm_reschedule_btn') }}
                                 </x-ui.button>
                             </div>
                         </form>
@@ -1174,29 +1174,29 @@
 
                             <div class="modal-header py-2.5 px-3 border-bottom bg-soft-danger">
                                 <h6 class="modal-title fw-bold text-danger fs-14">
-                                    <i class="feather-x-circle me-1.5"></i>Cancel Scheduled Meeting
+                                    <i class="feather-x-circle me-1.5"></i>{{ __('crm.meetings_cancel_modal_title') }}
                                 </h6>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
 
                             <div class="modal-body p-3">
                                 <p class="text-muted fs-12 mb-3">
-                                    Are you sure you want to cancel this meeting with <strong>{{ $clientCompany }}</strong>?
+                                    {!! __('crm.meetings_cancel_confirm_question', ['client' => '<strong>' . e($clientCompany) . '</strong>']) !!}
                                 </p>
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">Cancellation Reason</label>
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_cancellation_reason') }}</label>
                                     <textarea name="notes" class="form-control fs-12" rows="2"
-                                        placeholder="e.g. Deal dropped, client requested cancellation...">{{ $item['notes'] ?? '' }}</textarea>
+                                        placeholder="{{ __('crm.meetings_cancellation_placeholder') }}">{{ $item['notes'] ?? '' }}</textarea>
                                 </div>
                             </div>
 
                             <div class="modal-footer py-2 px-3 border-top bg-light">
                                 <x-ui.button type="button" variant="light" size="sm" data-bs-dismiss="modal">
-                                    Close
+                                    {{ __('crm.close') }}
                                 </x-ui.button>
                                 <x-ui.button type="submit" variant="danger" size="sm" icon="feather-trash-2">
-                                    Confirm Cancel
+                                    {{ __('crm.meetings_confirm_cancel_btn') }}
                                 </x-ui.button>
                             </div>
                         </form>
@@ -1212,22 +1212,24 @@
                             @csrf
                             <div class="modal-header py-2.5 px-3 border-bottom bg-soft-primary">
                                 <h6 class="modal-title fw-bold text-primary fs-14">
-                                    <i class="feather-user-plus me-1.5"></i>Assign Meeting to Colleague
+                                    <i class="feather-user-plus me-1.5"></i>{{ __('crm.meetings_assign_modal_title') }}
                                 </h6>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
 
                             <div class="modal-body p-3">
                                 <p class="text-muted fs-12 mb-3">
-                                    Transfer or assign this field meeting with <strong>{{ $clientCompany }}</strong>
-                                    ({{ $dueDate ? $dueDate->format('d M Y, h:i A') : '' }}) to another sales person.
+                                    {!! __('crm.meetings_assign_desc', [
+                                        'client' => '<strong>' . e($clientCompany) . '</strong>',
+                                        'time' => $dueDate ? $dueDate->format('d M Y, h:i A') : ''
+                                    ]) !!}
                                 </p>
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">Assign To Sales Person <span
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_assign_to_sales_person') }} <span
                                             class="text-danger">*</span></label>
                                     <select name="tagged_user_id" class="form-select fs-12" required>
-                                        <option value="">-- Choose Sales Person --</option>
+                                        <option value="">{{ __('crm.meetings_choose_sales_person') }}</option>
                                         @php
                                             $selectedAssigneeId = $item['tagged_user']['id'] ?? ($item['assigned_to']['id'] ?? null);
                                             if (!$selectedAssigneeId && !empty($item['tagged_users'])) {
@@ -1245,19 +1247,18 @@
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fs-12 fw-semibold text-dark">Handover Note / Instructions
-                                        (Optional)</label>
+                                    <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_handover_notes') }}</label>
                                     <textarea name="notes" class="form-control fs-12" rows="2"
-                                        placeholder="e.g. Please visit client site today, discuss requirements..."></textarea>
+                                        placeholder="{{ __('crm.meetings_handover_placeholder') }}"></textarea>
                                 </div>
                             </div>
 
                             <div class="modal-footer py-2 px-3 border-top bg-light">
                                 <x-ui.button type="button" variant="light" size="sm" data-bs-dismiss="modal">
-                                    Cancel
+                                    {{ __('crm.cancel') }}
                                 </x-ui.button>
                                 <x-ui.button type="submit" variant="primary" size="sm" icon="feather-check">
-                                    Confirm Assignment
+                                    {{ __('crm.meetings_confirm_assignment_btn') }}
                                 </x-ui.button>
                             </div>
                         </form>
@@ -1272,6 +1273,6 @@
         style="width: 48px; height: 48px;">
         <i class="feather-search fs-20"></i>
     </div>
-    <h6 class="fw-bold text-dark mb-1">No matching meetings found</h6>
-    <p class="text-muted fs-12 mb-0">Try searching with a different term.</p>
+    <h6 class="fw-bold text-dark mb-1">{{ __('crm.meetings_no_matching_found') }}</h6>
+    <p class="text-muted fs-12 mb-0">{{ __('crm.meetings_try_different_term') }}</p>
 </div>

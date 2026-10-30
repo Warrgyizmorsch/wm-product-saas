@@ -37,9 +37,9 @@ class LeadFollowupService
         $titleInput = !empty($validated['title']) ? trim($validated['title']) : (($validated['type'] ?? 'Scheduled Call') . " with " . ($lead->company_name ?: $lead->contact_person));
 
         $followup = $this->followupRepo->create([
-            'tenant_id' => $lead->tenant_id ?? (tenant_id() ?? (auth()->user()?->tenant_id ?? 1)),
-            'company_id' => $lead->company_id ?? (company_id() ?? (auth()->user()?->company_id ?? 1)),
-            'branch_id' => $lead->branch_id ?? (branch_id() ?? (auth()->user()?->branch_id ?? null)),
+            'tenant_id' => $lead->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id),
+            'company_id' => $lead->company_id ?? (company_id() ?? auth()->user()?->company_id),
+            'branch_id' => $lead->branch_id ?? (branch_id() ?? auth()->user()?->branch_id),
             'lead_id' => $lead->id,
             'followup_date' => $followupDateTime,
             'type' => $validated['type'],
