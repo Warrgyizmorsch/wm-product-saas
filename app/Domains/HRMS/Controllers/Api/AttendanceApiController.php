@@ -163,6 +163,15 @@ class AttendanceApiController extends Controller
             'is_on_break'         => $isOnBreak,
             'active_break_id'     => $activeBreak?->id,
             'breaks_count'        => $att->breaks->count(),
+            'check_in_latitude'   => $att->check_in_latitude ? (float) $att->check_in_latitude : null,
+            'check_in_longitude'  => $att->check_in_longitude ? (float) $att->check_in_longitude : null,
+            'check_out_latitude'  => $att->check_out_latitude ? (float) $att->check_out_latitude : null,
+            'check_out_longitude' => $att->check_out_longitude ? (float) $att->check_out_longitude : null,
+            'check_in_selfie_url' => $att->check_in_selfie_path ? asset('storage/' . $att->check_in_selfie_path) : null,
+            'check_out_selfie_url'=> $att->check_out_selfie_path ? asset('storage/' . $att->check_out_selfie_path) : null,
+            'total_distance_km'   => (float) ($att->total_distance_km ?? 0),
+            'route_snapshot_url'  => $att->route_snapshot_url,
+            'route_polyline'      => $att->route_polyline,
             'capabilities'        => [
                 'can_view'          => true,
                 'can_clock_in'      => $canClockIn,
@@ -413,6 +422,8 @@ class AttendanceApiController extends Controller
             return $this->sendSuccess($attendance->load('breaks'), 'Clocked in successfully!');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to clock in: ' . $e->getMessage(), 500);
         }
     }
 
@@ -432,26 +443,79 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only clock out for yourself.', 403);
         }
 
         $validated = $request->validate([
-            'latitude'  => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'selfie'    => 'nullable|string',
+            'latitude'       => 'nullable|numeric|between:-90,90',
+            'longitude'      => 'nullable|numeric|between:-180,180',
+            'selfie'         => 'nullable|string',
+            'route_snapshot' => 'nullable', // supports file upload (image) or base64 string from app
         ]);
+
+        $routeSnapshot = $request->file('route_snapshot') ?? $request->input('route_snapshot');
 
         try {
             $updatedAttendance = $this->attendanceRepository->checkOut(
                 $attendance->id,
                 $validated['latitude'] ?? null,
                 $validated['longitude'] ?? null,
-                $request->input('selfie')
+                $request->input('selfie'),
+                $routeSnapshot
             );
-            return $this->sendSuccess($updatedAttendance->load('breaks'), 'Clocked out successfully!');
+            $fresh = $updatedAttendance->fresh(['breaks', 'employee.department']);
+            return $this->sendSuccess($this->transformAttendance($fresh), 'Clocked out successfully!');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Clock-out failed for attendance #{$attendance->id}: " . $e->getMessage());
+            return $this->sendError('Failed to process clock-out: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/hrms/attendance/{attendance}/snapshot
+     * Upload or update route snapshot directly from mobile app.
+     */
+    public function uploadSnapshot(Request $request, mixed $id): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $attendance = Attendance::find($id);
+        if (!$attendance) {
+            return $this->sendError("Attendance log with ID '{$id}' not found.", 404);
+        }
+
+        $isHrAdmin = $this->isHrAdmin();
+        $authEmployee = $this->getAuthenticatedEmployee();
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
+            return $this->sendError('Unauthorized action. You can only upload route snapshot for your own attendance.', 403);
+        }
+
+        $request->validate([
+            'route_snapshot' => 'required',
+        ]);
+
+        try {
+            $snapshotInput = $request->file('route_snapshot') ?? $request->input('route_snapshot');
+            $url = $this->attendanceRepository->uploadRouteSnapshot($snapshotInput, $attendance->id);
+
+            if (!$url) {
+                return $this->sendError('Failed to process route snapshot image. Please provide a valid image file or Base64 string.', 422);
+            }
+
+            $attendance->update(['route_snapshot_url' => $url]);
+
+            return $this->sendSuccess([
+                'attendance_id'      => (int) $attendance->id,
+                'route_snapshot_url' => $attendance->fresh()->route_snapshot_url,
+            ], 'Route snapshot uploaded successfully');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to upload route snapshot for attendance #{$attendance->id}: " . $e->getMessage());
+            return $this->sendError('Failed to process route snapshot: ' . $e->getMessage(), 500);
         }
     }
 
@@ -471,15 +535,21 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
         }
 
         $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
         $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
 
-        $this->attendanceRepository->breakIn($attendance->id, $latitude, $longitude);
-        return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break started successfully.');
+        try {
+            $this->attendanceRepository->breakIn($attendance->id, $latitude, $longitude);
+            return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break started successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to start break: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
@@ -498,15 +568,21 @@ class AttendanceApiController extends Controller
 
         $isHrAdmin = $this->isHrAdmin();
         $authEmployee = $this->getAuthenticatedEmployee();
-        if (!$isHrAdmin && $authEmployee && $attendance->employee_id !== $authEmployee->id) {
+        if (!$isHrAdmin && $authEmployee && (int) $attendance->employee_id !== (int) $authEmployee->id) {
             return $this->sendError('Unauthorized action. You can only manage break for yourself.', 403);
         }
 
         $latitude = $request->filled('latitude') ? (float) $request->input('latitude') : null;
         $longitude = $request->filled('longitude') ? (float) $request->input('longitude') : null;
 
-        $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
-        return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break ended successfully.');
+        try {
+            $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
+            return $this->sendSuccess($attendance->fresh()->load('breaks'), 'Break ended successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->sendError($e->getMessage(), 422, $e->errors());
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to end break: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
