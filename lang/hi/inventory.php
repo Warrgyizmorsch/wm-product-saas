@@ -720,6 +720,17 @@ return array (
   'view_material_requirement' => 'सामग्री आवश्यकता देखें',
   'units' => 'यूनिट',
   'item_count' => ':count आइटम|:count आइटम',
+  'pending_material_requests_prod' => 'लंबित सामग्री अनुरोध (उत्पादन)',
+  'pending_prod_demands_subtext' => 'स्टोर इन्वेंट्री जारी करने की प्रतीक्षा कर रहे नवीनतम शॉप फ्लोर अनुरोध',
+  'view_all_prod_requests' => 'सभी उत्पादन अनुरोध देखें',
+  'issue_store' => 'स्टोर से जारी करें',
+  'no_pending_prod_material_requests' => 'कोई लंबित उत्पादन सामग्री अनुरोध नहीं मिले।',
+  'view_all' => 'सभी देखें',
+  'items_and_date' => 'आइटम और दिनांक',
+  'release' => 'रिलीज',
+  'issue' => 'जारी करें',
+  'maintenance' => 'मेंटेनेंस',
+  'production' => 'उत्पादन',
 
   // Remnants Modals
   'split_remnant' => 'अवशेष विभाजित करें',

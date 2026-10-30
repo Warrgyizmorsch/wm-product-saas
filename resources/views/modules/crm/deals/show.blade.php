@@ -1545,10 +1545,16 @@
                     <span class="badge bg-soft-success text-success fw-bold px-2.5 py-1.5 fs-11 me-1">
                         <i class="feather-check-circle me-1"></i> {{ __('crm.customer_converted') }}
                     </span>
-                    @if($acceptedQuote && in_array($acceptedQuote->status, ['Accepted', 'Converted', 'Won']))
-                        <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
-                            <i class="feather-shopping-cart me-1"></i> {{ __('crm.convert_to_sales_order') }}
-                        </a>
+                    @if($acceptedQuote)
+                        @if($acceptedQuote->salesOrder)
+                            <a href="{{ route('sales.orders.show', $acceptedQuote->salesOrder->id) }}" class="btn btn-xs btn-primary fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                                <i class="feather-shopping-bag me-1"></i> View Sales Order ({{ $acceptedQuote->salesOrder->sales_order_number }})
+                            </a>
+                        @elseif(in_array($acceptedQuote->status, ['Accepted', 'Won']))
+                            <a href="{{ route('sales.orders.create', ['quotation_id' => $acceptedQuote->id]) }}" class="btn btn-xs btn-success fw-bold py-1 px-3 rounded shadow-sm d-inline-flex align-items-center" style="font-size: 11px;">
+                                <i class="feather-shopping-cart me-1"></i> {{ __('crm.convert_to_sales_order') }}
+                            </a>
+                        @endif
                     @endif
                 @endif
 

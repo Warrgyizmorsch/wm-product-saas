@@ -339,9 +339,6 @@
                         @if($lead->segment && $lead->segment !== 'Select an Option')
                             <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ $lead->segment }}</span>
                         @endif
-                        <button type="button" class="btn btn-xs btn-outline-secondary zoho-tag-btn d-inline-flex align-items-center text-muted px-2 py-0.5 border" style="font-size: 10px; border-radius: 3px;">
-                            <i class="feather-tag me-1 fs-9"></i> {{ __('crm.add_tags') }}
-                        </button>
                     </div>
                 </div>
 
@@ -551,6 +548,46 @@
                 </div>
             </div>
 
+            @php
+                $customFieldsFormatted = $lead->custom_fields_formatted;
+            @endphp
+            @if(!empty($customFieldsFormatted))
+                <!-- ==================== ADDITIONAL / CUSTOM FIELDS OVERVIEW BOX ==================== -->
+                <div class="mt-3.5 p-3 rounded-3 border bg-light-50 shadow-2xs" style="border-color: #e2e8f0 !important;">
+                    <div class="d-flex align-items-center justify-content-between pb-2 border-bottom mb-2.5">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-text avatar-xs bg-soft-primary text-primary rounded-circle" style="width: 24px; height: 24px; font-size: 11px;">
+                                <i class="feather-sliders"></i>
+                            </div>
+                            <span class="fs-12 fw-bold text-dark text-uppercase letter-spacing-1">
+                                {{ __('crm.additional_details') ?? 'Additional Details' }}
+                            </span>
+                        </div>
+                        <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-0.5 fs-10 font-monospace fw-bold">
+                            {{ count($customFieldsFormatted) }} {{ count($customFieldsFormatted) === 1 ? (__('crm.field') ?? 'Field') : (__('crm.fields') ?? 'Fields') }}
+                        </span>
+                    </div>
+                    <div class="row g-2">
+                        @foreach($customFieldsFormatted as $fieldLabel => $fieldVal)
+                            <div class="col-md-6 col-lg-4">
+                                <div class="p-2.5 px-3 rounded-2 bg-white border shadow-2xs h-100 d-flex flex-column justify-content-center">
+                                    <div class="text-muted fs-11 fw-semibold mb-1 text-truncate" title="{{ $fieldLabel }}">
+                                        {{ $fieldLabel }}
+                                    </div>
+                                    <div class="text-dark fw-bold fs-12 text-break">
+                                        @if(is_null($fieldVal) || $fieldVal === '')
+                                            <span class="text-muted fst-italic">—</span>
+                                        @else
+                                            {{ $fieldVal }}
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <!-- Odoo Notebook Horizontal Tabs -->
             <div class="odoo-notebook mt-3 pt-2">
                 @php
@@ -563,7 +600,7 @@
                     $leadPIds = !empty($leadItems) ? array_column($leadItems, 'product_id') : [];
                     $leadProductsMap = !empty($leadPIds) ? \App\Domains\Inventory\Models\Product::whereIn('id', $leadPIds)->get()->keyBy('id') : collect();
                 @endphp
-                <ul class="nav nav-tabs odoo-notebook-tabs border-bottom" id="odooNotebookTabs" role="tablist">
+                <ul class="nav nav-tabs odoo-notebook-tabs border-bottom flex-nowrap" id="odooNotebookTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active fw-bold fs-12 px-3 py-2" id="nb-requirements-tab" data-bs-toggle="tab" data-bs-target="#nb-requirements-pane" type="button" role="tab" aria-controls="nb-requirements-pane" aria-selected="true">
                             <i class="feather-file-text me-1 text-primary"></i>{{ __('crm.requirements') }}
@@ -877,6 +914,17 @@
     @push('scripts')
     <script>
         $(function () {
+            // Enable smooth horizontal scrolling with mouse wheel over notebook tabs
+            const nbTabsEl = document.getElementById('odooNotebookTabs');
+            if (nbTabsEl) {
+                nbTabsEl.addEventListener('wheel', function(e) {
+                    if (e.deltaY !== 0) {
+                        e.preventDefault();
+                        nbTabsEl.scrollLeft += e.deltaY;
+                    }
+                }, { passive: false });
+            }
+
             (function () {
                 const fallbackCountries = [
                 { name: "India", code: "in" },

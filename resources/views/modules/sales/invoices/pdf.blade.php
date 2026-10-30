@@ -5,19 +5,22 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Tax Invoice - {{ $invoice->invoice_number }}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @page {
+            margin-top: 18mm;
+            margin-bottom: 22mm;
+            margin-left: 15mm;
+            margin-right: 15mm;
+            size: A4 portrait;
         }
 
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: 'DejaVu Sans', sans-serif;
             font-size: 10px;
-            line-height: 1.38;
             color: #1e293b;
             background: #ffffff;
-            padding: 28px 32px;
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
         }
 
         /* ── UTILITY ─────────────────────────────────── */
@@ -32,6 +35,26 @@
         .text-danger { color: #dc2626; }
         .font-mono   { font-family: monospace; }
 
+        /* ── PERSISTENT FOOTER ON EVERY PAGE (REFRENS STYLE) ── */
+        footer.doc-page-footer {
+            position: fixed;
+            bottom: -16mm;
+            left: 0;
+            right: 0;
+            height: 14mm;
+        }
+        .footer-dashed-line {
+            border-top: 1.2px dashed #94a3b8;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+        .footer-meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8.5px;
+            color: #64748b;
+        }
+
         /* ── 1. E-INVOICE / E-WAY BILL STRIP ─────────── */
         .einvoice-banner {
             width: 100%;
@@ -39,32 +62,30 @@
             border-left: 4px solid #16a34a;
             background-color: #f8fafc;
             border-radius: 6px;
-            padding: 8px 10px;
+            padding: 6px 8px;
             margin-bottom: 10px;
+            page-break-inside: avoid;
         }
-
         .badge-einvoice {
             background-color: #16a34a;
             color: #ffffff;
             font-size: 8px;
             font-weight: bold;
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 3px;
             display: inline-block;
             text-transform: uppercase;
         }
-
         .badge-ewaybill {
             background-color: #0284c7;
             color: #ffffff;
             font-size: 8px;
             font-weight: bold;
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 3px;
             display: inline-block;
             text-transform: uppercase;
         }
-
         .qr-box {
             background-color: #ffffff;
             border: 1px solid #cbd5e1;
@@ -73,346 +94,356 @@
             display: inline-block;
         }
 
-        /* ── 2. HEADER ───────────────────────────────── */
+        /* ── 2. HEADER SECTION ──────────────────────── */
         .header-table {
             width: 100%;
-            border-bottom: 1.5px solid #e2e8f0;
+            border-collapse: collapse;
             padding-bottom: 10px;
-            margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e1;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
         }
-
         .company-avatar {
             display: inline-block;
-            width: 42px;
-            height: 42px;
+            width: 40px;
+            height: 40px;
             background-color: #1e40af;
             color: #ffffff;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             text-align: center;
-            line-height: 42px;
+            line-height: 40px;
             border-radius: 6px;
             vertical-align: middle;
         }
-
-        .company-title-wrap {
+        .company-info {
             display: inline-block;
             vertical-align: middle;
             padding-left: 8px;
         }
-
         .company-name {
             font-size: 15px;
             font-weight: bold;
             color: #0f172a;
         }
-
         .company-sub {
-            font-size: 9px;
+            font-size: 9.5px;
             color: #64748b;
         }
-
-        .company-details {
+        .company-address {
             font-size: 9.5px;
             color: #475569;
-            margin-top: 4px;
-            line-height: 1.45;
+            margin-top: 5px;
+            line-height: 1.35;
         }
 
         .doc-title {
-            font-size: 20px;
-            font-weight: bold;
+            font-size: 18px;
+            font-weight: 900;
             color: #1e40af;
             text-align: right;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 0.5px;
         }
-
         .doc-number {
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: bold;
             color: #1e293b;
             text-align: right;
             margin-top: 2px;
         }
-
-        .doc-meta-table {
+        .meta-table {
             margin-left: auto;
-            margin-top: 6px;
+            margin-top: 5px;
         }
-
-        .doc-meta-table td {
+        .meta-table td {
+            padding: 1.5px 0;
             font-size: 9.5px;
-            padding: 1px 0;
+        }
+        .meta-label {
+            color: #64748b;
+            text-align: right;
+            padding-right: 6px;
+        }
+        .meta-value {
+            color: #1e293b;
+            font-weight: bold;
             text-align: right;
         }
 
-        .meta-lbl {
-            color: #64748b;
-            padding-right: 6px;
-            white-space: nowrap;
-        }
-
-        .meta-val {
-            color: #0f172a;
-            font-weight: bold;
-            white-space: nowrap;
-        }
-
-        /* ── 3. ADDRESS & REFERENCE CARDS ───────────── */
-        .cards-table {
+        /* ── 3. ADDRESS & REFERENCES CARDS ───────────── */
+        .info-boxes-table {
             width: 100%;
-            margin-bottom: 10px;
+            border-collapse: separate;
+            border-spacing: 12px 0;
+            margin-left: -12px;
+            margin-right: -12px;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
         }
-
-        .card-box {
-            border: 1px solid #cbd5e1;
+        .info-box {
             background-color: #f8fafc;
-            border-radius: 5px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
             padding: 8px 10px;
             vertical-align: top;
+            width: 50%;
         }
-
-        .card-header-lbl {
+        .box-title {
             font-size: 8.5px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #64748b;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 3px;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
-
-        .card-party-name {
-            font-size: 12.5px;
+        .client-name {
+            font-size: 12px;
             font-weight: bold;
             color: #0f172a;
             margin-bottom: 2px;
         }
-
-        .card-line {
+        .client-contact {
             font-size: 9.5px;
             color: #475569;
+            margin-bottom: 4px;
+        }
+        .address-block {
+            font-size: 9px;
+            color: #475569;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 4px;
+            margin-top: 3px;
             line-height: 1.35;
         }
 
         .ref-row {
-            font-size: 9.5px;
-            color: #475569;
+            width: 100%;
             padding: 2px 0;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 9.5px;
         }
-
         .ref-row:last-child {
             border-bottom: none;
+        }
+        .ref-label {
+            color: #64748b;
+            display: inline-block;
+            width: 44%;
+        }
+        .ref-val {
+            color: #0f172a;
+            font-weight: bold;
+            display: inline-block;
+            width: 52%;
+            text-align: right;
         }
 
         /* ── 4. ITEMS TABLE ──────────────────────────── */
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            page-break-inside: auto;
+            border: 1px solid #cbd5e1;
         }
-
-        .items-table thead th {
-            background-color: #f1f5f9;
-            color: #334155;
+        .items-table thead {
+            display: table-header-group;
+        }
+        .items-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        .items-table th {
+            background-color: #f8fafc;
+            color: #475569;
             font-size: 8.5px;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.4px;
+            border: 1px solid #cbd5e1;
             padding: 6px 7px;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1.5px solid #cbd5e1;
         }
-
-        .items-table tbody td {
+        .items-table td {
             padding: 6px 7px;
+            border: 1px solid #e2e8f0;
             font-size: 9.5px;
             color: #1e293b;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
+            vertical-align: top;
         }
-
-        .item-name {
+        .item-title {
             font-weight: bold;
             color: #0f172a;
             font-size: 10px;
-            display: block;
         }
-
-        .item-sub {
+        .item-desc {
             font-size: 8px;
             color: #64748b;
-            display: block;
-            margin-top: 1px;
-        }
-
-        /* ── 5. SPLIT SUMMARY SECTION ────────────────── */
-        .bottom-split-table {
-            width: 100%;
             margin-top: 2px;
         }
 
-        .tax-summary-table {
+        /* ── 5. SUMMARY / CALCULATIONS SECTION ──────── */
+        .calc-wrapper {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 6px;
+            margin-top: 6px;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+        .calc-notes-col {
+            width: 50%;
+            vertical-align: top;
+            padding-right: 14px;
+        }
+        .calc-summary-col {
+            width: 50%;
+            vertical-align: top;
+        }
+
+        .summary-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .summary-line {
+            width: 100%;
+            padding: 2.5px 0;
+            font-size: 9.5px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .summary-lbl {
+            color: #64748b;
+            display: inline-block;
+            width: 50%;
+        }
+        .summary-num {
+            color: #0f172a;
+            font-weight: bold;
+            display: inline-block;
+            width: 48%;
+            text-align: right;
+        }
+        .total-payable-box {
+            background-color: #f1f5f9;
+            border-radius: 4px;
+            padding: 5px 8px;
+            margin-top: 5px;
+        }
+        .total-payable-lbl {
+            font-weight: bold;
+            color: #0f172a;
+            font-size: 10.5px;
+            display: inline-block;
+            width: 48%;
+        }
+        .total-payable-num {
+            font-weight: bold;
+            color: #1e40af;
+            font-size: 12px;
+            display: inline-block;
+            width: 50%;
+            text-align: right;
+        }
+
+        /* ── 6. FULL-WIDTH TERMS & CONDITIONS SECTION ── */
+        .terms-section {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            page-break-inside: auto;
+        }
+        .section-label {
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        .terms-content {
+            font-size: 9px;
+            color: #475569;
+            line-height: 1.45;
+        }
+        .terms-content p {
+            margin: 0 0 3px 0;
+            padding-top: 3px;
+            padding-bottom: 1px;
             page-break-inside: avoid;
         }
 
+        /* ── 7. GST TAX SUMMARY TABLE ────────────────── */
+        .tax-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            margin-bottom: 10px;
+            page-break-inside: avoid;
+            border: 1px solid #cbd5e1;
+        }
         .tax-summary-table th {
-            background-color: #f1f5f9;
-            color: #334155;
+            background-color: #f8fafc;
+            color: #475569;
             font-size: 8px;
             font-weight: bold;
             text-transform: uppercase;
-            padding: 4px 6px;
-            border-top: 1px solid #cbd5e1;
-            border-bottom: 1.5px solid #94a3b8;
+            padding: 5px 6px;
+            border: 1px solid #cbd5e1;
         }
-
         .tax-summary-table td {
             padding: 4px 6px;
             font-size: 8.5px;
             color: #1e293b;
-            border-bottom: 1px solid #e2e8f0;
+            border: 1px solid #e2e8f0;
         }
-
         .tax-summary-table tfoot td {
-            background-color: #f8fafc;
+            background-color: #f1f5f9;
             font-weight: bold;
             border-top: 1.5px solid #cbd5e1;
-            border-bottom: 1.5px solid #cbd5e1;
         }
 
-        .bank-info-box {
-            border: 1px solid #cbd5e1;
-            background-color: #f8fafc;
-            border-radius: 4px;
-            padding: 6px 8px;
-            margin-bottom: 6px;
-        }
-
-        .bank-info-title {
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            color: #1e40af;
-            margin-bottom: 3px;
-        }
-
-        .notes-box {
-            border: 1px solid #cbd5e1;
-            background-color: #f8fafc;
-            border-radius: 4px;
-            padding: 6px 8px;
-            font-size: 8px;
-            color: #475569;
-        }
-
-        /* ── SUMMARY CALCULATION TABLE ───────────────── */
-        .summary-card {
-            border: 1px solid #cbd5e1;
-            background-color: #f8fafc;
-            border-radius: 5px;
-            padding: 6px 8px;
-        }
-
-        .summary-table {
+        /* ── 8. SIGNATURE SECTION ────────────────────── */
+        .signature-table {
             width: 100%;
             border-collapse: collapse;
-        }
-
-        .summary-table td {
-            padding: 3.5px 4px;
-            font-size: 9.5px;
-            color: #64748b;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .summary-table td.amt {
-            text-align: right;
-            font-weight: bold;
-            color: #0f172a;
-        }
-
-        .summary-table .billed-items-total td {
-            background-color: #ffffff;
-            color: #0f172a;
-            font-weight: bold;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 4px;
-        }
-
-        .summary-table .grand-total-row td {
-            border-top: 1.5px solid #cbd5e1;
-            padding: 6px 4px;
-        }
-
-        .summary-table .grand-total-row td.lbl {
-            font-size: 11px;
-            font-weight: bold;
-            color: #0f172a;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .summary-table .grand-total-row td.amt {
-            font-size: 13.5px;
-            font-weight: bold;
-            color: #1e40af;
-        }
-
-        .summary-table .bal-row td {
-            font-size: 10px;
-            font-weight: bold;
-            padding: 4px;
-        }
-
-        /* ── 6. FOOTER & SIGNATURE ───────────────────── */
-        .footer-table {
-            width: 100%;
-            border-top: 1px solid #e2e8f0;
-            margin-top: 12px;
+            margin-top: 20px;
             padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            page-break-inside: avoid;
         }
-
-        .footer-disclaimer {
-            font-size: 8px;
+        .sig-note {
+            font-size: 9px;
             color: #64748b;
+            vertical-align: bottom;
+            width: 60%;
             line-height: 1.4;
         }
-
-        .sig-box {
+        .sig-space {
             text-align: right;
+            vertical-align: bottom;
+            width: 40%;
         }
-
-        .sig-company {
-            font-size: 9.5px;
-            font-weight: bold;
-            color: #0f172a;
-            margin-bottom: 22px;
-        }
-
         .sig-line {
-            font-size: 8.5px;
-            color: #64748b;
-            font-weight: 600;
-            border-top: 1px solid #94a3b8;
             display: inline-block;
-            padding-top: 2px;
-            width: 140px;
+            border-top: 1px solid #94a3b8;
+            width: 160px;
             text-align: center;
+            padding-top: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
         }
     </style>
 </head>
 <body>
 
     @php
+        $rawSymbol = active_currency_symbol();
+        $currencySymbol = ($rawSymbol === '₹' || active_currency() === 'INR') ? '&#8377;' : $rawSymbol;
+
         $hasEinvoice = !empty($invoice->irn) || $invoice->einvoice_status === 'Generated' || $invoice->einvoice_status === 'generated';
         $hasEwayBill = !empty($invoice->eway_bill_no) || $invoice->eway_bill_status === 'Generated' || $invoice->eway_bill_status === 'generated';
         
@@ -437,14 +468,31 @@
         }
     @endphp
 
+    <!-- 0. PERSISTENT FOOTER ON EVERY PAGE (REFRENS STYLE) -->
+    <footer class="doc-page-footer">
+        <div class="footer-dashed-line"></div>
+        <table class="footer-meta-table">
+            <tr>
+                <td style="text-align: left; width: 75%;">
+                    Invoice #: <strong style="color: #0f172a;">{{ $invoice->invoice_number }}</strong> &nbsp;|&nbsp;
+                    Date: {{ $invoice->invoice_date ? date('d-M-Y', strtotime($invoice->invoice_date)) : '—' }} &nbsp;|&nbsp;
+                    Billed To: <strong style="color: #0f172a;">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</strong>
+                </td>
+                <td style="text-align: right; width: 25%;">
+                    <!-- Space reserved for Page X of Y rendered by canvas script -->
+                </td>
+            </tr>
+        </table>
+    </footer>
+
     <!-- ═══ 1. GST E-INVOICE & E-WAY BILL BANNER STRIP ═══ -->
     @if($hasEinvoice || $hasEwayBill)
         <table class="einvoice-banner" cellpadding="0" cellspacing="0">
             <tr>
                 @if($hasEinvoice && $qrBase64)
-                    <td style="width: 72px; vertical-align: middle; text-align: center; padding-right: 8px;">
+                    <td style="width: 68px; vertical-align: middle; text-align: center; padding-right: 8px;">
                         <div class="qr-box">
-                            <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 62px; height: 62px; display: block;">
+                            <img src="{{ $qrBase64 }}" alt="QR Code" style="width: 56px; height: 56px; display: block;">
                         </div>
                     </td>
                 @endif
@@ -452,37 +500,32 @@
                     <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                             <!-- Left: E-Invoice Details -->
-                            <td style="vertical-align: top; padding-right: 10px;">
+                            <td style="vertical-align: top; padding-right: 8px;">
                                 <div style="margin-bottom: 2px;">
                                     <span class="badge-einvoice">GST E-INVOICE</span>
                                     <span style="font-size: 8px; color: #64748b; margin-left: 4px;">Govt. E-Invoice Portal (NIC)</span>
                                 </div>
-                                <div style="font-size: 9px; color: #0f172a; margin-bottom: 2px;">
-                                    <strong>Ack No:</strong> <span class="font-mono text-primary fw-bold" style="font-size: 9.5px;">{{ $invoice->ack_no }}</span>
+                                <div style="font-size: 8.5px; color: #0f172a; margin-bottom: 2px;">
+                                    <strong>Ack No:</strong> <span class="font-mono text-primary fw-bold">{{ $invoice->ack_no }}</span>
                                     &nbsp;|&nbsp;
                                     <strong>Ack Date:</strong> <span class="text-muted">{{ $invoice->ack_date ? date('d-M-Y H:i', strtotime($invoice->ack_date)) : '—' }}</span>
                                 </div>
-                                <div style="font-size: 8px; color: #475569; font-family: monospace; word-break: break-all; line-height: 1.25;">
+                                <div style="font-size: 7.5px; color: #475569; font-family: monospace; word-break: break-all; line-height: 1.2;">
                                     <strong style="color: #0f172a;">IRN:</strong> {{ $invoice->irn }}
                                 </div>
                             </td>
 
                             <!-- Right: E-Way Bill Details -->
                             @if($hasEwayBill)
-                                <td style="width: 175px; vertical-align: middle; text-align: right; border-left: 1px solid #cbd5e1; padding-left: 10px;">
+                                <td style="width: 175px; vertical-align: middle; text-align: right; border-left: 1px solid #cbd5e1; padding-left: 8px;">
                                     <span class="badge-ewaybill">E-WAY BILL ACTIVE</span>
-                                    <div class="font-mono fw-bold text-dark" style="font-size: 11px; margin-top: 1px;">{{ $invoice->eway_bill_no }}</div>
+                                    <div class="font-mono fw-bold text-dark" style="font-size: 10.5px; margin-top: 1px;">{{ $invoice->eway_bill_no }}</div>
                                     @if($invoice->transporter_name)
-                                        <div style="font-size: 8px; color: #475569; white-space: nowrap; overflow: hidden;">
-                                            Transporter: <strong>{{ $invoice->transporter_name }}</strong> @if($invoice->transporter_id)<span class="font-mono">({{ $invoice->transporter_id }})</span>@endif
-                                        </div>
-                                    @endif
-                                    @if($invoice->vehicle_no || $invoice->transport_mode)
                                         <div style="font-size: 8px; color: #475569;">
-                                            Vehicle/Mode: <strong>{{ $invoice->vehicle_no ?: ($invoice->transport_doc_no ?: '—') }}</strong> ({{ ucfirst($invoice->transport_mode ?: 'Road') }})
+                                            Transporter: <strong>{{ $invoice->transporter_name }}</strong>
                                         </div>
                                     @endif
-                                    <div style="font-size: 8px; color: #64748b;">
+                                    <div style="font-size: 7.5px; color: #64748b;">
                                         Valid Till: <strong style="color: #0f172a;">{{ $invoice->eway_bill_valid_till ? date('d-M-Y H:i', strtotime($invoice->eway_bill_valid_till)) : '—' }}</strong>
                                     </div>
                                 </td>
@@ -494,119 +537,112 @@
         </table>
     @endif
 
-    <!-- ═══ 2. HEADER ═══ -->
-    <table class="header-table" cellpadding="0" cellspacing="0">
+    <!-- ═══ 2. HEADER SECTION ═══ -->
+    <table class="header-table">
         <tr>
-            <!-- LEFT: Company Details -->
-            <td style="width: 58%; vertical-align: top;">
-                <table cellpadding="0" cellspacing="0">
-                    <tr>
-                        <td style="vertical-align: middle;">
-                            <div class="company-avatar">{{ strtoupper(substr(tenant() ? tenant()->name : 'D', 0, 1)) }}</div>
-                        </td>
-                        <td style="vertical-align: middle; padding-left: 8px;">
-                            <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
-                            <div class="company-sub">Official Corporate Billing Unit</div>
-                        </td>
-                    </tr>
-                </table>
-                <div class="company-details">
+            <td style="vertical-align: top; width: 58%;">
+                <div class="company-avatar">
+                    {{ strtoupper(substr(tenant() ? tenant()->name : 'D', 0, 1)) }}
+                </div>
+                <div class="company-info">
+                    <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
+                    <div class="company-sub">Official Corporate Billing Unit</div>
+                </div>
+                <div class="company-address">
                     H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
                     <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
                     <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@saaserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230
                 </div>
             </td>
-
-            <!-- RIGHT: Invoice Title & Meta -->
-            <td style="width: 42%; vertical-align: top;">
+            <td style="vertical-align: top; width: 42%; text-align: right;">
                 <div class="doc-title">TAX INVOICE</div>
                 <div class="doc-number"># {{ $invoice->invoice_number }}</div>
-                <table class="doc-meta-table" cellpadding="0" cellspacing="0">
+                
+                <table class="meta-table">
                     <tr>
-                        <td class="meta-lbl">Invoice Date:</td>
-                        <td class="meta-val">{{ date('d-M-Y', strtotime($invoice->invoice_date)) }}</td>
+                        <td class="meta-label">Invoice Date:</td>
+                        <td class="meta-value">{{ $invoice->invoice_date ? date('d-M-Y', strtotime($invoice->invoice_date)) : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="meta-lbl">Due Date:</td>
-                        <td class="meta-val">{{ $invoice->due_date ? date('d-M-Y', strtotime($invoice->due_date)) : '—' }}</td>
+                        <td class="meta-label">Due Date:</td>
+                        <td class="meta-value">{{ $invoice->due_date ? date('d-M-Y', strtotime($invoice->due_date)) : '—' }}</td>
                     </tr>
                     <tr>
-                        <td class="meta-lbl">Payment Terms:</td>
-                        <td class="meta-val">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($invoice->payment_terms ?: $invoice->salesOrder?->payment_terms) }}</td>
+                        <td class="meta-label">Payment Terms:</td>
+                        <td class="meta-value">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($invoice->payment_terms ?: $invoice->salesOrder?->payment_terms) ?: 'Immediate Payment' }}</td>
                     </tr>
                 </table>
             </td>
         </tr>
     </table>
 
-    <!-- ═══ 3. ADDRESS & ORDER CARDS ═══ -->
-    <table class="cards-table" cellpadding="0" cellspacing="0">
+    <!-- ═══ 3. ADDRESS & REFERENCES CARDS ═══ -->
+    <table class="info-boxes-table">
         <tr>
-            <!-- Left Card: Billed To Customer -->
-            <td class="card-box" style="width: 49%;">
-                <div class="card-header-lbl">BILLED TO (CUSTOMER):</div>
-                <div class="card-party-name">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</div>
-                @if($invoice->customer?->company_name)
-                    <div class="card-line" style="font-weight: 600; color: #475569;">{{ $invoice->customer->company_name }}</div>
+            <!-- Left Card: Customer Info -->
+            <td class="info-box">
+                <div class="box-title">BILLED TO (CUSTOMER):</div>
+                <div class="client-name">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</div>
+                @if($invoice->customer?->email || $invoice->customer?->phone || $invoice->salesOrder?->customer?->phone)
+                    <div class="client-contact">
+                        {{ $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '') }}
+                        @if(($invoice->customer?->email || $invoice->salesOrder?->customer?->email) && ($invoice->customer?->phone || $invoice->salesOrder?->customer?->phone))
+                            |
+                        @endif
+                        {{ $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '') }}
+                    </div>
                 @endif
-                <div class="card-line">
-                    {{ $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '') }}
-                    @if($invoice->customer?->phone || $invoice->salesOrder?->customer?->phone)
-                        &nbsp;|&nbsp; {{ $invoice->customer?->phone ?: $invoice->salesOrder?->customer?->phone }}
-                    @endif
-                </div>
                 @if($invoice->salesOrder?->billing_address)
-                    <div class="card-line" style="margin-top: 4px; padding-top: 3px; border-top: 1px solid #e2e8f0;">
-                        <strong style="color: #64748b;">Billing Address:</strong><br>{{ $invoice->salesOrder->billing_address }}
+                    <div class="address-block">
+                        <strong>Billing Address:</strong><br>{{ $invoice->salesOrder->billing_address }}
+                    </div>
+                @endif
+                @if($invoice->salesOrder?->shipping_address && $invoice->salesOrder?->shipping_address !== $invoice->salesOrder?->billing_address)
+                    <div class="address-block">
+                        <strong>Shipping Address:</strong><br>{{ $invoice->salesOrder->shipping_address }}
                     </div>
                 @endif
             </td>
 
-            <td style="width: 2%;"></td>
-
-            <!-- Right Card: Order & Dispatch References -->
-            <td class="card-box" style="width: 49%;">
-                <div class="card-header-lbl">ORDER &amp; DISPATCH REFERENCES:</div>
+            <!-- Right Card: References -->
+            <td class="info-box">
+                <div class="box-title">ORDER &amp; DISPATCH REFERENCES:</div>
+                
                 @if($invoice->salesOrder)
                     <div class="ref-row">
-                        <span style="color: #64748b;">Sales Order Reference:</span>
-                        <span style="float: right; font-weight: bold; color: #1e40af;">{{ $invoice->salesOrder->sales_order_number }}</span>
+                        <span class="ref-label">Sales Order Ref:</span>
+                        <span class="ref-val" style="color: #2563eb;">{{ $invoice->salesOrder->sales_order_number }}</span>
                     </div>
                 @endif
+
                 @if($invoice->materialRequirement)
                     <div class="ref-row">
-                        <span style="color: #64748b;">Dispatch Ref:</span>
-                        <span style="float: right; font-weight: bold; color: #0284c7;">{{ $invoice->materialRequirement->requirement_number }}</span>
+                        <span class="ref-label">Dispatch Ref:</span>
+                        <span class="ref-val" style="color: #0284c7;">{{ $invoice->materialRequirement->requirement_number }}</span>
                     </div>
                 @endif
-                @if($hasEwayBill)
-                    <div class="ref-row">
-                        <span style="color: #64748b;">E-Way Bill No:</span>
-                        <span style="float: right; font-weight: bold; color: #0f172a; font-family: monospace;">{{ $invoice->eway_bill_no }} @if($invoice->vehicle_no)({{ $invoice->vehicle_no }})@endif</span>
-                    </div>
-                    @if($invoice->transporter_name)
-                        <div class="ref-row">
-                            <span style="color: #64748b;">Transporter:</span>
-                            <span style="float: right; font-weight: 600; color: #0f172a;">{{ $invoice->transporter_name }} @if($invoice->transporter_id)({{ $invoice->transporter_id }})@endif</span>
-                        </div>
-                    @endif
-                @endif
+
                 <div class="ref-row">
-                    <span style="color: #64748b;">Place of Supply:</span>
+                    <span class="ref-label">Place of Supply:</span>
                     @php $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer); @endphp
-                    <span style="float: right; font-weight: 600; color: #0f172a;">{{ $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : '—' }}</span>
+                    <span class="ref-val">{{ $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : '—' }}</span>
                 </div>
+
                 <div class="ref-row">
-                    <span style="color: #64748b;">GST Option:</span>
-                    <span style="float: right; font-weight: bold; color: #0f172a;">{{ $invoice->gst_type === 'igst' ? 'Inter-State GST (IGST)' : 'Intra-State GST (CGST + SGST)' }}</span>
+                    <span class="ref-label">GST Tax Type:</span>
+                    <span class="ref-val" style="color: #0f766e;">
+                        {{ ($invoice->gst_type ?? 'cgst_sgst') === 'igst' ? 'Inter-State GST (IGST)' : 'Intra-State GST (CGST + SGST)' }}
+                    </span>
                 </div>
+
                 <div class="ref-row">
-                    <span style="color: #64748b;">{{ __('crm.tax_mode') }}:</span>
-                    <span style="float: right; font-weight: bold; color: #0f172a;">{{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? __('crm.tax_inclusive') : __('crm.tax_exclusive') }}</span>
+                    <span class="ref-label">Pricing Mode:</span>
+                    <span class="ref-val">{{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span>
                 </div>
+
                 <div class="ref-row">
-                    <span style="color: #64748b;">Payment Status:</span>
-                    <span style="float: right; font-weight: bold; color: {{ $balanceDue > 0 ? '#dc2626' : '#16a34a' }};">
+                    <span class="ref-label">Payment Status:</span>
+                    <span class="ref-val" style="color: {{ $balanceDue > 0 ? '#dc2626' : '#16a34a' }};">
                         {{ $balanceDue > 0 ? 'Balance Outstanding' : 'Fully Paid' }}
                     </span>
                 </div>
@@ -615,15 +651,15 @@
     </table>
 
     <!-- ═══ 4. ITEMS TABLE ═══ -->
-    <table class="items-table" cellpadding="0" cellspacing="0">
+    <table class="items-table">
         <thead>
             <tr>
-                <th class="text-center" style="width: 4%;">#</th>
-                <th style="width: 44%;">ITEM &amp; DESCRIPTION</th>
-                <th class="text-right" style="width: 10%;">QTY</th>
-                <th class="text-right" style="width: 14%;">RATE ({{ active_currency_symbol() }})</th>
-                <th class="text-right" style="width: 10%;">TAX %</th>
-                <th class="text-right" style="width: 18%;">AMOUNT ({{ active_currency_symbol() }})</th>
+                <th style="width: 5%; text-align: center;">#</th>
+                <th style="width: 45%;">Item &amp; Description</th>
+                <th style="width: 8%; text-align: right;">Qty</th>
+                <th style="width: 14%; text-align: right;">Rate ({!! $currencySymbol !!})</th>
+                <th style="width: 10%; text-align: right;">Tax %</th>
+                <th style="width: 18%; text-align: right;">Amount ({!! $currencySymbol !!})</th>
             </tr>
         </thead>
         <tbody>
@@ -634,20 +670,20 @@
                         : ($item->subtotal > 0 ? $item->subtotal : ($item->quantity * $item->unit_price));
                 @endphp
                 <tr>
-                    <td class="text-center" style="color: #94a3b8;">{{ $idx + 1 }}</td>
+                    <td style="text-align: center; color: #64748b;">{{ $idx + 1 }}</td>
                     <td>
-                        <span class="item-name">{{ $item->product?->name ?: $item->item_name }}</span>
+                        <div class="item-title">{{ $item->product?->name ?: $item->item_name }}</div>
                         @if($item->product?->sku)
-                            <span class="item-sub">SKU: {{ $item->product->sku }}</span>
+                            <div class="item-desc"><strong>SKU:</strong> {{ $item->product->sku }}</div>
                         @endif
                         @if($item->description)
-                            <span class="item-sub">{{ $item->description }}</span>
+                            <div class="item-desc">{{ $item->description }}</div>
                         @endif
                     </td>
-                    <td class="text-right" style="font-weight: 600;">{{ (float)$item->quantity }}</td>
-                    <td class="text-right">{{ format_currency($item->unit_price) }}</td>
-                    <td class="text-right" style="color: #64748b;">{{ (float)$item->tax_rate }}%</td>
-                    <td class="text-right" style="font-weight: bold; color: #0f172a;">{{ format_currency($lineTotal) }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ (float)$item->quantity }}</td>
+                    <td style="text-align: right;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($item->unit_price), 2) }}</td>
+                    <td style="text-align: right; color: #64748b;">{{ (float)$item->tax_rate }}%</td>
+                    <td style="text-align: right; font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($lineTotal), 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -711,23 +747,24 @@
         }
 
         $freightTax = ($freightAmount > 0 && $invoice->tax_type !== 'without_tax') ? round($freightAmount * ($freightTaxRatePercent / 100), 2) : 0;
-        $totalFreightInclGst = $freightAmount + $freightTax;
         $totalInvoiceTaxAmount = $itemsTaxAmount + $freightTax;
         $adjustment = (float)($invoice->adjustment ?? 0);
         $grandTotal = (float)($invoice->total_amount ?: ($taxMode === 'inclusive' ? ($itemsTotalInclGst + $freightAmount + $adjustment) : (($taxableBase + $freightAmount) + $totalInvoiceTaxAmount + $adjustment)));
         $gstType = $invoice->gst_type ?? 'cgst_sgst';
         $taxGroups = $invoice->items->groupBy(fn($item) => (string)(float)$item->tax_rate);
         $hasFreightTax = ($freightAmount > 0 && $freightTax > 0);
+        $totalPaid = $invoice->amount_paid ?: 0;
+        $balDue = max(0, $grandTotal - $totalPaid);
     @endphp
 
-    <!-- ═══ 5. SPLIT SUMMARY & BANK/TERMS SECTION ═══ -->
-    <table class="bottom-split-table" cellpadding="0" cellspacing="0">
+    <!-- ═══ 5. SPLIT SUMMARY & BANK/COMMERCIALS SECTION ═══ -->
+    <table class="calc-wrapper">
         <tr>
-            <!-- LEFT COLUMN: Bank Details & Notes -->
-            <td style="width: 53%; vertical-align: top; padding-right: 10px;">
-                <div class="bank-info-box">
-                    <div class="bank-info-title">Bank Payment Details:</div>
-                    <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 8.5px; color: #475569;">
+            <!-- LEFT COLUMN: Bank Details & Commercials -->
+            <td class="calc-notes-col">
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px;">
+                    <div style="font-size: 8px; font-weight: bold; text-transform: uppercase; color: #1e40af; letter-spacing: 0.4px; margin-bottom: 4px;">Bank Payment Details</div>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 9px; color: #475569;">
                         <tr>
                             <td style="width: 50%; padding-bottom: 2px;"><strong>Bank Name:</strong> State Bank of India</td>
                             <td style="width: 50%; padding-bottom: 2px;"><strong>Account Name:</strong> {{ tenant() ? tenant()->name : 'Demo Tenant' }}</td>
@@ -739,100 +776,109 @@
                     </table>
                 </div>
 
-                @if($invoice->notes)
-                    <div class="notes-box">
-                        <strong style="font-size: 7.5px; text-transform: uppercase; color: #1e40af; letter-spacing: 0.3px;">Terms &amp; Conditions / Notes:</strong><br>
-                        {!! $invoice->notes !!}
-                    </div>
-                @endif
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px;">
+                    <div style="font-size: 8px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.4px; margin-bottom: 4px;">Tax Treatment &amp; Commercials</div>
+                    <table style="width: 100%; font-size: 9px; border-collapse: collapse;">
+                        <tr>
+                            <td style="color: #64748b; padding: 1.5px 0; width: 44%;">Tax Scheme:</td>
+                            <td style="font-weight: bold; color: #1e293b; padding: 1.5px 0;">{{ $taxMode === 'inclusive' ? 'Inclusive of GST' : 'Exclusive of GST (Base Rate)' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #64748b; padding: 1.5px 0;">Applicable GST:</td>
+                            <td style="font-weight: bold; color: #0f766e; padding: 1.5px 0;">
+                                {{ $gstType === 'igst' ? 'IGST (Inter-State Supply)' : 'CGST + SGST (Intra-State Supply)' }}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             </td>
 
             <!-- RIGHT COLUMN: Subtotal Calculations Card -->
-            <td style="width: 47%; vertical-align: top;">
-                <div class="summary-card">
-                    <table class="summary-table" cellpadding="0" cellspacing="0">
-                        <tr>
-                            <td>{{ $taxMode === 'inclusive' ? __('crm.subtotal_incl_tax') : __('crm.subtotal_excl_tax') }}</td>
-                            <td class="amt">{{ format_currency($grossSubtotal) }}</td>
-                        </tr>
+            <td class="calc-summary-col">
+                <div class="summary-box">
+                    <div class="summary-line">
+                        <span class="summary-lbl">{{ $taxMode === 'inclusive' ? 'Subtotal (Incl. GST):' : 'Subtotal (Excl. Tax):' }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grossSubtotal), 2) }}</span>
+                    </div>
 
-                        @if($invoice->discount_type !== 'without_discount' && $effectiveDiscount > 0)
-                            <tr>
-                                <td style="color: #dc2626;">Less: Item Discounts:</td>
-                                <td class="amt" style="color: #dc2626;">-{{ format_currency($effectiveDiscount) }}</td>
-                            </tr>
+                    @if($invoice->discount_type !== 'without_discount' && $effectiveDiscount > 0)
+                        <div class="summary-line" style="color: #dc2626;">
+                            <span class="summary-lbl" style="color: #dc2626;">Less: Discounts:</span>
+                            <span class="summary-num" style="color: #dc2626;">-{!! $currencySymbol !!}{{ number_format((float) convert_from_base($effectiveDiscount), 2) }}</span>
+                        </div>
+                    @endif
+
+                    <div class="summary-line" style="color: #475569;">
+                        <span class="summary-lbl">{{ $taxMode === 'inclusive' ? 'Taxable Value (Excl. Tax):' : 'Items Taxable Value:' }}</span>
+                        <span class="summary-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($taxableBase), 2) }}</span>
+                    </div>
+
+                    @if($freightAmount > 0)
+                        <div class="summary-line">
+                            <span class="summary-lbl">Freight Charges:</span>
+                            <span class="summary-num">+{!! $currencySymbol !!}{{ number_format((float) convert_from_base($freightAmount), 2) }}</span>
+                        </div>
+                    @endif
+
+                    @if($invoice->tax_type !== 'without_tax' && $totalInvoiceTaxAmount > 0)
+                        @if($gstType === 'cgst_sgst')
+                            <div class="summary-line">
+                                <span class="summary-lbl">CGST (Central Tax) {{ $taxMode === 'inclusive' ? '(Included)' : '' }}:</span>
+                                <span class="summary-num">{{ ($taxMode === 'inclusive' ? '' : '+') }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totalInvoiceTaxAmount / 2), 2) }}</span>
+                            </div>
+                            <div class="summary-line">
+                                <span class="summary-lbl">SGST (State Tax) {{ $taxMode === 'inclusive' ? '(Included)' : '' }}:</span>
+                                <span class="summary-num">{{ ($taxMode === 'inclusive' ? '' : '+') }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totalInvoiceTaxAmount / 2), 2) }}</span>
+                            </div>
+                        @else
+                            <div class="summary-line">
+                                <span class="summary-lbl">IGST (Integrated Tax) {{ $taxMode === 'inclusive' ? '(Included)' : '' }}:</span>
+                                <span class="summary-num">{{ ($taxMode === 'inclusive' ? '' : '+') }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totalInvoiceTaxAmount), 2) }}</span>
+                            </div>
                         @endif
+                    @endif
 
-                        <tr>
-                            <td>{{ $taxMode === 'inclusive' ? __('crm.taxable_value_excl_tax') : __('crm.items_taxable_value') }}</td>
-                            <td class="amt">{{ format_currency($taxableBase) }}</td>
-                        </tr>
+                    @if($adjustment != 0)
+                        <div class="summary-line">
+                            <span class="summary-lbl">Adjustment:</span>
+                            <span class="summary-num">{{ $adjustment > 0 ? '+' : '' }}{!! $currencySymbol !!}{{ number_format((float) convert_from_base($adjustment), 2) }}</span>
+                        </div>
+                    @endif
 
-                        @if($freightAmount > 0)
-                            <tr>
-                                <td>Freight Charges:</td>
-                                <td class="amt" style="color: #1e40af;">{{ format_currency($freightAmount) }}</td>
-                            </tr>
-                            <tr>
-                                <td style="font-weight: bold; color: #0f172a;">Total Taxable Value:</td>
-                                <td class="amt">{{ format_currency($taxableBase + $freightAmount) }}</td>
-                            </tr>
-                        @endif
+                    <div class="total-payable-box">
+                        <span class="total-payable-lbl">Grand Total:</span>
+                        <span class="total-payable-num">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grandTotal), 2) }}</span>
+                    </div>
 
-                        @if($invoice->tax_type !== 'without_tax' && $totalInvoiceTaxAmount > 0)
-                            @if($gstType === 'cgst_sgst')
-                                <tr>
-                                    <td style="font-size: 8.5px; color: #64748b;">CGST (Central Tax) {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}:</td>
-                                    <td class="amt" style="font-size: 8.5px; color: #64748b;">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</td>
-                                </tr>
-                                <tr>
-                                    <td style="font-size: 8.5px; color: #64748b;">SGST (State Tax) {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}:</td>
-                                    <td class="amt" style="font-size: 8.5px; color: #64748b;">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount / 2) }}</td>
-                                </tr>
-                            @else
-                                <tr>
-                                    <td style="font-size: 8.5px; color: #64748b;">IGST (Integrated Tax) {{ $taxMode === 'inclusive' ? __('crm.tax_included') : '' }}:</td>
-                                    <td class="amt" style="font-size: 8.5px; color: #64748b;">{{ ($taxMode === 'inclusive' ? '' : '+') . format_currency($totalInvoiceTaxAmount) }}</td>
-                                </tr>
-                            @endif
-                        @endif
+                    @if($totalPaid > 0)
+                        <div class="summary-line" style="color: #16a34a; font-weight: 600; margin-top: 4px;">
+                            <span class="summary-lbl" style="color: #16a34a;">Payments Received:</span>
+                            <span class="summary-num" style="color: #16a34a;">-{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totalPaid), 2) }}</span>
+                        </div>
+                    @endif
 
-                        @if($adjustment != 0)
-                            <tr>
-                                <td>Adjustment:</td>
-                                <td class="amt">{{ format_currency($adjustment) }}</td>
-                            </tr>
-                        @endif
-
-                        <tr class="grand-total-row">
-                            <td class="lbl">Grand Total:</td>
-                            <td class="amt">{{ format_currency($grandTotal) }}</td>
-                        </tr>
-
-                        @php
-                            $totalPaid = $invoice->amount_paid ?: 0;
-                            $balDue = max(0, $grandTotal - $totalPaid);
-                        @endphp
-                        @if($totalPaid > 0)
-                            <tr>
-                                <td style="color: #16a34a; font-weight: 600;">Payments Received:</td>
-                                <td class="amt" style="color: #16a34a;">-{{ format_currency($totalPaid) }}</td>
-                            </tr>
-                        @endif
-
-                        <tr class="bal-row">
-                            <td style="color: {{ $balDue > 0 ? '#dc2626' : '#16a34a' }};">Balance Due:</td>
-                            <td class="amt" style="color: {{ $balDue > 0 ? '#dc2626' : '#16a34a' }}; font-size: 11.5px;">{{ format_currency($balDue) }}</td>
-                        </tr>
-                    </table>
+                    <div class="summary-line" style="border-top: 1px dashed #cbd5e1; margin-top: 3px; padding-top: 3px;">
+                        <span class="summary-lbl" style="font-weight: bold; color: {{ $balDue > 0 ? '#dc2626' : '#16a34a' }};">Balance Due:</span>
+                        <span class="summary-num" style="font-size: 11px; color: {{ $balDue > 0 ? '#dc2626' : '#16a34a' }};">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($balDue), 2) }}</span>
+                    </div>
                 </div>
             </td>
         </tr>
     </table>
 
-    <!-- ═══ 6. FULL-WIDTH GST TAX SUMMARY (A4 Standard) ═══ -->
+    <!-- ═══ 6. FULL-WIDTH TERMS & CONDITIONS SECTION (EXACTLY MATCHING QUOTATION PDF) ═══ -->
+    @if($invoice->notes)
+        <div class="terms-section">
+            <div class="section-label">Terms &amp; Conditions / Notes:</div>
+            <div class="terms-content">
+                {!! $invoice->notes !!}
+            </div>
+        </div>
+    @endif
+
+    <!-- ═══ 7. FULL-WIDTH GST TAX SUMMARY (A4 Standard) ═══ -->
     @if (($taxGroups->count() > 0 && $invoice->tax_amount > 0) || $hasFreightTax)
-        <div style="margin-top: 10px; margin-bottom: 8px;">
+        <div style="margin-top: 10px; margin-bottom: 8px; page-break-inside: avoid;">
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 3px;">
                 <tr>
                     <td style="font-size: 8px; font-weight: bold; text-transform: uppercase; color: #1e40af; letter-spacing: 0.4px;">
@@ -848,17 +894,17 @@
                     @if($gstType === 'igst')
                         <tr>
                             <th style="width: 38%; text-align: left;">Tax Rate / Description</th>
-                            <th class="text-right" style="width: 24%;">Taxable Value ({{ active_currency_symbol() }})</th>
-                            <th class="text-right" style="width: 19%;">Total Tax ({{ active_currency_symbol() }})</th>
-                            <th class="text-right" style="width: 19%;">IGST Amt ({{ active_currency_symbol() }})</th>
+                            <th class="text-right" style="width: 24%;">Taxable Value ({!! $currencySymbol !!})</th>
+                            <th class="text-right" style="width: 19%;">Total Tax ({!! $currencySymbol !!})</th>
+                            <th class="text-right" style="width: 19%;">IGST Amt ({!! $currencySymbol !!})</th>
                         </tr>
                     @else
                         <tr>
                             <th style="width: 32%; text-align: left;">Tax Rate / Description</th>
-                            <th class="text-right" style="width: 20%;">Taxable Value ({{ active_currency_symbol() }})</th>
-                            <th class="text-right" style="width: 16%;">Total Tax ({{ active_currency_symbol() }})</th>
-                            <th class="text-right" style="width: 16%;">CGST ({{ active_currency_symbol() }})</th>
-                            <th class="text-right" style="width: 16%;">SGST ({{ active_currency_symbol() }})</th>
+                            <th class="text-right" style="width: 20%;">Taxable Value ({!! $currencySymbol !!})</th>
+                            <th class="text-right" style="width: 16%;">Total Tax ({!! $currencySymbol !!})</th>
+                            <th class="text-right" style="width: 16%;">CGST ({!! $currencySymbol !!})</th>
+                            <th class="text-right" style="width: 16%;">SGST ({!! $currencySymbol !!})</th>
                         </tr>
                     @endif
                 </thead>
@@ -876,9 +922,9 @@
                             @php $totIgst += $itemsTaxAmount; @endphp
                             <tr>
                                 <td style="font-weight: bold; text-align: left;">GST {{ $orderTaxRate }}% (Order Level)</td>
-                                <td class="text-right">{{ format_currency($taxableBase) }}</td>
-                                <td class="text-right" style="font-weight: bold; color: #0f172a;">{{ format_currency($itemsTaxAmount) }}</td>
-                                <td class="text-right">{{ format_currency($itemsTaxAmount) }}</td>
+                                <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($taxableBase), 2) }}</td>
+                                <td class="text-right" style="font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($itemsTaxAmount), 2) }}</td>
+                                <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($itemsTaxAmount), 2) }}</td>
                             </tr>
                         @else
                             @php
@@ -888,14 +934,13 @@
                             @endphp
                             <tr>
                                 <td style="font-weight: bold; text-align: left;">GST {{ $orderTaxRate }}% (Order Level)</td>
-                                <td class="text-right">{{ format_currency($taxableBase) }}</td>
-                                <td class="text-right" style="font-weight: bold; color: #0f172a;">{{ format_currency($itemsTaxAmount) }}</td>
-                                <td class="text-right">{{ format_currency($oCgst) }}</td>
-                                <td class="text-right">{{ format_currency($oSgst) }}</td>
+                                <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($taxableBase), 2) }}</td>
+                                <td class="text-right" style="font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($itemsTaxAmount), 2) }}</td>
+                                <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($oCgst), 2) }}</td>
+                                <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($oSgst), 2) }}</td>
                             </tr>
                         @endif
                     @else
-                        {{-- Pure Item-wise Tax rows --}}
                         @foreach($taxGroups as $rateStr => $gItems)
                             @php
                                 $rate = floatval($rateStr);
@@ -914,9 +959,9 @@
                                 @endphp
                                 <tr>
                                     <td style="font-weight: bold; text-align: left;">GST {{ $rate }}%</td>
-                                    <td class="text-right">{{ format_currency($grpTaxable) }}</td>
-                                    <td class="text-right" style="font-weight: bold; color: #0f172a;">{{ format_currency($grpTax) }}</td>
-                                    <td class="text-right">{{ format_currency($grpIgst) }}</td>
+                                    <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpTaxable), 2) }}</td>
+                                    <td class="text-right" style="font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpTax), 2) }}</td>
+                                    <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpIgst), 2) }}</td>
                                 </tr>
                             @else
                                 @php
@@ -926,16 +971,15 @@
                                 @endphp
                                 <tr>
                                     <td style="font-weight: bold; text-align: left;">GST {{ $rate }}%</td>
-                                    <td class="text-right">{{ format_currency($grpTaxable) }}</td>
-                                    <td class="text-right" style="font-weight: bold; color: #0f172a;">{{ format_currency($grpTax) }}</td>
-                                    <td class="text-right">{{ format_currency($grpCgst) }}</td>
-                                    <td class="text-right">{{ format_currency($grpSgst) }}</td>
+                                    <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpTaxable), 2) }}</td>
+                                    <td class="text-right" style="font-weight: bold; color: #0f172a;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpTax), 2) }}</td>
+                                    <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpCgst), 2) }}</td>
+                                    <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($grpSgst), 2) }}</td>
                                 </tr>
                             @endif
                         @endforeach
                     @endif
 
-                    {{-- Dedicated Freight Tax Row --}}
                     @if($hasFreightTax)
                         @php
                             $totTaxable += $freightAmount;
@@ -945,9 +989,9 @@
                             @php $totIgst += $freightTax; @endphp
                             <tr style="background-color: #f1f5f9;">
                                 <td style="font-weight: bold; color: #1e40af; text-align: left;">Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
-                                <td class="text-right" style="color: #1e40af;">{{ format_currency($freightAmount) }}</td>
-                                <td class="text-right" style="font-weight: bold; color: #1e40af;">{{ format_currency($freightTax) }}</td>
-                                <td class="text-right" style="color: #1e40af;">{{ format_currency($freightTax) }}</td>
+                                <td class="text-right" style="color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($freightAmount), 2) }}</td>
+                                <td class="text-right" style="font-weight: bold; color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($freightTax), 2) }}</td>
+                                <td class="text-right" style="color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($freightTax), 2) }}</td>
                             </tr>
                         @else
                             @php
@@ -957,10 +1001,10 @@
                             @endphp
                             <tr style="background-color: #f1f5f9;">
                                 <td style="font-weight: bold; color: #1e40af; text-align: left;">Freight / Shipping ({{ $freightTaxRatePercent }}%)</td>
-                                <td class="text-right" style="color: #1e40af;">{{ format_currency($freightAmount) }}</td>
-                                <td class="text-right" style="font-weight: bold; color: #1e40af;">{{ format_currency($freightTax) }}</td>
-                                <td class="text-right" style="color: #1e40af;">{{ format_currency($fCgst) }}</td>
-                                <td class="text-right" style="color: #1e40af;">{{ format_currency($fSgst) }}</td>
+                                <td class="text-right" style="color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($freightAmount), 2) }}</td>
+                                <td class="text-right" style="font-weight: bold; color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($freightTax), 2) }}</td>
+                                <td class="text-right" style="color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($fCgst), 2) }}</td>
+                                <td class="text-right" style="color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($fSgst), 2) }}</td>
                             </tr>
                         @endif
                     @endif
@@ -968,13 +1012,13 @@
                 <tfoot>
                     <tr style="background-color: #f8fafc; font-weight: bold;">
                         <td style="text-align: left;">Total</td>
-                        <td class="text-right">{{ format_currency($totTaxable) }}</td>
-                        <td class="text-right" style="color: #1e40af;">{{ format_currency($totTax) }}</td>
+                        <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totTaxable), 2) }}</td>
+                        <td class="text-right" style="color: #1e40af;">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totTax), 2) }}</td>
                         @if($gstType === 'igst')
-                            <td class="text-right">{{ format_currency($totIgst) }}</td>
+                            <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totIgst), 2) }}</td>
                         @else
-                            <td class="text-right">{{ format_currency($totCgst) }}</td>
-                            <td class="text-right">{{ format_currency($totSgst) }}</td>
+                            <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totCgst), 2) }}</td>
+                            <td class="text-right">{!! $currencySymbol !!}{{ number_format((float) convert_from_base($totSgst), 2) }}</td>
                         @endif
                     </tr>
                 </tfoot>
@@ -982,21 +1026,33 @@
         </div>
     @endif
 
-    <!-- ═══ 6. SIGNATURE & FOOTER ═══ -->
-    <table class="footer-table" cellpadding="0" cellspacing="0">
+    <!-- ═══ 8. SIGNATURE SECTION ═══ -->
+    <table class="signature-table">
         <tr>
-            <td style="width: 60%; vertical-align: bottom;">
-                <div class="footer-disclaimer">
-                    Thank you for your business!<br>
-                    This is a computer generated invoice and does not require physical signature.
-                </div>
+            <td class="sig-note">
+                Thank you for your business!<br>
+                This is a computer generated tax invoice and does not require physical signature.
             </td>
-            <td style="width: 40%; vertical-align: bottom;" class="sig-box">
-                <div class="sig-company">For {{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
+            <td class="sig-space">
                 <div class="sig-line">Authorized Signatory</div>
             </td>
         </tr>
     </table>
+
+    <!-- ═══ 9. INLINE CANVAS SCRIPT FOR PAGE NUMBER ═══ -->
+    <script type="text/php">
+        if (isset($pdf)) {
+            $pdf->page_script(function ($pageNumber, $pageCount, $canvas, $fontMetrics) {
+                $text = "Page " . $pageNumber . " of " . $pageCount;
+                $font = $fontMetrics->getFont("Helvetica", "normal");
+                $size = 8.5;
+                $color = array(100/255, 116/255, 139/255);
+                $w = $canvas->get_width();
+                $h = $canvas->get_height();
+                $canvas->text($w - 95, $h - 24, $text, $font, $size, $color);
+            });
+        }
+    </script>
 
 </body>
 </html>

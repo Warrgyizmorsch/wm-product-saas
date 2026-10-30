@@ -26,7 +26,7 @@ class CustomerPaymentRepository
 
     public function find(int $id): ?CustomerPayment
     {
-        return CustomerPayment::with(['customer', 'allocations.invoice'])->find($id);
+        return CustomerPayment::with(['customer', 'allocations.invoice', 'allocations.salesOrder'])->find($id);
     }
 
     public function create(array $data): CustomerPayment

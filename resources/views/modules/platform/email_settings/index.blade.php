@@ -54,14 +54,14 @@
     <div class="table-responsive flex-grow-1">
         <x-ui.odoo-form-ui type="table" id="emailAccountsTable" class="mb-0">
             <thead>
-                <tr style="background-color: #e8ecf1 !important;">
-                    <th style="background-color: #e8ecf1 !important;" class="ps-3">Account Name</th>
-                    <th style="background-color: #e8ecf1 !important;">Email Address</th>
-                    <th style="background-color: #e8ecf1 !important;">Scope (Company & Branch)</th>
-                    <th style="background-color: #e8ecf1 !important;">SMTP Host & Port</th>
-                    <th style="background-color: #e8ecf1 !important;">Encryption</th>
-                    <th style="background-color: #e8ecf1 !important;">Status</th>
-                    <th style="background-color: #e8ecf1 !important;" class="text-end pe-3">Testing & Actions</th>
+                <tr>
+                    <th class="ps-3">Account Name</th>
+                    <th>Email Address</th>
+                    <th>Scope (Company & Branch)</th>
+                    <th>SMTP Host & Port</th>
+                    <th>Encryption</th>
+                    <th>Status</th>
+                    <th class="text-end pe-3">Testing & Actions</th>
                 </tr>
             </thead>
             <tbody>

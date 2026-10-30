@@ -265,12 +265,30 @@
             transition: all 0.2s ease;
         }
 
+        .odoo-notebook-tabs {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scrollbar-width: none !important; /* Firefox */
+            -ms-overflow-style: none !important; /* IE / Edge */
+            -webkit-overflow-scrolling: touch;
+        }
+        .odoo-notebook-tabs::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+        .odoo-notebook-tabs .nav-item {
+            flex-shrink: 0 !important;
+        }
         .odoo-notebook-tabs .nav-link {
+            white-space: nowrap !important;
             color: #64748b;
             border: none;
             border-bottom: 2px solid transparent;
             border-radius: 0;
-            padding: 8px 16px;
+            padding: 8px 14px;
             font-weight: 600;
             transition: all 0.2s ease;
         }
@@ -2047,14 +2065,13 @@
                 flex-wrap: nowrap !important;
                 overflow-x: auto !important;
                 -webkit-overflow-scrolling: touch !important;
-                scrollbar-width: thin;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
             }
             .odoo-notebook-tabs::-webkit-scrollbar {
-                height: 3px;
-            }
-            .odoo-notebook-tabs::-webkit-scrollbar-thumb {
-                background-color: #cbd5e1;
-                border-radius: 3px;
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
             }
             .odoo-notebook-tabs .nav-item {
                 flex-shrink: 0 !important;

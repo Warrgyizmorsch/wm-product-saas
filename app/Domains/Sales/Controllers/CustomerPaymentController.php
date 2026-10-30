@@ -254,4 +254,14 @@ class CustomerPaymentController extends Controller
 
         return view('modules.sales.payments.show', compact('payment'));
     }
+
+    public function downloadPdf(int $id)
+    {
+        $payment = $this->paymentRepo->find($id);
+        if (!$payment) abort(404, 'Payment receipt not found.');
+        $this->authorize('view', $payment);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.payments.pdf', compact('payment'));
+        return $pdf->download("Payment_Receipt_{$payment->payment_number}.pdf");
+    }
 }

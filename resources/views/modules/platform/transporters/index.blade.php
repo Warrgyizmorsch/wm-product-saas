@@ -100,17 +100,17 @@
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="transportersTable" class="mb-0">
                 <thead>
-                    <tr style="background-color: #e8ecf1 !important;">
-                        <th style="width: 35px; background-color: #e8ecf1 !important;" class="text-center">
+                    <tr>
+                        <th style="width: 35px;" class="text-center">
                             <input type="checkbox" class="form-check-input" id="selectAllTransporters">
                         </th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.transporter_name_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.transporter_id_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.gstin_pan_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.phone_mobile_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.city_state_col') }}</th>
-                        <th style="background-color: #e8ecf1 !important;">{{ __('crm.status') }}</th>
-                        <th style="width: 8%; background-color: #e8ecf1 !important;" class="text-end pe-3">{{ __('crm.actions') }}</th>
+                        <th>{{ __('crm.transporter_name_col') }}</th>
+                        <th>{{ __('crm.transporter_id_col') }}</th>
+                        <th>{{ __('crm.gstin_pan_col') }}</th>
+                        <th>{{ __('crm.phone_mobile_col') }}</th>
+                        <th>{{ __('crm.city_state_col') }}</th>
+                        <th>{{ __('crm.status') }}</th>
+                        <th style="width: 8%;" class="text-end pe-3">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

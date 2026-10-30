@@ -100,6 +100,7 @@ Route::prefix('sales')
         Route::get('payments/create', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'create'])->name('payments.create');
         Route::post('payments', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'store'])->name('payments.store');
         Route::get('payments/{payment}', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'show'])->name('payments.show');
+        Route::get('payments/{payment}/download', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'downloadPdf'])->name('payments.download');
         Route::post('payments/{payment}/confirm', [\App\Domains\Sales\Controllers\CustomerPaymentController::class, 'confirm'])->name('payments.confirm');
 
         // Returns Routes
@@ -108,6 +109,7 @@ Route::prefix('sales')
         Route::get('returns/create', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'create'])->name('returns.create');
         Route::post('returns', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'store'])->name('returns.store');
         Route::get('returns/{return}', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'show'])->name('returns.show');
+        Route::get('returns/{return}/download', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'downloadPdf'])->name('returns.download');
         Route::post('returns/{return}/approve', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/complete', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'complete'])->name('returns.complete');
 
