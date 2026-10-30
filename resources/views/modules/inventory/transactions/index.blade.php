@@ -13,18 +13,31 @@
         padding: 9px 22px;
         font-size: 13px;
         font-weight: 600;
-        color: #475569;
-        background-color: #ffffff;
-        border: 1.5px solid #cbd5e1;
         border-radius: 8px;
         transition: all 0.2s ease-in-out;
         text-decoration: none !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
-    .ledger-tab-link:hover {
+    html:not(.app-skin-dark) .ledger-tab-link {
+        color: #475569;
+        background-color: #ffffff;
+        border: 1.5px solid #cbd5e1;
+    }
+    html:not(.app-skin-dark) .ledger-tab-link:hover {
         background-color: #f8fafc;
         border-color: var(--bs-primary);
         color: var(--bs-primary);
+        transform: translateY(-1px);
+    }
+    html.app-skin-dark .ledger-tab-link {
+        color: #94a3b8;
+        background-color: #162038;
+        border: 1.5px solid #28334e;
+    }
+    html.app-skin-dark .ledger-tab-link:hover {
+        background-color: #1e293b;
+        border-color: var(--bs-primary);
+        color: #ffffff;
         transform: translateY(-1px);
     }
     .ledger-tab-link.active {
@@ -35,6 +48,34 @@
     }
     .ledger-tab-link.active i {
         color: #ffffff !important;
+    }
+
+    /* KPI Cards Dark / Light */
+    .erp-kpi-card {
+        border-radius: 12px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    html:not(.app-skin-dark) .erp-kpi-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+    }
+    html.app-skin-dark .erp-kpi-card {
+        background-color: #162038;
+        border: 1px solid #28334e;
+    }
+    html.app-skin-dark .erp-kpi-card .text-dark,
+    html.app-skin-dark .erp-single-panel .text-dark {
+        color: #e2e8f0 !important;
+    }
+    html.app-skin-dark .border-bottom {
+        border-color: #28334e !important;
+    }
+    html.app-skin-dark .bg-light {
+        background-color: #1e293b !important;
+        color: #cbd5e1 !important;
+    }
+    html.app-skin-dark .border {
+        border-color: #28334e !important;
     }
 </style>
 @endpush
@@ -81,7 +122,7 @@
         <!-- Top Stock Movement KPI Stat Widgets -->
         <div class="row g-3 mb-4">
             <div class="col-lg-3 col-md-6 col-12 d-flex">
-                <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+                <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                     <div class="avatar-text bg-soft-success text-success rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                         <i class="feather-arrow-down-left fs-5"></i>
                     </div>
@@ -94,7 +135,7 @@
             </div>
 
             <div class="col-lg-3 col-md-6 col-12 d-flex">
-                <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+                <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                     <div class="avatar-text bg-soft-danger text-danger rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                         <i class="feather-arrow-up-right fs-5"></i>
                     </div>
@@ -107,7 +148,7 @@
             </div>
 
             <div class="col-lg-3 col-md-6 col-12 d-flex">
-                <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+                <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                     <div class="avatar-text bg-soft-primary text-primary rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                         <i class="feather-activity fs-5"></i>
                     </div>
@@ -120,7 +161,7 @@
             </div>
 
             <div class="col-lg-3 col-md-6 col-12 d-flex">
-                <div class="card h-100 w-100 border-0 shadow-sm rounded-3 p-3 bg-white d-flex align-items-center flex-row">
+                <div class="card erp-kpi-card h-100 w-100 shadow-sm p-3 d-flex align-items-center flex-row">
                     <div class="avatar-text bg-soft-info text-info rounded-3 flex-shrink-0 me-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
                         <i class="feather-list fs-5"></i>
                     </div>
