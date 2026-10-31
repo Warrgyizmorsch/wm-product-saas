@@ -19,6 +19,65 @@ class SectionCalculationService
     {
         $tenantId = (int) $section->tenant_id;
 
+        // Inactive or deleted sections are strictly not calculated (values remain 0.0)
+        if (!$section->isActive() || $section->trashed()) {
+            return [
+                'capacity_per_hour'               => 0.0,
+                'daily_capacity'                  => 0.0,
+                'hourly_machine_capacity'         => 0.0,
+                'daily_machine_capacity'          => 0.0,
+                'hourly_manual_capacity'          => 0.0,
+                'daily_manual_capacity'           => 0.0,
+                'labor_cost_per_hour'             => 0.0,
+                'total_daily_labor_cost'          => 0.0,
+                'internal_labor_cost_per_hour'    => 0.0,
+                'total_daily_internal_labor_cost' => 0.0,
+                'external_labor_cost_per_hour'    => 0.0,
+                'total_daily_external_labor_cost' => 0.0,
+                'machine_cost_per_hour'           => 0.0,
+                'total_daily_machine_cost'        => 0.0,
+                'total_daily_operating_cost'      => 0.0,
+                'total_operating_cost_per_hour'   => 0.0,
+                'unique_operating_hours'          => 0.0,
+                'cost_per_unit'                   => 0.0,
+                'calculation_details'             => [
+                    'is_active' => false,
+                    'status'    => $section->status,
+                    'trashed'   => $section->trashed(),
+                    'message'   => 'Section is inactive or deleted. Operational metrics are not calculated.',
+                    'totals'    => [
+                        'daily_capacity'                => 0.0,
+                        'total_daily_capacity'          => 0.0,
+                        'capacity_per_hour'             => 0.0,
+                        'total_hourly_capacity'         => 0.0,
+                        'hourly_machine_capacity'       => 0.0,
+                        'daily_machine_capacity'        => 0.0,
+                        'hourly_manual_capacity'        => 0.0,
+                        'daily_manual_capacity'         => 0.0,
+                        'total_daily_operating_cost'    => 0.0,
+                        'total_operating_cost_per_hour' => 0.0,
+                        'total_daily_labor_cost'        => 0.0,
+                        'labor_cost_per_hour'           => 0.0,
+                        'total_daily_machine_cost'      => 0.0,
+                        'machine_cost_per_hour'         => 0.0,
+                    ],
+                    'operating_hours' => [
+                        'unique_clock_hours' => 0.0,
+                        'shifts'             => [],
+                        'inactive_gaps'      => [],
+                    ],
+                    'operating_timeline' => [
+                        'unique_clock_hours' => 0.0,
+                        'shifts'             => [],
+                        'timeline_intervals' => [],
+                    ],
+                    'machinery'       => ['machines' => [], 'inactive_machines' => [], 'hourly_capacity' => 0.0, 'daily_capacity' => 0.0, 'hourly_operating_cost' => 0.0, 'daily_operating_cost' => 0.0, 'total_daily_machine_expense' => 0.0],
+                    'manual_batches'  => ['manual_batches' => [], 'inactive_manual_batches' => [], 'daily_manual_capacity' => 0.0, 'peak_hourly_manual_capacity' => 0.0, 'shift_manual_capacities' => []],
+                    'labor'           => ['internal_employees' => [], 'inactive_internal_employees' => [], 'external_allocations' => [], 'inactive_external_allocations' => [], 'total_daily_internal_cost' => 0.0, 'total_daily_external_cost' => 0.0, 'peak_hourly_labor_cost' => 0.0],
+                ],
+            ];
+        }
+
         // ── 1. Operating Hours & Shift Timeline Map ───────────────────────────
         $operatingHours = $this->calculateOperatingHours($section);
         $uniqueOperatingHours = (float) ($operatingHours['unique_clock_hours'] ?? 0.0);
@@ -591,47 +650,112 @@ class SectionCalculationService
 
             $shiftId  = $batch->shift_id;
             $effHours = (float) ($shiftMap[$shiftId]['effective_hours'] ?? $shiftMap[$shiftId]['duration_hours'] ?? 0.0);
+            $shiftClockHours = (float) ($shiftMap[$shiftId]['duration_hours'] ?? 8.0);
+            if ($shiftClockHours <= 0) {
+                $shiftClockHours = 8.0;
+            }
             $dailyCap = round($capHr * $effHours, 4);
 
+            // ── Internal Employees on Batch ──
             $empNames = [];
-            if ($batch->relationLoaded('employees')) {
-                foreach ($batch->employees as $be) {
-                    if ($be->employee) {
-                        $empNames[] = $be->employee->full_name;
-                    }
+            $empDetails = [];
+            $internalHourlyCost = 0.0;
+            $internalDailyCost = 0.0;
+
+            $batchEmployees = $batch->relationLoaded('employees')
+                ? $batch->employees
+                : $batch->employees()->with('employee.designation')->get();
+
+            foreach ($batchEmployees as $be) {
+                $emp = $be->employee;
+                if (!$emp) {
+                    continue;
                 }
-            } else {
-                $empNames = $batch->employees()->with('employee')->get()->pluck('employee.full_name')->filter()->values()->all();
+                $empNames[] = $emp->full_name;
+                $monthlySalary = (float) ($emp->current_salary ?? 0.0);
+                $dailySalary = round($monthlySalary / 30, 4);
+                $hourlyRate = round($dailySalary / $shiftClockHours, 4);
+
+                $empDetails[] = [
+                    'employee_id'   => $emp->id,
+                    'employee_code' => $emp->employee_id ?? null,
+                    'name'          => $emp->full_name,
+                    'designation'   => $emp->designation?->name ?? 'Operator',
+                    'monthly_salary'=> $monthlySalary,
+                    'hourly_cost'   => $hourlyRate,
+                    'daily_cost'    => $dailySalary,
+                ];
+
+                $internalHourlyCost += $hourlyRate;
+                $internalDailyCost  += $dailySalary;
             }
 
+            // ── External Contractor Allocations on Batch ──
             $allocSummary = [];
-            if ($batch->relationLoaded('externalWorkerAllocations')) {
-                foreach ($batch->externalWorkerAllocations as $alloc) {
-                    $pgName = $alloc->payGrade ? ($alloc->payGrade->name ?? 'Contractor') : 'Contractor';
-                    $allocSummary[] = "{$alloc->number_of_external_workers}x {$pgName}";
-                }
-            } else {
-                $allocSummary = $batch->externalWorkerAllocations()->with('payGrade')->get()->map(function ($alloc) {
-                    $pgName = $alloc->payGrade ? ($alloc->payGrade->name ?? 'Contractor') : 'Contractor';
-                    return "{$alloc->number_of_external_workers}x {$pgName}";
-                })->all();
+            $allocDetails = [];
+            $externalHourlyCost = 0.0;
+            $externalDailyCost = 0.0;
+            $externalHeadcount = 0;
+
+            $batchAllocations = $batch->relationLoaded('externalWorkerAllocations')
+                ? $batch->externalWorkerAllocations
+                : $batch->externalWorkerAllocations()->with('payGrade')->get();
+
+            foreach ($batchAllocations as $alloc) {
+                $headcount = (int) ($alloc->number_of_external_workers ?? 1);
+                $pg = $alloc->payGrade;
+                $pgName = $pg ? ($pg->name ?? $pg->grade_name ?? 'Contractor') : 'Contractor';
+                $ratePerHour = (float) ($pg->hourly_rate ?? 0.0);
+                $hourlyBurn = round($headcount * $ratePerHour, 4);
+                $dailyCost = round($hourlyBurn * $shiftClockHours, 4);
+
+                $allocSummary[] = "{$headcount}x {$pgName}";
+                $allocDetails[] = [
+                    'allocation_id'  => $alloc->id,
+                    'pay_grade_name' => $pgName,
+                    'workers_count'  => $headcount,
+                    'rate_per_hour'  => $ratePerHour,
+                    'hourly_cost'    => $hourlyBurn,
+                    'daily_cost'     => $dailyCost,
+                ];
+
+                $externalHourlyCost += $hourlyBurn;
+                $externalDailyCost  += $dailyCost;
+                $externalHeadcount  += $headcount;
             }
 
             $shiftName = $shiftMap[$shiftId]['name'] ?? ($batch->shift ? $batch->shift->name : "Shift #{$shiftId}");
             $formula = "Batch capacity (" . number_format($capHr, 2) . " units/hr) x Shift effective hours (" . format_hours($effHours) . ") = " . number_format($dailyCap, 2) . " units/day";
 
+            $totalBatchHourlyCost = round($internalHourlyCost + $externalHourlyCost, 4);
+            $totalBatchDailyCost  = round($internalDailyCost + $externalDailyCost, 4);
+            $batchCostPerUnit     = $dailyCap > 0 ? round($totalBatchDailyCost / $dailyCap, 4) : 0.0;
+
             $item = [
-                'id'                      => $batch->id,
-                'batch_name'              => $batch->batch_name,
-                'shift_id'                => $shiftId,
-                'shift_name'              => $shiftName,
-                'cap_hr'                  => round($capHr, 4),
-                'eff_hrs'                 => $effHours,
-                'daily_cap'               => $dailyCap,
-                'formula'                 => $formula,
-                'team_members'            => $empNames,
-                'contractor_allocations'  => $allocSummary,
-                'active'                  => $isActive,
+                'id'                          => $batch->id,
+                'batch_name'                  => $batch->batch_name,
+                'shift_id'                    => $shiftId,
+                'shift_name'                  => $shiftName,
+                'cap_hr'                      => round($capHr, 4),
+                'eff_hrs'                     => $effHours,
+                'shift_clock_hours'           => $shiftClockHours,
+                'daily_cap'                   => $dailyCap,
+                'formula'                     => $formula,
+                'team_members'                => $empNames,
+                'contractor_allocations'      => $allocSummary,
+                'total_internal_workers'      => count($empDetails),
+                'total_external_workers'      => $externalHeadcount,
+                'total_workforce_count'       => count($empDetails) + $externalHeadcount,
+                'internal_hourly_cost'        => round($internalHourlyCost, 4),
+                'internal_daily_cost'         => round($internalDailyCost, 4),
+                'external_hourly_cost'        => round($externalHourlyCost, 4),
+                'external_daily_cost'         => round($externalDailyCost, 4),
+                'total_batch_hourly_cost'     => $totalBatchHourlyCost,
+                'total_batch_daily_cost'      => $totalBatchDailyCost,
+                'cost_per_unit'               => $batchCostPerUnit,
+                'internal_employees_details'  => $empDetails,
+                'external_contractors_details'=> $allocDetails,
+                'active'                      => $isActive,
             ];
 
             if ($isActive) {
@@ -1185,12 +1309,20 @@ class SectionCalculationService
         ?string $batchId = null,
         ?int $wcCalculationId = null
     ): WorkCenterSectionCalculation {
+        if ($section->trashed()) {
+            throw new \InvalidArgumentException("Cannot calculate snapshot for a deleted section.");
+        }
+
         $calc = $this->calculate($section);
         $batchId = $batchId ?: (string) Str::uuid();
+
+        // Assign sequential snapshot_number scoped per Section
+        $nextSnapshotNumber = ((int) WorkCenterSectionCalculation::where('section_id', $section->id)->max('snapshot_number')) + 1;
 
         $record = WorkCenterSectionCalculation::create([
             'tenant_id'                       => (int) $section->tenant_id,
             'section_id'                      => (int) $section->id,
+            'snapshot_number'                 => $nextSnapshotNumber,
             'work_center_calculation_id'      => $wcCalculationId,
             'batch_id'                        => $batchId,
             'trigger_type'                    => $triggerType,

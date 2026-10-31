@@ -42,6 +42,7 @@ class WorkCenterEmployeeController extends Controller
 
         try {
             $assignment = $this->service->assign($workCenterId, $employeeId, $tenantId, $active, $sectionId);
+            $this->triggerCalculationCountdown($assignment);
 
             $targetMsg = $sectionId ? 'Section' : 'Work Center';
             if ($request->expectsJson() || $request->ajax()) {
@@ -85,6 +86,7 @@ class WorkCenterEmployeeController extends Controller
         try {
             $targetActive = $request->has('active') ? $request->boolean('active') : !$assignment->active;
             $this->service->setActive($id, $targetActive, $tenantId);
+            $this->triggerCalculationCountdown($assignment);
 
             $statusText = $targetActive ? 'activated' : 'deactivated';
             if ($request->expectsJson() || $request->ajax()) {
@@ -120,6 +122,7 @@ class WorkCenterEmployeeController extends Controller
         Gate::authorize('update', $assignment->workCenter);
 
         try {
+            $this->triggerCalculationCountdown($assignment);
             $this->service->remove($id, $tenantId);
 
             if (request()->expectsJson() || request()->ajax()) {
@@ -139,6 +142,18 @@ class WorkCenterEmployeeController extends Controller
                 return response()->json(['success' => false, 'message' => 'An error occurred while removing employee assignment: ' . $e->getMessage()], 500);
             }
             return redirect()->back()->with('error', 'An error occurred while removing employee assignment: ' . $e->getMessage());
+        }
+    }
+
+    private function triggerCalculationCountdown(?WorkCenterEmployeeAssignment $assignment): void
+    {
+        if (!$assignment) {
+            return;
+        }
+
+        $workCenter = $assignment->workCenter;
+        if ($workCenter) {
+            app(\App\Domains\Production\Services\CountdownCalculationEngine::class)->triggerCountdown($workCenter, $assignment->section_id);
         }
     }
 }

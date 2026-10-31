@@ -45,7 +45,10 @@ class WorkCenterService
             );
         }
 
-        return $this->repository->update($id, $dto->toArray());
+        $updated = $this->repository->update($id, $dto->toArray());
+        app(CountdownCalculationEngine::class)->triggerCountdown($updated, null);
+
+        return $updated;
     }
 
     public function delete(int $id): bool

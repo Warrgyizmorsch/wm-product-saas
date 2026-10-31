@@ -15,6 +15,7 @@ class WorkCenterSectionCalculation extends BaseModel
     protected $fillable = [
         'tenant_id',
         'section_id',
+        'snapshot_number',
         'work_center_calculation_id',
         'batch_id',
         'trigger_type',

@@ -44,6 +44,8 @@ class ExternalWorkerAllocationController extends Controller
                 $updateIfExists
             );
 
+            $this->triggerCalculationCountdown($allocation);
+
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => true,
@@ -79,6 +81,7 @@ class ExternalWorkerAllocationController extends Controller
         try {
             $quantity = (int) $request->validated('number_of_external_workers');
             $allocation = $this->service->updateQuantity($id, $quantity, $tenantId);
+            $this->triggerCalculationCountdown($allocation);
 
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
@@ -115,6 +118,7 @@ class ExternalWorkerAllocationController extends Controller
         try {
             $targetActive = $request->has('active') ? $request->boolean('active') : !$allocation->active;
             $allocation = $this->service->setActive($id, $targetActive, $tenantId);
+            $this->triggerCalculationCountdown($allocation);
 
             $statusText = $targetActive ? 'activated' : 'deactivated';
             if ($request->expectsJson() || $request->ajax()) {
@@ -150,6 +154,7 @@ class ExternalWorkerAllocationController extends Controller
         Gate::authorize('delete', $allocation);
 
         try {
+            $this->triggerCalculationCountdown($allocation);
             $this->service->deallocate($id, $tenantId);
 
             if (request()->expectsJson() || request()->ajax()) {
@@ -169,6 +174,19 @@ class ExternalWorkerAllocationController extends Controller
                 return response()->json(['success' => false, 'message' => 'An error occurred while removing allocation: ' . $e->getMessage()], 500);
             }
             return redirect()->back()->with('error', 'An error occurred while removing allocation: ' . $e->getMessage());
+        }
+    }
+
+    private function triggerCalculationCountdown(?ExternalWorkerAllocation $allocation): void
+    {
+        if (!$allocation) {
+            return;
+        }
+
+        $section = $allocation->section;
+        $workCenter = $section?->workCenter;
+        if ($workCenter) {
+            app(\App\Domains\Production\Services\CountdownCalculationEngine::class)->triggerCountdown($workCenter, $allocation->section_id);
         }
     }
 }

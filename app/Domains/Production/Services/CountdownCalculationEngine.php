@@ -4,6 +4,7 @@ namespace App\Domains\Production\Services;
 
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Models\WorkCenterCalculation;
+use App\Domains\Production\Models\WorkCenterSection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -11,7 +12,7 @@ class CountdownCalculationEngine
 {
     public function __construct(
         private readonly WorkCenterCalculationService $workCenterCalculationService,
-        private readonly WorkCenterActivityLogger $activityLogger,
+        private readonly ?WorkCenterActivityLogger $activityLogger = null,
     ) {}
 
     /**
@@ -19,14 +20,8 @@ class CountdownCalculationEngine
      */
     public function isCountdownActive(WorkCenter $workCenter): bool
     {
-        // TEMPORARILY COMMENTED OUT FOR TESTING: Debounce timer disabled.
-        // Recalculations run on-demand via the "Recalculate" button click.
-        return false;
-
-        /*
         return !empty($workCenter->calculation_countdown_end_at)
             && now()->lt($workCenter->calculation_countdown_end_at);
-        */
     }
 
     /**
@@ -43,35 +38,33 @@ class CountdownCalculationEngine
 
     /**
      * Trigger or enqueue a Section into the Work Center's calculation countdown.
+     * Note: Activity logs are strictly reserved for completed calculation snapshots,
+     * so intermediate countdown/queuing events are NOT written to the audit log.
      */
     public function triggerCountdown(WorkCenter $workCenter, ?int $sectionId = null): void
     {
-        // TEMPORARILY COMMENTED OUT FOR TESTING: Debounce logic disabled.
-        // Recalculations are triggered on-demand via the "Recalculate" button.
-        /*
         $pending = is_array($workCenter->pending_calculation_section_ids)
             ? $workCenter->pending_calculation_section_ids
             : [];
 
-        if ($sectionId && !in_array($sectionId, $pending, true)) {
-            $pending[] = $sectionId;
+        // Allow active, inactive, and soft-deleted sections belonging to this work center to be tracked
+        $validSectionIds = WorkCenterSection::withTrashed()
+            ->where('work_center_id', $workCenter->id)
+            ->where('tenant_id', $workCenter->tenant_id)
+            ->pluck('id')
+            ->map(fn($val) => (int) $val)
+            ->all();
+
+        $pending = array_values(array_intersect($pending, $validSectionIds));
+
+        if ($sectionId && in_array((int) $sectionId, $validSectionIds, true) && !in_array((int) $sectionId, $pending, true)) {
+            $pending[] = (int) $sectionId;
         }
 
         if ($this->isCountdownActive($workCenter)) {
             // Timer already running: append section to batch without resetting timer
             $workCenter->pending_calculation_section_ids = array_values(array_unique($pending));
             $workCenter->save();
-
-            $this->activityLogger->log(
-                tenantId: (int) $workCenter->tenant_id,
-                workCenterId: (int) $workCenter->id,
-                sectionId: $sectionId,
-                userId: null,
-                eventType: 'calculation_queued',
-                entityType: 'WorkCenter',
-                entityId: (int) $workCenter->id,
-                description: "Section #{$sectionId} added to active calculation countdown queue."
-            );
         } else {
             // Arm new countdown
             $durationMinutes = max(1, (int) ($workCenter->calculation_countdown_minutes ?: 10));
@@ -80,24 +73,18 @@ class CountdownCalculationEngine
             $workCenter->calculation_countdown_end_at = $endAt;
             $workCenter->pending_calculation_section_ids = array_values(array_unique($pending));
             $workCenter->save();
-
-            $this->activityLogger->log(
-                tenantId: (int) $workCenter->tenant_id,
-                workCenterId: (int) $workCenter->id,
-                sectionId: $sectionId,
-                userId: null,
-                eventType: 'countdown_started',
-                entityType: 'WorkCenter',
-                entityId: (int) $workCenter->id,
-                description: "Calculation countdown started ({$durationMinutes} mins, expires at {$endAt->toTimeString()}).",
-                properties: [
-                    'duration_minutes' => $durationMinutes,
-                    'countdown_end_at' => $endAt->toIso8601String(),
-                    'pending_sections' => $pending,
-                ]
-            );
         }
-        */
+    }
+
+    /**
+     * Helper triggered when a section entity (e.g. manual batch) is modified.
+     */
+    public function onSectionModified(WorkCenterSection $section, string $event, ?int $entityId = null): void
+    {
+        $workCenter = $section->workCenter;
+        if ($workCenter) {
+            $this->triggerCountdown($workCenter, $section->id);
+        }
     }
 
     /**
@@ -114,24 +101,8 @@ class CountdownCalculationEngine
             throw new InvalidArgumentException('Countdown duration must be between 1 and 1440 minutes.');
         }
 
-        $oldMinutes = $workCenter->calculation_countdown_minutes;
         $workCenter->calculation_countdown_minutes = $minutes;
         $workCenter->save();
-
-        $this->activityLogger->log(
-            tenantId: (int) $workCenter->tenant_id,
-            workCenterId: (int) $workCenter->id,
-            sectionId: null,
-            userId: $userId ?? auth()->id(),
-            eventType: 'countdown_duration_updated',
-            entityType: 'WorkCenter',
-            entityId: (int) $workCenter->id,
-            description: "Updated calculation countdown duration from {$oldMinutes}m to {$minutes}m.",
-            properties: [
-                'previous_minutes' => $oldMinutes,
-                'new_minutes'      => $minutes,
-            ]
-        );
 
         return $workCenter;
     }

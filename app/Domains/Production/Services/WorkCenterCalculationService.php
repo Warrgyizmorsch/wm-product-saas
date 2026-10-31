@@ -277,10 +277,13 @@ class WorkCenterCalculationService
         // 2. Roll up Work Center Metrics
         $wcCalc = $this->calculate($workCenter, $sectionCalculationResults);
 
-        // 3. Persist Work Center Snapshot
+        // 3. Persist Work Center Snapshot (assign sequential snapshot_number scoped per Work Center)
+        $nextSnapshotNumber = ((int) WorkCenterCalculation::where('work_center_id', $workCenter->id)->max('snapshot_number')) + 1;
+
         $record = WorkCenterCalculation::create([
             'tenant_id'                     => $tenantId,
             'work_center_id'                => (int) $workCenter->id,
+            'snapshot_number'               => $nextSnapshotNumber,
             'batch_id'                      => $batchId,
             'trigger_type'                  => $triggerType,
             'impacted_section_ids'          => empty($impactedSectionIds) ? $allSections->pluck('id')->all() : array_values($impactedSectionIds),

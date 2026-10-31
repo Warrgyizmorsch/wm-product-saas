@@ -8,8 +8,13 @@
                         <i class="feather-bar-chart-2"></i>
                     </div>
                     <div>
-                        <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="sectionCalculationModalLabel_{{ $section->id }}">
+                        <h5 class="modal-title fw-bold text-dark fs-15 mb-0 d-flex align-items-center flex-wrap gap-1" id="sectionCalculationModalLabel_{{ $section->id }}">
                             {{ __('production.calculation_breakdown') }} &mdash; <span class="font-monospace text-primary">{{ $section->code }}</span> ({{ $section->name }})
+                            @if(!$section->isActive())
+                                <span class="badge bg-soft-secondary text-muted font-monospace fs-11 ms-1">Inactive</span>
+                            @elseif($section->latestCalculation)
+                                <span class="badge bg-soft-success text-success font-monospace fs-11 ms-1">Snapshot #{{ $section->latestCalculation->snapshot_number ?? $section->latestCalculation->id }}</span>
+                            @endif
                         </h5>
                         <small class="text-muted fs-11">{{ __('production.work_center') }}: {{ $workCenter->name }} [{{ $workCenter->code }}]</small>
                     </div>
@@ -18,8 +23,15 @@
             </div>
 
             <div class="modal-body p-4">
+                @if(!$section->isActive())
+                    <div class="alert alert-soft-secondary border-secondary-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12">
+                        <i class="feather-pause-circle text-secondary fs-14 flex-shrink-0"></i>
+                        <span><strong>Section Inactive:</strong> This section is marked inactive. Its values are not calculated and it does not contribute to the Work Center totals.</span>
+                    </div>
+                @endif
                 @php
-                    $secCalc = $section->latestCalculation;
+                    $isSecActive = $section->isActive();
+                    $secCalc = $isSecActive ? $section->latestCalculation : null;
                     // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on view render.
                     // If $secCalc is null, values gracefully default to zeros.
                     $details = $secCalc->calculation_details ?? [];
@@ -412,24 +424,161 @@
                             </div>
                         </div>
 
+                        <style>
+                            .batch-expand-btn {
+                                width: 24px;
+                                height: 24px;
+                                display: inline-flex;
+                                align-items: center;
+                                justify-content: center;
+                                border-radius: 4px;
+                                padding: 0;
+                                cursor: pointer;
+                                transition: all 0.2s ease-in-out;
+                            }
+                            .batch-expand-btn[aria-expanded="false"] {
+                                background-color: var(--bs-primary, #3e60d5);
+                                color: #ffffff;
+                                border: 1px solid var(--bs-primary, #3e60d5);
+                            }
+                            .batch-expand-btn[aria-expanded="true"] {
+                                background-color: #f1f5f9;
+                                color: var(--bs-primary, #3e60d5);
+                                border: 1px solid #cbd5e1;
+                            }
+                            .batch-expand-btn .batch-chevron {
+                                transition: transform 0.2s ease-in-out;
+                            }
+                            .batch-expand-btn[aria-expanded="true"] .batch-chevron {
+                                transform: rotate(90deg);
+                            }
+                            .batch-detail-row > td {
+                                padding: 0 !important;
+                                border: 0 !important;
+                            }
+                        </style>
                         <div class="table-responsive border rounded-3">
                             <table class="table table-sm table-hover align-middle mb-0 fs-12">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width: 20%">Batch Name</th>
-                                        <th style="width: 15%">Assigned Shift</th>
-                                        <th style="width: 12%" class="text-end">Hourly Capacity</th>
-                                        <th style="width: 12%" class="text-end">Shift Eff. Hours</th>
-                                        <th style="width: 14%" class="text-end">Daily Output</th>
-                                        <th style="width: 27%">Calculation Formula (English)</th>
+                                        <th style="width: 32%">Batch Name</th>
+                                        <th style="width: 22%">Assigned Shift</th>
+                                        <th style="width: 15%" class="text-end">Hourly Capacity</th>
+                                        <th style="width: 15%" class="text-end">Shift Eff. Hours</th>
+                                        <th style="width: 16%" class="text-end">
+                                            Daily Output
+                                            <i class="feather-info text-muted ms-1 cursor-pointer" title="Daily Output = Batch Capacity/hr × Shift Effective Hours" data-bs-toggle="tooltip"></i>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @forelse($batchData['batches'] ?? [] as $b)
-                                        <tr>
+                                        @php
+                                            $teamMembers = $b['team_members'] ?? $b['assigned_employees'] ?? [];
+                                            $contractors = $b['contractor_allocations'] ?? [];
+                                            $intCount = (int) ($b['total_internal_workers'] ?? count($teamMembers));
+
+                                            $extCount = (int) ($b['total_external_workers'] ?? 0);
+                                            if (!isset($b['total_external_workers'])) {
+                                                foreach ($contractors as $cStr) {
+                                                    if (preg_match('/^(\d+)x/', $cStr, $m)) {
+                                                        $extCount += (int) $m[1];
+                                                    } else {
+                                                        $extCount += 1;
+                                                    }
+                                                }
+                                            }
+
+                                            $empDetails = $b['internal_employees_details'] ?? [];
+                                            $allocDetails = $b['external_contractors_details'] ?? [];
+
+                                            $intHourlyCost = (float) ($b['internal_hourly_cost'] ?? 0);
+                                            $intDailyCost  = (float) ($b['internal_daily_cost'] ?? 0);
+                                            $extHourlyCost = (float) ($b['external_hourly_cost'] ?? 0);
+                                            $extDailyCost  = (float) ($b['external_daily_cost'] ?? 0);
+                                            $totBatchHourly = (float) ($b['total_batch_hourly_cost'] ?? ($intHourlyCost + $extHourlyCost));
+                                            $totBatchDaily  = (float) ($b['total_batch_daily_cost'] ?? ($intDailyCost + $extDailyCost));
+                                            $costPerUnit    = (float) ($b['cost_per_unit'] ?? 0);
+
+                                            // Graceful live fallback for legacy snapshot if cost details were not precalculated
+                                            if (empty($empDetails) && empty($allocDetails) && isset($b['id'])) {
+                                                $liveBatch = \App\Domains\Production\Models\SectionManualProduction::with(['employees.employee.designation', 'externalWorkerAllocations.payGrade'])->find($b['id']);
+                                                if ($liveBatch) {
+                                                    $shiftClock = (float) ($b['shift_clock_hours'] ?? ($shiftMap[$b['shift_id'] ?? null]['duration_hours'] ?? 8.0));
+                                                    if ($shiftClock <= 0) $shiftClock = 8.0;
+
+                                                    if (empty($empDetails) && $liveBatch->employees->isNotEmpty()) {
+                                                        foreach ($liveBatch->employees as $be) {
+                                                            $emp = $be->employee;
+                                                            if ($emp) {
+                                                                $mSal = (float) ($emp->current_salary ?? 0);
+                                                                $dSal = round($mSal / 30, 4);
+                                                                $hRate = round($dSal / $shiftClock, 4);
+                                                                $empDetails[] = [
+                                                                    'name' => $emp->full_name,
+                                                                    'employee_code' => $emp->employee_id ?? null,
+                                                                    'hourly_cost' => $hRate,
+                                                                    'daily_cost' => $dSal,
+                                                                ];
+                                                                $intHourlyCost += $hRate;
+                                                                $intDailyCost += $dSal;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (empty($allocDetails) && $liveBatch->externalWorkerAllocations->isNotEmpty()) {
+                                                        foreach ($liveBatch->externalWorkerAllocations as $alloc) {
+                                                            $hc = (int) ($alloc->number_of_external_workers ?? 1);
+                                                            $pg = $alloc->payGrade;
+                                                            $rph = (float) ($pg?->hourly_rate ?? 0);
+                                                            $hBurn = round($hc * $rph, 4);
+                                                            $dCost = round($hBurn * $shiftClock, 4);
+                                                            $allocDetails[] = [
+                                                                'workers_count' => $hc,
+                                                                'pay_grade_name' => $pg?->name ?? 'Contractor',
+                                                                'rate_per_hour' => $rph,
+                                                                'hourly_cost' => $hBurn,
+                                                                'daily_cost' => $dCost,
+                                                            ];
+                                                            $extHourlyCost += $hBurn;
+                                                            $extDailyCost += $dCost;
+                                                        }
+                                                    }
+                                                    $totBatchHourly = round($intHourlyCost + $extHourlyCost, 4);
+                                                    $totBatchDaily = round($intDailyCost + $extDailyCost, 4);
+                                                    $dailyCapVal = (float) ($b['daily_cap'] ?? 0);
+                                                    $costPerUnit = $dailyCapVal > 0 ? round($totBatchDaily / $dailyCapVal, 4) : 0;
+                                                }
+                                            }
+                                        @endphp
+                                        <tr class="align-middle">
                                             <td>
-                                                <strong class="text-dark d-block">{{ $b['batch_name'] ?? $b['name'] ?? 'Manual Batch' }}</strong>
-                                                <small class="text-muted">{{ count($b['team_members'] ?? $b['assigned_employees'] ?? []) }} internal emps</small>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <button type="button" 
+                                                            class="btn btn-xs batch-expand-btn rounded p-0 flex-shrink-0" 
+                                                            data-bs-toggle="collapse" 
+                                                            data-bs-target="#batchCollapse_{{ $section->id }}_{{ $b['id'] ?? $loop->index }}" 
+                                                            aria-expanded="false" 
+                                                            aria-controls="batchCollapse_{{ $section->id }}_{{ $b['id'] ?? $loop->index }}"
+                                                            title="Expand/collapse workforce & cost breakdown">
+                                                        <i class="feather-chevron-right fs-12 batch-chevron"></i>
+                                                    </button>
+                                                    <div>
+                                                        <strong class="text-dark d-block fs-13 cursor-pointer batch-expand-trigger" 
+                                                                data-bs-toggle="collapse" 
+                                                                data-bs-target="#batchCollapse_{{ $section->id }}_{{ $b['id'] ?? $loop->index }}">
+                                                            {{ $b['batch_name'] ?? $b['name'] ?? 'Manual Batch' }}
+                                                        </strong>
+                                                        <div class="d-flex align-items-center gap-1.5 mt-0.5">
+                                                            <span class="badge bg-soft-info text-info font-monospace fs-10 px-1.5 py-0.5">
+                                                                <i class="feather-user me-0.5"></i>{{ $intCount }} Emp
+                                                            </span>
+                                                            <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-1.5 py-0.5">
+                                                                <i class="feather-users me-0.5"></i>{{ $extCount }} Ext
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td>
                                                 <span class="badge bg-soft-info text-info font-monospace">{{ $b['shift_name'] ?? 'N/A' }}</span>
@@ -442,14 +591,325 @@
                                             </td>
                                             <td class="text-end font-monospace fw-bold text-dark">
                                                 {{ number_format((float) ($b['daily_cap'] ?? $b['daily_output'] ?? 0), 1) }} units
+                                                @if(!empty($b['formula']))
+                                                    <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $b['formula'] }}"></i>
+                                                @endif
                                             </td>
-                                            <td class="font-monospace text-muted fs-11">
-                                                {{ $b['formula'] ?? '' }}
+                                        </tr>
+                                        <!-- Collapsible Sub-Row for Workforce & Cost Details -->
+                                        <tr class="batch-detail-row p-0 border-0" style="border: none;">
+                                            <td colspan="5" class="p-0 border-0">
+                                                <div class="collapse batch-collapse-pane" id="batchCollapse_{{ $section->id }}_{{ $b['id'] ?? $loop->index }}">
+                                                    <div class="p-3 bg-light border-top border-bottom">
+                                                        @php
+                                                            $hasInt = !empty($empDetails);
+                                                            $hasExt = !empty($allocDetails) || !empty($contractors);
+                                                        @endphp
+                                                        <div class="row g-2.5">
+                                                            @if($hasInt && $hasExt)
+                                                                {{-- CASE 1: BOTH HAVE DATA -> Two side-by-side cards --}}
+                                                                <!-- Col 1: Internal Employees -->
+                                                                <div class="col-md-6">
+                                                                    <div class="card border shadow-none mb-0 bg-white">
+                                                                        <div class="card-header bg-soft-info py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                                                            <span class="fw-bold fs-12 text-dark">
+                                                                                <i class="feather-user text-info me-1"></i>Internal Employees ({{ $intCount }})
+                                                                            </span>
+                                                                            <span class="badge bg-white text-info border border-info font-monospace fs-10">
+                                                                                {{ format_currency($intHourlyCost) }}/hr &bull; {{ format_currency($intDailyCost) }}/day
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="card-body p-0">
+                                                                            <div class="table-responsive">
+                                                                                <table class="table table-sm table-hover align-middle mb-0 fs-11">
+                                                                                    <thead class="table-light">
+                                                                                        <tr>
+                                                                                            <th class="ps-3 py-1.5">Employee</th>
+                                                                                            <th class="text-end py-1.5">Hourly Cost</th>
+                                                                                            <th class="text-end pe-3 py-1.5">Daily Salary</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody>
+                                                                                        @foreach($empDetails as $emp)
+                                                                                            <tr>
+                                                                                                <td class="ps-3 py-1.5">
+                                                                                                    <strong class="text-dark d-block">{{ $emp['name'] }}</strong>
+                                                                                                    @if(!empty($emp['employee_code']))
+                                                                                                        <span class="text-muted font-monospace fs-10">[{{ $emp['employee_code'] }}]</span>
+                                                                                                    @endif
+                                                                                                </td>
+                                                                                                <td class="text-end font-monospace text-muted py-1.5">
+                                                                                                    {{ format_currency($emp['hourly_cost']) }}/hr
+                                                                                                </td>
+                                                                                                <td class="text-end font-monospace text-dark fw-semibold pe-3 py-1.5">
+                                                                                                    {{ format_currency($emp['daily_cost']) }}/day
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        @endforeach
+                                                                                    </tbody>
+                                                                                    <tfoot class="table-light border-top">
+                                                                                        <tr>
+                                                                                            <td class="ps-3 py-1.5 fw-bold text-dark">Subtotal ({{ $intCount }} staff):</td>
+                                                                                            <td class="text-end font-monospace text-info fw-bold py-1.5">{{ format_currency($intHourlyCost) }}/hr</td>
+                                                                                            <td class="text-end font-monospace text-info fw-bold pe-3 py-1.5">{{ format_currency($intDailyCost) }}/day</td>
+                                                                                        </tr>
+                                                                                    </tfoot>
+                                                                                </table>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Col 2: External Workers -->
+                                                                <div class="col-md-6">
+                                                                    <div class="card border shadow-none mb-0 bg-white">
+                                                                        <div class="card-header bg-soft-primary py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                                                            <span class="fw-bold fs-12 text-dark">
+                                                                                <i class="feather-users text-primary me-1"></i>External Workers ({{ $extCount }})
+                                                                            </span>
+                                                                            <span class="badge bg-white text-primary border border-primary font-monospace fs-10">
+                                                                                {{ format_currency($extHourlyCost) }}/hr &bull; {{ format_currency($extDailyCost) }}/day
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="card-body p-0">
+                                                                            @if(!empty($allocDetails))
+                                                                                <div class="table-responsive">
+                                                                                    <table class="table table-sm table-hover align-middle mb-0 fs-11">
+                                                                                        <thead class="table-light">
+                                                                                            <tr>
+                                                                                                <th class="ps-3 py-1.5">Allocation / Pay Grade</th>
+                                                                                                <th class="text-end py-1.5">Hourly Burn</th>
+                                                                                                <th class="text-end pe-3 py-1.5">Daily Cost</th>
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody>
+                                                                                            @foreach($allocDetails as $alloc)
+                                                                                                <tr>
+                                                                                                    <td class="ps-3 py-1.5">
+                                                                                                        <strong class="text-dark d-block">{{ $alloc['workers_count'] }}x {{ $alloc['pay_grade_name'] }}</strong>
+                                                                                                        <span class="text-muted font-monospace fs-10">Rate: {{ format_currency($alloc['rate_per_hour']) }}/hr</span>
+                                                                                                    </td>
+                                                                                                    <td class="text-end font-monospace text-muted py-1.5">
+                                                                                                        {{ format_currency($alloc['hourly_cost']) }}/hr
+                                                                                                    </td>
+                                                                                                    <td class="text-end font-monospace text-dark fw-semibold pe-3 py-1.5">
+                                                                                                        {{ format_currency($alloc['daily_cost']) }}/day
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            @endforeach
+                                                                                        </tbody>
+                                                                                        <tfoot class="table-light border-top">
+                                                                                            <tr>
+                                                                                                <td class="ps-3 py-1.5 fw-bold text-dark">Subtotal ({{ $extCount }} workers):</td>
+                                                                                                <td class="text-end font-monospace text-primary fw-bold py-1.5">{{ format_currency($extHourlyCost) }}/hr</td>
+                                                                                                <td class="text-end font-monospace text-primary fw-bold pe-3 py-1.5">{{ format_currency($extDailyCost) }}/day</td>
+                                                                                            </tr>
+                                                                                        </tfoot>
+                                                                                    </table>
+                                                                                </div>
+                                                                            @elseif(!empty($contractors))
+                                                                                <div class="p-2">
+                                                                                    @foreach($contractors as $cStr)
+                                                                                        <div class="text-dark fs-11 py-1 px-2 border-bottom"><i class="feather-user-check text-primary me-1"></i>{{ $cStr }}</div>
+                                                                                    @endforeach
+                                                                                </div>
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                            @elseif(!$hasInt && $hasExt)
+                                                                {{-- CASE 2: 0 INTERNAL, ACTIVE EXTERNAL -> Slim strip for 0 Internal + Full Width Card for External --}}
+                                                                <div class="col-12">
+                                                                    <div class="py-2 px-3 rounded-2 bg-white border d-flex align-items-center justify-content-between fs-11">
+                                                                        <div class="d-flex align-items-center gap-2">
+                                                                            <span class="badge bg-soft-info text-info font-monospace px-1.5 py-0.5">
+                                                                                <i class="feather-user me-0.5"></i>0 Emp
+                                                                            </span>
+                                                                            <span class="text-muted"><strong class="text-dark">Internal Employees:</strong> No salaried staff assigned to this batch</span>
+                                                                        </div>
+                                                                        <span class="text-muted font-monospace fs-11">{{ format_currency(0) }}/hr &bull; {{ format_currency(0) }}/day</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="col-12">
+                                                                    <div class="card border shadow-none mb-0 bg-white">
+                                                                        <div class="card-header bg-soft-primary py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                                                            <span class="fw-bold fs-12 text-dark">
+                                                                                <i class="feather-users text-primary me-1"></i>External Workers ({{ $extCount }})
+                                                                            </span>
+                                                                            <span class="badge bg-white text-primary border border-primary font-monospace fs-10">
+                                                                                {{ format_currency($extHourlyCost) }}/hr &bull; {{ format_currency($extDailyCost) }}/day
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="card-body p-0">
+                                                                            @if(!empty($allocDetails))
+                                                                                <div class="table-responsive">
+                                                                                    <table class="table table-sm table-hover align-middle mb-0 fs-11">
+                                                                                        <thead class="table-light">
+                                                                                            <tr>
+                                                                                                <th class="ps-3 py-1.5" style="width: 45%;">Allocation / Pay Grade</th>
+                                                                                                <th class="text-end py-1.5" style="width: 18%;">Hourly Rate</th>
+                                                                                                <th class="text-end py-1.5" style="width: 17%;">Hourly Burn</th>
+                                                                                                <th class="text-end pe-3 py-1.5" style="width: 20%;">Daily Cost</th>
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody>
+                                                                                            @foreach($allocDetails as $alloc)
+                                                                                                <tr>
+                                                                                                    <td class="ps-3 py-1.5">
+                                                                                                        <strong class="text-dark d-block">{{ $alloc['workers_count'] }}x {{ $alloc['pay_grade_name'] }}</strong>
+                                                                                                    </td>
+                                                                                                    <td class="text-end font-monospace text-muted py-1.5">
+                                                                                                        {{ format_currency($alloc['rate_per_hour']) }}/hr
+                                                                                                    </td>
+                                                                                                    <td class="text-end font-monospace text-muted py-1.5">
+                                                                                                        {{ format_currency($alloc['hourly_cost']) }}/hr
+                                                                                                    </td>
+                                                                                                    <td class="text-end font-monospace text-dark fw-semibold pe-3 py-1.5">
+                                                                                                        {{ format_currency($alloc['daily_cost']) }}/day
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            @endforeach
+                                                                                        </tbody>
+                                                                                        <tfoot class="table-light border-top">
+                                                                                            <tr>
+                                                                                                <td class="ps-3 py-1.5 fw-bold text-dark">Subtotal ({{ $extCount }} workers):</td>
+                                                                                                <td></td>
+                                                                                                <td class="text-end font-monospace text-primary fw-bold py-1.5">{{ format_currency($extHourlyCost) }}/hr</td>
+                                                                                                <td class="text-end font-monospace text-primary fw-bold pe-3 py-1.5">{{ format_currency($extDailyCost) }}/day</td>
+                                                                                            </tr>
+                                                                                        </tfoot>
+                                                                                    </table>
+                                                                                </div>
+                                                                            @elseif(!empty($contractors))
+                                                                                <div class="p-2">
+                                                                                    @foreach($contractors as $cStr)
+                                                                                        <div class="text-dark fs-11 py-1 px-2 border-bottom"><i class="feather-user-check text-primary me-1"></i>{{ $cStr }}</div>
+                                                                                    @endforeach
+                                                                                </div>
+                                                                            @endif
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                            @elseif($hasInt && !$hasExt)
+                                                                {{-- CASE 3: ACTIVE INTERNAL, 0 EXTERNAL -> Full Width Card for Internal + Slim strip for 0 External --}}
+                                                                <div class="col-12">
+                                                                    <div class="card border shadow-none mb-0 bg-white">
+                                                                        <div class="card-header bg-soft-info py-2 px-3 border-bottom d-flex align-items-center justify-content-between">
+                                                                            <span class="fw-bold fs-12 text-dark">
+                                                                                <i class="feather-user text-info me-1"></i>Internal Employees ({{ $intCount }})
+                                                                            </span>
+                                                                            <span class="badge bg-white text-info border border-info font-monospace fs-10">
+                                                                                {{ format_currency($intHourlyCost) }}/hr &bull; {{ format_currency($intDailyCost) }}/day
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="card-body p-0">
+                                                                            <div class="table-responsive">
+                                                                                <table class="table table-sm table-hover align-middle mb-0 fs-11">
+                                                                                    <thead class="table-light">
+                                                                                        <tr>
+                                                                                            <th class="ps-3 py-1.5" style="width: 50%;">Employee</th>
+                                                                                            <th class="text-end py-1.5" style="width: 25%;">Hourly Cost</th>
+                                                                                            <th class="text-end pe-3 py-1.5" style="width: 25%;">Daily Salary</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody>
+                                                                                        @foreach($empDetails as $emp)
+                                                                                            <tr>
+                                                                                                <td class="ps-3 py-1.5">
+                                                                                                    <strong class="text-dark">{{ $emp['name'] }}</strong>
+                                                                                                    @if(!empty($emp['employee_code']))
+                                                                                                        <span class="text-muted font-monospace fs-10">[{{ $emp['employee_code'] }}]</span>
+                                                                                                    @endif
+                                                                                                </td>
+                                                                                                <td class="text-end font-monospace text-muted py-1.5">
+                                                                                                    {{ format_currency($emp['hourly_cost']) }}/hr
+                                                                                                </td>
+                                                                                                <td class="text-end font-monospace text-dark fw-semibold pe-3 py-1.5">
+                                                                                                    {{ format_currency($emp['daily_cost']) }}/day
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        @endforeach
+                                                                                    </tbody>
+                                                                                    <tfoot class="table-light border-top">
+                                                                                        <tr>
+                                                                                            <td class="ps-3 py-1.5 fw-bold text-dark">Subtotal ({{ $intCount }} staff):</td>
+                                                                                            <td class="text-end font-monospace text-info fw-bold py-1.5">{{ format_currency($intHourlyCost) }}/hr</td>
+                                                                                            <td class="text-end font-monospace text-info fw-bold pe-3 py-1.5">{{ format_currency($intDailyCost) }}/day</td>
+                                                                                        </tr>
+                                                                                    </tfoot>
+                                                                                </table>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="col-12">
+                                                                    <div class="py-2 px-3 rounded-2 bg-white border d-flex align-items-center justify-content-between fs-11">
+                                                                        <div class="d-flex align-items-center gap-2">
+                                                                            <span class="badge bg-soft-primary text-primary font-monospace px-1.5 py-0.5">
+                                                                                <i class="feather-users me-0.5"></i>0 Ext
+                                                                            </span>
+                                                                            <span class="text-muted"><strong class="text-dark">External Workers:</strong> No external contractors allocated to this batch</span>
+                                                                        </div>
+                                                                        <span class="text-muted font-monospace fs-11">{{ format_currency(0) }}/hr &bull; {{ format_currency(0) }}/day</span>
+                                                                    </div>
+                                                                </div>
+
+                                                            @else
+                                                                {{-- CASE 4: NEITHER HAS DATA --}}
+                                                                <div class="col-12">
+                                                                    <div class="py-3 px-3 rounded-2 bg-white border text-center text-muted fst-italic fs-11">
+                                                                        <i class="feather-alert-circle me-1 text-warning"></i>No internal employees or external contractors have been allocated to this manual batch yet.
+                                                                    </div>
+                                                                </div>
+                                                            @endif
+
+                                                            <!-- Full-Width Summary Banner -->
+                                                            <div class="col-12 mt-1">
+                                                                <div class="p-2.5 rounded-3 bg-white border d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle">
+                                                                            <i class="feather-dollar-sign"></i>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span class="fs-12 fw-bold text-dark d-block">Total Batch Labor Cost</span>
+                                                                            <span class="text-muted fs-11">
+                                                                                Shift: {{ $b['shift_name'] ?? 'N/A' }} ({{ format_hours($b['eff_hrs'] ?? 8) }} eff. hrs) &bull; Daily Cap: {{ number_format((float) ($b['daily_cap'] ?? 0), 1) }} units
+                                                                                @if(!empty($b['formula']))
+                                                                                    &bull; <span class="font-monospace text-muted fs-10" title="Daily Output Formula"><i class="feather-help-circle me-0.5"></i>{{ $b['formula'] }}</span>
+                                                                                @endif
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="d-flex align-items-center gap-4 flex-wrap">
+                                                                        <div>
+                                                                            <span class="text-muted fs-10 text-uppercase d-block">Hourly Burn</span>
+                                                                            <strong class="font-monospace fs-12 text-dark">{{ format_currency($totBatchHourly) }}/hr</strong>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span class="text-muted fs-10 text-uppercase d-block">Daily Labor Expense</span>
+                                                                            <strong class="font-monospace fs-12 text-dark">{{ format_currency($totBatchDaily) }}/day</strong>
+                                                                        </div>
+                                                                        @if($costPerUnit > 0)
+                                                                            <div class="border-start ps-3">
+                                                                                <span class="text-muted fs-10 text-uppercase d-block">Cost Per Unit Output</span>
+                                                                                <strong class="font-monospace fs-12 text-success">{{ format_currency($costPerUnit) }} / unit</strong>
+                                                                            </div>
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="text-center py-3 text-muted fst-italic">
+                                            <td colspan="5" class="text-center py-3 text-muted fst-italic">
                                                 No active manual production batches configured in this section.
                                             </td>
                                         </tr>
@@ -465,7 +925,6 @@
                                             </td>
                                             <td></td>
                                             <td class="text-end font-monospace text-dark">{{ number_format($dailyManualCap, 1) }} units/day</td>
-                                            <td></td>
                                         </tr>
                                     </tfoot>
                                 @endif
@@ -490,13 +949,15 @@
                                     <table class="table table-sm table-hover align-middle mb-0 fs-12">
                                         <thead class="table-light">
                                             <tr>
-                                                <th style="width: 18%">Employee</th>
-                                                <th style="width: 14%" class="text-end">Monthly CTC</th>
-                                                <th style="width: 14%" class="text-end">Daily Salary (CTC/30)</th>
-                                                <th style="width: 14%">Shift (Clock Hours)</th>
-                                                <th style="width: 14%" class="text-end">Hourly Salary Rate</th>
-                                                <th style="width: 12%" class="text-end">Daily Cost</th>
-                                                <th style="width: 14%">Formula</th>
+                                                <th style="width: 22%">Employee</th>
+                                                <th style="width: 16%" class="text-end">Monthly CTC</th>
+                                                <th style="width: 16%" class="text-end">Daily Salary (CTC/30)</th>
+                                                <th style="width: 16%">Shift (Clock Hours)</th>
+                                                <th style="width: 15%" class="text-end">Hourly Salary Rate</th>
+                                                <th style="width: 15%" class="text-end">
+                                                    Daily Cost
+                                                    <i class="feather-info text-muted ms-1 cursor-pointer" title="Daily Cost = Daily Salary (Monthly CTC / 30)" data-bs-toggle="tooltip"></i>
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -527,14 +988,14 @@
                                                     </td>
                                                     <td class="text-end font-monospace fw-bold text-dark">
                                                         {{ format_currency((float) ($emp['daily_cost'] ?? 0)) }}
-                                                    </td>
-                                                    <td class="font-monospace text-muted fs-11">
-                                                        {{ $emp['formula'] ?? '' }}
+                                                        @if(!empty($emp['formula']))
+                                                            <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $emp['formula'] }}"></i>
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="7" class="text-center py-3 text-muted fst-italic">
+                                                    <td colspan="6" class="text-center py-3 text-muted fst-italic">
                                                         No active internal employees assigned to this section.
                                                     </td>
                                                 </tr>
@@ -549,7 +1010,6 @@
                                                     <td></td>
                                                     <td class="text-end font-monospace text-primary">Avg {{ format_currency($avgInternalRate) }}/hr</td>
                                                     <td class="text-end font-monospace text-dark">{{ format_currency($dailyInternalCost) }}</td>
-                                                    <td></td>
                                                 </tr>
                                             </tfoot>
                                         @endif
@@ -573,13 +1033,15 @@
                                     <table class="table table-sm table-hover align-middle mb-0 fs-12">
                                         <thead class="table-light">
                                             <tr>
-                                                <th style="width: 20%">Pay Grade & Group</th>
-                                                <th style="width: 14%">Shift (Clock Hours)</th>
+                                                <th style="width: 24%">Pay Grade & Group</th>
+                                                <th style="width: 18%">Shift (Clock Hours)</th>
                                                 <th style="width: 10%" class="text-center">Workers</th>
-                                                <th style="width: 14%" class="text-end">Hourly Pay Grade</th>
-                                                <th style="width: 14%" class="text-end">Group Burn / hr</th>
-                                                <th style="width: 14%" class="text-end">Daily Cost</th>
-                                                <th style="width: 14%">Formula</th>
+                                                <th style="width: 16%" class="text-end">Hourly Pay Grade</th>
+                                                <th style="width: 16%" class="text-end">Group Burn / hr</th>
+                                                <th style="width: 16%" class="text-end">
+                                                    Daily Cost
+                                                    <i class="feather-info text-muted ms-1 cursor-pointer" title="Daily Cost = Workers × Hourly Rate × Shift Clock Hours" data-bs-toggle="tooltip"></i>
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -603,14 +1065,14 @@
                                                     </td>
                                                     <td class="text-end font-monospace fw-bold text-dark">
                                                         {{ format_currency((float) ($alloc['daily_cost'] ?? 0)) }}
-                                                    </td>
-                                                    <td class="font-monospace text-muted fs-11">
-                                                        {{ $alloc['formula'] ?? '' }}
+                                                        @if(!empty($alloc['formula']))
+                                                            <i class="feather-info text-muted ms-1 cursor-pointer" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $alloc['formula'] }}"></i>
+                                                        @endif
                                                     </td>
                                                 </tr>
                                             @empty
                                                 <tr>
-                                                    <td colspan="7" class="text-center py-3 text-muted fst-italic">
+                                                    <td colspan="6" class="text-center py-3 text-muted fst-italic">
                                                         No external contractor groups allocated to this section.
                                                     </td>
                                                 </tr>
@@ -624,7 +1086,6 @@
                                                     <td></td>
                                                     <td class="text-end font-monospace text-primary">Avg {{ format_currency($avgExternalRate) }}/hr</td>
                                                     <td class="text-end font-monospace text-dark">{{ format_currency($dailyExternalCost) }}</td>
-                                                    <td></td>
                                                 </tr>
                                             </tfoot>
                                         @endif
@@ -928,3 +1389,17 @@
         </div>
     </div>
 </div>
+
+<script>
+if (!window.batchCollapseSyncInitialized) {
+    window.batchCollapseSyncInitialized = true;
+    $(document).on('show.bs.collapse', '.batch-collapse-pane', function () {
+        var id = $(this).attr('id');
+        $('[data-bs-target="#' + id + '"]').attr('aria-expanded', 'true');
+    });
+    $(document).on('hide.bs.collapse', '.batch-collapse-pane', function () {
+        var id = $(this).attr('id');
+        $('[data-bs-target="#' + id + '"]').attr('aria-expanded', 'false');
+    });
+}
+</script>

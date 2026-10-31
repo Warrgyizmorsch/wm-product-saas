@@ -118,6 +118,19 @@ class WorkCenterController extends Controller
             ->groupBy('employee_id');
 
         $countdownEngine = app(CountdownCalculationEngine::class);
+
+        // Auto-process expired countdown if user opens/reloads page after timer elapsed
+        if ($workCenter->calculation_countdown_end_at 
+            && now()->gte($workCenter->calculation_countdown_end_at) 
+            && !empty($workCenter->pending_calculation_section_ids)
+            && !$workCenter->is_calculation_running
+        ) {
+            try {
+                $countdownEngine->recalculateNow($workCenter, triggerType: 'countdown_timer');
+                $workCenter->refresh();
+            } catch (\Throwable $e) {}
+        }
+
         $isCountdownActive = $countdownEngine->isCountdownActive($workCenter);
         $countdownRemainingSeconds = ($workCenter->calculation_countdown_end_at && $isCountdownActive)
             ? max(0, (int) now()->diffInSeconds($workCenter->calculation_countdown_end_at, false))
@@ -135,7 +148,7 @@ class WorkCenterController extends Controller
             'sections.externalWorkerAllocations.shift',
             'sections.employeeAssignments.employee.shift',
             'employeeAssignments.employee.shift',
-            'activityLogs' => fn($q) => $q->latest()->take(20),
+            'activityLogs' => fn($q) => $q->orderByDesc('id')->take(20),
         ]);
 
         return view('modules.production.work-centers.show', compact(

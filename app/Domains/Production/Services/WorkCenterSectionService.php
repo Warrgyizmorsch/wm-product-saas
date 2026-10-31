@@ -17,7 +17,13 @@ class WorkCenterSectionService
     public function __construct(
         private readonly WorkCenterSectionRepositoryInterface $repository,
         private readonly SectionCalculationService $calculationService,
+        private readonly ?CountdownCalculationEngine $countdownEngine = null,
     ) {}
+
+    private function getCountdownEngine(): CountdownCalculationEngine
+    {
+        return $this->countdownEngine ?? app(CountdownCalculationEngine::class);
+    }
 
     public function create(WorkCenterSectionDTO $dto, int $tenantId): WorkCenterSection
     {
@@ -50,11 +56,9 @@ class WorkCenterSectionService
             }
 
             $fresh = $section->fresh(['workCenter', 'machines']);
-            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on section creation.
-            // $this->calculationService->calculateAndSave($fresh);
-            // if ($workCenter) {
-            //     app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
-            // }
+            if ($workCenter) {
+                $this->getCountdownEngine()->triggerCountdown($workCenter, $fresh->id);
+            }
 
             return $fresh;
         });
@@ -96,11 +100,9 @@ class WorkCenterSectionService
             }
 
             $fresh = $updated->fresh(['workCenter', 'machines']);
-            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on section edit.
-            // $this->calculationService->calculateAndSave($fresh);
-            // if ($workCenter) {
-            //     app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
-            // }
+            if ($workCenter) {
+                $this->getCountdownEngine()->triggerCountdown($workCenter, $fresh->id);
+            }
 
             return $fresh;
         });
@@ -146,11 +148,9 @@ class WorkCenterSectionService
             ]);
 
             $fresh = $updated->fresh(['workCenter', 'machines']);
-            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on manual production update.
-            // $this->calculationService->calculateAndSave($fresh);
-            // if ($fresh->workCenter) {
-            //     app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
-            // }
+            if ($fresh->workCenter) {
+                $this->getCountdownEngine()->triggerCountdown($fresh->workCenter, $fresh->id);
+            }
 
             return $fresh;
         });
@@ -185,11 +185,17 @@ class WorkCenterSectionService
             // 4. Delete the section (soft delete)
             $deleted = $this->repository->delete($id);
 
-            // 5. Recalculate parent work center
-            // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on section delete.
-            // if ($deleted && $workCenter) {
-            //     app(WorkCenterCalculationService::class)->calculateAndSave($workCenter);
-            // }
+            // 5. Track deleted section in pending queue and trigger countdown on parent work center
+            if ($deleted && $workCenter) {
+                $pending = is_array($workCenter->pending_calculation_section_ids) ? $workCenter->pending_calculation_section_ids : [];
+                if (!in_array((int) $id, $pending, true)) {
+                    $pending[] = (int) $id;
+                }
+                $workCenter->pending_calculation_section_ids = array_values(array_unique($pending));
+                $workCenter->save();
+
+                $this->getCountdownEngine()->triggerCountdown($workCenter, (int) $id);
+            }
 
             return (bool) $deleted;
         });

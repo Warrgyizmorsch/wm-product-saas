@@ -21,6 +21,11 @@ Schedule::command('billing:reconcile-subscriptions')
     ->hourly()
     ->withoutOverlapping();
 
+// Process expired Work Center calculation debounce countdowns.
+Schedule::command('production:process-calculation-countdowns')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 Artisan::command('fcm:test {target : User ID, Email, or FCM registration token} {--title=MossiERP Push Notification Test} {--message=Firebase Cloud Messaging is active and working! 🚀}', function ($target) {
     $this->info("Checking Firebase configuration...");
 

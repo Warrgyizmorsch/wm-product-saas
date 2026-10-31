@@ -23,7 +23,7 @@ All items will be queued here and implemented together in a clean batch once rev
 | ID | Title / Area | Status | Impacted Files |
 | :--- | :--- | :--- | :--- |
 | **ISSUE-01** | Rename "Tariff Rate" to "Energy Rate" in Modal & Machine Views | **Applied** | `section-calculation-modal.blade.php`, `machines/create.blade.php`, `machines/edit.blade.php` |
-| **ISSUE-02** | Unexpected Auto-Calculation & Audit Log on GET Page Load | **Unsolved / On Hold** (Temp Disabled for Testing — Final Decision Pending) | `section-calculation-modal.blade.php`, `WorkCenterController.php` |
+| **ISSUE-02** | Calculation Lifecycle, Debounce Countdown Engine & Mutating Triggers Architecture | **Applied & Verified** | `CountdownCalculationEngine.php`, `WorkCenterSectionService.php`, `MachineService.php`, `show.blade.php`, `routes/console.php` |
 | **ISSUE-03** | Section Details Modal (Machines Tab): Total Operating Cost Shows $0.00/hr When Uncalculated While Capacity Shows Sum | **Applied** | `show.blade.php` |
 | **ISSUE-04** | Main Section Row & Capacity Popover: Remove Ad-hoc Database Fallbacks — Strictly Source from Calculation Table | **Applied** | `show.blade.php` |
 | **ISSUE-05** | Section Details Modal (Manual Batches Tab): Missing Table Footer / Total Row for Target Rate & Allocated Workforce | **Applied** | `show.blade.php` |
@@ -33,7 +33,7 @@ All items will be queued here and implemented together in a clean batch once rev
 | **ISSUE-09** | Main Section Row: Daily Operating Cost Column Missing Matching Hover Breakdown Popover | **Applied** | `show.blade.php` |
 | **ISSUE-10** | Manual Batch Output Dilution (Active Speed Omitted to Prevent Redundancy & Confusion) | **Applied** | `show.blade.php`, popovers & modals |
 | **ISSUE-11** | Canonical Keys & UI Consistency (Terminology: Hourly Capacity; Reconciliation Tooltip) | **Applied** | `section-calculation-modal.blade.php`, `SectionCalculationService.php` |
-| **ISSUE-12** | Section Calculation Modal: Manual Batches Tab UI Overhaul | **On Hold** (Per user directive pending frontend overhaul guidance) | `section-calculation-modal.blade.php` |
+| **ISSUE-12** | Section Calculation Modal: Manual Batches Tab Internal & External Workforce Display | **Applied** | `section-calculation-modal.blade.php` |
 | **ISSUE-13** | Section Calculation Modal: External HRMS Shift Resolution & Warning Badge | **Applied** | `section-calculation-modal.blade.php`, `SectionCalculationService.php` |
 | **ISSUE-14** | Format Time/Hours Consistently Across Modals & Views via `format_hours()` (`16.30 hrs` vs raw `.5`) | **Applied** | `section-calculation-modal.blade.php`, `show.blade.php`, `SectionCalculationService.php`, `helpers.php` |
 | **ISSUE-15** | Section Calculation Modal: Timeline Intervals Not Generated for Unstaffed / Machine-Only Sections | **Applied** | `SectionCalculationService.php` |
@@ -57,7 +57,7 @@ All items will be queued here and implemented together in a clean batch once rev
 
 ### ISSUE-01: Ambiguous "Tariff Rate" Label in Section Modal & Machine Views
 * **Date Logged:** 2026-10-27
-* **Status:** Queued for Batch Implementation
+* **Status:** **Applied**
 * **Reported By:** User
 * **Area:** Machine Operating Expense & Section Breakdown Modal
 
@@ -83,38 +83,115 @@ In the Section Calculation Breakdown Modal (`Machines & Energy` tab), the table 
 
 ---
 
-### ISSUE-02: Unexpected Auto-Calculation & Audit Log on GET Page Load
-* **Date Logged:** 2026-10-27
-* **Status:** Unsolved / On Hold (Temporarily disabled for testing — final decision pending)
+### ISSUE-02: Calculation Lifecycle, Debounce Countdown Engine & Mutating Triggers Architecture
+* **Date Logged:** 2026-10-27 (Architecture finalized & applied: 2026-10-31)
+* **Status:** **Applied & Verified**
 * **Reported By:** User
-* **Area:** View Rendering & Calculation Lifecycle (`section-calculation-modal.blade.php`)
+* **Area:** Calculation Lifecycle, Event Triggers, Debounce Engine & View Rendering (`CountdownCalculationEngine.php`, `WorkCenterSectionService.php`, `WorkCenterService.php`, `ExternalWorkerAllocationController.php`, `WorkCenterEmployeeController.php`, `MachineController.php`, `show.blade.php`, `routes/console.php`)
 
-> **Testing Status Note:** Auto-calculation was temporarily disabled/commented out during audit testing (in `section-calculation-modal.blade.php` and `WorkCenterController.php`) to keep GET requests read-only. However, this issue is marked as **Unsolved / On Hold** because this was only a temporary testing measure; the final architectural decision on whether and how auto-calculation should behave across the application lifecycle will be made later.
+#### 1. Core Lifecycle Rules & Behavioral Invariants
+1. **Work Center Creation (`WorkCenterService::create`)**:
+   - Creating a Work Center performs zero calculations, generates zero snapshots, and writes zero calculation audit logs.
+2. **Page Load / View Rendering (`GET /production/work-centers/{id}`)**:
+   - HTTP GET requests remain strictly read-only.
+   - If no snapshot has been calculated yet, the UI displays the amber `Calculation Pending` badge / empty state. No database mutation or calculation is ever triggered on page load.
+3. **Section Creation (`WorkCenterSectionService::create`)**:
+   - When a Section is created, the debounce countdown timer is armed for that Work Center (`triggerCountdown($workCenter, $sectionId)`).
+   - Sets `calculation_countdown_end_at = now() + duration_minutes` and queues the Section ID in `pending_calculation_section_ids`.
+   - The page displays the Active Countdown Banner with live ticking seconds.
+4. **Subsequent Asset Changes (Section Edit, Machine Assigned/Edited, Batch Created/Updated, Workforce Allocated, Shifts Changed)**:
+   - All subsequent mutating events append the affected Section ID to `pending_calculation_section_ids` **without resetting the timer**.
+   - Zero immediate calculations are fired during asset edits, preventing multi-edit audit log spam.
+5. **Debounce Configuration Lockout while Timer is Actively Ticking**:
+   - While `isCountdownActive() === true`, the Debounce duration button is disabled on the UI and locked out in the modal.
+   - On the backend, `CountdownCalculationEngine::updateCountdownDuration()` throws `InvalidArgumentException` if a countdown timer is actively running, preventing mid-countdown changes.
+6. **Timer Expiration & Background Execution**:
+   - When the countdown timer completes (via the browser JS ticker, page reload, or the cron schedule `php artisan production:process-calculation-countdowns`):
+     * All pending queued sections are calculated in a single unified batch (`batch_id`).
+     * The parent Work Center rollup calculation is executed and recorded with `trigger_type = 'countdown_timer'`.
+     * Countdown state resets: `calculation_countdown_end_at = null` and `pending_calculation_section_ids = []`.
+7. **Immediate Calculation Guarantee**:
+   - The **ONLY** time an immediate calculation is executed is when an authorized user explicitly clicks:
+     * `[⚡ Recalculate]` button in the Work Center header, OR
+     * `[⚡ Recalculate Now]` button on the Active Countdown Banner.
+   - These fire `recalculateNow($workCenter, 'manual')`, immediately processing all pending sections and bypassing any remaining wait time.
 
-#### 1. Issue Description
-When a user opened or refreshed the Work Center page (`GET /production/work-centers/1`) right after clearing calculation tables or running a seeder, new entries appeared in the Activity & Audit History log saying:
-`Section calculation completed for CNC Milling & High-Speed Machining... (manual)`
-even though the user had NOT clicked "Recalculate" and before any terminal command was authorized.
+#### 2. Comprehensive Audit of Create, Edit & Save Buttons
+A full audit of all controllers and forms confirmed that **zero Save, Create, or Edit buttons trigger immediate calculations**:
+* `WorkCenterController::store()` / `update()` &rarr; Saves Work Center record; does NOT fire calculation.
+* `WorkCenterSectionController::store()` / `update()` / `destroy()` &rarr; Saves Section record; previously had immediate calculation commented out. Will now cleanly arm/append to the countdown timer.
+* `SectionManualProductionController::store()` / `update()` / `toggleActive()` / `destroy()` &rarr; Saves batch record; calls `countdownEngine->onSectionModified()`.
+* `ExternalWorkerAllocationController::store()` / `updateQuantity()` / `toggleStatus()` / `destroy()` &rarr; Saves contractor allocation; does NOT fire calculation. Will now trigger countdown.
+* `WorkCenterEmployeeController::store()` / `toggleStatus()` / `destroy()` &rarr; Saves employee assignment; does NOT fire calculation. Will now trigger countdown.
+* `MachineController::store()` / `update()` / `destroy()` &rarr; Saves machine record; does NOT fire calculation. Will now trigger countdown if machine belongs to a section.
+* **Conclusion**: ONLY explicit `[⚡ Recalculate]` and `[⚡ Recalculate Now]` buttons execute immediate synchronous calculations.
 
-#### 2. Reason / Root Cause
-In `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php` (lines 22-25), the Blade template contains an inline mutation fallback:
-```blade
-@php
-    $secCalc = $section->latestCalculation;
-    if (!$secCalc) {
-        $secCalc = app(\App\Domains\Production\Services\SectionCalculationService::class)->calculateAndSave($section, 'manual');
-    }
-@endphp
-```
-Whenever `$section->latestCalculation` is null, simply rendering the page executes `calculateAndSave($section, 'manual')`, which inserts records into `production_work_center_section_calculations` and immediately triggers `WorkCenterActivityLogger->logSectionCalculationCompleted()`. This creates unexpected audit entries and performs database writes during a read-only HTTP GET request.
+#### 3. Identified Gaps & Implementation Blueprint
+1. **JavaScript Ticker HTML ID Mismatch (`show.blade.php`)**:
+   - Element has `id="countdownTimerDisplay"` (camelCase at line 465), while JS ticker was selecting `$('#countdown-timer-display')` (kebab-case at line 7068). Aligning both to `countdownTimerDisplay`.
+2. **Missing `onSectionModified()` Method (`CountdownCalculationEngine.php`)**:
+   - Add `onSectionModified(WorkCenterSection $section, string $event, ?int $entityId = null)` helper method to `CountdownCalculationEngine` so calls from `SectionManualProductionController` successfully queue the section and arm the countdown instead of silently catching an undefined method error.
+3. **Re-Enable Engine Logic & Wire Services**:
+   - In `CountdownCalculationEngine.php`: Uncomment `isCountdownActive()` and `triggerCountdown()`.
+   - In `WorkCenterSectionService.php`: Call `$this->countdownEngine->triggerCountdown($workCenter, $sectionId)` in `create()`, `update()`, `updateManualProduction()`, and `delete()`.
+   - In `WorkCenterService.php`: Call countdown engine in `update()`.
+   - In `ExternalWorkerAllocationService.php` & `WorkCenterEmployeeService.php`: Trigger countdown on the parent Work Center when allocations or assignments are updated.
+   - In `MachineService.php`: Trigger countdown when a machine assigned to a section is updated.
+4. **Console Schedule Registration (`routes/console.php`)**:
+   - Register `Schedule::command('production:process-calculation-countdowns')->everyMinute()->withoutOverlapping()` so expired countdowns across all tenants are automatically processed by Laravel's background worker.
+5. **Page Reload Auto-Process Safety (`WorkCenterController::show`)**:
+   - If a user opens/reloads the page after the countdown end time has elapsed (`now() >= calculation_countdown_end_at`), automatically execute the pending calculation so the user instantly sees fresh numbers even if the background cron has a slight delay.
+6. **Frontend Auto-Recalculate Form (`show.blade.php`)**:
+   - Fixed JS ticker ID (`#countdownTimerDisplay`) and wired an auto-submitting form (`#autoCountdownRecalculateForm`) that fires `recalculateNow` as soon as the client-side countdown timer hits `00:00`.
+7. **`$eventType` Parameter Fix (`CountdownCalculationEngine.php`)**:
+   - Fixed fatal parameter exception on worker allocation/employee modals by updating `$this->activityLogger->log()` calls to `$this->activityLogger->logResourceChange()`.
+8. **Real-time AJAX Banner Sync without Page Refresh (`show.blade.php`)**:
+   - Wrapped the countdown banner in `#countdownBannerContainer` with `data-remaining-seconds`.
+   - Implemented `syncCountdownBannerFromHtml($newDoc)` and connected it to the AJAX completion hooks of both `Section Personnel Modal` and `Work Center Employees Modal`.
+   - The banner and ticker now appear and start ticking immediately upon saving worker allocations without requiring an F5 page refresh.
+9. **Deterministic Activity Log Sequencing (`WorkCenter.php`, `show.blade.php`)**:
+   - Work Center calculations strictly execute and persist *after* all section calculations in `WorkCenterCalculationService::calculateAndSave()`.
+   - Fixed apparent out-of-order log entries caused by MySQL `created_at DESC` timestamp ties by enforcing `orderByDesc('id')` across the `activityLogs()` relationship and in `show.blade.php`.
+10. **Strict Calculation Snapshot Audit Logging (`CountdownCalculationEngine.php`)**:
+   - Removed all intermediate event logging (`calculation_queued`, `countdown_started`, `countdown_duration_updated`) from `CountdownCalculationEngine`.
+   - Purged clutter event logs from the database so `production_work_center_activity_logs` is strictly reserved for genuine completed calculation snapshots (`Section Calc` and `WC Rollup`), eliminating fake `#1` snapshot links.
+11. **Top Header Action Toolbar Countdown Pill (`show.blade.php`)**:
+   - Added `#topBarCountdownTimerBadge` (`<span id="topCountdownTimerDisplay">`) directly in the top action toolbar beside `Debounce` and `Recalculate`.
+   - Automatically synchronizes with the main body banner, ticking in real-time when active and hiding when inactive.
+12. **Section Code Badges in Countdown Banner (`show.blade.php`)**:
+   - Replaced raw database IDs (`SEC #1`, `SEC #2`, `SEC #7`) in the Active Countdown Banner with clean, human-readable Section Codes (e.g., `SEC-CNC-01`, `SF`, `WAF`).
+13. **Inactive & Deleted Section Lifecycle (Track in Batch & Banner, Exclude from Calculation Values)**:
+   - **Tracking**:
+     - Inactive and soft-deleted sections are retained and tracked in `pending_calculation_section_ids` via `CountdownCalculationEngine::triggerCountdown()` using `WorkCenterSection::withTrashed()`.
+     - When a section is deleted, `WorkCenterSectionService::delete()` enqueues the section ID and arms the countdown timer so the pending deletion is tracked.
+     - The Active Countdown Banner displays badges for inactive (`[SEC-01] (Inactive)`) and deleted (`[SEC-01] (Deleted)`) sections.
+     - When the batch runs (recalculate now or timer expiry), the deleted and inactive section IDs are preserved in `impacted_section_ids` and tied to the unified `batch_id`.
+   - **Calculation Isolation (Values Strictly NOT Calculated)**:
+     - `WorkCenterCalculationService::calculateAndSave()` strictly resolves active, non-deleted sections for rollup calculations; deleted and inactive sections contribute 0 to capacity, labor costs, machine costs, and operating hours.
+     - `SectionCalculationService::calculate()` guards against `!$section->isActive() || $section->trashed()`, immediately returning 0.0 values with clear explanatory details.
+     - `SectionCalculationService::calculateAndSave()` throws an exception if invoked on a trashed section.
+     - In the main sections table (`show.blade.php`), inactive sections display `0.0 units/day` and `$0.00/day` with an `(Inactive)` pill and explanatory popover, preventing stale active snapshot values from leaking.
+14. **Human-Readable Sequential Snapshot Numbering (`snapshot_number` across all models & UI)**:
+   - Added sequential `snapshot_number` column (indexed with custom short names) to `production_work_center_calculations`, `production_work_center_section_calculations`, and `production_work_center_activity_logs`.
+   - Automatically scoped per Work Center and per Section (`#1, #2, #3...`) in `WorkCenterCalculationService`, `SectionCalculationService`, and `WorkCenterActivityLogger`.
+   - Replaced raw MySQL auto-increment primary keys everywhere in the UI: activity logs table, tab activity table, full logs modal, WC metric header, and calculation breakdown modals.
 
-#### 3. Agreed Solution
-1. Remove `calculateAndSave()` from the Blade view. View templates must remain strictly read-only.
-2. If `$section->latestCalculation` is null, initialize `$secCalc = null` and display a clean "Not Calculated Yet — Please click Recalculate" badge/empty-state in the modal instead of running an unprompted calculation.
-3. Calculations must only be executed through explicit user actions (clicking the "Recalculate" button) or controlled background schedulers (countdown timer / artisan commands).
+#### 4. Verification Results
+* **Syntax Linting**: All modified PHP files (`CountdownCalculationEngine.php`, `WorkCenterSectionService.php`, `WorkCenterService.php`, `MachineController.php`, `WorkCenterEmployeeController.php`, `ExternalWorkerAllocationController.php`, `WorkCenterController.php`, `WorkCenter.php`, `routes/console.php`) pass syntax linting with 0 errors.
+* **Console Command**: `php artisan production:process-calculation-countdowns` ran successfully with exit code 0.
+* **View Rendering Verification**: Executed `test_view.php` against live database rendering `show.blade.php` &rarr; returned **HTTP 200 OK (Content Length: 2,236,787 bytes)** with all accordion rows, contractor badges, banner sync hooks, and countdown tickers functional.
 
-#### 4. Files to Modify (During Batch)
-* `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php`
+#### 5. Impacted Files
+* `app/Domains/Production/Services/CountdownCalculationEngine.php`
+* `app/Domains/Production/Models/WorkCenter.php`
+* `app/Domains/Production/Services/WorkCenterSectionService.php`
+* `app/Domains/Production/Services/WorkCenterService.php`
+* `app/Domains/Production/Services/ExternalWorkerAllocationService.php`
+* `app/Domains/Production/Services/WorkCenterEmployeeService.php`
+* `app/Domains/Production/Services/MachineService.php`
+* `app/Domains/Production/Controllers/WorkCenterController.php`
+* `resources/views/modules/production/work-centers/show.blade.php`
+* `routes/console.php`
 
 ---
 
@@ -142,7 +219,7 @@ In `resources/views/modules/production/work-centers/show.blade.php` (lines 2110�
 
 ### ISSUE-04: Main Section Row & Capacity Popover: Remove Ad-hoc Database Fallbacks — Strictly Source from Calculation Table
 * **Date Logged:** 2026-10-27
-* **Status:** Queued for Batch Implementation
+* **Status:** **Applied**
 * **Reported By:** User
 * **Area:** Section Row &rarr; Daily Capacity & Operating Cost Columns + Hover Popover (`resources/views/modules/production/work-centers/show.blade.php`)
 
@@ -187,7 +264,7 @@ $totalHourlyCap= (float) ($totals['total_hourly_capacity'] ?? $capPerHour);
 
 ### ISSUE-05: Section Details Modal (Manual Batches Tab): Missing Table Footer / Total Row for Target Rate & Allocated Workforce
 * **Date Logged:** 2026-10-27
-* **Status:** Queued for Batch Implementation
+* **Status:** **Applied**
 * **Reported By:** User
 * **Area:** Section Details Modal (`#sectionDetailsModal_{id}`) &rarr; Manual Batches Tab (`#sec-batches-pane-{id}`)
 
@@ -262,6 +339,22 @@ In `resources/views/modules/production/work-centers/show.blade.php`:
      > *"Calculation Pending: Initial calculation snapshot has not been generated yet. Values will update upon recalculation."*
 3. **Removed Ad-hoc Fallbacks**:
    - Hourly machine capacity and machine cost now strictly evaluate to `0.0` when uncalculated, preventing live machine numbers from bleeding into an uncalculated breakdown.
+4. **Purpose & Operational Notes Placement**:
+   - Moved the Section Purpose & Operational Notes card directly below the Top 4 KPI Cards and above the tab navigation bar.
+5. **Cost & Capacity Tab Overhaul (Columns 7 to 22 Direct Sourcing)**:
+   - Replaced flat ad-hoc text list with two structured 3-column comparative tables (`Component/Source`, `Daily`, `Hourly`):
+     * **Operating Cost Breakdown (Cols 13–22)**:
+       - Row 1: Internal Labor (`total_daily_internal_labor_cost` [16] & `internal_labor_cost_per_hour` [15])
+       - Row 2: External Workforce (`total_daily_external_labor_cost` [18] & `external_labor_cost_per_hour` [17])
+       - Row 3: Total Labor Subtotal (`total_daily_labor_cost` [14] & `labor_cost_per_hour` [13])
+       - Row 4: Machinery Expense (`total_daily_machine_cost` [20] & `machine_cost_per_hour` [19])
+       - Footer: Total Daily Operating Cost (`total_daily_operating_cost` [22] & `total_operating_cost_per_hour` [21])
+     * **Capacity Breakdown (Cols 7–12)**:
+       - Row 1: Machinery Output (`daily_machine_capacity` [10] & `hourly_machine_capacity` [9])
+       - Row 2: Manual Batches (`daily_manual_capacity` [12] & `hourly_manual_capacity` [11] with explanatory tooltip)
+       - Row 3: Active Operating Window (`unique_operating_hours` [23] / net schedule)
+       - Row 4: Unit Production Cost (Derived: Total Cost / Total Units)
+       - Footer: Total Section Capacity (`daily_capacity` [8] & `capacity_per_hour` [7])
 
 #### 4. Impacted Files
 * `resources/views/modules/production/work-centers/show.blade.php`
@@ -270,7 +363,7 @@ In `resources/views/modules/production/work-centers/show.blade.php`:
 
 ### ISSUE-07: Section Details Modal: Shifts & Schedule Missing Footer Total & Operating Window KPI Fallback
 * **Date Logged:** 2026-10-27
-* **Status:** Queued for Batch Implementation
+* **Status:** **Applied**
 * **Reported By:** User
 * **Area:** Section Details Modal (`#sectionDetailsModal_{id}`) &rarr; Shifts & Schedule Tab (`#sec-shifts-pane-{id}`) + Top KPI Card
 
@@ -299,7 +392,7 @@ In `resources/views/modules/production/work-centers/show.blade.php`:
 
 ### ISSUE-08: WorkCenterCalculationService: Fix `operating_hours` Typo to `operating_timeline` for Shift Extraction
 * **Date Logged:** 2026-10-27
-* **Status:** Queued for Batch Implementation
+* **Status:** **Applied**
 * **Reported By:** Code Audit
 * **Area:** `app/Domains/Production/Services/WorkCenterCalculationService.php` (line 66)
 
@@ -328,7 +421,7 @@ $secShifts = $secCalc['calculation_details']['operating_timeline']['shifts']
 
 ### ISSUE-09: Main Section Row: Daily Operating Cost Column Missing Matching Hover Breakdown Popover
 * **Date Logged:** 2026-10-27
-* **Status:** Queued for Batch Implementation
+* **Status:** **Applied**
 * **Reported By:** User
 * **Area:** Main Section Table Row &rarr; Daily Operating Cost Column (`resources/views/modules/production/work-centers/show.blade.php`)
 
@@ -427,69 +520,58 @@ After recalculating, the section-wide average manual speed displays as **26.7 u/
 
 ---
 
-### ISSUE-12: Section Calculation Modal: Manual Batches Tab UI Overhaul
+### ISSUE-12: Section Calculation Modal: Manual Batches Tab Internal & External Workforce Display & Cost Breakdown Inline Accordion Row
 * **Date Logged:** 2026-10-28
-* **Status:** **On Hold** *(Per user directive: User requested to focus on consistency first; user will guide full frontend changes and redesign later)*
-* **Reported By:** User (via Manual Batches snapshot screenshot)
-* **Area:** Section Calculation Breakdown Modal (`Manual Batches` tab)
+* **Status:** **Applied**
+* **Reported By:** User (via Manual Batches snapshot screenshot & UI reference photos)
+* **Area:** Section Calculation Breakdown Modal (`Manual Batches` tab) & `SectionCalculationService.php`
 
-#### 1. Issue Description
-When viewing the **Manual Batches (1)** tab in the Section Calculation Breakdown Modal:
-1. **Missing Row Values**:
-   - **`Hourly Speed`** displayed **`0.0 u/h`**, despite the calculation formula right beside it showing `Batch speed (55.00 units/hr)` and the top summary bar showing `Peak Concurrent Output: 55.0 units/hr`.
-   - **`Shift Eff. Hours`** displayed **`0.0 hrs`**, despite the calculation formula showing `Shift effective hours (8.00 hrs)`.
-   - **`Daily Output`** displayed **`0.0 units`**, despite the calculation formula showing `= 440.00 units/day` and the footer displaying `440.0 units/day`.
-   - **Subtitle under batch name `gello`** displayed **`0 internal emps`**, despite internal employee `Rajesh Sharma` being assigned to this batch.
-2. **Hidden Workforce / Missing Contractor Information**:
-   - The batch `gello` has **2 external contractors** allocated (`2x Grade B - Skilled Welder & Technician`), stored in the calculation snapshot under `contractor_allocations`.
-   - The modal table has **no display, column, or pill for contractor allocations**, completely hiding the 2 external workers performing manual production.
-   - The subtitle only displays `<small>{{ count(...) }} internal emps</small>`, hiding specific employee names (`Rajesh Sharma`).
-3. **Redundant / Space-Wasting Column (`Calculation Formula`)**:
-   - The table dedicates **27% of its width** to a `Calculation Formula (English)` text column that prints:
-     `Batch speed (55.00 units/hr) x Shift effective hours (8.00 hrs) = 440.00 units/day`
-   - All three variables in this string already exist in the adjacent columns in the exact same row (`Hourly Speed`, `Shift Eff. Hours`, `Daily Output`).
-   - This formula column consumes significant table real estate while critical workforce information (assigned employees and contractor allocations) is squeezed into an incomplete subtitle.
-4. **Header vs. Footer Metric Semantic Mismatch**:
-   - The column header is **`HOURLY SPEED`**, showing the active batch production rate (**`55.0 u/h`** during its 8-hour shift).
-   - Directly underneath in the table footer, it displays **`Avg 26.7 u/h`** (the 24-hour section-wide time-weighted average diluted across the entire 16.5-hour section operating window).
-   - Having a footer of `Avg 26.7 u/h` under a single row of `55.0 u/h` without clear distinguishing labels makes users perceive the footer as mathematically incorrect.
-5. **Empty Footer Cells**:
-   - The footer leaves empty `<td></td>` cells under `Shift Eff. Hours` and `Calculation Formula`, missing an opportunity to show shift operating hours or total workforce summary.
+#### 1. Issue Description & User Requirements
+1. **Vertical Space & Row Bloat**: Stacking multiple external contractor allocation badges under the batch name caused rows with many allocations (e.g. 5 allocations totaling 29 workers in `kurta`) to expand vertically, distorting table spacing and visual balance.
+2. **Missing Granular Batch Labor Costing**: The table displayed capacity numbers but lacked the granular cost breakdown separating internal employee labor expense from external contractor expense for each specific batch.
+3. **User Clarified UX (Photos 2 & 3 - Accordion Expand/Collapse)**:
+   - Floating popup dropdowns overlapped adjacent table columns inside the modal.
+   - The user provided reference screenshots demonstrating an inline expandable/collapsible accordion sub-row pattern:
+     * A compact batch row with an expand button on the left showing a right-pointing chevron (`>`).
+     * Next to it, the batch name and compact workforce count pills (`X Emp` and `Y Ext`).
+     * When toggled, the chevron button smoothly rotates downwards (`v`), and an inline accordion row (`<tr><td colspan="6">...</td></tr>`) expands downwards directly beneath the batch row.
+     * The expanded container displays a clean 2-column card layout:
+       - **Internal Employees** (left): names, employee codes, hourly costs, daily salaries, and subtotal.
+       - **External Contractors** (right): pay grade names, worker headcounts, rates, hourly burns, daily costs, and subtotal.
+       - **Labor Expense Summary Banner** (bottom): total batch hourly burn, daily expense, and cost per unit output.
 
-#### 2. Root Cause Analysis
-1. **Field Name Mismatches in Snapshot Data (Addressed in ISSUE-11)**:
-   - Blade looked for `$b['capacity_per_hour']`, `$b['shift_effective_hours']`, `$b['daily_output']`, and `$b['assigned_employees']`.
-   - The snapshot stored `$b['cap_hr']`, `$b['eff_hrs']`, `$b['daily_cap']`, and `$b['team_members']`.
-2. **UI Design Omission for Contractors**:
-   - In manual production, batches can be staffed by internal employees, external contractors, or both.
-   - The calculation service correctly collects and stores `$allocSummary` (e.g. `['2x Grade B - Skilled Welder & Technician']`) into `$item['contractor_allocations']`.
-   - However, the Blade template was never coded to render `$b['contractor_allocations']`, rendering contractors completely invisible in this view.
-3. **Formula Text Redundancy**:
-   - The 6-column layout included `Calculation Formula (English)` as a dedicated column, which duplicates arithmetic and pushes out useful resource details.
+#### 2. Implemented Solution
+1. **Enhanced `SectionCalculationService::calculateSectionManualBatches()`**:
+   - Computes exact labor costs for each manual batch:
+     * **Internal Employees**: Monthly salary CTC / 30 / shift clock hours &rarr; `$empHourlyRate`, `$empDailyCost`.
+     * **External Contractors**: Headcount × pay grade rate &rarr; `$allocHourlyBurn`, `$allocDailyCost` (full shift clock duration).
+     * **Batch Totals**: `internal_hourly_cost`, `internal_daily_cost`, `external_hourly_cost`, `external_daily_cost`, `total_batch_hourly_cost`, `total_batch_daily_cost`, and `cost_per_unit`.
+     * Stores granular employee and allocation arrays (`internal_employees_details`, `external_contractors_details`) directly in the calculation snapshot payload.
+2. **Inline Accordion Row UI (`section-calculation-modal.blade.php`)**:
+   - Compact batch row featuring:
+     * A dedicated `.batch-expand-btn` styled with primary background in collapsed state and rotating chevron animation.
+     * Batch name and compact workforce badges: `X Emp` (`bg-soft-info`) and `Y Ext` (`bg-soft-primary`).
+     * Standard metrics: Assigned Shift, Hourly Capacity, Shift Eff. Hours, Daily Output, and English Formula.
+   - Collapsible sub-row (`<tr class="batch-detail-row"><td colspan="6"><div class="collapse batch-collapse-pane">`):
+     * **Left Card**: Internal Employees table with individual employee names, codes, hourly costs, daily salaries, and subtotal.
+     * **Right Card**: External Workers table with headcounts, pay grades, rates, hourly burns, daily costs, and subtotal.
+     * **Footer Banner**: Full-width card with total hourly burn, daily expense, shift details, and cost per unit output.
+   - Includes graceful live fallback for older historical snapshots.
+3. **Adaptive Zero-Data Layout**:
+   - When a batch has zero internal employees (or zero contractors), the empty category collapses into a sleek 1-line status banner (`0 Emp | Internal Employees: No salaried staff assigned to this batch — $0.00/hr • $0.00/day`, ~34px high).
+   - The active category expands across full width (`col-12`) with 4 spacious tabular columns (`Allocation/Pay Grade`, `Hourly Rate`, `Hourly Burn`, `Daily Cost`), completely eliminating empty 400px white boxes.
+4. **Formula Column Optimization**:
+   - Replaced wide dedicated formula columns across the Manual Batches table and personnel labor tables with discrete `(i)` info tooltips on Daily Output and Daily Cost.
+5. **Manual Production Setup Toolbar Shift Code Badges**:
+   - In the batch toolbar of the Manual Production Setup modal, added shift code badges beside batch names (`[ ✏️ gello | MRN | 55 u/h | Active ]`).
+6. **Event Listeners & Sync (`show.blade.php`)**:
+   - Integrated Bootstrap 5 collapse event delegation to handle toggle animations and sync `aria-expanded` attributes on triggers.
 
-#### 3. Proposed Solutions (Awaiting User Acceptance & Confirmation)
-
-##### Option A: Modern High-Density Table with Dedicated Workforce Column (Recommended)
-1. **Replace the redundant `Calculation Formula` column with a `Workforce & Team Allocation` column**:
-   - Instead of dedicating 27% width to repeating arithmetic, display the active workforce:
-     - **Internal Staff**: `<span class="badge bg-soft-info text-info"><i class="feather-user me-1"></i>Rajesh Sharma</span>`
-     - **External Contractors**: `<span class="badge bg-soft-primary text-primary"><i class="feather-users me-1"></i>2x Grade B (Welder)</span>`
-   - Move the formula string to a hover tooltip on the `Daily Output` number (e.g., *Title: "55.0 u/h × 8.0 hrs = 440.0 units"*).
-2. **Clarify Batch Shift Speed vs. Section Average in Header & Footer**:
-   - Header: **`Batch Shift Speed`** (or `Active Speed`).
-   - Row: **`55.0 u/h`** with subtitle `(during Morning Shift)`.
-   - Footer: **`Avg Section Output: 26.7 u/h`** with tooltip: *"Section-weighted average: 440 units / 16.5 section operating hours"*.
-3. **Populate Footer Hours**:
-   - Under `Shift Eff. Hours`, display the shift duration: `8.0 hrs`.
-
-##### Option B: Keep Formula Column, but Add Contractor Pills under Batch Name
-1. Keep the `Calculation Formula (English)` column as-is.
-2. In the first column under Batch Name, display both internal employee and contractor summary badges:
-   - `<small class="text-info">1 Internal (Rajesh Sharma)</small> &bull; <small class="text-primary">2x Grade B Contractor</small>`.
-3. Add explanatory tooltip to footer `Avg 26.7 u/h`.
-
-#### 4. Impacted Files (Pending Confirmation)
+#### 3. Impacted Files
+* `app/Domains/Production/Services/SectionCalculationService.php`
 * `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php`
+* `resources/views/modules/production/work-centers/show.blade.php`
+* `docs/calculation_audit_issues_tracker.md`
 
 ---
 

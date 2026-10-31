@@ -65,6 +65,7 @@ class MachineController extends Controller
             $dto      = MachineDTO::fromArray($request->validated());
             $assetId  = $request->validated('asset_id') ? (int) $request->validated('asset_id') : null;
             $machine  = $this->service->create($dto, $tenantId, $assetId);
+            $this->triggerCalculationCountdown($machine);
 
             return redirect()
                 ->route('production.machines.index')
@@ -148,12 +149,14 @@ class MachineController extends Controller
         Gate::authorize('update', $machine);
 
         try {
+            $oldSectionId = $machine->section_id;
             $dto     = MachineDTO::fromArray($request->validated());
-            $machine = $this->service->update($id, $dto);
+            $updatedMachine = $this->service->update($id, $dto);
+            $this->triggerCalculationCountdown($updatedMachine, $oldSectionId ?: $updatedMachine->section_id);
 
             return redirect()
                 ->route('production.machines.index')
-                ->with('success', "Machine '{$machine->name}' updated successfully.");
+                ->with('success', "Machine '{$updatedMachine->name}' updated successfully.");
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -167,7 +170,10 @@ class MachineController extends Controller
         Gate::authorize('delete', $machine);
 
         try {
+            $sectionId = $machine->section_id;
             $this->service->delete($id);
+            $this->triggerCalculationCountdown(null, $sectionId);
+
             return redirect()
                 ->route('production.machines.index')
                 ->with('success', 'Machine deleted successfully.');
@@ -281,5 +287,19 @@ class MachineController extends Controller
 
         $machines = $this->service->getMachinesForWorkCenter($workCenter, activeOnly: true);
         return response()->json($machines);
+    }
+
+    private function triggerCalculationCountdown(?Machine $machine, ?int $sectionId = null): void
+    {
+        $targetSectionId = $sectionId ?: $machine?->section_id;
+        if (!$targetSectionId) {
+            return;
+        }
+
+        $section = \App\Domains\Production\Models\WorkCenterSection::withoutGlobalScopes()->find($targetSectionId);
+        $workCenter = $section?->workCenter;
+        if ($workCenter) {
+            app(\App\Domains\Production\Services\CountdownCalculationEngine::class)->triggerCountdown($workCenter, $targetSectionId);
+        }
     }
 }

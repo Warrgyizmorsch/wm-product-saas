@@ -20,6 +20,7 @@ class WorkCenterActivityLog extends BaseModel
         'user_id',
         'calculation_type',
         'snapshot_id',
+        'snapshot_number',
         'batch_id',
         'description',
     ];

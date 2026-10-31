@@ -59,7 +59,7 @@ class WorkCenter extends BaseModel
 
     public function activityLogs(): HasMany
     {
-        return $this->hasMany(WorkCenterActivityLog::class, 'work_center_id');
+        return $this->hasMany(WorkCenterActivityLog::class, 'work_center_id')->orderByDesc('id');
     }
 
     public function sections(): HasMany

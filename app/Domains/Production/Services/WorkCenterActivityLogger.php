@@ -22,7 +22,8 @@ class WorkCenterActivityLogger
         string $calculationType,
         ?int $snapshotId,
         ?string $batchId,
-        string $description
+        string $description,
+        ?int $snapshotNumber = null
     ): WorkCenterActivityLog {
         return WorkCenterActivityLog::create([
             'tenant_id'        => $tenantId,
@@ -31,6 +32,7 @@ class WorkCenterActivityLogger
             'user_id'          => $userId ?: (Auth::check() ? Auth::id() : null),
             'calculation_type' => $calculationType,
             'snapshot_id'      => $snapshotId,
+            'snapshot_number'  => $snapshotNumber,
             'batch_id'         => $batchId,
             'description'      => $description,
         ]);
@@ -46,12 +48,13 @@ class WorkCenterActivityLogger
         $section = $calculation->section;
         $sectionName = $section?->name ?? "Section #{$calculation->section_id}";
         $sectionCode = $section?->code ?? "SEC-{$calculation->section_id}";
+        $snapNum = (int) ($calculation->snapshot_number ?: $calculation->id);
 
         $description = sprintf(
             '%s [%s] snapshot #%d calculated',
             $sectionName,
             $sectionCode,
-            $calculation->id
+            $snapNum
         );
 
         return $this->log(
@@ -62,7 +65,8 @@ class WorkCenterActivityLogger
             calculationType: 'section',
             snapshotId: (int) $calculation->id,
             batchId: $calculation->batch_id,
-            description: $description
+            description: $description,
+            snapshotNumber: $snapNum
         );
     }
 
@@ -76,12 +80,13 @@ class WorkCenterActivityLogger
         $workCenter = $calculation->workCenter;
         $wcName = $workCenter?->name ?? "Work Center #{$calculation->work_center_id}";
         $wcCode = $workCenter?->code ?? "WC-{$calculation->work_center_id}";
+        $snapNum = (int) ($calculation->snapshot_number ?: $calculation->id);
 
         $description = sprintf(
             '%s [%s] snapshot #%d calculated',
             $wcName,
             $wcCode,
-            $calculation->id
+            $snapNum
         );
 
         return $this->log(
@@ -92,7 +97,8 @@ class WorkCenterActivityLogger
             calculationType: 'work_center',
             snapshotId: (int) $calculation->id,
             batchId: $calculation->batch_id,
-            description: $description
+            description: $description,
+            snapshotNumber: $snapNum
         );
     }
 

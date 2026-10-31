@@ -16,6 +16,7 @@ class WorkCenterCalculation extends BaseModel
     protected $fillable = [
         'tenant_id',
         'work_center_id',
+        'snapshot_number',
         'batch_id',
         'trigger_type',
         'impacted_section_ids',
