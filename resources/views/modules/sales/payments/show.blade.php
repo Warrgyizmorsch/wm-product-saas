@@ -375,22 +375,43 @@
         {{-- ══════ 1. DOCUMENT HEADER ══════ --}}
         <div class="row align-items-start pb-4 border-bottom mb-4">
 
+            @php
+                $sellerOrg = billing_organization_details($payment);
+            @endphp
             {{-- Left : Company --}}
             <div class="col-7">
                 <div class="d-flex align-items-center mb-3">
                     <div class="d-flex align-items-center justify-content-center fw-bold text-white fs-3 me-3 pay-avatar-box shadow-sm"
                          style="width:50px;height:50px;border-radius:8px;flex-shrink:0;">
-                        {{ strtoupper(substr(tenant()?->name ?? 'E', 0, 1)) }}
+                        {{ strtoupper(substr($sellerOrg['name'] ?? 'E', 0, 1)) }}
                     </div>
                     <div>
-                        <h4 class="fw-bold text-dark mb-0 fs-17">{{ tenant()?->name ?? 'SaaS ERP Workspace' }}</h4>
+                        <h4 class="fw-bold text-dark mb-0 fs-17">{{ $sellerOrg['name'] }}</h4>
                         <span class="fs-11 text-muted">Official Payment Receipt</span>
                     </div>
                 </div>
                 <div class="fs-12 text-secondary" style="line-height:1.75;">
-                    <div>H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India</div>
-                    <div><strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)</div>
-                    <div><strong>Email:</strong> {{ tenant()?->billing_email ?? 'billing@sasserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230</div>
+                    @if(!empty($sellerOrg['address']))
+                        <div>{{ $sellerOrg['address'] }}</div>
+                    @endif
+                    <div>
+                        @if(!empty($sellerOrg['gstin']))
+                            <strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }}
+                        @endif
+                        @if(!empty($sellerOrg['state_code']) || !empty($sellerOrg['state_name']))
+                            @if(!empty($sellerOrg['gstin'])) &nbsp;|&nbsp; @endif
+                            <strong>State Code:</strong> {{ $sellerOrg['state_code'] ?? '—' }} ({{ $sellerOrg['state_name'] ?? '—' }})
+                        @endif
+                    </div>
+                    <div>
+                        @if(!empty($sellerOrg['email']))
+                            <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                        @endif
+                        @if(!empty($sellerOrg['phone']))
+                            @if(!empty($sellerOrg['email'])) &nbsp;|&nbsp; @endif
+                            <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                        @endif
+                    </div>
                 </div>
             </div>
 

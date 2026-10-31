@@ -33,8 +33,10 @@ class LoginController extends Controller
         // the tenant, so take it from the account being signed into. TenantResolver
         // reads it from the session on this and every following request, which also
         // lets TenantAwareUserProvider accept the user for their own tenant.
-        if (! $request->hasHeader(config('tenancy.header'))
-            && in_array($request->getHost(), config('tenancy.central_domains'), true)) {
+        if (
+            !$request->hasHeader(config('tenancy.header'))
+            && in_array($request->getHost(), config('tenancy.central_domains'), true)
+        ) {
             $tenantSlug = app(LoginTenantLocator::class)->slugFor($credentials['email'], $credentials['password']);
 
             if ($tenantSlug !== null) {
@@ -42,7 +44,7 @@ class LoginController extends Controller
             }
         }
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (!Auth::attempt($credentials, $request->boolean('remember'))) {
             return back()
                 ->withErrors(['email' => 'These credentials do not match our records.'])
                 ->onlyInput('email');
@@ -87,7 +89,7 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (! Auth::attempt($credentials)) {
+        if (!Auth::attempt($credentials)) {
             return response()->json([
                 'message' => 'These credentials do not match our records.'
             ], 401);
@@ -112,12 +114,39 @@ class LoginController extends Controller
         }
         $user->unsetRelation('employee');
         $user->loadMissing('primaryRole');
+
+        // Provide fallback default company_id & branch_id for the tenant if null
+        if (empty($user->company_id)) {
+            $defaultCompanyId = \App\Domains\HRMS\Models\Company::where('tenant_id', $user->tenant_id)->where('is_default', 1)->value('id')
+                ?: \App\Domains\HRMS\Models\Company::where('tenant_id', $user->tenant_id)->orderBy('id')->value('id')
+                ?: \App\Domains\HRMS\Models\Company::orderBy('id')->value('id');
+            if ($defaultCompanyId) {
+                $user->company_id = (int) $defaultCompanyId;
+            }
+        }
+
+        if (empty($user->branch_id)) {
+            $defaultBranchId = \App\Domains\HRMS\Models\Branch::where('tenant_id', $user->tenant_id)
+                ->when($user->company_id, fn($q) => $q->where('company_id', $user->company_id))
+                ->where('is_default', 1)->value('id')
+                ?: \App\Domains\HRMS\Models\Branch::where('tenant_id', $user->tenant_id)
+                    ->when($user->company_id, fn($q) => $q->where('company_id', $user->company_id))
+                    ->orderBy('id')->value('id')
+                ?: \App\Domains\HRMS\Models\Branch::where('tenant_id', $user->tenant_id)->orderBy('id')->value('id')
+                ?: \App\Domains\HRMS\Models\Branch::orderBy('id')->value('id');
+            if ($defaultBranchId) {
+                $user->branch_id = (int) $defaultBranchId;
+            }
+        }
+
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
-            'user'        => $user,
+            'user' => $user,
             'employee_id' => $employee?->id,
-            'token'       => $token,
+            'company_id' => $user->company_id,
+            'branch_id' => $user->branch_id,
+            'token' => $token,
         ]);
     }
 
@@ -183,27 +212,27 @@ class LoginController extends Controller
 
         $payload = [
             'user' => [
-                'id'        => $user->id,
+                'id' => $user->id,
                 'tenant_id' => $user->tenant_id,
-                'name'      => $user->name,
-                'email'     => $user->email,
-                'role'      => $user->role,
-                'avatar'    => $user->avatar_url,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'avatar' => $user->avatar_url,
             ],
             'employee' => $employee ? [
-                'id'               => $employee->id,
-                'employee_id'      => $employee->employee_id ?? null,
-                'name'             => $employee->full_name,
-                'email'            => $employee->office_email ?? $employee->personal_email ?? $user->email,
-                'department_id'    => $employee->department_id,
-                'department_name'  => $employee->department?->name,
-                'designation_id'   => $employee->designation_id,
+                'id' => $employee->id,
+                'employee_id' => $employee->employee_id ?? null,
+                'name' => $employee->full_name,
+                'email' => $employee->office_email ?? $employee->personal_email ?? $user->email,
+                'department_id' => $employee->department_id,
+                'department_name' => $employee->department?->name,
+                'designation_id' => $employee->designation_id,
                 'designation_name' => $employee->designation?->name,
             ] : null,
-            'roles'              => $roles,
-            'is_manager'         => $isManager,
-            'is_admin'           => $isPlatformAdmin,
-            'permissions'        => $permissions,
+            'roles' => $roles,
+            'is_manager' => $isManager,
+            'is_admin' => $isPlatformAdmin,
+            'permissions' => $permissions,
             'accessible_modules' => $accessibleModules,
         ];
 

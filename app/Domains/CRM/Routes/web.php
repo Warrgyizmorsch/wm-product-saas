@@ -217,6 +217,10 @@ Route::prefix('crm')
             ->name('customers.quick-create');
         Route::get('customers/{customer}', [CustomerController::class, 'show'])
             ->name('customers.show');
+        Route::get('customers/{customer}/edit', [CustomerController::class, 'edit'])
+            ->name('customers.edit');
+        Route::put('customers/{customer}', [CustomerController::class, 'update'])
+            ->name('customers.update');
         Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])
             ->name('customers.updateStatus');
         Route::get('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus'])

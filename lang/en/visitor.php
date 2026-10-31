@@ -179,7 +179,7 @@ return [
     'first_time_visitors'         => 'First-time Visitors',
     'extend_minutes'              => 'Minutes to Add',
     'incident_details'            => 'Incident Description',
-    'blacklist_visitor'           => 'Blacklist visitor from future entry',
+    'blacklist_visitor'           => 'Blacklist Visitor',
     'convert_to_lead'             => 'Convert to CRM Lead',
     'convert_lead_modal_title'    => 'Convert Walk-in Visitor to CRM Lead',
     'converted_to_lead'           => 'Converted to Lead',

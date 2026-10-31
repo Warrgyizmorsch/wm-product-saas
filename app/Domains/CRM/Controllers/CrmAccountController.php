@@ -83,6 +83,14 @@ class CrmAccountController extends Controller
             }
         }
 
+        $addressParts = array_filter([
+            $validated['street'] ?? null,
+            $validated['city'] ?? null,
+            !empty($validated['state']) ? ($validated['state'] . (!empty($validated['zip_code']) ? ' - ' . $validated['zip_code'] : '')) : ($validated['zip_code'] ?? null),
+            $validated['country'] ?? null,
+        ]);
+        $compiledAddress = !empty($addressParts) ? implode(', ', $addressParts) : null;
+
         if (!$customer) {
             Customer::$skipAccountAutoCreate = true;
             $customer = Customer::create([
@@ -91,7 +99,8 @@ class CrmAccountController extends Controller
                 'email'     => $validated['email'] ?? null,
                 'phone'     => $validated['phone'] ?? null,
                 'gstin'     => $validated['gstin'] ?? null,
-                'billing_address' => $validated['street'] ?? null,
+                'billing_address'  => $compiledAddress,
+                'shipping_address' => $compiledAddress,
                 'opening_balance' => $openingBalance,
                 'opening_balance_type' => $validated['opening_balance_type'] ?? 'debit',
                 'status'    => 'active',
@@ -345,12 +354,32 @@ class CrmAccountController extends Controller
         }
 
         if ($account->customer_id) {
+            $updatedStreet = array_key_exists('street', $validated) ? $validated['street'] : $account->street;
+            $updatedCity = array_key_exists('city', $validated) ? $validated['city'] : $account->city;
+            $updatedState = array_key_exists('state', $validated) ? $validated['state'] : $account->state;
+            $updatedCountry = array_key_exists('country', $validated) ? $validated['country'] : $account->country;
+            $updatedZip = array_key_exists('zip_code', $validated) ? $validated['zip_code'] : $account->zip_code;
+
+            $addressParts = array_filter([
+                $updatedStreet,
+                $updatedCity,
+                !empty($updatedState) ? ($updatedState . (!empty($updatedZip) ? ' - ' . $updatedZip : '')) : $updatedZip,
+                $updatedCountry,
+            ]);
+            $compiledAddress = !empty($addressParts) ? implode(', ', $addressParts) : null;
+
             $customerUpdate = [
                 'name'  => $validated['name'],
                 'email' => $validated['email'] ?? null,
                 'phone' => $validated['phone'] ?? null,
                 'gstin' => $validated['gstin'] ?? null,
             ];
+
+            if ($compiledAddress) {
+                $customerUpdate['billing_address'] = $compiledAddress;
+                $customerUpdate['shipping_address'] = $compiledAddress;
+            }
+
             if (array_key_exists('opening_balance', $validated)) {
                 $customerUpdate['opening_balance'] = $validated['opening_balance'] !== null
                     ? convert_to_base((float) $validated['opening_balance'])

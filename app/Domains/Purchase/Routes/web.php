@@ -67,6 +67,7 @@ Route::prefix('purchase')
         Route::get('bill-matching', [BillMatchingController::class, 'index'])->name('bill-matching.index');
         Route::put('bill-matching/settings', [BillMatchingController::class, 'updateSettings'])->name('bill-matching.settings');
         Route::post('bills/{bill}/release-hold', [BillMatchingController::class, 'release'])->name('bills.release-hold');
+        Route::get('bills/{bill}/pdf', [VendorBillController::class, 'downloadPdf'])->name('bills.pdf');
         Route::resource('bills', VendorBillController::class);
         Route::get('payments/export', [VendorPaymentController::class, 'export'])->name('payments.export');
         Route::resource('payments', VendorPaymentController::class);

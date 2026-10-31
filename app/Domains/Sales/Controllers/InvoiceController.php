@@ -370,6 +370,8 @@ class InvoiceController extends Controller
             'freight_terms'           => ['nullable', 'string', 'in:To Pay,To Be Billed,Prepaid,Customer Pickup'],
             'freight_amount'          => ['nullable', 'numeric', 'min:0'],
             'freight_tax_rate'        => ['nullable', 'string'],
+            'billing_address'         => ['nullable', 'string'],
+            'shipping_address'        => ['nullable', 'string'],
             'notes'                   => ['nullable', 'string'],
             'items'                   => ['required', 'array', 'min:1'],
             'items.*.sales_order_item_id'          => ['nullable', 'exists:sales_order_items,id'],
@@ -418,6 +420,8 @@ class InvoiceController extends Controller
             return redirect()->back()->withInput()->with('error', 'Customer selection is required.');
         }
 
+        $customerObj = \App\Domains\CRM\Models\Customer::find($customerId);
+
         $tenantId = $salesOrder?->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
         $branchId = branch_id() ?? $salesOrder?->branch_id ?? auth()->user()?->branch_id;
         $companyId = company_id() ?? $salesOrder?->company_id ?? auth()->user()?->company_id;
@@ -430,7 +434,7 @@ class InvoiceController extends Controller
         $freightTerms  = $validated['freight_terms'] ?? $salesOrder?->freight_terms ?? 'To Pay';
         $freightAmount = convert_to_base(floatval($validated['freight_amount'] ?? 0));
 
-        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $tenantId, $branchId, $companyId, $taxMode, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
+        $invoice = DB::transaction(function () use ($validated, $salesOrder, $customerId, $customerObj, $tenantId, $branchId, $companyId, $taxMode, $taxType, $discountType, $gstType, $freightTerms, $freightAmount, $request) {
             $subtotal = 0;
             $taxAmount = 0;
             $discountAmount = 0;
@@ -524,6 +528,8 @@ class InvoiceController extends Controller
                 'branch_id'               => $branchId,
                 'sales_order_id'          => $salesOrder?->id,
                 'customer_id'             => $customerId,
+                'billing_address'         => !empty($validated['billing_address']) ? $validated['billing_address'] : ($salesOrder?->billing_address ?: $customerObj?->billing_address),
+                'shipping_address'        => !empty($validated['shipping_address']) ? $validated['shipping_address'] : ($salesOrder?->shipping_address ?: ($customerObj?->shipping_address ?: ($salesOrder?->billing_address ?: $customerObj?->billing_address))),
                 'material_requirement_id' => $validated['material_requirement_id'] ?? null,
                 'invoice_number'          => $validated['invoice_number'],
                 'invoice_date'            => $validated['invoice_date'],

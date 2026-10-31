@@ -870,19 +870,32 @@
                 <!-- 1. Invoice Document Header -->
                 <div class="row align-items-start pb-4 border-bottom mb-4">
                     <div class="col-7">
+                        @php
+                            $sellerOrg = billing_organization_details($invoice);
+                        @endphp
                         <div class="d-flex align-items-center mb-3">
                             <div class="avatar-text invoice-avatar-box text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0;">
-                                {{ strtoupper(substr(tenant() ? tenant()->name : 'ERP', 0, 1)) }}
+                                {{ $sellerOrg['avatar_char'] }}
                             </div>
                             <div>
-                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
-                                <span class="fs-11 text-muted">{{ __('crm.official_corporate_billing_unit') }}</span>
+                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ $sellerOrg['name'] }}</h4>
+                                <span class="fs-11 text-muted">{{ $sellerOrg['unit_subtext'] }}</span>
                             </div>
                         </div>
                         <div class="fs-12 text-secondary leading-relaxed">
-                            <div>H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India</div>
-                            <div><strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)</div>
-                            <div><strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@sasserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230</div>
+                            <div>{{ $sellerOrg['address'] }}</div>
+                            <div><strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }} &nbsp;|&nbsp; <strong>State Code:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] }})</div>
+                            <div>
+                                @if($sellerOrg['email'])
+                                    <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                                @endif
+                                @if($sellerOrg['email'] && $sellerOrg['phone'])
+                                    &nbsp;|&nbsp;
+                                @endif
+                                @if($sellerOrg['phone'])
+                                    <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                                @endif
+                            </div>
                         </div>
                     </div>
 
@@ -892,53 +905,80 @@
                         
                         <div class="mt-3 fs-12 text-secondary">
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">{{ __('crm.invoice_date') }}:</span>
+                                <span class="text-muted">{{ rtrim(__('crm.invoice_date'), ':') }}:</span>
                                 <strong class="text-dark">{{ date('d-M-Y', strtotime($invoice->invoice_date)) }}</strong>
                             </div>
                             <div class="d-flex justify-content-end gap-2 mb-1">
-                                <span class="text-muted">{{ __('crm.due_date') }}:</span>
+                                <span class="text-muted">{{ rtrim(__('crm.due_date'), ':') }}:</span>
                                 <strong class="text-dark">{{ $invoice->due_date ? date('d-M-Y', strtotime($invoice->due_date)) : '—' }}</strong>
                             </div>
                             <div class="d-flex justify-content-end gap-2">
-                                <span class="text-muted">{{ __('crm.payment_terms') }}:</span>
+                                <span class="text-muted">{{ rtrim(__('crm.payment_terms'), ':') }}:</span>
                                 <strong class="text-dark">{{ \App\Domains\Platform\Models\PaymentTerm::getLabel($invoice->payment_terms ?: $invoice->salesOrder?->payment_terms) }}</strong>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Address & Order Details Section -->
+                <!-- 2. Customer & Order References Section (Standard 2-Box ERP Layout) -->
                 <div class="row g-4 mb-4 fs-12 text-dark">
-                    <!-- Left: Customer Details -->
+                    @php
+                        $customerGstin = $invoice->customer?->gstin ?: ($invoice->salesOrder?->customer?->gstin ?: null);
+                        $acc = $invoice->customer?->crmAccount;
+                        $accAddress = $acc ? implode(', ', array_filter([$acc->street, $acc->city, $acc->state ? ($acc->state . ($acc->zip_code ? ' - ' . $acc->zip_code : '')) : $acc->zip_code, $acc->country])) : null;
+                        $displayBilling = $invoice->billing_address ?: ($invoice->salesOrder?->billing_address ?: ($invoice->customer?->billing_address ?: $accAddress));
+                        $displayShipping = $invoice->shipping_address ?: ($invoice->salesOrder?->shipping_address ?: ($invoice->customer?->shipping_address ?: null));
+                        $isSameAddress = empty($displayShipping) || trim($displayShipping) === trim($displayBilling);
+                        $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer);
+                        $placeOfSupplyStr = $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : null;
+                    @endphp
+
+                    <!-- Box 1 (Left 50%): Billed To (Customer) -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.billed_to_customer') }}</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ rtrim(__('crm.billed_to_customer'), ':') }}</span>
                             <h6 class="fw-bold text-dark mb-1 fs-14">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: '—') }}</h6>
                             @if($invoice->customer?->company_name)
-                                <div class="text-muted fw-semibold mb-1">{{ $invoice->customer->company_name }}</div>
+                                <div class="text-muted fw-semibold mb-1 fs-11">{{ $invoice->customer->company_name }}</div>
                             @endif
-                            <div class="text-secondary mb-1">
-                                <i class="feather-mail me-1 fs-11 text-muted"></i>{{ $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '—') }}
-                                &nbsp;|&nbsp;
-                                <i class="feather-phone me-1 fs-11 text-muted"></i>{{ $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '—') }}
-                            </div>
-                            @if ($invoice->salesOrder?->billing_address)
-                                <div class="mt-2 pt-2 border-top text-secondary fs-11" style="white-space: pre-wrap;">
-                                    <strong>{{ __('crm.billing_address') }}:</strong><br>{{ $invoice->salesOrder->billing_address }}
+                            @if($customerGstin)
+                                <div class="text-dark mb-1 fs-11">
+                                    <strong>GSTIN / Tax ID:</strong> <span class="font-monospace fw-bold text-primary">{{ $customerGstin }}</span>
                                 </div>
                             @endif
+                            @if($invoice->customer?->email || $invoice->customer?->phone || $invoice->salesOrder?->customer?->phone)
+                                <div class="text-secondary mb-2 fs-11">
+                                    @if($invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: null))
+                                        <span class="me-3"><i class="feather-mail me-1 fs-11 text-muted"></i>{{ $invoice->customer?->email ?: $invoice->salesOrder?->customer?->email }}</span>
+                                    @endif
+                                    @if($invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: null))
+                                        <span><i class="feather-phone me-1 fs-11 text-muted"></i>{{ $invoice->customer?->phone ?: $invoice->salesOrder?->customer?->phone }}</span>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <div class="row g-2 mt-2 pt-2 border-top text-secondary fs-11">
+                                <div class="col-sm-6">
+                                    <strong class="text-dark d-block mb-1">{{ __('crm.billing_address') }}:</strong>
+                                    <div style="white-space: pre-wrap;">{{ $displayBilling ?: '—' }}</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <strong class="text-dark d-block mb-1">Shipping Address:</strong>
+                                    <div style="white-space: pre-wrap;">{{ $displayShipping ?: ($displayBilling ?: '—') }}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Right: Order References & Dispatch Info -->
+                    <!-- Box 2 (Right 50%): Order & Dispatch References -->
                     <div class="col-6">
                         <div class="p-3 bg-light bg-opacity-40 rounded border h-100">
-                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ __('crm.order_dispatch_references') }}</span>
+                            <span class="fs-10 fw-bold text-uppercase text-muted d-block mb-2" style="letter-spacing: 0.5px;">{{ rtrim(__('crm.order_dispatch_references'), ':') }}</span>
                             
                             @if ($invoice->salesOrder)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">{{ __('crm.sales_order_reference') }}:</span>
-                                    <a href="{{ route('sales.orders.show', $invoice->sales_order_id) }}" class="fw-bold text-primary">
+                                    <span class="text-muted">{{ rtrim(__('crm.sales_order_reference'), ':') }}:</span>
+                                    <a href="{{ route('sales.orders.show', $invoice->sales_order_id) }}" class="fw-bold text-primary font-monospace">
                                         {{ $invoice->salesOrder->sales_order_number }}
                                     </a>
                                 </div>
@@ -946,52 +986,45 @@
 
                             @if ($invoice->materialRequirement)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                    <span class="text-muted">{{ __('crm.dispatch_order_reference') }}:</span>
-                                    <a href="{{ route('inventory.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info">
+                                    <span class="text-muted">{{ rtrim(__('crm.dispatch_order_reference'), ':') }}:</span>
+                                    <a href="{{ route('inventory.material-requirements.show', $invoice->material_requirement_id) }}" class="fw-bold text-info font-monospace">
                                         {{ $invoice->materialRequirement->requirement_number }}
                                     </a>
                                 </div>
                             @endif
 
-                            @if ($invoice->eway_bill_status === 'Generated')
+                            @if($invoice->salesOrder?->order_date)
+                                <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                    <span class="text-muted">Order Date:</span>
+                                    <span class="fw-semibold text-dark">{{ date('d-M-Y', strtotime($invoice->salesOrder->order_date)) }}</span>
+                                </div>
+                            @endif
+
+                            @if($placeOfSupplyStr)
+                                <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                    <span class="text-muted">{{ rtrim(__('crm.place_of_supply'), ':') }}:</span>
+                                    <span class="fw-semibold text-dark">{{ $placeOfSupplyStr }}</span>
+                                </div>
+                            @endif
+
+                            @if ($invoice->eway_bill_status === 'Generated' || $invoice->eway_bill_no)
                                 <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
                                     <span class="text-muted">E-Way Bill No:</span>
-                                    <span class="fw-bold text-dark font-monospace">{{ $invoice->eway_bill_no }} ({{ $invoice->vehicle_no ?: 'Road' }})</span>
+                                    <span class="fw-bold text-dark font-monospace">{{ $invoice->eway_bill_no }}</span>
                                 </div>
-                                @if($invoice->transporter_name)
+                                @if($invoice->vehicle_no || $invoice->transport_mode)
                                     <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                        <span class="text-muted">Vehicle / Mode:</span>
+                                        <span class="fw-semibold text-dark font-monospace">{{ $invoice->vehicle_no ?: ($invoice->transport_mode ?: 'Road') }}</span>
+                                    </div>
+                                @endif
+                                @if($invoice->transporter_name)
+                                    <div class="d-flex justify-content-between">
                                         <span class="text-muted">Transporter:</span>
-                                        <span class="fw-semibold text-dark">{{ $invoice->transporter_name }} @if($invoice->transporter_id)({{ $invoice->transporter_id }})@endif</span>
+                                        <span class="fw-semibold text-dark">{{ $invoice->transporter_name }}</span>
                                     </div>
                                 @endif
                             @endif
-
-                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">{{ __('crm.place_of_supply') }}</span>
-                                @php $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer); @endphp
-                                <span class="fw-semibold text-dark">{{ $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : '—' }}</span>
-                            </div>
-
-                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">{{ __('crm.gst_option') }}</span>
-                                <span class="fw-bold text-dark">{{ $invoice->gst_type === 'igst' ? __('crm.inter_state_gst') : __('crm.intra_state_gst') }}</span>
-                            </div>
-
-                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
-                                <span class="text-muted">{{ __('crm.tax_mode') }}</span>
-                                <span class="badge {{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary' }} fw-bold">
-                                    {{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? __('crm.tax_inclusive') : __('crm.tax_exclusive') }}
-                                </span>
-                            </div>
-
-                            <div class="d-flex justify-content-between">
-                                <span class="text-muted">{{ __('crm.payment_status') }}</span>
-                                @if (in_array(strtolower((string)$invoice->status), ['cancelled', 'void']))
-                                    <span class="badge bg-danger-subtle text-danger fw-bold fs-11">{{ __('crm.cancelled') ?? 'Cancelled' }}</span>
-                                @else
-                                    <span class="fw-bold {{ ($balanceDue ?? 0) > 0 ? 'text-danger' : 'text-success' }}">{{ ($balanceDue ?? 0) > 0 ? __('crm.balance_outstanding') : __('crm.fully_paid') }}</span>
-                                @endif
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1815,7 +1848,7 @@
                         <tbody>
                             <tr>
                                 <td class="text-muted py-0.5" style="width: 38%;">Seller GSTIN:</td>
-                                <td class="fw-bold text-dark py-0.5 font-monospace">{{ $qrDecoded['sellerGstin'] ?? (tenant()?->gstin ?: '08AAFCS1234E1Z0') }}</td>
+                                <td class="fw-bold text-dark py-0.5 font-monospace">{{ $qrDecoded['sellerGstin'] ?? ($sellerOrg['gstin'] ?? (tenant()?->gstin ?: '—')) }}</td>
                             </tr>
                             <tr>
                                 <td class="text-muted py-0.5">Buyer GSTIN:</td>

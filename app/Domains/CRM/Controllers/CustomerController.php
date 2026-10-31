@@ -198,6 +198,59 @@ class CustomerController extends Controller
         ));
     }
 
+    public function edit(Customer $customer): View
+    {
+        $this->authorize('update', $customer);
+        $customer->load('crmAccount');
+        return view('modules.crm.customers.edit', compact('customer'));
+    }
+
+    public function update(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->authorize('update', $customer);
+
+        $validated = $request->validate([
+            'name'                 => ['required', 'string', 'max:255'],
+            'company_name'         => ['nullable', 'string', 'max:255'],
+            'email'                => ['required', 'email', 'max:255'],
+            'phone'                => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin'                => TaxIdentityService::gstinRules(false),
+            'billing_address'      => ['nullable', 'string'],
+            'shipping_address'     => ['nullable', 'string'],
+            'opening_balance'      => ['nullable', 'numeric', 'min:0'],
+            'opening_balance_type' => ['nullable', 'in:debit,credit'],
+            'status'               => ['required', 'string', 'in:active,inactive'],
+        ], [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'phone.max'   => 'Phone number cannot exceed 20 digits.',
+        ]);
+
+        if (array_key_exists('opening_balance', $validated)) {
+            $validated['opening_balance'] = $validated['opening_balance'] !== null
+                ? convert_to_base((float) $validated['opening_balance'])
+                : 0.00;
+        }
+
+        $customer->update($validated);
+
+        if ($customer->crmAccount) {
+            $customer->crmAccount->update([
+                'name'   => $validated['name'],
+                'email'  => $validated['email'],
+                'phone'  => $validated['phone'] ?? null,
+                'gstin'  => $validated['gstin'] ?? null,
+                'status' => $validated['status'],
+            ]);
+        }
+
+        $openingWarning = app(\App\Domains\CRM\Services\CustomerOpeningBalanceService::class)->trySync($customer);
+
+        return redirect()
+            ->route('crm.customers.show', $customer)
+            ->with('success', 'Customer updated successfully.')
+            ->with('warning', $openingWarning);
+    }
+
     public function updateStatus(Request $request, Customer $customer): RedirectResponse
     {
         $this->authorize('update', $customer);

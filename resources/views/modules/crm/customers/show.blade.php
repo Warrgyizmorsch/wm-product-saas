@@ -24,6 +24,9 @@
                 {{ __('crm.view_account') }}
             </x-ui.button>
         @endif
+        <a href="{{ route('crm.customers.edit', $customer) }}" class="btn btn-primary px-3 d-inline-flex align-items-center">
+            <i class="feather-edit me-1.5"></i>{{ __('crm.edit') ?? 'Edit Customer' }}
+        </a>
     </div>
 @endsection
 

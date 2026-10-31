@@ -173,16 +173,17 @@ class EInvoiceService
         $tenant = tenant();
         $customer = $invoice->customer ?: $invoice->salesOrder?->customer;
 
-        $sellerGstin = $gstConfig?->seller_gstin ?: ($tenant?->gstin ?: '08AAFCS1234E1Z0');
-        $sellerLegalName = $gstConfig?->legal_name ?: ($tenant?->name ?: 'SaaS ERP Workspace');
-        $sellerTradeName = $gstConfig?->trade_name ?: ($tenant?->name ?: 'SaaS ERP Workspace');
-        $sellerAddr1 = $gstConfig?->address_line1 ?: 'H-1, Industrial Area';
-        $sellerAddr2 = $gstConfig?->address_line2 ?: 'Sukher';
-        $sellerLoc = $gstConfig?->location ?: 'Udaipur';
-        $sellerPin = (int)($gstConfig?->pincode ?: 313001);
-        $sellerStateCode = $gstConfig?->state_code ?: (substr($sellerGstin, 0, 2) ?: '08');
-        $sellerEmail = $gstConfig?->contact_email ?: ($tenant?->billing_email ?: 'billing@saaserp.com');
-        $sellerPhone = $gstConfig?->contact_phone ?: '+91 294 2440230';
+        $comp = $invoice->company ?: company();
+        $sellerGstin = $gstConfig?->seller_gstin ?: ($comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: '')));
+        $sellerLegalName = $comp?->legal_name ?: ($gstConfig?->legal_name ?: ($comp?->company_name ?: ($tenant?->name ?: '')));
+        $sellerTradeName = $comp?->company_name ?: ($gstConfig?->trade_name ?: ($tenant?->name ?: ''));
+        $sellerAddr1 = $comp?->address ?: ($gstConfig?->address_line1 ?: ($tenant?->billing_address ?: ''));
+        $sellerAddr2 = $gstConfig?->address_line2 ?: '';
+        $sellerLoc = $comp?->city ?: ($gstConfig?->location ?: '');
+        $sellerPin = (int)($comp?->postal_code ?: ($gstConfig?->pincode ?: 0));
+        $sellerStateCode = $gstConfig?->state_code ?: (substr($sellerGstin, 0, 2) ?: '');
+        $sellerEmail = $comp?->email ?: ($gstConfig?->contact_email ?: ($tenant?->billing_email ?: ''));
+        $sellerPhone = $comp?->phone ?: ($gstConfig?->contact_phone ?: ($tenant?->billing_phone ?: ''));
 
         $buyerGstin = $customer?->gstin ?: '27AABCU9603R1ZM';
         $buyerStateCode = substr($buyerGstin, 0, 2) ?: '27';
