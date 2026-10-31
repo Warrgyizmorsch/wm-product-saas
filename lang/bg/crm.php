@@ -2306,5 +2306,12 @@ return array (
   'date_label' => 'Дата',
   'meetings_geo_verification' => 'Гео-верификация:',
   'download_pdf' => 'Изтегляне на PDF',
+
+  // Customer Edit Screen
+  'edit_customer' => 'Редактиране на клиент',
+  'opening_balance' => 'Начално салдо',
+  'linked_to_crm_account' => 'Свързан с CRM профил',
+  'update_customer' => 'Обнови клиент',
+  'update' => 'Обнови',
 );
 

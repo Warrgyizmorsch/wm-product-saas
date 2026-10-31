@@ -175,9 +175,7 @@
         .info-boxes-table {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 12px 0;
-            margin-left: -12px;
-            margin-right: -12px;
+            border-spacing: 0;
             margin-bottom: 12px;
             page-break-inside: avoid;
         }
@@ -187,7 +185,13 @@
             border-radius: 6px;
             padding: 8px 10px;
             vertical-align: top;
-            width: 50%;
+            width: 48.5%;
+        }
+        .info-box-gap {
+            width: 3%;
+            border: none;
+            background: transparent;
+            padding: 0;
         }
         .box-title {
             font-size: 8.5px;
@@ -541,17 +545,41 @@
     <table class="header-table">
         <tr>
             <td style="vertical-align: top; width: 58%;">
+                @php
+                    $sellerOrg = billing_organization_details($invoice);
+                @endphp
                 <div class="company-avatar">
-                    {{ strtoupper(substr(tenant() ? tenant()->name : 'D', 0, 1)) }}
+                    {{ $sellerOrg['avatar_char'] }}
                 </div>
                 <div class="company-info">
-                    <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
-                    <div class="company-sub">Official Corporate Billing Unit</div>
+                    <div class="company-name">{{ $sellerOrg['name'] }}</div>
+                    @if(!empty($sellerOrg['unit_subtext']))
+                        <div class="company-sub">{{ $sellerOrg['unit_subtext'] }}</div>
+                    @endif
                 </div>
                 <div class="company-address">
-                    H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
-                    <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
-                    <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@saaserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230
+                    @if(!empty($sellerOrg['address']))
+                        {{ $sellerOrg['address'] }}<br>
+                    @endif
+                    @if(!empty($sellerOrg['gstin']))
+                        <strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }}
+                    @endif
+                    @if(!empty($sellerOrg['state_code']) && !empty($sellerOrg['state_name']))
+                        @if(!empty($sellerOrg['gstin'])) &nbsp;|&nbsp; @endif
+                        <strong>State Code:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] }})
+                    @endif
+                    @if(!empty($sellerOrg['gstin']) || !empty($sellerOrg['state_code']))
+                        <br>
+                    @endif
+                    @if(!empty($sellerOrg['email']))
+                        <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                    @endif
+                    @if(!empty($sellerOrg['email']) && !empty($sellerOrg['phone']))
+                        &nbsp;|&nbsp;
+                    @endif
+                    @if(!empty($sellerOrg['phone']))
+                        <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                    @endif
                 </div>
             </td>
             <td style="vertical-align: top; width: 42%; text-align: right;">
@@ -576,13 +604,32 @@
         </tr>
     </table>
 
-    <!-- ═══ 3. ADDRESS & REFERENCES CARDS ═══ -->
+    <!-- ═══ 3. ADDRESS & REFERENCES CARDS (2-BOX FORMAT) ═══ -->
     <table class="info-boxes-table">
         <tr>
-            <!-- Left Card: Customer Info -->
+            @php
+                $customerGstin = $invoice->customer?->gstin ?: ($invoice->salesOrder?->customer?->gstin ?: null);
+                $acc = $invoice->customer?->crmAccount;
+                $accAddress = $acc ? implode(', ', array_filter([$acc->street, $acc->city, $acc->state ? ($acc->state . ($acc->zip_code ? ' - ' . $acc->zip_code : '')) : $acc->zip_code, $acc->country])) : null;
+                $pdfBilling = $invoice->billing_address ?: ($invoice->salesOrder?->billing_address ?: ($invoice->customer?->billing_address ?: $accAddress));
+                $pdfShipping = $invoice->shipping_address ?: ($invoice->salesOrder?->shipping_address ?: ($invoice->customer?->shipping_address ?: null));
+                $isSameAddress = empty($pdfShipping) || trim($pdfShipping) === trim($pdfBilling);
+                $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer);
+                $placeOfSupplyStr = $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : null;
+            @endphp
+
+            <!-- Left Box: Billed To (Buyer) -->
             <td class="info-box">
-                <div class="box-title">BILLED TO (CUSTOMER):</div>
+                <div class="box-title">BILLED TO (BUYER):</div>
                 <div class="client-name">{{ $invoice->customer?->name ?: ($invoice->salesOrder?->customer?->name ?: 'Customer') }}</div>
+                @if($invoice->customer?->company_name)
+                    <div style="font-size: 8.5px; color: #475569; margin-bottom: 2px;">{{ $invoice->customer->company_name }}</div>
+                @endif
+                @if($customerGstin)
+                    <div style="font-size: 8.5px; margin-bottom: 3px;">
+                        <strong>GSTIN:</strong> {{ $customerGstin }}
+                    </div>
+                @endif
                 @if($invoice->customer?->email || $invoice->customer?->phone || $invoice->salesOrder?->customer?->phone)
                     <div class="client-contact">
                         {{ $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '') }}
@@ -592,19 +639,25 @@
                         {{ $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '') }}
                     </div>
                 @endif
-                @if($invoice->salesOrder?->billing_address)
-                    <div class="address-block">
-                        <strong>Billing Address:</strong><br>{{ $invoice->salesOrder->billing_address }}
-                    </div>
-                @endif
-                @if($invoice->salesOrder?->shipping_address && $invoice->salesOrder?->shipping_address !== $invoice->salesOrder?->billing_address)
-                    <div class="address-block">
-                        <strong>Shipping Address:</strong><br>{{ $invoice->salesOrder->shipping_address }}
-                    </div>
-                @endif
+
+                <table style="width: 100%; border-collapse: collapse; margin-top: 6px; border-top: 1px solid #e2e8f0; padding-top: 4px;">
+                    <tr>
+                        <td style="width: 50%; vertical-align: top; padding-right: 5px; font-size: 8.5px; color: #475569;">
+                            <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Billing Address:</strong>
+                            {{ $pdfBilling ?: '—' }}
+                        </td>
+                        <td style="width: 50%; vertical-align: top; padding-left: 5px; font-size: 8.5px; color: #475569;">
+                            <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Shipping Address:</strong>
+                            {{ $pdfShipping ?: ($pdfBilling ?: '—') }}
+                        </td>
+                    </tr>
+                </table>
             </td>
 
-            <!-- Right Card: References -->
+            <!-- Gap -->
+            <td class="info-box-gap"></td>
+
+            <!-- Right Box: Order & Dispatch References -->
             <td class="info-box">
                 <div class="box-title">ORDER &amp; DISPATCH REFERENCES:</div>
                 
@@ -622,30 +675,38 @@
                     </div>
                 @endif
 
-                <div class="ref-row">
-                    <span class="ref-label">Place of Supply:</span>
-                    @php $supply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class)->supplyFor($invoice->customer ?? $invoice->salesOrder?->customer); @endphp
-                    <span class="ref-val">{{ $supply['pos'] ? \App\Domains\Accounting\Support\GstStates::name($supply['pos']) . ' (' . $supply['pos'] . ')' : '—' }}</span>
-                </div>
+                @if($invoice->salesOrder?->order_date)
+                    <div class="ref-row">
+                        <span class="ref-label">Order Date:</span>
+                        <span class="ref-val">{{ date('d-M-Y', strtotime($invoice->salesOrder->order_date)) }}</span>
+                    </div>
+                @endif
 
-                <div class="ref-row">
-                    <span class="ref-label">GST Tax Type:</span>
-                    <span class="ref-val" style="color: #0f766e;">
-                        {{ ($invoice->gst_type ?? 'cgst_sgst') === 'igst' ? 'Inter-State GST (IGST)' : 'Intra-State GST (CGST + SGST)' }}
-                    </span>
-                </div>
+                @if($placeOfSupplyStr)
+                    <div class="ref-row">
+                        <span class="ref-label">Place of Supply:</span>
+                        <span class="ref-val">{{ $placeOfSupplyStr }}</span>
+                    </div>
+                @endif
 
-                <div class="ref-row">
-                    <span class="ref-label">Pricing Mode:</span>
-                    <span class="ref-val">{{ ($invoice->effective_tax_mode ?? 'exclusive') === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span>
-                </div>
-
-                <div class="ref-row">
-                    <span class="ref-label">Payment Status:</span>
-                    <span class="ref-val" style="color: {{ $balanceDue > 0 ? '#dc2626' : '#16a34a' }};">
-                        {{ $balanceDue > 0 ? 'Balance Outstanding' : 'Fully Paid' }}
-                    </span>
-                </div>
+                @if($invoice->eway_bill_no)
+                    <div class="ref-row">
+                        <span class="ref-label">E-Way Bill No:</span>
+                        <span class="ref-val">{{ $invoice->eway_bill_no }}</span>
+                    </div>
+                    @if($invoice->vehicle_no)
+                        <div class="ref-row">
+                            <span class="ref-label">Vehicle No:</span>
+                            <span class="ref-val">{{ $invoice->vehicle_no }}</span>
+                        </div>
+                    @endif
+                    @if($invoice->transporter_name)
+                        <div class="ref-row">
+                            <span class="ref-label">Transporter:</span>
+                            <span class="ref-val">{{ $invoice->transporter_name }}</span>
+                        </div>
+                    @endif
+                @endif
             </td>
         </tr>
     </table>
@@ -776,21 +837,12 @@
                     </table>
                 </div>
 
-                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px;">
-                    <div style="font-size: 8px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.4px; margin-bottom: 4px;">Tax Treatment &amp; Commercials</div>
-                    <table style="width: 100%; font-size: 9px; border-collapse: collapse;">
-                        <tr>
-                            <td style="color: #64748b; padding: 1.5px 0; width: 44%;">Tax Scheme:</td>
-                            <td style="font-weight: bold; color: #1e293b; padding: 1.5px 0;">{{ $taxMode === 'inclusive' ? 'Inclusive of GST' : 'Exclusive of GST (Base Rate)' }}</td>
-                        </tr>
-                        <tr>
-                            <td style="color: #64748b; padding: 1.5px 0;">Applicable GST:</td>
-                            <td style="font-weight: bold; color: #0f766e; padding: 1.5px 0;">
-                                {{ $gstType === 'igst' ? 'IGST (Inter-State Supply)' : 'CGST + SGST (Intra-State Supply)' }}
-                            </td>
-                        </tr>
-                    </table>
-                </div>
+                @if ($invoice->notes)
+                    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px;">
+                        <div style="font-size: 8px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.4px; margin-bottom: 4px;">Terms &amp; Conditions / Notes</div>
+                        <div style="font-size: 8.5px; color: #475569; line-height: 1.35;">{!! $invoice->notes !!}</div>
+                    </div>
+                @endif
             </td>
 
             <!-- RIGHT COLUMN: Subtotal Calculations Card -->

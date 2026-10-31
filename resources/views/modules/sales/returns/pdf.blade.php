@@ -336,22 +336,32 @@
     <table class="header-table">
         <tr>
             <td style="width: 58%; vertical-align: top;">
+                @php
+                    $sellerOrg = billing_organization_details($return);
+                @endphp
                 <table style="border-collapse: collapse;">
                     <tr>
                         <td style="vertical-align: top; width: 44px;">
-                            <div class="company-avatar">{{ $companyInitial }}</div>
+                            <div class="company-avatar">{{ $sellerOrg['avatar_char'] }}</div>
                         </td>
                         <td style="vertical-align: top; padding-left: 8px;">
-                            <div class="company-name">{{ $tenantName }}</div>
-                            <div class="company-sub">Sales Return / Credit Voucher Unit</div>
+                            <div class="company-name">{{ $sellerOrg['name'] }}</div>
+                            <div class="company-sub">{{ $sellerOrg['unit_subtext'] }}</div>
                         </td>
                     </tr>
                 </table>
                 <div class="company-address">
-                    H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
-                    <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
-                    <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@sasserp.com' }} &nbsp;|&nbsp; 
-                    <strong>Phone:</strong> +91 294 2440230
+                    {{ $sellerOrg['address'] }}<br>
+                    <strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }} &nbsp;|&nbsp; <strong>State Code:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] }})<br>
+                    @if($sellerOrg['email'])
+                        <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                    @endif
+                    @if($sellerOrg['email'] && $sellerOrg['phone'])
+                        &nbsp;|&nbsp;
+                    @endif
+                    @if($sellerOrg['phone'])
+                        <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                    @endif
                 </div>
             </td>
             <td style="width: 42%; vertical-align: top; text-align: right;">

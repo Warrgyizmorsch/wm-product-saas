@@ -124,9 +124,7 @@
         .info-boxes-table {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 12px 0;
-            margin-left: -12px;
-            margin-right: -12px;
+            border-spacing: 0;
             margin-bottom: 14px;
             page-break-inside: avoid;
         }
@@ -136,7 +134,13 @@
             border-radius: 6px;
             padding: 10px 12px;
             vertical-align: top;
-            width: 50%;
+            width: 48.5%;
+        }
+        .info-box-gap {
+            width: 3%;
+            border: none;
+            background: transparent;
+            padding: 0;
         }
         .box-title {
             font-size: 9px;
@@ -353,21 +357,41 @@
         </table>
     </footer>
 
+    @php
+        $sellerOrg = billing_organization_details($payment);
+    @endphp
     <!-- 1. HEADER SECTION -->
     <table class="header-table">
         <tr>
             <td style="vertical-align: top; width: 58%;">
                 <div class="company-avatar">
-                    {{ strtoupper(substr(tenant() ? tenant()->name : 'D', 0, 1)) }}
+                    {{ strtoupper(substr($sellerOrg['name'] ?? 'D', 0, 1)) }}
                 </div>
                 <div class="company-info">
-                    <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
+                    <div class="company-name">{{ $sellerOrg['name'] }}</div>
                     <div class="company-sub">Official Payment Receipt</div>
                 </div>
                 <div class="company-address">
-                    H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
-                    <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
-                    <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@sasserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230
+                    @if(!empty($sellerOrg['address']))
+                        {{ $sellerOrg['address'] }}<br>
+                    @endif
+                    @if(!empty($sellerOrg['gstin']))
+                        <strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }}
+                    @endif
+                    @if(!empty($sellerOrg['state_code']) || !empty($sellerOrg['state_name']))
+                        @if(!empty($sellerOrg['gstin'])) &nbsp;|&nbsp; @endif
+                        <strong>State Code:</strong> {{ $sellerOrg['state_code'] ?? '—' }} ({{ $sellerOrg['state_name'] ?? '—' }})
+                    @endif
+                    @if(!empty($sellerOrg['gstin']) || !empty($sellerOrg['state_code']))
+                        <br>
+                    @endif
+                    @if(!empty($sellerOrg['email']))
+                        <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                    @endif
+                    @if(!empty($sellerOrg['phone']))
+                        @if(!empty($sellerOrg['email'])) &nbsp;|&nbsp; @endif
+                        <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                    @endif
                 </div>
             </td>
             <td style="vertical-align: top; width: 42%; text-align: right;">
@@ -423,6 +447,9 @@
                     </div>
                 @endif
             </td>
+
+            <!-- Gap -->
+            <td class="info-box-gap"></td>
 
             <!-- Right Box: Payment Summary & Status -->
             <td class="info-box">

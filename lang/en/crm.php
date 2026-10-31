@@ -2312,5 +2312,12 @@ return array (
   'date_label' => 'Date',
   'meetings_geo_verification' => 'Geo-Verification:',
   'download_pdf' => 'Download PDF',
+
+  // Customer Edit Screen
+  'edit_customer' => 'Edit Customer',
+  'opening_balance' => 'Opening Balance',
+  'linked_to_crm_account' => 'Linked to CRM Account',
+  'update_customer' => 'Update Customer',
+  'update' => 'Update',
 );
 

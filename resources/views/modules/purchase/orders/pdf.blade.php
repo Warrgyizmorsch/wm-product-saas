@@ -209,6 +209,7 @@
     @php
         $currency = tenant()?->settings['currency'] ?? 'INR';
         $currencySymbol = ($currency === 'INR') ? '₹' : $currency . ' ';
+        $buyerOrg = billing_organization_details($order);
     @endphp
     
     <div class="container">
@@ -220,7 +221,7 @@
                     <table style="width: 55px; height: 55px; border-collapse: collapse; border: 0; background-color: #1e40af; border-radius: 6px;">
                         <tr>
                             <td style="vertical-align: middle; text-align: center; color: #ffffff; font-weight: bold; font-size: 26px; border: 0; padding: 0; height: 55px; width: 55px;">
-                                {{ strtoupper(substr(tenant() ? tenant()->name : 'E', 0, 1)) }}
+                                {{ strtoupper(substr($buyerOrg['name'] ?? 'E', 0, 1)) }}
                             </td>
                         </tr>
                     </table>
@@ -229,17 +230,29 @@
                 <!-- Column 2: Company Details -->
                 <td style="vertical-align: top; border: 0; padding: 0 0 0 12px;">
                     <div style="font-size: 15px; font-weight: bold; color: #1e293b; margin: 0 0 2px 0; line-height: 1.2;">
-                        {{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}
+                        {{ $buyerOrg['name'] }}
                     </div>
+                    @if(!empty($buyerOrg['address']))
                     <div style="font-size: 9px; color: #64748b; margin-bottom: 1px; line-height: 1.3;">
-                        H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India
+                        {{ $buyerOrg['address'] }}
                     </div>
+                    @endif
                     <div style="font-size: 8.5px; color: #64748b; margin-bottom: 1px; line-height: 1.3;">
-                        Tel: +91 294 2440230 | GSTIN: 08AAFCS1234E1Z0
+                        @if(!empty($buyerOrg['phone']))
+                            Tel: {{ $buyerOrg['phone'] }}
+                        @endif
+                        @if(!empty($buyerOrg['gstin']))
+                            @if(!empty($buyerOrg['phone'])) | @endif GSTIN: {{ $buyerOrg['gstin'] }}
+                        @endif
+                        @if(!empty($buyerOrg['state_code']))
+                            | State: {{ $buyerOrg['state_code'] }} ({{ $buyerOrg['state_name'] ?? '' }})
+                        @endif
                     </div>
+                    @if(!empty($buyerOrg['email']))
                     <div style="font-size: 8.5px; color: #64748b; line-height: 1.3;">
-                        Email: {{ (tenant() && tenant()->billing_email) ? tenant()->billing_email : 'info@sasserp.com' }} | Web: www.sasserp.com
+                        Email: {{ $buyerOrg['email'] }}
                     </div>
+                    @endif
                 </td>
                 
                 <!-- Column 3: PO details -->

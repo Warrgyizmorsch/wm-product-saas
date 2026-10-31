@@ -11,6 +11,9 @@
         <a href="{{ route('purchase.bills.index') }}" class="btn btn-light border fs-12">
             <i class="feather-arrow-left me-2"></i>{{ __('purchase.back_to_bills') }}
         </a>
+        <a href="{{ route('purchase.bills.pdf', $bill->id) }}" class="btn btn-outline-secondary border fs-12 fw-semibold" target="_blank">
+            <i class="feather-printer me-1.5"></i>PDF / Print
+        </a>
 
         {{-- A bill held by 3-way match can't be paid or offset until released. --}}
         @if($bill->due_amount > 0 && !$bill->isOnHold())

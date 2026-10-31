@@ -18,6 +18,8 @@ class Invoice extends BaseModel
         'company_id',
         'branch_id',
         'customer_id',
+        'billing_address',
+        'shipping_address',
         'project_id',
         'sales_order_id',
         'material_requirement_id',

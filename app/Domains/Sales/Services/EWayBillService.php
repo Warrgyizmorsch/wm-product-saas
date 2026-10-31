@@ -158,10 +158,11 @@ class EWayBillService
         $tenant = tenant();
         $customer = $invoice->customer ?: $invoice->salesOrder?->customer;
 
-        $sellerGstin = $tenant?->gstin ?: '08AAFCS1234E1Z0';
-        $sellerStateCode = (int)substr($sellerGstin, 0, 2) ?: 8;
-        $buyerGstin = $customer?->gstin ?: '27AABCU9603R1ZM';
-        $buyerStateCode = (int)substr($buyerGstin, 0, 2) ?: 27;
+        $comp = $invoice->company ?: company();
+        $sellerGstin = $comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: ''));
+        $sellerStateCode = (int)substr($sellerGstin, 0, 2) ?: 0;
+        $buyerGstin = $customer?->gstin ?: '';
+        $buyerStateCode = (int)substr($buyerGstin, 0, 2) ?: 0;
 
         $items = [];
         $totTaxable = 0;

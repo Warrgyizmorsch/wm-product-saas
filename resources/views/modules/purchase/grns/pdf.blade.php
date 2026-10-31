@@ -102,15 +102,23 @@
     @php
         $tenant = tenant();
         $currency = $tenant?->settings['currency'] ?? 'INR';
+        $org = billing_organization_details($grn);
     @endphp
 
     <table class="header-table">
         <tr>
-            <td>
-                <div class="company-title">{{ $tenant?->name ?? 'SaaS ERP Workspace' }}</div>
-                <div style="color: #64748b; margin-top: 4px;">{{ $tenant?->settings['address'] ?? __('purchase.main_warehouse') }}</div>
+            <td style="width: 60%;">
+                <div class="company-title">{{ $org['name'] }}</div>
+                @if(!empty($org['address']))
+                    <div style="color: #64748b; font-size: 10px; margin-top: 3px; line-height: 1.4;">{{ $org['address'] }}</div>
+                @endif
+                <div style="color: #64748b; font-size: 9.5px; margin-top: 2px;">
+                    @if(!empty($org['gstin'])) <strong>GSTIN:</strong> {{ $org['gstin'] }} @endif
+                    @if(!empty($org['state_code'])) | <strong>State:</strong> {{ $org['state_code'] }} ({{ $org['state_name'] ?? '' }}) @endif
+                    @if(!empty($org['phone'])) | <strong>Tel:</strong> {{ $org['phone'] }} @endif
+                </div>
             </td>
-            <td class="text-right">
+            <td class="text-right" style="width: 40%;">
                 <div class="doc-title">{{ strtoupper(__('purchase.goods_receipt_note')) }}</div>
                 <div class="font-mono" style="font-size: 14px; font-weight: bold; color: #3454d1; margin-top: 3px;">{{ $grn->grn_number }}</div>
                 <div style="margin-top: 4px;"><span class="badge-approved">{{ strtoupper(__('purchase.status_' . strtolower($grn->status))) }}</span></div>
@@ -127,9 +135,19 @@
         </tr>
         <tr>
             <td class="info-header">{{ __('purchase.supplier_vendor') }}:</td>
-            <td style="font-weight: bold; color: #1e293b;">{{ $grn->vendor?->name ?? 'N/A' }}</td>
+            <td style="font-weight: bold; color: #1e293b;">
+                {{ $grn->vendor?->name ?? 'N/A' }}
+                @if($grn->vendor?->address)
+                    <div style="font-size: 9px; color: #64748b; font-weight: normal;">{{ $grn->vendor->address }}</div>
+                @endif
+            </td>
             <td class="info-header">{{ __('purchase.warehouse') }}:</td>
-            <td>{{ $grn->warehouse?->name ?? __('purchase.main_warehouse') }}</td>
+            <td>
+                <strong>{{ $grn->warehouse?->name ?? __('purchase.main_warehouse') }}</strong>
+                @if($grn->warehouse?->address)
+                    <div style="font-size: 9px; color: #64748b;">{{ $grn->warehouse->address }}</div>
+                @endif
+            </td>
         </tr>
         <tr>
             <td class="info-header">{{ __('purchase.challan_invoice_no') }}:</td>

@@ -565,4 +565,17 @@ class VendorBillController extends Controller
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Service Bill {$bill->bill_number} created successfully.");
     }
+
+    public function downloadPdf($id)
+    {
+        $tenantId = require_tenant_id();
+        $bill = VendorBill::where('tenant_id', $tenantId)
+            ->with(['vendor', 'purchaseOrder', 'goodsReceiptNote', 'items.product'])
+            ->findOrFail($id);
+
+        $this->authorize('view', $bill);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.bills.pdf', compact('bill'));
+        return $pdf->download("Bill_{$bill->bill_number}.pdf");
+    }
 }
