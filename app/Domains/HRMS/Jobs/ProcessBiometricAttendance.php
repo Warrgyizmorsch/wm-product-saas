@@ -56,47 +56,28 @@ class ProcessBiometricAttendance implements ShouldQueue
             $totalWorkHours = round($totalGrossMinutes / 60, 2);
         }
 
-        // 3. Check if they checked in late based on shift roster and penalization policy
+        // 3. Evaluate Penalization Policy (Late Arrival & Under Hours)
         $status = 'present';
-        try {
-            $shift = $employee->resolveShiftForDate($this->date);
-            if ($shift && !empty($shift->start_time)) {
-                $shiftStartTimeStr = $this->date . ' ' . $shift->start_time;
-                $shiftStartTime = Carbon::parse($shiftStartTimeStr);
-                
-                $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
-                        $q->where('company_id', $employee->company_id)
-                          ->orWhereNull('company_id');
-                    })
-                    ->where('rule_type', 'late_arrival')
-                    ->where('status', true)
-                    ->orderByRaw('company_id IS NULL ASC')
-                    ->first();
+        $penaltyService = app(\App\Domains\HRMS\Services\AttendancePenaltyService::class);
+        $penaltyService->evaluateLateArrival($employee, $this->date, $checkInTime, $status);
 
-                $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : ($shift->grace_period_minutes ?? 15);
-                $lateThreshold = $shiftStartTime->copy()->addMinutes($graceMinutes);
+        $existingAtt = Attendance::where('employee_id', $employee->id)->whereDate('date', $this->date)->first();
+        $existingBreakHours = $existingAtt ? (float) ($existingAtt->total_break_hours ?? 0.00) : 0.00;
+        $netWorkHours = $checkOutTime ? max(0.00, round($totalWorkHours - $existingBreakHours, 2)) : 0.00;
 
-                if ($checkInTime->gt($lateThreshold)) {
-                    $status = 'late';
-                }
-            }
-        } catch (\Throwable $e) {
-            // Fallback gracefully on parsing issue
-            $status = 'present';
+        if ($checkOutTime && $netWorkHours > 0) {
+            $penaltyService->evaluateUnderHours($employee, $this->date, $netWorkHours, $status);
         }
 
         // 4. Update or create the Attendance record
-        DB::transaction(function () use ($employee, $checkInTime, $checkOutTime, $totalWorkHours, $status) {
+        DB::transaction(function () use ($employee, $checkInTime, $checkOutTime, $netWorkHours, $existingBreakHours, $status) {
             $attendance = Attendance::where('employee_id', $employee->id)
                 ->whereDate('date', $this->date)
                 ->first();
 
-            $existingBreakHours = $attendance ? (float) ($attendance->total_break_hours ?? 0.00) : 0.00;
-            $netWorkHours = $checkOutTime ? max(0.00, round($totalWorkHours - $existingBreakHours, 2)) : 0.00;
-
             if ($attendance) {
-                // If attendance already has a recognized custom status (e.g. on_leave, half_day), don't overwrite if manual
-                $attendanceStatus = in_array($attendance->status, ['on_leave', 'half_day', 'holiday'])
+                // If attendance already has a recognized custom status (e.g. on_leave, holiday), don't overwrite if manual
+                $attendanceStatus = in_array($attendance->status, ['on_leave', 'holiday'])
                     ? $attendance->status
                     : $status;
 

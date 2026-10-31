@@ -286,40 +286,10 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             }
         }
 
-        // Optional: Check if check-in is late relative to shift
-        $resolvedShift = $employee ? $employee->resolveShiftForDate($today) : null;
-        if ($resolvedShift) {
-            $shiftStartStr = $resolvedShift->start_time; // e.g. "09:00:00"
-            $nowTime = Carbon::now();
-            $shiftStart = Carbon::parse($today . ' ' . $shiftStartStr);
-
-            if ($nowTime->greaterThan($shiftStart)) {
-                // Determine grace minutes configured
-                $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
-                        $q->where('company_id', $employee->company_id)
-                          ->orWhereNull('company_id');
-                    })
-                    ->where('rule_type', 'late_arrival')
-                    ->where('status', true)
-                    ->orderByRaw('company_id IS NULL ASC')
-                    ->first();
-
-                $graceMinutes = $penaltyRule ? (int)$penaltyRule->grace_period_minutes : 15;
-                $diffMinutes = $nowTime->diffInMinutes($shiftStart);
-
-                if ($diffMinutes > 0) {
-                    $status = 'late';
-                    $bypassGrace = ($diffMinutes > $graceMinutes); // true if major late (outside daily grace limit)
-
-                    // Count past late arrivals in the current calendar month
-                    $pastLateCount = Attendance::where('employee_id', $employeeId)
-                        ->where('status', 'late')
-                        ->whereBetween('date', [Carbon::now()->startOfMonth()->toDateString(), Carbon::now()->endOfMonth()->toDateString()])
-                        ->count();
-
-                    $this->applyAttendancePenalty($employee, $today, 'late_arrival', $pastLateCount, $status, $bypassGrace);
-                }
-            }
+        // Check if check-in is late relative to shift and evaluate penalization policy
+        if ($employee) {
+            app(\App\Domains\HRMS\Services\AttendancePenaltyService::class)
+                ->evaluateLateArrival($employee, $today, Carbon::now(), $status);
         }
 
         return Attendance::create([
@@ -520,7 +490,8 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         $status = $attendance->status ?: 'present';
 
         if ($employee) {
-            $this->applyAttendancePenalty($employee, $attendance->date->toDateString(), 'under_hours', $totalWorkHours, $status);
+            app(\App\Domains\HRMS\Services\AttendancePenaltyService::class)
+                ->evaluateUnderHours($employee, $attendance->date->toDateString(), $totalWorkHours, $status);
         }
 
         $updateData = [
@@ -558,195 +529,20 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
     private function applyAttendancePenalty($employee, $date, $ruleType, $valToCheck, &$status, $bypassGrace = false)
     {
-        $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
-                $q->where('company_id', $employee->company_id)
-                  ->orWhereNull('company_id');
-            })
-            ->where('rule_type', $ruleType)
-            ->where('status', true)
-            ->orderByRaw('company_id IS NULL ASC')
-            ->first();
-
-        if (!$penaltyRule || !is_array($penaltyRule->penalty_tiers)) {
-            return;
-        }
-
+        if (!$employee) return;
+        $penaltyService = app(\App\Domains\HRMS\Services\AttendancePenaltyService::class);
         if ($ruleType === 'late_arrival') {
-            $occurrenceNum = $valToCheck + 1;
-            
-            // If within allowed monthly grace period, skip penalization (unless major late bypasses grace)
-            if (!$bypassGrace && $occurrenceNum <= ($penaltyRule->threshold_count ?? 0)) {
-                return;
-            }
-
-            foreach ($penaltyRule->penalty_tiers as $tier) {
-                $min = isset($tier['min_occurrence']) ? (int)$tier['min_occurrence'] : 0;
-                $max = isset($tier['max_occurrence']) && $tier['max_occurrence'] !== null ? (int)$tier['max_occurrence'] : null;
-
-                if ($occurrenceNum >= $min && ($max === null || $occurrenceNum <= $max)) {
-                    $action = $tier['penalty_action'] ?? '';
-                    $val = isset($tier['penalty_value']) ? floatval($tier['penalty_value']) : 0;
-
-                    if ($action === 'working_hour_deduction' || $action === 'both_deductions') {
-                        if ($val >= 1.0) {
-                            $status = 'absent';
-                        } elseif ($val > 0) {
-                            $status = 'half_day';
-                        }
-                    }
-
-                    if ($action === 'salary_deduction' || $action === 'both_deductions') {
-                        if ($val > 0) {
-                            $payrollMonth = Carbon::parse($date)->format('Y-m');
-                            $tenantId = $employee->tenant_id ?? (auth()->user()?->tenant_id);
-
-                            \App\Domains\HRMS\Models\EmployeePenalty::updateOrCreate(
-                                [
-                                    'employee_id' => $employee->id,
-                                    'date'        => $date,
-                                    'rule_type'   => $ruleType,
-                                ],
-                                [
-                                    'tenant_id'      => $tenantId,
-                                    'penalty_amount' => round($val, 2),
-                                    'status'         => 'pending',
-                                    'payroll_month'  => $payrollMonth,
-                                    'remarks'        => "Late check-in occurrence #{$occurrenceNum}. Automated salary deduction applied ({$val} Day(s)).",
-                                ]
-                            );
-                        }
-                    }
-                    break;
-                }
-            }
+            $penaltyService->evaluateLateArrival($employee, $date, Carbon::parse($date . ' ' . Carbon::now()->format('H:i:s')), $status);
         } elseif ($ruleType === 'under_hours') {
-            // Calculate target hours
-            $targetHours = ($penaltyRule->grace_period_minutes > 0) ? ($penaltyRule->grace_period_minutes / 60) : 8.0;
-
-            // Count past deficit occurrences this month
-            $pastDeficitCount = Attendance::where('employee_id', $employee->id)
-                ->whereBetween('date', [Carbon::now()->startOfMonth()->toDateString(), Carbon::now()->endOfMonth()->toDateString()])
-                ->where('total_work_hours', '>', 0)
-                ->where('total_work_hours', '<', $targetHours)
-                ->where('date', '<', $date)
-                ->count();
-
-            $occurrenceNum = $pastDeficitCount + 1;
-
-            // If within allowed monthly grace period, skip penalization
-            if ($occurrenceNum <= ($penaltyRule->threshold_count ?? 0)) {
-                return;
-            }
-
-            $sortedTiers = collect($penaltyRule->penalty_tiers)->sortBy('hours_threshold')->all();
-            foreach ($sortedTiers as $tier) {
-                $hoursThreshold = isset($tier['hours_threshold']) ? floatval($tier['hours_threshold']) : 0;
-
-                if ($valToCheck < $hoursThreshold) {
-                    $action = $tier['penalty_action'] ?? '';
-                    $val = isset($tier['penalty_value']) ? floatval($tier['penalty_value']) : 0;
-
-                    if ($action === 'working_hour_deduction' || $action === 'both_deductions') {
-                        if ($val >= 1.0) {
-                            $status = 'absent';
-                        } elseif ($val > 0) {
-                            $status = 'half_day';
-                        }
-                    }
-
-                    if ($action === 'salary_deduction' || $action === 'both_deductions') {
-                        if ($val > 0) {
-                            $payrollMonth = Carbon::parse($date)->format('Y-m');
-                            $tenantId = $employee->tenant_id ?? (auth()->user()?->tenant_id);
-
-                            \App\Domains\HRMS\Models\EmployeePenalty::updateOrCreate(
-                                [
-                                    'employee_id' => $employee->id,
-                                    'date'        => $date,
-                                    'rule_type'   => $ruleType,
-                                ],
-                                [
-                                    'tenant_id'      => $tenantId,
-                                    'penalty_amount' => round($val, 2),
-                                    'status'         => 'pending',
-                                    'payroll_month'  => $payrollMonth,
-                                    'remarks'        => "Work hours deficit today ({$valToCheck} hours). Automated salary deduction applied ({$val} Day(s)).",
-                                ]
-                            );
-                        }
-                    }
-                    break;
-                }
-            }
+            $penaltyService->evaluateUnderHours($employee, $date, (float) $valToCheck, $status);
         }
     }
 
     private function applyMissingLogsPenalty($employee, $date, $valToCheck)
     {
-        $penaltyRule = \App\Domains\HRMS\Models\AttendancePenalty::where(function ($q) use ($employee) {
-                $q->where('company_id', $employee->company_id)
-                  ->orWhereNull('company_id');
-            })
-            ->where('rule_type', 'missing_logs')
-            ->where('status', true)
-            ->orderByRaw('company_id IS NULL ASC')
-            ->first();
-
-        if (!$penaltyRule || !is_array($penaltyRule->penalty_tiers)) {
-            return;
-        }
-
-        $occurrenceNum = $valToCheck;
-
-        // If within allowed monthly grace period, skip penalization
-        if ($occurrenceNum <= ($penaltyRule->threshold_count ?? 0)) {
-            return;
-        }
-
-        foreach ($penaltyRule->penalty_tiers as $tier) {
-            $min = isset($tier['min_occurrence']) ? (int)$tier['min_occurrence'] : 0;
-            $max = isset($tier['max_occurrence']) && $tier['max_occurrence'] !== null ? (int)$tier['max_occurrence'] : null;
-
-            if ($occurrenceNum >= $min && ($max === null || $occurrenceNum <= $max)) {
-                $action = $tier['penalty_action'] ?? '';
-                $val = isset($tier['penalty_value']) ? floatval($tier['penalty_value']) : 0;
-
-                if ($action === 'working_hour_deduction' || $action === 'both_deductions') {
-                    if ($val >= 1.0) {
-                        $targetStatus = 'absent';
-                    } elseif ($val > 0) {
-                        $targetStatus = 'half_day';
-                    } else {
-                        $targetStatus = 'missing_logs';
-                    }
-                    Attendance::where('employee_id', $employee->id)
-                        ->where('date', $date)
-                        ->update(['status' => $targetStatus]);
-                }
-
-                if ($action === 'salary_deduction' || $action === 'both_deductions') {
-                    if ($val > 0) {
-                        $payrollMonth = Carbon::parse($date)->format('Y-m');
-                        $tenantId = $employee->tenant_id ?? (auth()->user()?->tenant_id);
-
-                        \App\Domains\HRMS\Models\EmployeePenalty::updateOrCreate(
-                            [
-                                'employee_id' => $employee->id,
-                                'date'        => $date,
-                                'rule_type'   => 'missing_logs',
-                            ],
-                            [
-                                'tenant_id'      => $tenantId,
-                                'penalty_amount' => round($val, 2),
-                                'status'         => 'pending',
-                                'payroll_month'  => $payrollMonth,
-                                'remarks'        => "Missing check-out on {$date} (occurrence #{$occurrenceNum}). Automated salary deduction applied ({$val} Day(s)).",
-                            ]
-                        );
-                    }
-                }
-                break;
-            }
+        if ($employee) {
+            app(\App\Domains\HRMS\Services\AttendancePenaltyService::class)
+                ->evaluateMissingLogs($employee, $date, (int) $valToCheck);
         }
     }
 
@@ -1893,6 +1689,8 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                 ->whereDate('date', $dateStr)
                 ->first();
 
+            $penaltyService = app(\App\Domains\HRMS\Services\AttendancePenaltyService::class);
+
             if ($existingAtt) {
                 // If existing record already has check_in and this is a single punch import
                 $newCheckIn = $existingAtt->check_in;
@@ -1924,6 +1722,13 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                     $workHours = round($newCheckIn->diffInMinutes($newCheckOut) / 60, 2);
                 }
 
+                if ($newCheckIn) {
+                    $penaltyService->evaluateLateArrival($employee, $dateStr, $newCheckIn, $statusRaw);
+                }
+                if ($workHours > 0) {
+                    $penaltyService->evaluateUnderHours($employee, $dateStr, $workHours, $statusRaw);
+                }
+
                 $existingAtt->update([
                     'status'           => $statusRaw ?: $existingAtt->status,
                     'check_in'         => $newCheckIn,
@@ -1935,6 +1740,13 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                 $workHours = 0.00;
                 if ($punchInDatetime && $punchOutDatetime && $punchOutDatetime->gt($punchInDatetime)) {
                     $workHours = round($punchInDatetime->diffInMinutes($punchOutDatetime) / 60, 2);
+                }
+
+                if ($punchInDatetime) {
+                    $penaltyService->evaluateLateArrival($employee, $dateStr, $punchInDatetime, $statusRaw);
+                }
+                if ($workHours > 0) {
+                    $penaltyService->evaluateUnderHours($employee, $dateStr, $workHours, $statusRaw);
                 }
 
                 Attendance::create([
