@@ -12,6 +12,7 @@ use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\OvertimeRequest;
 use App\Domains\HRMS\Models\PayGroup;
 use App\Domains\HRMS\Models\PayrollHold;
+use App\Domains\HRMS\Models\PayrollPayslip;
 use App\Domains\HRMS\Models\PayrollRetroactiveAdjustment;
 use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\SalaryComponent;
@@ -47,67 +48,7 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
         $pendingPriorHolds = [];
         
         if ($selectedRun) {
-            $excludeEmployeeIds = [];
-            if (empty($selectedRun->employee_ids)) {
-                $otherRuns = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
-                    ->where('id', '!=', $selectedRun->id)
-                    ->get();
-
-                foreach ($otherRuns as $or) {
-                    if ($or->employee_ids && count($or->employee_ids) > 0) {
-                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                    } elseif ($or->pay_group_id) {
-                        $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                    } else {
-                        $genEmpIds = Employee::where('status', true)
-                            ->where(function($q) {
-                                $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                            })
-                            ->pluck('id')->toArray();
-                        $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
-                    }
-                }
-                $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-            }
-
-            if ($selectedRun->employee_ids && count($selectedRun->employee_ids) > 0) {
-                $employees = Employee::whereIn('id', $selectedRun->employee_ids)
-                    ->whereNotIn('id', $excludeEmployeeIds)
-                    ->where('status', true)
-                    ->where(function($q) {
-                        $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                    })
-                    ->get();
-            } else {
-                $employeesQuery = Employee::where('status', true)
-                    ->where(function($q) {
-                        $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                    })
-                    ->where(function($q) use ($selectedRun) {
-                        $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $selectedRun->end_date);
-                    })
-                    ->whereNotIn('id', $excludeEmployeeIds);
-
-                if ($selectedRun->pay_group_id) {
-                    $employeesQuery->where('pay_group_id', $selectedRun->pay_group_id);
-                } else {
-                    $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $selectedRun->payroll_month)
-                        ->where('id', '!=', $selectedRun->id)
-                        ->whereNotNull('pay_group_id')
-                        ->pluck('pay_group_id')
-                        ->toArray();
-
-                    if (!empty($otherProcessedPayGroupIds)) {
-                        $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
-                            $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
-                                ->orWhereNull('pay_group_id');
-                        });
-                    }
-                }
-
-                $employees = $employeesQuery->get();
-            }
+            $employees = $this->getRunEmployees($selectedRun);
 
             foreach ($employees as $employee) {
                 $calc = $this->payrollCalculationService->calculateSalary($employee, $selectedRun->payroll_month, $selectedRun);
@@ -334,10 +275,17 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
         try {
             DB::transaction(function () use ($run) {
                 $run->update(['status' => 'locked']);
+
+                // Capture frozen snapshot of all payslips for this run
+                $this->snapshotRun($run, 'locked');
+
                 app(PayrollAccountingService::class)->postPayrollRunJournal($run);
             });
         } catch (\InvalidArgumentException $e) {
             return ['success' => false, 'message' => 'Payroll not locked — the salary entry could not be posted: ' . $e->getMessage()];
+        } catch (\Throwable $e) {
+            Log::error('Payroll lock failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return ['success' => false, 'message' => 'Payroll not locked due to an unexpected error: ' . $e->getMessage()];
         }
 
         return ['success' => true];
@@ -456,62 +404,12 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
     {
         $run->update(['status' => 'paid']);
 
-        $excludeEmployeeIds = [];
-        if (empty($run->employee_ids)) {
-            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->get();
+        try {
+            PayrollPayslip::where('payroll_run_id', $run->id)
+                ->update(['status' => 'paid']);
+        } catch (\Throwable $e) {}
 
-            foreach ($otherRuns as $or) {
-                if ($or->employee_ids && count($or->employee_ids) > 0) {
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                } else {
-                    $allEmpIds = Employee::pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $allEmpIds);
-                }
-            }
-            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-        }
-
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            $employees = Employee::whereIn('id', $run->employee_ids)
-                ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->get();
-        } else {
-            $employeesQuery = Employee::where('status', true)
-                ->where(function($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->where(function($q) use ($run) {
-                    $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
-                })
-                ->whereNotIn('id', $excludeEmployeeIds);
-
-            if ($run->pay_group_id) {
-                $employeesQuery->where('pay_group_id', $run->pay_group_id);
-            } else {
-                $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
-                    ->where('id', '!=', $run->id)
-                    ->whereNotNull('pay_group_id')
-                    ->pluck('pay_group_id')
-                    ->toArray();
-                if (!empty($otherProcessedPayGroupIds)) {
-                    $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
-                        $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
-                            ->orWhereNull('pay_group_id');
-                    });
-                }
-            }
-            $employees = $employeesQuery->get();
-        }
-
+        $employees = $this->getRunEmployees($run);
         $processedEmployeeIds = $employees->pluck('id')->toArray();
 
         if (!empty($processedEmployeeIds)) {
@@ -615,13 +513,13 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
         return $msg;
     }
 
-    public function getMySalaryData(Employee $employee): array
+    public function getMySalaryData(Employee $employee, array $inputs = []): array
     {
-        $paidRuns = PayrollRun::where('status', 'paid')
+        $paidRuns = PayrollRun::whereIn('status', ['paid', 'locked'])
             ->orderBy('payroll_month', 'desc')
             ->get();
 
-        $salaryHistory = [];
+        $allHistory = [];
         foreach ($paidRuns as $run) {
             // Ensure employee actually belongs to this payroll run
             if ($run->company_id && $run->company_id != $employee->company_id) {
@@ -662,19 +560,71 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             }
 
             $calc = $this->payrollCalculationService->calculateSalary($employee, $run->payroll_month, $run);
-            $salaryHistory[] = [
-                'run' => $run,
-                'calc' => $calc['summary'] ?? null,
-                'details' => $calc['items'] ?? [],
+            $netPayout = (float) ($calc['summary']['net_payout'] ?? 0.0);
+            $monthObj = Carbon::parse($run->payroll_month . '-01');
+
+            $allHistory[] = [
+                'run'           => $run,
+                'calc'          => $calc['summary'] ?? null,
+                'details'       => $calc['items'] ?? [],
+                'payroll_month' => $run->payroll_month,
+                'month_name'    => $monthObj->locale(app()->getLocale())->translatedFormat('F Y'),
+                'month_name_en' => $monthObj->format('F Y'),
+                'year'          => $monthObj->format('Y'),
+                'month_num'     => $monthObj->format('m'),
+                'net_payout'    => $netPayout,
             ];
         }
 
-        $page = (int)request()->input('page', 1);
+        $collection = collect($allHistory);
+
+        // Available years and months for filter dropdowns
+        $availableYears = $collection->pluck('year')->unique()->sortDesc()->values()->toArray();
+        $availableMonths = $collection->pluck('payroll_month')->unique()->sort()->values()->toArray();
+
+        // 1. Search Filter
+        if (!empty($inputs['search'])) {
+            $search = mb_strtolower(trim($inputs['search']), 'UTF-8');
+            $collection = $collection->filter(function ($item) use ($search) {
+                $monthMatch   = str_contains(mb_strtolower($item['month_name'], 'UTF-8'), $search)
+                             || str_contains(mb_strtolower($item['month_name_en'], 'UTF-8'), $search);
+                $codeMatch    = str_contains(mb_strtolower($item['payroll_month'], 'UTF-8'), $search);
+                $payoutMatch  = str_contains((string)$item['net_payout'], $search);
+                return $monthMatch || $codeMatch || $payoutMatch;
+            });
+        }
+
+        // 2. Year Filter
+        if (!empty($inputs['year'])) {
+            $year = trim($inputs['year']);
+            $collection = $collection->filter(fn($item) => $item['year'] === $year);
+        }
+
+        // 3. Month Filter (1-12)
+        if (!empty($inputs['month'])) {
+            $month = str_pad(trim($inputs['month']), 2, '0', STR_PAD_LEFT);
+            $collection = $collection->filter(fn($item) => $item['month_num'] === $month);
+        }
+
+        // 4. Sorting
+        $sort = $inputs['sort'] ?? 'newest';
+        if ($sort === 'oldest') {
+            $collection = $collection->sortBy('payroll_month')->values();
+        } elseif ($sort === 'payout_high') {
+            $collection = $collection->sortByDesc('net_payout')->values();
+        } elseif ($sort === 'payout_low') {
+            $collection = $collection->sortBy('net_payout')->values();
+        } else {
+            // Default newest first
+            $collection = $collection->sortByDesc('payroll_month')->values();
+        }
+
+        // 5. Pagination
+        $page = (int) ($inputs['page'] ?? request()->input('page', 1));
         if ($page < 1) $page = 1;
         $perPage = 10;
-        $historyCollection = collect($salaryHistory);
-        $total = $historyCollection->count();
-        $pagedItems = $historyCollection->slice(($page - 1) * $perPage, $perPage)->values();
+        $total = $collection->count();
+        $pagedItems = $collection->slice(($page - 1) * $perPage, $perPage)->values();
 
         $salaryHistory = new LengthAwarePaginator(
             $pagedItems,
@@ -688,11 +638,83 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             ]
         );
 
-        return compact('employee', 'salaryHistory');
+        return compact('employee', 'salaryHistory', 'availableYears', 'availableMonths', 'inputs');
+    }
+
+    public function getRangePayslipsData(Employee $employee, string $fromMonth, string $toMonth): array
+    {
+        $minMonth = min($fromMonth, $toMonth);
+        $maxMonth = max($fromMonth, $toMonth);
+
+        $runs = PayrollRun::whereIn('status', ['paid', 'locked'])
+            ->whereBetween('payroll_month', [$minMonth, $maxMonth])
+            ->orderBy('payroll_month', 'asc')
+            ->get();
+
+        $payslipsData = [];
+        foreach ($runs as $run) {
+            if ($run->company_id && $run->company_id != $employee->company_id) {
+                continue;
+            }
+
+            if (!empty($run->employee_ids) && is_array($run->employee_ids) && !in_array($employee->id, $run->employee_ids)) {
+                continue;
+            }
+
+            if ($run->pay_group_id && $run->pay_group_id != $employee->pay_group_id) {
+                continue;
+            }
+
+            if ($employee->date_of_joining && $run->end_date) {
+                if (Carbon::parse($employee->date_of_joining)->gt(Carbon::parse($run->end_date))) {
+                    continue;
+                }
+            }
+
+            if (empty($run->pay_group_id) && empty($run->employee_ids) && $employee->pay_group_id) {
+                $specificRunExists = PayrollRun::where('payroll_month', $run->payroll_month)
+                    ->whereIn('status', ['paid', 'locked'])
+                    ->where('pay_group_id', $employee->pay_group_id)
+                    ->exists();
+                if ($specificRunExists) {
+                    continue;
+                }
+            }
+
+            $isHeld = PayrollHold::where('employee_id', $employee->id)
+                ->where('payroll_month', $run->payroll_month)
+                ->where('status', 'on_hold')
+                ->exists();
+
+            if ($isHeld) {
+                continue;
+            }
+
+            $payslipsData[] = $this->getPayslipData($run, $employee);
+        }
+
+        return $payslipsData;
     }
 
     public function storeBulkAdhoc(array $validated): array
     {
+        $lockedOrPaid = PayrollRun::where('payroll_month', $validated['payroll_month'])
+            ->whereIn('status', ['locked', 'paid'])
+            ->where(function($q) use ($validated) {
+                $q->whereNull('employee_ids')
+                  ->orWhere('employee_ids', '[]')
+                  ->orWhere(function($sub) use ($validated) {
+                      foreach ($validated['employee_ids'] as $empId) {
+                          $sub->orWhereJsonContains('employee_ids', (int)$empId);
+                      }
+                  });
+            })
+            ->exists();
+
+        if ($lockedOrPaid) {
+            return ['success' => false, 'message' => "Cannot add ad-hoc adjustments: Payroll for {$validated['payroll_month']} is already locked or paid."];
+        }
+
         $employees = Employee::whereIn('id', $validated['employee_ids'])->get();
 
         if ($employees->isEmpty()) {
@@ -704,7 +726,7 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             $insertData = [];
             foreach ($employees as $employee) {
                 $insertData[] = [
-                    'tenant_id'           => auth()->user()->tenant_id ?? 1,
+                    'tenant_id'           => $employee->tenant_id ?? tenant_id() ?? auth()->user()->tenant_id ?? 1,
                     'employee_id'         => $employee->id,
                     'salary_component_id' => $validated['salary_component_id'],
                     'amount'              => $validated['amount'],
@@ -832,5 +854,126 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             $paise = ' and ' . ($point < 21 ? $words[$point] : $words[floor($point / 10) * 10] . ' ' . $words[$point % 10]) . ' Paise';
         }
         return ($Rupees ? $Rupees . 'Rupees' : '') . $paise;
+    }
+
+    /**
+     * Generate and permanently persist calculation snapshots for all employees in a payroll run.
+     */
+    public function snapshotRun(PayrollRun $run, string $status = 'locked'): void
+    {
+        $employees = $this->getRunEmployees($run);
+
+        foreach ($employees as $employee) {
+            $calc = $this->payrollCalculationService->calculateSalaryFresh($employee, $run->payroll_month, $run);
+            $summary = $calc['summary'] ?? [];
+            $items = $calc['items'] ?? [];
+
+            try {
+                PayrollPayslip::updateOrCreate(
+                    [
+                        'payroll_run_id' => $run->id,
+                        'employee_id'    => $employee->id,
+                    ],
+                    [
+                        'tenant_id'        => $employee->tenant_id ?? $run->tenant_id ?? 1,
+                        'company_id'       => $employee->company_id ?? $run->company_id ?? 1,
+                        'payroll_month'    => $run->payroll_month,
+                        'status'           => $status,
+                        'gross_earnings'   => $summary['total_earnings'] ?? 0.00,
+                        'total_deductions' => $summary['total_deductions'] ?? 0.00,
+                        'net_payout'       => $summary['net_payout'] ?? 0.00,
+                        'lop_days'         => $summary['lop_days'] ?? 0.00,
+                        'paid_days'        => $summary['paid_days'] ?? 0.00,
+                        'summary_data'     => $summary,
+                        'items_data'       => $items,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning("Could not snapshot payslip for employee #{$employee->id}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Retrieve all eligible employees for a payroll run.
+     * If the run is locked or paid and has existing payslip snapshots, returns those exact employees.
+     */
+    public function getRunEmployees(PayrollRun $run): \Illuminate\Support\Collection
+    {
+        // 1. If run is already locked or paid and has stored payslips, get those exact employees
+        if (in_array($run->status, ['locked', 'paid'])) {
+            try {
+                $payslipEmpIds = PayrollPayslip::where('payroll_run_id', $run->id)
+                    ->pluck('employee_id')
+                    ->toArray();
+
+                if (!empty($payslipEmpIds)) {
+                    return Employee::withTrashed()->whereIn('id', $payslipEmpIds)->get();
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 2. Otherwise resolve dynamically
+        $excludeEmployeeIds = [];
+        if (empty($run->employee_ids)) {
+            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
+                ->where('id', '!=', $run->id)
+                ->get();
+
+            foreach ($otherRuns as $or) {
+                if ($or->employee_ids && count($or->employee_ids) > 0) {
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
+                } elseif ($or->pay_group_id) {
+                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
+                } else {
+                    $genEmpIds = Employee::where('status', true)
+                        ->where(function($q) {
+                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                        })
+                        ->pluck('id')->toArray();
+                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
+                }
+            }
+            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
+        }
+
+        if ($run->employee_ids && count($run->employee_ids) > 0) {
+            return Employee::whereIn('id', $run->employee_ids)
+                ->whereNotIn('id', $excludeEmployeeIds)
+                ->where('status', true)
+                ->where(function($q) {
+                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+                })
+                ->get();
+        }
+
+        $employeesQuery = Employee::where('status', true)
+            ->where(function($q) {
+                $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
+            })
+            ->where(function($q) use ($run) {
+                $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
+            })
+            ->whereNotIn('id', $excludeEmployeeIds);
+
+        if ($run->pay_group_id) {
+            $employeesQuery->where('pay_group_id', $run->pay_group_id);
+        } else {
+            $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
+                ->where('id', '!=', $run->id)
+                ->whereNotNull('pay_group_id')
+                ->pluck('pay_group_id')
+                ->toArray();
+
+            if (!empty($otherProcessedPayGroupIds)) {
+                $employeesQuery->where(function($sub) use ($otherProcessedPayGroupIds) {
+                    $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
+                        ->orWhereNull('pay_group_id');
+                });
+            }
+        }
+
+        return $employeesQuery->get();
     }
 }

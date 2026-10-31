@@ -667,17 +667,41 @@ class EmployeeController extends Controller
             'remarks'             => 'nullable|string|max:500',
         ]);
 
+        $payrollMonth = $validated['payroll_month'];
+
+        // Enforce: Check if payroll for this month is already locked or paid for this employee
+        $isLockedOrPaid = \App\Domains\HRMS\Models\PayrollRun::where('payroll_month', $payrollMonth)
+            ->whereIn('status', ['locked', 'paid'])
+            ->where(function ($q) use ($employee) {
+                $q->whereNull('employee_ids')
+                  ->orWhere('employee_ids', '[]')
+                  ->orWhereJsonContains('employee_ids', (int) $employee->id)
+                  ->orWhereJsonContains('employee_ids', (string) $employee->id);
+            })
+            ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+            ->when($employee->pay_group_id, function ($q) use ($employee) {
+                $q->where(function ($sub) use ($employee) {
+                    $sub->whereNull('pay_group_id')
+                        ->orWhere('pay_group_id', $employee->pay_group_id);
+                });
+            })
+            ->exists();
+
+        if ($isLockedOrPaid) {
+            return redirect()->back()->with('error', "Cannot add ad-hoc component: Payroll for {$payrollMonth} is already locked or paid.");
+        }
+
         // Enforce Pay Group Variable / Ad-hoc Inputs Lock Day
         $employee->loadMissing('payGroup');
         if ($employee->payGroup && is_array($employee->payGroup->payroll_rules)) {
             $lockDay = (int) ($employee->payGroup->payroll_rules['variable_lock_day'] ?? 25);
-            $payrollMonth = $validated['payroll_month'];
             $currentMonth = \Carbon\Carbon::now()->format('Y-m');
             if ($payrollMonth === $currentMonth && \Carbon\Carbon::now()->day > $lockDay) {
                 return redirect()->back()->with('error', "Ad-hoc / Variable inputs for {$payrollMonth} are locked after day {$lockDay} of the month.");
             }
         }
 
+        $validated['tenant_id']   = $employee->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $validated['employee_id'] = $employee->id;
         $validated['status']      = 'pending';
 

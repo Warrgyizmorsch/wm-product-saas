@@ -97,6 +97,10 @@ class PayrollRunController extends Controller
             // Nothing was marked paid: the books refused (no open period, not enough cash ...).
             return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
                 ->with('error', 'Payouts not released — ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('Payroll payout release failed: ' . $e->getMessage());
+            return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])
+                ->with('error', 'Payouts not released due to an error: ' . $e->getMessage());
         }
 
         return redirect()->route('hrms.payroll.index', ['run_id' => $run->id])->with('success', 'Payroll payouts released successfully.');
@@ -147,7 +151,7 @@ class PayrollRunController extends Controller
         return redirect()->back()->with('success', $msg);
     }
 
-    public function mySalary()
+    public function mySalary(Request $request)
     {
         $user = auth()->user();
         $employee = $user?->employee;
@@ -164,10 +168,10 @@ class PayrollRunController extends Controller
             $employee = Employee::where('tenant_id', tenant_id())->first();
         }
         if (!$employee) {
-            return redirect()->back()->with('error', 'No employee profile linked to your user account.');
+            return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
         }
 
-        $data = $this->payrollRunRepository->getMySalaryData($employee);
+        $data = $this->payrollRunRepository->getMySalaryData($employee, $request->all());
 
         return view('modules.hrms.payroll.my_salary', $data);
     }
@@ -249,6 +253,52 @@ class PayrollRunController extends Controller
         }
 
         $pdf = Pdf::loadView('modules.hrms.payroll.pdf_payslip', $data);
+        return $pdf->download($fileName);
+    }
+
+    public function downloadRangePayslips(Request $request)
+    {
+        $user = auth()->user();
+        $employee = $user?->employee;
+        if (!$employee && $user) {
+            $employee = Employee::where('tenant_id', tenant_id())
+                ->where(function ($q) use ($user) {
+                    if ($user->email) {
+                        $q->where('office_email', $user->email)
+                          ->orWhere('personal_email', $user->email);
+                    }
+                })->first();
+        }
+        if (!$employee) {
+            $employee = Employee::where('tenant_id', tenant_id())->first();
+        }
+        if (!$employee) {
+            return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
+        }
+
+        $validated = $request->validate([
+            'from_month' => 'required|string',
+            'to_month'   => 'required|string',
+        ]);
+
+        $fromMonth = min($validated['from_month'], $validated['to_month']);
+        $toMonth   = max($validated['from_month'], $validated['to_month']);
+
+        $payslipsData = $this->payrollRunRepository->getRangePayslipsData($employee, $fromMonth, $toMonth);
+
+        if (empty($payslipsData)) {
+            return redirect()->back()->with('error', __('hrms.payroll.no_payslips_found_range', ['from' => $fromMonth, 'to' => $toMonth]));
+        }
+
+        $fileName = 'payslips_' . ($employee->employee_id ?: 'emp') . '_' . $fromMonth . '_to_' . $toMonth . '.pdf';
+
+        $pdf = Pdf::loadView('modules.hrms.payroll.pdf_payslips_range', [
+            'payslips'   => $payslipsData,
+            'employee'   => $employee,
+            'fromMonth'  => $fromMonth,
+            'toMonth'    => $toMonth,
+        ]);
+
         return $pdf->download($fileName);
     }
 }

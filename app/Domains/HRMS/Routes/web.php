@@ -462,6 +462,7 @@ Route::prefix('hrms')
             Route::get('/statutory-returns/esi', [\App\Domains\HRMS\Controllers\PayrollStatutoryReturnController::class, 'esi'])->name('payroll.statutory-returns.esi');
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
             Route::get('/run/{run}/export-bank-file', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'exportBankFile'])->name('payroll.run.export-bank-file');
+            Route::get('/payslip/download-range', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadRangePayslips'])->name('payroll.payslip.download-range');
             Route::get('/payslip/{run}/{employee}/download', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadPayslip'])->name('payroll.payslip.download');
         });
 

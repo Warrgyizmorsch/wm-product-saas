@@ -7,34 +7,153 @@ use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\EmployeePenalty;
 use App\Domains\HRMS\Models\EmployeeAdhocComponent;
 use App\Domains\HRMS\Models\PayrollHold;
+use App\Domains\HRMS\Models\PayrollPayslip;
 use App\Domains\HRMS\Models\PayrollRetroactiveAdjustment;
+use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\SalaryRevision;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class PayrollCalculationService
 {
     /**
      * Compute final salary breakdown for an employee in a given month.
+     * If the payroll run is locked or paid, returns the immutable stored snapshot.
      *
      * @param Employee $employee
      * @param string $payrollMonth Format: YYYY-MM
+     * @param PayrollRun|null $run
      * @return array
      */
-    public function calculateSalary(Employee $employee, string $payrollMonth, ?\App\Domains\HRMS\Models\PayrollRun $run = null): array
+    public function calculateSalary(Employee $employee, string $payrollMonth, ?PayrollRun $run = null): array
+    {
+        // Try to fetch corresponding run if not explicitly passed
+        if (!$run) {
+            // Check if employee is in an individual payroll run first
+            $run = PayrollRun::where('payroll_month', $payrollMonth)
+                ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                ->whereJsonContains('employee_ids', $employee->id)
+                ->first();
+
+            if (!$run && $employee->pay_group_id) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->where('pay_group_id', $employee->pay_group_id)
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->whereNull('pay_group_id')
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->first();
+            }
+        }
+
+        // 1. If run is locked or paid, return the immutable stored snapshot
+        if ($run && in_array($run->status, ['locked', 'paid'])) {
+            try {
+                $payslip = PayrollPayslip::where('payroll_run_id', $run->id)
+                    ->where('employee_id', $employee->id)
+                    ->first();
+
+                if ($payslip && is_array($payslip->summary_data) && is_array($payslip->items_data)) {
+                    $isHeld = PayrollHold::where('employee_id', $employee->id)
+                        ->where('payroll_month', $payrollMonth)
+                        ->where('status', 'on_hold')
+                        ->exists();
+
+                    return [
+                        'success'       => true,
+                        'status'        => $isHeld ? 'on_hold' : $payslip->status,
+                        'summary'       => $payslip->summary_data,
+                        'items'         => $payslip->items_data,
+                        'from_snapshot' => true,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Could not load payroll snapshot: " . $e->getMessage());
+            }
+        }
+
+        // 2. Fresh dynamic calculation
+        $calc = $this->calculateSalaryFresh($employee, $payrollMonth, $run);
+
+        // 3. If run is locked or paid, automatically persist snapshot so it stays permanently frozen
+        if ($run && in_array($run->status, ['locked', 'paid']) && !empty($calc['summary'])) {
+            try {
+                PayrollPayslip::updateOrCreate(
+                    [
+                        'payroll_run_id' => $run->id,
+                        'employee_id'    => $employee->id,
+                    ],
+                    [
+                        'tenant_id'        => $employee->tenant_id ?? $run->tenant_id ?? 1,
+                        'company_id'       => $employee->company_id ?? $run->company_id ?? 1,
+                        'payroll_month'    => $payrollMonth,
+                        'status'           => $run->status,
+                        'gross_earnings'   => $calc['summary']['total_earnings'] ?? 0.00,
+                        'total_deductions' => $calc['summary']['total_deductions'] ?? 0.00,
+                        'net_payout'       => $calc['summary']['net_payout'] ?? 0.00,
+                        'lop_days'         => $calc['summary']['lop_days'] ?? 0.00,
+                        'paid_days'        => $calc['summary']['paid_days'] ?? 0.00,
+                        'summary_data'     => $calc['summary'],
+                        'items_data'       => $calc['items'] ?? [],
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning("Could not auto-persist payroll snapshot: " . $e->getMessage());
+            }
+        }
+
+        return $calc;
+    }
+
+    /**
+     * Compute live on-the-fly salary calculation from active employee profile, rules, and attendance.
+     *
+     * @param Employee $employee
+     * @param string $payrollMonth Format: YYYY-MM
+     * @param PayrollRun|null $run
+     * @return array
+     */
+    public function calculateSalaryFresh(Employee $employee, string $payrollMonth, ?PayrollRun $run = null): array
     {
         $carbonMonth = Carbon::parse($payrollMonth . '-01');
         $totalDaysInMonth = $carbonMonth->daysInMonth;
 
         // Try to fetch corresponding active run to get exact user-defined start and end dates
         if (!$run) {
-            $run = \App\Domains\HRMS\Models\PayrollRun::where('payroll_month', $payrollMonth)
-                ->where(function($q) use ($employee) {
-                    $q->whereNull('pay_group_id');
-                    if ($employee->pay_group_id) {
-                        $q->orWhere('pay_group_id', $employee->pay_group_id);
-                    }
-                })
+            $run = PayrollRun::where('payroll_month', $payrollMonth)
+                ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                ->whereJsonContains('employee_ids', $employee->id)
                 ->first();
+
+            if (!$run && $employee->pay_group_id) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->where('pay_group_id', $employee->pay_group_id)
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->whereNull('pay_group_id')
+                    ->first();
+            }
+
+            if (!$run) {
+                $run = PayrollRun::where('payroll_month', $payrollMonth)
+                    ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+                    ->first();
+            }
         }
 
         $startDate = $run && $run->start_date ? Carbon::parse($run->start_date) : $carbonMonth->copy()->startOfMonth();
@@ -231,10 +350,27 @@ class PayrollCalculationService
             }
         }
 
-        $penaltyDaysCount = EmployeePenalty::where('employee_id', $employee->id)
+        $penalties = EmployeePenalty::where('employee_id', $employee->id)
             ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->where('status', '!=', 'excused')
-            ->sum('penalty_amount');
+            ->get();
+
+        $penaltyDaysCount = 0.0;
+        foreach ($penalties as $penalty) {
+            $pDate = $penalty->date instanceof Carbon ? $penalty->date->format('Y-m-d') : Carbon::parse($penalty->date)->format('Y-m-d');
+            $att = $attendances->get($pDate);
+            $alreadyCountedInAbsence = 0.0;
+            if ($att) {
+                if ($att->status === 'absent') {
+                    $alreadyCountedInAbsence = 1.0;
+                } elseif ($att->status === 'half_day') {
+                    $alreadyCountedInAbsence = 0.5;
+                }
+            }
+            // Only add excess penalty days beyond any absence already accounted for on the same date to avoid double counting
+            $netPenaltyDays = max(0.0, (float)$penalty->penalty_amount - $alreadyCountedInAbsence);
+            $penaltyDaysCount += $netPenaltyDays;
+        }
 
         $lopDays = $absenceDays + $unpaidLeaveDays + $penaltyDaysCount;
 
@@ -438,10 +574,7 @@ class PayrollCalculationService
         }
 
         // 8. Inject Unexcused Attendance Penalties (stored as number of days, e.g. 0.25 days, 0.5 days)
-        $penaltyDays = EmployeePenalty::where('employee_id', $employee->id)
-            ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-            ->where('status', '!=', 'excused')
-            ->sum('penalty_amount');
+        $penaltyDays = $penaltyDaysCount;
 
         $dailyWage = ($employee->current_salary / 12) / $divisor;
         // Since penalty days are now added directly to LOP days above, we set penalty money deduction to 0.00 to avoid double-counting.
