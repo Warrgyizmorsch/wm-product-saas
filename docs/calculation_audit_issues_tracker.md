@@ -6,15 +6,12 @@ All items will be queued here and implemented together in a clean batch once rev
 
 ---
 
-## 🛠️ Temporary Test Overrides (Revert After Audit)
+## 📐 Calculation Lifecycle & Dynamic Currency Architecture
 
-| File | Functions / Lines | Original Behavior | Temporary Audit Behavior | Reason |
-| :--- | :--- | :--- | :--- | :--- |
-| `app/helpers.php` | `convert_from_base()`, `convert_to_base()`, `format_currency()`, `active_currency_symbol()` | Multiplied base USD amounts by `active_currency_rate()` (85 for INR) and formatted as Indian Rupees (`₹`). | **Conversion disabled**: Returns raw database values (1:1 rate) formatted as base currency (`$`). | Allows direct 1-to-1 visual audit against raw values stored in database columns without conversion noise. |
-| `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php` | Lines 22–26 | Executed `calculateAndSave($section, 'manual')` on the fly whenever `$section->latestCalculation` was null. | **Auto-calculation blocked**: Leaves `$secCalc = null`, allowing UI to render zeros/nulls without writing DB records. | Prevents GET page view from firing unwanted calculations and audit logs. |
-| `app/Domains/Production/Controllers/WorkCenterController.php` | `calculationDetails()` (lines 344–350) | Executed `calculateAndSave($workCenter)` if `$workCenter->latestCalculation` was null. | **Auto-calculation blocked**: Returns null snapshot without writing DB records. | Keeps GET endpoints pure and read-only. |
-| `app/Domains/Production/Services/WorkCenterSectionService.php` | `create()`, `update()`, `recalculate()`, `updateManualProduction()`, `delete()` | Automatically fired `$this->calculationService->calculateAndSave()` and WorkCenter rollup calculation on every create, edit, manual production update, and delete. | **Auto-calculations commented out**: Methods create/update/delete records without triggering automatic recalculations. | Ensures only the manual "Recalculate" button triggers calculations during audit. |
-| `app/Domains/Production/Services/WorkCenterService.php` | `recalculate()` (lines 71–75) | Fired `calculateAndSave($workCenter)`. | **Commented out**: Prevents indirect recalculation triggers. | Ensures only explicit "Recalculate" button runs calculations. |
+> **Architecture & Currency Status:**
+> 1. **Dynamic Tenant Currency:** Restored and fully active in [`app/helpers.php`](file:///c:/xampp/htdocs/wm-product-saas/app/helpers.php) via `convert_from_base()`, `convert_to_base()`, `format_currency()`, and `active_currency_symbol()`. All underlying financial amounts are stored in Base Currency (USD, 1.0) and dynamically converted to the active tenant currency (e.g. INR `₹` with Indian comma numbering) at display boundaries.
+> 2. **Read-Only GET Endpoints:** Formalized under **ISSUE-02**. View rendering (`GET /production/work-centers/{id}`) and modal views (`section-calculation-modal.blade.php`, `WorkCenterController::calculationDetails`) remain strictly read-only and never trigger silent background calculations.
+> 3. **Mutating Triggers & Debounce Engine:** Formalized under **ISSUE-02**. Entity mutations queue affected Section IDs into the `CountdownCalculationEngine` (10-minute debounce queue) or are triggered immediately via the manual `[⚡ Recalculate Now]` button. Direct, unmanaged recalculation triggers have been cleanly deprecated.
 
 ---
 

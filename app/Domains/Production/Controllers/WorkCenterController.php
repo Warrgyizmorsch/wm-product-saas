@@ -355,12 +355,8 @@ class WorkCenterController extends Controller
         Gate::authorize('view', $workCenter);
 
         $latestSnapshot = $workCenter->latestCalculation;
-        // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on calculationDetails GET request.
-        // if (!$latestSnapshot) {
-        //     $calcService = app(\App\Domains\Production\Services\WorkCenterCalculationService::class);
-        //     $latestSnapshot = $calcService->calculateAndSave($workCenter);
-        // }
-
+        // Per ISSUE-02: HTTP GET requests remain strictly read-only.
+        // Uncalculated state returns a null snapshot; calculations are only executed via countdown or explicit user action.
         return response()->json([
             'success'  => true,
             'snapshot' => $latestSnapshot,

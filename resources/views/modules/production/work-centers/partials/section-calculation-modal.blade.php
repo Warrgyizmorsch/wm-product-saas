@@ -32,8 +32,7 @@
                 @php
                     $isSecActive = $section->isActive();
                     $secCalc = $isSecActive ? $section->latestCalculation : null;
-                    // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation on view render.
-                    // If $secCalc is null, values gracefully default to zeros.
+                    // Read-only view: If $secCalc is null, values gracefully display uncalculated empty states/zeros.
                     $details = $secCalc->calculation_details ?? [];
                     $opTimeline = $details['operating_timeline'] ?? [];
                     $machData = $details['machinery'] ?? [];

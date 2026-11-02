@@ -111,11 +111,7 @@ class WorkCenterSectionService
     public function recalculate(WorkCenterSection $section): WorkCenterSection
     {
         $fresh = $section->fresh(['workCenter', 'machines']);
-        // TEMPORARY AUDIT OVERRIDE: Blocked auto-calculation.
-        // $this->calculationService->calculateAndSave($fresh);
-        // if ($fresh->workCenter) {
-        //     app(WorkCenterCalculationService::class)->calculateAndSave($fresh->workCenter);
-        // }
+        // Note: Calculations are managed through CountdownCalculationEngine or explicit manual triggers.
         return $fresh;
     }
 

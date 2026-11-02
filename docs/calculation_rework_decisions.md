@@ -256,18 +256,16 @@ Every calculation run will persist a rich, human-friendly JSON document in `calc
 
 ---
 
-## 8. Temporary Testing Setup: Debounce Logic Commented Out
-* **Status**: Completed.
-* **Changes Made**:
+## 8. Calculation Countdown Engine & Mutating Triggers (ISSUE-02 Applied)
+* **Status**: Applied & Verified.
+* **Architecture Rules**:
   1. In `app/Domains/Production/Services/CountdownCalculationEngine.php`:
-     - Inside `isCountdownActive()`: Temporarily commented out timer checks to return `false` unconditionally. This suppresses UI timer lockouts, countdown banners, and delays.
-     - Inside `triggerCountdown()`: Temporarily commented out timer arming logic so modifications do not start 10-minute countdowns.
+     - Countdown timer active check (`isCountdownActive()`) and timer arming logic (`triggerCountdown()`) are fully active.
+     - Modifying any asset (sections, machines, batches, workers) arms a 10-minute debounce countdown or appends to an active countdown without resetting the timer.
   2. In `app/Domains/Production/Controllers/WorkCenterController.php`:
-     - In `recalculateNow()`: Fixed parameter passing so it triggers immediate calculation (`'manual'`) on the "Recalculate" button click.
-* **How to Test**:
-  - Open any Work Center page (`/production/work-centers/{id}`).
-  - Click the **"Recalculate"** button in the top action bar or bypass banner.
-  - Calculation executes immediately and generates fresh snapshots for the Work Center and all of its active Sections.
+     - `recalculateNow()` immediately processes all pending calculations (`'manual'`) on explicit button click, bypassing any remaining wait time.
+     - HTTP GET requests remain strictly read-only.
+  3. `php artisan production:process-calculation-countdowns` runs on cron to process expired countdowns in the background.
 
 ---
 
