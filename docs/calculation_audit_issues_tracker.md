@@ -45,6 +45,7 @@ All items will be queued here and implemented together in a clean batch once rev
 | **ISSUE-24** | Work Center Calculation Modal: Replace Raw Snapshot JSON with 47-Metric Work Center Audit Table & Complete Raw JSON Removal | **Applied** | `show.blade.php` |
 | **ISSUE-25** | Work Center Calculation Modal: 3x2 KPI Header Grid (Combined Output, Unit Cost, 24/7 Hours) | **Applied** | `show.blade.php` |
 | **ISSUE-26** | Work Center Activity & Audit Logs Table Rework (Granular Per-Snapshot Schema, Explicit `snapshot_id`, Simplified Descriptions & Direct Historical Drill-Down) | **Applied** | Migration, `WorkCenterActivityLog.php`, `WorkCenterActivityLogger.php`, `show.blade.php` |
+| **ISSUE-27** | Section Configuration Advisory: Labor Allocated Without Machines or Manual Batches (Cost Incurred With Zero Output) | **Applied & Verified** | `show.blade.php`, `section-calculation-modal.blade.php` |
 
 > **Live Work Center URL:** `http://127.0.0.1:8000/production/work-centers/1`
 
@@ -1211,6 +1212,36 @@ The user reviewed the Activity & Audit History table in the Work Center view and
 * `app/Domains/Production/Models/WorkCenterActivityLog.php`
 * `app/Domains/Production/Services/WorkCenterActivityLogger.php`
 * `resources/views/modules/production/work-centers/show.blade.php`
+* `docs/calculation_audit_issues_tracker.md`
+
+---
+
+### ISSUE-27: Section Configuration Advisory — Labor Allocation with Zero Output (No Machines & No Active Manual Batches)
+* **Date Logged:** 2026-11-02
+* **Status:** **Applied & Verified**
+* **Reported By:** User
+* **Area:** Work Center Detail Page (`show.blade.php`), Section Table Row, Section Details Modal (`#sectionDetailsModal`), Section Calculation Breakdown Modal (`section-calculation-modal.blade.php`)
+
+#### 1. Issue Description & Business Problem
+In Work Center sections, planners can assign internal employees and external contractor workforces. If a section is allocated workers or employees (`totalSecPersonnel > 0`) but has **0 machines assigned** and **0 active manual production batches configured**, the section incurs daily labor expenses (e.g. ₹13,77,000.00/day in salaries or contractor rates) while producing `0.0 units/day` output.
+While business scenarios may legitimately require a non-producing preparatory or support section (so saving should never be blocked), users must be prominently advised across all inspection views to prevent accidental misconfiguration and unnoticed expense leakage.
+
+#### 2. Agreed Solution & Implementation
+1. **Sections List Table (`show.blade.php`)**:
+   - **Configuration Advisory Banner (Above Table)**: Placed a soft warning banner above the sections table identifying sections that have personnel allocated without machines or manual production batches.
+   - **Section Name Column**: Displays an amber badge `[⚠ Cost with 0 Output]` with an explanatory tooltip below the section code/name.
+   - **Resource Cluster (Pill 4: Manual Batches)**: When labor is assigned without machines or batches, the `No Manual Batch` pill switches to `badge bg-soft-warning text-warning border-warning-subtle` with a warning triangle icon (`<i class="feather-alert-triangle"></i>`).
+   - **Daily Capacity Column**: Displays an alert triangle icon next to `0.0 units/day` with a tooltip clarifying that labor is active but production output is 0.
+2. **Section Details Modal (`#sectionDetailsModal_{{ $section->id }}`)**:
+   - **Top Advisory Alert Banner**: Placed directly at the top of the modal body (above the 4 KPI metric cards) informing planners:
+     > **Labor Cost Incurred with Zero Production Output:** This section has X personnel allocated, but no machines are assigned and no manual production batches are configured. Daily labor costs of ₹.../day are being accrued without contributing production capacity. If intentional, this configuration can remain; otherwise, assign machines or configure manual batches to generate production output.
+   - **Manual Batches Tab (Pane 4)**: Added a contextual advisory alert highlighting that creating a manual batch will enable production output for the allocated workforce.
+3. **Section Calculation Breakdown Modal (`section-calculation-modal.blade.php`)**:
+   - Added a matching soft warning banner in the calculation modal body so managers inspecting operational metrics and financial summaries are clearly informed.
+
+#### 3. Impacted Files
+* `resources/views/modules/production/work-centers/show.blade.php`
+* `resources/views/modules/production/work-centers/partials/section-calculation-modal.blade.php`
 * `docs/calculation_audit_issues_tracker.md`
 
 ---

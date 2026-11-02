@@ -1006,6 +1006,32 @@
                 @endcan
             </div>
 
+            @php
+                $unproductiveSections = $workCenter->sections->filter(function($sec) {
+                    $secEmp = $sec->employeeAssignments ? $sec->employeeAssignments->where('active', true)->count() : 0;
+                    $secExt = $sec->externalWorkerAllocations ? (int) $sec->externalWorkerAllocations->where('active', true)->sum('number_of_external_workers') : 0;
+                    $hasLabor = ($secEmp + $secExt) > 0;
+                    $hasMach = $sec->machines && $sec->machines->count() > 0;
+                    $hasBatch = $sec->manualProductions && $sec->manualProductions->where('active', true)->count() > 0;
+                    return $hasLabor && !$hasMach && !$hasBatch;
+                });
+            @endphp
+            @if($unproductiveSections->isNotEmpty())
+                <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3">
+                    <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
+                    <div class="flex-grow-1">
+                        <strong class="text-dark">Configuration Advisory:</strong>
+                        Labor is allocated to
+                        @if($unproductiveSections->count() === 1)
+                            section <span class="fw-semibold text-dark">"{{ $unproductiveSections->first()->name }}"</span>,
+                        @else
+                            sections <span class="fw-semibold text-dark">{{ $unproductiveSections->pluck('name')->map(fn($n) => '"' . $n . '"')->join(', ') }}</span>,
+                        @endif
+                        but no machines are assigned and no manual production batches are configured. Daily labor costs are being accrued without contributing production output.
+                    </div>
+                </div>
+            @endif
+
             <div class="table-responsive">
                 <x-ui.odoo-form-ui type="table">
                     <thead>
@@ -1080,6 +1106,7 @@
 
                                 // Assigned Machines
                                 $machineCount = $section->machines ? $section->machines->count() : 0;
+                                $hasLaborWithoutProduction = ($machineCount === 0) && ($activeBatchesCount === 0) && ($totalSecPersonnel > 0);
                                 if ($machineCount > 0) {
                                     $machineListHtml = '<ul class="list-unstyled mb-0 text-start fs-12">';
                                     foreach ($section->machines as $sm) {
@@ -1262,6 +1289,16 @@
                                             <i class="feather-maximize-2 text-primary fs-10 ms-1.5 opacity-75"></i>
                                         </a>
                                     </div>
+                                    @if($hasLaborWithoutProduction)
+                                        <div class="mt-1">
+                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill px-2 py-0.5 fs-10 d-inline-flex align-items-center gap-1"
+                                                  data-bs-toggle="tooltip"
+                                                  data-bs-placement="top"
+                                                  title="Labor is allocated to this section, but no machines or active manual batches are configured. Daily labor costs are incurred with 0 output.">
+                                                <i class="feather-alert-triangle fs-10"></i>Cost with 0 Output
+                                            </span>
+                                        </div>
+                                    @endif
                                 </td>
 
                                 <!-- 2. Shifts (Clean Badges with Tooltips) -->
@@ -1356,7 +1393,7 @@
                                                 <i class="feather-tool me-1 fs-11"></i>{{ $manualBatchesCount }} {{ \Illuminate\Support\Str::plural('Manual Batch', $manualBatchesCount) }}
                                             </span>
                                         @else
-                                            <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
+                                            <span class="badge @if($hasLaborWithoutProduction) bg-soft-warning text-warning border border-warning-subtle @else bg-soft-secondary text-secondary border border-secondary-subtle @endif rounded-pill px-2.5 py-1 fs-11 resource-cluster-pill"
                                                   role="button"
                                                   tabindex="0"
                                                   data-bs-toggle="popover"
@@ -1364,11 +1401,15 @@
                                                   data-bs-placement="top"
                                                   data-bs-html="true"
                                                   data-bs-custom-class="section-popover"
-                                                  data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-tool text-secondary fs-12'></i>Manual Production Batches (0)</div>"
+                                                  data-bs-title="<div class='fw-bold fs-12 text-dark d-flex align-items-center gap-1'><i class='feather-tool @if($hasLaborWithoutProduction) text-warning @else text-secondary @endif fs-12'></i>Manual Production Batches (0)</div>"
                                                   data-bs-content="{{ $batchListHtml }}"
                                                   data-modal-target="#sectionManualProductionModal_{{ $section->id }}"
                                                   title="Click to configure Manual Production Batches">
-                                                <i class="feather-tool me-1 fs-11"></i>No Manual Batch
+                                                @if($hasLaborWithoutProduction)
+                                                    <i class="feather-alert-triangle me-1 fs-11 text-warning"></i>No Manual Batch
+                                                @else
+                                                    <i class="feather-tool me-1 fs-11"></i>No Manual Batch
+                                                @endif
                                             </span>
                                         @endif
                                     </div>
@@ -1392,6 +1433,12 @@
                                                 {{ number_format($dailyCap, 1) }}
                                             </span>
                                             <small class="text-muted fs-10">units/day</small>
+                                            @if($hasLaborWithoutProduction)
+                                                <i class="feather-alert-triangle text-warning fs-11 ms-0.5" 
+                                                   data-bs-toggle="tooltip" 
+                                                   data-bs-placement="top"
+                                                   title="Labor is active but output is 0.0 because no machines or manual batches are configured."></i>
+                                            @endif
                                             <i class="feather-info text-primary opacity-75 fs-11 ms-1" 
                                                role="button"
                                                data-bs-toggle="modal" 
@@ -2140,6 +2187,10 @@
             $secDetailsTotalDailyCap = (float) ($secDetailsCalc?->daily_capacity ?? 0);
             $secDetailsTotalHourlyCap= (float) ($secDetailsCalc?->capacity_per_hour ?? 0);
             $secDetailsUnitCost = $secDetailsTotalDailyCap > 0 ? round($secDetailsDailyOperatingCost / $secDetailsTotalDailyCap, 2) : 0.0;
+
+            $secDetailsMachineCount = $section->machines ? $section->machines->count() : 0;
+            $secDetailsActiveBatchesCount = $section->manualProductions ? $section->manualProductions->where('active', true)->count() : 0;
+            $secDetailsHasLaborWithoutProduction = ($secDetailsMachineCount === 0) && ($secDetailsActiveBatchesCount === 0) && ($secDetailsTotalPersonnel > 0);
         @endphp
         <div class="modal fade section-details-modal" id="sectionDetailsModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionDetailsModalLabel_{{ $section->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
@@ -2164,6 +2215,16 @@
                     </div>
 
                     <div class="modal-body p-4">
+                        @if($secDetailsHasLaborWithoutProduction)
+                            <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3">
+                                <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
+                                <div class="flex-grow-1">
+                                    <strong class="text-dark d-block mb-0.5">Labor Cost Incurred with Zero Production Output</strong>
+                                    <span>This section has <strong>{{ $secDetailsTotalPersonnel }} {{ \Illuminate\Support\Str::plural('personnel', $secDetailsTotalPersonnel) }}</strong> ({{ $secDetailsEmpCount }} internal, {{ $secDetailsExtCount }} external) allocated, but no machines are assigned and no manual production batches are configured. Daily labor costs of <strong>{{ format_currency($secDetailsDailyLaborCost) }}/day</strong> are being accrued without contributing production capacity. If intentional, this configuration can remain; otherwise, assign machines or configure manual batches to generate production output.</span>
+                                </div>
+                            </div>
+                        @endif
+
                         <!-- Top 4 KPI Metric Cards -->
                         <div class="row g-3 mb-3">
                             <!-- 1. Operating Window -->
@@ -2568,6 +2629,12 @@
 
                             <!-- Pane 4: Manual Batches -->
                             <div class="tab-pane fade" id="sec-batches-pane-{{ $section->id }}" role="tabpanel">
+                                @if($secDetailsHasLaborWithoutProduction)
+                                    <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12 rounded-2">
+                                        <i class="feather-alert-triangle text-warning fs-14 flex-shrink-0"></i>
+                                        <span><strong>Advisory:</strong> Personnel are allocated to this section, but no manual production batches or machines exist. Configuring a manual batch will enable production output for your workforce.</span>
+                                    </div>
+                                @endif
                                 <div class="table-responsive border rounded-3">
                                     <table class="table table-sm table-hover align-middle mb-0 fs-12">
                                         <thead class="table-light">

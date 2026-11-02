@@ -77,6 +77,13 @@
                     $avgInternalRate = (float) ($intLabor['average_internal_hourly_rate'] ?? 0);
                     $dailyExternalCost = (float) ($extLabor['total_daily_external_labor_cost'] ?? 0);
                     $avgExternalRate = (float) ($extLabor['average_external_hourly_rate'] ?? 0);
+
+                    $calcSecEmpCount = $section->employeeAssignments ? $section->employeeAssignments->where('active', true)->count() : 0;
+                    $calcSecExtCount = $section->externalWorkerAllocations ? (int) $section->externalWorkerAllocations->where('active', true)->sum('number_of_external_workers') : 0;
+                    $calcTotalPersonnel = $calcSecEmpCount + $calcSecExtCount;
+                    $calcMachCount = $section->machines ? $section->machines->count() : 0;
+                    $calcActiveBatches = $section->manualProductions ? $section->manualProductions->where('active', true)->count() : 0;
+                    $calcHasLaborWithoutProduction = ($calcMachCount === 0) && ($calcActiveBatches === 0) && ($calcTotalPersonnel > 0);
                 @endphp
 
                 @if(!$secCalc)
@@ -85,6 +92,16 @@
                         <div>
                             <strong class="d-block text-dark mb-0.5">Calculation Snapshot Pending</strong>
                             <span class="text-muted fs-12">An initial calculation snapshot has not been recorded yet. Click the <strong>Recalculate</strong> button on the Work Center page to generate live capacity and cost metrics.</span>
+                        </div>
+                    </div>
+                @endif
+
+                @if($calcHasLaborWithoutProduction)
+                    <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3">
+                        <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
+                        <div class="flex-grow-1">
+                            <strong class="text-dark d-block mb-0.5">Labor Cost Incurred with Zero Production Output</strong>
+                            <span>This section has <strong>{{ $calcTotalPersonnel }} {{ \Illuminate\Support\Str::plural('personnel', $calcTotalPersonnel) }}</strong> ({{ $calcSecEmpCount }} internal, {{ $calcSecExtCount }} external) allocated, but no machines are assigned and no manual production batches are configured. Daily labor costs of <strong>{{ format_currency($dailyLaborCost) }}/day</strong> are being accrued with 0 production capacity.</span>
                         </div>
                     </div>
                 @endif
