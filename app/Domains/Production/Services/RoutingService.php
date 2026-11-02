@@ -9,6 +9,8 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationMaterial;
+use App\Domains\Production\Models\SectionManualProduction;
+use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Repositories\RoutingRepositoryInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,12 +42,12 @@ class RoutingService
             }
         }
 
-        // Check version conflicts for this product
-        $this->checkRoutingConflicts($dto->product_id, $dto->version, $tenantId);
+        // Check version conflicts for this routing name
+        $this->checkRoutingConflicts($dto->name, $dto->version, $tenantId);
         $this->routingLifecycleService->validateEffectiveDates(
             $dto->effective_from,
             $dto->effective_to,
-            $dto->product_id,
+            0,
             null,
             $tenantId
         );
@@ -92,11 +94,11 @@ class RoutingService
             );
         }
 
-        $this->checkRoutingConflicts($dto->product_id, $dto->version, $routing->tenant_id, $id);
+        $this->checkRoutingConflicts($dto->name ?? $routing->name, $dto->version, $routing->tenant_id, $id);
         $this->routingLifecycleService->validateEffectiveDates(
             $dto->effective_from,
             $dto->effective_to,
-            $dto->product_id,
+            0,
             $id,
             $routing->tenant_id
         );
@@ -289,11 +291,11 @@ class RoutingService
         }
 
         $tenantId = $original->tenant_id;
-        $this->checkRoutingConflicts($original->product_id, $newVersion, $tenantId);
+        $this->checkRoutingConflicts($original->name, $newVersion, $tenantId);
         $this->routingLifecycleService->validateEffectiveDates(
             Carbon::now()->toDateString(),
             null,
-            $original->product_id,
+            0,
             null,
             $tenantId
         );
@@ -327,7 +329,7 @@ class RoutingService
                 'tenant_id'      => $tenantId,
                 'routing_number' => $this->numberService->generateNextNumber($tenantId),
                 'name'           => $original->name,
-                'product_id'     => $original->product_id,
+                // [DECOUPLE-PRODUCT-INDEPENDENT] 'product_id' => $original->product_id,
                 // [INVERSION-DECOUPLE-TRACK-03]
                 // 'bom_id'                 => $bomId,
                 // 'material_quantity_mode' => $original->material_quantity_mode ?? 'per_unit',
@@ -380,13 +382,13 @@ class RoutingService
     }
 
     /**
-     * Guard against duplicate product+version combinations per tenant.
+     * Guard against duplicate [name, version] combinations per tenant.
      */
-    public function checkRoutingConflicts(int $productId, string $version, int $tenantId, ?int $ignoreId = null): void
+    public function checkRoutingConflicts(?string $name, string $version, int $tenantId, ?int $ignoreId = null): void
     {
         $query = Routing::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
+            ->where('name', $name)
             ->where('version', $version)
             ->whereNotIn('status', [Routing::STATUS_CANCELLED]);
 
@@ -396,7 +398,7 @@ class RoutingService
 
         if ($query->exists()) {
             throw new InvalidArgumentException(
-                "A routing version '{$version}' already exists for this product."
+                "A routing with name '{$name}' and version '{$version}' already exists."
             );
         }
     }
@@ -414,6 +416,7 @@ class RoutingService
 
         $createdOps = [];
         $opsBySeq = [];
+        $uidToOpMap = [];
 
         foreach ($operationDTOs as $index => $opDto) {
             $seq = $opDto->sequence ?: (($index + 1) * 10);
@@ -424,10 +427,21 @@ class RoutingService
                 'operation_number' => $opDto->operation_number ?: 'OP-' . str_pad((string) $seq, 3, '0', STR_PAD_LEFT),
             ]);
             unset($data['previous_operation_id']);
+            // Unset replaces_operation_id for Pass 1 to prevent FK violations
+            unset($data['replaces_operation_id']);
 
             $createdOp = RoutingOperation::create($data);
             $createdOps[] = ['model' => $createdOp, 'dto' => $opDto];
             $opsBySeq[$seq] = $createdOp->id;
+
+            if (!empty($opDto->row_uid)) {
+                $uidToOpMap[$opDto->row_uid] = $createdOp;
+            }
+            $uidToOpMap[(string) $index] = $createdOp;
+            $uidToOpMap[(string) $seq] = $createdOp;
+            if (!empty($data['operation_number'])) {
+                $uidToOpMap[$data['operation_number']] = $createdOp;
+            }
 
             // [INVERSION-DECOUPLE-TRACK-03] Material assignment moved to BOM creation/edit.
             // RoutingOperationMaterial is now populated by ProductionBomService when BOM is saved.
@@ -457,7 +471,7 @@ class RoutingService
             */
         }
 
-        // Pass 2: Bind dependencies (previous_operation_id)
+        // Pass 2: Bind dependencies (previous_operation_id) and alternatives (replaces_operation_id)
         foreach ($createdOps as $index => $item) {
             $model = $item['model'];
             $dto = $item['dto'];
@@ -480,6 +494,22 @@ class RoutingService
                 $model->previous_operation_id = null;
             }
 
+            // Bind alternative replacement
+            if ($dto->is_alternative) {
+                if (!empty($dto->replaces_row_uid) && isset($uidToOpMap[$dto->replaces_row_uid])) {
+                    $model->replaces_operation_id = $uidToOpMap[$dto->replaces_row_uid]->id;
+                } elseif (!empty($dto->replaces_operation_id)) {
+                    $target = (string) $dto->replaces_operation_id;
+                    if (isset($uidToOpMap[$target])) {
+                        $model->replaces_operation_id = $uidToOpMap[$target]->id;
+                    } elseif (RoutingOperation::where('tenant_id', $tenantId)->where('id', $dto->replaces_operation_id)->exists()) {
+                        $model->replaces_operation_id = $dto->replaces_operation_id;
+                    }
+                }
+            } else {
+                $model->replaces_operation_id = null;
+            }
+
             $model->save();
         }
     }
@@ -492,5 +522,35 @@ class RoutingService
     {
         $machine = Machine::with('section')->find($machineId);
         return (bool) ($machine && $machine->section?->work_center_id === $workCenterId);
+    }
+
+    /**
+     * Validate that a section belongs to the specified work center.
+     */
+    public function validateSectionBelongsToWorkCenter(int $sectionId, int $workCenterId): bool
+    {
+        return WorkCenterSection::where('id', $sectionId)
+            ->where('work_center_id', $workCenterId)
+            ->exists();
+    }
+
+    /**
+     * Validate that a machine belongs to the specified section.
+     */
+    public function validateMachineBelongsToSection(int $machineId, int $sectionId): bool
+    {
+        return Machine::where('id', $machineId)
+            ->where('section_id', $sectionId)
+            ->exists();
+    }
+
+    /**
+     * Validate that a manual production batch belongs to the specified section.
+     */
+    public function validateManualProductionBelongsToSection(int $manualProductionId, int $sectionId): bool
+    {
+        return SectionManualProduction::where('id', $manualProductionId)
+            ->where('section_id', $sectionId)
+            ->exists();
     }
 }

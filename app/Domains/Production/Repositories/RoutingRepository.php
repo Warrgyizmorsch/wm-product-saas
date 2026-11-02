@@ -11,12 +11,8 @@ class RoutingRepository implements RoutingRepositoryInterface
     public function getAll(array $filters = []): Collection
     {
         $query = Routing::query()
-            ->with(['product', 'creator'])
-            ->withCount('operations');
-
-        if (!empty($filters['product_id'])) {
-            $query->where('product_id', $filters['product_id']);
-        }
+            ->with(['creator'])
+            ->withCount(['operations', 'boms']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -26,11 +22,7 @@ class RoutingRepository implements RoutingRepositoryInterface
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('routing_number', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhereHas('product', function ($pq) use ($search): void {
-                      $pq->where('name', 'like', "%{$search}%")
-                         ->orWhere('sku', 'like', "%{$search}%");
-                  });
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
@@ -40,12 +32,8 @@ class RoutingRepository implements RoutingRepositoryInterface
     public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         $query = Routing::query()
-            ->with(['product', 'creator'])
-            ->withCount('operations');
-
-        if (!empty($filters['product_id'])) {
-            $query->where('product_id', $filters['product_id']);
-        }
+            ->with(['creator'])
+            ->withCount(['operations', 'boms']);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -55,11 +43,7 @@ class RoutingRepository implements RoutingRepositoryInterface
             $search = $filters['search'];
             $query->where(function ($q) use ($search): void {
                 $q->where('routing_number', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhereHas('product', function ($pq) use ($search): void {
-                      $pq->where('name', 'like', "%{$search}%")
-                         ->orWhere('sku', 'like', "%{$search}%");
-                  });
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
@@ -74,12 +58,9 @@ class RoutingRepository implements RoutingRepositoryInterface
     public function getRoutingWithOperations(int $id): ?Routing
     {
         return Routing::with([
-            'product',
-            'boms',
+            'boms.product',
             'operations.workCenter',
             'operations.machine',
-            'operations.materials.material',
-            'operations.materials.uom',
             'creator',
             'approver',
             'approvals.user',
@@ -106,20 +87,14 @@ class RoutingRepository implements RoutingRepositoryInterface
 
     public function getActiveRouting(int $productId): ?Routing
     {
-        return Routing::query()
-            ->active()
-            ->where('product_id', $productId)
-            ->orderByDesc('is_default')
-            ->first();
+        // [DECOUPLE-PRODUCT-INDEPENDENT] Routings are no longer bound to a product_id.
+        return null;
     }
 
     public function getPrimaryActiveRouting(int $productId): ?Routing
     {
-        return Routing::query()
-            ->active()
-            ->where('product_id', $productId)
-            ->where('is_default', true)
-            ->first();
+        // [DECOUPLE-PRODUCT-INDEPENDENT] Routings are no longer bound to a product_id.
+        return null;
     }
 
     public function findByRoutingNumber(string $number, int $tenantId, ?int $ignoreId = null): ?Routing

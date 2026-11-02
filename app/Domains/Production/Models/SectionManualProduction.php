@@ -58,6 +58,11 @@ class SectionManualProduction extends BaseModel
         return $this->hasMany(ExternalWorkerAllocation::class, 'manual_production_id');
     }
 
+    public function routingOperations(): HasMany
+    {
+        return $this->hasMany(RoutingOperation::class, 'section_manual_production_id');
+    }
+
     public function externalWorkerAllocations(): HasMany
     {
         return $this->hasMany(ExternalWorkerAllocation::class, 'manual_production_id');

@@ -110,54 +110,15 @@ class RoutingLifecycleService
         $this->validateEffectiveDates(
             $startDate,
             $routing->effective_to ? Carbon::parse($routing->effective_to)->toDateString() : null,
-            $routing->product_id,
+            0,
             $routing->id,
             $routing->tenant_id
         );
 
-        // 1. Identify currently active/scheduled version(s) for the same tenant and product
-        $activeRoutings = Routing::withoutGlobalScopes()
-            ->where('tenant_id', $routing->tenant_id)
-            ->where('product_id', $routing->product_id)
-            ->whereIn('status', [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED])
-            ->where('id', '!=', $routing->id)
-            ->get();
-
-        foreach ($activeRoutings as $activeRouting) {
-            if ($isFutureStart) {
-                // Future start date: current active version remains ACTIVE until that future start date arrives!
-                // Its effective_to is set to the new version's start date so there is no validity gap.
-                $activeRouting->update([
-                    'status'       => Routing::STATUS_ACTIVE,
-                    'effective_to' => $startDate,
-                ]);
-
-                RoutingApproval::create([
-                    'tenant_id'  => $activeRouting->tenant_id,
-                    'routing_id' => $activeRouting->id,
-                    'user_id'    => $approverUserId,
-                    'action'     => RoutingApproval::ACTION_ARCHIVED,
-                    'comments'   => "Scheduled to expire on {$startDate} when new routing version {$routing->version} takes effect.",
-                ]);
-            } else {
-                // Immediate/today start: supersede current active version to historical
-                $activeRouting->update([
-                    'status'       => Routing::STATUS_HISTORICAL,
-                    'effective_to' => $startDate,
-                ]);
-
-                RoutingApproval::create([
-                    'tenant_id'  => $activeRouting->tenant_id,
-                    'routing_id' => $activeRouting->id,
-                    'user_id'    => $approverUserId,
-                    'action'     => RoutingApproval::ACTION_ARCHIVED,
-                    'comments'   => "Automatically archived and expired on {$startDate} by new routing version {$routing->version}.",
-                ]);
-
-                // [TRACK-06] Cascade to connected BOMs when active routing is archived/superseded
-                $this->handleBomsOnRoutingRetirement($activeRouting, $approverUserId, "connected routing ({$activeRouting->routing_number}) has become historical/superseded by new routing version {$routing->version}.");
-            }
-        }
+        // [DECOUPLE-MANUAL-LIFECYCLE] No product-linked auto-supersession.
+        // Routings are standalone reusable process templates.
+        // Approving a routing does NOT retire older versions automatically.
+        // Planners manually inactivate or mark older routings as historical when replaced.
 
         // 2. Activate or schedule the new version
         $newStatus = $isFutureStart ? Routing::STATUS_SCHEDULED : Routing::STATUS_ACTIVE;

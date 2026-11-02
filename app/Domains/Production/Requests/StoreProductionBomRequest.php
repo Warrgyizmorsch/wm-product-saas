@@ -87,9 +87,7 @@ class StoreProductionBomRequest extends FormRequest
             if ($routingId > 0) {
                 $routing = Routing::with('operations')->find($routingId);
                 if ($routing) {
-                    if ($routing->product_id !== $productId) {
-                        $validator->errors()->add('routing_id', "The selected routing does not belong to the selected finished product.");
-                    }
+                    // [DECOUPLE-PRODUCT-INDEPENDENT] Routing is a generic reusable process route; no product_id check needed
                     $validOpIds = $routing->operations->pluck('id')->all();
                 }
             }

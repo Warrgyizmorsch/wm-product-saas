@@ -8,6 +8,7 @@ use App\Domains\Production\Repositories\WorkCenterRepositoryInterface;
 use App\Domains\Production\Repositories\WorkCenterSectionRepositoryInterface;
 use App\Domains\Production\Requests\StoreWorkCenterSectionRequest;
 use App\Domains\Production\Requests\UpdateWorkCenterSectionRequest;
+use App\Domains\Production\Services\SectionCalculationService;
 use App\Domains\Production\Services\WorkCenterSectionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class WorkCenterSectionController extends Controller
         private readonly WorkCenterSectionRepositoryInterface $repository,
         private readonly WorkCenterSectionService $service,
         private readonly WorkCenterRepositoryInterface $workCenterRepository,
+        private readonly SectionCalculationService $calculationService,
     ) {}
 
     public function index(Request $request): View|JsonResponse
@@ -66,6 +68,18 @@ class WorkCenterSectionController extends Controller
                 'active'           => (bool) ($sh->pivot->active ?? true),
             ]),
         ])->values());
+    }
+
+    public function resources(WorkCenterSection $section): JsonResponse
+    {
+        Gate::authorize('viewAny', WorkCenterSection::class);
+
+        $tenantId = require_tenant_id();
+        abort_if((int) $section->tenant_id !== (int) $tenantId, 404, 'Section not found.');
+
+        $data = $this->calculationService->getSectionResourceCosts($section);
+
+        return response()->json($data);
     }
 
     public function store(StoreWorkCenterSectionRequest $request): RedirectResponse|JsonResponse

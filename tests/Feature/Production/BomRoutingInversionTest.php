@@ -204,37 +204,37 @@ class BomRoutingInversionTest extends TestCase
     }
 
     /**
-     * TRACK-01: BOM rejects linking a Routing belonging to a different finished product.
+     * TRACK-01: Decoupled Architecture: A generic Routing can be reused across different products and BOMs.
      */
-    public function test_bom_rejects_routing_from_different_product(): void
+    public function test_routing_can_be_reused_across_different_products_and_boms(): void
     {
         $this->actingAs($this->engineer);
 
-        // Routing belongs to otherProduct (Bookshelf)
-        $shelfRouting = new RoutingDTO(
-            name: 'Bookshelf Routing',
-            product_id: $this->otherProduct->id,
+        // Standalone generic routing without product dependency
+        $genericRoutingDTO = new RoutingDTO(
+            name: 'Standard Woodworking Process',
             version: '1.0.0',
             effective_from: now()->toDateString(),
             operations: [
                 new RoutingOperationDTO(
                     sequence: 10,
                     operation_number: 'OP-010',
-                    name: 'Shelf Op',
+                    name: 'Wood Cutting Op',
                     operation_type: 'manufacturing',
                     work_center_id: $this->workCenter->id
                 ),
             ]
         );
-        $otherRouting = $this->routingService->create($shelfRouting, $this->tenant->id, $this->engineer->id);
-        $otherOp = $otherRouting->operations->first();
+        $genericRouting = $this->routingService->create($genericRoutingDTO, $this->tenant->id, $this->engineer->id);
+        $op = $genericRouting->operations->first();
 
-        $payload = [
-            'bom_number' => 'BOM-MISMATCH',
-            'bom_name' => 'Mismatch Product BOM',
+        // 1. Link to Desk BOM
+        $deskPayload = [
+            'bom_number' => 'BOM-DESK-REUSE',
+            'bom_name' => 'Desk BOM',
             'bom_type' => 'manufacturing',
             'product_id' => $this->finishedProduct->id, // Desk
-            'routing_id' => $otherRouting->id,          // Bookshelf routing
+            'routing_id' => $genericRouting->id,
             'base_quantity' => 1.0,
             'base_uom_id' => $this->pieceUom->id,
             'version' => '1.0.0',
@@ -244,13 +244,41 @@ class BomRoutingInversionTest extends TestCase
                     'material_id' => $this->rawMaterial1->id,
                     'quantity' => 2.0,
                     'uom_id' => $this->pieceUom->id,
-                    'routing_operation_id' => $otherOp->id,
+                    'routing_operation_id' => $op->id,
                 ],
             ],
         ];
 
-        $response = $this->post(route('production.boms.store'), $payload);
-        $response->assertSessionHasErrors(['routing_id']);
+        $resp1 = $this->post(route('production.boms.store'), $deskPayload);
+        $resp1->assertSessionHasNoErrors();
+        $resp1->assertRedirect();
+
+        // 2. Link same generic routing to Bookshelf BOM
+        $shelfPayload = [
+            'bom_number' => 'BOM-SHELF-REUSE',
+            'bom_name' => 'Bookshelf BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->otherProduct->id, // Bookshelf
+            'routing_id' => $genericRouting->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->pieceUom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'items' => [
+                [
+                    'material_id' => $this->rawMaterial1->id,
+                    'quantity' => 4.0,
+                    'uom_id' => $this->pieceUom->id,
+                    'routing_operation_id' => $op->id,
+                ],
+            ],
+        ];
+
+        $resp2 = $this->post(route('production.boms.store'), $shelfPayload);
+        $resp2->assertSessionHasNoErrors();
+        $resp2->assertRedirect();
+
+        $this->assertCount(2, $genericRouting->fresh()->boms);
     }
 
     /**
@@ -454,9 +482,10 @@ class BomRoutingInversionTest extends TestCase
     }
 
     /**
-     * TRACK-06: Approving a new Routing version inactivates Active BOMs linked to the retiring Routing.
+     * TRACK-06: Decoupled routing lifecycle: Multiple parallel active routings are permitted.
+     * Approving Routing v2 does NOT auto-retire Routing v1, and existing BOMs stay active.
      */
-    public function test_approving_new_routing_inactivates_active_bom_linked_to_retiring_routing_with_audit_log(): void
+    public function test_approving_new_routing_keeps_existing_active_routings_and_boms_parallel(): void
     {
         $this->actingAs($this->engineer);
 
@@ -496,19 +525,12 @@ class BomRoutingInversionTest extends TestCase
         $this->routingService->submitApproval($routingV2->id, $this->engineer->id);
         $this->routingService->approve($routingV2->id, $this->engineer->id);
 
-        // 4. Assert Routing v1 is historical, and BOM v1 is automatically inactivated
+        // 4. In decoupled architecture: Routing v1 remains ACTIVE, and BOM remains APPROVED/ACTIVE
         $routingV1->refresh();
-        $this->assertEquals(Routing::STATUS_HISTORICAL, $routingV1->status);
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routingV1->status);
 
         $bom->refresh();
-        $this->assertEquals(ProductionBom::STATUS_INACTIVE, $bom->status);
-        $this->assertTrue($bom->has_warning);
-
-        // Assert audit trail log was created
-        $this->assertDatabaseHas('production_bom_approvals', [
-            'bom_id' => $bom->id,
-            'action' => 'Inactivated',
-        ]);
+        $this->assertEquals(ProductionBom::STATUS_APPROVED, $bom->status);
     }
 
     /**

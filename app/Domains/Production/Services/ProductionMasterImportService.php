@@ -11,6 +11,8 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\WorkCenterSection;
+use App\Domains\Production\Models\SectionManualProduction;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -358,7 +360,9 @@ class ProductionMasterImportService
 
             $products = Product::where('tenant_id', $tenantId)->pluck('id', 'sku')->toArray();
             $workCenters = WorkCenter::where('tenant_id', $tenantId)->pluck('id', 'code')->toArray();
-            $machines = Machine::where('tenant_id', $tenantId)->with('workCenter')->get();
+            $machines = Machine::where('tenant_id', $tenantId)->with(['workCenter', 'section'])->get();
+            $sections = WorkCenterSection::where('tenant_id', $tenantId)->get();
+            $manualBatches = SectionManualProduction::where('tenant_id', $tenantId)->get();
             $uoms = Uom::where('tenant_id', $tenantId)->pluck('id', 'code')->toArray();
 
             foreach ($grouped as $routingCode => $group) {
@@ -374,12 +378,9 @@ class ProductionMasterImportService
                     $rowErrors[] = "Routing Name is required on the first row of routing '{$routingCode}'.";
                 }
 
+                // [INVERSION-DECOUPLE-TRACK-11] Routings are independent of products. Product code is optional/ignored.
                 $productId = null;
-                if (empty($productSku)) {
-                    $rowErrors[] = "Product Code is required.";
-                } elseif (!isset($products[$productSku])) {
-                    $rowErrors[] = "Product Code '{$productSku}' does not exist.";
-                } else {
+                if (!empty($productSku) && isset($products[$productSku])) {
                     $productId = $products[$productSku];
                 }
 
@@ -395,7 +396,12 @@ class ProductionMasterImportService
                     $opNumber = trim($opData['operation_code'] ?? '');
                     $opType = strtolower(trim($opData['operation_type'] ?? 'manufacturing'));
                     $wcCode = trim($opData['work_center_code'] ?? '');
+                    $secCode = trim($opData['section_code'] ?? '');
                     $mchCode = trim($opData['machine_code'] ?? '');
+                    $batchName = trim($opData['manual_batch_name'] ?? '');
+                    $isAlt = in_array(strtolower(trim($opData['is_alternative'] ?? 'no')), ['yes', '1', 'true']);
+                    $replacesOpNum = trim($opData['replaces_operation_number'] ?? '');
+                    $priority = !empty($opData['priority']) ? (int) $opData['priority'] : 1;
                     $setupTime = trim($opData['setup_time_minutes'] ?? '0');
                     $procTime = trim($opData['processing_time_minutes'] ?? '0');
                     $yield = trim($opData['yield_percentage'] ?? '100');
@@ -415,7 +421,12 @@ class ProductionMasterImportService
                             'operation_number' => $opNumber,
                             'operation_type' => $opType,
                             'work_center_code' => $wcCode,
+                            'section_code' => $secCode,
                             'machine_code' => $mchCode,
+                            'manual_batch_name' => $batchName,
+                            'is_alternative' => $isAlt,
+                            'replaces_operation_number' => $replacesOpNum,
+                            'priority' => $priority,
                             'setup_time_minutes' => $setupTime,
                             'processing_time_minutes' => $procTime,
                             'expected_yield_percentage' => $yield,
@@ -470,25 +481,65 @@ class ProductionMasterImportService
                         $opErrors[] = "Operation type '{$op['operation_type']}' for '{$opNumber}' is invalid.";
                     }
 
+                    $isExternal = $op['is_external'];
                     $wcId = null;
-                    if (empty($op['work_center_code'])) {
-                        $opErrors[] = "Work Center Code is required for '{$opNumber}'.";
-                    } elseif (!isset($workCenters[$op['work_center_code']])) {
-                        $opErrors[] = "Work Center '{$op['work_center_code']}' does not exist.";
-                    } else {
-                        $wcId = $workCenters[$op['work_center_code']];
+                    $secId = null;
+                    $mchId = null;
+                    $batchId = null;
+
+                    if (!$isExternal) {
+                        if (empty($op['work_center_code'])) {
+                            $opErrors[] = "Work Center Code is required for internal operation '{$opNumber}'.";
+                        } elseif (!isset($workCenters[$op['work_center_code']])) {
+                            $opErrors[] = "Work Center '{$op['work_center_code']}' does not exist.";
+                        } else {
+                            $wcId = $workCenters[$op['work_center_code']];
+                        }
+
+                        if (!empty($op['section_code'])) {
+                            $sec = $sections->firstWhere('code', $op['section_code']);
+                            if (!$sec) {
+                                $opErrors[] = "Section '{$op['section_code']}' does not exist.";
+                            } elseif ($wcId && $sec->work_center_id !== $wcId) {
+                                $opErrors[] = "Section '{$op['section_code']}' does not belong to Work Center '{$op['work_center_code']}'.";
+                            } else {
+                                $secId = $sec->id;
+                            }
+                        }
+
+                        // Mutual exclusivity: Machine XOR Manual Batch
+                        $hasMachine = !empty($op['machine_code']);
+                        $hasBatch = !empty($op['manual_batch_name']);
+
+                        if ($hasMachine && $hasBatch) {
+                            $opErrors[] = "Operation '{$opNumber}' cannot specify both a Machine and a Manual Batch.";
+                        } elseif ($hasMachine) {
+                            $mach = $machines->firstWhere('code', $op['machine_code']);
+                            if (!$mach) {
+                                $opErrors[] = "Machine '{$op['machine_code']}' does not exist.";
+                            } else {
+                                $mchId = $mach->id;
+                                if ($secId && $mach->section_id !== $secId) {
+                                    $opErrors[] = "Machine '{$op['machine_code']}' does not belong to Section '{$op['section_code']}'.";
+                                }
+                            }
+                        } elseif ($hasBatch) {
+                            $batch = $manualBatches->first(fn ($b) => $b->batch_name === $op['manual_batch_name'] && (!$secId || $b->section_id === $secId));
+                            if (!$batch) {
+                                $opErrors[] = "Manual Batch '{$op['manual_batch_name']}' does not exist in Section '{$op['section_code']}'.";
+                            } else {
+                                $batchId = $batch->id;
+                            }
+                        }
                     }
 
-                    $mchId = null;
-                    if (!empty($op['machine_code'])) {
-                        $mach = $machines->firstWhere('code', $op['machine_code']);
-                        if (!$mach) {
-                            $opErrors[] = "Machine '{$op['machine_code']}' does not exist.";
-                        } else {
-                            $mchId = $mach->id;
-                            if ($wcId && $mach->workCenter?->id !== $wcId) {
-                                $opErrors[] = "Machine/Work Center mismatch: Machine '{$op['machine_code']}' belongs to Work Center '{$mach->workCenter?->code}', not '{$op['work_center_code']}'.";
-                            }
+                    if ($op['is_alternative']) {
+                        if (empty($op['replaces_operation_number'])) {
+                            $opErrors[] = "Alternative operation '{$opNumber}' must specify 'replaces_operation_number'.";
+                        } elseif (!isset($opsGrouped[$op['replaces_operation_number']])) {
+                            $opErrors[] = "Alternative operation '{$opNumber}' references non-existent operation '{$op['replaces_operation_number']}'.";
+                        } elseif ($op['priority'] < 1) {
+                            $opErrors[] = "Priority for alternative operation '{$opNumber}' must be at least 1.";
                         }
                     }
 
@@ -508,7 +559,9 @@ class ProductionMasterImportService
                         $rowErrors = array_merge($rowErrors, $opErrors);
                     } else {
                         $op['work_center_id'] = $wcId;
+                        $op['section_id'] = $secId;
                         $op['machine_id'] = $mchId;
+                        $op['section_manual_production_id'] = $batchId;
                         $operations[] = $op;
                     }
                 }
@@ -727,7 +780,6 @@ class ProductionMasterImportService
                         if ($strategy === 'update') {
                             $routing->update([
                                 'name' => $data['name'],
-                                'product_id' => $data['product_id'],
                                 'version' => $data['version']
                             ]);
 
@@ -774,7 +826,6 @@ class ProductionMasterImportService
                             'tenant_id' => $tenantId,
                             'routing_number' => $data['routing_number'],
                             'name' => $data['name'],
-                            'product_id' => $data['product_id'],
                             'version' => $data['version'],
                             'status' => 'draft',
                             'created_by' => $userId
@@ -782,6 +833,7 @@ class ProductionMasterImportService
 
                         RoutingOperation::withTrashed()->where('routing_id', $routing->id)->forceDelete();
 
+                        $createdOpsMap = [];
                         foreach ($data['operations'] as $op) {
                             $newOp = RoutingOperation::create([
                                 'tenant_id' => $tenantId,
@@ -791,12 +843,29 @@ class ProductionMasterImportService
                                 'name' => $op['name'],
                                 'operation_type' => $op['operation_type'],
                                 'work_center_id' => $op['work_center_id'],
-                                'machine_id' => $op['machine_id'],
+                                'section_id' => $op['section_id'] ?? null,
+                                'machine_id' => $op['machine_id'] ?? null,
+                                'section_manual_production_id' => $op['section_manual_production_id'] ?? null,
+                                'is_alternative' => $op['is_alternative'] ?? false,
+                                'priority' => !empty($op['is_alternative']) ? ($op['priority'] ?? 1) : null,
                                 'setup_time_minutes' => $op['setup_time_minutes'],
                                 'processing_time_minutes' => $op['processing_time_minutes'],
                                 'expected_yield_percentage' => $op['expected_yield_percentage'],
                                 'is_external' => $op['is_external']
                             ]);
+                            $createdOpsMap[$op['operation_number']] = $newOp;
+                        }
+
+                        // Pass 2: Link alternative replaces_operation_id
+                        foreach ($data['operations'] as $op) {
+                            if (!empty($op['is_alternative']) && !empty($op['replaces_operation_number'])) {
+                                if (isset($createdOpsMap[$op['replaces_operation_number']]) && isset($createdOpsMap[$op['operation_number']])) {
+                                    $createdOpsMap[$op['operation_number']]->update([
+                                        'replaces_operation_id' => $createdOpsMap[$op['replaces_operation_number']]->id
+                                    ]);
+                                }
+                            }
+                        }
 
                             // [INVERSION-DECOUPLE-TRACK-11] Routing import no longer populates RoutingOperationMaterial; populated from BOM side
                             /*

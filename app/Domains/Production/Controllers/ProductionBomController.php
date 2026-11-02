@@ -260,7 +260,14 @@ class ProductionBomController extends Controller
             ->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
-        $routings = Routing::with('operations')->where('product_id', $bom->product_id)->get();
+        $routings = Routing::with('operations')
+            ->where(function ($q) use ($bom) {
+                $q->whereIn('status', ['approved', 'active', 'draft']);
+                if ($bom->routing_id) {
+                    $q->orWhere('id', $bom->routing_id);
+                }
+            })
+            ->get();
 
         return view('modules.production.bom.edit', compact('bom', 'products', 'materials', 'uoms', 'routings'));
     }

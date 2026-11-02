@@ -34,7 +34,7 @@ class ProductionCostService
      */
     public function calculateLaborCost(ProductionBom $bom): float
     {
-        $bom->loadMissing('routing.operations.workCenter');
+        $bom->loadMissing('routing.operations.workCenter', 'routing.operations.section', 'routing.operations.machine', 'routing.operations.manualProduction');
         $routing = $bom->routing;
         if (!$routing) {
             return 0.0;
@@ -42,14 +42,32 @@ class ProductionCostService
 
         $totalCost = 0.0;
         foreach ($routing->operations as $operation) {
+            if ($operation->is_alternative || $operation->is_external) {
+                continue;
+            }
+
             $activeMinutes = $operation->setup_time_minutes + $operation->processing_time_minutes;
             $yieldFactor = ($operation->expected_yield_percentage > 0)
                 ? (100 / $operation->expected_yield_percentage)
                 : 1.0;
 
-            $routingLaborRate = (float) $operation->labor_cost_rate;
-            $wcLaborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
-            $laborRate = $routingLaborRate > 0.0 ? $routingLaborRate : $wcLaborRate;
+            $laborRate = (float) $operation->labor_cost_rate;
+            if ($laborRate <= 0.0) {
+                if ($operation->section_manual_production_id && $operation->section) {
+                    $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($operation->section);
+                    foreach ($sectionCosts['manual_batches'] as $mb) {
+                        if ((int) $mb['id'] === (int) $operation->section_manual_production_id) {
+                            $laborRate = ($mb['labor_cost_per_hour'] ?? 0.0) / 60.0;
+                            break;
+                        }
+                    }
+                } elseif ($operation->machine_id && $operation->section) {
+                    $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($operation->section);
+                    $laborRate = ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0) / 60.0;
+                } else {
+                    $laborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
+                }
+            }
 
             $laborCost = $activeMinutes * $laborRate * $bom->base_quantity * $yieldFactor;
             $totalCost += $laborCost;
@@ -64,7 +82,7 @@ class ProductionCostService
      */
     public function calculateMachineCost(ProductionBom $bom): float
     {
-        $bom->loadMissing('routing.operations');
+        $bom->loadMissing('routing.operations.machine');
         $routing = $bom->routing;
         if (!$routing) {
             return 0.0;
@@ -72,12 +90,21 @@ class ProductionCostService
 
         $totalCost = 0.0;
         foreach ($routing->operations as $operation) {
+            if ($operation->is_alternative || $operation->is_external || $operation->section_manual_production_id) {
+                continue;
+            }
+
             $activeMinutes = $operation->setup_time_minutes + $operation->processing_time_minutes;
             $yieldFactor = ($operation->expected_yield_percentage > 0)
                 ? (100 / $operation->expected_yield_percentage)
                 : 1.0;
 
-            $machineCost = $activeMinutes * $operation->machine_cost_rate * $bom->base_quantity * $yieldFactor;
+            $machineRate = (float) $operation->machine_cost_rate;
+            if ($machineRate <= 0.0 && $operation->machine) {
+                $machineRate = ((float) $operation->machine->operating_cost_per_hour) / 60.0;
+            }
+
+            $machineCost = $activeMinutes * $machineRate * $bom->base_quantity * $yieldFactor;
             $totalCost += $machineCost;
         }
 
@@ -86,30 +113,11 @@ class ProductionCostService
 
     /**
      * Calculate total overhead cost of a BOM (scaled to its base quantity).
-     * Formula: sum(duration * (work_center.overhead_rate / 60.0) * base_quantity * yield_factor)
+     * Overhead is currently on hold (out of scope for this phase).
      */
     public function calculateOverheadCost(ProductionBom $bom): float
     {
-        $bom->loadMissing('routing.operations.workCenter');
-        $routing = $bom->routing;
-        if (!$routing) {
-            return 0.0;
-        }
-
-        $totalCost = 0.0;
-        foreach ($routing->operations as $operation) {
-            $activeMinutes = $operation->setup_time_minutes + $operation->processing_time_minutes;
-            $yieldFactor = ($operation->expected_yield_percentage > 0)
-                ? (100 / $operation->expected_yield_percentage)
-                : 1.0;
-
-            $overheadRate = $operation->workCenter ? (float) $operation->workCenter->overhead_rate : 0.0;
-            // overhead_rate is hourly, convert to per minute
-            $overheadCost = $activeMinutes * ($overheadRate / 60.0) * $bom->base_quantity * $yieldFactor;
-            $totalCost += $overheadCost;
-        }
-
-        return $totalCost;
+        return 0.0;
     }
 
     /**

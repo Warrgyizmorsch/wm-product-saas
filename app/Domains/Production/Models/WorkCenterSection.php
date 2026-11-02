@@ -162,6 +162,11 @@ class WorkCenterSection extends BaseModel
         return $this->hasMany(SectionManualProduction::class, 'section_id');
     }
 
+    public function routingOperations(): HasMany
+    {
+        return $this->hasMany(RoutingOperation::class, 'section_id');
+    }
+
     public function activeManualProductions(): HasMany
     {
         return $this->manualProductions()->where('production_section_manual_productions.active', true);

@@ -111,6 +111,21 @@
                         <small class="form-text text-muted fs-11 mb-3 d-block">
                             <i class="feather-lock me-1 text-secondary"></i>Auto-assigned from product master (read-only)
                         </small>
+
+                        <x-ui.odoo-form-ui type="select" :label="__('production.process_routing') ?? 'Process Routing'" name="routing_id"
+                            id="routing_id" :required="true" data-master="routing"
+                            :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
+                            <option value="">-- {{ __('production.select_routing') ?? 'Select Process Routing' }} --</option>
+                            @foreach ($routings as $r)
+                                <option value="{{ $r->id }}" @selected(old('routing_id') == $r->id)>
+                                    {{ $r->routing_number }} - {{ $r->name }} (v{{ $r->version }}) [{{ ucfirst($r->status) }}]
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        <small class="form-text text-muted fs-11 mb-3 d-block">
+                            <i class="feather-git-commit me-1 text-primary"></i>Process route defining operations and work centers
+                        </small>
+
                         <x-ui.odoo-form-ui type="textarea" :label="__('production.revision_notes')" name="notes"
                             placeholder="{{ __('production.notes_placeholder') }}" rows="3"
                             :error-text="$errors->first('notes')"
@@ -167,17 +182,18 @@
                             <x-ui.odoo-form-ui type="table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
-                                        <th style="width: 25%">{{ __('production.component_product') }}</th>
-                                        <th style="width: 12%">{{ __('production.quantity') }}</th>
-                                        <th style="width: 10%">
+                                        <th style="width: 4%" class="text-center">{{ __('production.seq') }}</th>
+                                        <th style="width: 23%">{{ __('production.component_product') }}</th>
+                                        <th style="width: 16%">{{ __('production.operation') ?? 'Operation / Station' }}</th>
+                                        <th style="width: 13%">{{ __('production.quantity') }}</th>
+                                        <th style="width: 8%">
                                             {{ __('production.uom') }}
                                             <i class="feather-lock text-muted ms-1 fs-11" title="Auto-selected from component product (read-only)"></i>
                                         </th>
-                                        <th style="width: 8%">{{ __('production.scrap_percent') }}</th>
-                                        <th style="width: 8%">{{ __('production.priority') }}</th>
-                                        <th style="width: 27%">{{ __('production.alternative') }}</th>
-                                        <th style="width: 5%" class="text-center">{{ __('production.action') }}</th>
+                                        <th style="width: 6%">{{ __('production.scrap_percent') }}</th>
+                                        <th style="width: 6%">{{ __('production.priority') }}</th>
+                                        <th style="width: 20%">{{ __('production.alternative') }}</th>
+                                        <th style="width: 4%" class="text-center">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -265,6 +281,29 @@
                                                 <div class="mt-1">
                                                     <input type="text" x-bind:name="'items['+index+'][notes]'" class="odoo-table-input fs-11 text-muted" placeholder="Component notes (optional)..." x-model="item.notes" />
                                                 </div>
+                                            </td>
+
+                                            <!-- Operation / Station Assignment -->
+                                            <td class="align-middle">
+                                                <select class="form-select form-select-sm fs-11"
+                                                    x-bind:name="'items['+index+'][routing_operation_id]'"
+                                                    x-model="item.routing_operation_id"
+                                                    required
+                                                    :class="errors['items.' + index + '.routing_operation_id'] ? 'is-invalid' : ''">
+                                                    <option value="" x-show="!availableOperations.length">-- {{ __('production.select_routing_first') ?? 'Select Routing First' }} --</option>
+                                                    <template x-for="op in availableOperations" :key="op.id">
+                                                        <option :value="op.id"
+                                                            :selected="item.routing_operation_id == op.id"
+                                                            x-text="'Op ' + op.sequence + ': ' + op.name">
+                                                        </option>
+                                                    </template>
+                                                </select>
+                                                <template x-if="errors['items.' + index + '.routing_operation_id']">
+                                                    <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray(errors['items.' + index + '.routing_operation_id']) ? errors['items.' + index + '.routing_operation_id'][0] : errors['items.' + index + '.routing_operation_id']"></div>
+                                                </template>
+                                                <template x-if="selectedRoutingId && !availableOperations.length">
+                                                    <small class="text-danger fs-10 d-block mt-1">Routing has no operations</small>
+                                                </template>
                                             </td>
 
                                             <!-- Quantity & Type -->
@@ -416,7 +455,7 @@
 
     @php
         $oldItems = old('items', [
-            ['material_id' => '', 'quantity' => '', 'quantity_type' => 'fixed', 'formula' => '', 'uom_id' => '', 'material_scrap_percentage' => 0.00, 'is_alternative' => false, 'replaces_row_uid' => '', 'priority' => 1]
+            ['material_id' => '', 'routing_operation_id' => '', 'quantity' => '', 'quantity_type' => 'fixed', 'formula' => '', 'uom_id' => '', 'material_scrap_percentage' => 0.00, 'is_alternative' => false, 'replaces_row_uid' => '', 'priority' => 1]
         ]);
     @endphp
 
@@ -439,14 +478,44 @@
 
     <script>
         const productsData = @json($products);
+        const routingsData = @json($routings->keyBy('id'));
 
         document.addEventListener('alpine:init', () => {
             Alpine.data('bomForm', () => ({
                 items: @json($oldItems),
                 errors: @json($errors->toArray()),
                 materials: @json($materials),
+                routings: routingsData,
+                selectedRoutingId: '{{ old('routing_id', '') }}',
+                availableOperations: [],
                 activeTab: 'components',
                 showAdvanced: true,
+
+                updateAvailableOperations(routingId, autoAssignDefault = true) {
+                    if (!routingId || !this.routings[routingId] || !this.routings[routingId].operations) {
+                        this.availableOperations = [];
+                        return;
+                    }
+                    this.availableOperations = (this.routings[routingId].operations || []).slice().sort((a, b) => a.sequence - b.sequence);
+
+                    const firstOpId = this.availableOperations.length > 0 ? String(this.availableOperations[0].id) : '';
+                    const validOpIds = this.availableOperations.map(op => String(op.id));
+
+                    if (autoAssignDefault) {
+                        this.items.forEach(item => {
+                            if (!item.routing_operation_id || !validOpIds.includes(String(item.routing_operation_id))) {
+                                item.routing_operation_id = firstOpId;
+                            }
+                        });
+                    }
+                },
+
+                getFirstOperationId() {
+                    if (this.availableOperations && this.availableOperations.length > 0) {
+                        return String(this.availableOperations[0].id);
+                    }
+                    return '';
+                },
 
                 getMaterialType(materialId) {
                     if (!materialId) return '';
@@ -510,6 +579,7 @@
                         return {
                             uid: item.uid || item.row_uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
                             material_id: item.material_id || '',
+                            routing_operation_id: item.routing_operation_id ? String(item.routing_operation_id) : '',
                             child_bom_id: item.child_bom_id || null,
                             quantity: item.quantity || '',
                             quantity_type: item.quantity_type || 'fixed',
@@ -558,6 +628,26 @@
                             $baseUomDisplay.trigger('change');
                         }
                     };
+
+                    // Initial routing and operations setup
+                    const initialRoutingId = $('#routing_id').val() || this.selectedRoutingId;
+                    this.selectedRoutingId = initialRoutingId;
+                    this.updateAvailableOperations(initialRoutingId, false);
+
+                    const firstOp = this.getFirstOperationId();
+                    if (firstOp) {
+                        this.items.forEach(item => {
+                            if (!item.routing_operation_id) {
+                                item.routing_operation_id = firstOp;
+                            }
+                        });
+                    }
+
+                    $('#routing_id').on('change.select2 change', (e) => {
+                        var routingVal = e.target.value;
+                        this.selectedRoutingId = routingVal;
+                        this.updateAvailableOperations(routingVal, true);
+                    });
 
                     // Initial header UOM on load
                     const initialProductId = $('#product_id').val();
@@ -707,6 +797,7 @@
                     this.items.push({
                         uid: 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                         material_id: '',
+                        routing_operation_id: this.getFirstOperationId(),
                         child_bom_id: null,
                         quantity: '',
                         quantity_type: 'fixed',

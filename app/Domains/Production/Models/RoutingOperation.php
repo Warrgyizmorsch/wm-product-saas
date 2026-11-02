@@ -39,7 +39,12 @@ class RoutingOperation extends BaseModel
         'description',
         'operation_type',
         'work_center_id',
+        'section_id',
         'machine_id',
+        'section_manual_production_id',
+        'is_alternative',
+        'replaces_operation_id',
+        'priority',
         'setup_time_minutes',
         'processing_time_minutes',
         'wait_time_minutes',
@@ -68,6 +73,11 @@ class RoutingOperation extends BaseModel
 
     protected $casts = [
         'sequence'                  => 'integer',
+        'section_id'                => 'integer',
+        'section_manual_production_id' => 'integer',
+        'is_alternative'            => 'boolean',
+        'replaces_operation_id'     => 'integer',
+        'priority'                  => 'integer',
         'setup_time_minutes'        => 'float',
         'processing_time_minutes'   => 'float',
         'wait_time_minutes'         => 'float',
@@ -117,9 +127,29 @@ class RoutingOperation extends BaseModel
         return $this->belongsTo(WorkCenter::class, 'work_center_id');
     }
 
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(WorkCenterSection::class, 'section_id');
+    }
+
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function manualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
+    }
+
+    public function primaryOperation(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaces_operation_id');
+    }
+
+    public function alternativeOperations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(self::class, 'replaces_operation_id')->orderBy('priority');
     }
 
     public function vendor(): BelongsTo
@@ -192,17 +222,20 @@ class RoutingOperation extends BaseModel
     }
 
     /**
-     * Estimated operation cost per unit.
-     * Future RoutingCostService will use this for detailed costing.
+     * Estimated operation cost per unit (1-unit baseline).
      */
     public function estimatedCostPerUnit(): float
     {
-        $totalMinutes = $this->setup_time_minutes + $this->processing_time_minutes;
-        $laborRate = (float) $this->labor_cost_rate > 0.0
-            ? (float) $this->labor_cost_rate
-            : ($this->workCenter ? ((float) $this->workCenter->cost_per_hour / 60.0) : 0.0);
+        if ($this->is_external) {
+            return (float) $this->subcontract_cost_per_unit;
+        }
 
-        return ($totalMinutes * $laborRate)
-             + ($totalMinutes * $this->machine_cost_rate);
+        $totalMinutes = (float) $this->processing_time_minutes;
+        $laborRate = (float) $this->labor_cost_rate;
+        $machineRate = (float) $this->machine_cost_rate > 0.0
+            ? (float) $this->machine_cost_rate
+            : ($this->machine ? ((float) $this->machine->operating_cost_per_hour / 60.0) : 0.0);
+
+        return ($totalMinutes * $laborRate) + ($totalMinutes * $machineRate);
     }
 }

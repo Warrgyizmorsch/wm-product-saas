@@ -4,6 +4,8 @@ namespace App\Domains\Production\Requests;
 
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\SectionManualProduction;
+use App\Domains\Production\Models\WorkCenterSection;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRoutingRequest extends FormRequest
@@ -30,11 +32,20 @@ class StoreRoutingRequest extends FormRequest
             // Header
             'routing_number'         => 'nullable|string|max:50',
             'name'                   => 'required|string|max:255',
-            'product_id'             => 'required|exists:products,id',
+            // [DECOUPLE-PRODUCT-INDEPENDENT] 'product_id' => 'required|exists:products,id',
             // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing no longer tracks BOM or material quantity mode
             // 'bom_id'                 => 'nullable|exists:production_boms,id',
             // 'material_quantity_mode' => 'nullable|in:per_unit,per_bom_base_quantity',
-            'version'                => 'nullable|string|max:50',
+            'version'                => [
+                'nullable',
+                'string',
+                'max:50',
+                \Illuminate\Validation\Rule::unique('routings')->where(function ($query) {
+                    return $query->where('tenant_id', tenant_id() ?? 1)
+                        ->where('name', $this->input('name'))
+                        ->whereNull('deleted_at');
+                }),
+            ],
             'is_default'             => 'boolean',
             'effective_from'         => 'nullable|date',
             'effective_to'           => 'nullable|date|after_or_equal:effective_from',
@@ -46,7 +57,14 @@ class StoreRoutingRequest extends FormRequest
             'operations.*.name'                               => 'required|string|max:255',
             'operations.*.operation_type'                     => "required|in:{$operationTypes}",
             'operations.*.work_center_id'                     => 'nullable|exists:production_work_centers,id',
+            'operations.*.section_id'                         => 'nullable|exists:production_work_center_sections,id',
             'operations.*.machine_id'                         => 'nullable|exists:production_machines,id',
+            'operations.*.section_manual_production_id'       => 'nullable|exists:production_section_manual_productions,id',
+            'operations.*.is_alternative'                     => 'nullable|boolean',
+            'operations.*.row_uid'                            => 'nullable|string',
+            'operations.*.replaces_operation_id'              => 'nullable',
+            'operations.*.replaces_row_uid'                   => 'nullable|string',
+            'operations.*.priority'                           => 'nullable|integer|min:1',
             'operations.*.setup_time_minutes'                 => 'nullable|numeric|min:0',
             'operations.*.processing_time_minutes'            => 'nullable|numeric|min:0',
             'operations.*.wait_time_minutes'                  => 'nullable|numeric|min:0',
@@ -89,7 +107,7 @@ class StoreRoutingRequest extends FormRequest
                 app(\App\Domains\Production\Services\RoutingLifecycleService::class)->validateEffectiveDates(
                     $this->input('effective_from'),
                     $this->input('effective_to'),
-                    (int) $this->input('product_id'),
+                    0,
                     null,
                     tenant_id() ?? 1
                 );
@@ -130,12 +148,15 @@ class StoreRoutingRequest extends FormRequest
                 }
             }
 
-            // Rule 3: Conditional validation based on is_external
+            // Rule 3: Conditional validation based on is_external and resource assignments
             foreach ($operations as $index => $op) {
-                $isExternal   = filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN);
-                $machineId    = !empty($op['machine_id']) ? (int) $op['machine_id'] : null;
-                $workCenterId = !empty($op['work_center_id']) ? (int) $op['work_center_id'] : null;
-                $vendorId     = !empty($op['vendor_id']) ? (int) $op['vendor_id'] : null;
+                $isExternal         = filter_var($op['is_external'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $isAlternative      = filter_var($op['is_alternative'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $machineId          = !empty($op['machine_id']) ? (int) $op['machine_id'] : null;
+                $workCenterId       = !empty($op['work_center_id']) ? (int) $op['work_center_id'] : null;
+                $sectionId          = !empty($op['section_id']) ? (int) $op['section_id'] : null;
+                $manualProductionId = !empty($op['section_manual_production_id']) ? (int) $op['section_manual_production_id'] : null;
+                $vendorId           = !empty($op['vendor_id']) ? (int) $op['vendor_id'] : null;
 
                 if ($isExternal) {
                     if (empty($vendorId)) {
@@ -170,14 +191,72 @@ class StoreRoutingRequest extends FormRequest
                         );
                     }
 
-                    if ($machineId && $workCenterId) {
-                        $machine = Machine::with('section')->find($machineId);
-                        if ($machine && $machine->section?->work_center_id !== $workCenterId) {
+                    if (empty($sectionId)) {
+                        $validator->errors()->add(
+                            "operations.{$index}.section_id",
+                            "Section is required for internal operations."
+                        );
+                    } elseif ($workCenterId) {
+                        $section = WorkCenterSection::find($sectionId);
+                        if (!$section || (int) $section->work_center_id !== (int) $workCenterId) {
                             $validator->errors()->add(
-                                "operations.{$index}.machine_id",
-                                "The selected machine does not belong to the chosen work center."
+                                "operations.{$index}.section_id",
+                                "The selected section does not belong to the chosen work center."
                             );
                         }
+                    }
+
+                    // Resource Selection: Exactly one of machine_id OR section_manual_production_id (Machine XOR Manual Batch)
+                    $hasMachine = !empty($machineId);
+                    $hasManual  = !empty($manualProductionId);
+
+                    if (!$hasMachine && !$hasManual) {
+                        $validator->errors()->add(
+                            "operations.{$index}.machine_id",
+                            "Each internal operation must have either a Machine OR a Manual Production Batch selected."
+                        );
+                    } elseif ($hasMachine && $hasManual) {
+                        $validator->errors()->add(
+                            "operations.{$index}.machine_id",
+                            "An operation cannot have both a Machine and a Manual Production Batch. Select only one."
+                        );
+                    } else {
+                        if ($hasMachine && $sectionId) {
+                            $machine = Machine::find($machineId);
+                            if (!$machine || (int) $machine->section_id !== (int) $sectionId) {
+                                $validator->errors()->add(
+                                    "operations.{$index}.machine_id",
+                                    "The selected machine does not belong to the chosen section."
+                                );
+                            }
+                        }
+                        if ($hasManual && $sectionId) {
+                            $manualBatch = SectionManualProduction::find($manualProductionId);
+                            if (!$manualBatch || (int) $manualBatch->section_id !== (int) $sectionId) {
+                                $validator->errors()->add(
+                                    "operations.{$index}.section_manual_production_id",
+                                    "The selected manual production batch does not belong to the chosen section."
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Alternative operation validation
+                if ($isAlternative) {
+                    $replacesId  = $op['replaces_operation_id'] ?? null;
+                    $replacesUid = $op['replaces_row_uid'] ?? null;
+                    if (empty($replacesId) && empty($replacesUid)) {
+                        $validator->errors()->add(
+                            "operations.{$index}.replaces_operation_id",
+                            "An alternative operation must specify which primary operation it replaces."
+                        );
+                    }
+                    if (empty($op['priority']) || (int) $op['priority'] < 1) {
+                        $validator->errors()->add(
+                            "operations.{$index}.priority",
+                            "Priority is required for alternative operations and must be at least 1."
+                        );
                     }
                 }
             }
@@ -333,9 +412,11 @@ class StoreRoutingRequest extends FormRequest
             'operations.required'           => 'At least one operation is required.',
             'operations.min'                => 'At least one routing operation must be defined.',
             'operations.*.work_center_id.required' => 'Work center is required for each operation.',
+            'operations.*.section_id.required'     => 'Section is required for internal operations.',
             'operations.*.name.required'    => 'Operation name is required.',
             'operations.*.operation_type.required' => 'Operation type is required.',
             'operations.*.operation_type.in' => 'Invalid operation type selected.',
+            'operations.*.priority.min'     => 'Alternative operation priority must be at least 1.',
             'operations.*.processing_time_minutes.min' => 'Processing time cannot be negative.',
             'operations.*.setup_time_minutes.min'      => 'Setup time cannot be negative.',
             'operations.*.expected_yield_percentage.min' => 'Yield percentage must be greater than 0.',

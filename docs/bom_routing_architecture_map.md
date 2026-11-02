@@ -138,9 +138,12 @@ flowchart TD
   * `description` (`text`, nullable)
   * `operation_type` (`varchar(50)`) — `manufacturing`, `inspection`, `outsourcing`, `transport`, `maintenance`
   * `work_center_id` (`bigint unsigned`, nullable, FK `production_work_centers.id`)
-  * `section_id` (`bigint unsigned`, nullable, FK `production_work_center_sections.id`) — *Planned in WC-TRACK-01 (Primary Section)*
-  * `machine_id` (`bigint unsigned`, nullable, FK `production_machines.id`) — *Primary Machine (Multi-machine supported via `production_routing_operation_machines` pivot)*
-  * `section_manual_production_id` (`bigint unsigned`, nullable, FK `production_section_manual_productions.id`) — *Planned in WC-TRACK-02 (Primary Manual Batch; multi-batch via `production_routing_operation_manual_batches` pivot)*
+  * `section_id` (`bigint unsigned`, nullable, FK `production_work_center_sections.id`) — *Mandatory for internal ops; 1 section per op (WC-TRACK-01)*
+  * `machine_id` (`bigint unsigned`, nullable, FK `production_machines.id`) — *Mutually exclusive with manual batch (WC-TRACK-02)*
+  * `section_manual_production_id` (`bigint unsigned`, nullable, FK `production_section_manual_productions.id`) — *Mutually exclusive with machine (WC-TRACK-02)*
+  * `is_alternative` (`tinyint(1)`) — default `0` (Alternative Operation flag, mirrors BOM items) [WC-TRACK-01]
+  * `replaces_operation_id` (`bigint unsigned`, nullable, FK `production_routing_operations.id` cascade) — [WC-TRACK-01]
+  * `priority` (`integer`) — default `1` (Alternative dispatching priority) [WC-TRACK-01]
   * `setup_time_minutes` (`decimal(10,2)`) — default `0.00`
   * `processing_time_minutes` (`decimal(10,2)`) — default `0.00`
   * `wait_time_minutes` (`decimal(10,2)`) — default `0.00`
@@ -222,15 +225,19 @@ public function approver(): BelongsTo          // User
 public function routing(): BelongsTo           // Routing
 public function previousOperation(): BelongsTo // Predecessor operation (self-referencing)
 public function workCenter(): BelongsTo        // WorkCenter (work_center_id)
-public function machine(): BelongsTo           // Machine (machine_id)
+public function section(): BelongsTo           // WorkCenterSection (section_id) — [WC-TRACK-01]
+public function machine(): BelongsTo           // Machine (machine_id) — Mutually exclusive with manualProduction [WC-TRACK-02]
+public function manualProduction(): BelongsTo  // SectionManualProduction (section_manual_production_id) — [WC-TRACK-02]
 public function vendor(): BelongsTo            // Subcontractor Vendor
 public function subcontractServiceProduct(): BelongsTo  // Service Product for subcontracting
 public function materials(): HasMany           // RoutingOperationMaterial (ordered by sequence)
 public function bomItems(): HasMany            // ✅ HasMany(ProductionBomItem::class, 'routing_operation_id') — NEW
-public function alternateMachines(): HasMany   // RoutingOperationAlternateMachine (ordered by priority)
+public function primaryOperation(): BelongsTo  // Primary operation this replaces (replaces_operation_id) — [WC-TRACK-01]
+public function alternativeOperations(): HasMany // Alternative operations replacing this (replaces_operation_id) — [WC-TRACK-01]
+public function alternateMachines(): HasMany   // Legacy RoutingOperationAlternateMachine (ordered by priority)
 ```
-**Note:** `section_id` is **NOT yet present** on this model or table — it is proposed in WC-TRACK-01.  
-**Known Bug:** `estimatedCostPerUnit()` at line 203 still reads `$this->workCenter->cost_per_hour` which no longer exists. This method is a legacy stub; fix is pending WC-TRACK-03.
+**Note:** `section_id` and `section_manual_production_id` will be added via migration as direct foreign keys (no pivot tables needed) in **WC-TRACK-01** and **WC-TRACK-02**.  
+**Known Bug:** `estimatedCostPerUnit()` at line 203 still reads `$this->workCenter->cost_per_hour` which no longer exists. Fix is pending **WC-TRACK-03**.
 
 ### 3.5 `RoutingOperationMaterial` (`app/Domains/Production/Models/RoutingOperationMaterial.php`)
 ```php

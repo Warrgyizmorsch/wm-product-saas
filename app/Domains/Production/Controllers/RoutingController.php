@@ -34,11 +34,10 @@ class RoutingController extends Controller
     {
         Gate::authorize('viewAny', Routing::class);
 
-        $filters  = $request->only(['product_id', 'status', 'search']);
+        $filters  = $request->only(['status', 'search']);
         $routings = $this->routingRepository->paginateAll($filters, 15)->withQueryString();
-        $products = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
 
-        return view('modules.production.routing.index', compact('routings', 'products', 'filters'));
+        return view('modules.production.routing.index', compact('routings', 'filters'));
     }
 
     public function create(Request $request): View
@@ -46,7 +45,7 @@ class RoutingController extends Controller
         Gate::authorize('create', Routing::class);
 
         $products    = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
-        $workCenters = $this->workCenterRepository->getActiveWorkCenters();
+        $workCenters = \App\Domains\Production\Models\WorkCenter::with(['sections' => fn($q) => $q->where('status', 'active')])->where('status', 'active')->get();
         $vendors     = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
@@ -106,6 +105,15 @@ class RoutingController extends Controller
 
         Gate::authorize('view', $routing);
 
+        $routing->loadMissing([
+            'operations.workCenter',
+            'operations.section',
+            'operations.machine',
+            'operations.manualProduction',
+            'operations.primaryOperation',
+            'operations.alternativeOperations',
+        ]);
+
         // Cost preview (only if active or operations exist)
         $costSummary = null;
         if ($routing->operations->count() > 0) {
@@ -128,8 +136,17 @@ class RoutingController extends Controller
 
         abort_if($routing->isReadOnly(), 403, 'This routing is read-only. Only draft routings can be edited.');
 
+        $routing->loadMissing([
+            'operations.workCenter',
+            'operations.section',
+            'operations.machine',
+            'operations.manualProduction',
+            'operations.primaryOperation',
+            'operations.alternativeOperations',
+        ]);
+
         $products       = Product::whereIn('type', ['finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get();
-        $workCenters    = $this->workCenterRepository->getActiveWorkCenters();
+        $workCenters    = \App\Domains\Production\Models\WorkCenter::with(['sections' => fn($q) => $q->where('status', 'active')])->where('status', 'active')->get();
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();

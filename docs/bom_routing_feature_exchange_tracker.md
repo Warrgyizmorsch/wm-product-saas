@@ -21,7 +21,7 @@ This document tracks all requirements, architecture shifts, business rules, desi
 | **TRACK-01** | Invert Parent Entity Tracking Link (`routing_id` on BOM vs `bom_id` on Routing) | 🛠️ **Applied** | Migrations, `ProductionBom`, `Routing`, DTOs |
 | **TRACK-02** | Move Operation-Component Assignment into BOM & Populate `RoutingOperationMaterial` | 🛠️ **Applied** | Migrations, `ProductionBomItem`, `RoutingOperationMaterial`, `ProductionBomService` |
 | **TRACK-03** | Decouple Routing Creation & Approval from BOM Pre-requisite | 🛠️ **Applied** | `StoreRoutingRequest`, `RoutingService`, `RoutingRepository`, `RoutingController` |
-| **TRACK-04** | BOM Creation & Edit UI Overhaul (Routing Header Selector & Component Operation Dropdowns) | 🟢 **Agreed / Finalized UI Spec** | `bom/create.blade.php`, `bom/edit.blade.php`, `routing/create.blade.php`, `routing/edit.blade.php` |
+| **TRACK-04** | BOM Creation & Edit UI Overhaul (Routing Header Selector & Component Operation Dropdowns) | 🛠️ **Applied** | `bom/create.blade.php`, `bom/edit.blade.php`, `routing/create.blade.php`, `routing/edit.blade.php`, `routing/show.blade.php` |
 | **TRACK-05** | Material Allocation & Validation Rules (Mandatory Operation, Zero-Material Operations, Multi-Op) | 🛠️ **Applied** | `StoreProductionBomRequest`, `UpdateProductionBomRequest`, `ProductionBomService` |
 | **TRACK-06** | Invert Lifecycle & Approval Cascades (Routing State Changes Affecting Connected BOMs) | 🛠️ **Applied** | `RoutingLifecycleService`, `BomLifecycleService`, `ProductionBomService` |
 | **TRACK-07** | Refactor Downstream Consumers (`ProductionOrder`, `ProductionPlan`, Readiness & Costing) | ⏸️ **On Hold / Deferred** | `ProductionOrderService`, `ProductionReadinessService`, `ProductionCostService` (After BOM & Routing finalized) |
@@ -181,61 +181,118 @@ Currently:
 
 ---
 
-### TRACK-04: BOM Creation & Edit UI Overhaul (Routing Header Selector & Component Operation Dropdowns)
-* **Date Logged:** 2026-10-30
-* **Status:** 🟢 **Agreed / Finalized UI Specification**
-* **Area:** BOM Frontend Views (`bom/create.blade.php`, `bom/edit.blade.php`), Alpine.js Scripts & Form Validation
+### TRACK-04: BOM Creation & Edit UI Overhaul (Operation-Centric Sequential Cards / Accordions)
+* **Date Logged:** 2026-10-30 (Updated: November 2026 with Option A Layout Consensus)
+* **Status:** 🟡 **Agreed Architecture & Design / Ready for Implementation**
+* **Area:** BOM Frontend Views (`bom/create.blade.php`, `bom/edit.blade.php`), Routing Views (`routing/create.blade.php`, `routing/edit.blade.php`, `routing/index.blade.php`, `routing/show.blade.php`), Alpine.js Scripts & Form Validation
 
 #### 1. Description & Context
 In the inverted architecture:
 * Routing is created first as an independent, reusable manufacturing process route (without `product_id` or `bom_id`).
 * When creating a BOM, the user chooses which Finished Product to manufacture (`product_id`) and which Process Routing to use (`routing_id`).
-* Each raw material / component in the BOM is mapped to a specific operation of that Routing (`routing_operation_id`), giving complete visibility of where each part is consumed.
+* **UI Evolution (Consensus Reached):**
+  * *Initial Implementation:* A flat components table where every row contained an "Operation" dropdown selector.
+  * *User Refinement (Agreed Option A):* Instead of repetitive dropdowns in every row, the components workspace presents **sequential Operation Cards/Accordions** corresponding to the operations of the selected Process Routing.
+  * Inside each operation card, the user configures the specific raw materials / components consumed at that physical work station.
 
-#### 2. Finalized UI Specifications
+#### 2. Visual Architecture & Block Diagrams
 
-##### A. BOM Header (`bom/create.blade.php` & `bom/edit.blade.php`)
-1. **Routing Dropdown Placement:**
-   - In the Left Column of the BOM Header card, place the **Process Routing (`routing_id`)** selector directly below/adjacent to the **Item to Produce (`product_id`)** field.
-2. **Selectable Options:**
-   - Options include all tenant Routings in **`Active`**, **`Approved`**, or **`Draft`** status (not restricted by product).
-   - Option label format: `[RTG-XXXX] Routing Name (v1.0.0 · Active)`.
-   - Embed operations data (or initialize a client-side lookup dictionary) so Alpine.js has instantaneous, zero-latency access to the operations of the selected routing.
-3. **Change Handling:**
-   - When the user selects or switches a Routing:
-     - The available operations in Alpine.js (`availableOperations`) immediately update to reflect the newly selected routing's operations.
-     - If the routing is changed after component operations were already selected, existing assigned rows are alerted/prompted to avoid invalid operation IDs.
+```mermaid
+flowchart TD
+    subgraph HEADER["BOM Header Area"]
+        H1["Product Selection (product_id)"]
+        H2["Process Routing Selection (routing_id)\n(Fetches Active, Approved & Draft Routings)"]
+        H3["Base Quantity & UOM"]
+    end
 
-##### B. Components Table (`tab-components`)
-1. **New "Operation / Station" Column:**
-   - Add a dedicated column to the BOM components table: **`Operation / Station`** (`routing_operation_id`).
-   - Width: ~16% (responsive table layout).
-   - Position: Placed between Component Product and Quantity for intuitive operational flow.
-2. **Operation Dropdown Behavior:**
-   - Rendered as `<x-ui.odoo-form-ui type="select" name="items[index][routing_operation_id]" ...>` bound to `x-model="item.routing_operation_id"`.
-   - **When Routing is selected:** Populates with the selected routing's operations.
-     - Option label: `[Seq 10] Op Name (Work Center Name)`.
-   - **When no Routing is selected yet:** The select displays: *`-- Select Routing in Header First --`* and is disabled.
-   - **Defaulting on New Row (`addItem`):** Automatically defaults `routing_operation_id` to the first operation of the selected routing (`availableOperations[0].id`), eliminating unnecessary clicks for single-step or linear assembly while still allowing the user to change it.
-3. **Edit Mode (`bom/edit.blade.php`):**
-   - Automatically initializes `routing_id` with the BOM's existing routing.
-   - Pre-populates `availableOperations` on page load so all existing component rows display their saved `routing_operation_id` cleanly without missing labels.
+    subgraph DYNAMIC_WORKSPACE["Dynamic Operations Workspace (Option A Layout)"]
+        direction TB
+        EMPTY["State 0: No Routing Selected\nAlert Banner: 'Please select a Process Routing in the header to load operations'"]
+        
+        subgraph OP_CARDS["State 1: Routing Selected (Sequential Operation Cards)"]
+            direction TB
+            OP1["Card 1 — Op 10: Sheet Metal Cutting (WC: Cutting Workshop)\n- Sub-table: Steel Plates, Trim Strips\n- Action: [+ Add Material to Op 10]"]
+            OP2["Card 2 — Op 20: Heat Treatment (WC: Thermal Bay)\n- Tag: 'Process Operation: Zero materials consumed'\n- Action: [+ Add Material to Op 20]"]
+            OP3["Card 3 — Op 30: Hardware Assembly (WC: Assembly Station 1)\n- Sub-table: M6 Screws, Brackets\n- Action: [+ Add Material to Op 30]"]
+        end
+    end
 
-##### C. Routing Form Cleanups (`routing/create.blade.php` & `routing/edit.blade.php`)
-1. **Header Cleanup (Finalized):**
-   - Remove legacy `bom_id` select dropdown and the "Linked BOM" badge from the header.
-2. **Operation Accordion Cleanup (Finalized):**
-   - Remove the "Consumed Materials" input sections and the "Live BOM Component Allocation Summary Card".
-   - The Routing builder focuses 100% on manufacturing process steps, Work Centers, sequence numbers, setup times, cycle times, SOP instructions, and QC gates.
-3. **Routing Show View (`routing/show.blade.php`):**
-   - To be finalized in dedicated discussion (displays connected BOMs list, conditional operation consumption, etc.).
+    H2 -- "Routing Chosen" --> OP_CARDS
+    H2 -- "No Routing" --> EMPTY
+```
 
-#### 3. Files to Modify (During Implementation Batch)
+##### UI Layout Blueprint (Option A: Operation-Centric Cards)
+
+```text
+══════════════════════════════════════════════════════════════════════════════════════════════
+BOM HEADER
+Item to Produce: [ Executive Desk (FG-DESK) ]       Base Quantity: [ 1.00 ] [ PCS (auto) ]
+Process Routing: [ RTG-001 - Desk Routing (v1.0.0 · Active) ]   Version: [ 1.0.0 ]
+══════════════════════════════════════════════════════════════════════════════════════════════
+
+[ Expand All ]  [ Collapse All ]                                  Total Materials: 4 items
+
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ▼  OP 10: SHEET METAL CUTTING                         [ WC: Cutting Workshop ] 2 Materials │
+├────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Setup: 15.0m  •  Run: 45.0m/unit  •  Yield: 98%                                           │
+│                                                                                            │
+│  #   COMPONENT PRODUCT        QTY & TYPE   UOM   SCRAP %   ALTERNATIVE    ACTION           │
+│  ────────────────────────────────────────────────────────────────────────────────────────  │
+│  1   Steel Plate 2mm (RM-01)  2.00 Fixed   PCS   0.00%     Primary        [✕]              │
+│  2   Edge Trim Strip (RM-05)  1.00 Fixed   MTR   2.00%     Primary        [✕]              │
+│                                                                                            │
+│  + Add Material to Op 10                                                                   │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ▶  OP 20: HEAT TREATMENT & CURING                     [ WC: Thermal Bay ]      0 Materials │
+├────────────────────────────────────────────────────────────────────────────────────────────┤
+│  (Collapsed / Tag: "Process Operation: No materials consumed at this station")             │
+│  [ Click to expand & add material ]                                                        │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ▼  OP 30: HARDWARE ASSEMBLY                           [ WC: Assembly Bay 1 ]   2 Materials │
+├────────────────────────────────────────────────────────────────────────────────────────────┤
+│  Setup: 10.0m  •  Run: 30.0m/unit  •  Yield: 100%                                          │
+│                                                                                            │
+│  #   COMPONENT PRODUCT        QTY & TYPE   UOM   SCRAP %   ALTERNATIVE    ACTION           │
+│  ────────────────────────────────────────────────────────────────────────────────────────  │
+│  1   M6 Hex Screw (RM-SCREW)  16.00 Fixed  PCS   0.00%     Primary        [✕]              │
+│  2   Corner Bracket (RM-BRKT) 4.00 Fixed   PCS   0.00%     Primary        [✕]              │
+│                                                                                            │
+│  + Add Material to Op 30                                                                   │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 3. Interaction & Frontend Implementation Details
+
+1. **Automatic Operation Locking (`routing_operation_id`)**:
+   - When the user clicks `+ Add Material to Op 10`, the new item is pushed with its `routing_operation_id` hardcoded to Op 10 (`op.id`).
+   - The user never has to touch an operation dropdown in the table row.
+2. **Reclaimed Table Space**:
+   - The ~16% width previously eaten up by the per-row Operation dropdown is removed.
+   - Component Name, SKU, Notes, Formula, UOM, Scrap %, Priority, and Alternatives have generous horizontal breathing room.
+3. **Empty / Process Operations**:
+   - Operations that do not consume raw materials (e.g. QC inspection, drying, cooling) display a clean soft alert: *"Process operation: Zero materials consumed at this station"*.
+4. **Form Submission Mapping**:
+   - In Alpine.js, each item carries its `routing_operation_id: op.id`.
+   - On submit, all rows compile into the standard array `items[index][routing_operation_id]`, `items[index][material_id]`, etc.
+   - Backend controller, DTO, validation requests, and models remain 100% consistent with no breaking changes.
+5. **Alternative Component Scoping**:
+   - Primary component replacement targets (`replaces_row_uid`) are scoped to the **same operation** (an alternative component must replace a primary component consumed at that same station).
+
+#### 4. Routing Views Cleanups (Already Applied)
+1. **Header Cleanup**: Removed `bom_id` dropdown and "Linked BOM" badge from `routing/create.blade.php` and `routing/edit.blade.php`.
+2. **Accordion Cleanup**: Removed consumed materials row and live BOM allocation summary card from the Routing builder.
+3. **Routing Show View (`routing/show.blade.php`)**:
+   - Removed legacy "Consumed Component / Input Item" column from operations sequence table.
+   - Replaced old allocation summary with the **Linked Bill of Materials (BOMs)** table displaying `$routing->boms`.
+
+#### 5. Files Impacted for Implementation
 * `resources/views/modules/production/bom/create.blade.php`
 * `resources/views/modules/production/bom/edit.blade.php`
-* `app/Domains/Production/Controllers/ProductionBomController.php`
-* `resources/views/modules/production/routing/create.blade.php`
-* `resources/views/modules/production/routing/edit.blade.php`
 
 ---
 
@@ -255,9 +312,13 @@ The BOM defines the material components, and every component must be assigned to
 2. **Mandatory Component Assignment:**
    - Every raw material / component row in the BOM **must** be assigned to a valid operation (`routing_operation_id` is required).
    - Packaging materials are also assigned to a designated packaging operation (packaging is modeled as an operation in the routing).
-3. **Multi-Operation Consumption Support:**
-   - The backend accepts the same material component consumed across multiple different operations (e.g. 10 fasteners at Op 10, and 10 fasteners at Op 20).
-   - In `StoreProductionBomRequest`, the duplicate material prevention rule is refined: a material cannot be duplicated for the *same* operation, but can exist across *distinct* operations.
+3. **Multi-Operation Consumption Support & Operation-Scoped Duplicate Prevention:**
+   - **Historical Rule Context:** Before the inversion, BOM had no routing link and strictly enforced a global duplicate check (`Duplicate material component found in BOM`), while the Routing page had its own separate material allocation checks.
+   - **New Inverted Architecture Rule:** In the new architecture where BOM owns the operation assignment (and especially with Option A's Operation Card layout), duplicate component prevention is scoped strictly **per operation**:
+     - **Allowed:** Consuming the same component across multiple distinct operations (e.g. M6 Screws consumed in Op 10 Frame Assembly, and M6 Screws consumed again in Op 30 Final Fastening).
+     - **Blocked:** Adding the exact same material component twice inside the **same** operation (`$key = "{$materialId}_{$opId}"`).
+   - In `StoreProductionBomRequest` and `UpdateProductionBomRequest`, this is already enforced via `$key = "{$materialId}_{$opId}"`.
+   - In the frontend Option A UI, inside an operation's card, attempting to add an already selected material triggers an immediate client-side duplicate alert.
 4. **Operation Ownership Validation:**
    - Every `items.*.routing_operation_id` must exist and belong to the selected `routing_id` (`production_routing_operations.routing_id == bom.routing_id`).
 

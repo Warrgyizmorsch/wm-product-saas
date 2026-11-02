@@ -82,6 +82,11 @@ class Machine extends BaseModel
         return $this->belongsTo(WorkCenterSection::class, 'section_id');
     }
 
+    public function routingOperations(): HasMany
+    {
+        return $this->hasMany(RoutingOperation::class, 'machine_id');
+    }
+
     /**
      * Operational Work Center derived through the assigned Section.
      * Returns null when the machine has no Section assignment.

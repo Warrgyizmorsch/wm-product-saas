@@ -8,6 +8,7 @@ use App\Domains\Production\Models\SectionManualProduction;
 use App\Domains\Production\Models\WorkCenterSection;
 use App\Domains\Production\Models\WorkCenterSectionCalculation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SectionCalculationService
@@ -1368,6 +1369,152 @@ class SectionCalculationService
     {
         $calc = $this->calculate($section);
         return $calc['labor_cost'];
+    }
+
+    /**
+     * Get operational resource costs and speed metrics for a section.
+     * Computes individual machine capacities and costs, batch labor costs,
+     * and operator labor cost per active machine from unassigned section workers.
+     *
+     * @return array{
+     *     section_id: int,
+     *     section_name: string,
+     *     section_code: string,
+     *     active_machines_count: int,
+     *     total_unassigned_labor_cost_per_hour: float,
+     *     operator_labor_cost_per_machine_per_hour: float,
+     *     machines: array<int, array>,
+     *     manual_batches: array<int, array>
+     * }
+     */
+    public function getSectionResourceCosts(WorkCenterSection $section): array
+    {
+        $tenantId = (int) $section->tenant_id;
+
+        $operatingHours = $this->calculateOperatingHours($section);
+        $shiftMap = $operatingHours['shift_map'] ?? [];
+        $uniqueOperatingHours = (float) ($operatingHours['unique_clock_hours'] ?? 0.0);
+
+        // 1. Active Machines in this section
+        $machines = $section->machines()
+            ->where('status', 'active')
+            ->get();
+        $activeMachinesCount = $machines->count();
+
+        // 2. Active Manual Batches in this section
+        $manualBatchesData = $this->calculateSectionManualBatches($section, $shiftMap, $uniqueOperatingHours);
+        $activeBatches = collect($manualBatchesData['manual_batches'] ?? [])
+            ->filter(fn($b) => !empty($b['active']))
+            ->values();
+
+        // Map assigned employee assignment IDs across all batches in this section
+        $assignedEmployeeAssignmentIds = DB::table('production_section_manual_production_employees')
+            ->join('production_section_manual_productions', 'production_section_manual_productions.id', '=', 'production_section_manual_production_employees.manual_production_id')
+            ->where('production_section_manual_productions.section_id', $section->id)
+            ->whereNull('production_section_manual_productions.deleted_at')
+            ->pluck('production_section_manual_production_employees.work_center_employee_id')
+            ->all();
+
+        // 3. Unassigned Internal Labor (assigned to Section but NOT to any manual batch)
+        $internalAssignments = $section->employeeAssignments()
+            ->where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->with('employee')
+            ->get();
+
+        $unassignedInternalLaborHourlyCost = 0.0;
+        foreach ($internalAssignments as $assignment) {
+            if (in_array($assignment->id, $assignedEmployeeAssignmentIds, true)) {
+                continue; // Belongs to a manual batch
+            }
+            $emp = $assignment->employee;
+            if (!$emp || !$emp->status) {
+                continue;
+            }
+            $shiftId = $emp->shift_id ?: (!empty($operatingHours['shifts']) ? $operatingHours['shifts'][0]['id'] : null);
+            $shiftClockHours = (float) ($shiftMap[$shiftId]['duration_hours'] ?? 8.0);
+            if ($shiftClockHours <= 0) {
+                $shiftClockHours = 8.0;
+            }
+            $monthlySalary = (float) ($emp->current_salary ?? 0.0);
+            $dailySalary = round($monthlySalary / 30, 4);
+            $hourlyRate = round($dailySalary / $shiftClockHours, 4);
+            $unassignedInternalLaborHourlyCost += $hourlyRate;
+        }
+
+        // 4. Unassigned External Contractor Labor (assigned to Section but manual_production_id IS NULL)
+        $externalAllocations = $section->externalWorkerAllocations()
+            ->where('tenant_id', $tenantId)
+            ->where('active', true)
+            ->whereNull('manual_production_id')
+            ->with('payGrade')
+            ->get();
+
+        $unassignedExternalLaborHourlyCost = 0.0;
+        foreach ($externalAllocations as $alloc) {
+            $headcount = (int) ($alloc->number_of_external_workers ?? 1);
+            $ratePerHour = (float) ($alloc->payGrade?->hourly_rate ?? 0.0);
+            $unassignedExternalLaborHourlyCost += round($headcount * $ratePerHour, 4);
+        }
+
+        $totalUnassignedLaborCostPerHour = round($unassignedInternalLaborHourlyCost + $unassignedExternalLaborHourlyCost, 4);
+        $operatorLaborCostPerMachinePerHour = $activeMachinesCount > 0
+            ? round($totalUnassignedLaborCostPerHour / $activeMachinesCount, 4)
+            : 0.0;
+
+        $formattedMachines = $machines->map(function ($m) use ($operatorLaborCostPerMachinePerHour) {
+            $capacity = (float) ($m->capacity ?? 0.0);
+            $operatingCost = (float) ($m->operating_cost_per_hour ?? 0.0);
+            $speedMinutes = $capacity > 0 ? round(60.0 / $capacity, 4) : 0.0;
+            $unitLaborCost = $capacity > 0 ? round($operatorLaborCostPerMachinePerHour / $capacity, 4) : 0.0;
+            $unitMachineCost = $capacity > 0 ? round($operatingCost / $capacity, 4) : 0.0;
+            $totalCostPerUnit = round($unitLaborCost + $unitMachineCost, 4);
+
+            return [
+                'id'                              => $m->id,
+                'name'                            => $m->name,
+                'code'                            => $m->code,
+                'capacity'                        => $capacity,
+                'operating_cost_per_hour'         => $operatingCost,
+                'speed_minutes_per_unit'          => $speedMinutes,
+                'operator_labor_cost_per_hour'    => $operatorLaborCostPerMachinePerHour,
+                'labor_cost_per_unit'             => $unitLaborCost,
+                'machine_cost_per_unit'           => $unitMachineCost,
+                'cost_per_unit'                   => $totalCostPerUnit,
+            ];
+        })->values()->all();
+
+        $formattedBatches = $activeBatches->map(function ($b) {
+            $capacity = (float) ($b['cap_hr'] ?? 0.0);
+            $laborCost = (float) ($b['total_batch_hourly_cost'] ?? 0.0);
+            $speedMinutes = $capacity > 0 ? round(60.0 / $capacity, 4) : 0.0;
+            $unitLaborCost = $capacity > 0 ? round($laborCost / $capacity, 4) : 0.0;
+
+            return [
+                'id'                              => $b['id'],
+                'batch_name'                      => $b['batch_name'],
+                'shift_name'                      => $b['shift_name'] ?? '',
+                'capacity_per_hour'               => $capacity,
+                'labor_cost_per_hour'             => $laborCost,
+                'operating_cost_per_hour'         => 0.0,
+                'speed_minutes_per_unit'          => $speedMinutes,
+                'labor_cost_per_unit'             => $unitLaborCost,
+                'machine_cost_per_unit'           => 0.0,
+                'cost_per_unit'                   => $unitLaborCost,
+            ];
+        })->values()->all();
+
+        return [
+            'section_id'                               => $section->id,
+            'section_name'                             => $section->name,
+            'section_code'                             => $section->code,
+            'active_machines_count'                    => $activeMachinesCount,
+            'total_unassigned_labor_cost_per_hour'     => $totalUnassignedLaborCostPerHour,
+            'unassigned_labor_hourly_total'            => $totalUnassignedLaborCostPerHour,
+            'operator_labor_cost_per_machine_per_hour' => $operatorLaborCostPerMachinePerHour,
+            'machines'                                 => $formattedMachines,
+            'manual_batches'                           => $formattedBatches,
+        ];
     }
 
     /**

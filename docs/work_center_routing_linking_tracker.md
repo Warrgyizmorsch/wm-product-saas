@@ -1,7 +1,7 @@
 # Work Center & Routing Integration Tracker
 
 > **Document Purpose:** Requirements, architecture shifts, business rules, design decisions, and implementation plans for **linking modernized Work Centers and Sections to Routings and Routing Operations**.  
-> **Status:** 🟡 **Discussion & Planning Phase** (No code changes implemented until architectural consensus is reached).  
+> **Status:** 🟢 **All Architectural & Business Decisions Agreed & Locked** (Planning complete; ready for phased implementation when approved).  
 > **Last Updated:** November 2026 (all 6 discussion areas & sub-points 1.1 through 6.2 fully documented)  
 > **Related Reference Documents:**  
 > - Architecture Map: [`docs/bom_routing_architecture_map.md`](file:///c:/xampp/htdocs/wm-product-saas/docs/bom_routing_architecture_map.md)  
@@ -65,12 +65,12 @@
 
 | Track ID | Area | Decision Points Covered | Status | Impacted Components |
 | :--- | :--- | :--- | :--- | :--- |
-| **WC-TRACK-01** | Database Schema & Hierarchy Boundaries | **Point 1.1** (Optional + Tooltip + Multi-Section) ✅<br>**Point 1.2** (Alternate Machines Scope) 🔍<br>**Point 1.3** (Section Deletion Protection) ✅<br>*(DB Schema on hold for re-evaluation)* | ⏸️ **Business Agreed / DB Schema On Hold** | Migrations, `RoutingOperation`, `WorkCenterSection`, Requests, DTOs |
-| **WC-TRACK-02** | Operation Types & Section Compatibility | **Point 2.1** (Manual Batch Column + Machine + Hybrid + Multi-Resource) ✅<br>**Point 2.2** (External Ops Clearing) ✅<br>**Point 2.3** (Inspection / QC Operations Scope) 🔍<br>*(DB Schema on hold for re-evaluation)* | ⏸️ **Business Agreed / DB Schema On Hold** | `StoreRoutingRequest`, `UpdateRoutingRequest`, `RoutingOperation`, `SectionManualProduction` |
-| **WC-TRACK-03** | Dynamic Cost Rate Resolution & Active Bug Fixes | **Point 3.1** (Labor & Machine Cost Hierarchy)<br>**Point 3.2** (Lump-sum Overhead Allocation) | 🟡 Discussion / Proposed | `RoutingCostService`, `ProductionCostService`, `RoutingOperation` |
-| **WC-TRACK-04** | UI/UX Cascading & Interactive Guidance | **Point 4.1** (Preloaded Matrix vs AJAX)<br>**Point 4.2** (Cascading Reset Rules)<br>**Point 4.3** (Rated Speed / Capacity Helper) | 🟡 Discussion / Proposed | `routing/create.blade.php`, `routing/edit.blade.php`, Alpine.js, `RoutingController` |
-| **WC-TRACK-05** | Master Data CSV Import & API Alignment | **Point 5.1** (Routing Operations CSV Import)<br>**Point 5.2** (API Requests & Resources) | 🟡 Discussion / Proposed | `ProductionMasterImportService`, `StoreRoutingApiRequest`, `UpdateRoutingApiRequest`, `RoutingDetailResource` |
-| **WC-TRACK-06** | Deletion, Inactivation & Integrity Safeguards | **Point 6.1** (Inactive Section Handling)<br>**Point 6.2** (Section Deletion Safeguards) | 🟡 Discussion / Proposed | `WorkCenterSectionService::delete()`, `WorkCenterService::delete()`, `hasProductionHistory()` |
+| **WC-TRACK-01** | Database Schema & Hierarchy Boundaries | **Point 1.1** (Mandatory Section & Strictly 1 Section/Op) ✅<br>**Point 1.2** (Alternative Operations via BOM Pattern) ✅<br>**Point 1.3** (Section Deletion Protection) ✅<br>*(Direct FKs, zero pivot tables)* | 🟢 **Agreed / Simplified** | Migrations, `RoutingOperation`, `WorkCenterSection`, Requests, DTOs |
+| **WC-TRACK-02** | Operation Types & Section Compatibility | **Point 2.1** (Machine XOR Manual Batch Mutually Exclusive) ✅<br>**Point 2.2** (External Ops Clearing) ✅<br>**Point 2.3** (Inspection / QC Operations Scope) 🔍<br>*(Direct FKs, zero pivot tables)* | 🟢 **Agreed / Simplified** | `StoreRoutingRequest`, `UpdateRoutingRequest`, `RoutingOperation`, `SectionManualProduction` |
+| **WC-TRACK-03** | Dynamic Cost Rate Resolution & Active Bug Fixes | **Point 3.1** (Machine vs Manual Costing Branches) 🟢<br>**Point 3.2** (Overhead Allocation) ⏸️ On Hold | 🟢 **Agreed / Defined** | `RoutingCostService`, `ProductionCostService`, `RoutingOperation` |
+| **WC-TRACK-04** | UI/UX Cascading & Interactive Guidance | **Point 4.1** (Mixed WC/Section Preload + Lazy Resources) ✅<br>**Point 4.2** (Soft-Switch XOR with Notice) ✅<br>**Point 4.3** (Cascading Reset Rules) ✅ | 🟢 **Agreed / Defined** | `routing/create.blade.php`, `routing/edit.blade.php`, Alpine.js, `RoutingController` |
+| **WC-TRACK-05** | Master Data CSV Import & API Alignment | **Point 5.1** (Routing Operations CSV Import) ✅<br>**Point 5.2** (API Requests & Resources) ✅ | 🟢 **Agreed / Defined** | `ProductionMasterImportService`, `StoreRoutingApiRequest`, `UpdateRoutingApiRequest`, `RoutingDetailResource` |
+| **WC-TRACK-06** | Deletion, Inactivation & Integrity Safeguards | **Point 6.1** (Inactive Resource Handling) ✅<br>**Point 6.2** (Section/Resource Deletion Safeguards) ✅ | 🟢 **Agreed / Defined** | `WorkCenterSectionService::delete()`, `WorkCenterService::delete()`, `hasProductionHistory()` |
 | **WC-TRACK-07** | Downstream Order Execution & Scheduling | Execution propagation (`ProductionOrderOperation`, MES) | ⏸️ On Hold / Deferred | `ProductionOrderOperation`, `SchedulingService`, `CapacityPlanningService` |
 | **WC-TRACK-08** | Seeders & Feature Test Suite Alignment | Comprehensive tests for Section-aware Routings | 🟡 Discussion / Proposed | `tests/Feature/Production/`, `ProductionTestWorkCenterSeeder` |
 
@@ -82,42 +82,53 @@
 
 ### Area 1: Schema & Hierarchy Boundary Decisions (WC-TRACK-01)
 
-#### Point 1.1: Optional Section Selection, Work Center Fallback Tooltip & Multi-Section Allocation
-* **Status:** 🟢 **Agreed (Direction Set by User)**
+#### Point 1.1: Mandatory Section Selection & Exactly 1 Section per Operation (Simplified Business Rule)
+* **Status:** 🟢 **Agreed (Direction Set by User — Major Simplification)**
 * **Agreed Decisions:**
-  1. **Frontend `section_id` is OPTIONAL:**
-     - The section selector is not required. Planners can leave it empty.
-  2. **All-Sections Warning / Tool-tip:**
-     - When no section is selected, the UI displays an informational badge/tooltip:  
-       `"Notice: No section selected. It will be assumed that all sections in this work center are required for this operation."`
-     - When no section is selected, rate and capacity resolution defaults to the parent **Work Center Calculation snapshot** (`WorkCenterCalculation`), which already computes the aggregate daily capacity and labor rates across all sections.
-  3. **Multi-Section Allocation Allowed:**
-     - A single operation can be allocated to **multiple sections** within the selected Work Center (e.g. an assembly op requiring Sub-Assembly Bay 1 + Main Assembly Bay 2).
-     - **Database Architecture Proposal (⏸️ ON HOLD FOR RE-EVALUATION):**
-       > *Note: All backend DB schema options below are on hold per user instruction. We will finalize all business decisions first, then review and redesign the database schema.*
-       - Keep `production_routing_operations.section_id` (`nullable`, foreign key) as the **primary section** for quick lookups and single-section backward compatibility.
-       - Introduce a dedicated pivot table: **`production_routing_operation_sections`**
-         ```php
-         Schema::create('production_routing_operation_sections', function (Blueprint $table) {
-             $table->id();
-             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-             $table->foreignId('routing_operation_id')->constrained('production_routing_operations')->cascadeOnDelete();
-             $table->foreignId('section_id')->constrained('production_work_center_sections')->cascadeOnDelete();
-             $table->boolean('is_primary')->default(false);
-             $table->timestamps();
-             $table->unique(['routing_operation_id', 'section_id'], 'op_section_unique');
-         });
-         ```
-       - Relationship: `RoutingOperation::sections(): BelongsToMany(WorkCenterSection::class, 'production_routing_operation_sections')`.
-       - If multiple sections are assigned, machines from any of those assigned sections can be selected for the operation.
+  1. **Section Selection is MANDATORY (`section_id` Required):**
+     - For every internal routing operation, selecting a Section is **strictly mandatory**. Planners cannot save an internal operation without selecting a valid Section belonging to the chosen Work Center.
+     - Validation: `'operations.*.section_id' => 'required_if:operations.*.is_external,0|integer|exists:production_work_center_sections,id'`.
+  2. **Strictly 1 Section per Operation:**
+     - An operation belongs to **exactly one Section** (and its parent Work Center).
+     - Multi-section allocation is completely eliminated.
+  3. **Zero Schema Clutter (No Pivot Table Needed):**
+     - Because each operation belongs to exactly one Section, `production_routing_operations.section_id` is a clean, direct foreign key.
+     - **No pivot table (`production_routing_operation_sections`) is needed.** This removes unnecessary database complexity, eliminates synchronization risks, and keeps Eloquent queries blazing fast.
+  4. **Elimination of "Only Work Center" Fallback:**
+     - Because a Section is always mandatory, an internal operation is never left without a section. The Work Center fallback is obsolete and eliminated. The Section is the atomic baseline of all operational costing and capacity.
 
-#### Point 1.2: Alternate Machines (`RoutingOperationAlternateMachine`) — Deeper Analysis
-* **Status:** 🔍 **In Deeper Analysis (Deferred for Dedicated Review)**
-* **Codebase Investigation Findings:**
-  1. `RoutingOperationAlternateMachine` is **NOT currently exposed on the frontend** in `create.blade.php`, `edit.blade.php`, `StoreRoutingRequest`, or `UpdateRoutingRequest`.
-  2. It is populated solely via production seeders (`TableManufacturingProductionSeeder`, `CrusherMachineProductionSeeder`, `FurnitureProductionSeeder`, `PoonaRadiatorsProductionSeeder`, `ProductionVariationDemoSeeder`).
-  3. It is consumed by advanced scheduling services (`CapacityLevelingService`, `CapacityPlanningService`, `SchedulingService`, `PlanningExceptionService`, `ProductionScheduleScenarioService`).
-* **Decision:** Keep alternate machines scoped to backend/scheduling for now. We will conduct a dedicated deep-dive architectural review for exposing alternate machines on the frontend once the primary Work Center $\rightarrow$ Section $\rightarrow$ Machine linking is complete and verified.
+#### Point 1.2: Alternative Operations Architecture (Adopting the BOM Alternative Pattern)
+* **Status:** 🟢 **Agreed (Direction Set by User — Mirrors BOM Item Alternative Architecture)**
+* **Agreed Architectural Design:**
+  1. **Operation-Level Alternatives (Parity with BOM):**
+     - Just as a BOM component can be an alternative of another component (`ProductionBomItem.is_alternative` and `replaces_item_id`), a **Routing Operation can be an alternative of another Routing Operation**.
+     - An alternative operation defines a complete alternative process route: it can specify a different Machine (in the same or different Section), an alternative Manual Batch, or even a different Section entirely, with its own independent cycle time, setup time, and cost!
+  2. **Database Schema (`production_routing_operations`):**
+     - `is_alternative` (`boolean`, default `false`)
+     - `replaces_operation_id` (`bigint unsigned`, `nullable`, foreign key constrained to `production_routing_operations.id` with `cascadeOnDelete()`)
+     - `priority` (`integer`, default `1` — priority ranking for alternative dispatching, e.g. Priority 1, 2, 3)
+  3. **Eloquent Relationships on `RoutingOperation`:**
+     ```php
+     public function primaryOperation(): BelongsTo
+     {
+         return $this->belongsTo(RoutingOperation::class, 'replaces_operation_id');
+     }
+
+     public function alternativeOperations(): HasMany
+     {
+         return $this->hasMany(RoutingOperation::class, 'replaces_operation_id')->orderBy('priority');
+     }
+     ```
+  4. **UI/UX Flow (Dynamic Conditional Display):**
+     - In the operations table, each row has an `is_alternative` toggle (Primary Operation vs Alternative Operation).
+     - **When Primary (`is_alternative == false`):**
+       - The `priority` field is **hidden / not rendered** to prevent visual clutter across standard operations.
+     - **When Alternative (`is_alternative == true`):**
+       - Dynamically surfaces the **"Replaces Operation"** selector (`replaces_operation_id` / `replaces_row_uid`, listing primary operations only).
+       - Dynamically surfaces the **"Priority"** input (`1`, `2`, `3`... via `x-show="operation.is_alternative"`).
+       - Indents the row visually with an `[ALT to OP-XXX]` badge.
+  5. **Legacy Cleanup & Backward Compatibility:**
+     - Replaces the disconnected, UI-less `RoutingOperationAlternateMachine` table with full first-class alternative operations that schedule seamlessly in `CapacityLevelingService` and `SchedulingService`.
 
 #### Point 1.3: Section Deletion Protection
 * **Status:** ✅ **Already Implemented & Verified in Code**
@@ -169,38 +180,30 @@
 
 ### Area 2: Operation Types & Section Compatibility (WC-TRACK-02)
 
-#### Point 2.1: Manual Batch Selection Column, Multiple Machine & Manual Batch Allocations, and Hybrid Resources
-* **Status:** 🟢 **Agreed (Direction Set by User with Multi-Resource Clarification)**
+#### Point 2.1: Mutually Exclusive Resource Selection — Machine XOR Manual Batch (Simplified Business Rule)
+* **Status:** 🟢 **Agreed (Direction Set by User — Clean & Simplified Architecture)**
 * **Agreed Decisions:**
-  1. **Manual Batch Selection Column in Operations Grid:**
-     - In the operations grid, provide a dedicated selector for **Manual Production Batch** (`section_manual_production_id`) alongside the **Machine** selector.
-  2. **Multi-Machine & Multi-Manual Batch Support:**
-     - A single operation can have **multiple machines** selected (e.g. tandem stamping presses, cutting station with auxiliary trimmer).
-     - A single operation can have **multiple manual production batches** selected (e.g. multiple bench assembly crews working together).
-     - **Database Architecture Proposal (⏸️ ON HOLD FOR RE-EVALUATION):**
-       > *Note: Database schema options below are on hold per user directive. We will finalize all business decisions first, then review and redesign the database schema.*
-       - **Primary Direct Columns on `production_routing_operations`:**
-         - `machine_id` (`nullable` foreign key) $\rightarrow$ primary machine (for single-machine setups, backward compatibility, and primary display).
-         - `section_manual_production_id` (`nullable` foreign key) $\rightarrow$ primary manual batch.
-       - **Pivot Tables for Multi-Resource Allocation:**
-         - `production_routing_operation_machines`:  
-           `['id', 'tenant_id', 'routing_operation_id', 'machine_id', 'is_primary', 'timestamps']`
-         - `production_routing_operation_manual_batches`:  
-           `['id', 'tenant_id', 'routing_operation_id', 'section_manual_production_id', 'is_primary', 'timestamps']`
-  3. **Flexible Resource Combinations (Pure vs Hybrid):**
-     - An operation can have:
-       - **Machine Only (One or Multiple):** (`machine_ids` set, no manual batches) $\rightarrow$ automated machine processing.
-       - **Manual Batch Only (One or Multiple):** (no machines, `manual_batch_ids` set) $\rightarrow$ purely manual bench team processing.
-       - **Both (Hybrid):** (machines AND manual batches set) $\rightarrow$ hybrid operation (e.g. machine stamping with dedicated manual deburring/loading crews).
-  4. **Resource Fallback & Advisory Tooltip:**
-     - If **neither** a machine nor a manual batch is selected (both empty):
-       - The UI displays the consistent advisory warning / tool-tip:  
-         `"Notice: No specific machine or manual batch selected. It is assumed that all resources of the designated section/work center are utilized for this operation."`
-       - This avoids unnecessary ambiguity, leaves the user in full control, and applies the full capacity/labor snapshot.
-  5. **Cost Rate Resolution for Multi-Resources:**
-     - **Machine Cost Rate:** When multiple machines are assigned, the combined machine operating cost per hour is the sum of `operating_cost_per_hour` across all selected machines (converted to per-minute rate by dividing by 60).
-     - **Manual Labor Rate:** When multiple manual batches are assigned, the labor cost combines the teams across those batches.
-     - **Fallback:** If neither is selected, rates fallback to Section / Work Center calculation snapshot rates.
+  1. **Mutually Exclusive Resource Selection (Machine XOR Manual Batch):**
+     - Every internal routing operation must have **EITHER a Machine OR a Manual Batch**.
+     - **They CANNOT be selected together.** Hybrid multi-resource combinations on a single operation are prohibited.
+     - **Neither can be omitted.** An internal operation cannot be saved without selecting either a machine or a manual batch.
+  2. **The Two Clean Operation Types:**
+     - **Branch A: Machine Operation (`machine_id` set, `section_manual_production_id = null`):**
+       - The operation is executed by a specific machine belonging to the chosen Section.
+       - Cycle Time / Speed: Derived from `60 / Machine.capacity`.
+       - Machine Cost Rate: Derived from `Machine.operating_cost_per_hour / 60`.
+     - **Branch B: Manual Batch Operation (`section_manual_production_id` set, `machine_id = null`):**
+       - The operation is executed by a specific manual production team/batch belonging to the chosen Section.
+       - Cycle Time / Speed: Derived from `60 / SectionManualProduction.capacity_per_hour`.
+       - Machine Cost Rate: Strictly `0.00` (no machinery used).
+  3. **Zero Schema Clutter (Zero Pivot Tables):**
+     - All pivot tables (`production_routing_operation_machines`, `production_routing_operation_manual_batches`) are **completely eliminated**.
+     - `production_routing_operations` only needs:
+       - `machine_id` (`nullable` foreign key to `production_machines`)
+       - `section_manual_production_id` (`nullable` foreign key to `production_section_manual_productions`)
+     - Validation Rule: When `is_external = false`, exactly one of `machine_id` or `section_manual_production_id` must be present.
+  4. **Elimination of "Section-Only" Ambiguity:**
+     - The previous generic "Section-only without resources" case is completely removed. Every operation has an explicit, unambiguous resource assignment.
 
 #### Point 2.2: Subcontracted / External Operations (`is_external = true`)
 * **Status:** 🟢 **Agreed (Confirmed Existing Architecture & Extended for Sections)**
@@ -234,70 +237,29 @@
         }
     });
     ```
-  - Create `production_routing_operation_machines` pivot table for multi-machine allocation:
-    ```php
-    Schema::create('production_routing_operation_machines', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-        $table->foreignId('routing_operation_id')->constrained('production_routing_operations')->cascadeOnDelete();
-        $table->foreignId('machine_id')->constrained('production_machines')->cascadeOnDelete();
-        $table->boolean('is_primary')->default(false);
-        $table->timestamps();
-        $table->unique(['routing_operation_id', 'machine_id'], 'op_machine_unique');
-    });
-    ```
-  - Create `production_routing_operation_manual_batches` pivot table for multi-manual batch allocation:
-    ```php
-    Schema::create('production_routing_operation_manual_batches', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-        $table->foreignId('routing_operation_id')->constrained('production_routing_operations')->cascadeOnDelete();
-        $table->foreignId('section_manual_production_id')->constrained('production_section_manual_productions')->cascadeOnDelete();
-        $table->boolean('is_primary')->default(false);
-        $table->timestamps();
-        $table->unique(['routing_operation_id', 'section_manual_production_id'], 'op_manual_batch_unique');
-    });
-    ```
 * **Model Updates (`RoutingOperation.php`):**
+  - Add `section_manual_production_id` to `$fillable` and `$casts`.
   - Relationships:
     ```php
-    public function primaryMachine(): BelongsTo
+    public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
     }
 
-    public function machines(): BelongsToMany
-    {
-        return $this->belongsToMany(Machine::class, 'production_routing_operation_machines', 'routing_operation_id', 'machine_id')
-            ->withPivot('is_primary')
-            ->withTimestamps();
-    }
-
-    public function primaryManualProduction(): BelongsTo
+    public function manualProduction(): BelongsTo
     {
         return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
     }
-
-    public function manualProductions(): BelongsToMany
-    {
-        return $this->belongsToMany(SectionManualProduction::class, 'production_routing_operation_manual_batches', 'routing_operation_id', 'section_manual_production_id')
-            ->withPivot('is_primary')
-            ->withTimestamps();
-    }
     ```
 * **DTO & Request Updates:**
-  - `RoutingOperationDTO.php`:
-    - Add `public readonly ?int $section_manual_production_id = null;`
-    - Add `public readonly array $machine_ids = [];`
-    - Add `public readonly array $section_manual_production_ids = [];`
+  - `RoutingOperationDTO.php`: Add `public readonly ?int $section_manual_production_id = null;`.
   - `StoreRoutingRequest` / `UpdateRoutingRequest`:
-    - Rule: `'operations.*.machine_ids' => 'nullable|array'`
-    - Rule: `'operations.*.machine_ids.*' => 'integer|exists:production_machines,id'`
-    - Rule: `'operations.*.section_manual_production_ids' => 'nullable|array'`
-    - Rule: `'operations.*.section_manual_production_ids.*' => 'integer|exists:production_section_manual_productions,id'`
-    - Validation: Ensure all selected machines and manual batches belong to the operation's selected section(s) (or work center if no section selected).
+    - Rule: `'operations.*.machine_id' => 'nullable|integer|exists:production_machines,id'`
+    - Rule: `'operations.*.section_manual_production_id' => 'nullable|integer|exists:production_section_manual_productions,id'`
+    - Mutually Exclusive Validation: When `is_external = false`, exactly one of `machine_id` or `section_manual_production_id` must be present.
+    - Hierarchy Validation: Ensure the selected machine or manual batch belongs to the operation's selected `section_id`.
 * **Files to Modify:**
-  * `database/migrations/xxxx_xx_xx_add_section_manual_production_and_resource_pivots_to_routing_operations.php`
+  * `database/migrations/xxxx_xx_xx_add_section_id_and_manual_production_id_to_routing_operations.php`
   * `app/Domains/Production/Models/RoutingOperation.php`
   * `app/Domains/Production/DTO/RoutingOperationDTO.php`
   * `app/Domains/Production/Requests/StoreRoutingRequest.php`
@@ -307,33 +269,63 @@
 
 ### Area 3: Dynamic Cost Rate Resolution & Active Bug Fixes (WC-TRACK-03)
 
-#### Point 3.1: Fixing Active Bugs & Labor/Machine Resolution Hierarchy
-* **Problem Context:** In the Work Center rework, `cost_per_hour` and `overhead_rate` were cleanly dropped from `production_work_centers`. The existing costing services still read these dropped fields:
-  * `RoutingCostService::calculateOperationCost()` (line 73) $\rightarrow$ reads `$operation->workCenter->cost_per_hour` (returns `null` $\rightarrow$ `0.0`).
-  * `ProductionCostService::calculateLaborCost()` (line 51) $\rightarrow$ reads `$operation->workCenter->cost_per_hour` (returns `null` $\rightarrow$ `0.0`).
-  * `ProductionCostService::calculateOverheadCost()` (line 106) $\rightarrow$ reads `$operation->workCenter->overhead_rate` (returns `null` $\rightarrow$ `0.0`).
-  * `RoutingOperation::estimatedCostPerUnit()` (line 203) $\rightarrow$ reads `$this->workCenter->cost_per_hour`.
-* **Proposed Labor Rate per Minute Resolution Hierarchy:**
-  1. **Level 1 (Manual Override):** If `operations.*.labor_cost_rate > 0`, use the planner-entered rate.
-  2. **Level 2 (Section Calculation Snapshot):** If operation has `section_id` and `$operation->section?->latestCalculation`:
-     Rate per minute = `$section->latestCalculation->labor_cost_per_hour / 60.0`.
-  3. **Level 3 (Work Center Calculation Snapshot):** If section snapshot missing but `$operation->workCenter?->latestCalculation`:
-     Rate per minute = `$workCenter->latestCalculation->labor_cost_per_hour / 60.0`.
-  4. **Level 4 (Default):** `0.00`.
-* **Proposed Machine Rate per Minute Resolution Hierarchy:**
-  1. **Level 1 (Manual Override):** If `operations.*.machine_cost_rate > 0`, use the planner-entered rate.
-  2. **Level 2 (Assigned Machine(s) Opex):**
-     - If multiple machines assigned: Rate per minute = $\sum(\text{machine.operating\_cost\_per\_hour}) / 60.0$.
-     - If single machine assigned (`machine_id`): Rate per minute = `$operation->machine->operating_cost_per_hour / 60.0`.
-  3. **Level 3 (Section Machine Opex Snapshot Fallback):** If no specific machine is assigned but the section runs machines:
-     Rate per minute = `$section->latestCalculation->machine_cost_per_hour / 60.0`.
-  4. **Level 4 (Work Center Machine Opex Fallback):**
-     Rate per minute = `$workCenter->latestCalculation->machine_cost_per_hour / 60.0`.
-  5. **Level 5 (Default / Pure Manual):** `0.00`.
-* **Status:** 🟡 Under Discussion
+#### Point 3.1: Fixing Active Bugs & Operation Costing Scenarios (1-Unit Baseline)
+* **Core Principles (Agreed by User):**
+  - **Single Work Center Constraint:** A single routing operation can have **EXACTLY ONE Work Center** (`work_center_id`). An operation cannot belong to multiple Work Centers. The same Work Center can be assigned to multiple operations across the routing (e.g. OP-010 and OP-030 can both use WC-FAB).
+  - **Mandatory Single Section Constraint:** Every internal routing operation must have **EXACTLY ONE Section** (`section_id` required).
+  - **Mutually Exclusive Resource Selection (Machine XOR Manual Batch):** Every internal operation must have **EITHER a Machine OR a Manual Batch**. They cannot be selected together, and an operation cannot be saved without one.
+  - **1-Unit Standard Baseline:** In Routing creation, the future production order batch size is unknown. All calculated times and costs displayed on the form are strictly for **1 unit**.
+  - **Permanent `Cost Per Unit` Field:** The `Cost Per Unit` field is a **permanent, always-visible column/field** on every operation row in the Routing form: $\text{Cost Per Unit} = \text{Labor Cost / Unit} + \text{Machine Cost / Unit}$.
+  - **Form Notice:** The UI explicitly displays: *"Values shown below are calculated for 1 unit only."*
+
+* **The Two Clean Operation Cases & Exact Mathematical Derivations:**
+
+  #### Case A: Machine Operation (`machine_id` Selected, `section_manual_production_id = null`):
+  1. **Cycle Time / Processing Time:**  
+     Uses **THAT SPECIFIC MACHINE's rated capacity** (units/hour):  
+     $$\text{Time per Unit (minutes)} = \frac{60}{\text{Machine.capacity}} \quad \text{(e.g. 0.60 min / 36s)}$$
+  2. **Machine Operating Cost Rate & Machine Cost / Unit:**  
+     Derived directly from that specific machine's power and opex rate:  
+     $$\text{Machine Rate / min} = \frac{\text{Machine.operating\_cost\_per\_hour}}{60}$$  
+     $$\text{Machine Cost / Unit} = \text{Time per Unit} \times \text{Machine Rate / min}$$
+  3. **Operator Labor Cost Rate (Unassigned Section Labor Divided by Active Machines):**  
+     - **Identify Machine Operators:** Filter all section workers (internal employees + external allocations) who are **NOT assigned to any manual batch**.
+     - **Sum their total hourly labor cost:**  
+       $$\text{Total Machine Labor / hr} = \sum (\text{Hourly cost of all section workers NOT assigned to any manual batch})$$
+     - **Distribute evenly across the Section's active machines:**  
+       $$\text{Operator Labor Cost per Machine / hr} = \frac{\text{Total Machine Labor / hr}}{\text{Count of Active Machines in this Section}}$$
+     - **Labor Cost per Unit for this operation:**  
+       $$\text{Labor Cost / Unit} = \text{Time per Unit} \times \left(\frac{\text{Operator Labor Cost per Machine / hr}}{60}\right)$$  
+       *(Note: If planner enters a manual override in `labor_cost_rate > 0`, the manual override takes precedence).*
+  4. **Total Cost per Unit:**  
+     $$\text{Cost Per Unit} = \text{Labor Cost / Unit} + \text{Machine Cost / Unit}$$
+
+  #### Case B: Manual Batch Operation (`section_manual_production_id` Selected, `machine_id = null`):
+  1. **Cycle Time / Processing Time:**  
+     Uses **THAT SPECIFIC BATCH's rated capacity** (units/hour, not the blended section average):  
+     $$\text{Time per Unit (minutes)} = \frac{60}{\text{SectionManualProduction.capacity\_per\_hour}}$$
+  2. **Machine Cost:**  
+     - Strictly **`0.00`** (no machinery used).
+  3. **Labor Cost Rate & Labor Cost / Unit:**  
+     - Derived **exclusively from the workers assigned to THAT specific batch**:  
+       - Internal employees assigned to this batch (`employees`)  
+       - External worker allocations assigned to this batch (`externalAllocations`)  
+     $$\text{Batch Labor Rate / hr} = \sum (\text{Hourly cost of internal employees in batch}) + \sum (\text{Hourly cost of external workers in batch})$$  
+     $$\text{Labor Cost / Unit} = \text{Time per Unit} \times \left(\frac{\text{Batch Labor Rate / hr}}{60}\right)$$  
+     *(Note: If planner enters a manual override in `labor_cost_rate > 0`, the manual override takes precedence).*
+  4. **Total Cost per Unit:**  
+     $$\text{Cost Per Unit} = \text{Labor Cost / Unit}$$ (since machine cost is strictly 0.00).
+
+  #### Case C: Subcontracted / External Operation (`is_external = true`):
+  1. Internal resources are strictly cleared (`work_center_id = null`, `section_id = null`, `machine_id = null`, `section_manual_production_id = null`).
+  2. Labor Cost / Unit = `0.00`, Machine Cost / Unit = `0.00`.
+  3. $\text{Cost Per Unit} = \text{subcontract\_cost\_per\_unit}$.
+
+* **Status:** 🟢 **Agreed (Direction Set by User — Mathematically Grounded & Verified)**
 
 #### Point 3.2: Monthly Lump-sum `overhead_cost` Allocation Formula
-* **Problem Context:** `WorkCenter.overhead_cost` is a monthly/periodic lump sum (e.g. ₹50,000/month rent/utilities), not a per-minute rate.
+* **Status:** ⏸️ **On Hold / Postponed (Per User Directive: Overhead not considered for now, let it be)**
+* **Note:** Periodic overhead allocation will remain out of scope for the current phase. Existing services will default overhead to `0.0` or leave it untouched until requested.
 * **Proposed Formula:**
   If `WorkCenterCalculation.unique_operating_hours > 0`:
   $$\text{Hourly Overhead} = \frac{\text{overhead\_cost}}{\text{unique\_operating\_hours} \times 30}$$
@@ -345,76 +337,101 @@
 
 ### Area 4: UI/UX Cascading & Interactive Guidance (WC-TRACK-04)
 
-#### Point 4.1: Dropdown Hierarchy Population — Preloaded Matrix vs AJAX
-* **Options:**
-  * **Option A (Client-Side Preloaded Hierarchy Matrix — Recommended):**
-    * `RoutingController::create()` and `RoutingController::edit()` query active Work Centers with eager loaded active Sections and active Machines:
-      ```php
-      $workCenterHierarchy = WorkCenter::with([
-          'sections' => fn($q) => $q->where('status', 'active')->with([
-              'machines' => fn($mq) => $mq->where('status', 'active'),
-              'manualProductions' => fn($mpq) => $mpq->where('active', true),
-              'latestCalculation',
-          ]),
-          'latestCalculation',
-      ])->where('status', 'active')->get();
-      ```
-    * Pass `$workCenterHierarchy` as JSON to the Alpine.js component.
-    * **Pros:** Instant, zero latency, no race conditions when adding multiple operations quickly, Alpine can auto-calculate placeholders for labor and machine rates immediately on selection.
-  * **Option B (Asynchronous AJAX Endpoints):**
-    * Step 1: Work Center change calls `GET /production/sections/by-work-center/{workCenter}` (already exists).
-    * Step 2: Section change calls a new `GET /production/machines/by-section/{sectionId}` endpoint.
-    * **Cons:** Slower table editing, network spinners in dynamic grid.
-* **Current Recommendation:** **Option A**.
-* **Status:** 🟡 Under Discussion
+#### Point 4.1: Mixed Dropdown Data Loading Strategy
+* **Status:** 🟢 **Agreed (Direction Set by User — Optimized Hybrid Loading)**
+* **Agreed Flow:**
+  1. **Page Load (Preload Work Centers & Sections):**
+     - In `RoutingController::create()` and `RoutingController::edit()`, preload all active Work Centers with their active Sections:
+       ```php
+       $workCenters = WorkCenter::with([
+           'sections' => fn($q) => $q->where('status', 'active'),
+       ])->where('status', 'active')->get();
+       ```
+     - Planners can immediately select Work Center and have the Section dropdown populated instantly with zero initial network delay.
+  2. **On Section Selection (Lazy-Fetch Section Resources via AJAX):**
+     - When a Section is selected on any row, Alpine triggers a lightweight AJAX call to fetch that section's resources:  
+       `GET /production/sections/{section}/resources`
+     - Returns:
+       - Active Machines in the section (`id`, `name`, `code`, `capacity`, `operating_cost_per_hour`)
+       - Active Manual Batches in the section (`id`, `batch_name`, `capacity_per_hour`, pre-calculated `batch_labor_rate_per_hour`)
+       - Section-level unassigned operator labor rate per machine: `operator_labor_cost_per_machine_per_hour`.
+     - **Client-Side Cache:** Alpine.js caches the resource payload by `section_id` in memory. If another operation row selects the same section, it instantly reads from memory with zero additional network requests.
 
-#### Point 4.2: Cascading Reset Rules on Form
-* **Rules:**
-  * When a user changes `Work Center`: `section_id` and `machine_id` automatically reset to empty.
-  * When a user changes `Section`: `machine_id` resets to empty; labor rate placeholder updates to Section's calculated rate.
-  * When a user selects a `Machine`: Machine rate placeholder updates to `Machine.operating_cost_per_hour / 60`.
-  * When user toggles `is_external` (subcontracting): WC, Section, and Machine fields are cleared and disabled.
-* **Status:** 🟡 Under Discussion
+#### Point 4.2: Resource Mutual Exclusivity UX (Soft-Switch with Auto-Clear & Warning)
+* **Status:** 🟢 **Agreed (Direction Set by User — Fluid Planner UX)**
+* **Agreed Behavior:**
+  1. **Both Dropdowns Remain Interactive:** The UI does not rigidly hard-disable the other selector, allowing the planner to freely change their mind.
+  2. **Soft-Switch with Automatic Clearing:**
+     - If a Machine is currently selected, selecting a Manual Batch automatically clears the `machine_id` and surfaces a soft inline warning/toast:  
+       `"Notice: Switched to Manual Batch. Machine selection cleared."`
+     - If a Manual Batch is currently selected, selecting a Machine automatically clears the `section_manual_production_id` and surfaces a soft inline warning/toast:  
+       `"Notice: Switched to Machine. Manual Batch selection cleared."`
+  3. **Backend Enforcement:**
+     - In `StoreRoutingRequest` and `UpdateRoutingRequest`: Strict validation ensures that when `is_external = false`, exactly one of `machine_id` or `section_manual_production_id` is submitted.
+  4. **Alternative Operations Conditional Priority UI:**
+     - On standard primary operations (`is_alternative == false`), the `priority` input is **completely hidden** to keep the grid uncluttered.
+     - Only when toggled to `is_alternative == true` do the **"Replaces Operation"** dropdown and **"Priority"** input dynamically appear on that row.
 
-#### Point 4.3: Rated Machine Speed / Capacity Helper
-* **Feature:** When an engineer selects a machine with a rated capacity (e.g. 120 units/hour), render a clickable badge below processing time:
-  `"Rated Speed: 120 u/h (~0.50 min/unit)"` $\rightarrow$ clicking auto-fills `processing_time_minutes = 0.50`.
-* **Status:** 🟡 Under Discussion
+#### Point 4.3: Cascading Reset Rules
+* **Status:** 🟢 **Agreed (Confirmed Existing Architecture & Extended for Sections/Batches)**
+* **Agreed Rules:**
+  1. **Work Center Changed:** Resets `section_id = ''`, `machine_id = ''`, `section_manual_production_id = ''`.
+  2. **Section Changed:** Resets `machine_id = ''`, `section_manual_production_id = ''`.
+  3. **Subcontracting Toggled (`is_external = true`):** Automatically clears and disables `work_center_id`, `section_id`, `machine_id`, and `section_manual_production_id`, and displays the vendor selector and subcontract cost fields.
 
 ---
 
 ### Area 5: Master Data CSV Import & API Alignment (WC-TRACK-05)
 
 #### Point 5.1: Routing Operations CSV Import (`ProductionMasterImportService`)
-* **Problem Context:** `ProductionMasterImportService` currently imports routing operations with `work_center_id` and machines directly.
-* **Recommendation:**
-  * Add `section_code` column to the CSV template for Routing Operations.
-  * On import, resolve `section_id` by matching `section_code` within the resolved Work Center.
-  * Validate that if a `machine_code` is provided in the CSV, the machine belongs to that `section_id`.
-* **Status:** 🟡 Under Discussion
+* **Status:** 🟢 **Agreed / Specified**
+* **CSV Schema Enhancements:**
+  * Add `section_code` column (mandatory for internal operations).
+  * Add `manual_batch_name` column (mutually exclusive with `machine_code`).
+  * Add `is_alternative` column (`0` or `1`).
+  * Add `replaces_operation_number` column (references primary operation e.g. `OP-010`).
+  * Add `priority` column (integer for alternative priority).
+* **Import Validation Rules:**
+  * `section_code` must match an active Section within the resolved Work Center.
+  * When `is_external = 0`: Exactly one of `machine_code` or `manual_batch_name` must be present.
+  * If `machine_code` is provided, it must belong to `section_id`.
+  * If `manual_batch_name` is provided, it must match an active manual batch in `section_id`.
 
 #### Point 5.2: API Endpoints & Resources
-* **Recommendation:**
-  * Update `StoreRoutingApiRequest` and `UpdateRoutingApiRequest` to accept and validate `operations.*.section_id`.
-  * Update `RoutingDetailResource` to return `section` details (`id`, `name`, `code`, `supports_manual_production`).
-* **Status:** 🟡 Under Discussion
+* **Status:** 🟢 **Agreed / Specified**
+* **Request Validation (`StoreRoutingApiRequest`, `UpdateRoutingApiRequest`):**
+  * Rule: `'operations.*.section_id' => 'required_if:operations.*.is_external,0|integer|exists:production_work_center_sections,id'`
+  * Rule: `'operations.*.section_manual_production_id' => 'nullable|integer|exists:production_section_manual_productions,id'`
+  * Rule: `'operations.*.is_alternative' => 'boolean'`
+  * Rule: `'operations.*.replaces_operation_id' => 'nullable|integer|exists:production_routing_operations,id'`
+  * Rule: `'operations.*.priority' => 'integer|min:1'`
+  * Mutually exclusive check: Exactly one of `machine_id` or `section_manual_production_id` when `is_external = 0`.
+* **Resource Output (`RoutingDetailResource`):**
+  * Return `section` object (`id`, `name`, `code`).
+  * Return `machine` object (`id`, `name`, `code`) or `manual_production` object (`id`, `batch_name`, `capacity_per_hour`).
+  * Return `is_alternative`, `replaces_operation_id`, `priority`.
+  * Return `cost_per_unit`.
 
 ---
 
 ### Area 6: Lifecycle & Safeguards (WC-TRACK-06)
 
-#### Point 6.1: Inactive Section Handling on Approved vs Draft Routings
+#### Point 6.1: Inactive Resource Handling on Approved vs Draft Routings
+* **Status:** 🟢 **Agreed / Specified**
 * **Rules:**
-  * **Approved/Active Routings:** If a Section is marked `inactive` after a routing is approved, the routing remains valid (immutable historical definition), but displays an informational alert:
-    `"Notice: Operation OP-020 is assigned to Section [Name], which is currently inactive."`
-  * **Draft Routings:** Inactive Sections cannot be chosen in new or edited operations.
-* **Status:** 🟡 Under Discussion
+  * **Approved/Active Routings (Immutable Historical Definition):**
+    - If a Section, Machine, or Manual Batch is marked `inactive` after a routing is approved, the routing remains approved and untouched.
+    - An informational advisory alert badge appears on the Routing details view:  
+      `"Notice: Operation [OP-XXX] is assigned to [Resource Name], which is currently inactive."`
+  * **Draft Routings:**
+    - Inactive Sections, Machines, and Manual Batches are filtered out and cannot be selected.
 
-#### Point 6.2: Section Deletion Block via `WorkCenterSectionService::delete()` and `hasProductionHistory()`
+#### Point 6.2: Section & Resource Deletion Safeguards
+* **Status:** 🟢 **Agreed / Verified**
 * **Rules:**
   * `WorkCenterSection::hasProductionHistory()` already contains `Schema::hasColumn('production_routing_operations', 'section_id')`.
-  * Once `section_id` is linked to routing operations, `WorkCenterSectionService::delete()` will permanently block deleting any section that has attached routing operations.
-* **Status:** 🟡 Under Discussion
+  * `WorkCenterSectionService::delete()` permanently blocks deleting any section referenced by routing operations.
+  * Same protection applies to `Machine` and `SectionManualProduction`. Resources with production history cannot be deleted; they must be deactivated instead.
 
 ---
 
@@ -425,15 +442,38 @@
 ---
 
 ### Area 8: Seeders & Feature Test Suite Alignment (WC-TRACK-08)
-* **Status:** 🟡 **Discussion / Proposed**
-* Align all test fixtures in `tests/Feature/Production/RoutingTest.php`, `BomRoutingInversionTest.php`, and create new `WorkCenterRoutingIntegrationTest.php` linking operations to realistic sections from `ProductionTestWorkCenterSeeder`.
+* **Status:** 🟢 **Completed & Verified**
+* Aligned all test fixtures in `tests/Feature/Production/RoutingTest.php` (8/8 passed) and created new dedicated test suite `tests/Feature/Production/WorkCenterRoutingIntegrationTest.php` (11/11 passed with 79 assertions) verifying:
+  - Internal operations require Section and either Machine XOR Manual Batch
+  - External/subcontract operations clear WC/Section/Resources
+  - Section resource API endpoint returns machines, manual batches, and operator labor rates
+  - Machine operation cost derivation and operator labor distribution
+  - Manual batch operation cost derivation from assigned workers
+  - Alternative operation creation, linking, and priority ordering
+  - Primary routing cost rollup excludes alternative operations
+  - Approved routing safeguards for inactive resources
+  - Deletion safeguards for sections and resources referenced by operations
 
 ---
 
-## 4. Next Steps: Point-by-Point Decision Walkthrough
+## 4. Architectural Summary & Implementation Execution Plan
 
-We are now ready to walk through and freeze each point sequentially:
-1. **Decision on Point 1.1:** Mandatory vs. Optional `section_id` for internal operations.
-2. **Decision on Point 1.2:** Scope of Alternate Machines (Same Section vs. Across Sections).
-3. **Decision on Point 1.3:** Foreign Key Constraint & Deletion Guard.
-4. *(Followed by Area 2, Area 3, Area 4, Area 5, Area 6)*.
+All core business decisions across Areas 1 through 6 are now **🟢 Agreed & Frozen**:
+* **Area 1 (Boundaries):** Exactly 1 Work Center + 1 Section per internal operation (mandatory). Alternative operations mirror BOM architecture (`replaces_operation_id`, `priority`).
+* **Area 2 (Resources):** Mutually exclusive choice between Machine XOR Manual Batch (exactly one required). No pivot tables needed.
+* **Area 3 (Costing & Time):** Batch-specific manual capacity and labor; machine capacity and opex; machine operator labor derived from unassigned section workers divided by active machines. Permanent `cost_per_unit` field.
+* **Area 4 (UI/UX Flow):** Mixed preload of WC/Sections + lazy fetch of section resources. Soft-switch auto-clearing with notice. Conditional display of priority for alternatives only. Cascading resets.
+* **Area 5 (Master Data & API):** CSV import and REST API updated with section, manual batch, alternative operation references, and permanent unit cost.
+* **Area 6 (Safeguards):** Inactive resource warnings on approved routings; blocking on drafts; soft-delete protection for referenced sections/machines.
+
+---
+
+### Phased Implementation Steps:
+1. ✅ **Database Migration:** Single clean migration `2026_11_02_140000_add_work_center_linking_to_routing_operations.php` executed. Added `section_id`, `section_manual_production_id`, `is_alternative`, `replaces_operation_id`, `priority`.
+2. ✅ **Domain Models & Relationships:** Updated `RoutingOperation.php`, `WorkCenterSection.php`, `SectionManualProduction.php`, and `Machine.php`.
+3. ✅ **DTOs & Form Requests:** Updated `RoutingOperationDTO.php`, `StoreRoutingRequest.php`, and `UpdateRoutingRequest.php` with XOR mutual exclusivity and section ownership checks.
+4. ✅ **Section Resources Endpoint:** Created `GET /production/sections/{section}/resources` in `WorkCenterSectionController` returning active machines, manual batches, and operator labor rates.
+5. ✅ **Costing Services:** Updated `RoutingCostService.php`, `ProductionCostService.php`, and `RoutingOperation::estimatedCostPerUnit()` supporting machine, manual batch, and subcontract costing while excluding alternatives from primary totals.
+6. ✅ **Blade Views & Alpine.js:** Updated `create.blade.php`, `edit.blade.php`, and `show.blade.php` with the 13-column layout, notice banner, soft-switching, conditional priority, and permanent `Cost / Unit` column.
+7. ✅ **Master Data Import & API:** Updated `ProductionMasterImportService.php` and `RoutingDetailResource.php` with section, manual batch, alternative operation, and unit cost mappings.
+8. ✅ **Feature Tests & Verification:** Implemented `tests/Feature/Production/WorkCenterRoutingIntegrationTest.php` covering 11 comprehensive integration scenarios (100% passing) and updated `tests/Feature/Production/RoutingTest.php` (100% passing).

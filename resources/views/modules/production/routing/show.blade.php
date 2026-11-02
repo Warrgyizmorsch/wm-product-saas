@@ -112,16 +112,7 @@
             </div>
         </div>
 
-        @if ($routing->isPendingApproval() && $routing->bom && $routing->bom->status === \App\Domains\Production\Models\ProductionBom::STATUS_DRAFT)
-            <div class="alert alert-warning py-2 px-3 d-flex align-items-center gap-2 mb-3 fs-13">
-                <i class="feather-clock fs-18 text-warning flex-shrink-0"></i>
-                <div>
-                    <strong>Awaiting Linked BOM Approval:</strong> This routing is linked to draft BOM 
-                    <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="fw-bold text-dark text-decoration-underline">{{ $routing->bom->bom_number }}</a>. 
-                    The BOM must be approved first before this routing can be activated.
-                </div>
-            </div>
-        @endif
+
 
         <!-- Summary Statistics Layout -->
         <div class="row g-4 mb-4 pb-4 border-bottom">
@@ -137,49 +128,14 @@
 
                 <div class="d-flex flex-column gap-3 mt-4 px-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.item_to_produce') }}:</span>
-                        <span class="fw-bold text-dark text-end">
-                            @if ($routing->product)
-                                {{ $routing->product->name }}
-                                <small class="text-muted d-block fs-11">{{ $routing->product->sku }}</small>
-                            @else
-                                <span class="text-danger">{{ __('production.not_specified') }}</span>
-                            @endif
+                        <span class="text-muted fs-13">{{ __('production.boms') ?? 'Linked BOMs' }}:</span>
+                        <span class="badge bg-soft-primary text-primary font-monospace fw-bold">
+                            {{ $routing->boms->count() }} BOM(s)
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.bom') ?? 'BOM' }}:</span>
-                        <span class="fw-bold text-dark text-end">
-                            @if ($routing->bom)
-                                <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="text-primary text-decoration-none">
-                                    {{ $routing->bom->bom_number }}
-                                </a>
-                                <small class="text-muted d-block fs-11">
-                                    v{{ $routing->bom->version }} &bull; 
-                                    <span class="badge badge-sm @if($routing->bom->status === 'active') bg-soft-success text-success @elseif($routing->bom->status === 'draft') bg-soft-warning text-warning @else bg-soft-secondary text-secondary @endif">
-                                        {{ ucfirst($routing->bom->status) }}
-                                    </span>
-                                </small>
-                            @else
-                                <span class="text-muted fs-12">{{ __('production.not_specified') }}</span>
-                            @endif
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Qty Entry Basis:</span>
-                        <span class="text-end">
-                            @if ($routing->isPerBomBaseQuantity())
-                                <span class="badge bg-soft-info text-info font-monospace fw-bold">Per BOM Base Quantity</span>
-                                @if ($routing->bom)
-                                    <small class="text-muted d-block fs-11">
-                                        BOM Base: {{ number_format($routing->bom->base_quantity, 2) }} {{ $routing->bom->baseUom->name ?? $routing->bom->product->uom->name ?? 'Units' }}
-                                    </small>
-                                @endif
-                            @else
-                                <span class="badge bg-soft-primary text-primary font-monospace fw-bold">Per 1 Finished Unit</span>
-                                <small class="text-muted d-block fs-11">1 Finished Product Unit</small>
-                            @endif
-                        </span>
+                        <span class="text-muted fs-13">{{ __('production.total_operations') ?? 'Total Operations' }}:</span>
+                        <span class="fw-bold text-dark">{{ $routing->operations->count() }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="text-muted fs-13">{{ __('production.version') }}:</span>
@@ -273,17 +229,17 @@
                     <thead>
                         <tr>
                             <th style="width: 4%" class="text-center">{{ __('production.seq') }}</th>
-                            <th style="width: 18%">{{ __('production.operation_details') }}</th>
-                            <th style="width: 13%">Consumed Component / Input Item</th>
-                            <th style="width: 8%">{{ __('production.type') }}</th>
+                            <th style="width: 22%">{{ __('production.operation_details') }}</th>
                             <th style="width: 12%">{{ __('production.work_center') }}</th>
-                            <th style="width: 11%">{{ __('production.machine') }}</th>
+                            <th style="width: 11%">Section</th>
+                            <th style="width: 14%">Resource</th>
                             <th class="text-end" style="width: 5%">{{ __('production.setup') }}</th>
                             <th class="text-end" style="width: 5%">{{ __('production.run') }}</th>
-                            <th class="text-end" style="width: 5%">Wait</th>
-                            <th class="text-end" style="width: 7%">Labor ({{ active_currency_symbol() }}/m)</th>
-                            <th class="text-end" style="width: 5%">{{ __('production.yield') }}</th>
+                            <th class="text-end" style="width: 4%">Wait</th>
+                            <th class="text-end" style="width: 7%">Cost / Unit</th>
+                            <th class="text-end" style="width: 4%">{{ __('production.yield') }}</th>
                             <th class="text-center" style="width: 4%">{{ __('production.qc_gate') }}</th>
+                            <th style="width: 8%">{{ __('production.type') }} / Alt</th>
                             <th class="text-center" style="width: 7%">Queue Threshold</th>
                         </tr>
                     </thead>
@@ -315,55 +271,43 @@
                                     @endif
                                 </td>
                                 <td class="align-middle">
-                                    @php
-                                        $materials = $op->materials;
-                                        $basisLabel = $routing->isPerBomBaseQuantity()
-                                            ? ($routing->bom ? ' / ' . number_format($routing->bom->base_quantity, 2) . ' ' . ($routing->bom->baseUom->name ?? $routing->bom->product->uom->name ?? 'units') : ' / BOM Base')
-                                            : ' / unit';
-                                    @endphp
-                                    @if ($materials && $materials->isNotEmpty())
-                                        <div class="d-flex flex-column gap-1">
-                                            @foreach ($materials as $mat)
-                                                <div class="p-1 px-2 rounded bg-light border border-light">
-                                                    <div class="d-flex align-items-center justify-content-between gap-2">
-                                                        <span class="fw-semibold text-dark fs-11">
-                                                            <i class="feather-box text-primary me-1"></i>{{ $mat->material->name ?? 'Material #' . $mat->material_id }}
-                                                        </span>
-                                                        <span class="badge bg-white text-dark border font-monospace fs-10 text-nowrap">
-                                                            {{ number_format($mat->quantity, 4) }} {{ $mat->uom->name ?? '' }}<span class="text-muted">{{ $basisLabel }}</span>
-                                                        </span>
-                                                    </div>
-                                                    @if ($mat->material && $mat->material->sku)
-                                                        <small class="text-muted d-block font-monospace fs-9">{{ $mat->material->sku }}</small>
-                                                    @endif
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <span class="text-muted fs-11 fst-italic">No Material Consumed</span>
-                                    @endif
-                                </td>
-                                <td class="align-middle">
-                                    <span class="badge bg-soft-secondary text-secondary text-uppercase fs-10">
-                                        {{ config('production.operation_types')[$op->operation_type] ?? $op->operation_type }}
-                                    </span>
-                                </td>
-                                <td class="align-middle">
                                     @if ($op->workCenter)
                                         <a href="{{ route('production.work-centers.show', $op->work_center_id) }}" class="fw-semibold text-primary">
                                             {{ $op->workCenter->name }}
                                         </a>
                                         <small class="text-muted d-block fs-10">{{ $op->workCenter->code }}</small>
+                                    @elseif ($op->is_external)
+                                        <span class="badge bg-soft-secondary text-secondary">External</span>
                                     @else
                                         <span class="text-danger">{{ __('production.missing') }}</span>
                                     @endif
                                 </td>
                                 <td class="align-middle">
-                                    @if ($op->machine)
-                                        <span class="fw-semibold text-dark">{{ $op->machine->name }}</span>
-                                        <small class="text-muted d-block fs-10">{{ $op->machine->code }}</small>
+                                    @if ($op->section)
+                                        <span class="fw-semibold text-dark">{{ $op->section->name }}</span>
+                                        <small class="text-muted d-block fs-10">{{ $op->section->code }}</small>
                                     @else
-                                        <span class="text-muted">{{ __('production.generic_capacity') }}</span>
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="align-middle">
+                                    @if ($op->is_external)
+                                        <span class="badge bg-soft-info text-info"><i class="feather-truck me-1"></i>Subcontract</span>
+                                        @if ($op->vendor)
+                                            <small class="text-muted d-block fs-10">{{ $op->vendor->name }}</small>
+                                        @endif
+                                    @elseif ($op->machine)
+                                        <span class="badge bg-soft-primary text-primary"><i class="feather-cpu me-1"></i>Machine</span>
+                                        <span class="fw-semibold text-dark d-block fs-11 mt-0.5">{{ $op->machine->name }}</span>
+                                        <small class="text-muted fs-10">{{ $op->machine->code }}</small>
+                                    @elseif ($op->manualProduction)
+                                        <span class="badge bg-soft-success text-success"><i class="feather-users me-1"></i>Manual Batch</span>
+                                        <span class="fw-semibold text-dark d-block fs-11 mt-0.5">{{ $op->manualProduction->batch_name }}</span>
+                                        @if ($op->manualProduction->shift)
+                                            <small class="text-muted fs-10">Shift: {{ $op->manualProduction->shift->name }}</small>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">—</span>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->setup_time_minutes, 1) }} min</td>
@@ -376,18 +320,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">
-                                    @php
-                                        $customRate = (float) ($op->labor_cost_rate ?? 0);
-                                        $wcRate = $op->workCenter ? ((float) $op->workCenter->cost_per_hour / 60.0) : 0.0;
-                                    @endphp
-                                    @if ($customRate > 0)
-                                        <span class="text-dark fw-semibold">{{ format_currency($customRate) }}</span>
-                                    @elseif ($wcRate > 0)
-                                        <span class="text-dark">{{ format_currency($wcRate) }}</span>
-                                        <small class="text-muted d-block fs-9">(from WC)</small>
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
+                                    <span class="fw-bold text-primary fs-12">{{ format_currency($op->estimatedCostPerUnit()) }}</span>
                                 </td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->expected_yield_percentage, 0) }}%</td>
                                 <td class="text-center align-middle">
@@ -395,6 +328,20 @@
                                         <span class="badge bg-soft-danger text-danger"><i class="feather-shield"></i> QC</span>
                                     @else
                                         <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="align-middle">
+                                    @if ($op->is_alternative)
+                                        <span class="badge bg-soft-warning text-warning d-inline-flex align-items-center gap-1 mb-1 fs-10">
+                                            <i class="feather-git-branch"></i> Alt (Pri: {{ $op->priority ?? 1 }})
+                                        </span>
+                                        @if ($op->primaryOperation)
+                                            <small class="d-block text-muted fs-10">Alt of Op {{ $op->primaryOperation->sequence }}</small>
+                                        @endif
+                                    @else
+                                        <span class="badge bg-soft-secondary text-secondary text-uppercase fs-10">
+                                            {{ config('production.operation_types')[$op->operation_type] ?? $op->operation_type }}
+                                        </span>
                                     @endif
                                 </td>
                                 <td class="text-center align-middle">
@@ -426,116 +373,81 @@
             </div>
         </div>
 
-        <!-- BOM Component Material Allocation Summary -->
-        @if ($routing->bom && $routing->bom->items->isNotEmpty())
-            @php
-                $baseQty = (float) ($routing->bom->base_quantity > 0 ? $routing->bom->base_quantity : 1);
-                $isPerBom = $routing->isPerBomBaseQuantity();
-                $allOpMaterials = $routing->operations->flatMap->materials;
-            @endphp
-            <div class="mb-4 pb-4 border-bottom">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <h5 class="fw-bold text-dark mb-0">BOM Component Material Allocation Summary</h5>
-                        <p class="fs-12 text-muted mb-0">
-                            BOM: <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="fw-semibold text-primary text-decoration-none">{{ $routing->bom->bom_number }}</a> &bull; 
-                            Base Quantity: <span class="fw-semibold text-dark">{{ number_format($baseQty, 2) }} {{ $routing->bom->baseUom->name ?? $routing->bom->product->uom->name ?? 'units' }}</span> &bull;
-                            Routing Mode: <span class="badge @if($isPerBom) bg-soft-info text-info @else bg-soft-primary text-primary @endif font-monospace">{{ $isPerBom ? 'Per BOM Base Quantity' : 'Per 1 Finished Product Unit' }}</span>
-                        </p>
-                    </div>
+        <!-- Linked Bill of Materials (BOMs) -->
+        <div class="mb-4 pb-4 border-bottom">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">Linked Bill of Materials (BOMs)</h5>
+                    <p class="fs-12 text-muted mb-0">Production BOMs utilizing this process routing as their manufacturing sequence.</p>
                 </div>
-                <div class="table-responsive">
-                    <table class="erp-thin-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 22%">BOM Component</th>
-                                <th style="width: 8%">UOM</th>
-                                <th class="text-end" style="width: 14%">BOM Requirement</th>
-                                <th class="text-end" style="width: 14%">Norm. BOM Req (Per Unit)</th>
-                                <th class="text-end" style="width: 14%">Total Allocated</th>
-                                <th class="text-end" style="width: 14%">Remaining</th>
-                                <th class="text-center" style="width: 14%">Status & Operations</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($routing->bom->items as $item)
-                                @php
-                                    $matId = $item->material_id;
-                                    $bomQty = (float) $item->quantity;
-                                    $normBomReq = $bomQty / $baseQty;
-
-                                    $matchingAllocs = $allOpMaterials->filter(fn($m) => (int)$m->material_id === (int)$matId);
-                                    $totalAllocEntered = (float) $matchingAllocs->sum('quantity');
-                                    $normAlloc = $isPerBom ? ($totalAllocEntered / $baseQty) : $totalAllocEntered;
-
-                                    $normDiff = $normAlloc - $normBomReq;
-                                    $isOver = $normDiff > 0.00001;
-                                    $isFull = abs($normDiff) <= 0.00001;
-                                    $normRemaining = max(0, $normBomReq - $normAlloc);
-                                    $remainingEntered = $isPerBom ? ($normRemaining * $baseQty) : $normRemaining;
-
-                                    $assignedOpSequences = [];
-                                    foreach ($routing->operations as $op) {
-                                        if ($op->materials && $op->materials->contains(fn($m) => (int)$m->material_id === (int)$matId)) {
-                                            $assignedOpSequences[] = 'Op ' . $op->sequence;
-                                        }
-                                    }
-                                @endphp
-                                <tr>
-                                    <td class="align-middle">
-                                        <span class="fw-semibold text-dark fs-12">{{ $item->material->name ?? 'Material #' . $matId }}</span>
-                                        <small class="text-muted d-block fs-10 font-monospace">{{ $item->material->sku ?? '' }}</small>
-                                    </td>
-                                    <td class="align-middle fs-12 text-muted">
-                                        {{ $item->uom->name ?? '' }}
-                                    </td>
-                                    <td class="text-end align-middle font-monospace fs-12">
-                                        <span class="fw-semibold text-dark">{{ number_format($bomQty, 4) }}</span>
-                                        <small class="text-muted d-block fs-10">per {{ number_format($baseQty, 2) }} {{ $routing->bom->baseUom->name ?? 'units' }}</small>
-                                    </td>
-                                    <td class="text-end align-middle font-monospace fs-12 text-muted">
-                                        {{ number_format($normBomReq, 4) }} / unit
-                                    </td>
-                                    <td class="text-end align-middle font-monospace fs-12">
-                                        <span class="fw-bold @if($isOver) text-danger @else text-primary @endif">
-                                            {{ number_format($totalAllocEntered, 4) }}
-                                        </span>
-                                        <small class="text-muted d-block fs-10">({{ number_format($normAlloc, 4) }} / unit)</small>
-                                    </td>
-                                    <td class="text-end align-middle font-monospace fs-12">
-                                        @if ($isOver)
-                                            <span class="text-danger fw-bold">+{{ number_format($isPerBom ? $normDiff * $baseQty : $normDiff, 4) }} over</span>
-                                        @elseif ($isFull)
-                                            <span class="text-success fw-bold">0.0000</span>
-                                        @else
-                                            <span class="text-warning fw-bold">{{ number_format($remainingEntered, 4) }}</span>
-                                            <small class="text-muted d-block fs-10">({{ number_format($normRemaining, 4) }} / unit)</small>
-                                        @endif
-                                    </td>
-                                    <td class="text-center align-middle">
-                                        <div class="d-flex flex-column align-items-center gap-1">
-                                            @if (empty($assignedOpSequences))
-                                                <span class="badge bg-soft-danger text-danger fs-10">Unassigned</span>
-                                            @elseif ($isOver)
-                                                <span class="badge bg-soft-danger text-danger fs-10">Over-Allocated</span>
-                                            @elseif ($isFull)
-                                                <span class="badge bg-soft-success text-success fs-10">Fully Allocated</span>
-                                            @else
-                                                <span class="badge bg-soft-warning text-warning fs-10">Partially Allocated</span>
-                                            @endif
-
-                                            @if (!empty($assignedOpSequences))
-                                                <span class="text-muted fs-10 font-monospace">{{ implode(', ', $assignedOpSequences) }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                <span class="badge bg-soft-primary text-primary font-monospace">{{ $routing->boms->count() }} Linked</span>
             </div>
-        @endif
+            <div class="table-responsive">
+                <table class="erp-thin-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 18%">BOM Number</th>
+                            <th style="width: 28%">Item / Product to Produce</th>
+                            <th style="width: 12%">Version</th>
+                            <th class="text-end" style="width: 15%">Base Quantity</th>
+                            <th class="text-center" style="width: 15%">Status</th>
+                            <th class="text-center" style="width: 12%">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($routing->boms as $bom)
+                            <tr>
+                                <td class="align-middle">
+                                    <a href="{{ route('production.boms.show', $bom->id) }}" class="fw-semibold text-primary font-monospace">
+                                        {{ $bom->bom_number }}
+                                    </a>
+                                    @if ($bom->bom_name)
+                                        <small class="text-muted d-block fs-11">{{ $bom->bom_name }}</small>
+                                    @endif
+                                </td>
+                                <td class="align-middle">
+                                    <span class="fw-semibold text-dark fs-12">{{ $bom->product->name ?? '—' }}</span>
+                                    @if ($bom->product && $bom->product->sku)
+                                        <small class="text-muted d-block font-monospace fs-10">{{ $bom->product->sku }}</small>
+                                    @endif
+                                </td>
+                                <td class="align-middle font-monospace fs-12">
+                                    v{{ $bom->version }}
+                                    @if ($bom->revision)
+                                        <small class="text-muted fs-10">(r{{ $bom->revision }})</small>
+                                    @endif
+                                </td>
+                                <td class="text-end align-middle font-monospace fs-12">
+                                    {{ number_format($bom->base_quantity, 2) }} {{ $bom->baseUom->name ?? $bom->product->uom->name ?? 'units' }}
+                                </td>
+                                <td class="text-center align-middle">
+                                    @if ($bom->status === 'approved' || $bom->status === 'active')
+                                        <span class="badge bg-soft-success text-success text-uppercase font-monospace fs-10">{{ $bom->status }}</span>
+                                    @elseif ($bom->status === 'draft')
+                                        <span class="badge bg-soft-warning text-warning text-uppercase font-monospace fs-10">Draft</span>
+                                    @elseif ($bom->status === 'pending_approval')
+                                        <span class="badge bg-soft-info text-info text-uppercase font-monospace fs-10">Pending</span>
+                                    @else
+                                        <span class="badge bg-soft-secondary text-secondary text-uppercase font-monospace fs-10">{{ $bom->status }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-center align-middle">
+                                    <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-sm btn-outline-primary py-0 px-2 fs-11">
+                                        <i class="feather-eye me-1"></i>View
+                                    </a>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    <i class="feather-info me-2"></i>No Bill of Materials linked to this routing yet.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
         <!-- Approval Audit History -->
         <div>

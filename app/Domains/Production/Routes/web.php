@@ -118,6 +118,7 @@ Route::prefix('production')
 
         // ── Work Center Sections ──────────────────────────────────────────────
         Route::get('sections/by-work-center/{workCenter}', [WorkCenterSectionController::class, 'byWorkCenter'])->name('work-center-sections.by-work-center');
+        Route::get('sections/{section}/resources', [WorkCenterSectionController::class, 'resources'])->name('sections.resources');
         Route::patch('work-center-sections/{section}/manual-production', [WorkCenterSectionController::class, 'updateManualProduction'])->name('work-center-sections.update-manual-production');
         Route::post('work-center-sections/{section}/manual-productions', [SectionManualProductionController::class, 'store'])->name('work-center-sections.manual-productions.store');
         Route::put('manual-productions/{batch}', [SectionManualProductionController::class, 'update'])->name('manual-productions.update');

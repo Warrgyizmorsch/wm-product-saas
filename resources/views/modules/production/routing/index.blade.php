@@ -221,18 +221,6 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.finished_product') }}</label>
-                                <x-ui.odoo-form-ui type="select" name="product_id">
-                                    <option value="">{{ __('production.all_products') }}</option>
-                                    @foreach($products as $product)
-                                        <option value="{{ $product->id }}" {{ request('product_id') == $product->id ? 'selected' : '' }}>
-                                            {{ $product->name }}
-                                        </option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
-                            </div>
-
-                            <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="status">
                                     <option value="">{{ __('production.all_statuses') }}</option>
@@ -282,15 +270,14 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" id="check-all-routings" class="form-check-input">
                         </th>
-                        <th style="width: 12%">{{ __('production.routing_number') }}</th>
-                        <th style="width: 18%">{{ __('production.routing_name') }}</th>
-                        <th style="width: 20%">{{ __('production.product_to_manufacture') }}</th>
-                        <th style="width: 7%">{{ __('production.version') }}</th>
-                        <th style="width: 6%" class="text-center">{{ __('production.operations_count') }}</th>
-                        <th style="width: 8%">{{ __('production.effective_from') }}</th>
-                        <th style="width: 8%">{{ __('production.effective_to') }}</th>
-                        <th style="width: 10%">{{ __('production.bom') ?? 'Linked BOM' }}</th>
-                        <th style="width: 7%">{{ __('production.status') }}</th>
+                        <th style="width: 14%">{{ __('production.routing_number') }}</th>
+                        <th style="width: 22%">{{ __('production.routing_name') }}</th>
+                        <th style="width: 8%">{{ __('production.version') }}</th>
+                        <th style="width: 8%" class="text-center">{{ __('production.operations_count') }}</th>
+                        <th style="width: 10%">{{ __('production.effective_from') }}</th>
+                        <th style="width: 10%">{{ __('production.effective_to') }}</th>
+                        <th style="width: 12%">{{ __('production.boms') ?? 'Linked BOMs' }}</th>
+                        <th style="width: 8%">{{ __('production.status') }}</th>
                         <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
@@ -309,16 +296,6 @@
                                 <span class="fw-semibold text-dark">{{ $routing->name }}</span>
                             </td>
                             <td>
-                                @if ($routing->product)
-                                    <div class="d-flex flex-column">
-                                        <span class="fw-semibold text-dark">{{ $routing->product->name }}</span>
-                                        <small class="text-muted font-monospace fs-10">{{ $routing->product->sku }}</small>
-                                    </div>
-                                @else
-                                    <span class="text-muted">{{ __('production.no_product') ?? 'No Product' }}</span>
-                                @endif
-                            </td>
-                            <td>
                                 <span class="text-dark">{{ $routing->version }}</span>
                                 @if ($routing->revision > 0)
                                     <small class="text-muted d-block fs-10">Rev {{ $routing->revision }}</small>
@@ -332,14 +309,9 @@
                             <td class="text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '-' }}</td>
                             <td class="text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}</td>
                             <td>
-                                @if ($routing->bom)
-                                    <a href="{{ route('production.boms.show', $routing->bom->id) }}" class="fw-semibold text-primary">
-                                        {{ $routing->bom->bom_number }}
-                                    </a>
-                                    <small class="text-muted d-block fs-10">v{{ $routing->bom->version }}</small>
-                                @else
-                                    <span class="text-muted fs-11">—</span>
-                                @endif
+                                <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fw-semibold">
+                                    <i class="feather-layers me-1 fs-10"></i>{{ $routing->boms_count ?? 0 }} {{ __('production.boms') ?? 'BOMs' }}
+                                </span>
                             </td>
                             <td>
                                 @php

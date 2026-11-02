@@ -23,6 +23,7 @@ class RoutingTest extends TestCase
     private User $engineerA;
     private Product $finishedProductA;
     private WorkCenter $workCenterA;
+    private \App\Domains\Production\Models\WorkCenterSection $sectionA;
     private Machine $machineA;
 
     protected function setUp(): void
@@ -81,7 +82,7 @@ class RoutingTest extends TestCase
             'status' => 'active',
         ]);
 
-        $sectionA = \App\Domains\Production\Models\WorkCenterSection::create([
+        $this->sectionA = \App\Domains\Production\Models\WorkCenterSection::create([
             'tenant_id' => $this->tenantA->id,
             'work_center_id' => $this->workCenterA->id,
             'name' => 'Cutting Section A',
@@ -91,7 +92,7 @@ class RoutingTest extends TestCase
 
         $this->machineA = Machine::create([
             'tenant_id' => $this->tenantA->id,
-            'section_id' => $sectionA->id,
+            'section_id' => $this->sectionA->id,
             'name' => 'Saw Machine A',
             'code' => 'MCH-SAW-A',
             'status' => 'active',
@@ -113,6 +114,7 @@ class RoutingTest extends TestCase
                     'name' => 'Raw sheet cutting',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenterA->id,
+                    'section_id' => $this->sectionA->id,
                     'machine_id' => $this->machineA->id,
                     'setup_time_minutes' => 15,
                     'processing_time_minutes' => 5,
@@ -126,7 +128,8 @@ class RoutingTest extends TestCase
                     'name' => 'Hole drilling',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenterA->id,
-                    'machine_id' => null,
+                    'section_id' => $this->sectionA->id,
+                    'machine_id' => $this->machineA->id,
                     'setup_time_minutes' => 5,
                     'processing_time_minutes' => 2,
                     'expected_yield_percentage' => 100.00,
@@ -144,7 +147,6 @@ class RoutingTest extends TestCase
         $this->assertDatabaseHas('routings', [
             'tenant_id' => $this->tenantA->id,
             'name' => 'Cabinet Z Cutting and Drilling',
-            'product_id' => $this->finishedProductA->id,
             'status' => Routing::STATUS_DRAFT,
         ]);
 
@@ -313,6 +315,8 @@ class RoutingTest extends TestCase
                         'name' => 'Operation 1 Modified',
                         'operation_type' => 'manufacturing',
                         'work_center_id' => $this->workCenterA->id,
+                        'section_id' => $this->sectionA->id,
+                        'machine_id' => $this->machineA->id,
                     ]
                 ]
             ]);
@@ -568,10 +572,9 @@ class RoutingTest extends TestCase
         $routing2->refresh();
         $this->assertEquals(Routing::STATUS_ACTIVE, $routing2->status);
 
-        // Routing 1 is retired (historical) with effective_to = today
+        // Under decoupled architecture, parallel active routings are permitted; Routing 1 is NOT auto-retired
         $routing1->refresh();
-        $this->assertEquals(Routing::STATUS_HISTORICAL, $routing1->status);
-        $this->assertEquals(now()->toDateString(), $routing1->effective_to->toDateString());
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routing1->status);
     }
 }
 

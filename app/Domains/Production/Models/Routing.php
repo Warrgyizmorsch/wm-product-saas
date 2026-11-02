@@ -49,7 +49,7 @@ class Routing extends BaseModel
         'tenant_id',
         'routing_number',
         'name',
-        'product_id',
+        // [DECOUPLE-PRODUCT-INDEPENDENT] 'product_id',
         // [INVERSION-DECOUPLE-TRACK-03] 'bom_id',
         // [INVERSION-DECOUPLE-TRACK-03] 'material_quantity_mode',
         'version',
@@ -86,10 +86,11 @@ class Routing extends BaseModel
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class, 'product_id');
-    }
+    // [DECOUPLE-PRODUCT-INDEPENDENT] Routing is independent of products
+    // public function product(): BelongsTo
+    // {
+    //     return $this->belongsTo(Product::class, 'product_id');
+    // }
 
     // [INVERSION-DECOUPLE-TRACK-03] Inverted: Routing no longer belongs to a single BOM via bom_id
     // public function bom(): BelongsTo
