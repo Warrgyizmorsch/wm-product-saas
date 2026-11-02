@@ -135,6 +135,8 @@ class RoutingService
             throw new InvalidArgumentException('Routing must have at least one operation before submitting for approval.');
         }
 
+        // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing no longer requires a linked BOM to submit for approval
+        /*
         // Require linked active or draft BOM before routing can be submitted for approval
         $bom = $routing->bom;
         if (!$bom && $routing->product_id) {
@@ -156,6 +158,7 @@ class RoutingService
         if (!in_array($bom->status, ['approved', 'active', 'draft'])) {
             throw new InvalidArgumentException("Cannot submit routing for approval: The linked BOM must be active or draft (currently '{$bom->status}').");
         }
+        */
 
         return DB::transaction(function () use ($routing, $userId) {
             $this->routingRepository->update($routing->id, ['status' => Routing::STATUS_PENDING_APPROVAL]);
@@ -187,6 +190,8 @@ class RoutingService
             throw new InvalidArgumentException('Only routings pending approval can be approved.');
         }
 
+        // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing no longer requires a linked BOM to approve
+        /*
         // Require linked BOM to be approved and active before routing can be approved
         $bom = $routing->bom;
         if (!$bom && $routing->product_id) {
@@ -204,6 +209,7 @@ class RoutingService
         if (!$bom || !in_array($bom->status, ['approved', 'active', 'scheduled'])) {
             throw new InvalidArgumentException('Cannot approve routing: The linked Bill of Materials (BOM) must be approved and active first.');
         }
+        */
 
         return DB::transaction(function () use ($routing, $approverUserId) {
             // Centralized routing approval lifecycle transition: archives previous active versions
@@ -241,6 +247,9 @@ class RoutingService
                 'action'     => RoutingApproval::ACTION_REJECTED,
                 'comments'   => $comments ?: 'Routing rejected during review.',
             ]);
+
+            // [TRACK-06] Revert pending-approval BOMs linked to this rejected routing back to draft
+            $this->routingLifecycleService->handleBomsOnRoutingRejection($routing, $userId, $comments);
 
             return $routing->fresh();
         });
@@ -290,6 +299,8 @@ class RoutingService
         );
 
         return DB::transaction(function () use ($original, $newVersion, $creatorUserId, $tenantId) {
+            // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing no longer tracks BOM or material_quantity_mode
+            /*
             $bomId = $original->bom_id;
             $currentBom = $original->bom_id ? \App\Domains\Production\Models\ProductionBom::where('tenant_id', $tenantId)->find($original->bom_id) : null;
             if (!$currentBom || in_array($currentBom->status, ['cancelled', 'inactive'])) {
@@ -310,15 +321,17 @@ class RoutingService
                     $bomId = $draftBom ? $draftBom->id : null;
                 }
             }
+            */
 
             $newRouting = $this->routingRepository->create([
                 'tenant_id'      => $tenantId,
                 'routing_number' => $this->numberService->generateNextNumber($tenantId),
                 'name'           => $original->name,
-                'product_id'             => $original->product_id,
-                'bom_id'                 => $bomId,
-                'material_quantity_mode' => $original->material_quantity_mode ?? 'per_unit',
-                'version'                => $newVersion,
+                'product_id'     => $original->product_id,
+                // [INVERSION-DECOUPLE-TRACK-03]
+                // 'bom_id'                 => $bomId,
+                // 'material_quantity_mode' => $original->material_quantity_mode ?? 'per_unit',
+                'version'        => $newVersion,
                 'revision'       => $original->revision + 1,
                 'is_default'     => $original->is_default,
                 'effective_from' => Carbon::now()->toDateString(),
@@ -416,6 +429,9 @@ class RoutingService
             $createdOps[] = ['model' => $createdOp, 'dto' => $opDto];
             $opsBySeq[$seq] = $createdOp->id;
 
+            // [INVERSION-DECOUPLE-TRACK-03] Material assignment moved to BOM creation/edit.
+            // RoutingOperationMaterial is now populated by ProductionBomService when BOM is saved.
+            /*
             $materialsToSync = !empty($opDto->materials) 
                 ? $opDto->materials 
                 : (!empty($opDto->material_id) ? [['material_id' => $opDto->material_id, 'quantity' => 1.0]] : []);
@@ -438,6 +454,7 @@ class RoutingService
                     'sequence'             => $matIndex + 1,
                 ]);
             }
+            */
         }
 
         // Pass 2: Bind dependencies (previous_operation_id)

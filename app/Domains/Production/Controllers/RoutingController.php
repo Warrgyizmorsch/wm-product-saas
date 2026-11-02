@@ -51,10 +51,8 @@ class RoutingController extends Controller
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials    = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
         $operationTypes = config('production.operation_types', []);
-        $boms        = ProductionBom::with(['baseUom', 'product.uom', 'items.material', 'items.uom'])
-            ->whereIn('status', ['approved', 'active', 'draft'])
-            ->orderBy('bom_number')
-            ->get();
+        // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing creation is standalone; empty collection kept for view compatibility
+        $boms = collect([]);
 
         $selectedProductId = request('product_id');
 
@@ -135,10 +133,8 @@ class RoutingController extends Controller
         $vendors        = \App\Domains\Inventory\Models\Vendor::where('status', 'active')->get();
         $serviceProducts = Product::where('type', 'service')->get();
         $rawMaterials   = Product::whereIn('type', ['raw_material', 'semi_finished', 'semi_finished_goods', 'finished_good', 'finished_goods'])->get();
-        $boms           = ProductionBom::with(['baseUom', 'product.uom', 'items.material', 'items.uom'])
-            ->whereIn('status', ['approved', 'active', 'draft'])
-            ->orderBy('bom_number')
-            ->get();
+        // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing edit is standalone; empty collection kept for view compatibility
+        $boms           = collect([]);
 
         $operationTypes = config('production.operation_types', []);
 

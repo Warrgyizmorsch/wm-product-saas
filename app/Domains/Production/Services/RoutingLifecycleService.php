@@ -3,6 +3,7 @@
 namespace App\Domains\Production\Services;
 
 use App\Domains\Production\Models\ProductionBom;
+use App\Domains\Production\Models\ProductionBomApproval;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use Illuminate\Support\Carbon;
@@ -152,6 +153,9 @@ class RoutingLifecycleService
                     'action'     => RoutingApproval::ACTION_ARCHIVED,
                     'comments'   => "Automatically archived and expired on {$startDate} by new routing version {$routing->version}.",
                 ]);
+
+                // [TRACK-06] Cascade to connected BOMs when active routing is archived/superseded
+                $this->handleBomsOnRoutingRetirement($activeRouting, $approverUserId, "connected routing ({$activeRouting->routing_number}) has become historical/superseded by new routing version {$routing->version}.");
             }
         }
 
@@ -213,13 +217,136 @@ class RoutingLifecycleService
             'action'     => RoutingApproval::ACTION_CANCELLED,
             'comments'   => $comments ?: 'Routing cancelled.',
         ]);
+
+        // [TRACK-06] Cascade to connected BOMs when routing is cancelled
+        $this->handleBomsOnRoutingCancellation($routing, $userId, $comments);
     }
 
     /**
-     * Synchronize unsubmitted draft routings to point to the newly approved BOM.
-     * Only routings in 'draft' status (not submitted for approval) get updated.
-     * Submitted routings ('pending_approval') and active/historical routings are NOT modified.
+     * [TRACK-06] Handle connected BOMs when a routing is superseded/retired.
+     * Active BOMs transition to 'inactive' with warning reason & approval log.
+     * Draft BOMs stay 'draft' with warning badge/reason.
      */
+    public function handleBomsOnRoutingRetirement(Routing $routing, int $userId, string $reason): void
+    {
+        // 1. Active BOMs linked to the retiring routing become inactive
+        $activeBoms = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $routing->tenant_id)
+            ->where('routing_id', $routing->id)
+            ->whereIn('status', [ProductionBom::STATUS_APPROVED, 'active'])
+            ->get();
+
+        foreach ($activeBoms as $bom) {
+            $bom->update([
+                'status'         => ProductionBom::STATUS_INACTIVE,
+                'has_warning'    => true,
+                'warning_reason' => "Automatically inactivated because {$reason}",
+            ]);
+
+            ProductionBomApproval::create([
+                'tenant_id' => $bom->tenant_id,
+                'bom_id'    => $bom->id,
+                'user_id'   => $userId,
+                'action'    => 'Inactivated',
+                'comments'  => "Automatically inactivated because {$reason}",
+            ]);
+        }
+
+        // 2. Draft BOMs keep draft status but get warning
+        $draftBoms = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $routing->tenant_id)
+            ->where('routing_id', $routing->id)
+            ->where('status', ProductionBom::STATUS_DRAFT)
+            ->get();
+
+        foreach ($draftBoms as $bom) {
+            $bom->update([
+                'has_warning'    => true,
+                'warning_reason' => "The linked routing ({$routing->routing_number}) has become historical/superseded. Please review and update the BOM accordingly.",
+            ]);
+        }
+    }
+
+    /**
+     * [TRACK-06] Handle connected BOMs when a routing is cancelled.
+     * Active BOMs transition to 'inactive' with warning reason.
+     * Draft BOMs stay 'draft' with warning badge/reason.
+     */
+    public function handleBomsOnRoutingCancellation(Routing $routing, int $userId, ?string $comments = null): void
+    {
+        $reasonText = $comments ? " Reason: {$comments}" : '';
+
+        // 1. Active BOMs linked to the cancelled routing become inactive
+        $activeBoms = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $routing->tenant_id)
+            ->where('routing_id', $routing->id)
+            ->whereIn('status', [ProductionBom::STATUS_APPROVED, 'active'])
+            ->get();
+
+        foreach ($activeBoms as $bom) {
+            $bom->update([
+                'status'         => ProductionBom::STATUS_INACTIVE,
+                'has_warning'    => true,
+                'warning_reason' => "Automatically inactivated because connected routing ({$routing->routing_number}) was cancelled.{$reasonText}",
+            ]);
+
+            ProductionBomApproval::create([
+                'tenant_id' => $bom->tenant_id,
+                'bom_id'    => $bom->id,
+                'user_id'   => $userId,
+                'action'    => 'Inactivated',
+                'comments'  => "Automatically inactivated because connected routing ({$routing->routing_number}) was cancelled.{$reasonText}",
+            ]);
+        }
+
+        // 2. Draft BOMs keep draft status but get warning
+        $draftBoms = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $routing->tenant_id)
+            ->where('routing_id', $routing->id)
+            ->where('status', ProductionBom::STATUS_DRAFT)
+            ->get();
+
+        foreach ($draftBoms as $bom) {
+            $bom->update([
+                'has_warning'    => true,
+                'warning_reason' => "The linked routing ({$routing->routing_number}) was cancelled. Please review and update the BOM accordingly.{$reasonText}",
+            ]);
+        }
+    }
+
+    /**
+     * [TRACK-06] Handle connected BOMs when a routing is rejected during review.
+     * Pending approval BOMs return to draft with a warning.
+     */
+    public function handleBomsOnRoutingRejection(Routing $routing, int $userId, ?string $comments = null): void
+    {
+        $reasonText = $comments ? " Reason: {$comments}" : '';
+
+        $pendingBoms = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $routing->tenant_id)
+            ->where('routing_id', $routing->id)
+            ->where('status', ProductionBom::STATUS_PENDING_APPROVAL)
+            ->get();
+
+        foreach ($pendingBoms as $bom) {
+            $bom->update([
+                'status'         => ProductionBom::STATUS_DRAFT,
+                'has_warning'    => true,
+                'warning_reason' => "Automatically returned to draft because linked routing ({$routing->routing_number}) was rejected.{$reasonText}",
+            ]);
+
+            ProductionBomApproval::create([
+                'tenant_id' => $bom->tenant_id,
+                'bom_id'    => $bom->id,
+                'user_id'   => $userId,
+                'action'    => 'Rejected',
+                'comments'  => "Automatically returned to draft because linked routing ({$routing->routing_number}) was rejected.{$reasonText}",
+            ]);
+        }
+    }
+
+    // [INVERSION-DECOUPLE-TRACK-03] Old BOM-to-Routing cascade methods commented out
+    /*
     public function syncDraftRoutingsToApprovedBom(ProductionBom $bom): void
     {
         $draftRoutings = Routing::withoutGlobalScopes()
@@ -235,9 +362,6 @@ class RoutingLifecycleService
         }
     }
 
-    /**
-     * Archive active routings when their connected BOM is deactivated or superseded.
-     */
     public function archiveRoutingsForDeactivatedBoms(
         array|int $deactivatedBomIds,
         int $productId,
@@ -275,15 +399,6 @@ class RoutingLifecycleService
         }
     }
 
-    /**
-     * Handle connected routings when a BOM gets cancelled.
-     *
-     * Rules:
-     * - Any connected routing that is scheduled ('scheduled') must be cancelled ('cancelled')
-     *   along with the cancellation reason provided for the BOM.
-     * - Any connected routing that is active ('active') becomes historical ('historical')
-     *   with effective_to set to today (current flow).
-     */
     public function handleRoutingsOnBomCancellation(
         ProductionBom $bom,
         int $userId,
@@ -292,7 +407,6 @@ class RoutingLifecycleService
         $today = Carbon::now()->toDateString();
         $reasonText = $cancelReason ? " Reason: {$cancelReason}" : '';
 
-        // 1. Scheduled routings -> cancelled with BOM cancellation reason
         $scheduledRoutings = Routing::withoutGlobalScopes()
             ->where('tenant_id', $bom->tenant_id)
             ->where(function ($q) use ($bom) {
@@ -320,7 +434,6 @@ class RoutingLifecycleService
             ]);
         }
 
-        // 2. Active routings -> historical (existing flow)
         $activeRoutings = Routing::withoutGlobalScopes()
             ->where('tenant_id', $bom->tenant_id)
             ->where(function ($q) use ($bom) {
@@ -348,6 +461,7 @@ class RoutingLifecycleService
             ]);
         }
     }
+    */
 
     /**
      * Transition routings on Engineering Change Order (ECO) release.

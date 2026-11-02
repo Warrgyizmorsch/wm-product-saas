@@ -81,9 +81,17 @@ class RoutingTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->machineA = Machine::create([
+        $sectionA = \App\Domains\Production\Models\WorkCenterSection::create([
             'tenant_id' => $this->tenantA->id,
             'work_center_id' => $this->workCenterA->id,
+            'name' => 'Cutting Section A',
+            'code' => 'SEC-CUT-01',
+            'status' => 'active',
+        ]);
+
+        $this->machineA = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'section_id' => $sectionA->id,
             'name' => 'Saw Machine A',
             'code' => 'MCH-SAW-A',
             'status' => 'active',
@@ -101,6 +109,7 @@ class RoutingTest extends TestCase
             'operations' => [
                 [
                     'sequence' => 10,
+                    'operation_number' => 'OP-010',
                     'name' => 'Raw sheet cutting',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenterA->id,
@@ -113,6 +122,7 @@ class RoutingTest extends TestCase
                 ],
                 [
                     'sequence' => 20,
+                    'operation_number' => 'OP-020',
                     'name' => 'Hole drilling',
                     'operation_type' => 'manufacturing',
                     'work_center_id' => $this->workCenterA->id,
@@ -128,6 +138,7 @@ class RoutingTest extends TestCase
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.store'), $payload);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         
         $this->assertDatabaseHas('routings', [
@@ -213,6 +224,7 @@ class RoutingTest extends TestCase
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.approve', $routing->id));
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
 
         $routing->refresh();
@@ -271,6 +283,7 @@ class RoutingTest extends TestCase
                 'new_version' => '1.1.0'
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         
         $newRouting = Routing::where('version', '1.1.0')->first();
@@ -376,6 +389,7 @@ class RoutingTest extends TestCase
                 'ids' => [$routing1->id, $routing2->id]
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing1->refresh();
         $routing2->refresh();
@@ -390,6 +404,7 @@ class RoutingTest extends TestCase
                 'ids' => [$routing1->id, $routing2->id]
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing1->refresh();
         $routing2->refresh();
@@ -404,6 +419,7 @@ class RoutingTest extends TestCase
                 'ids' => [$routing1->id, $routing2->id]
             ]);
 
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing1->refresh();
         $routing2->refresh();
@@ -411,30 +427,18 @@ class RoutingTest extends TestCase
         $this->assertTrue($routing2->isCancelled());
     }
 
-    public function test_routing_approval_blocked_until_linked_draft_bom_is_approved(): void
+    public function test_routing_approval_succeeds_independently_without_bom(): void
     {
-        $draftBom = ProductionBom::create([
-            'tenant_id' => $this->tenantA->id,
-            'bom_number' => 'BOM-DRAFT-LINK',
-            'bom_name' => 'Draft Linked BOM',
-            'bom_type' => 'manufacturing',
-            'product_id' => $this->finishedProductA->id,
-            'base_quantity' => 1.0,
-            'status' => ProductionBom::STATUS_DRAFT,
-            'version' => '1.0.0',
-            'effective_date' => now()->toDateString(),
-        ]);
-
         $routing = Routing::create([
             'tenant_id' => $this->tenantA->id,
             'routing_number' => 'RTG-DRAFT-BOM-TEST',
-            'name' => 'Test Routing with Draft BOM',
+            'name' => 'Test Standalone Routing',
             'product_id' => $this->finishedProductA->id,
-            'bom_id' => $draftBom->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_DRAFT,
             'is_default' => true,
             'created_by' => $this->engineerA->id,
+            'effective_from' => now()->toDateString(),
         ]);
 
         $routing->operations()->create([
@@ -446,54 +450,32 @@ class RoutingTest extends TestCase
             'work_center_id' => $this->workCenterA->id,
         ]);
 
-        // Submitting routing with draft BOM should succeed
+        // Submitting routing succeeds standalone
         $response = $this->actingAs($this->engineerA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.submit', $routing->id));
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing->refresh();
         $this->assertTrue($routing->isPendingApproval());
 
-        // Approving routing while BOM is still in draft should fail
+        // Approving routing succeeds standalone without any BOM requirement
         $response = $this->actingAs($this->adminA)
             ->withHeader('X-Tenant', 'tenant-a')
             ->post(route('production.routing.approve', $routing->id));
-        $response->assertSessionHas('error');
-        $routing->refresh();
-        $this->assertTrue($routing->isPendingApproval());
-
-        // Now approve the BOM
-        $draftBom->update(['status' => ProductionBom::STATUS_APPROVED]);
-
-        // Approving routing should now succeed
-        $response = $this->actingAs($this->adminA)
-            ->withHeader('X-Tenant', 'tenant-a')
-            ->post(route('production.routing.approve', $routing->id));
+        $response->assertSessionHasNoErrors();
         $response->assertRedirect();
         $routing->refresh();
         $this->assertTrue($routing->isActive());
     }
 
-    public function test_draft_bom_rejection_auto_rejects_linked_pending_routing(): void
+    public function test_bom_rejection_does_not_affect_independent_routing(): void
     {
-        $draftBom = ProductionBom::create([
-            'tenant_id' => $this->tenantA->id,
-            'bom_number' => 'BOM-REJECT-CASCADE',
-            'bom_name' => 'BOM to Reject',
-            'bom_type' => 'manufacturing',
-            'product_id' => $this->finishedProductA->id,
-            'base_quantity' => 1.0,
-            'status' => ProductionBom::STATUS_DRAFT,
-            'version' => '1.0.0',
-            'effective_date' => now()->toDateString(),
-        ]);
-
         $routing = Routing::create([
             'tenant_id' => $this->tenantA->id,
             'routing_number' => 'RTG-REJECT-CASCADE',
-            'name' => 'Routing Pending BOM',
+            'name' => 'Routing Independent',
             'product_id' => $this->finishedProductA->id,
-            'bom_id' => $draftBom->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_PENDING_APPROVAL,
             'is_default' => true,
@@ -509,43 +491,39 @@ class RoutingTest extends TestCase
             'work_center_id' => $this->workCenterA->id,
         ]);
 
-        // Put BOM in pending approval
-        $draftBom->update(['status' => ProductionBom::STATUS_PENDING_APPROVAL]);
+        $draftBom = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_id' => $routing->id,
+            'bom_number' => 'BOM-REJECT-CASCADE',
+            'bom_name' => 'BOM to Reject',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedProductA->id,
+            'base_quantity' => 1.0,
+            'status' => ProductionBom::STATUS_PENDING_APPROVAL,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+        ]);
 
         // Reject the BOM
         $bomService = app(\App\Domains\Production\Services\ProductionBomService::class);
         $bomService->reject($draftBom->id, $this->adminA->id, 'BOM engineering specifications rejected');
 
-        // Check that routing was automatically rejected
-        $routing->refresh();
-        $this->assertEquals(Routing::STATUS_DRAFT, $routing->status);
+        // Check that BOM was reverted to draft
+        $draftBom->refresh();
+        $this->assertEquals(ProductionBom::STATUS_DRAFT, $draftBom->status);
 
-        $latestLog = $routing->approvals()->latest()->first();
-        $this->assertNotNull($latestLog);
-        $this->assertEquals(RoutingApproval::ACTION_REJECTED, $latestLog->action);
-        $this->assertStringContainsString('Automatically rejected because connected BOM', $latestLog->comments);
+        // Under inversion, routing remains untouched and still pending approval
+        $routing->refresh();
+        $this->assertEquals(Routing::STATUS_PENDING_APPROVAL, $routing->status);
     }
 
     public function test_bom_deactivation_makes_linked_active_routing_historical(): void
     {
-        $bom1 = ProductionBom::create([
-            'tenant_id' => $this->tenantA->id,
-            'bom_number' => 'BOM-SUPERSEDE-1',
-            'bom_name' => 'Old Active BOM',
-            'bom_type' => 'manufacturing',
-            'product_id' => $this->finishedProductA->id,
-            'base_quantity' => 1.0,
-            'status' => ProductionBom::STATUS_APPROVED,
-            'version' => '1.0.0',
-            'effective_date' => now()->subMonths(2)->toDateString(),
-        ]);
-
         $routing1 = Routing::create([
             'tenant_id' => $this->tenantA->id,
             'routing_number' => 'RTG-SUPERSEDE-1',
-            'name' => 'Routing for Old BOM',
+            'name' => 'Routing v1',
             'product_id' => $this->finishedProductA->id,
-            'bom_id' => $bom1->id,
             'version' => '1.0.0',
             'status' => Routing::STATUS_ACTIVE,
             'is_default' => true,
@@ -562,26 +540,35 @@ class RoutingTest extends TestCase
             'work_center_id' => $this->workCenterA->id,
         ]);
 
-        // Create and approve BOM v2
-        $bom2 = ProductionBom::create([
+        // Create and approve Routing v2
+        $routing2 = Routing::create([
             'tenant_id' => $this->tenantA->id,
-            'bom_number' => 'BOM-SUPERSEDE-2',
-            'bom_name' => 'New Active BOM',
-            'bom_type' => 'manufacturing',
+            'routing_number' => 'RTG-SUPERSEDE-2',
+            'name' => 'Routing v2',
             'product_id' => $this->finishedProductA->id,
-            'base_quantity' => 1.0,
-            'status' => ProductionBom::STATUS_PENDING_APPROVAL,
             'version' => '2.0.0',
-            'effective_date' => now()->toDateString(),
+            'status' => Routing::STATUS_PENDING_APPROVAL,
+            'is_default' => true,
+            'effective_from' => now()->toDateString(),
+            'created_by' => $this->adminA->id,
         ]);
 
-        $bomService = app(\App\Domains\Production\Services\ProductionBomService::class);
-        $bomService->approve($bom2->id, $this->adminA->id);
+        $routing2->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Cutting v2',
+            'operation_type' => 'manufacturing',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
 
-        $bom1->refresh();
-        $this->assertEquals(ProductionBom::STATUS_INACTIVE, $bom1->status);
+        $routingService = app(\App\Domains\Production\Services\RoutingService::class);
+        $routingService->approve($routing2->id, $this->adminA->id);
 
-        // Routing 1 connected to bom1 should now be historical with effective_to = today
+        $routing2->refresh();
+        $this->assertEquals(Routing::STATUS_ACTIVE, $routing2->status);
+
+        // Routing 1 is retired (historical) with effective_to = today
         $routing1->refresh();
         $this->assertEquals(Routing::STATUS_HISTORICAL, $routing1->status);
         $this->assertEquals(now()->toDateString(), $routing1->effective_to->toDateString());

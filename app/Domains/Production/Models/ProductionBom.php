@@ -37,6 +37,7 @@ class ProductionBom extends BaseModel
         'bom_type', // manufacturing, engineering, sales, phantom, subcontracting
         'usage_context', // manufacturing, engineering, prototype, costing
         'product_id',
+        'routing_id',
         'base_quantity',
         'base_uom_id',
         'version',
@@ -59,6 +60,7 @@ class ProductionBom extends BaseModel
         'approved_at' => 'datetime',
         'revision' => 'integer',
         'base_quantity' => 'float',
+        'routing_id' => 'integer',
         'has_warning' => 'boolean',
     ];
 
@@ -72,21 +74,23 @@ class ProductionBom extends BaseModel
         return $this->belongsTo(Uom::class, 'base_uom_id');
     }
 
-    public function routings(): HasMany
-    {
-        return $this->hasMany(Routing::class, 'bom_id');
-    }
+    // [INVERSION-DECOUPLE-TRACK-03] Old inverse routings relationship commented out
+    // public function routings(): HasMany
+    // {
+    //     return $this->hasMany(Routing::class, 'bom_id');
+    // }
 
-    public function routing(): \Illuminate\Database\Eloquent\Relations\HasOne
+    /**
+     * Inverted relationship: A BOM belongs directly to its process Routing.
+     */
+    public function routing(): BelongsTo
     {
-        return $this->hasOne(Routing::class, 'bom_id')
-            ->whereIn('status', [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED]);
+        return $this->belongsTo(Routing::class, 'routing_id');
     }
 
     public function getActiveRoutingAttribute(): ?Routing
     {
-        return Routing::where('bom_id', $this->id)->active()->first()
-            ?: Routing::where('product_id', $this->product_id)->active()->first();
+        return $this->routing;
     }
 
     public function items(): HasMany

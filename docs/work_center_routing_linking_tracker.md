@@ -52,12 +52,21 @@
 
 ---
 
+> [!IMPORTANT]
+> **Database Architecture Strategy — ON HOLD FOR RE-EVALUATION (User Directive):**  
+> All backend database structure proposals (e.g., dual storage with direct foreign keys alongside multiple pivot tables: `production_routing_operation_sections`, `production_routing_operation_machines`, `production_routing_operation_manual_batches`) are placed **ON HOLD**.  
+> **Order of Execution:**  
+> 1. Complete, align, and freeze all **business requirements, cost resolution formulas, operational rules, lifecycle safeguards, and UI/UX behaviors** first.  
+> 2. After all business decisions are finalised, conduct a dedicated review of the database schema to select the cleanest, most performant, and least complex database design that supports all finalized business needs.
+
+---
+
 ## 2. Summary Register of Discussion Tracks & Decision Points
 
 | Track ID | Area | Decision Points Covered | Status | Impacted Components |
 | :--- | :--- | :--- | :--- | :--- |
-| **WC-TRACK-01** | Database Schema & Hierarchy Boundaries | **Point 1.1** (Optional + Tooltip + Multi-Section) ✅<br>**Point 1.2** (Alternate Machines Scope) 🔍<br>**Point 1.3** (Section Deletion Protection) ✅ | 🟢 **Agreed / Defined** | Migrations, `RoutingOperation`, `RoutingOperationAlternateMachine`, `WorkCenterSection`, Requests, DTOs |
-| **WC-TRACK-02** | Operation Types & Section Compatibility | **Point 2.1** (Pure Manual Operations)<br>**Point 2.2** (Subcontracted Operations)<br>**Point 2.3** (Inspection / QC Operations) | 🟡 Discussion / Proposed | `StoreRoutingRequest`, `UpdateRoutingRequest`, `RoutingOperation`, `SectionManualProduction` |
+| **WC-TRACK-01** | Database Schema & Hierarchy Boundaries | **Point 1.1** (Optional + Tooltip + Multi-Section) ✅<br>**Point 1.2** (Alternate Machines Scope) 🔍<br>**Point 1.3** (Section Deletion Protection) ✅<br>*(DB Schema on hold for re-evaluation)* | ⏸️ **Business Agreed / DB Schema On Hold** | Migrations, `RoutingOperation`, `WorkCenterSection`, Requests, DTOs |
+| **WC-TRACK-02** | Operation Types & Section Compatibility | **Point 2.1** (Manual Batch Column + Machine + Hybrid + Multi-Resource) ✅<br>**Point 2.2** (External Ops Clearing) ✅<br>**Point 2.3** (Inspection / QC Operations Scope) 🔍<br>*(DB Schema on hold for re-evaluation)* | ⏸️ **Business Agreed / DB Schema On Hold** | `StoreRoutingRequest`, `UpdateRoutingRequest`, `RoutingOperation`, `SectionManualProduction` |
 | **WC-TRACK-03** | Dynamic Cost Rate Resolution & Active Bug Fixes | **Point 3.1** (Labor & Machine Cost Hierarchy)<br>**Point 3.2** (Lump-sum Overhead Allocation) | 🟡 Discussion / Proposed | `RoutingCostService`, `ProductionCostService`, `RoutingOperation` |
 | **WC-TRACK-04** | UI/UX Cascading & Interactive Guidance | **Point 4.1** (Preloaded Matrix vs AJAX)<br>**Point 4.2** (Cascading Reset Rules)<br>**Point 4.3** (Rated Speed / Capacity Helper) | 🟡 Discussion / Proposed | `routing/create.blade.php`, `routing/edit.blade.php`, Alpine.js, `RoutingController` |
 | **WC-TRACK-05** | Master Data CSV Import & API Alignment | **Point 5.1** (Routing Operations CSV Import)<br>**Point 5.2** (API Requests & Resources) | 🟡 Discussion / Proposed | `ProductionMasterImportService`, `StoreRoutingApiRequest`, `UpdateRoutingApiRequest`, `RoutingDetailResource` |
@@ -84,7 +93,8 @@
      - When no section is selected, rate and capacity resolution defaults to the parent **Work Center Calculation snapshot** (`WorkCenterCalculation`), which already computes the aggregate daily capacity and labor rates across all sections.
   3. **Multi-Section Allocation Allowed:**
      - A single operation can be allocated to **multiple sections** within the selected Work Center (e.g. an assembly op requiring Sub-Assembly Bay 1 + Main Assembly Bay 2).
-     - **Database Architecture:**
+     - **Database Architecture Proposal (⏸️ ON HOLD FOR RE-EVALUATION):**
+       > *Note: All backend DB schema options below are on hold per user instruction. We will finalize all business decisions first, then review and redesign the database schema.*
        - Keep `production_routing_operations.section_id` (`nullable`, foreign key) as the **primary section** for quick lookups and single-section backward compatibility.
        - Introduce a dedicated pivot table: **`production_routing_operation_sections`**
          ```php
@@ -154,40 +164,144 @@
   * `app/Domains/Production/DTO/RoutingOperationDTO.php`
   * `app/Domains/Production/Requests/StoreRoutingRequest.php`
   * `app/Domains/Production/Requests/UpdateRoutingRequest.php`
-* **Files to Modify:**
-  * `database/migrations/xxxx_xx_xx_add_section_id_to_production_routing_operations_table.php`
-  * `app/Domains/Production/Models/RoutingOperation.php`
-  * `app/Domains/Production/Models/WorkCenterSection.php`
-  * `app/Domains/Production/DTO/RoutingOperationDTO.php`
-  * `app/Domains/Production/Requests/StoreRoutingRequest.php`
-  * `app/Domains/Production/Requests/UpdateRoutingRequest.php`
 
 ---
 
 ### Area 2: Operation Types & Section Compatibility (WC-TRACK-02)
 
-#### Point 2.1: Pure Manual Operations (`machine_id = null`)
-* **Problem Context:** Many operations require zero machinery (e.g. manual deburring, visual packaging, sticker labeling, manual harness assembly). Currently, `machine_id` is optional, but there is no check whether the selected Section is capable of manual production.
-* **Recommendation:**
-  * If `machine_id` is null on an internal operation, the selected Section must have active manual capabilities (`$section->supportsManualProduction()` or active worker assignments).
-  * If a planner selects a purely automated machine section with no manual capability and assigns no machine, the form displays an advisory alert:
-    `"Section [Name] operates automated machinery. If this is a manual operation, please select a section with assigned personnel or manual production teams."`
-  * Cost calculation: `machine_cost_rate = 0.00`; labor cost is derived strictly from Section worker rates.
-* **Status:** 🟡 Under Discussion
+#### Point 2.1: Manual Batch Selection Column, Multiple Machine & Manual Batch Allocations, and Hybrid Resources
+* **Status:** 🟢 **Agreed (Direction Set by User with Multi-Resource Clarification)**
+* **Agreed Decisions:**
+  1. **Manual Batch Selection Column in Operations Grid:**
+     - In the operations grid, provide a dedicated selector for **Manual Production Batch** (`section_manual_production_id`) alongside the **Machine** selector.
+  2. **Multi-Machine & Multi-Manual Batch Support:**
+     - A single operation can have **multiple machines** selected (e.g. tandem stamping presses, cutting station with auxiliary trimmer).
+     - A single operation can have **multiple manual production batches** selected (e.g. multiple bench assembly crews working together).
+     - **Database Architecture Proposal (⏸️ ON HOLD FOR RE-EVALUATION):**
+       > *Note: Database schema options below are on hold per user directive. We will finalize all business decisions first, then review and redesign the database schema.*
+       - **Primary Direct Columns on `production_routing_operations`:**
+         - `machine_id` (`nullable` foreign key) $\rightarrow$ primary machine (for single-machine setups, backward compatibility, and primary display).
+         - `section_manual_production_id` (`nullable` foreign key) $\rightarrow$ primary manual batch.
+       - **Pivot Tables for Multi-Resource Allocation:**
+         - `production_routing_operation_machines`:  
+           `['id', 'tenant_id', 'routing_operation_id', 'machine_id', 'is_primary', 'timestamps']`
+         - `production_routing_operation_manual_batches`:  
+           `['id', 'tenant_id', 'routing_operation_id', 'section_manual_production_id', 'is_primary', 'timestamps']`
+  3. **Flexible Resource Combinations (Pure vs Hybrid):**
+     - An operation can have:
+       - **Machine Only (One or Multiple):** (`machine_ids` set, no manual batches) $\rightarrow$ automated machine processing.
+       - **Manual Batch Only (One or Multiple):** (no machines, `manual_batch_ids` set) $\rightarrow$ purely manual bench team processing.
+       - **Both (Hybrid):** (machines AND manual batches set) $\rightarrow$ hybrid operation (e.g. machine stamping with dedicated manual deburring/loading crews).
+  4. **Resource Fallback & Advisory Tooltip:**
+     - If **neither** a machine nor a manual batch is selected (both empty):
+       - The UI displays the consistent advisory warning / tool-tip:  
+         `"Notice: No specific machine or manual batch selected. It is assumed that all resources of the designated section/work center are utilized for this operation."`
+       - This avoids unnecessary ambiguity, leaves the user in full control, and applies the full capacity/labor snapshot.
+  5. **Cost Rate Resolution for Multi-Resources:**
+     - **Machine Cost Rate:** When multiple machines are assigned, the combined machine operating cost per hour is the sum of `operating_cost_per_hour` across all selected machines (converted to per-minute rate by dividing by 60).
+     - **Manual Labor Rate:** When multiple manual batches are assigned, the labor cost combines the teams across those batches.
+     - **Fallback:** If neither is selected, rates fallback to Section / Work Center calculation snapshot rates.
 
 #### Point 2.2: Subcontracted / External Operations (`is_external = true`)
-* **Problem Context:** Outsourced job-work operations have `vendor_id`, subcontract lead time, and cost per unit. They do not execute internally.
-* **Recommendation:**
-  * In the UI, toggling "Subcontracted" (`is_external = true`) immediately hides/disables and clears `work_center_id`, `section_id`, and `machine_id`.
-  * In backend validation (`StoreRoutingRequest` / `UpdateRoutingRequest`): If `is_external == true`, ensure `work_center_id`, `section_id`, and `machine_id` are null.
-* **Status:** 🟡 Under Discussion
+* **Status:** 🟢 **Agreed (Confirmed Existing Architecture & Extended for Sections)**
+* **Investigation Findings:**
+  1. In `resources/views/modules/production/routing/create.blade.php` and `edit.blade.php` (line 363), toggling `is_external` already triggers:
+     ```js
+     @change="if (operation.is_external) { operation.work_center_id = ''; operation.machine_id = ''; }"
+     ```
+  2. In `StoreRoutingRequest` lines 126–140, validation already requires `vendor_id` when `is_external == true` and requires `work_center_id` when `is_external == false`.
+* **Agreed Extension:**
+  - When `is_external` is toggled true, also clear the newly introduced fields:
+    `operation.section_id = ''; operation.section_ids = []; operation.section_manual_production_id = '';`
+  - In backend validation: Ensure `section_id`, `section_ids`, `machine_id`, and `section_manual_production_id` are strictly null/empty when `is_external == true`.
 
 #### Point 2.3: Inspection / QC Operations (`operation_type = 'inspection'`)
-* **Problem Context:** Inspection can be machine-assisted (e.g. CMM, 3D scanner) or purely manual bench inspection.
-* **Recommendation:** Support both:
-  * If automated CMM: planner picks Section $\rightarrow$ CMM Machine.
-  * If manual bench QA: planner picks Section (e.g. QA Bench Section) $\rightarrow$ `machine_id = null`.
-* **Status:** 🟡 Under Discussion
+* **Status:** 🔍 **In Deeper Analysis (Deferred for Dedicated Review)**
+* **Decision:** Put on hold for a thorough inspection of the QA/QC backend workflows, test scenarios, and quality plan integration before making final decisions, exactly like Point 1.2.
+
+#### Proposed Technical Specification for Area 2 (⏸️ DB SCHEMA ON HOLD FOR RE-EVALUATION):
+> *Note: Database migrations and schema proposals below are on hold per user instruction. We will finalize all business decisions first, then review and redesign the database schema.*
+* **Database Migration:**
+  - Add `section_manual_production_id` to `production_routing_operations`:
+    ```php
+    Schema::table('production_routing_operations', function (Blueprint $table) {
+        if (!Schema::hasColumn('production_routing_operations', 'section_manual_production_id')) {
+            $table->foreignId('section_manual_production_id')
+                ->nullable()
+                ->after('machine_id')
+                ->constrained('production_section_manual_productions')
+                ->nullOnDelete();
+        }
+    });
+    ```
+  - Create `production_routing_operation_machines` pivot table for multi-machine allocation:
+    ```php
+    Schema::create('production_routing_operation_machines', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+        $table->foreignId('routing_operation_id')->constrained('production_routing_operations')->cascadeOnDelete();
+        $table->foreignId('machine_id')->constrained('production_machines')->cascadeOnDelete();
+        $table->boolean('is_primary')->default(false);
+        $table->timestamps();
+        $table->unique(['routing_operation_id', 'machine_id'], 'op_machine_unique');
+    });
+    ```
+  - Create `production_routing_operation_manual_batches` pivot table for multi-manual batch allocation:
+    ```php
+    Schema::create('production_routing_operation_manual_batches', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+        $table->foreignId('routing_operation_id')->constrained('production_routing_operations')->cascadeOnDelete();
+        $table->foreignId('section_manual_production_id')->constrained('production_section_manual_productions')->cascadeOnDelete();
+        $table->boolean('is_primary')->default(false);
+        $table->timestamps();
+        $table->unique(['routing_operation_id', 'section_manual_production_id'], 'op_manual_batch_unique');
+    });
+    ```
+* **Model Updates (`RoutingOperation.php`):**
+  - Relationships:
+    ```php
+    public function primaryMachine(): BelongsTo
+    {
+        return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function machines(): BelongsToMany
+    {
+        return $this->belongsToMany(Machine::class, 'production_routing_operation_machines', 'routing_operation_id', 'machine_id')
+            ->withPivot('is_primary')
+            ->withTimestamps();
+    }
+
+    public function primaryManualProduction(): BelongsTo
+    {
+        return $this->belongsTo(SectionManualProduction::class, 'section_manual_production_id');
+    }
+
+    public function manualProductions(): BelongsToMany
+    {
+        return $this->belongsToMany(SectionManualProduction::class, 'production_routing_operation_manual_batches', 'routing_operation_id', 'section_manual_production_id')
+            ->withPivot('is_primary')
+            ->withTimestamps();
+    }
+    ```
+* **DTO & Request Updates:**
+  - `RoutingOperationDTO.php`:
+    - Add `public readonly ?int $section_manual_production_id = null;`
+    - Add `public readonly array $machine_ids = [];`
+    - Add `public readonly array $section_manual_production_ids = [];`
+  - `StoreRoutingRequest` / `UpdateRoutingRequest`:
+    - Rule: `'operations.*.machine_ids' => 'nullable|array'`
+    - Rule: `'operations.*.machine_ids.*' => 'integer|exists:production_machines,id'`
+    - Rule: `'operations.*.section_manual_production_ids' => 'nullable|array'`
+    - Rule: `'operations.*.section_manual_production_ids.*' => 'integer|exists:production_section_manual_productions,id'`
+    - Validation: Ensure all selected machines and manual batches belong to the operation's selected section(s) (or work center if no section selected).
+* **Files to Modify:**
+  * `database/migrations/xxxx_xx_xx_add_section_manual_production_and_resource_pivots_to_routing_operations.php`
+  * `app/Domains/Production/Models/RoutingOperation.php`
+  * `app/Domains/Production/DTO/RoutingOperationDTO.php`
+  * `app/Domains/Production/Requests/StoreRoutingRequest.php`
+  * `app/Domains/Production/Requests/UpdateRoutingRequest.php`
 
 ---
 
@@ -208,11 +322,14 @@
   4. **Level 4 (Default):** `0.00`.
 * **Proposed Machine Rate per Minute Resolution Hierarchy:**
   1. **Level 1 (Manual Override):** If `operations.*.machine_cost_rate > 0`, use the planner-entered rate.
-  2. **Level 2 (Assigned Machine Opex):** If operation has `machine_id` and `$operation->machine`:
-     Rate per minute = `$operation->machine->operating_cost_per_hour / 60.0`. *(Confirmed field: `operating_cost_per_hour` on `production_machines`).*
-  3. **Level 3 (Section Machine Opex Snapshot):** If no specific machine is assigned but the section runs machines:
+  2. **Level 2 (Assigned Machine(s) Opex):**
+     - If multiple machines assigned: Rate per minute = $\sum(\text{machine.operating\_cost\_per\_hour}) / 60.0$.
+     - If single machine assigned (`machine_id`): Rate per minute = `$operation->machine->operating_cost_per_hour / 60.0`.
+  3. **Level 3 (Section Machine Opex Snapshot Fallback):** If no specific machine is assigned but the section runs machines:
      Rate per minute = `$section->latestCalculation->machine_cost_per_hour / 60.0`.
-  4. **Level 4 (Default / Pure Manual):** `0.00`.
+  4. **Level 4 (Work Center Machine Opex Fallback):**
+     Rate per minute = `$workCenter->latestCalculation->machine_cost_per_hour / 60.0`.
+  5. **Level 5 (Default / Pure Manual):** `0.00`.
 * **Status:** 🟡 Under Discussion
 
 #### Point 3.2: Monthly Lump-sum `overhead_cost` Allocation Formula

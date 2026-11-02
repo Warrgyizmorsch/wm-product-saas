@@ -18,6 +18,7 @@ class ProductionBomItem extends BaseModel
     protected $fillable = [
         'tenant_id',
         'bom_id',
+        'routing_operation_id',
         'material_id',
         'child_bom_id',
         'replaces_item_id',
@@ -38,6 +39,7 @@ class ProductionBomItem extends BaseModel
         'is_alternative' => 'boolean',
         'priority' => 'integer',
         'sequence' => 'integer',
+        'routing_operation_id' => 'integer',
         'child_bom_id' => 'integer',
         'replaces_item_id' => 'integer',
     ];
@@ -70,6 +72,11 @@ class ProductionBomItem extends BaseModel
     public function bom(): BelongsTo
     {
         return $this->belongsTo(ProductionBom::class, 'bom_id');
+    }
+
+    public function operation(): BelongsTo
+    {
+        return $this->belongsTo(RoutingOperation::class, 'routing_operation_id');
     }
 
     public function childBom(): BelongsTo

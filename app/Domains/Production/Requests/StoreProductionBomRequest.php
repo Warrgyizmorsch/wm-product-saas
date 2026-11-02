@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Requests;
 
+use App\Domains\Production\Models\Routing;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreProductionBomRequest extends FormRequest
@@ -47,6 +48,7 @@ class StoreProductionBomRequest extends FormRequest
             'bom_type' => 'required|in:manufacturing,engineering,sales,phantom,subcontracting',
             'usage_context' => 'nullable|string|in:manufacturing,engineering,prototype,costing',
             'product_id' => 'required|exists:products,id',
+            'routing_id' => 'required|integer|exists:routings,id',
             'base_quantity' => 'required|numeric|gt:0',
             'base_uom_id' => 'required|exists:uoms,id',
             'version' => 'required|string|max:50',
@@ -56,6 +58,7 @@ class StoreProductionBomRequest extends FormRequest
             
             'items' => 'required|array|min:1',
             'items.*.material_id' => 'required|exists:products,id',
+            'items.*.routing_operation_id' => 'required|integer|exists:production_routing_operations,id',
             'items.*.child_bom_id' => 'nullable|integer|exists:production_boms,id',
             'items.*.quantity' => 'required|numeric|gt:0',
             'items.*.quantity_type' => 'nullable|string|in:fixed,formula',
@@ -76,6 +79,20 @@ class StoreProductionBomRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             $productId = (int) $this->input('product_id');
+            $routingId = (int) $this->input('routing_id');
+
+            // [TRACK-01] Product-Routing consistency validation
+            $routing = null;
+            $validOpIds = [];
+            if ($routingId > 0) {
+                $routing = Routing::with('operations')->find($routingId);
+                if ($routing) {
+                    if ($routing->product_id !== $productId) {
+                        $validator->errors()->add('routing_id', "The selected routing does not belong to the selected finished product.");
+                    }
+                    $validOpIds = $routing->operations->pluck('id')->all();
+                }
+            }
 
             // Date lifecycle validation
             try {
@@ -92,22 +109,31 @@ class StoreProductionBomRequest extends FormRequest
             }
 
             $items = $this->input('items', []);
-            $materialIds = [];
+            $seenMaterialOperationKeys = [];
             $allRows = [];
 
             foreach ($items as $index => $item) {
                 $materialId = (int) ($item['material_id'] ?? 0);
+                $opId = (int) ($item['routing_operation_id'] ?? 0);
+
+                // [TRACK-05] Operation ownership check: Operation must belong to the selected Routing
+                if ($routing && $opId > 0 && !in_array($opId, $validOpIds, true)) {
+                    $validator->errors()->add("items.{$index}.routing_operation_id", "The selected operation does not belong to the chosen routing.");
+                }
+
                 if ($materialId > 0) {
                     // Rule 1: Finished product cannot be its own component
                     if ($materialId === $productId) {
                         $validator->errors()->add("items.{$index}.material_id", "A finished product cannot be its own component material.");
                     }
 
-                    // Rule 2: Duplicate component prevention
-                    if (in_array($materialId, $materialIds)) {
-                        $validator->errors()->add("items.{$index}.material_id", "Duplicate material component found in BOM.");
+                    // [TRACK-05] Duplicate component prevention per operation:
+                    // Same material cannot exist in the same operation, but CAN be split across distinct operations
+                    $key = "{$materialId}_{$opId}";
+                    if (in_array($key, $seenMaterialOperationKeys, true)) {
+                        $validator->errors()->add("items.{$index}.material_id", "Duplicate material component found for the same routing operation.");
                     } else {
-                        $materialIds[] = $materialId;
+                        $seenMaterialOperationKeys[] = $key;
                     }
                 }
 

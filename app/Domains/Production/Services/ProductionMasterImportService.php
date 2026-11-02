@@ -625,9 +625,16 @@ class ProductionMasterImportService
 
                     if ($bom) {
                         if ($strategy === 'update') {
+                            $routingId = null;
+                            if (!empty($data['routing_number'])) {
+                                $r = Routing::where('tenant_id', $tenantId)->where('routing_number', $data['routing_number'])->first();
+                                $routingId = $r?->id;
+                            }
+
                             $bom->update([
                                 'bom_name' => $data['bom_name'],
                                 'product_id' => $data['product_id'],
+                                'routing_id' => $routingId ?? $bom->routing_id,
                                 'base_quantity' => $data['base_quantity'],
                                 'base_uom_id' => $data['base_uom_id'],
                                 'version' => $data['version'],
@@ -650,6 +657,7 @@ class ProductionMasterImportService
                                 ProductionBomItem::create([
                                     'tenant_id' => $tenantId,
                                     'bom_id' => $bom->id,
+                                    'routing_operation_id' => $item['routing_operation_id'] ?? null,
                                     'material_id' => $item['material_id'],
                                     'quantity' => $item['quantity'],
                                     'uom_id' => $item['uom_id'],
@@ -657,16 +665,24 @@ class ProductionMasterImportService
                                     'child_bom_id' => $childBomId
                                 ]);
                             }
+                            app(ProductionBomService::class)->syncRoutingOperationMaterials($bom);
                             $successCount++;
                         } else {
                             $failedCount++;
                         }
                     } else {
+                        $routingId = null;
+                        if (!empty($data['routing_number'])) {
+                            $r = Routing::where('tenant_id', $tenantId)->where('routing_number', $data['routing_number'])->first();
+                            $routingId = $r?->id;
+                        }
+
                         $bom = ProductionBom::create([
                             'tenant_id' => $tenantId,
                             'bom_number' => $data['bom_number'],
                             'bom_name' => $data['bom_name'],
                             'product_id' => $data['product_id'],
+                            'routing_id' => $routingId,
                             'base_quantity' => $data['base_quantity'],
                             'base_uom_id' => $data['base_uom_id'],
                             'version' => $data['version'],
@@ -690,6 +706,7 @@ class ProductionMasterImportService
                             ProductionBomItem::create([
                                 'tenant_id' => $tenantId,
                                 'bom_id' => $bom->id,
+                                'routing_operation_id' => $item['routing_operation_id'] ?? null,
                                 'material_id' => $item['material_id'],
                                 'quantity' => $item['quantity'],
                                 'uom_id' => $item['uom_id'],
@@ -697,6 +714,7 @@ class ProductionMasterImportService
                                 'child_bom_id' => $childBomId
                             ]);
                         }
+                        app(ProductionBomService::class)->syncRoutingOperationMaterials($bom);
                         $successCount++;
                     }
                 }
@@ -733,6 +751,8 @@ class ProductionMasterImportService
                                     'is_external' => $op['is_external']
                                 ]);
 
+                                // [INVERSION-DECOUPLE-TRACK-11] Routing import no longer populates RoutingOperationMaterial; populated from BOM side
+                                /*
                                 foreach ($op['materials'] as $index => $mat) {
                                     RoutingOperationMaterial::create([
                                         'tenant_id' => $tenantId,
@@ -743,6 +763,7 @@ class ProductionMasterImportService
                                         'sequence' => ($index + 1) * 10
                                     ]);
                                 }
+                                */
                             }
                             $successCount++;
                         } else {
@@ -777,6 +798,8 @@ class ProductionMasterImportService
                                 'is_external' => $op['is_external']
                             ]);
 
+                            // [INVERSION-DECOUPLE-TRACK-11] Routing import no longer populates RoutingOperationMaterial; populated from BOM side
+                            /*
                             foreach ($op['materials'] as $index => $mat) {
                                 RoutingOperationMaterial::create([
                                     'tenant_id' => $tenantId,
@@ -787,6 +810,7 @@ class ProductionMasterImportService
                                     'sequence' => ($index + 1) * 10
                                 ]);
                             }
+                            */
                         }
                         $successCount++;
                     }

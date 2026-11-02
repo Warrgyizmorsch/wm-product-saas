@@ -36,22 +36,22 @@ class Routing extends BaseModel
         self::STATUS_CANCELLED,
     ];
 
-    // Material quantity entry modes
-    public const MODE_PER_UNIT              = 'per_unit';
-    public const MODE_PER_BOM_BASE_QUANTITY = 'per_bom_base_quantity';
+    // [INVERSION-DECOUPLE-TRACK-03] Material quantity entry modes on routing commented out
+    // public const MODE_PER_UNIT              = 'per_unit';
+    // public const MODE_PER_BOM_BASE_QUANTITY = 'per_bom_base_quantity';
 
-    public const MATERIAL_QUANTITY_MODES = [
-        self::MODE_PER_UNIT,
-        self::MODE_PER_BOM_BASE_QUANTITY,
-    ];
+    // public const MATERIAL_QUANTITY_MODES = [
+    //     self::MODE_PER_UNIT,
+    //     self::MODE_PER_BOM_BASE_QUANTITY,
+    // ];
 
     protected $fillable = [
         'tenant_id',
         'routing_number',
         'name',
         'product_id',
-        'bom_id',
-        'material_quantity_mode',
+        // [INVERSION-DECOUPLE-TRACK-03] 'bom_id',
+        // [INVERSION-DECOUPLE-TRACK-03] 'material_quantity_mode',
         'version',
         'revision',
         'is_default',       // A3: routing alternatives flag
@@ -70,18 +70,19 @@ class Routing extends BaseModel
         'approved_at'            => 'datetime',
         'revision'               => 'integer',
         'is_default'             => 'boolean',
-        'material_quantity_mode' => 'string',
+        // [INVERSION-DECOUPLE-TRACK-03] 'material_quantity_mode' => 'string',
     ];
 
-    public function isPerUnit(): bool
-    {
-        return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_UNIT;
-    }
+    // [INVERSION-DECOUPLE-TRACK-03] Mode helpers commented out
+    // public function isPerUnit(): bool
+    // {
+    //     return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_UNIT;
+    // }
 
-    public function isPerBomBaseQuantity(): bool
-    {
-        return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_BOM_BASE_QUANTITY;
-    }
+    // public function isPerBomBaseQuantity(): bool
+    // {
+    //     return ($this->material_quantity_mode ?? self::MODE_PER_UNIT) === self::MODE_PER_BOM_BASE_QUANTITY;
+    // }
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
@@ -90,9 +91,18 @@ class Routing extends BaseModel
         return $this->belongsTo(Product::class, 'product_id');
     }
 
-    public function bom(): BelongsTo
+    // [INVERSION-DECOUPLE-TRACK-03] Inverted: Routing no longer belongs to a single BOM via bom_id
+    // public function bom(): BelongsTo
+    // {
+    //     return $this->belongsTo(ProductionBom::class, 'bom_id');
+    // }
+
+    /**
+     * Inverted relationship: A Routing has many BOMs that reference it.
+     */
+    public function boms(): HasMany
     {
-        return $this->belongsTo(ProductionBom::class, 'bom_id');
+        return $this->hasMany(ProductionBom::class, 'routing_id');
     }
 
     public function operations(): HasMany

@@ -8,6 +8,7 @@ use App\Domains\Production\Models\ProductionBomItem;
 use App\Domains\Production\Models\ProductionBomApproval;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
+use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Repositories\ProductionBomRepositoryInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -190,10 +191,18 @@ class ProductionBomService
                 throw new InvalidArgumentException("Only BOMs pending approval can be approved.");
             }
 
+            // [TRACK-06] Inverted approval check: BOM requires its linked routing to be active/approved
+            $routing = $bom->routing;
+            if (!$routing || !in_array($routing->status, [Routing::STATUS_ACTIVE, Routing::STATUS_SCHEDULED, 'approved'], true)) {
+                throw new InvalidArgumentException("Cannot approve BOM: The linked Routing must be approved and active first.");
+            }
+
             // 1. Centralized lifecycle transition on approval: sets previous active version's expiry date
             // to the new version's start date and activates the new version
             $deactivatedBomIds = $this->bomLifecycleService->transitionOnApproval($bom, $approverUserId);
 
+            // [INVERSION-DECOUPLE-TRACK-03] Old BOM-to-Routing cascades commented out
+            /*
             // 2. Centralized archival of connected routings
             if (!empty($deactivatedBomIds)) {
                 $this->routingLifecycleService->archiveRoutingsForDeactivatedBoms(
@@ -207,6 +216,7 @@ class ProductionBomService
 
             // 3. Synchronize unsubmitted draft routings to point to the newly approved BOM
             $this->routingLifecycleService->syncDraftRoutingsToApprovedBom($bom);
+            */
 
             // 4. Log approval history
             ProductionBomApproval::create([
@@ -254,6 +264,8 @@ class ProductionBomService
                 'comments' => $comments ?: 'BOM rejected during review.',
             ]);
 
+            // [INVERSION-DECOUPLE-TRACK-03] Routing does not track BOM; rejecting BOM no longer auto-rejects Routings
+            /*
             // If a draft BOM gets rejected, the routing connected to that draft BOM also gets automatically rejected
             $linkedRoutings = Routing::withoutGlobalScopes()
                 ->where(function ($q) use ($bom) {
@@ -277,6 +289,7 @@ class ProductionBomService
                     'comments' => 'Automatically rejected because connected BOM (' . $bom->bom_number . ') was rejected.',
                 ]);
             }
+            */
 
             return $bom;
         });
@@ -296,6 +309,8 @@ class ProductionBomService
         return DB::transaction(function () use ($bom, $userId, $comments) {
             $this->bomLifecycleService->transitionOnCancellation($bom, $userId, $comments);
 
+            // [INVERSION-DECOUPLE-TRACK-03] Routing does not track BOM; cancelling BOM no longer cancels Routings
+            /*
             // Handle connected routings on BOM cancellation:
             // Scheduled routings get cancelled with reason, active routings get historical (current flow)
             $this->routingLifecycleService->handleRoutingsOnBomCancellation(
@@ -303,6 +318,7 @@ class ProductionBomService
                 $userId,
                 $comments
             );
+            */
 
             // Notify parent BOMs using this component that its sub-BOM was cancelled
             $this->updateParentBomWarningsForComponent($bom->product_id, $bom->id);
@@ -341,6 +357,7 @@ class ProductionBomService
                 'bom_type' => $original->bom_type,
                 'usage_context' => $original->usage_context ?? 'manufacturing',
                 'product_id' => $original->product_id,
+                'routing_id' => $original->routing_id, // [TRACK-10] Duplicate preserves routing link
                 'base_quantity' => $original->base_quantity,
                 'base_uom_id' => $original->base_uom_id,
                 'version' => $newVersion,
@@ -370,6 +387,7 @@ class ProductionBomService
                     'tenant_id' => $tenantId,
                     'bom_id' => $newBom->id,
                     'material_id' => $item->material_id,
+                    'routing_operation_id' => $item->routing_operation_id, // [TRACK-10] Clone operation assignment
                     'child_bom_id' => $item->child_bom_id,
                     'quantity' => $item->quantity,
                     'quantity_type' => $item->quantity_type ?? 'fixed',
@@ -399,6 +417,9 @@ class ProductionBomService
                     }
                 }
             }
+
+            // [TRACK-02] Sync cloned component allocations into RoutingOperationMaterial
+            $this->syncRoutingOperationMaterials($newBom);
 
             // Log revision creation
             ProductionBomApproval::create([
@@ -504,6 +525,33 @@ class ProductionBomService
                         $model->update(['replaces_item_id' => $targetModel->id]);
                     }
                 }
+            }
+        }
+
+        // [TRACK-02] Sync component allocations to production_routing_operation_materials
+        $this->syncRoutingOperationMaterials($bom);
+    }
+
+    /**
+     * [TRACK-02] Sync BOM component allocations into production_routing_operation_materials.
+     */
+    public function syncRoutingOperationMaterials(ProductionBom $bom): void
+    {
+        RoutingOperationMaterial::where('bom_id', $bom->id)->delete();
+
+        $items = $bom->items()->get();
+        foreach ($items as $item) {
+            if (!empty($item->routing_operation_id)) {
+                RoutingOperationMaterial::create([
+                    'tenant_id'            => $bom->tenant_id,
+                    'bom_id'               => $bom->id,
+                    'routing_operation_id' => $item->routing_operation_id,
+                    'material_id'          => $item->material_id,
+                    'quantity'             => (float) $item->quantity,
+                    'uom_id'               => $item->uom_id,
+                    'consumption_type'     => null,
+                    'sequence'             => (int) $item->sequence,
+                ]);
             }
         }
     }

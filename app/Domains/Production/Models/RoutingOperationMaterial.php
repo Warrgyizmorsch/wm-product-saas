@@ -16,6 +16,7 @@ class RoutingOperationMaterial extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'bom_id',
         'routing_operation_id',
         'material_id',
         'quantity',
@@ -25,9 +26,15 @@ class RoutingOperationMaterial extends BaseModel
     ];
 
     protected $casts = [
+        'bom_id' => 'integer',
         'quantity' => 'float',
         'sequence' => 'integer',
     ];
+
+    public function bom(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBom::class, 'bom_id');
+    }
 
     public function routingOperation(): BelongsTo
     {

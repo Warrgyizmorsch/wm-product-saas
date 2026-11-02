@@ -30,8 +30,9 @@ class UpdateRoutingRequest extends FormRequest
             'routing_number'         => 'nullable|string|max:50',
             'name'                   => 'required|string|max:255',
             'product_id'             => 'required|exists:products,id',
-            'bom_id'                 => 'nullable|exists:production_boms,id',
-            'material_quantity_mode' => 'nullable|in:per_unit,per_bom_base_quantity',
+            // [INVERSION-DECOUPLE-TRACK-03] Decoupled: Routing no longer tracks BOM or material quantity mode
+            // 'bom_id'                 => 'nullable|exists:production_boms,id',
+            // 'material_quantity_mode' => 'nullable|in:per_unit,per_bom_base_quantity',
             'version'                => 'nullable|string|max:50',
             'is_default'             => 'boolean',
             'effective_from'         => 'nullable|date',
@@ -180,7 +181,10 @@ class UpdateRoutingRequest extends FormRequest
                 }
             }
 
-            // Rule 4: BOM Component Assignment & Over-Allocation Validation
+            // [INVERSION-DECOUPLE-TRACK-03] Rule 4 (BOM Component Assignment & Over-Allocation Validation)
+            // Commented out: Routing is now standalone and does not validate BOM allocations.
+            // Component-to-operation assignment and allocations are now validated on the BOM in StoreProductionBomRequest.
+            /*
             $mode = $this->input('material_quantity_mode', \App\Domains\Production\Models\Routing::MODE_PER_UNIT);
             $allocatedByMaterial = [];
             $allAssignedMaterialIds = [];
@@ -318,6 +322,7 @@ class UpdateRoutingRequest extends FormRequest
                     }
                 }
             }
+            */
         });
     }
 }

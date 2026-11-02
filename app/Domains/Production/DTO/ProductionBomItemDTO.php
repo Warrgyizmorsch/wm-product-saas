@@ -8,6 +8,7 @@ class ProductionBomItemDTO
         public readonly int $material_id,
         public readonly float $quantity,
         public readonly int $uom_id,
+        public readonly ?int $routing_operation_id = null,
         public readonly string $quantity_type = 'fixed',
         public readonly ?string $formula = null,
         public readonly float $material_scrap_percentage = 0.00,
@@ -28,6 +29,7 @@ class ProductionBomItemDTO
             material_id: (int) $data['material_id'],
             quantity: (float) $data['quantity'],
             uom_id: (int) $data['uom_id'],
+            routing_operation_id: !empty($data['routing_operation_id']) ? (int) $data['routing_operation_id'] : null,
             quantity_type: in_array($data['quantity_type'] ?? '', ['fixed', 'formula'], true) ? $data['quantity_type'] : 'fixed',
             formula: !empty($data['formula']) ? trim($data['formula']) : null,
             material_scrap_percentage: isset($data['material_scrap_percentage']) ? (float) $data['material_scrap_percentage'] : (isset($data['wastage_percentage']) ? (float) $data['wastage_percentage'] : 0.00),
@@ -46,6 +48,7 @@ class ProductionBomItemDTO
     {
         return [
             'material_id' => $this->material_id,
+            'routing_operation_id' => $this->routing_operation_id,
             'quantity' => $this->quantity,
             'uom_id' => $this->uom_id,
             'quantity_type' => $this->quantity_type,

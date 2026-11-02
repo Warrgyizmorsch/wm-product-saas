@@ -12,8 +12,9 @@ class RoutingDTO
         public readonly int     $product_id,
         public readonly string  $version,
         public readonly string  $effective_from,
+        // [INVERSION-DECOUPLE-TRACK-03] bom_id and material_quantity_mode removed
         public readonly ?int    $bom_id = null,
-        public readonly string  $material_quantity_mode = \App\Domains\Production\Models\Routing::MODE_PER_UNIT,
+        public readonly ?string $material_quantity_mode = null,
         public readonly ?string $routing_number = null,
         public readonly ?int    $revision = null,
         public readonly bool    $is_default = true,
@@ -34,8 +35,9 @@ class RoutingDTO
         return new self(
             name:                   $data['name'],
             product_id:             (int) $data['product_id'],
+            // [INVERSION-DECOUPLE-TRACK-03] bom_id and material_quantity_mode decoupled
             bom_id:                 !empty($data['bom_id']) ? (int) $data['bom_id'] : null,
-            material_quantity_mode: $data['material_quantity_mode'] ?? \App\Domains\Production\Models\Routing::MODE_PER_UNIT,
+            material_quantity_mode: $data['material_quantity_mode'] ?? null,
             version:                $data['version'] ?? '1.0.0',
             effective_from:         $data['effective_from'] ?? now()->toDateString(),
             routing_number:         $data['routing_number'] ?? null,
@@ -52,8 +54,8 @@ class RoutingDTO
         $data = [
             'name'                   => $this->name,
             'product_id'             => $this->product_id,
-            'bom_id'                 => $this->bom_id,
-            'material_quantity_mode' => $this->material_quantity_mode,
+            // [INVERSION-DECOUPLE-TRACK-03] 'bom_id' => $this->bom_id,
+            // [INVERSION-DECOUPLE-TRACK-03] 'material_quantity_mode' => $this->material_quantity_mode,
             'version'                => $this->version,
             'effective_from'         => $this->effective_from,
             'routing_number'         => $this->routing_number,

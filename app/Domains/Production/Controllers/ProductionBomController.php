@@ -217,9 +217,10 @@ class ProductionBomController extends Controller
             ->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
+        $routings = Routing::with('operations')->whereIn('status', ['approved', 'active', 'draft'])->get();
         $selectedProductId = $request->query('product_id');
 
-        return view('modules.production.bom.create', compact('products', 'materials', 'uoms', 'selectedProductId'));
+        return view('modules.production.bom.create', compact('products', 'materials', 'uoms', 'routings', 'selectedProductId'));
     }
 
     public function store(StoreProductionBomRequest $request): RedirectResponse
@@ -259,8 +260,9 @@ class ProductionBomController extends Controller
             ->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'finished_goods', 'semi_finished', 'semi_finished_goods'])->get(); // support multi-level
         $uoms = Uom::all();
+        $routings = Routing::with('operations')->where('product_id', $bom->product_id)->get();
 
-        return view('modules.production.bom.edit', compact('bom', 'products', 'materials', 'uoms'));
+        return view('modules.production.bom.edit', compact('bom', 'products', 'materials', 'uoms', 'routings'));
     }
 
     public function update(int $id, UpdateProductionBomRequest $request): RedirectResponse

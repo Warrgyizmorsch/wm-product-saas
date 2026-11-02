@@ -137,6 +137,11 @@ class RoutingOperation extends BaseModel
         return $this->hasMany(RoutingOperationMaterial::class, 'routing_operation_id')->orderBy('sequence');
     }
 
+    public function bomItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductionBomItem::class, 'routing_operation_id');
+    }
+
     public function alternateMachines(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(RoutingOperationAlternateMachine::class, 'routing_operation_id')->orderBy('priority');
