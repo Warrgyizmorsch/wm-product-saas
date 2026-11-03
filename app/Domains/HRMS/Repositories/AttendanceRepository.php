@@ -738,7 +738,7 @@ class AttendanceRepository implements AttendanceRepositoryInterface
     }
 
     /**
-     * Decode base64 image data and save it as a local file.
+     * Decode base64 image data and save it via tenant storage abstraction.
      */
     private function uploadSelfie(?string $imageData, string $prefix): ?string
     {
@@ -747,23 +747,23 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         // If it is already a saved relative path, return directly
-        if (str_starts_with($imageData, 'selfies/')) {
+        if (str_starts_with($imageData, 'selfies/') || str_contains($imageData, '/selfies/')) {
             return $imageData;
         }
 
         if (preg_match('/^data:image\/(\w+);base64,/', $imageData, $type)) {
             $imageDataBytes = substr($imageData, strpos($imageData, ',') + 1);
             $type = strtolower($type[1]);
-            if (in_array($type, ['jpg', 'jpeg', 'png'])) {
+            if (in_array($type, ['jpg', 'jpeg', 'png', 'webp'])) {
                 $decodedData = base64_decode($imageDataBytes);
                 if ($decodedData !== false) {
-                    $fileName = 'selfie_' . $prefix . '_' . uniqid() . '.' . $type;
-                    $dirPath = public_path('storage/selfies');
-                    if (!file_exists($dirPath)) {
-                        mkdir($dirPath, 0755, true);
-                    }
-                    file_put_contents($dirPath . '/' . $fileName, $decodedData);
-                    return 'selfies/' . $fileName;
+                    $tenantId = auth()->user()?->tenant_id ?? tenant_id() ?? 1;
+                    $fileName = 'selfie_' . $prefix . '_' . uniqid() . '.' . ($type === 'jpeg' ? 'jpg' : $type);
+                    $storagePath = "tenants/{$tenantId}/attendance/selfies/{$fileName}";
+
+                    tenant_storage()->put('public', $storagePath, $decodedData, (int) $tenantId);
+
+                    return $storagePath;
                 }
             }
         }

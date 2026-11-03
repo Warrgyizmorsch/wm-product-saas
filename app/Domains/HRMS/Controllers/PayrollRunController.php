@@ -154,19 +154,7 @@ class PayrollRunController extends Controller
     public function mySalary(Request $request)
     {
         $user = auth()->user();
-        $employee = $user?->employee;
-        if (!$employee && $user) {
-            $employee = Employee::where('tenant_id', tenant_id())
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
-        if (!$employee) {
-            $employee = Employee::where('tenant_id', tenant_id())->first();
-        }
+        $employee = $user ? Employee::resolveForUser($user) : null;
         if (!$employee) {
             return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
         }
@@ -259,19 +247,7 @@ class PayrollRunController extends Controller
     public function downloadRangePayslips(Request $request)
     {
         $user = auth()->user();
-        $employee = $user?->employee;
-        if (!$employee && $user) {
-            $employee = Employee::where('tenant_id', tenant_id())
-                ->where(function ($q) use ($user) {
-                    if ($user->email) {
-                        $q->where('office_email', $user->email)
-                          ->orWhere('personal_email', $user->email);
-                    }
-                })->first();
-        }
-        if (!$employee) {
-            $employee = Employee::where('tenant_id', tenant_id())->first();
-        }
+        $employee = $user ? Employee::resolveForUser($user) : null;
         if (!$employee) {
             return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
         }

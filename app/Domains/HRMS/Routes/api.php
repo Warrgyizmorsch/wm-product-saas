@@ -532,6 +532,7 @@ Route::prefix('api/hrms/travel-expense')
     ->group(function () {
         // Summary & Dashboard
         Route::get('/', [TravelExpenseApiController::class, 'index'])->name('index');
+        Route::get('/paying-accounts', [TravelExpenseApiController::class, 'payingAccounts'])->name('paying-accounts');
         
         // Travel Requests (Individual list, single get, store, approve, reject, delete)
         Route::get('/travel', [TravelExpenseApiController::class, 'indexTravelRequests'])->name('travel.index');

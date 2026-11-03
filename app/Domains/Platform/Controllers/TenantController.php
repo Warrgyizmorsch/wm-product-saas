@@ -45,6 +45,23 @@ class TenantController extends Controller
 
         $tenant = $this->tenants->create($this->validated($request));
 
+        $user = $request->user();
+        $canSwitchTenant = $user !== null && (
+            $user->tenant_id === null
+            || app(\App\Services\Access\AccessService::class)->hasRole($user, 'super_admin')
+            || app(\App\Services\Access\AccessService::class)->holdsPlatformAdminRole($user)
+            || (int) $user->tenant_id === (int) $tenant->id
+        );
+
+        if ($canSwitchTenant && $tenant->hasModule('hrms')) {
+            $request->session()->put('tenant_slug', $tenant->slug);
+            $request->session()->forget(['company_id', 'branch_id']);
+
+            return redirect()
+                ->route('hrms.org.index', ['tab' => 'legal-entities'])
+                ->with('success', 'Tenant '.$tenant->name.' created successfully. Organization structure and legal entity initialized.');
+        }
+
         return redirect()
             ->route('platform.tenants.index')
             ->with('success', 'Tenant '.$tenant->name.' created successfully.');

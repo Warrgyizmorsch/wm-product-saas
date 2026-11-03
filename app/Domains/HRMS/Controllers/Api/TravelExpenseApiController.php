@@ -226,6 +226,26 @@ class TravelExpenseApiController extends Controller
             ],
         ];
 
+        $payingAccounts = [];
+        try {
+            $payrollBooks = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+            $payingAccounts = $payrollBooks->payingLedgers()->map(function ($acc) use ($payrollBooks) {
+                $balance = $payrollBooks->balance($acc);
+                return [
+                    'id'               => $acc->id,
+                    'code'             => $acc->code,
+                    'name'             => $acc->name,
+                    'system_key'       => $acc->system_key,
+                    'balance'          => (float) $balance,
+                    'balance_formatted'=> '$' . number_format($balance, 2),
+                    'is_default'       => $acc->system_key === \App\Domains\Accounting\Support\SystemAccount::BANK,
+                ];
+            })->values()->all();
+        } catch (\Throwable $e) {
+            Log::warning("Could not load paying accounts: " . $e->getMessage());
+        }
+        $data['paying_accounts'] = $payingAccounts;
+
         return $this->sendSuccess($data, 'Travel & Expense summary loaded successfully.');
     }
 
@@ -1097,7 +1117,7 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/advance/{cashAdvance}/disburse
      */
-    public function disburseCashAdvance(mixed $id): JsonResponse
+    public function disburseCashAdvance(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
@@ -1115,13 +1135,45 @@ class TravelExpenseApiController extends Controller
             return $this->sendError("Cash advance with ID '{$id}' not found.", 404);
         }
 
-        $cashAdvance->update(['status' => 'disbursed']);
+        $validated = $request->validate([
+            'bank_account_id'  => ['nullable', 'integer'],
+            'payment_date'     => ['nullable', 'date'],
+            'disbursed_amount' => ['nullable', 'numeric', 'min:0.01'],
+        ]);
+
+        if ($cashAdvance->status === 'disbursed') {
+            return $this->sendError('This cash advance has already been disbursed.', 422);
+        }
+        if (!in_array($cashAdvance->status, ['approved', 'l1_approved'])) {
+            return $this->sendError('Only approved cash advances can be disbursed.', 422);
+        }
+
+        $approvedAmount = floatval($cashAdvance->approved_amount ?? $cashAdvance->amount);
+        $disbursedAmount = $request->filled('disbursed_amount') ? floatval($request->disbursed_amount) : $approvedAmount;
+
+        if ($disbursedAmount <= 0) {
+            return $this->sendError('Disbursed amount must be greater than zero.', 422);
+        }
+
+        if ($disbursedAmount > $approvedAmount) {
+            return $this->sendError("Disbursed amount (₹" . number_format($disbursedAmount, 2) . ") cannot exceed approved amount (₹" . number_format($approvedAmount, 2) . ").", 422);
+        }
+
+        $bankAccountId = !empty($validated['bank_account_id']) ? (int) $validated['bank_account_id'] : null;
+        $paymentDate = !empty($validated['payment_date']) ? (string) $validated['payment_date'] : null;
 
         try {
-            $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
-            $travelAccountingService->postCashAdvanceDisbursementJournal($cashAdvance);
+            DB::transaction(function () use ($cashAdvance, $bankAccountId, $paymentDate, $disbursedAmount) {
+                $cashAdvance->update(['approved_amount' => $disbursedAmount]);
+                $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+                $travelAccountingService->postCashAdvanceDisbursementJournal($cashAdvance, $bankAccountId, $paymentDate);
+                $cashAdvance->update(['status' => 'disbursed']);
+            });
+        } catch (\InvalidArgumentException $e) {
+            return $this->sendError($e->getMessage(), 422);
         } catch (\Throwable $e) {
             Log::error("Disbursement Journal Posting Failed: " . $e->getMessage());
+            return $this->sendError("Disbursement failed: " . $e->getMessage(), 500);
         }
 
         return $this->sendSuccess($this->transformCashAdvance($cashAdvance->fresh(), true), 'Cash advance disbursed successfully.');
@@ -1215,6 +1267,15 @@ class TravelExpenseApiController extends Controller
             'claims.*.receipts'   => 'nullable|array',
             'claims.*.receipts.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
+
+        foreach ($validated['claims'] as $index => $c) {
+            if (floatval($c['amount']) <= 0) {
+                return $this->sendError("Claim amount at index {$index} must be greater than zero.", 422);
+            }
+            if (!empty($c['tax']) && floatval($c['tax']) > floatval($c['amount'])) {
+                return $this->sendError("Tax at index {$index} cannot exceed the claim amount.", 422);
+            }
+        }
 
         [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
         if (!$isAdmin) {
@@ -1450,6 +1511,15 @@ class TravelExpenseApiController extends Controller
             'claims.*.status'            => 'nullable|string',
             'claims.*.approved_amount'   => 'nullable',
         ]);
+
+        foreach ($validated['claims'] as $index => $c) {
+            if (floatval($c['amount']) <= 0) {
+                return $this->sendError("Claim amount at index {$index} must be greater than zero.", 422);
+            }
+            if (!empty($c['tax']) && floatval($c['tax']) > floatval($c['amount'])) {
+                return $this->sendError("Tax at index {$index} cannot exceed the claim amount.", 422);
+            }
+        }
 
         [$authEmployee, $isAdmin] = $this->resolveEmployeeContext();
         if (!$isAdmin) {
@@ -1916,7 +1986,7 @@ class TravelExpenseApiController extends Controller
     /**
      * POST /api/hrms/travel-expense/report/{expenseReport}/pay
      */
-    public function payExpenseReport(mixed $id): JsonResponse
+    public function payExpenseReport(Request $request, mixed $id): JsonResponse
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
@@ -1934,34 +2004,45 @@ class TravelExpenseApiController extends Controller
             return $this->sendError("Expense report with ID '{$id}' not found.", 404);
         }
 
-        DB::transaction(function () use ($expenseReport, $tenantId) {
-            $expenseReport->update(['status' => 'paid']);
-            $expenseReport->claims()->where('status', 'approved')->update(['status' => 'paid']);
+        $validated = $request->validate([
+            'bank_account_id' => ['nullable', 'integer'],
+            'payment_date'    => ['nullable', 'date'],
+        ]);
 
-            $advance = $expenseReport->cashAdvance;
-            if (!$advance && $expenseReport->travel_request_id) {
-                $advance = CashAdvance::where('tenant_id', $tenantId)
-                    ->where('travel_request_id', $expenseReport->travel_request_id)
-                    ->whereIn('status', ['approved', 'disbursed'])
-                    ->first();
-            }
+        $bankAccountId = !empty($validated['bank_account_id']) ? (int) $validated['bank_account_id'] : null;
+        $paymentDate = !empty($validated['payment_date']) ? (string) $validated['payment_date'] : null;
 
-            $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
+        try {
+            DB::transaction(function () use ($expenseReport, $tenantId, $bankAccountId, $paymentDate) {
+                $expenseReport->update(['status' => 'paid']);
+                $expenseReport->claims()->where('status', 'approved')->update(['status' => 'paid']);
 
-            if ($isAccountingChannel) {
-                try {
-                    $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
-                    $travelAccountingService->postExpenseReportPayoutJournal($expenseReport);
-                } catch (\Throwable $e) {
-                    Log::error("Payout Journal Posting Failed: " . $e->getMessage());
+                $advance = $expenseReport->cashAdvance;
+                if (!$advance && $expenseReport->travel_request_id) {
+                    $advance = CashAdvance::where('tenant_id', $tenantId)
+                        ->where('travel_request_id', $expenseReport->travel_request_id)
+                        ->whereIn('status', ['approved', 'disbursed'])
+                        ->first();
                 }
-            }
 
-            // If an advance was associated, check if all reports are paid/settled
-            if ($advance) {
-                $advance->update(['status' => 'settled']);
-            }
-        });
+                $isAccountingChannel = ($expenseReport->payout_channel ?? 'accounting') === 'accounting';
+
+                if ($isAccountingChannel) {
+                    $travelAccountingService = app(\App\Domains\Accounting\Services\TravelExpenseAccountingService::class);
+                    $travelAccountingService->postExpenseReportPayoutJournal($expenseReport, $bankAccountId, $paymentDate);
+                }
+
+                // If an advance was associated, check if all reports are paid/settled
+                if ($advance) {
+                    $advance->update(['status' => 'settled']);
+                }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return $this->sendError($e->getMessage(), 422);
+        } catch (\Throwable $e) {
+            Log::error("Payout Journal Posting Failed: " . $e->getMessage());
+            return $this->sendError("Payment processing failed: " . $e->getMessage(), 500);
+        }
 
         return $this->sendSuccess($this->transformExpenseReport($expenseReport->fresh(), true), 'Expense report marked as paid and advance settled successfully.');
     }
@@ -2280,5 +2361,36 @@ class TravelExpenseApiController extends Controller
                 'description' => 'Reimbursement of travel & expense claims'
             ]
         );
+    }
+
+    /**
+     * GET /api/hrms/travel-expense/paying-accounts
+     * Returns cash/bank accounts with live balances for disbursement/payout.
+     */
+    public function payingAccounts(): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        try {
+            $payrollBooks = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+            $accounts = $payrollBooks->payingLedgers()->map(function ($acc) use ($payrollBooks) {
+                $balance = $payrollBooks->balance($acc);
+                return [
+                    'id'                => $acc->id,
+                    'code'              => $acc->code,
+                    'name'              => $acc->name,
+                    'system_key'        => $acc->system_key,
+                    'balance'           => (float) $balance,
+                    'balance_formatted' => '$' . number_format($balance, 2),
+                    'is_default'        => $acc->system_key === \App\Domains\Accounting\Support\SystemAccount::BANK,
+                ];
+            });
+
+            return $this->sendSuccess($accounts->values(), 'Paying accounts loaded successfully.');
+        } catch (\Throwable $e) {
+            return $this->sendError('Failed to load paying accounts: ' . $e->getMessage(), 500);
+        }
     }
 }

@@ -21,12 +21,21 @@ class AttendanceCorrection extends BaseModel
         'status',
         'rejected_reason',
         'approved_by',
+        'approved_at',
+        'cancellation_reason',
+        'cancellation_requested_at',
+        'cancellation_decided_by',
+        'cancellation_decided_at',
+        'cancellation_denial_reason',
     ];
 
     protected $casts = [
         'date' => 'date',
         'requested_check_in' => 'datetime',
         'requested_check_out' => 'datetime',
+        'approved_at' => 'datetime',
+        'cancellation_requested_at' => 'datetime',
+        'cancellation_decided_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo

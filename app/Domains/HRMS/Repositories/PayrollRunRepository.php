@@ -16,12 +16,16 @@ use App\Domains\HRMS\Models\PayrollPayslip;
 use App\Domains\HRMS\Models\PayrollRetroactiveAdjustment;
 use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\SalaryComponent;
+use App\Domains\HRMS\Models\EmployeeExit;
+use App\Domains\HRMS\Models\EmployeeFnfSettlement;
+use App\Domains\HRMS\Models\CashAdvance;
+use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Services\DocumentTemplateService;
+use App\Domains\HRMS\Services\ExitDocumentationService;
 use App\Domains\HRMS\Services\PayrollCalculationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -33,10 +37,6 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
 
     public function getIndexData(array $inputs): array
     {
-        try {
-            Artisan::call('migrate', ['--force' => true]);
-        } catch (\Throwable $e) {}
-
         $runs = PayrollRun::orderBy('payroll_month', 'desc')->get();
         
         $selectedRunId = $inputs['run_id'] ?? null;
@@ -448,6 +448,68 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             DB::table('leave_encashments')
                 ->whereIn('id', $allEncashIds)
                 ->update(['status' => 'processed']);
+        }
+
+        // Auto-settle FnF for exiting employees included in this monthly payroll payout
+        if (!empty($processedEmployeeIds)) {
+            try {
+                $runStart = $run->start_date instanceof Carbon ? $run->start_date->format('Y-m-d') : Carbon::parse($run->start_date)->format('Y-m-d');
+                $runEnd = $run->end_date instanceof Carbon ? $run->end_date->format('Y-m-d') : Carbon::parse($run->end_date)->format('Y-m-d');
+
+                $activeExits = EmployeeExit::whereIn('employee_id', $processedEmployeeIds)
+                    ->whereIn('status', ['approved', 'in_clearance'])
+                    ->where(function($q) use ($runStart, $runEnd) {
+                        $q->whereBetween('approved_lwd', [$runStart, $runEnd])
+                          ->orWhereBetween('preferred_lwd', [$runStart, $runEnd])
+                          ->orWhereHas('fnfSettlement', function($sq) {
+                              $sq->where('settlement_channel', 'monthly_payroll')
+                                 ->where('status', 'approved');
+                          });
+                    })
+                    ->with(['fnfSettlement', 'employee'])
+                    ->get();
+
+                foreach ($activeExits as $exit) {
+                    $settlement = $exit->fnfSettlement;
+                    if ($settlement && ($settlement->settlement_channel ?? 'monthly_payroll') === 'monthly_payroll' && $settlement->status !== 'paid') {
+                        $settlement->update([
+                            'status'            => 'paid',
+                            'payment_method'    => 'Monthly Payroll',
+                            'paid_at'           => now(),
+                            'payment_reference' => 'Payroll Run #' . $run->payroll_month,
+                        ]);
+
+                        $exit->update(['status' => 'settled']);
+
+                        if ($exit->employee) {
+                            $exit->employee->update([
+                                'status'         => false,
+                                'employee_stage' => 'Relieved',
+                                'date_of_exit'   => $exit->approved_lwd ?? $exit->preferred_lwd ?? now()->format('Y-m-d'),
+                            ]);
+
+                            CashAdvance::where('employee_id', $exit->employee_id)
+                                ->whereIn('status', ['approved', 'disbursed'])
+                                ->update(['status' => 'settled']);
+
+                            ExpenseReport::where('employee_id', $exit->employee_id)
+                                ->where('status', 'approved')
+                                ->update(['status' => 'paid']);
+                        }
+
+                        try {
+                            $docService = app(ExitDocumentationService::class);
+                            $docService->generateRelievingLetter($exit);
+                            $docService->generateExperienceCertificate($exit);
+                            $docService->generateNocCertificate($exit);
+                        } catch (\Throwable $e) {
+                            Log::warning("Could not auto-generate exit documents for exit #{$exit->id}: " . $e->getMessage());
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Could not auto-settle exit FnF during payroll release: " . $e->getMessage());
+            }
         }
     }
 
@@ -938,17 +1000,31 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             $excludeEmployeeIds = array_unique($excludeEmployeeIds);
         }
 
+        $startDateStr = $run->start_date instanceof Carbon ? $run->start_date->format('Y-m-d') : Carbon::parse($run->start_date)->format('Y-m-d');
+
         if ($run->employee_ids && count($run->employee_ids) > 0) {
             return Employee::whereIn('id', $run->employee_ids)
                 ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
+                ->where(function($q) use ($startDateStr) {
+                    $q->where('status', true)
+                      ->orWhere(function($sub) use ($startDateStr) {
+                          $sub->where('status', false)
+                              ->where('date_of_exit', '>=', $startDateStr);
+                      });
+                })
                 ->where(function($q) {
                     $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
                 })
                 ->get();
         }
 
-        $employeesQuery = Employee::where('status', true)
+        $employeesQuery = Employee::where(function($q) use ($startDateStr) {
+                $q->where('status', true)
+                  ->orWhere(function($sub) use ($startDateStr) {
+                      $sub->where('status', false)
+                          ->where('date_of_exit', '>=', $startDateStr);
+                  });
+            })
             ->where(function($q) {
                 $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
             })

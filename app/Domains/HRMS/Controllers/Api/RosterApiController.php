@@ -67,12 +67,7 @@ class RosterApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -388,17 +383,24 @@ class RosterApiController extends Controller
                 break;
         }
 
-        $employees = $query->with(['department', 'designation', 'shift'])->paginate($request->integer('per_page', 10), ['employees.*']);
+        $employees = $query->with(['department', 'designation', 'shift', 'defaultShift'])->paginate($request->integer('per_page', 10), ['employees.*']);
 
-        $rosters = ShiftRoster::query()
+        $rosters = ShiftRoster::with('shift')
             ->whereIn('employee_id', $employees->pluck('id'))
             ->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->get();
 
+        $rostersByEmployee = $rosters->groupBy('employee_id');
+
         $rosterMap = [];
-        foreach ($rosters as $roster) {
-            $dateStr = $roster->date->format('Y-m-d');
-            $rosterMap[$roster->employee_id][$dateStr] = $roster;
+        foreach ($employees as $emp) {
+            $empRosters = $rostersByEmployee->get($emp->id, collect());
+            $emp->setRelation('rosters', $empRosters);
+
+            foreach ($empRosters as $roster) {
+                $dateStr = $roster->date->format('Y-m-d');
+                $rosterMap[$emp->id][$dateStr] = $roster;
+            }
         }
 
         return $this->sendSuccess([

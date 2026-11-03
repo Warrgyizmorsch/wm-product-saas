@@ -4533,6 +4533,8 @@ return [
 
         // Statuses
         'status_pending' => 'Pending',
+        'status_l1_approved' => 'L1 Approved',
+        'status_partially_approved' => 'Partially Approved',
         'status_approved' => 'Approved',
         'status_rejected' => 'Rejected',
         'status_disbursed' => 'Disbursed',

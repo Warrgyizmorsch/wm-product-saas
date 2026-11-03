@@ -6,17 +6,75 @@ use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\EmployeePenalty;
+use App\Domains\HRMS\Services\AttendancePenaltyService;
 use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryInterface
 {
     public function __construct(
         private readonly HrmsScopeService $scopeService
     ) {}
+
+    private function ensureColumnsExist(): void
+    {
+        if (!Schema::hasTable('attendance_corrections')) {
+            return;
+        }
+
+        $missing = [];
+        if (!Schema::hasColumn('attendance_corrections', 'approved_at')) {
+            $missing['approved_at'] = true;
+        }
+        if (!Schema::hasColumn('attendance_corrections', 'cancellation_reason')) {
+            $missing['cancellation_reason'] = true;
+        }
+        if (!Schema::hasColumn('attendance_corrections', 'cancellation_requested_at')) {
+            $missing['cancellation_requested_at'] = true;
+        }
+        if (!Schema::hasColumn('attendance_corrections', 'cancellation_decided_by')) {
+            $missing['cancellation_decided_by'] = true;
+        }
+        if (!Schema::hasColumn('attendance_corrections', 'cancellation_decided_at')) {
+            $missing['cancellation_decided_at'] = true;
+        }
+        if (!Schema::hasColumn('attendance_corrections', 'cancellation_denial_reason')) {
+            $missing['cancellation_denial_reason'] = true;
+        }
+
+        if (!empty($missing)) {
+            try {
+                Schema::table('attendance_corrections', function (Blueprint $table) use ($missing) {
+                    if (isset($missing['approved_at'])) {
+                        $table->timestamp('approved_at')->nullable()->after('approved_by');
+                    }
+                    if (isset($missing['cancellation_reason'])) {
+                        $table->text('cancellation_reason')->nullable();
+                    }
+                    if (isset($missing['cancellation_requested_at'])) {
+                        $table->timestamp('cancellation_requested_at')->nullable();
+                    }
+                    if (isset($missing['cancellation_decided_by'])) {
+                        $table->unsignedBigInteger('cancellation_decided_by')->nullable();
+                    }
+                    if (isset($missing['cancellation_decided_at'])) {
+                        $table->timestamp('cancellation_decided_at')->nullable();
+                    }
+                    if (isset($missing['cancellation_denial_reason'])) {
+                        $table->text('cancellation_denial_reason')->nullable();
+                    }
+                });
+            } catch (\Throwable $e) {
+                Log::warning('Could not automatically add columns to attendance_corrections: ' . $e->getMessage());
+            }
+        }
+    }
 
     private function transformCorrection(AttendanceCorrection $ac): array
     {
@@ -173,6 +231,8 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             ];
         }
 
+        $this->ensureColumnsExist();
+
         DB::beginTransaction();
         try {
             $dateStr = $correction->date ? $correction->date->format('Y-m-d') : Carbon::today()->format('Y-m-d');
@@ -183,19 +243,55 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             $requestedCheckIn = $finalCheckInTime ? Carbon::parse($dateStr . ' ' . $finalCheckInTime) : null;
             $requestedCheckOut = $finalCheckOutTime ? Carbon::parse($dateStr . ' ' . $finalCheckOutTime) : null;
 
-            $correction->update([
+            $updatePayload = [
                 'status'              => 'approved',
                 'requested_check_in'  => $requestedCheckIn ?? $correction->requested_check_in,
                 'requested_check_out' => $requestedCheckOut ?? $correction->requested_check_out,
                 'approved_by'         => $user?->id,
-                'approved_at'         => Carbon::now(),
                 'rejected_reason'     => null,
-            ]);
+            ];
+            if (Schema::hasColumn('attendance_corrections', 'approved_at')) {
+                $updatePayload['approved_at'] = Carbon::now();
+            }
+
+            $correction->update($updatePayload);
 
             $attendance = $correction->attendance ?? Attendance::where('tenant_id', $correction->tenant_id)
                 ->where('employee_id', $correction->employee_id)
                 ->whereDate('date', $correction->date)
                 ->first();
+
+            // Snapshot pre-correction attendance and penalty state so it can be restored on cancellation
+            $preState = [
+                'attendance_existed' => $attendance !== null,
+                'attendance_id'      => $attendance?->id,
+                'status'             => $attendance?->status,
+                'check_in'           => $attendance?->check_in?->toDateTimeString(),
+                'check_out'          => $attendance?->check_out?->toDateTimeString(),
+                'total_work_hours'   => $attendance?->total_work_hours,
+            ];
+
+            $existingPenalties = EmployeePenalty::where('employee_id', $correction->employee_id)
+                ->whereDate('date', $dateStr)
+                ->whereIn('status', ['pending', 'active'])
+                ->get();
+
+            $penaltySnapshots = [];
+            foreach ($existingPenalties as $pen) {
+                $penaltySnapshots[] = [
+                    'id'             => $pen->id,
+                    'tenant_id'      => $pen->tenant_id,
+                    'employee_id'    => $pen->employee_id,
+                    'date'           => $pen->date instanceof Carbon ? $pen->date->format('Y-m-d') : (string)$pen->date,
+                    'rule_type'      => $pen->rule_type,
+                    'penalty_amount' => $pen->penalty_amount,
+                    'status'         => $pen->status,
+                    'payroll_month'  => $pen->payroll_month,
+                    'remarks'        => $pen->remarks,
+                ];
+            }
+            $preState['penalties'] = $penaltySnapshots;
+            Cache::put("attendance_correction_prev_{$correction->id}", $preState, now()->addYears(1));
 
             $effectiveCheckIn = $requestedCheckIn ?? $attendance?->check_in;
             $effectiveCheckOut = $requestedCheckOut ?? $attendance?->check_out;
@@ -231,10 +327,16 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
                 $correction->update(['attendance_id' => $attendance->id]);
             }
 
+            // Waive penalties by setting status to excused with a tracking marker so payroll skips them,
+            // but the records remain intact for restoration if the correction is subsequently cancelled.
+            $penaltyMarker = "[Waived by correction #{$correction->id}]";
             EmployeePenalty::where('employee_id', $correction->employee_id)
                 ->whereDate('date', $dateStr)
                 ->whereIn('status', ['pending', 'active'])
-                ->delete();
+                ->update([
+                    'status'  => 'excused',
+                    'remarks' => DB::raw("CONCAT(COALESCE(remarks, ''), ' {$penaltyMarker}')"),
+                ]);
 
             DB::commit();
 
@@ -271,12 +373,18 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             ];
         }
 
-        $correction->update([
+        $this->ensureColumnsExist();
+
+        $updatePayload = [
             'status'          => 'rejected',
             'rejected_reason' => $reason,
             'approved_by'     => $user?->id,
-            'approved_at'     => Carbon::now(),
-        ]);
+        ];
+        if (Schema::hasColumn('attendance_corrections', 'approved_at')) {
+            $updatePayload['approved_at'] = Carbon::now();
+        }
+
+        $correction->update($updatePayload);
 
         $correction->load(['employee', 'attendance']);
 
@@ -321,11 +429,19 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             ];
         }
 
-        $correction->update([
+        $this->ensureColumnsExist();
+
+        $updatePayload = [
             'status' => 'cancellation_requested',
-            'cancellation_reason' => $reason,
-            'cancellation_requested_at' => Carbon::now(),
-        ]);
+        ];
+        if (Schema::hasColumn('attendance_corrections', 'cancellation_reason')) {
+            $updatePayload['cancellation_reason'] = $reason;
+        }
+        if (Schema::hasColumn('attendance_corrections', 'cancellation_requested_at')) {
+            $updatePayload['cancellation_requested_at'] = Carbon::now();
+        }
+
+        $correction->update($updatePayload);
 
         return [
             'success' => true,
@@ -345,13 +461,119 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             ];
         }
 
+        $this->ensureColumnsExist();
+
         DB::beginTransaction();
         try {
-            $correction->update([
+            $dateStr = $correction->date ? $correction->date->format('Y-m-d') : Carbon::today()->format('Y-m-d');
+            $cacheKey = "attendance_correction_prev_{$correction->id}";
+            $preState = Cache::get($cacheKey);
+
+            $attendance = $correction->attendance ?? Attendance::where('tenant_id', $correction->tenant_id)
+                ->where('employee_id', $correction->employee_id)
+                ->whereDate('date', $correction->date)
+                ->first();
+
+            // 1. Revert attendance record to pre-correction state
+            if ($preState !== null) {
+                if (empty($preState['attendance_existed'])) {
+                    // Attendance was synthesized/created solely by this correction for an absent day.
+                    // On cancellation, remove the created attendance record so employee reverts to absent.
+                    if ($attendance) {
+                        $attendance->delete();
+                    }
+                    $correction->update(['attendance_id' => null]);
+                    $attendance = null;
+                } else {
+                    // Attendance existed prior to correction. Revert fields back to their original values.
+                    if ($attendance) {
+                        $attendance->update([
+                            'check_in'         => $preState['check_in'],
+                            'check_out'        => $preState['check_out'],
+                            'status'           => $preState['status'] ?? 'absent',
+                            'total_work_hours' => $preState['total_work_hours'] ?? 0.00,
+                        ]);
+                    }
+                }
+            } else {
+                // Fallback if pre-state cache is not available
+                if ($attendance) {
+                    $attendance->update([
+                        'status'           => 'absent',
+                        'check_in'         => null,
+                        'check_out'        => null,
+                        'total_work_hours' => 0.00,
+                    ]);
+                }
+            }
+
+            // 2. Restore penalties that were waived by this correction
+            $penaltyMarker = "[Waived by correction #{$correction->id}]";
+            $waivedPenalties = EmployeePenalty::where('employee_id', $correction->employee_id)
+                ->whereDate('date', $dateStr)
+                ->where('remarks', 'like', "%{$penaltyMarker}%")
+                ->get();
+
+            foreach ($waivedPenalties as $wp) {
+                $cleanedRemarks = trim(str_replace($penaltyMarker, '', $wp->remarks));
+                $wp->update([
+                    'status'  => 'pending',
+                    'remarks' => $cleanedRemarks,
+                ]);
+            }
+
+            // 3. Restore any snapshotted penalties that might have been hard-deleted
+            if (!empty($preState['penalties'])) {
+                foreach ($preState['penalties'] as $ps) {
+                    $exists = EmployeePenalty::where('employee_id', $ps['employee_id'])
+                        ->whereDate('date', $ps['date'])
+                        ->where('rule_type', $ps['rule_type'])
+                        ->where('status', '!=', 'excused')
+                        ->exists();
+
+                    if (!$exists) {
+                        EmployeePenalty::create([
+                            'tenant_id'      => $ps['tenant_id'],
+                            'employee_id'    => $ps['employee_id'],
+                            'date'           => $ps['date'],
+                            'rule_type'      => $ps['rule_type'],
+                            'penalty_amount' => $ps['penalty_amount'],
+                            'status'         => 'pending',
+                            'payroll_month'  => $ps['payroll_month'],
+                            'remarks'        => $ps['remarks'],
+                        ]);
+                    }
+                }
+            }
+
+            // 4. If attendance record was retained with punches, re-evaluate statutory attendance penalties
+            $employee = Employee::find($correction->employee_id);
+            if ($employee && $attendance && $attendance->exists && $attendance->status !== 'absent') {
+                $penaltyService = app(AttendancePenaltyService::class);
+                if ($attendance->check_in) {
+                    $penaltyService->evaluateLateArrival($employee, $dateStr, $attendance->check_in, $attendance->status);
+                }
+                if ($attendance->total_work_hours !== null && (float) $attendance->total_work_hours > 0) {
+                    $penaltyService->evaluateUnderHours($employee, $dateStr, (float) $attendance->total_work_hours, $attendance->status);
+                }
+                if ($attendance->check_in && empty($attendance->check_out)) {
+                    $penaltyService->evaluateMissingLogs($employee, $dateStr, 1);
+                }
+            }
+
+            // 5. Update correction status to cancelled
+            $cancelPayload = [
                 'status' => 'cancelled',
-                'cancellation_decided_by' => $user?->id,
-                'cancellation_decided_at' => Carbon::now(),
-            ]);
+            ];
+            if (Schema::hasColumn('attendance_corrections', 'cancellation_decided_by')) {
+                $cancelPayload['cancellation_decided_by'] = $user?->id;
+            }
+            if (Schema::hasColumn('attendance_corrections', 'cancellation_decided_at')) {
+                $cancelPayload['cancellation_decided_at'] = Carbon::now();
+            }
+            $correction->update($cancelPayload);
+
+            Cache::forget($cacheKey);
 
             DB::commit();
 
@@ -381,12 +603,22 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             ];
         }
 
-        $correction->update([
+        $this->ensureColumnsExist();
+
+        $denyPayload = [
             'status' => 'approved',
-            'cancellation_decided_by' => $user?->id,
-            'cancellation_decided_at' => Carbon::now(),
-            'cancellation_denial_reason' => $reason,
-        ]);
+        ];
+        if (Schema::hasColumn('attendance_corrections', 'cancellation_decided_by')) {
+            $denyPayload['cancellation_decided_by'] = $user?->id;
+        }
+        if (Schema::hasColumn('attendance_corrections', 'cancellation_decided_at')) {
+            $denyPayload['cancellation_decided_at'] = Carbon::now();
+        }
+        if (Schema::hasColumn('attendance_corrections', 'cancellation_denial_reason')) {
+            $denyPayload['cancellation_denial_reason'] = $reason;
+        }
+
+        $correction->update($denyPayload);
 
         return [
             'success' => true,

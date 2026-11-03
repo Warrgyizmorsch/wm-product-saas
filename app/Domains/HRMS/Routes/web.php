@@ -488,6 +488,8 @@ Route::prefix('hrms')
             Route::get('/', [EmployeeExitController::class, 'index'])->name('exits.index');
             Route::post('/initiate', [EmployeeExitController::class, 'initiate'])->name('exits.initiate');
             Route::post('/{exit}/approve', [EmployeeExitController::class, 'approve'])->name('exits.approve');
+            Route::post('/{exit}/approve-manager', [EmployeeExitController::class, 'approveManager'])->name('exits.approve-manager');
+            Route::post('/{exit}/reject', [EmployeeExitController::class, 'reject'])->name('exits.reject');
             Route::post('/clearance/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearance.update');
             Route::post('/clearances/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearances.update');
             Route::post('/{exit}/clearances/{department}/batch-update', [EmployeeExitController::class, 'updateDepartmentClearances'])->name('exits.clearances.batch-update');

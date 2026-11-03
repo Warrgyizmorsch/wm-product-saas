@@ -117,6 +117,20 @@ class HolidayCalendarApiController extends Controller
         $validated['branch_id'] = $request->filled('branch_id') ? $request->branch_id : null;
         $validated['status'] = $request->has('status') ? $request->boolean('status') : true;
 
+        $duplicateQuery = HolidayCalendar::whereDate('holiday_date', $validated['holiday_date']);
+        if ($validated['company_id']) {
+            $duplicateQuery->where(function ($q) use ($validated) {
+                $q->where('company_id', $validated['company_id'])
+                  ->orWhereNull('company_id');
+            });
+        } else {
+            $duplicateQuery->whereNull('company_id');
+        }
+
+        if ($duplicateQuery->exists()) {
+            return $this->sendError('A holiday already exists for this date and company.', 422);
+        }
+
         $holiday = $this->holidayCalendarRepository->storeHoliday($validated);
         return $this->sendSuccess($holiday, 'Holiday created successfully.', 201);
     }
@@ -169,7 +183,22 @@ class HolidayCalendarApiController extends Controller
         $validated['company_id'] = $request->filled('company_id') ? $request->company_id : null;
         $validated['business_unit_id'] = $request->filled('business_unit_id') ? $request->business_unit_id : null;
         $validated['branch_id'] = $request->filled('branch_id') ? $request->branch_id : null;
-        $validated['status'] = $request->has('status') ? $request->boolean('status') : false;
+        $validated['status'] = $request->has('status') ? $request->boolean('status') : (bool) $holiday->status;
+
+        $duplicateQuery = HolidayCalendar::where('id', '!=', $holiday->id)
+            ->whereDate('holiday_date', $validated['holiday_date']);
+        if ($validated['company_id']) {
+            $duplicateQuery->where(function ($q) use ($validated) {
+                $q->where('company_id', $validated['company_id'])
+                  ->orWhereNull('company_id');
+            });
+        } else {
+            $duplicateQuery->whereNull('company_id');
+        }
+
+        if ($duplicateQuery->exists()) {
+            return $this->sendError('A holiday already exists for this date and company.', 422);
+        }
 
         $this->holidayCalendarRepository->updateHoliday($holiday, $validated);
         return $this->sendSuccess($holiday->fresh(), 'Holiday updated successfully.');

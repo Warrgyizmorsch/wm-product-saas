@@ -785,7 +785,11 @@ class SalaryStructureApiController extends Controller
                 }
             }
             if (!$companyId) {
-                $companyId = Company::first()?->id ?? 1;
+                $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+                $companyId = auth()->user()?->company_id
+                    ?? ($tenantId ? Company::where('tenant_id', $tenantId)->value('id') : null)
+                    ?? Company::first()?->id
+                    ?? 1;
             }
 
             // Validation for overlapping slabs within the same Pay Group
@@ -907,7 +911,11 @@ class SalaryStructureApiController extends Controller
                 }
             }
             if (!$companyId) {
-                $companyId = Company::first()?->id ?? 1;
+                $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+                $companyId = auth()->user()?->company_id
+                    ?? ($tenantId ? Company::where('tenant_id', $tenantId)->value('id') : null)
+                    ?? Company::first()?->id
+                    ?? 1;
             }
 
             $minCtc = (float)$request->input('min_ctc');

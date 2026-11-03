@@ -92,11 +92,39 @@ class EmployeeProfileRequestRepository implements EmployeeProfileRequestReposito
 
                 if ($field === 'photo') {
                     if ($newVal && Storage::disk('public')->exists($newVal)) {
+                        $tenantId = $employee->tenant_id ?? $profileRequest->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
+
                         if ($employee->photo && Storage::disk('public')->exists($employee->photo)) {
                             Storage::disk('public')->delete($employee->photo);
+                            tenant_storage()->forget('public', $employee->photo);
                         }
-                        $permanentPath = 'employees/' . basename($newVal);
+
+                        $fileName = basename($newVal);
+                        $dir = dirname($newVal);
+
+                        if (preg_match('#^(tenants/\d+)#', $dir, $matches)) {
+                            $targetDir = $matches[1] . '/employees';
+                        } elseif (str_contains($dir, 'temp/profile_requests')) {
+                            $targetDir = "tenants/{$tenantId}/employees";
+                        } elseif (str_contains($dir, 'employees/temp_requests')) {
+                            $targetDir = "tenants/{$tenantId}/employees";
+                        } elseif (str_contains($dir, 'temp_requests')) {
+                            $targetDir = "tenants/{$tenantId}/employees";
+                        } else {
+                            $targetDir = "tenants/{$tenantId}/employees";
+                        }
+
+                        $permanentPath = rtrim($targetDir, '/') . '/' . $fileName;
+                        if (Storage::disk('public')->exists($permanentPath) && $permanentPath !== $newVal) {
+                            $permanentPath = rtrim($targetDir, '/') . '/' . uniqid() . '_' . $fileName;
+                        }
+
+                        $fileSize = (int) (Storage::disk('public')->size($newVal) ?: 0);
                         Storage::disk('public')->move($newVal, $permanentPath);
+
+                        tenant_storage()->forget('public', $newVal);
+                        tenant_storage()->record((int) $tenantId, 'public', $permanentPath, $fileSize);
+
                         $employeeUpdates['photo'] = $permanentPath;
                     }
                 } else {
@@ -126,6 +154,15 @@ class EmployeeProfileRequestRepository implements EmployeeProfileRequestReposito
     public function rejectRequest(EmployeeProfileUpdateRequest $profileRequest, string $reason): bool
     {
         return DB::transaction(function () use ($profileRequest, $reason) {
+            $changes = $profileRequest->changes ?? [];
+            if (!empty($changes['photo']['new'])) {
+                $tempPhoto = $changes['photo']['new'];
+                if ($tempPhoto && $tempPhoto !== '—' && Storage::disk('public')->exists($tempPhoto)) {
+                    Storage::disk('public')->delete($tempPhoto);
+                    tenant_storage()->forget('public', $tempPhoto);
+                }
+            }
+
             return $profileRequest->update([
                 'status'           => 'rejected',
                 'rejection_reason' => $reason,

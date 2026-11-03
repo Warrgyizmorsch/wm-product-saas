@@ -57,6 +57,16 @@ class EmployeeFnfSettlement extends BaseModel
         'net_payable_amount' => 'decimal:2',
     ];
 
+    public function getPaymentModeAttribute(): ?string
+    {
+        return $this->attributes['payment_method'] ?? null;
+    }
+
+    public function setPaymentModeAttribute(?string $value): void
+    {
+        $this->attributes['payment_method'] = $value;
+    }
+
     public function exit(): BelongsTo
     {
         return $this->belongsTo(EmployeeExit::class, 'employee_exit_id');

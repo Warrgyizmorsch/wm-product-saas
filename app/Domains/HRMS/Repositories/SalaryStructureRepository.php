@@ -222,11 +222,25 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
         );
     }
 
+    private function resolveTenantCompanyId(?int $companyId = null): int
+    {
+        if ($companyId) {
+            return $companyId;
+        }
+
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+
+        return auth()->user()?->company_id
+            ?? ($tenantId ? Company::where('tenant_id', $tenantId)->value('id') : null)
+            ?? Company::first()?->id
+            ?? 1;
+    }
+
     public function storeStructure(array $validated): SalaryStructure
     {
         return DB::transaction(function () use ($validated) {
             $salaryStructure = SalaryStructure::create([
-                'company_id' => $validated['company_id'] ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'company_id' => $this->resolveTenantCompanyId($validated['company_id'] ?? null),
                 'pay_group_id' => $validated['pay_group_id'] ?? null,
                 'name' => $validated['name'],
                 'min_ctc' => $validated['min_ctc'],
@@ -258,7 +272,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
     {
         return DB::transaction(function () use ($salaryStructure, $validated) {
             $salaryStructure->update([
-                'company_id' => $validated['company_id'] ?? $salaryStructure->company_id ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'company_id' => $this->resolveTenantCompanyId($validated['company_id'] ?? $salaryStructure->company_id),
                 'pay_group_id' => $validated['pay_group_id'] ?? $salaryStructure->pay_group_id,
                 'name' => $validated['name'],
                 'min_ctc' => $validated['min_ctc'],
@@ -310,7 +324,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
             }
 
             $newComponent = SalaryComponent::create([
-                'company_id' => $companyId ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
+                'company_id' => $this->resolveTenantCompanyId($companyId),
                 'pay_group_id' => $payGroupId,
                 'name' => trim($itemData['name']),
                 'code' => $code,
@@ -352,9 +366,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
 
     public function storeComponent(array $validated): SalaryComponent
     {
-        if (empty($validated['company_id'])) {
-            $validated['company_id'] = \App\Domains\HRMS\Models\Company::first()?->id ?? 1;
-        }
+        $validated['company_id'] = $this->resolveTenantCompanyId($validated['company_id'] ?? null);
         return SalaryComponent::create($validated);
     }
 

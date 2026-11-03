@@ -24,13 +24,28 @@ class DefaultOrganization
         $company = Company::query()->orderByDesc('is_default')->orderBy('id')->first();
 
         if ($company === null) {
+            $companyName = trim((string) $tenant->name);
+            $displayName = isset($tenant->settings['display_name']) ? trim((string) $tenant->settings['display_name']) : '';
+            // Display name matches legal entity name; if empty, fallback to company name
+            $legalName = $displayName !== '' ? $displayName : $companyName;
+
             $company = new Company([
-                'company_name' => $tenant->settings['display_name'] ?? $tenant->name,
+                'company_name' => $companyName,
+                'legal_name' => $legalName,
+                'email' => $tenant->billing_email ?? null,
+                'logo' => $tenant->settings['logo_full'] ?? null,
                 'currency' => $tenant->getAttribute('currency') ?? $tenant->settings['currency'] ?? 'INR',
                 'timezone' => $tenant->timezone ?: config('app.timezone'),
                 'status' => true,
             ]);
             $company->forceFill(['tenant_id' => $tenant->id, 'is_default' => true])->save();
+        } else {
+            if (empty($company->legal_name)) {
+                $displayName = isset($tenant->settings['display_name']) ? trim((string) $tenant->settings['display_name']) : '';
+                $company->forceFill([
+                    'legal_name' => $displayName !== '' ? $displayName : $company->company_name,
+                ])->save();
+            }
         }
 
         $branch = Branch::query()
@@ -47,11 +62,15 @@ class DefaultOrganization
                 $businessUnit->forceFill(['tenant_id' => $tenant->id])->save();
             }
 
+            $branchName = !empty($tenant->settings['branch']) ? trim((string) $tenant->settings['branch']) : 'Main Office';
+            $cleanedCode = strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $branchName));
+            $branchCode = !empty($cleanedCode) ? substr($cleanedCode, 0, 4) : 'MAIN';
+
             $branch = new Branch([
                 'company_id' => $company->id,
                 'business_unit_id' => $businessUnit->id,
-                'name' => $tenant->settings['branch'] ?? 'Main Office',
-                'code' => 'MAIN',
+                'name' => $branchName,
+                'code' => $branchCode,
                 'status' => true,
             ]);
             $branch->forceFill(['tenant_id' => $tenant->id, 'is_default' => true])->save();

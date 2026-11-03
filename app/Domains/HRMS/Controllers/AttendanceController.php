@@ -438,21 +438,13 @@ class AttendanceController extends Controller
     public function myAttendance(Request $request)
     {
         $user = auth()->user();
-
-        $employee = \App\Domains\HRMS\Models\Employee::resolveForUser($user);
-        if (!$employee) {
-            $employee = \App\Domains\HRMS\Models\Employee::where('user_id', $user->id)
-                ->orWhere('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->with(['department', 'designation'])
-                ->first();
-        } else {
-            $employee->loadMissing(['department', 'designation']);
-        }
+        $employee = $user ? \App\Domains\HRMS\Models\Employee::resolveForUser($user) : null;
 
         if (!$employee) {
-            abort(404, 'No employee record linked to the authenticated user.');
+            return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
         }
+
+        $employee->loadMissing(['department', 'designation']);
 
         $date = $request->input('date');
         $monthFilter = $request->input('month');

@@ -497,8 +497,10 @@ class EmployeeController extends Controller
                 }
             }
 
+            $tenantId = tenant_id() ?? $authUser->tenant_id ?? $employee->tenant_id;
+
             if ($request->hasFile('photo')) {
-                $tempPath = $request->file('photo')->storeTenantFile('employees/temp_requests', 'public');
+                $tempPath = $request->file('photo')->storeTenantFile("tenants/{$tenantId}/employees/temp_requests", 'public');
                 $changes['photo'] = [
                     'label'    => 'Profile Photo',
                     'old'      => $employee->photo ?: '—',
@@ -510,8 +512,6 @@ class EmployeeController extends Controller
             if (empty($changes)) {
                 return redirect()->back()->with('info', 'No changes were detected in your profile details.');
             }
-
-            $tenantId = tenant_id() ?? $authUser->tenant_id ?? $employee->tenant_id;
 
             \App\Domains\HRMS\Models\EmployeeProfileUpdateRequest::updateOrCreate(
                 [

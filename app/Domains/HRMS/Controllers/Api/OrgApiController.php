@@ -9,6 +9,8 @@ use App\Domains\HRMS\Models\Branch;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\PayrollRun;
+use App\Domains\HRMS\Models\Attendance;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -311,6 +313,28 @@ class OrgApiController extends Controller
         $company = Company::find($id);
         if (!$company) {
             return $this->sendError("Company with ID '{$id}' not found.", 404);
+        }
+
+        // Dependency Guards: Check for active or historical payroll runs
+        $activePayrollRunsCount = PayrollRun::where('company_id', $company->id)
+            ->whereIn('status', ['draft', 'processing', 'locked'])
+            ->count();
+        if ($activePayrollRunsCount > 0) {
+            return $this->sendError("Cannot delete company. There are {$activePayrollRunsCount} active payroll run(s) associated with this company.", 422);
+        }
+
+        $allPayrollRunsCount = PayrollRun::where('company_id', $company->id)->count();
+        if ($allPayrollRunsCount > 0) {
+            return $this->sendError("Cannot delete company. There are {$allPayrollRunsCount} historical payroll run(s) associated with this company.", 422);
+        }
+
+        // Dependency Guards: Check for historical attendance records
+        $companyEmployeeIds = Employee::withTrashed()->where('company_id', $company->id)->pluck('id');
+        if ($companyEmployeeIds->isNotEmpty()) {
+            $attendanceCount = Attendance::whereIn('employee_id', $companyEmployeeIds)->count();
+            if ($attendanceCount > 0) {
+                return $this->sendError("Cannot delete company. There are {$attendanceCount} historical attendance record(s) linked to employees of this company.", 422);
+            }
         }
 
         Employee::withTrashed()->where('company_id', $company->id)->update(['company_id' => null]);

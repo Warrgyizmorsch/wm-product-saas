@@ -63,6 +63,42 @@ class Attendance extends BaseModel
     }
 
     /**
+     * Get normalized Check-In Selfie URL.
+     */
+    public function getCheckInSelfieUrlAttribute(): ?string
+    {
+        $val = $this->check_in_selfie_path;
+        if (empty($val)) {
+            return null;
+        }
+        if (str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
+            return $val;
+        }
+        if (str_starts_with($val, 'storage/') || str_starts_with($val, '/storage/')) {
+            return asset(ltrim($val, '/'));
+        }
+        return asset('storage/' . ltrim($val, '/'));
+    }
+
+    /**
+     * Get normalized Check-Out Selfie URL.
+     */
+    public function getCheckOutSelfieUrlAttribute(): ?string
+    {
+        $val = $this->check_out_selfie_path;
+        if (empty($val)) {
+            return null;
+        }
+        if (str_starts_with($val, 'http://') || str_starts_with($val, 'https://')) {
+            return $val;
+        }
+        if (str_starts_with($val, 'storage/') || str_starts_with($val, '/storage/')) {
+            return asset(ltrim($val, '/'));
+        }
+        return asset('storage/' . ltrim($val, '/'));
+    }
+
+    /**
      * Get location logs seamlessly: uses live raw logs if present,
      * or decoded polyline points if raw logs have been purged after checkout.
      */

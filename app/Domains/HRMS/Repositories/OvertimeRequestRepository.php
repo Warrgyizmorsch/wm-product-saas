@@ -10,22 +10,12 @@ use App\Domains\HRMS\Models\OvertimeRequest;
 use App\Models\Tenant;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 {
     public function getIndexData(array $inputs): array
     {
-        try {
-            if (!Schema::hasTable('overtime_requests')) {
-                Artisan::call('migrate', ['--force' => true]);
-            }
-        } catch (\Exception $e) {
-            // Silently log or ignore migration execution errors
-        }
-
         $user = auth()->user();
         $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
         $isAdmin = $isHrAdmin;
@@ -255,7 +245,8 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
             }
 
             $approvedHours = (float) ($overtime->approved_duration_hours ?? $overtime->duration_hours);
-            $creditDays = round($approvedHours / 8, 1);
+            $workdayHours = $this->getEmployeeWorkdayHours($employee, (string) $overtime->date);
+            $creditDays = round($approvedHours / $workdayHours, 1);
             if ($creditDays <= 0) {
                 return;
             }
@@ -276,12 +267,19 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                     ->first();
                 if ($balance) {
                     $newAllocated = max(0.0, (float) $balance->allocated - $creditDays);
-                    $balance->update(['allocated' => $newAllocated]);
+                    $newUsed      = min((float) $balance->used, $newAllocated);
+
+                    $balance->update([
+                        'allocated' => $newAllocated,
+                        'used'      => $newUsed,
+                    ]);
+
                     Log::info('Comp Off reverted', [
                         'employee_id'   => $employee->id,
                         'overtime_id'   => $overtime->id,
                         'reverted_days' => $creditDays,
                         'new_allocated' => $newAllocated,
+                        'new_used'      => $newUsed,
                     ]);
                 }
             }
@@ -319,8 +317,9 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                 return;
             }
 
-            // Standard workday = 8 hours. Convert overtime hours to fractional days.
-            $creditDays = round($approvedHours / 8, 1);
+            // Convert overtime hours to fractional days using the employee's assigned shift workday hours
+            $workdayHours = $this->getEmployeeWorkdayHours($employee, (string) $overtime->date);
+            $creditDays = round($approvedHours / $workdayHours, 1);
             if ($creditDays <= 0) {
                 return;
             }
@@ -402,6 +401,23 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                 'error'       => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Resolve the standard daily shift duration in hours for an employee on a given date.
+     * Accurately supports 9-, 10-, or 12-hour shifts dynamically.
+     */
+    protected function getEmployeeWorkdayHours(Employee $employee, ?string $date = null): float
+    {
+        $shift = $employee->resolveShiftForDate($date);
+        if ($shift) {
+            $duration = (float) $shift->durationHours();
+            if ($duration > 0) {
+                return $duration;
+            }
+        }
+
+        return 8.0;
     }
 
     public function processAutoOvertime(Employee $employee, string $date, float $extraHours): ?OvertimeRequest

@@ -212,6 +212,18 @@
     @php
         $activeTab = $activeTab ?? request('tab', 'travel');
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        if (!isset($payingLedgers) || !isset($ledgerBalances)) {
+            try {
+                $payrollBooks = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
+                $payingLedgers = $payrollBooks->payingLedgers();
+                $ledgerBalances = $payingLedgers->mapWithKeys(fn ($ledger) => [$ledger->id => $payrollBooks->balance($ledger)]);
+                $defaultPayingLedger = $payingLedgers->firstWhere('system_key', \App\Domains\Accounting\Support\SystemAccount::BANK) ?? $payingLedgers->first();
+            } catch (\Throwable $e) {
+                $payingLedgers = collect();
+                $ledgerBalances = collect();
+                $defaultPayingLedger = null;
+            }
+        }
         $expenseTabs = [
             [
                 'id' => 'travel',
@@ -448,12 +460,47 @@
                                             @endphp
                                             <div class="d-flex justify-content-end align-items-center gap-1 flex-wrap">
                                                 @if($approvedAdv && $isAdmin)
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $approvedAdv) }}" class="m-0">
-                                                        @csrf
-                                                        <x-ui.button type="submit" variant="success" size="sm" icon="feather-credit-card" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_disburse_advance') }} ({{ $currencySymbol }}{{ number_format($approvedAdv->approved_amount ?? $approvedAdv->amount, 2) }})">
-                                                            {{ __('hrms.travel_expense.btn_disburse_advance') }}
-                                                        </x-ui.button>
-                                                    </form>
+                                                    <x-ui.button type="button" variant="success" size="sm" icon="feather-credit-card" class="py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#disburseAdvanceModal_tr_{{ $approvedAdv->id }}" title="{{ __('hrms.travel_expense.title_disburse_advance') }} ({{ $currencySymbol }}{{ number_format($approvedAdv->approved_amount ?? $approvedAdv->amount, 2) }})">
+                                                        {{ __('hrms.travel_expense.btn_disburse_advance') }}
+                                                    </x-ui.button>
+
+                                                    {{-- Disburse Cash Advance Modal for Travel Request --}}
+                                                    <x-ui.modal id="disburseAdvanceModal_tr_{{ $approvedAdv->id }}" title="Disburse Cash Advance" :formAction="route('hrms.travel-expense.advance.disburse', $approvedAdv)" submitText="Disburse Payment">
+                                                        <div class="mb-3 p-3 bg-light rounded border text-start">
+                                                            <div class="d-flex justify-content-between mb-1">
+                                                                <span class="text-muted fs-12">Employee:</span>
+                                                                <span class="fw-semibold fs-12 text-dark">{{ $req->employee?->full_name ?? 'N/A' }}</span>
+                                                            </div>
+                                                            <div class="d-flex justify-content-between mb-1">
+                                                                <span class="text-muted fs-12">Purpose:</span>
+                                                                <span class="fw-semibold fs-12 text-dark">{{ $approvedAdv->purpose ?: $req->purpose }}</span>
+                                                            </div>
+                                                            <div class="d-flex justify-content-between">
+                                                                <span class="text-muted fs-12">Disbursement Amount:</span>
+                                                                <span class="fw-bold fs-13 text-success">{{ $currencySymbol }}{{ number_format($approvedAdv->approved_amount ?? $approvedAdv->amount, 2) }}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="mb-3 text-start">
+                                                            <label class="form-label fw-semibold fs-13">Paid From <span class="text-danger">*</span></label>
+                                                            <select name="bank_account_id" class="form-select" required>
+                                                                @forelse($payingLedgers as $ledger)
+                                                                    @php $bal = $ledgerBalances[$ledger->id] ?? 0; @endphp
+                                                                    <option value="{{ $ledger->id }}" @selected($defaultPayingLedger?->id === $ledger->id)>
+                                                                        {{ $ledger->code }} &mdash; {{ $ledger->name }} (Available: {{ $currencySymbol }}{{ number_format($bal, 2) }})
+                                                                    </option>
+                                                                @empty
+                                                                    <option value="">No bank/cash ledger configured</option>
+                                                                @endforelse
+                                                            </select>
+                                                            <div class="form-text fs-11 text-muted">Cash-in-Hand accounts cannot pay more than their available balance.</div>
+                                                        </div>
+
+                                                        <div class="mb-2 text-start">
+                                                            <label class="form-label fw-semibold fs-13">Payment Date <span class="text-danger">*</span></label>
+                                                            <input type="date" name="payment_date" class="form-control" value="{{ now()->toDateString() }}" required>
+                                                        </div>
+                                                    </x-ui.modal>
                                                 @endif
 
                                                 @if($activeUnpaidReport)
@@ -662,11 +709,48 @@
                                         @elseif($adv->status === 'approved')
                                             @if($isAdmin)
                                                 <div class="d-flex justify-content-end gap-1">
-                                                    <form method="POST" action="{{ route('hrms.travel-expense.advance.disburse', $adv) }}" class="m-0">
-                                                        @csrf
-                                                        <x-ui.button type="submit" variant="soft-primary" size="sm" icon="feather-dollar-sign" class="py-1 fw-bold fs-11">{{ __('hrms.travel_expense.btn_disburse') }}</x-ui.button>
-                                                    </form>
+                                                    <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-dollar-sign" class="py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#disburseAdvanceModal_{{ $adv->id }}" title="{{ __('hrms.travel_expense.title_disburse_advance') }}">
+                                                        {{ __('hrms.travel_expense.btn_disburse') }}
+                                                    </x-ui.button>
                                                 </div>
+
+                                                {{-- Disburse Cash Advance Modal --}}
+                                                <x-ui.modal id="disburseAdvanceModal_{{ $adv->id }}" title="Disburse Cash Advance" :formAction="route('hrms.travel-expense.advance.disburse', $adv)" submitText="Disburse Payment">
+                                                    <div class="mb-3 p-3 bg-light rounded border text-start">
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted fs-12">Employee:</span>
+                                                            <span class="fw-semibold fs-12 text-dark">{{ $adv->employee?->full_name ?? 'N/A' }}</span>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted fs-12">Purpose:</span>
+                                                            <span class="fw-semibold fs-12 text-dark">{{ $adv->purpose }}</span>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between">
+                                                            <span class="text-muted fs-12">Disbursement Amount:</span>
+                                                            <span class="fw-bold fs-13 text-success">{{ $currencySymbol }}{{ number_format($adv->approved_amount ?? $adv->amount, 2) }}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 text-start">
+                                                        <label class="form-label fw-semibold fs-13">Paid From <span class="text-danger">*</span></label>
+                                                        <select name="bank_account_id" class="form-select" required>
+                                                            @forelse($payingLedgers as $ledger)
+                                                                @php $bal = $ledgerBalances[$ledger->id] ?? 0; @endphp
+                                                                <option value="{{ $ledger->id }}" @selected($defaultPayingLedger?->id === $ledger->id)>
+                                                                    {{ $ledger->code }} &mdash; {{ $ledger->name }} (Available: {{ $currencySymbol }}{{ number_format($bal, 2) }})
+                                                                </option>
+                                                            @empty
+                                                                <option value="">No bank/cash ledger configured</option>
+                                                            @endforelse
+                                                        </select>
+                                                        <div class="form-text fs-11 text-muted">Cash-in-Hand accounts cannot pay more than their available balance.</div>
+                                                    </div>
+
+                                                    <div class="mb-2 text-start">
+                                                        <label class="form-label fw-semibold fs-13">Payment Date <span class="text-danger">*</span></label>
+                                                        <input type="date" name="payment_date" class="form-control" value="{{ now()->toDateString() }}" required>
+                                                    </div>
+                                                </x-ui.modal>
                                             @else
                                                 -
                                             @endif
@@ -1052,10 +1136,64 @@
                                             @endif
 
                                             @if($isAdmin && in_array($rep->status, ['approved', 'partially_approved']))
-                                                <form method="POST" action="{{ route('hrms.travel-expense.report.pay', $rep) }}" class="m-0">
-                                                    @csrf
-                                                    <x-ui.button type="submit" variant="success" size="sm" icon="feather-credit-card" class="py-1 fw-bold fs-11 text-uppercase" title="{{ __('hrms.travel_expense.title_pay_out') }} ({{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }})">{{ __('hrms.travel_expense.btn_pay_out') }}</x-ui.button>
-                                                </form>
+                                                @php
+                                                    $unpaidApproved = $rep->claims->where('status', 'approved')->sum(fn($c) => floatval($c->approved_amount ?? $c->amount));
+                                                    if ($unpaidApproved <= 0) {
+                                                        $unpaidApproved = floatval($rep->approved_amount ?? $rep->total_amount);
+                                                    }
+                                                    $netPayout = floatval($rep->approved_net_reimbursement ?? $unpaidApproved);
+                                                @endphp
+                                                <x-ui.button type="button" variant="success" size="sm" icon="feather-credit-card" class="py-1 fw-bold fs-11 text-uppercase" data-bs-toggle="modal" data-bs-target="#payExpenseReportModal_{{ $rep->id }}" title="{{ __('hrms.travel_expense.title_pay_out') }} ({{ $currencySymbol }}{{ number_format($netPayout, 2) }})">
+                                                    {{ __('hrms.travel_expense.btn_pay_out') }}
+                                                </x-ui.button>
+
+                                                {{-- Pay Expense Report Modal --}}
+                                                <x-ui.modal id="payExpenseReportModal_{{ $rep->id }}" title="Pay Expense Claim" :formAction="route('hrms.travel-expense.report.pay', $rep)" submitText="Process Payment">
+                                                    <div class="mb-3 p-3 bg-light rounded border text-start">
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted fs-12">Report:</span>
+                                                            <span class="fw-semibold fs-12 text-dark">{{ $rep->title }}</span>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted fs-12">Employee:</span>
+                                                            <span class="fw-semibold fs-12 text-dark">{{ $rep->employee?->full_name ?? 'N/A' }}</span>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted fs-12">Total Approved:</span>
+                                                            <span class="fw-semibold fs-12 text-dark">{{ $currencySymbol }}{{ number_format($rep->approved_amount ?? $rep->total_amount, 2) }}</span>
+                                                        </div>
+                                                        @if(($rep->advance_adjusted ?? 0) > 0)
+                                                            <div class="d-flex justify-content-between mb-1">
+                                                                <span class="text-muted fs-12">Advance Adjusted:</span>
+                                                                <span class="fw-semibold fs-12 text-info">-{{ $currencySymbol }}{{ number_format($rep->advance_adjusted, 2) }}</span>
+                                                            </div>
+                                                        @endif
+                                                        <div class="d-flex justify-content-between border-top pt-1 mt-1">
+                                                            <span class="text-muted fs-12 fw-bold">Net Payout Amount:</span>
+                                                            <span class="fw-bold fs-13 text-success">{{ $currencySymbol }}{{ number_format($netPayout, 2) }}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 text-start">
+                                                        <label class="form-label fw-semibold fs-13">Paid From <span class="text-danger">*</span></label>
+                                                        <select name="bank_account_id" class="form-select" required>
+                                                            @forelse($payingLedgers as $ledger)
+                                                                @php $bal = $ledgerBalances[$ledger->id] ?? 0; @endphp
+                                                                <option value="{{ $ledger->id }}" @selected($defaultPayingLedger?->id === $ledger->id)>
+                                                                    {{ $ledger->code }} &mdash; {{ $ledger->name }} (Available: {{ $currencySymbol }}{{ number_format($bal, 2) }})
+                                                                </option>
+                                                            @empty
+                                                                <option value="">No bank/cash ledger configured</option>
+                                                            @endforelse
+                                                        </select>
+                                                        <div class="form-text fs-11 text-muted">Cash-in-Hand accounts cannot pay more than their available balance. Overdraft accounts permitted.</div>
+                                                    </div>
+
+                                                    <div class="mb-2 text-start">
+                                                        <label class="form-label fw-semibold fs-13">Payment Date <span class="text-danger">*</span></label>
+                                                        <input type="date" name="payment_date" class="form-control" value="{{ now()->toDateString() }}" required>
+                                                    </div>
+                                                </x-ui.modal>
                                             @endif
 
                                             @if(in_array($rep->status, ['draft', 'rejected']) && ($isOwner || $isAdmin))
