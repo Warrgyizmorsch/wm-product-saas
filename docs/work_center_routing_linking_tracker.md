@@ -456,6 +456,29 @@
 
 ---
 
+### Area 9: Parallel Operations, Live Memory Grouping & Resource Collision Safeguards (WC-TRACK-09)
+* **Status:** ⏸️ **Logged / Deferred (To be implemented later)**
+* **Context & Problem Statement:**
+  Currently, `is_parallel` uses a simple unstyled text input (`Grp: [ A ]`). The freeform text input is prone to typos, breaking finite capacity scheduling where exact string matches are required. Furthermore, there is no validation preventing two parallel operations from booking the same physical machine or manual batch team simultaneously.
+* **Key Requirements & Architecture (To be implemented):**
+  1. **Dynamic Group Dropdown & Live Memory Pool:**
+     - Replace the raw text input with a Select2 / dynamic select dropdown.
+     - Maintain an in-memory list of active parallel groups in the current routing session.
+     - Include a `+ Add New Group...` option allowing on-the-fly creation of custom groups (e.g. `Sub-Assembly`, `Wiring Branch`), immediately registering in memory across all table rows and saving to `routing_operations.parallel_group`.
+  2. **Physical Resource Collision Validation (Same Machine / Manual Batch):**
+     - Two operations marked `Parallel` in the same `parallel_group` **cannot** be assigned to the same `machine_id` or same `section_manual_production_id` (a single physical resource cannot process two parallel operations at the exact same moment).
+     - **UI Warning:** Display inline warning badge on affected rows alerting planner to the bottleneck.
+     - **Backend Validation:** Enforce in `StoreRoutingRequest` and `UpdateRoutingRequest`.
+  3. **Parallel vs. Predecessor Relationship Rules:**
+     - Resolve styling conflict where Bootstrap's `.d-flex` overrides Alpine's `x-show` on the Predecessor wrapper.
+     - Support branch-level parallelism (an operation can have a predecessor inside its branch, but the branch itself runs parallel to another branch).
+     - Guard against paradoxical configurations (e.g. Op 30 depends on Op 20 which depends on Op 10, but Op 10 and Op 30 are marked as simultaneous parallel siblings).
+  4. **UI/UX Cleanup:**
+     - Neatly align `[✓] Parallel` checkbox and the group selector on the same row.
+     - Auto-clear group assignment and resource warnings when `Parallel` is unchecked.
+
+---
+
 ## 4. Architectural Summary & Implementation Execution Plan
 
 All core business decisions across Areas 1 through 6 are now **🟢 Agreed & Frozen**:

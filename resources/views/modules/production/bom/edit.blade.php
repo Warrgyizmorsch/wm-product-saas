@@ -13,7 +13,7 @@
                 title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
         @endif
 
-        <form method="POST" action="{{ route('production.boms.update', $bom->id) }}">
+        <form method="POST" action="{{ route('production.boms.update', $bom->id) }}" @submit="if (!validateBeforeSubmit($event)) return false;">
             @csrf
             @method('PUT')
             @if(request()->has('parent_product_id'))
@@ -188,271 +188,384 @@
                     <!-- Tab 1: Components Panel -->
                     <div class="tab-pane fade show active" id="tab-components" role="tabpanel"
                         aria-labelledby="tab-components-tab">
-                        <h5 class="fw-bold text-dark mb-3">{{ __('production.add_material_item') }}*</h5>
-                        <div class="table-responsive mb-4">
-                            <x-ui.odoo-form-ui type="table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 4%" class="text-center">{{ __('production.seq') }}</th>
-                                        <th style="width: 23%">{{ __('production.component_product') }}</th>
-                                        <th style="width: 16%">{{ __('production.operation') ?? 'Operation / Station' }}</th>
-                                        <th style="width: 13%">{{ __('production.quantity') }}</th>
-                                        <th style="width: 8%">
-                                            {{ __('production.uom') }}
-                                            <i class="feather-lock text-muted ms-1 fs-11" title="Auto-selected from component product (read-only)"></i>
-                                        </th>
-                                        <th style="width: 6%">{{ __('production.scrap_percent') }}</th>
-                                        <th style="width: 6%">{{ __('production.priority') }}</th>
-                                        <th style="width: 20%">{{ __('production.alternative') }}</th>
-                                        <th style="width: 4%" class="text-center">{{ __('production.action') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="(item, index) in items" :key="item.uid">
-                                        <tr class="bom-component-row" x-init="$nextTick(() => initRowSelects($el, item))">
-                                            <!-- Sequence -->
-                                            <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
 
-                                            <!-- Material Selection -->
-                                            <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="select" name="items[][material_id]"
-                                                    x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select"
-                                                    x-model="item.material_id" required select2Selector="default"
-                                                    data-master="product"
-                                                    alpineError="errors['items.' + index + '.material_id']">
-                                                    <option value="">{{ __('production.select_component') }}</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">
-                                                        {{ __('production.add_new_product') }}
-                                                    </option>
-                                                    @foreach($materials as $material)
-                                                        <option value="{{ $material->id }}" data-type="{{ $material->type }}"
-                                                            data-sku="{{ $material->sku }}" data-uom-id="{{ $material->uom_id }}">{{ $material->name }}
-                                                            ({{ $material->sku }})</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                                <template x-if="!item.child_bom_versions || item.child_bom_versions.length === 0">
-                                                    <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'"
-                                                        x-model="item.child_bom_id">
-                                                </template>
-                                                <template x-if="item.child_bom_loading">
-                                                    <div class="mt-1 text-muted fs-11">
-                                                        <span class="spinner-border spinner-border-sm text-secondary me-1"
-                                                            role="status"
-                                                            style="width: 10px; height: 10px;"></span>{{ __('production.checking_child_bom') }}
-                                                    </div>
-                                                </template>
-                                                <template
-                                                    x-if="!item.child_bom_loading && item.child_bom_versions && item.child_bom_versions.length > 0">
-                                                    <div class="mt-1 d-flex align-items-center gap-1.5 flex-wrap fs-11">
-                                                        <span class="text-muted fs-11 me-1">Sub-BOM:</span>
-                                                        <x-ui.odoo-form-ui type="select" name="items[][child_bom_id]"
-                                                            x-bind:name="'items['+index+'][child_bom_id]'"
-                                                            class="odoo-table-select d-inline-block w-auto fs-11"
-                                                            x-model="item.child_bom_id" select2Selector="default"
-                                                            data-master="bom">
-                                                            <option value="">{{ __('production.explicit_selection') }}
-                                                            </option>
-                                                            <template x-for="v in item.child_bom_versions" :key="v.id">
-                                                                <option :value="v.id"
-                                                                    x-text="'v' + v.version + ' (' + v.status + ')'">
-                                                                </option>
-                                                            </template>
-                                                        </x-ui.odoo-form-ui>
+                        <!-- State 0: No Routing Selected Alert -->
+                        <template x-if="!selectedRoutingId || !availableOperations.length">
+                            <div class="alert alert-info border d-flex align-items-center p-4 rounded-2 mb-4">
+                                <i class="feather-git-commit fs-24 text-info me-3"></i>
+                                <div>
+                                    <h6 class="fw-bold mb-1 text-dark">{{ __('production.select_routing_first') }}</h6>
+                                    <p class="mb-0 fs-12 text-muted">{{ __('production.no_routing_selected_alert') }}</p>
+                                </div>
+                            </div>
+                        </template>
 
-                                                        <template x-if="item.child_bom_id">
-                                                            <span class="d-inline-flex align-items-center gap-1.5 ms-1">
-                                                                <a :href="'{{ url('production/boms') }}/' + item.child_bom_id"
-                                                                    target="_blank"
-                                                                    class="text-primary text-decoration-none fs-11 fw-semibold"
-                                                                    title="{{ __('production.view') }}">
-                                                                    <i
-                                                                        class="feather-eye me-0.5"></i>{{ __('production.view') }}
-                                                                </a>
-                                                                <template
-                                                                    x-if="item.child_bom_id && (!item.child_bom_versions.find(x => x.id == item.child_bom_id) || !['approved', 'active', 'scheduled'].includes(item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status))">
-                                                                    <span
-                                                                        class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1 py-0.5"
-                                                                        title="Draft, inactive, or non-approved version"><i
-                                                                            class="feather-alert-triangle me-0.5"></i>{{ __('production.non_approved') }}</span>
-                                                                </template>
-                                                            </span>
-                                                        </template>
-                                                    </div>
-                                                </template>
-                                                <template
-                                                    x-if="!item.child_bom_loading && (!item.child_bom_versions || item.child_bom_versions.length === 0) && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
-                                                    <div class="mt-1 fs-11">
-                                                        <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')"
-                                                            target="_blank"
-                                                            class="text-primary text-decoration-none fw-semibold">
-                                                            <i
-                                                                class="feather-plus-circle me-0.5"></i>{{ __('production.configure_sub_bom') }}
-                                                        </a>
-                                                    </div>
-                                                </template>
-                                                <div class="mt-1">
-                                                    <input type="text" x-bind:name="'items['+index+'][notes]'" class="odoo-table-input fs-11 text-muted" placeholder="Component notes (optional)..." x-model="item.notes" />
-                                                </div>
-                                            </td>
+                        <!-- State 1: Routing Selected with Operations Workspace -->
+                        <div x-show="selectedRoutingId && availableOperations.length > 0">
+                            <!-- Workspace Toolbar -->
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary fs-12" @click="expandAllOps()">
+                                        <i class="feather-maximize-2 me-1"></i>{{ __('production.expand_all') }}
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary fs-12" @click="collapseAllOps()">
+                                        <i class="feather-minimize-2 me-1"></i>{{ __('production.collapse_all') }}
+                                    </button>
+                                </div>
+                                <div class="text-muted fs-12">
+                                    <span class="fw-semibold text-dark" x-text="items.filter(it => it.material_id).length"></span>
+                                    <span x-text="items.filter(it => it.material_id).length === 1 ? ' material configured' : ' materials configured'"></span>
+                                    across
+                                    <span class="fw-semibold text-dark" x-text="availableOperations.length"></span>
+                                    <span> operations</span>
+                                </div>
+                            </div>
 
-                                            <!-- Operation / Station Assignment -->
-                                            <td class="align-middle">
-                                                <select class="form-select form-select-sm fs-11"
-                                                    x-bind:name="'items['+index+'][routing_operation_id]'"
-                                                    x-model="item.routing_operation_id"
-                                                    required
-                                                    :class="errors['items.' + index + '.routing_operation_id'] ? 'is-invalid' : ''">
-                                                    <option value="" x-show="!availableOperations.length">-- {{ __('production.select_routing_first') ?? 'Select Routing First' }} --</option>
-                                                    <template x-for="op in availableOperations" :key="op.id">
-                                                        <option :value="op.id"
-                                                            :selected="item.routing_operation_id == op.id"
-                                                            x-text="'Op ' + op.sequence + ': ' + op.name">
-                                                        </option>
+                            <!-- Sequential Operation Cards -->
+                            <template x-for="(op, opIndex) in availableOperations" :key="op.id">
+                                <div class="card border shadow-none mb-3 operation-card"
+                                    :class="isOpExpanded(op.id) ? 'border-primary-subtle' : ''">
+                                    <!-- Card Header / Accordion Bar -->
+                                    <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center c-pointer select-none"
+                                        @click="toggleOp(op.id)"
+                                        style="cursor: pointer;">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <i class="feather-chevron-down text-muted transition-all"
+                                                style="transition: transform 0.2s;"
+                                                :style="isOpExpanded(op.id) ? 'transform: rotate(0deg);' : 'transform: rotate(-90deg);'"></i>
+                                            <span class="badge bg-primary text-white fw-bold fs-11 px-2 py-1">
+                                                Op <span x-text="op.sequence"></span>
+                                            </span>
+                                            <span class="fw-bold text-dark fs-13" x-text="op.name"></span>
+
+                                            <!-- Work Center / Section Badge -->
+                                            <template x-if="op.work_center && op.work_center.name">
+                                                <span class="badge bg-soft-secondary text-secondary border fs-11 fw-normal">
+                                                    <i class="feather-box me-1"></i><span x-text="op.work_center.name"></span>
+                                                    <template x-if="op.section && op.section.name">
+                                                        <span x-text="' / ' + op.section.name"></span>
                                                     </template>
-                                                </select>
-                                                <template x-if="errors['items.' + index + '.routing_operation_id']">
-                                                    <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray(errors['items.' + index + '.routing_operation_id']) ? errors['items.' + index + '.routing_operation_id'][0] : errors['items.' + index + '.routing_operation_id']"></div>
+                                                </span>
+                                            </template>
+
+                                            <!-- Metrics: Setup / Processing / Yield -->
+                                            <div class="d-none d-md-flex align-items-center gap-2 text-muted fs-11 ms-2">
+                                                <template x-if="op.setup_time_minutes > 0">
+                                                    <span>Setup: <strong x-text="op.setup_time_minutes + 'm'"></strong></span>
                                                 </template>
-                                                <template x-if="selectedRoutingId && !availableOperations.length">
-                                                    <small class="text-danger fs-10 d-block mt-1">Routing has no operations</small>
+                                                <template x-if="op.processing_time_minutes > 0">
+                                                    <span>• Run: <strong x-text="op.processing_time_minutes + 'm/unit'"></strong></span>
                                                 </template>
-                                            </td>
-
-                                            <!-- Quantity & Type -->
-                                            <td class="align-middle" style="min-width: 220px;">
-                                                <div class="d-flex flex-column gap-1">
-                                                    <div class="d-flex gap-1">
-                                                        <x-ui.odoo-form-ui type="input" inputType="number" step="any"
-                                                            name="items[][quantity]" x-bind:name="'items['+index+'][quantity]'"
-                                                            class="odoo-table-input text-end" x-model="item.quantity"
-                                                            placeholder="0.00" required min="0.0001"
-                                                            alpineError="errors['items.' + index + '.quantity']" />
-
-                                                        <x-ui.odoo-form-ui type="select"
-                                                            name="items[][quantity_type]"
-                                                            x-bind:name="'items['+index+'][quantity_type]'"
-                                                            class="odoo-table-select fs-11"
-                                                            style="width: 100px;"
-                                                            select2Selector="default"
-                                                            x-model="item.quantity_type">
-                                                            <option value="fixed">Fixed</option>
-                                                            <option value="formula">Formula</option>
-                                                        </x-ui.odoo-form-ui>
-                                                    </div>
-
-                                                    <div x-show="item.quantity_type === 'formula'" class="mt-1">
-                                                        <x-ui.odoo-form-ui type="input" inputType="text"
-                                                            name="items[][formula]"
-                                                            x-bind:name="'items['+index+'][formula]'"
-                                                            class="odoo-table-input font-monospace fs-11"
-                                                            x-model="item.formula"
-                                                            placeholder="e.g. length * width * quantity" />
-                                                        <div class="d-flex justify-content-between align-items-center mt-1">
-                                                            <small class="text-muted fs-10">Vars: length, width, height, quantity</small>
-                                                            <button type="button" class="btn btn-xs btn-outline-primary py-0 fs-10"
-                                                                @click="previewFormula(item.formula)">
-                                                                <i class="feather-play me-1"></i>Preview
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <!-- UOM -->
-                                            <td class="align-middle">
-                                                <input type="hidden" x-bind:name="'items['+index+'][uom_id]'" x-model="item.uom_id">
-                                                <select class="odoo-table-select bg-light text-muted bom-row-uom-select"
-                                                    x-model="item.uom_id"
-                                                    disabled
-                                                    tabindex="-1"
-                                                    data-select2-selector="default"
-                                                    style="pointer-events: none; cursor: not-allowed; background-color: #f8f9fa;"
-                                                    :class="errors['items.' + index + '.uom_id'] ? 'is-invalid' : ''">
-                                                    <option value="">{{ __('production.select_uom') }}</option>
-                                                    @foreach($uoms as $uom)
-                                                        <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
-                                                    @endforeach
-                                                </select>
-                                                <template x-if="errors['items.' + index + '.uom_id']">
-                                                    <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray(errors['items.' + index + '.uom_id']) ? errors['items.' + index + '.uom_id'][0] : errors['items.' + index + '.uom_id']"></div>
+                                                <template x-if="op.expected_yield_percentage && op.expected_yield_percentage < 100">
+                                                    <span>• Yield: <strong x-text="op.expected_yield_percentage + '%'"></strong></span>
                                                 </template>
-                                            </td>
+                                            </div>
+                                        </div>
 
-                                            <!-- Material Scrap Percentage -->
-                                            <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="input" inputType="number" step="any"
-                                                    name="items[][material_scrap_percentage]"
-                                                    x-bind:name="'items['+index+'][material_scrap_percentage]'"
-                                                    class="odoo-table-input text-end text-danger"
-                                                    x-model="item.material_scrap_percentage" placeholder="0.00" min="0"
-                                                    max="100"
-                                                    alpineError="errors['items.' + index + '.material_scrap_percentage']" />
-                                            </td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <!-- Materials count badge -->
+                                            <span class="badge rounded-pill fs-11 px-2.5 py-1"
+                                                :class="getItemsForOp(op.id).length > 0 ? 'bg-soft-primary text-primary border border-primary-subtle' : 'bg-light text-muted border'">
+                                                <i class="feather-layers me-1"></i>
+                                                <span x-text="getItemsForOp(op.id).length + ' ' + (getItemsForOp(op.id).length === 1 ? 'Material' : 'Materials')"></span>
+                                            </span>
+                                        </div>
+                                    </div>
 
-                                            <!-- Priority -->
-                                            <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[][priority]"
-                                                    x-bind:name="'items['+index+'][priority]'"
-                                                    class="odoo-table-input text-end" x-model="item.priority"
-                                                    placeholder="1" min="1"
-                                                    alpineError="errors['items.' + index + '.priority']" />
-                                            </td>
+                                    <!-- Card Body: Materials Sub-Table (Collapsible) -->
+                                    <div class="card-body p-3" x-show="isOpExpanded(op.id)">
+                                        <!-- When Operation has Materials -->
+                                        <div x-show="getItemsForOp(op.id).length > 0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle table-hover mb-2 fs-12">
+                                                    <thead class="table-light fs-11 text-uppercase text-muted border-bottom">
+                                                        <tr>
+                                                            <th style="width: 4%" class="text-center">#</th>
+                                                            <th style="width: 32%">{{ __('production.component_product') }}</th>
+                                                            <th style="width: 18%">{{ __('production.quantity') }}</th>
+                                                            <th style="width: 10%">
+                                                                {{ __('production.uom') }}
+                                                                <i class="feather-lock text-muted ms-1 fs-11" title="Auto-selected from component product (read-only)"></i>
+                                                            </th>
+                                                            <th style="width: 8%">{{ __('production.scrap_percent') }}</th>
+                                                            <th style="width: 24%">{{ __('production.alternative') }}</th>
+                                                            <th style="width: 4%" class="text-center">{{ __('production.action') }}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <template x-for="(item, subIndex) in getItemsForOp(op.id)" :key="item.uid">
+                                                            <tr class="bom-component-row" :data-row-uid="item.uid" x-init="$nextTick(() => initRowSelects($el, item))">
+                                                                <!-- Sequence inside this operation -->
+                                                                <td class="fw-bold text-center align-middle text-muted" x-text="subIndex + 1"></td>
 
-                                            <!-- Alternative material options -->
-                                            <td class="align-middle">
-                                                <input type="hidden" x-bind:name="'items['+index+'][row_uid]'" :value="item.uid">
-                                                <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
-                                                <input type="hidden" x-bind:name="'items['+index+'][replaces_row_uid]'" :value="item.is_alternative ? (item.replaces_row_uid || '') : ''">
-                                                <input type="hidden" x-bind:name="'items['+index+'][id]'" :value="item.id || ''">
-                                                <input type="hidden" x-bind:name="'items['+index+'][replaces_item_id]'" :value="item.is_alternative ? (item.replaces_item_id || '') : ''">
-                                                <div class="d-flex flex-column gap-1.5">
-                                                    <div class="form-check form-switch mb-0">
-                                                        <input class="form-check-input" type="checkbox"
-                                                            x-model="item.is_alternative"
-                                                            @change="onAlternativeToggle(item)"
-                                                            x-bind:id="'is_alternative_edit_' + index">
-                                                        <label class="form-check-label fs-11 fw-semibold" x-bind:for="'is_alternative_edit_' + index"
-                                                            x-text="item.is_alternative ? '{{ __('production.alternative_component') }}' : '{{ __('production.primary_component') }}'">
-                                                        </label>
-                                                    </div>
-                                                    <div x-show="item.is_alternative" class="mt-1">
-                                                        <label class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">
-                                                            {{ __('production.alternative_of') }} <span class="text-danger">*</span>
-                                                        </label>
-                                                        <select class="form-select form-select-sm fs-11"
-                                                            x-model="item.replaces_row_uid"
-                                                            @change="onAlternativeTargetChange(item)"
-                                                            :required="item.is_alternative"
-                                                            alpineError="errors['items.' + index + '.replaces_row_uid'] || errors['items.' + index + '.replaces_item_id']">
-                                                            <option value="">-- {{ __('production.select_primary_component') }} --</option>
-                                                            <template x-for="target in getEligiblePrimaryComponents(index)" :key="target.uid">
-                                                                <option :value="target.uid"
-                                                                    :selected="item.replaces_row_uid === target.uid"
-                                                                    x-text="'[' + (target.sku || 'No SKU') + '] ' + target.name + ' (Seq ' + target.seq + ')'">
-                                                                </option>
-                                                            </template>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </td>
+                                                                <!-- Material Selection -->
+                                                                <td class="align-middle">
+                                                                    <!-- Locked Operation ID -->
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][routing_operation_id]'" :value="op.id">
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][id]'" :value="item.id || ''">
 
-                                            <!-- Remove Row Action -->
-                                            <td class="text-center align-middle">
-                                                <button type="button" class="erp-btn-delete" @click="removeItem(index)">
-                                                    <i class="feather-x"></i>
+                                                                    <x-ui.odoo-form-ui type="select" name="items[][material_id]"
+                                                                        x-bind:name="'items['+getItemIndex(item)+'][material_id]'" class="odoo-table-select"
+                                                                        x-model="item.material_id" required select2Selector="default"
+                                                                        data-master="product"
+                                                                        alpineError="errors['items.' + getItemIndex(item) + '.material_id']">
+                                                                        <option value="">{{ __('production.select_component') }}</option>
+                                                                        <option value="__ADD_NEW__" class="fw-bold text-primary">
+                                                                            {{ __('production.add_new_product') }}
+                                                                        </option>
+                                                                        @foreach($materials as $material)
+                                                                            <option value="{{ $material->id }}" data-type="{{ $material->type }}"
+                                                                                data-sku="{{ $material->sku }}" data-uom-id="{{ $material->uom_id }}">{{ $material->name }}
+                                                                                ({{ $material->sku }})</option>
+                                                                        @endforeach
+                                                                    </x-ui.odoo-form-ui>
+                                                                    <template x-if="!item.child_bom_versions || item.child_bom_versions.length === 0">
+                                                                        <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][child_bom_id]'"
+                                                                            x-model="item.child_bom_id">
+                                                                    </template>
+                                                                    <template x-if="item.child_bom_loading">
+                                                                        <div class="mt-1 text-muted fs-11">
+                                                                            <span class="spinner-border spinner-border-sm text-secondary me-1"
+                                                                                role="status"
+                                                                                style="width: 10px; height: 10px;"></span>{{ __('production.checking_child_bom') }}
+                                                                        </div>
+                                                                    </template>
+                                                                    <template
+                                                                        x-if="!item.child_bom_loading && item.child_bom_versions && item.child_bom_versions.length > 0">
+                                                                        <div class="mt-1 d-flex align-items-center gap-1.5 flex-wrap fs-11">
+                                                                            <span class="text-muted fs-11 me-1">Sub-BOM:</span>
+                                                                            <x-ui.odoo-form-ui type="select" name="items[][child_bom_id]"
+                                                                                x-bind:name="'items['+getItemIndex(item)+'][child_bom_id]'"
+                                                                                class="odoo-table-select d-inline-block w-auto fs-11"
+                                                                                x-model="item.child_bom_id" select2Selector="default"
+                                                                                data-master="bom">
+                                                                                <option value="">{{ __('production.explicit_selection') }}
+                                                                                </option>
+                                                                                <template x-for="v in item.child_bom_versions" :key="v.id">
+                                                                                    <option :value="v.id"
+                                                                                        x-text="'v' + v.version + ' (' + v.status + ')'">
+                                                                                    </option>
+                                                                                </template>
+                                                                            </x-ui.odoo-form-ui>
+
+                                                                            <template x-if="item.child_bom_id">
+                                                                                <span class="d-inline-flex align-items-center gap-1.5 ms-1">
+                                                                                    <a :href="'{{ url('production/boms') }}/' + item.child_bom_id"
+                                                                                        target="_blank"
+                                                                                        class="text-primary text-decoration-none fs-11 fw-semibold"
+                                                                                        title="{{ __('production.view') }}">
+                                                                                        <i
+                                                                                            class="feather-eye me-0.5"></i>{{ __('production.view') }}
+                                                                                    </a>
+                                                                                    <template
+                                                                                        x-if="item.child_bom_id && (!item.child_bom_versions.find(x => x.id == item.child_bom_id) || !['approved', 'active', 'scheduled'].includes(item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status))">
+                                                                                        <span
+                                                                                            class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 px-1 py-0.5"
+                                                                                            title="Draft, inactive, or non-approved version"><i
+                                                                                                class="feather-alert-triangle me-0.5"></i>{{ __('production.non_approved') }}</span>
+                                                                                    </template>
+                                                                                </span>
+                                                                            </template>
+                                                                        </div>
+                                                                    </template>
+                                                                    <template
+                                                                        x-if="!item.child_bom_loading && (!item.child_bom_versions || item.child_bom_versions.length === 0) && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
+                                                                        <div class="mt-1 fs-11">
+                                                                            <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')"
+                                                                                target="_blank"
+                                                                                class="text-primary text-decoration-none fw-semibold">
+                                                                                <i
+                                                                                    class="feather-plus-circle me-0.5"></i>{{ __('production.configure_sub_bom') }}
+                                                                            </a>
+                                                                        </div>
+                                                                    </template>
+                                                                    <div class="mt-1">
+                                                                        <input type="text" x-bind:name="'items['+getItemIndex(item)+'][notes]'" class="odoo-table-input fs-11 text-muted" placeholder="Component notes (optional)..." x-model="item.notes" />
+                                                                    </div>
+                                                                </td>
+
+                                                                <!-- Quantity & Type -->
+                                                                <td class="align-middle" style="min-width: 195px;">
+                                                                    <div class="d-flex flex-column gap-1">
+                                                                        <div class="d-flex gap-2 align-items-center">
+                                                                            <x-ui.odoo-form-ui type="input" inputType="number" step="any" min="0.0001" required
+                                                                                name="items[][quantity]"
+                                                                                x-bind:name="'items['+getItemIndex(item)+'][quantity]'"
+                                                                                class="odoo-table-input text-end"
+                                                                                style="width: 85px;"
+                                                                                x-model="item.quantity"
+                                                                                placeholder="0.00"
+                                                                                alpineError="errors['items.' + getItemIndex(item) + '.quantity']" />
+
+                                                                            <select class="odoo-table-select"
+                                                                                name="items[][quantity_type]"
+                                                                                x-bind:name="'items['+getItemIndex(item)+'][quantity_type]'"
+                                                                                x-model="item.quantity_type"
+                                                                                style="width: 100px;">
+                                                                                <option value="fixed">Fixed</option>
+                                                                                <option value="formula">Formula</option>
+                                                                            </select>
+                                                                        </div>
+
+                                                                        <!-- Formula Expression Box (Shown when Formula is selected) -->
+                                                                        <div x-show="item.quantity_type === 'formula'" 
+                                                                            x-transition:enter="transition ease-out duration-100"
+                                                                            class="mt-1" style="width: 190px;">
+                                                                            <div class="d-flex align-items-center gap-1">
+                                                                                <input type="text"
+                                                                                    name="items[][formula]"
+                                                                                    x-bind:name="'items['+getItemIndex(item)+'][formula]'"
+                                                                                    class="odoo-table-input font-monospace fs-11"
+                                                                                    style="flex: 1 1 auto;"
+                                                                                    x-model="item.formula"
+                                                                                    placeholder="e.g. length * width"
+                                                                                    :class="errors['items.' + getItemIndex(item) + '.formula'] ? 'is-invalid' : ''" />
+                                                                                <button type="button" 
+                                                                                    class="btn btn-outline-primary btn-sm px-2 py-0 d-inline-flex align-items-center justify-content-center"
+                                                                                    style="height: 32px; border-radius: var(--ax-radius-sm, 6px);"
+                                                                                    @click="previewFormula(item.formula)"
+                                                                                    title="Test formula evaluation">
+                                                                                    <i class="feather-play fs-11"></i>
+                                                                                </button>
+                                                                            </div>
+                                                                            <template x-if="errors['items.' + getItemIndex(item) + '.formula']">
+                                                                                <div class="invalid-feedback d-block fs-10 mt-1" x-text="Array.isArray(errors['items.' + getItemIndex(item) + '.formula']) ? errors['items.' + getItemIndex(item) + '.formula'][0] : errors['items.' + getItemIndex(item) + '.formula']"></div>
+                                                                            </template>
+                                                                            <div class="d-flex align-items-center flex-wrap gap-1 mt-1 text-muted" style="font-size: 10px;">
+                                                                                <span>Vars:</span>
+                                                                                <code class="text-primary c-pointer text-decoration-underline" @click="item.formula = (item.formula ? item.formula + ' ' : '') + 'length'">length</code>,
+                                                                                <code class="text-primary c-pointer text-decoration-underline" @click="item.formula = (item.formula ? item.formula + ' ' : '') + 'width'">width</code>,
+                                                                                <code class="text-primary c-pointer text-decoration-underline" @click="item.formula = (item.formula ? item.formula + ' ' : '') + 'height'">height</code>,
+                                                                                <code class="text-primary c-pointer text-decoration-underline" @click="item.formula = (item.formula ? item.formula + ' ' : '') + 'quantity'">qty</code>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+
+                                                                <!-- UOM -->
+                                                                <td class="align-middle">
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][uom_id]'" x-model="item.uom_id">
+                                                                    <select class="odoo-table-select bg-light text-muted bom-row-uom-select"
+                                                                        x-model="item.uom_id"
+                                                                        disabled
+                                                                        tabindex="-1"
+                                                                        data-select2-selector="default"
+                                                                        style="pointer-events: none; cursor: not-allowed; background-color: #f8f9fa;"
+                                                                        :class="errors['items.' + getItemIndex(item) + '.uom_id'] ? 'is-invalid' : ''">
+                                                                        <option value="">{{ __('production.select_uom') }}</option>
+                                                                        @foreach($uoms as $uom)
+                                                                            <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                    <template x-if="errors['items.' + getItemIndex(item) + '.uom_id']">
+                                                                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray(errors['items.' + getItemIndex(item) + '.uom_id']) ? errors['items.' + getItemIndex(item) + '.uom_id'][0] : errors['items.' + getItemIndex(item) + '.uom_id']"></div>
+                                                                    </template>
+                                                                </td>
+
+                                                                <!-- Material Scrap Percentage -->
+                                                                <td class="align-middle">
+                                                                    <x-ui.odoo-form-ui type="input" inputType="number" step="any"
+                                                                        name="items[][material_scrap_percentage]"
+                                                                        x-bind:name="'items['+getItemIndex(item)+'][material_scrap_percentage]'"
+                                                                        class="odoo-table-input text-end text-danger"
+                                                                        x-model="item.material_scrap_percentage" placeholder="0.00" min="0"
+                                                                        max="100"
+                                                                        alpineError="errors['items.' + getItemIndex(item) + '.material_scrap_percentage']" />
+                                                                </td>
+
+                                                                <!-- Alternative material options + Embedded Priority -->
+                                                                <td class="align-middle" style="min-width: 250px;">
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][row_uid]'" :value="item.uid">
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][replaces_row_uid]'" :value="item.is_alternative ? (item.replaces_row_uid || '') : ''">
+                                                                    <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][replaces_item_id]'" :value="item.is_alternative ? (item.replaces_item_id || '') : ''">
+                                                                    <div class="d-flex flex-column gap-1.5">
+                                                                        <div class="form-check form-switch mb-0">
+                                                                            <input class="form-check-input" type="checkbox"
+                                                                                x-model="item.is_alternative"
+                                                                                @change="onAlternativeToggle(item)"
+                                                                                x-bind:id="'is_alternative_edit_' + item.uid">
+                                                                            <label class="form-check-label fs-11 fw-semibold" x-bind:for="'is_alternative_edit_' + item.uid"
+                                                                                x-text="item.is_alternative ? '{{ __('production.alternative_component') }}' : '{{ __('production.primary_component') }}'">
+                                                                            </label>
+                                                                        </div>
+                                                                        <div x-show="item.is_alternative" class="mt-1">
+                                                                            <div class="d-flex gap-2 align-items-end">
+                                                                                <div class="flex-grow-1" style="min-width: 150px;">
+                                                                                    <label class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">
+                                                                                        {{ __('production.alternative_of') }} <span class="text-danger">*</span>
+                                                                                    </label>
+                                                                                    <select class="form-select form-select-sm fs-11 bom-alt-select"
+                                                                                        data-select2-selector="alt"
+                                                                                        style="width: 100%;"
+                                                                                        :required="item.is_alternative">
+                                                                                        <option value="">-- {{ __('production.select_primary_component') }} --</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                                <div style="width: 70px;">
+                                                                                    <label class="fs-10 text-muted fw-bold text-uppercase d-block mb-1">
+                                                                                        {{ __('production.priority') }}
+                                                                                    </label>
+                                                                                    <input type="number"
+                                                                                        x-bind:name="'items['+getItemIndex(item)+'][priority]'"
+                                                                                        class="odoo-table-input text-end"
+                                                                                        style="width: 100%;"
+                                                                                        x-model="item.priority"
+                                                                                        placeholder="1" min="1">
+                                                                                </div>
+                                                                            </div>
+                                                                            <template x-if="errors['items.' + getItemIndex(item) + '.replaces_row_uid'] || errors['items.' + getItemIndex(item) + '.replaces_item_id']">
+                                                                                <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray(errors['items.' + getItemIndex(item) + '.replaces_row_uid']) ? errors['items.' + getItemIndex(item) + '.replaces_row_uid'][0] : errors['items.' + getItemIndex(item) + '.replaces_row_uid']"></div>
+                                                                            </template>
+                                                                        </div>
+                                                                        <template x-if="!item.is_alternative">
+                                                                            <input type="hidden" x-bind:name="'items['+getItemIndex(item)+'][priority]'" value="1">
+                                                                        </template>
+                                                                    </div>
+                                                                </td>
+
+                                                                <!-- Remove Row Action -->
+                                                                <td class="text-center align-middle">
+                                                                    <button type="button"
+                                                                        class="btn btn-outline-danger btn-sm p-0 d-inline-flex align-items-center justify-content-center"
+                                                                        style="width: 24px; height: 24px; border-radius: 4px;"
+                                                                        @click="removeItem(getItemIndex(item))"
+                                                                        title="{{ __('production.delete') }}">
+                                                                        <i class="feather-trash-2 fs-12"></i>
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        </template>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-link p-0 text-primary fw-semibold text-decoration-none shadow-none border-0 bg-transparent fs-12"
+                                                    @click="addItemToOp(op.id)">
+                                                    <i class="feather-plus me-1 fs-13"></i>{{ __('production.add_material_to_op') }} <span x-text="op.sequence"></span>
                                                 </button>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </x-ui.odoo-form-ui>
-                        </div>
+                                            </div>
+                                        </div>
 
-                        <!-- Add Row Action -->
-                        <div class="mb-4">
-                            <button type="button" class="btn btn-link p-0 text-primary fw-semibold text-decoration-none shadow-none border-0 bg-transparent" @click="addItem()">
-                                <i class="feather-plus me-1 fs-14"></i>{{ __('production.add_material_line') }}
-                            </button>
+                                        <!-- When Operation has ZERO Materials -->
+                                        <div x-show="getItemsForOp(op.id).length === 0">
+                                            <div class="alert alert-light border border-dashed d-flex align-items-center justify-content-between p-3 mb-0 rounded-2">
+                                                <div class="d-flex align-items-center text-muted fs-12">
+                                                    <i class="feather-info text-secondary me-2 fs-16"></i>
+                                                    <div>
+                                                        <div class="fw-semibold text-dark">{{ __('production.process_operation_zero_materials') }}</div>
+                                                        <div class="fs-11 text-muted">{{ __('production.zero_materials_notice', ['seq' => '']) }}</div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-primary fs-11" @click="addItemToOp(op.id)">
+                                                    <i class="feather-plus me-1"></i>{{ __('production.add_material_to_op') }} <span x-text="op.sequence"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -485,6 +598,37 @@
             cursor: not-allowed !important;
             background-color: #f8f9fa !important;
         }
+        .operation-card {
+            border-radius: 6px;
+            border-color: #e2e8f0;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .operation-card:hover {
+            border-color: #cbd5e1;
+        }
+        .operation-card.border-primary-subtle {
+            border-color: #c7d2fe !important;
+        }
+        .c-pointer {
+            cursor: pointer;
+        }
+        .select-none {
+            user-select: none;
+        }
+        .bom-select2-dropdown .select2-results__option {
+            font-size: 11px;
+            padding: 6px 10px;
+        }
+        .bom-alt-select + .select2-container--bootstrap-5 .select2-selection {
+            min-height: 32px !important;
+            height: 32px !important;
+            font-size: 13px !important;
+        }
+        .bom-alt-select + .select2-container--bootstrap-5 .select2-selection__rendered {
+            line-height: 30px !important;
+            padding-left: 8px !important;
+            padding-right: 20px !important;
+        }
     </style>
 
     <script>
@@ -499,8 +643,56 @@
                 routings: routingsData,
                 selectedRoutingId: '{{ old('routing_id', $bom->routing_id ?? '') }}',
                 availableOperations: [],
+                expandedOps: {},
                 activeTab: 'components',
                 showAdvanced: true,
+
+                isOpExpanded(opId) {
+                    if (this.expandedOps[opId] === undefined) {
+                        return true;
+                    }
+                    return !!this.expandedOps[opId];
+                },
+
+                toggleOp(opId) {
+                    this.expandedOps[opId] = !this.isOpExpanded(opId);
+                    if (this.expandedOps[opId]) {
+                        this.$nextTick(() => {
+                            var self = this;
+                            $('.operation-card[data-op-id="' + opId + '"] .bom-component-row').each(function () {
+                                var rowUid = $(this).attr('data-row-uid');
+                                var item = self.items.find(it => it.uid === rowUid);
+                                if (item && item.is_alternative) {
+                                    self.initAltSelect(this, item);
+                                }
+                            });
+                        });
+                    }
+                },
+
+                expandAllOps() {
+                    this.availableOperations.forEach(op => {
+                        this.expandedOps[op.id] = true;
+                    });
+                    this.$nextTick(() => {
+                        this.initAllRowSelects();
+                    });
+                },
+
+                collapseAllOps() {
+                    this.availableOperations.forEach(op => {
+                        this.expandedOps[op.id] = false;
+                    });
+                },
+
+                getItemsForOp(opId) {
+                    return this.items.filter(it => String(it.routing_operation_id) === String(opId));
+                },
+
+                getItemIndex(item) {
+                    const idx = this.items.indexOf(item);
+                    return idx >= 0 ? idx : 0;
+                },
 
                 updateAvailableOperations(routingId, autoAssignDefault = true) {
                     if (!routingId || !this.routings[routingId] || !this.routings[routingId].operations) {
@@ -613,9 +805,22 @@
                             child_bom_loading: false
                         };
                     });
-                    if (this.items.length === 0) {
-                        this.addItem();
+
+                    // Initial routing and operations setup
+                    const initialRoutingId = $('#routing_id').val() || this.selectedRoutingId;
+                    this.selectedRoutingId = initialRoutingId;
+                    this.updateAvailableOperations(initialRoutingId, false);
+
+                    const firstOp = this.getFirstOperationId();
+                    if (firstOp) {
+                        this.items.forEach(item => {
+                            if (!item.routing_operation_id) {
+                                item.routing_operation_id = firstOp;
+                            }
+                        });
                     }
+
+                    this.expandAllOps();
 
                     this.$nextTick(() => {
                         this.items.forEach(item => {
@@ -623,6 +828,7 @@
                                 this.fetchChildBomStatus(item);
                             }
                         });
+                        this.initAllRowSelects();
                     });
 
                     const syncHeaderUom = (productId) => {
@@ -647,24 +853,12 @@
                         }
                     };
 
-                    // Initial routing and operations setup
-                    const initialRoutingId = $('#routing_id').val() || this.selectedRoutingId;
-                    this.selectedRoutingId = initialRoutingId;
-                    this.updateAvailableOperations(initialRoutingId, false);
-
-                    const firstOp = this.getFirstOperationId();
-                    if (firstOp) {
-                        this.items.forEach(item => {
-                            if (!item.routing_operation_id) {
-                                item.routing_operation_id = firstOp;
-                            }
-                        });
-                    }
-
                     $('#routing_id').on('change.select2 change', (e) => {
                         var routingVal = e.target.value;
                         this.selectedRoutingId = routingVal;
                         this.updateAvailableOperations(routingVal, true);
+                        this.expandAllOps();
+                        this.$nextTick(() => this.initAllRowSelects());
                     });
 
                     // Initial header UOM on load
@@ -779,16 +973,17 @@
                 getEligiblePrimaryComponents(currentIndex) {
                     const currentItem = this.items[currentIndex];
                     if (!currentItem) return [];
-                    return this.items
-                        .map((it, idx) => {
+                    const opItems = this.getItemsForOp(currentItem.routing_operation_id);
+                    return opItems
+                        .map((it, subIdx) => {
                             const mat = this.materials.find(m => String(m.id) === String(it.material_id));
                             return {
-                                index: idx,
                                 uid: it.uid,
                                 id: it.id || null,
-                                seq: idx + 1,
+                                seq: subIdx + 1,
                                 material_id: it.material_id,
-                                name: mat ? mat.name : (it.material_id ? ('Component #' + it.material_id) : ('Item #' + (idx + 1))),
+                                routing_operation_id: it.routing_operation_id,
+                                name: mat ? mat.name : (it.material_id ? ('Component #' + it.material_id) : ('Item #' + (subIdx + 1))),
                                 sku: mat ? mat.sku : '—',
                                 is_alternative: it.is_alternative,
                             };
@@ -796,14 +991,82 @@
                         .filter(it => {
                             if (it.uid === currentItem.uid) return false;
                             if (it.is_alternative) return false;
+                            if (!it.material_id) return false;
                             return true;
                         });
                 },
 
+                initAltSelect(rowEl, item) {
+                    var self = this;
+                    if (!rowEl) return;
+                    var $altSelect = $(rowEl).find('select.bom-alt-select');
+                    if (!$altSelect.length) return;
+
+                    var eligible = self.getEligiblePrimaryComponents(self.getItemIndex(item));
+                    var currentVal = item.replaces_row_uid || '';
+
+                    if ($altSelect.data('select2')) {
+                        $altSelect.select2('destroy');
+                    }
+
+                    $altSelect.empty();
+                    $altSelect.append(new Option('-- {{ __('production.select_primary_component') }} --', ''));
+                    eligible.forEach(function (target) {
+                        var label = '[' + (target.sku || 'No SKU') + '] ' + target.name + ' (#' + target.seq + ')';
+                        var isSelected = String(target.uid) === String(currentVal);
+                        var opt = new Option(label, target.uid, isSelected, isSelected);
+                        $altSelect.append(opt);
+                    });
+
+                    if (currentVal && !eligible.some(t => String(t.uid) === String(currentVal))) {
+                        item.replaces_row_uid = '';
+                        item.replaces_item_id = null;
+                        currentVal = '';
+                    }
+
+                    $altSelect.val(currentVal);
+
+                    $altSelect.select2({
+                        theme: "bootstrap-5",
+                        width: '100%',
+                        dropdownParent: $('body'),
+                        dropdownCssClass: 'bom-select2-dropdown'
+                    });
+
+                    $altSelect.off('change.bom-alt-select').on('change.bom-alt-select', function () {
+                        var val = $(this).val();
+                        item.replaces_row_uid = val;
+                        self.onAlternativeTargetChange(item);
+                    });
+                },
+
+                refreshAltSelectsForOp(opId) {
+                    var self = this;
+                    this.$nextTick(() => {
+                        var opRows = self.getItemsForOp(opId);
+                        opRows.forEach(item => {
+                            if (item.is_alternative) {
+                                var rowEl = document.querySelector('.bom-component-row[data-row-uid="' + item.uid + '"]');
+                                if (rowEl) {
+                                    self.initAltSelect(rowEl, item);
+                                }
+                            }
+                        });
+                    });
+                },
+
                 onAlternativeToggle(item) {
+                    var self = this;
                     if (!item.is_alternative) {
                         item.replaces_row_uid = '';
                         item.replaces_item_id = null;
+                        var rowEl = document.querySelector('.bom-component-row[data-row-uid="' + item.uid + '"]');
+                        if (rowEl) {
+                            var $altSelect = $(rowEl).find('select.bom-alt-select');
+                            if ($altSelect.data('select2')) {
+                                $altSelect.select2('destroy');
+                            }
+                        }
                     } else {
                         // Prevent this item from remaining target of another alternative
                         this.items.forEach(other => {
@@ -812,7 +1075,14 @@
                                 other.replaces_item_id = null;
                             }
                         });
+                        this.$nextTick(() => {
+                            var rowEl = document.querySelector('.bom-component-row[data-row-uid="' + item.uid + '"]');
+                            if (rowEl) {
+                                self.initAltSelect(rowEl, item);
+                            }
+                        });
                     }
+                    self.refreshAltSelectsForOp(item.routing_operation_id);
                 },
 
                 onAlternativeTargetChange(item) {
@@ -820,12 +1090,12 @@
                     item.replaces_item_id = target && target.id ? target.id : null;
                 },
 
-                addItem() {
+                addItemToOp(opId) {
                     this.items.push({
                         uid: 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                         id: null,
                         material_id: '',
-                        routing_operation_id: this.getFirstOperationId(),
+                        routing_operation_id: String(opId),
                         child_bom_id: null,
                         quantity: '',
                         quantity_type: 'fixed',
@@ -841,37 +1111,78 @@
                         child_bom_versions: [],
                         child_bom_loading: false
                     });
+                    this.expandedOps[opId] = true;
                     this.$nextTick(() => this.initAllRowSelects());
                 },
 
+                addItem() {
+                    const firstOp = this.getFirstOperationId();
+                    this.addItemToOp(firstOp);
+                },
+
                 removeItem(index) {
-                    if (this.items.length > 1) {
-                        const removedItem = this.items[index];
-                        this.items.forEach(it => {
-                            if (it.is_alternative && it.replaces_row_uid === removedItem.uid) {
-                                it.replaces_row_uid = '';
-                                it.replaces_item_id = null;
-                            }
-                        });
-                        this.items.splice(index, 1);
-                    } else {
-                        if (typeof confirmAction === 'function') {
-                            confirmAction({
-                                title: @js(__('production.validation_failed') ?? 'Validation Warning'),
-                                message: @js(__('production.must_contain_material_row')),
+                    const removedItem = this.items[index];
+                    if (!removedItem) return;
+                    const opId = removedItem.routing_operation_id;
+
+                    this.items.forEach(it => {
+                        if (it.is_alternative && it.replaces_row_uid === removedItem.uid) {
+                            it.replaces_row_uid = '';
+                            it.replaces_item_id = null;
+                        }
+                    });
+                    this.items.splice(index, 1);
+                    this.$nextTick(() => {
+                        this.initAllRowSelects();
+                        if (opId) {
+                            this.refreshAltSelectsForOp(opId);
+                        }
+                    });
+                },
+
+                validateBeforeSubmit(e) {
+                    if (!this.selectedRoutingId) {
+                        e.preventDefault();
+                        if (typeof window.confirmAction === 'function') {
+                            window.confirmAction({
+                                title: 'Process Routing Required',
+                                message: 'Please select a Process Routing in the header before saving the BOM.',
                                 variant: 'warning',
-                                confirmText: 'OK'
+                                confirmText: 'OK',
+                                cancelButtonText: ''
                             });
                         } else {
-                            alert(@js(__('production.must_contain_material_row')));
+                            alert('Please select a Process Routing before saving.');
                         }
+                        return false;
                     }
+                    const configuredItems = this.items.filter(it => it.material_id);
+                    if (configuredItems.length === 0) {
+                        e.preventDefault();
+                        if (typeof window.confirmAction === 'function') {
+                            window.confirmAction({
+                                title: 'Materials Required',
+                                message: 'Please add at least one material component to the Bill of Materials.',
+                                variant: 'warning',
+                                confirmText: 'OK',
+                                cancelButtonText: ''
+                            });
+                        } else {
+                            alert('Please add at least one material component to the Bill of Materials.');
+                        }
+                        return false;
+                    }
+                    return true;
                 },
 
                 initRowSelects(rowEl, item) {
                     var self = this;
                     $(rowEl).find('[data-select2-selector="default"]').each(function () {
                         var $select = $(this);
+
+                        if ($select.hasClass('bom-alt-select')) {
+                            return;
+                        }
 
                         if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
                             return;
@@ -922,11 +1233,6 @@
                                     }
                                 }
                             }
-                        } else if (nameAttr.indexOf('quantity_type') !== -1) {
-                            var val = $select.val();
-                            if (val) {
-                                item.quantity_type = val;
-                            }
                         }
 
                         // Sync select2 changes to Alpine.js
@@ -957,25 +1263,30 @@
                                 }
 
                                 self.fetchChildBomStatus(item);
+                                self.refreshAltSelectsForOp(item.routing_operation_id);
                             } else if (nameAttr.indexOf('uom_id') !== -1) {
                                 item.uom_id = val;
                             } else if (nameAttr.indexOf('child_bom_id') !== -1) {
                                 item.child_bom_id = val;
-                            } else if (nameAttr.indexOf('quantity_type') !== -1) {
-                                item.quantity_type = val;
                             }
 
                             // Trigger native events to propagate up to Alpine
                             this.dispatchEvent(new Event('input', { bubbles: true }));
                         });
                     });
+
+                    if (item.is_alternative) {
+                        self.initAltSelect(rowEl, item);
+                    }
                 },
 
                 initAllRowSelects() {
                     var self = this;
-                    $('.bom-component-row').each(function (index) {
-                        if (self.items[index]) {
-                            self.initRowSelects(this, self.items[index]);
+                    $('.bom-component-row').each(function () {
+                        var rowUid = $(this).attr('data-row-uid') || $(this).find('input[name*="[row_uid]"]').val();
+                        var item = self.items.find(it => it.uid === rowUid);
+                        if (item) {
+                            self.initRowSelects(this, item);
                         }
                     });
                 },

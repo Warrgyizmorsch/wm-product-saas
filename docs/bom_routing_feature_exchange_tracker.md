@@ -30,6 +30,7 @@ This document tracks all requirements, architecture shifts, business rules, desi
 | **TRACK-10** | BOM Duplication & Revision — Clone `routing_operation_id` on Items | 🛠️ **Applied** | `ProductionBomService::duplicateVersion()` |
 | **TRACK-11** | Bulk Import Service — Invert `RoutingOperationMaterial` Population Source | 🛠️ **Applied** | `ProductionMasterImportService` (lines 703–793), CSV import schema |
 | **TRACK-12** | Feature Test Suite Updates — Align All BOM & Routing Tests with New Architecture | 🛠️ **Applied** | `tests/Feature/Production/BomRoutingInversionTest.php`, `tests/Feature/Production/RoutingTest.php` |
+| **TRACK-13** | Parallel Operations Live Grouping & Machine/Batch Collision Safeguards | ⏸️ **On Hold / Deferred** | `create.blade.php`, `edit.blade.php`, `StoreRoutingRequest`, `UpdateRoutingRequest`, `SchedulingService` |
 
 ---
 
@@ -183,7 +184,7 @@ Currently:
 
 ### TRACK-04: BOM Creation & Edit UI Overhaul (Operation-Centric Sequential Cards / Accordions)
 * **Date Logged:** 2026-10-30 (Updated: November 2026 with Option A Layout Consensus)
-* **Status:** 🟡 **Agreed Architecture & Design / Ready for Implementation**
+* **Status:** 🟢 **Applied & Complete**
 * **Area:** BOM Frontend Views (`bom/create.blade.php`, `bom/edit.blade.php`), Routing Views (`routing/create.blade.php`, `routing/edit.blade.php`, `routing/index.blade.php`, `routing/show.blade.php`), Alpine.js Scripts & Form Validation
 
 #### 1. Description & Context
@@ -291,8 +292,10 @@ Process Routing: [ RTG-001 - Desk Routing (v1.0.0 · Active) ]   Version: [ 1.0.
    - Replaced old allocation summary with the **Linked Bill of Materials (BOMs)** table displaying `$routing->boms`.
 
 #### 5. Files Impacted for Implementation
-* `resources/views/modules/production/bom/create.blade.php`
-* `resources/views/modules/production/bom/edit.blade.php`
+* `resources/views/modules/production/bom/create.blade.php` (Option A Sequential Operation Cards, sub-tables, zero-material notices, embedded priority, unified Odoo/Apex UI input controls with `odoo-table-input` and `odoo-table-select`, dynamic Bootstrap-5 Select2 on `bom-alt-select` with operation-specific candidate indexing)
+* `resources/views/modules/production/bom/edit.blade.php` (Option A Sequential Operation Cards, sub-tables, zero-material notices, embedded priority, unified Odoo/Apex UI input controls with `odoo-table-input` and `odoo-table-select`, dynamic Bootstrap-5 Select2 on `bom-alt-select` with operation-specific candidate indexing)
+* `lang/en/production.php` (Added `select_routing_first`, `select_routing_operation`, `process_operation_zero_materials`, `add_material_to_op`, `expand_all`, `collapse_all`, `no_routing_selected_alert`, `zero_materials_notice`)
+* `app/Domains/Production/Controllers/ProductionBomController.php` (Eager loaded `['operations.workCenter', 'operations.section']` on Routings)
 
 ---
 
@@ -616,6 +619,33 @@ The existing test suite has multiple test files that were written against the ol
 * `tests/Feature/Production/MasterDataImportExportTest.php`
 * `tests/Feature/Production/ComplexIndustrialManufacturingScenarioTest.php`
 * New file: `tests/Feature/Production/BomRoutingInversionTest.php` (new test suite)
+
+---
+
+### TRACK-13: Parallel Operations Live Grouping & Machine/Batch Collision Safeguards
+* **Date Logged:** 2026-11-03
+* **Status:** ⏸️ **On Hold / Deferred**
+* **Area:** Sequence Grid UI/UX, Dynamic Grouping, Physical Collision Validation & Scheduling
+
+#### 1. Description & Context
+Currently, `is_parallel` uses an unstyled text input (`Grp: [ A ]`). The freeform input is prone to typos (e.g. `Group-A` vs `group a`), which breaks finite scheduling where exact string matches are required. Additionally, there is no validation preventing parallel operations from booking the same physical machine or manual batch team simultaneously.
+
+#### 2. Key Requirements & Architecture (To be implemented):
+1. **Dynamic Group Dropdown & Live Memory Pool:**
+   - Replace freeform single-letter input box (`Grp: [ A ]`) with a Select2 / dynamic select dropdown.
+   - Maintain an in-memory list of active parallel groups in the current routing session.
+   - Include a `+ Add New Group...` option allowing on-the-fly creation of custom groups (e.g. `Sub-Assembly`, `Wiring Branch`), immediately registering in memory across all table rows and saving to `routing_operations.parallel_group`.
+2. **Physical Resource Collision Validation (Same Machine / Manual Batch):**
+   - Two operations marked `Parallel` in the same `parallel_group` **cannot** be assigned to the same `machine_id` or same `section_manual_production_id` (a single physical resource cannot process two parallel operations at the exact same moment).
+   - **UI Warning:** Display inline warning badge on affected rows alerting planner to the bottleneck.
+   - **Backend Validation:** Enforce in `StoreRoutingRequest` and `UpdateRoutingRequest`.
+3. **Parallel vs. Predecessor Relationship Rules:**
+   - Resolve styling conflict where Bootstrap's `.d-flex` overrides Alpine's `x-show` on the Predecessor wrapper.
+   - Support branch-level parallelism (an operation can have a predecessor inside its branch, but the branch itself runs parallel to another branch).
+   - Guard against paradoxical configurations (e.g. Op 30 depends on Op 20 which depends on Op 10, but Op 10 and Op 30 are marked as simultaneous parallel siblings).
+4. **UI/UX Cleanup:**
+   - Neatly align `[✓] Parallel` checkbox and the group selector on the same row.
+   - Auto-clear group assignment and resource warnings when `Parallel` is unchecked.
 
 ---
 
