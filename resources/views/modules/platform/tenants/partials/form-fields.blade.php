@@ -26,7 +26,7 @@
         @error('name')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-6">
-        <x-ui.odoo-form-ui type="input" label="Display Name" name="display_name" :value="old('display_name', $settings['display_name'] ?? $tenant->name)" placeholder="shown in header and sidebar" class="@error('display_name') is-invalid @enderror" />
+        <x-ui.odoo-form-ui type="input" label="Display Name" name="display_name" :value="old('display_name', $settings['display_name'] ?? $tenant->name)" placeholder="shown in header and reflects in legal entity" helperText="Used in header and reflects in the Org Structure Legal Entity name." class="@error('display_name') is-invalid @enderror" />
         @error('display_name')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-6">

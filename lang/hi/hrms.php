@@ -4713,6 +4713,8 @@ return [
 
         // Statuses
         'status_pending' => 'लंबित',
+        'status_l1_approved' => 'L1 स्वीकृत',
+        'status_partially_approved' => 'आंशिक रूप से स्वीकृत',
         'status_approved' => 'स्वीकृत',
         'status_rejected' => 'अस्वीकृत',
         'status_disbursed' => 'संवितरित',

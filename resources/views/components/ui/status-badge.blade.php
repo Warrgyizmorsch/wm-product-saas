@@ -19,6 +19,8 @@
         'sent' => ['bg' => 'bg-soft-info', 'text' => 'text-info', 'dot' => 'bg-info', 'default_label' => 'Sent'],
         'received' => ['bg' => 'bg-soft-warning', 'text' => 'text-warning', 'dot' => 'bg-warning', 'default_label' => 'Received'],
         'confirmed' => ['bg' => 'bg-soft-success', 'text' => 'text-success', 'dot' => 'bg-success', 'default_label' => 'Confirmed'],
+        'l1_approved' => ['bg' => 'bg-soft-info', 'text' => 'text-info', 'dot' => 'bg-info', 'default_label' => 'L1 Approved'],
+        'partially_approved' => ['bg' => 'bg-soft-info', 'text' => 'text-info', 'dot' => 'bg-info', 'default_label' => 'Partially Approved'],
         'approved' => ['bg' => 'bg-soft-success', 'text' => 'text-success', 'dot' => 'bg-success', 'default_label' => 'Approved'],
         'completed' => ['bg' => 'bg-soft-teal', 'text' => 'text-teal', 'dot' => 'bg-teal', 'default_label' => 'Completed'],
         'finished' => ['bg' => 'bg-soft-teal', 'text' => 'text-teal', 'dot' => 'bg-teal', 'default_label' => 'Finished'],

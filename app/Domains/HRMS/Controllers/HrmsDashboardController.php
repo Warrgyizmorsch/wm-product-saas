@@ -94,31 +94,16 @@ class HrmsDashboardController extends Controller
 
         if ($currentEmployee) {
             $shiftCutoff = $now->copy()->subHours(18);
-            $staleLogs = Attendance::where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->whereNull('check_out')
-                ->where(function ($q) use ($shiftCutoff, $today) {
-                    $q->where('check_in', '<', $shiftCutoff)
-                      ->orWhere('date', '<', Carbon::yesterday()->format('Y-m-d'));
-                })
-                ->get();
-
-            foreach ($staleLogs as $stale) {
-                $stale->update([
-                    'status' => in_array($stale->status, ['present', 'late', 'half_day', 'wfh']) ? 'missing_logs' : $stale->status,
-                    'check_out' => Carbon::parse($stale->check_in)->addHours(8),
-                ]);
-            }
 
             $myTodayAttendance = Attendance::with('breaks')
                 ->where('tenant_id', $tenantId)
                 ->where('employee_id', $currentEmployee->id)
-                ->where(function ($q) use ($today, $now) {
+                ->where(function ($q) use ($today, $shiftCutoff) {
                     $q->whereDate('date', $today)
-                      ->orWhere(function ($sub) use ($now) {
+                      ->orWhere(function ($sub) use ($shiftCutoff) {
                           $sub->whereNotNull('check_in')
                               ->whereNull('check_out')
-                              ->where('check_in', '>=', $now->copy()->subHours(18));
+                              ->where('check_in', '>=', $shiftCutoff);
                       });
                 })
                 ->latest('check_in')
@@ -187,14 +172,14 @@ class HrmsDashboardController extends Controller
             $fields = [
                 $currentEmployee->full_name,
                 $currentEmployee->office_email,
-                $currentEmployee->phone_number,
+                $currentEmployee->personal_mobile_number ?? $currentEmployee->phone_number,
                 $currentEmployee->date_of_birth,
                 $currentEmployee->pan_card_number,
                 $currentEmployee->aadhaar_card_number,
                 $currentEmployee->bank_name,
                 $currentEmployee->account_number,
                 $currentEmployee->ifsc_code,
-                $currentEmployee->emergency_contact_phone ?? $currentEmployee->phone_number,
+                $currentEmployee->emergency_contact_number ?? $currentEmployee->emergency_contact_phone,
             ];
             $filled = count(array_filter($fields));
             $profileCompletion = count($fields) > 0 ? round(($filled / count($fields)) * 100) : 100;
@@ -593,21 +578,6 @@ class HrmsDashboardController extends Controller
 
         if ($currentEmployee) {
             $shiftCutoff = $now->copy()->subHours(18);
-            $staleLogs = Attendance::where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->whereNull('check_out')
-                ->where(function ($q) use ($shiftCutoff, $today) {
-                    $q->where('check_in', '<', $shiftCutoff)
-                      ->orWhere('date', '<', Carbon::yesterday()->format('Y-m-d'));
-                })
-                ->get();
-
-            foreach ($staleLogs as $stale) {
-                $stale->update([
-                    'status' => in_array($stale->status, ['present', 'late', 'half_day', 'wfh']) ? 'missing_logs' : $stale->status,
-                    'check_out' => Carbon::parse($stale->check_in)->addHours(8),
-                ]);
-            }
 
             $myTodayAttendance = Attendance::with('breaks')
                 ->where('tenant_id', $tenantId)

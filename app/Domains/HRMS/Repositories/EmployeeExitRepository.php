@@ -376,12 +376,14 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 
     public function clearItem(EmployeeExitClearance $item, array $validated, ?int $userId): bool
     {
+        $deduction = (float) ($validated['deduction_amount'] ?? ($validated['recovery_amount'] ?? 0));
         $item->update([
-            'status' => $validated['status'],
-            'recovery_amount' => $validated['recovery_amount'] ?? 0,
-            'remarks' => $validated['remarks'] ?? null,
-            'cleared_by' => $userId,
-            'cleared_at' => $validated['status'] === 'cleared' ? now() : null,
+            'status'           => $validated['status'],
+            'deduction_amount' => $deduction,
+            'recovery_amount'  => $deduction,
+            'remarks'          => $validated['remarks'] ?? null,
+            'cleared_by'       => $userId,
+            'cleared_at'       => in_array($validated['status'], ['cleared', 'waived']) ? now() : null,
         ]);
 
         $exit = $item->exit ?? $item->employeeExit;
@@ -419,14 +421,61 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
     public function settleFnf(EmployeeFnfSettlement $settlement, array $validated, ?int $userId): bool
     {
         $exit = $settlement->exit ?? $settlement->employeeExit;
+        $paymentModeDisplay = $validated['payment_method'] ?? ($validated['payment_mode'] ?? 'Bank Transfer');
 
-        DB::transaction(function () use ($settlement, $validated, $exit) {
-            $settlement->update([
-                'status' => 'paid',
-                'payment_mode' => $validated['payment_mode'],
-                'payment_reference' => $validated['payment_reference'] ?? null,
-                'paid_at' => $validated['paid_at'] ?? now(),
-            ]);
+        DB::transaction(function () use ($settlement, $validated, $exit, $paymentModeDisplay) {
+            $channel = $validated['settlement_channel'] ?? ($settlement->settlement_channel ?? 'monthly_payroll');
+
+            $updateData = [
+                'status'             => 'paid',
+                'settlement_channel' => $channel,
+                'payment_method'     => $paymentModeDisplay,
+                'payment_reference'  => $validated['payment_reference'] ?? null,
+                'paid_at'            => $validated['paid_at'] ?? now(),
+                'notes'              => $validated['notes'] ?? $settlement->notes,
+            ];
+
+            if (isset($validated['unpaid_salary'])) {
+                $updateData['unpaid_salary_amount'] = (float) $validated['unpaid_salary'];
+            }
+            if (isset($validated['leave_encashment_amount'])) {
+                $updateData['leave_encashment_amount'] = (float) $validated['leave_encashment_amount'];
+            }
+            if (isset($validated['gratuity_amount'])) {
+                $updateData['gratuity_amount'] = (float) $validated['gratuity_amount'];
+            }
+            if (isset($validated['bonus_amount'])) {
+                $updateData['bonus_amount'] = (float) $validated['bonus_amount'];
+            }
+            if (isset($validated['other_earnings'])) {
+                $updateData['other_earnings'] = (float) $validated['other_earnings'];
+            }
+            if (isset($validated['notice_recovery_amount'])) {
+                $updateData['notice_shortfall_recovery'] = (float) $validated['notice_recovery_amount'];
+            }
+            if (isset($validated['asset_recovery_amount'])) {
+                $updateData['asset_damage_recovery'] = (float) $validated['asset_recovery_amount'];
+            }
+            if (isset($validated['other_deductions'])) {
+                $updateData['other_deductions'] = (float) $validated['other_deductions'];
+            }
+
+            if (isset($validated['unpaid_salary']) || isset($validated['leave_encashment_amount']) || isset($validated['gratuity_amount']) || isset($validated['notice_recovery_amount'])) {
+                $earnings = ($updateData['unpaid_salary_amount'] ?? $settlement->unpaid_salary_amount)
+                    + ($updateData['leave_encashment_amount'] ?? $settlement->leave_encashment_amount)
+                    + ($updateData['gratuity_amount'] ?? $settlement->gratuity_amount)
+                    + ($updateData['bonus_amount'] ?? $settlement->bonus_amount)
+                    + ($updateData['other_earnings'] ?? $settlement->other_earnings);
+                $deductions = ($updateData['notice_shortfall_recovery'] ?? $settlement->notice_shortfall_recovery)
+                    + ($updateData['asset_damage_recovery'] ?? $settlement->asset_damage_recovery)
+                    + (float) ($settlement->unsettled_advances_recovery ?? 0)
+                    + ($updateData['other_deductions'] ?? $settlement->other_deductions);
+                $updateData['total_earnings'] = round($earnings, 2);
+                $updateData['total_deductions'] = round($deductions, 2);
+                $updateData['net_payable_amount'] = round(max(0, $earnings - $deductions), 2);
+            }
+
+            $settlement->update($updateData);
 
             $exit->update(['status' => 'settled']);
 
@@ -459,7 +508,7 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
                 NotificationService::sendToEmployee(
                     $exit->employee,
                     'Full & Final Settlement Settled',
-                    "Your Full & Final Settlement has been processed and paid via {$validated['payment_mode']}. Exit certificates are now generated.",
+                    "Your Full & Final Settlement has been processed and paid via {$paymentModeDisplay}. Exit certificates are now generated.",
                     route('hrms.exits.index'),
                     'hrms',
                     'fnf_settled',

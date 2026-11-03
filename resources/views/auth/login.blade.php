@@ -347,6 +347,112 @@
             *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
             .reveal, .node, .kpi { opacity: 1; }
         }
+
+        /* ---------- Forgot Password Modal ---------- */
+        .forgot-link {
+            background: none; border: 0; padding: 0; margin: 0;
+            color: var(--brand); font-weight: 600; font-size: 13.5px;
+            cursor: pointer; text-decoration: none; font-family: var(--font);
+            transition: color .2s ease;
+        }
+        .forgot-link:hover { color: var(--brand-2); text-decoration: underline; }
+
+        .fp-backdrop {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(10, 15, 31, .65);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+            opacity: 0; pointer-events: none;
+            transition: opacity .25s ease;
+        }
+        .fp-backdrop.active { opacity: 1; pointer-events: auto; }
+
+        .fp-card {
+            position: relative; width: 100%; max-width: 440px;
+            background: #fff; border-radius: 22px;
+            box-shadow: 0 24px 60px -15px rgba(15, 23, 42, .25), 0 0 0 1px rgba(226, 232, 240, .8);
+            padding: 32px 28px;
+            transform: translateY(12px) scale(.98);
+            transition: transform .25s cubic-bezier(.16, 1, .3, 1);
+            max-height: 90vh; overflow-y: auto;
+        }
+        .fp-backdrop.active .fp-card { transform: translateY(0) scale(1); }
+
+        .fp-close {
+            position: absolute; top: 20px; right: 20px;
+            width: 34px; height: 34px; border-radius: 10px;
+            border: 1px solid var(--line); background: #fff;
+            display: grid; place-items: center; cursor: pointer;
+            color: var(--muted); transition: all .2s ease;
+        }
+        .fp-close:hover { background: var(--field); color: var(--ink); border-color: #cbd5e1; }
+
+        .fp-stepper {
+            display: flex; align-items: center; justify-content: center;
+            gap: 10px; margin-bottom: 24px;
+        }
+        .fp-step-dot {
+            width: 32px; height: 6px; border-radius: 99px;
+            background: #e2e8f0; transition: all .3s ease;
+        }
+        .fp-step-dot.active { background: var(--brand); width: 44px; }
+        .fp-step-dot.completed { background: var(--accent); }
+
+        .fp-icon-wrap {
+            width: 52px; height: 52px; border-radius: 16px;
+            background: rgba(91, 61, 245, .08); color: var(--brand);
+            display: grid; place-items: center; margin-bottom: 16px;
+        }
+        .fp-title {
+            font-family: var(--font-display); font-size: 20px; font-weight: 700;
+            color: var(--ink); margin: 0 0 6px; letter-spacing: -.01em;
+        }
+        .fp-desc {
+            font-size: 13.5px; color: var(--muted); line-height: 1.5; margin: 0 0 20px;
+        }
+
+        .fp-alert {
+            display: none; align-items: flex-start; gap: 10px;
+            padding: 12px 14px; border-radius: 12px; font-size: 13px;
+            line-height: 1.45; margin-bottom: 18px;
+        }
+        .fp-alert.show { display: flex; animation: rise .25s ease both; }
+        .fp-alert-danger { background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; }
+        .fp-alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+
+        .fp-otp-input {
+            width: 100%; height: 58px; text-align: center; font-family: 'DM Sans', monospace;
+            font-size: 28px; font-weight: 800; letter-spacing: 12px;
+            border-radius: 14px; border: 1.5px solid var(--line);
+            background: var(--field); color: var(--ink);
+            outline: none; transition: border-color .2s ease, box-shadow .2s ease;
+            box-sizing: border-box; padding-left: 14px;
+        }
+        .fp-otp-input:focus {
+            border-color: var(--brand); background: #fff;
+            box-shadow: 0 0 0 4px rgba(91, 61, 245, .15);
+        }
+
+        .fp-resend-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin: 14px 0 22px; font-size: 13px; color: var(--muted);
+        }
+        .fp-resend-btn {
+            background: none; border: 0; padding: 0; font-size: 13px;
+            font-weight: 600; color: var(--brand); cursor: pointer;
+        }
+        .fp-resend-btn:disabled { color: var(--muted); cursor: not-allowed; text-decoration: none; }
+        .fp-resend-btn:not(:disabled):hover { text-decoration: underline; color: var(--brand-2); }
+
+        .fp-actions { display: flex; gap: 10px; margin-top: 18px; }
+        .fp-btn-ghost {
+            height: 54px; padding: 0 20px; border-radius: 14px;
+            border: 1px solid var(--line); background: #fff;
+            color: var(--ink); font-weight: 600; font-size: 14px;
+            cursor: pointer; transition: background .2s, border-color .2s;
+        }
+        .fp-btn-ghost:hover { background: var(--field); border-color: #cbd5e1; }
     </style>
 </head>
 @php
@@ -436,6 +542,9 @@
                                 <span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
                                 {{ __('ui.remember_me') }}
                             </label>
+                            <button type="button" class="forgot-link" id="openForgotModal" onclick="window.openForgotPasswordModal ? window.openForgotPasswordModal(event) : null">
+                                {{ __('ui.forgot_password') }}
+                            </button>
                         </div>
 
                         <div class="reveal" style="--d:7">
@@ -529,6 +638,112 @@
         </aside>
     </main>
 
+    {{-- ================= Forgot Password Modal ================= --}}
+    <div class="fp-backdrop" id="fpBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="fpModalTitle">
+        <div class="fp-card">
+            <button type="button" class="fp-close" id="fpCloseBtn" onclick="window.closeForgotPasswordModal ? window.closeForgotPasswordModal() : null" aria-label="Close modal">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+
+            <!-- Stepper Indicators -->
+            <div class="fp-stepper" aria-hidden="true">
+                <span class="fp-step-dot active" id="fpStepDot1"></span>
+                <span class="fp-step-dot" id="fpStepDot2"></span>
+                <span class="fp-step-dot" id="fpStepDot3"></span>
+            </div>
+
+            <!-- Alert Notification Box -->
+            <div class="fp-alert" id="fpAlert" role="alert">
+                <svg class="fp-alert-icon" id="fpAlertIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+                <span id="fpAlertMsg"></span>
+            </div>
+
+            <!-- STEP 1: Enter Email -->
+            <div class="fp-step-pane" id="fpStep1">
+                <div class="fp-icon-wrap">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="3"/><path d="m22 7-10 6L2 7"/></svg>
+                </div>
+                <h2 class="fp-title" id="fpModalTitle">{{ __('ui.forgot_password') !== 'ui.forgot_password' ? __('ui.forgot_password') : 'Forgot password?' }}</h2>
+                <p class="fp-desc">{{ __('ui.forgot_password_desc') !== 'ui.forgot_password_desc' ? __('ui.forgot_password_desc') : 'Enter your email to receive a 6-digit verification code.' }}</p>
+
+                <form id="fpEmailForm" novalidate onsubmit="return false;">
+                    <div class="field" id="fpEmailField">
+                        <input type="email" id="fpEmailInput" placeholder=" " required autocomplete="email">
+                        <label for="fpEmailInput">{{ __('ui.email') !== 'ui.email' ? __('ui.email') : 'Email' }}</label>
+                        <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m22 7-10 6L2 7"/></svg>
+                    </div>
+                    <button type="button" class="btn-primary" id="fpSendOtpBtn" style="margin-top: 20px;">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span class="btn-label" data-loading="{{ __('Sending Code...') }}">{{ __('Send Verification Code') }}</span>
+                        <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                </form>
+            </div>
+
+            <!-- STEP 2: Enter OTP -->
+            <div class="fp-step-pane" id="fpStep2" style="display: none;">
+                <div class="fp-icon-wrap" style="background: rgba(20, 200, 168, .1); color: var(--accent);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </div>
+                <h2 class="fp-title">{{ __('ui.enter_verification_code') !== 'ui.enter_verification_code' ? __('ui.enter_verification_code') : 'Enter Verification Code' }}</h2>
+                <p class="fp-desc">{{ __('ui.otp_sent_to') !== 'ui.otp_sent_to' ? __('ui.otp_sent_to') : 'We sent a 6-digit code to' }} <strong id="fpDisplayEmail" style="color: var(--ink);"></strong></p>
+
+                <form id="fpOtpForm" novalidate onsubmit="return false;">
+                    <div style="margin-bottom: 8px;">
+                        <input type="text" id="fpOtpInput" class="fp-otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="------" autocomplete="one-time-code" required>
+                    </div>
+
+                    <div class="fp-resend-row">
+                        <span id="fpTimerText">{{ __('ui.resend_in') !== 'ui.resend_in' ? __('ui.resend_in') : 'Resend in' }} <b id="fpCountdown">60s</b></span>
+                        <button type="button" class="fp-resend-btn" id="fpResendBtn" disabled>{{ __('ui.resend_code') !== 'ui.resend_code' ? __('ui.resend_code') : 'Resend code' }}</button>
+                    </div>
+
+                    <div class="fp-actions">
+                        <button type="button" class="fp-btn-ghost" id="fpBackToStep1Btn">{{ __('ui.back') !== 'ui.back' ? __('ui.back') : 'Back' }}</button>
+                        <button type="button" class="btn-primary" id="fpVerifyOtpBtn" style="flex: 1;">
+                            <span class="spinner" aria-hidden="true"></span>
+                            <span class="btn-label" data-loading="{{ __('Verifying...') }}">{{ __('ui.verify_code') !== 'ui.verify_code' ? __('ui.verify_code') : 'Verify Code' }}</span>
+                            <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- STEP 3: Reset Password -->
+            <div class="fp-step-pane" id="fpStep3" style="display: none;">
+                <div class="fp-icon-wrap">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <h2 class="fp-title">{{ __('ui.set_new_password') !== 'ui.set_new_password' ? __('ui.set_new_password') : 'Set New Password' }}</h2>
+                <p class="fp-desc">{{ __('Create a secure password of at least 8 characters.') }}</p>
+
+                <form id="fpResetForm" novalidate onsubmit="return false;">
+                    <div class="field" id="fpNewPassField" style="margin-bottom: 16px;">
+                        <input type="password" id="fpNewPassword" placeholder=" " required autocomplete="new-password">
+                        <label for="fpNewPassword">{{ __('ui.new_password') !== 'ui.new_password' ? __('ui.new_password') : 'New Password' }}</label>
+                        <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <button type="button" class="toggle-pass" id="fpToggleNewPass" aria-pressed="false" aria-label="{{ __('ui.login_show_password') }}">
+                            <svg class="eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="field" id="fpConfirmPassField">
+                        <input type="password" id="fpConfirmPassword" placeholder=" " required autocomplete="new-password">
+                        <label for="fpConfirmPassword">{{ __('ui.confirm_new_password') !== 'ui.confirm_new_password' ? __('ui.confirm_new_password') : 'Confirm New Password' }}</label>
+                        <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+
+                    <button type="button" class="btn-primary" id="fpSubmitResetBtn" style="margin-top: 20px;">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span class="btn-label" data-loading="{{ __('Updating Password...') }}">{{ __('ui.reset_password') !== 'ui.reset_password' ? __('ui.reset_password') : __('Reset Password') }}</span>
+                        <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function () {
             var form = document.getElementById('loginForm');
@@ -579,6 +794,396 @@
             window.addEventListener('pageshow', function () {
                 btn.classList.remove('loading');
                 label.textContent = labelText;
+            });
+        })();
+
+        // ================= Forgot Password Flow =================
+        (function () {
+            var backdrop = document.getElementById('fpBackdrop');
+            var openBtn = document.getElementById('openForgotModal');
+            var closeBtn = document.getElementById('fpCloseBtn');
+
+            var step1 = document.getElementById('fpStep1');
+            var step2 = document.getElementById('fpStep2');
+            var step3 = document.getElementById('fpStep3');
+
+            var dot1 = document.getElementById('fpStepDot1');
+            var dot2 = document.getElementById('fpStepDot2');
+            var dot3 = document.getElementById('fpStepDot3');
+
+            var alertBox = document.getElementById('fpAlert');
+            var alertMsg = document.getElementById('fpAlertMsg');
+            var alertIcon = document.getElementById('fpAlertIcon');
+
+            var emailInput = document.getElementById('fpEmailInput');
+            var emailField = document.getElementById('fpEmailField');
+            var sendOtpBtn = document.getElementById('fpSendOtpBtn');
+
+            var otpInput = document.getElementById('fpOtpInput');
+            var verifyOtpBtn = document.getElementById('fpVerifyOtpBtn');
+            var resendBtn = document.getElementById('fpResendBtn');
+            var backToStep1Btn = document.getElementById('fpBackToStep1Btn');
+            var displayEmail = document.getElementById('fpDisplayEmail');
+            var timerText = document.getElementById('fpTimerText');
+            var countdownEl = document.getElementById('fpCountdown');
+
+            var newPassInput = document.getElementById('fpNewPassword');
+            var confirmPassInput = document.getElementById('fpConfirmPassword');
+            var toggleNewPass = document.getElementById('fpToggleNewPass');
+            var submitResetBtn = document.getElementById('fpSubmitResetBtn');
+
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+            var currentEmail = '';
+            var resetToken = '';
+            var timerInterval = null;
+
+            var SVG_DANGER = '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>';
+            var SVG_SUCCESS = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>';
+
+            function showAlert(type, message) {
+                alertBox.className = 'fp-alert show ' + (type === 'success' ? 'fp-alert-success' : 'fp-alert-danger');
+                alertIcon.innerHTML = type === 'success' ? SVG_SUCCESS : SVG_DANGER;
+                alertMsg.textContent = message;
+            }
+
+            function hideAlert() {
+                alertBox.classList.remove('show');
+            }
+
+            function setBtnLoading(btn, isLoading) {
+                var label = btn.querySelector('.btn-label');
+                if (isLoading) {
+                    btn.classList.add('loading');
+                    if (label && label.dataset.loading) {
+                        btn.dataset.origText = label.textContent;
+                        label.textContent = label.dataset.loading;
+                    }
+                } else {
+                    btn.classList.remove('loading');
+                    if (label && btn.dataset.origText) {
+                        label.textContent = btn.dataset.origText;
+                    }
+                }
+            }
+
+            function goToStep(step) {
+                hideAlert();
+                step1.style.display = step === 1 ? 'block' : 'none';
+                step2.style.display = step === 2 ? 'block' : 'none';
+                step3.style.display = step === 3 ? 'block' : 'none';
+
+                dot1.className = 'fp-step-dot' + (step === 1 ? ' active' : (step > 1 ? ' completed' : ''));
+                dot2.className = 'fp-step-dot' + (step === 2 ? ' active' : (step > 2 ? ' completed' : ''));
+                dot3.className = 'fp-step-dot' + (step === 3 ? ' active' : '');
+
+                if (step === 1) setTimeout(function () { emailInput.focus(); }, 150);
+                if (step === 2) setTimeout(function () { otpInput.focus(); }, 150);
+                if (step === 3) setTimeout(function () { newPassInput.focus(); }, 150);
+            }
+
+            function startCooldown(seconds) {
+                clearInterval(timerInterval);
+                resendBtn.disabled = true;
+                timerText.style.display = 'inline';
+                countdownEl.textContent = seconds + 's';
+
+                var rem = seconds;
+                timerInterval = setInterval(function () {
+                    rem--;
+                    if (rem <= 0) {
+                        clearInterval(timerInterval);
+                        resendBtn.disabled = false;
+                        timerText.style.display = 'none';
+                    } else {
+                        countdownEl.textContent = rem + 's';
+                    }
+                }, 1000);
+            }
+
+            function openModal(e) {
+                if (e && e.preventDefault) e.preventDefault();
+                var loginEmail = document.getElementById('email');
+                if (loginEmail && loginEmail.value && loginEmail.value.includes('@')) {
+                    emailInput.value = loginEmail.value;
+                }
+                hideAlert();
+                goToStep(1);
+                backdrop.classList.add('active');
+                backdrop.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeModal() {
+                backdrop.classList.remove('active');
+                backdrop.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+                hideAlert();
+                clearInterval(timerInterval);
+            }
+
+            window.openForgotPasswordModal = openModal;
+            window.closeForgotPasswordModal = closeModal;
+
+            if (openBtn) openBtn.addEventListener('click', openModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+            backdrop.addEventListener('click', function (e) {
+                if (e.target === backdrop) closeModal();
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && backdrop.classList.contains('active')) {
+                    closeModal();
+                }
+            });
+
+            // Toggle Password visibility in Step 3
+            if (toggleNewPass) {
+                toggleNewPass.addEventListener('click', function () {
+                    var show = newPassInput.type === 'password';
+                    newPassInput.type = show ? 'text' : 'password';
+                    confirmPassInput.type = show ? 'text' : 'password';
+                    toggleNewPass.setAttribute('aria-pressed', show ? 'true' : 'false');
+                });
+            }
+
+            // OTP Input auto-cleanup (numbers only)
+            otpInput.addEventListener('input', function () {
+                otpInput.value = otpInput.value.replace(/[^0-9]/g, '');
+                if (otpInput.value.length === 6) {
+                    verifyOtpBtn.focus();
+                }
+            });
+
+            // Enter key shortcuts
+            emailInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); sendOtpBtn.click(); }
+            });
+            otpInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); verifyOtpBtn.click(); }
+            });
+            confirmPassInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); submitResetBtn.click(); }
+            });
+
+            // Clear invalid styling when user types
+            if (emailInput && emailField) {
+                emailInput.addEventListener('input', function () {
+                    emailField.classList.remove('is-invalid');
+                    hideAlert();
+                });
+            }
+
+            // STEP 1: Send OTP
+            sendOtpBtn.addEventListener('click', function () {
+                var email = emailInput.value.trim();
+                if (!email || !email.includes('@')) {
+                    showAlert('danger', '{{ __('Please enter a valid email address.') }}');
+                    if (emailField) emailField.classList.add('is-invalid');
+                    emailInput.focus();
+                    return;
+                }
+
+                hideAlert();
+                setBtnLoading(sendOtpBtn, true);
+
+                fetch('{{ url("/api/auth/forgot-password/send-otp") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ email: email })
+                })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, status: res.status, data: data };
+                    });
+                })
+                .then(function (res) {
+                    setBtnLoading(sendOtpBtn, false);
+                    if (!res.ok) {
+                        // User not found or invalid: STAY ON STEP 1!
+                        showAlert('danger', res.data.message || '{{ __('Failed to send verification code.') }}');
+                        if (emailField) {
+                            emailField.classList.add('is-invalid');
+                            emailField.style.animation = 'none';
+                            emailField.offsetHeight;
+                            emailField.style.animation = 'shake .45s ease both';
+                        }
+                        if (res.status === 429 && res.data.cooldown) {
+                            startCooldown(res.data.cooldown);
+                        }
+                        emailInput.focus();
+                        return;
+                    }
+
+                    // User exists: Proceed to Step 2
+                    currentEmail = email;
+                    displayEmail.textContent = email;
+                    otpInput.value = '';
+                    goToStep(2);
+                    startCooldown(60);
+                })
+                .catch(function (err) {
+                    setBtnLoading(sendOtpBtn, false);
+                    showAlert('danger', '{{ __('A network error occurred. Please try again.') }}');
+                });
+            });
+
+            // STEP 2: Resend OTP
+            resendBtn.addEventListener('click', function () {
+                if (!currentEmail) return;
+
+                resendBtn.disabled = true;
+                hideAlert();
+
+                fetch('{{ url("/api/auth/forgot-password/send-otp") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ email: currentEmail })
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        showAlert('success', data.message || '{{ __('A new verification code has been sent.') }}');
+                        startCooldown(60);
+                    } else {
+                        showAlert('danger', data.message || '{{ __('Failed to resend code.') }}');
+                        startCooldown(data.cooldown || 30);
+                    }
+                })
+                .catch(function () {
+                    resendBtn.disabled = false;
+                    showAlert('danger', '{{ __('Unable to resend code. Please try again.') }}');
+                });
+            });
+
+            // STEP 2: Back to Step 1
+            backToStep1Btn.addEventListener('click', function () {
+                goToStep(1);
+            });
+
+            // STEP 2: Verify OTP
+            verifyOtpBtn.addEventListener('click', function () {
+                var otp = otpInput.value.trim();
+                if (!otp || otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+                    showAlert('danger', '{{ __('Please enter the 6-digit verification code.') }}');
+                    otpInput.focus();
+                    return;
+                }
+
+                hideAlert();
+                setBtnLoading(verifyOtpBtn, true);
+
+                fetch('{{ url("/api/auth/forgot-password/verify-otp") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ email: currentEmail, otp: otp })
+                })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                })
+                .then(function (res) {
+                    setBtnLoading(verifyOtpBtn, false);
+                    if (!res.ok) {
+                        showAlert('danger', res.data.message || '{{ __('Invalid verification code.') }}');
+                        otpInput.select();
+                        return;
+                    }
+
+                    resetToken = res.data.reset_token;
+                    newPassInput.value = '';
+                    confirmPassInput.value = '';
+                    goToStep(3);
+                })
+                .catch(function () {
+                    setBtnLoading(verifyOtpBtn, false);
+                    showAlert('danger', '{{ __('Verification failed. Please try again.') }}');
+                });
+            });
+
+            // STEP 3: Reset Password
+            submitResetBtn.addEventListener('click', function () {
+                var password = newPassInput.value;
+                var confirmation = confirmPassInput.value;
+
+                if (!password || password.length < 8) {
+                    showAlert('danger', '{{ __('Password must be at least 8 characters long.') }}');
+                    newPassInput.focus();
+                    return;
+                }
+
+                if (password !== confirmation) {
+                    showAlert('danger', '{{ __('Password confirmation does not match.') }}');
+                    confirmPassInput.focus();
+                    return;
+                }
+
+                hideAlert();
+                setBtnLoading(submitResetBtn, true);
+
+                fetch('{{ url("/api/auth/forgot-password/reset") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        email: currentEmail,
+                        reset_token: resetToken,
+                        password: password,
+                        password_confirmation: confirmation
+                    })
+                })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                })
+                .then(function (res) {
+                    setBtnLoading(submitResetBtn, false);
+                    if (!res.ok) {
+                        showAlert('danger', res.data.message || '{{ __('Failed to reset password.') }}');
+                        return;
+                    }
+
+                    showAlert('success', res.data.message || '{{ __('Password reset successfully! You can now log in.') }}');
+
+                    // Pre-fill email on the main login form
+                    var mainEmail = document.getElementById('email');
+                    var mainPass = document.getElementById('password');
+                    if (mainEmail) mainEmail.value = currentEmail;
+                    if (mainPass) mainPass.value = '';
+
+                    // Close modal after 1.5 seconds and focus main password field
+                    setTimeout(function () {
+                        closeModal();
+                        if (mainPass) mainPass.focus();
+                    }, 1500);
+                })
+                .catch(function () {
+                    setBtnLoading(submitResetBtn, false);
+                    showAlert('danger', '{{ __('An error occurred while resetting your password. Please try again.') }}');
+                });
             });
         })();
     </script>

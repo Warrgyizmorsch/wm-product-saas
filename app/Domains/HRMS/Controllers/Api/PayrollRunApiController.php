@@ -16,11 +16,13 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\OvertimeRequest;
+use App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface;
 
 class PayrollRunApiController extends Controller
 {
     public function __construct(
-        private readonly PayrollCalculationService $payrollCalculationService
+        private readonly PayrollCalculationService $payrollCalculationService,
+        private readonly PayrollRunRepositoryInterface $payrollRunRepository
     ) {}
 
     /**
@@ -542,16 +544,13 @@ class PayrollRunApiController extends Controller
             );
         }
 
-        $run->update(['status' => 'locked']);
+        $result = $this->payrollRunRepository->lockRun($run);
 
-        try {
-            $payrollAccountingService = app(\App\Domains\Accounting\Services\PayrollAccountingService::class);
-            $payrollAccountingService->postPayrollRunJournal($run);
-        } catch (\Throwable $e) {
-            Log::error("Failed to post payroll accrual journal on API lock: " . $e->getMessage());
+        if (!$result['success']) {
+            return $this->sendError($result['message'] ?? 'Failed to lock payroll run.', 422);
         }
 
-        return $this->sendSuccess($this->transformPayrollRun($run), 'Payroll run locked successfully.');
+        return $this->sendSuccess($this->transformPayrollRun($run->fresh()), 'Payroll run locked successfully.');
     }
 
     /**
@@ -674,7 +673,7 @@ class PayrollRunApiController extends Controller
         // Same path as the web screen: books first, then marked paid; a refusal
         // (no open period, not enough cash) changes nothing and is reported.
         try {
-            app(\App\Domains\HRMS\Repositories\PayrollRunRepositoryInterface::class)
+            $this->payrollRunRepository
                 ->releasePayouts($run, $validated['bank_account_id'] ?? null, $validated['payout_date'] ?? null);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['success' => false, 'message' => 'Payouts not released — ' . $e->getMessage()], 422);

@@ -118,10 +118,18 @@ class ExitClearanceService
 
     /**
      * Check if all department clearance items have been reviewed/completed.
+     * Automatically keeps the exit workflow status synchronized between in_clearance and approved.
      */
     public function checkAllClearancesCompleted(EmployeeExit $exit): bool
     {
         $hasPending = $exit->clearances()->where('status', 'pending')->exists();
+
+        if (!$hasPending && $exit->status === 'in_clearance') {
+            $exit->update(['status' => 'approved']);
+        } elseif ($hasPending && $exit->status === 'approved') {
+            $exit->update(['status' => 'in_clearance']);
+        }
+
         return !$hasPending;
     }
 

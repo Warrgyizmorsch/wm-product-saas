@@ -390,6 +390,11 @@ class LeaveStructureApiController extends Controller
             return $this->sendError("Leave plan not found.", 404);
         }
 
+        $assignedEmployeesCount = Employee::where('leave_plan_id', $leavePlan->id)->count();
+        if ($assignedEmployeesCount > 0) {
+            return $this->sendError("Cannot delete leave plan. It is currently assigned to {$assignedEmployeesCount} employee(s). Please reassign them first.", 422);
+        }
+
         $deletedId = $leavePlan->id;
         $leavePlan->delete();
 
@@ -599,6 +604,23 @@ class LeaveStructureApiController extends Controller
         $leaveType = $id instanceof LeaveType ? $id : LeaveType::find($id);
         if (!$leaveType) {
             return $this->sendError("Leave type not found.", 404);
+        }
+
+        $pendingRequestsCount = LeaveRequest::where('leave_type_id', $leaveType->id)
+            ->whereIn('status', ['pending', 'applied'])
+            ->count();
+        if ($pendingRequestsCount > 0) {
+            return $this->sendError("Cannot delete leave type. There are {$pendingRequestsCount} pending leave request(s) associated with this type.", 422);
+        }
+
+        $activeBalancesCount = LeaveBalance::where('leave_type_id', $leaveType->id)
+            ->where(function ($q) {
+                $q->where('allocated', '>', 0)
+                  ->orWhere('used', '>', 0);
+            })
+            ->count();
+        if ($activeBalancesCount > 0) {
+            return $this->sendError("Cannot delete leave type. Active employee leave balances exist for this leave type.", 422);
         }
 
         $deletedId = $leaveType->id;

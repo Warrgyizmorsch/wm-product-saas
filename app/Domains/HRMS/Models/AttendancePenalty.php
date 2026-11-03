@@ -7,6 +7,7 @@ use App\Core\Database\BaseModel;
 class AttendancePenalty extends BaseModel
 {
     protected $fillable = [
+        'tenant_id',
         'company_id',
         'rule_type',
         'grace_period_minutes',

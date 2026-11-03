@@ -290,7 +290,7 @@ class AssetModuleController extends Controller
     public function returnDirectMulti(Request $request): RedirectResponse
     {
         $user = auth()->user();
-        $employee = Employee::where('user_id', $user?->id)->first();
+        $employee = $user ? Employee::resolveForUser($user) : null;
         $assetIds = (array) $request->input('allocated_asset_ids', []);
 
         $allBelongToEmployee = $employee && !empty($assetIds) &&
@@ -369,13 +369,13 @@ class AssetModuleController extends Controller
     /**
      * Display the current logged-in employee's active assets and requests history.
      */
-    public function myAssets(Request $request): View
+    public function myAssets(Request $request): View|RedirectResponse
     {
         $user = auth()->user();
-        $employee = Employee::where('user_id', $user->id)->first();
+        $employee = $user ? Employee::resolveForUser($user) : null;
 
         if (!$employee) {
-            return redirect()->route('hrms.dashboard')->with('warning', __('hrms.assets.error_no_employee_profile'));
+            return redirect()->back()->with('error', __('hrms.assets.error_no_employee_profile'));
         }
 
         $categories = AssetCategory::orderBy('name')->get();

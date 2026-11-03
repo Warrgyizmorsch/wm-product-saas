@@ -7,6 +7,7 @@ use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Models\JournalEntry;
 use App\Domains\Accounting\Support\SystemAccount;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\EmployeeFnfSettlement;
 use App\Domains\HRMS\Models\PayrollHold;
 use App\Domains\HRMS\Models\PayrollRun;
 use App\Domains\HRMS\Models\SalaryComponent;
@@ -227,7 +228,7 @@ class PayrollAccountingService
                     'description'         => "Advance / loan recovered for month {$run->payroll_month}",
                 ];
                 // Recovery pays back the employee's open advances, oldest first.
-                $billHints[] = BillWise\BillAllocationService::againstOldest('receivable')
+                $billHints[] = \App\Domains\Accounting\Services\BillWise\BillAllocationService::againstOldest('receivable')
                     + ['party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_EMPLOYEE, 'party_id' => $employeeId, 'account_id' => $defaultAccounts['1420']->id];
             }
         }
@@ -309,7 +310,7 @@ class PayrollAccountingService
         $nameUpper = strtoupper($name);
 
         return match (true) {
-            $codeUpper === 'LOP' || str_contains($codeUpper, 'LOSS_OF_PAY') || str_contains($nameUpper, 'LOSS OF PAY') => 'lop',
+            $codeUpper === 'LOP' || $codeUpper === 'PRORATION' || str_contains($codeUpper, 'LOSS_OF_PAY') || str_contains($nameUpper, 'LOSS OF PAY') || str_contains($nameUpper, 'PRORATION') => 'lop',
             str_contains($codeUpper, 'PF') || str_contains($codeUpper, 'PROVIDENT') || str_contains($nameUpper, 'PROVIDENT') || str_contains($nameUpper, 'PF') => '2160',
             str_contains($codeUpper, 'ESI') || str_contains($nameUpper, 'ESI') || str_contains($nameUpper, 'STATE INSURANCE') => '2170',
             str_contains($codeUpper, 'TDS') || str_contains($codeUpper, 'TAX') || str_contains($nameUpper, 'TDS') || str_contains($nameUpper, 'INCOME TAX') || str_contains($nameUpper, 'TAX DEDUCTION') => '2140',
@@ -607,6 +608,86 @@ class PayrollAccountingService
     }
 
     /**
+     * Post Cash/Bank payout journal entry for an immediate off-cycle Full & Final (FnF) settlement.
+     * Dr Salary/FnF Payable (clearing net liability for the employee), Cr Bank/Cash Ledger.
+     */
+    public function postFnFSettlementPayoutJournal(EmployeeFnfSettlement $settlement, ?int $bankAccountId = null, ?string $payoutDate = null): ?Journal
+    {
+        $tenantId = (int) ($settlement->tenant_id ?? current_tenant_id() ?? require_tenant_id());
+        $employee = $settlement->employee ?? $settlement->employeeExit?->employee;
+        $netPayout = round((float) ($settlement->net_payable_amount ?? 0), 2);
+
+        if ($netPayout <= 0) {
+            return null;
+        }
+
+        $existingJournal = $this->journalService->activePosting($tenantId, 'EmployeeFnfSettlement', $settlement->id);
+        if ($existingJournal) {
+            return $existingJournal;
+        }
+
+        $salaryPayableAccount = $this->getOrCreateAccount($tenantId, '2030', 'Salary Payable', ChartOfAccount::TYPE_LIABILITY, ChartOfAccount::BALANCE_CREDIT, ChartOfAccount::SUBTYPE_CURRENT_LIABILITY);
+        $bankAccount = $this->payingLedger($tenantId, $bankAccountId);
+        $payoutDate = Carbon::parse($payoutDate ?? now())->toDateString();
+
+        $this->assertCashCovers($bankAccount, $netPayout, $payoutDate);
+
+        $employeeName = $employee?->full_name ?? ('Employee #' . $settlement->employee_id);
+        $employeeCode = $employee?->employee_id ?? 'N/A';
+
+        $advanceRecovery = round((float) ($settlement->unsettled_advances_recovery ?? 0), 2);
+        $totalDebitToPayable = round($netPayout + $advanceRecovery, 2);
+
+        $lines = [
+            [
+                'chart_of_account_id' => $salaryPayableAccount->id,
+                'debit'               => $totalDebitToPayable,
+                'credit'              => 0.00,
+                'party_type'          => JournalEntry::PARTY_EMPLOYEE,
+                'party_id'            => (int) $settlement->employee_id,
+                'description'         => "Full & Final Settlement payout for {$employeeName} ({$employeeCode})",
+            ],
+            [
+                'chart_of_account_id' => $bankAccount->id,
+                'debit'               => 0.00,
+                'credit'              => $netPayout,
+                'description'         => "FnF disbursement for {$employeeName} from {$bankAccount->name}",
+            ],
+        ];
+
+        $billHints = [];
+        if ($advanceRecovery > 0) {
+            $advanceAccount = $this->getOrCreateAccount($tenantId, '1420', 'Advance to Employees', ChartOfAccount::TYPE_ASSET, ChartOfAccount::BALANCE_DEBIT, ChartOfAccount::SUBTYPE_LOANS_ADVANCES);
+            $lines[] = [
+                'chart_of_account_id' => $advanceAccount->id,
+                'debit'               => 0.00,
+                'credit'              => $advanceRecovery,
+                'party_type'          => JournalEntry::PARTY_EMPLOYEE,
+                'party_id'            => (int) $settlement->employee_id,
+                'description'         => "Advance recovered in FnF settlement for {$employeeName}",
+            ];
+            $billHints[] = \App\Domains\Accounting\Services\BillWise\BillAllocationService::againstOldest('receivable')
+                + ['party_type' => JournalEntry::PARTY_EMPLOYEE, 'party_id' => (int) $settlement->employee_id, 'account_id' => $advanceAccount->id];
+        }
+
+        $meta = [
+            'tenant_id'             => $tenantId,
+            'company_id'            => $employee?->company_id ?? require_company_id(),
+            'journal_date'          => $payoutDate,
+            'source'                => 'payroll',
+            'voucher_type'          => 'payment',
+            'journal_number_prefix' => 'FNF-PAY',
+            'reference_type'        => 'EmployeeFnfSettlement',
+            'reference_id'          => $settlement->id,
+            'memo'                  => "Full & Final Settlement payout for {$employeeName} from {$bankAccount->code} {$bankAccount->name}",
+            'posted_by'             => auth()->id(),
+            'bill_allocations'      => $billHints,
+        ];
+
+        return $this->journalService->postOnce($lines, $meta);
+    }
+
+    /**
      * What is still owed on each statutory liability (credit balance).
      *
      * @return array<string, array{label: string, account: ChartOfAccount, balance: float}>
@@ -779,72 +860,12 @@ class PayrollAccountingService
     }
 
     /**
-     * Employees this run pays: its own list, else its pay group / everyone on
-     * a salary structure, minus those already paid by another run this month.
+     * Employees this run pays: delegated directly to PayrollRunRepository to guarantee
+     * 100% parity with payroll register calculations, including mid-month exit settlements.
      */
     private function runEmployees(PayrollRun $run): Collection
     {
-        $excludeEmployeeIds = [];
-        if (empty($run->employee_ids)) {
-            $otherRuns = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->get();
-
-            foreach ($otherRuns as $or) {
-                if ($or->employee_ids && count($or->employee_ids) > 0) {
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $or->employee_ids);
-                } elseif ($or->pay_group_id) {
-                    $pgEmpIds = Employee::where('pay_group_id', $or->pay_group_id)->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $pgEmpIds);
-                } else {
-                    $genEmpIds = Employee::where('status', true)
-                        ->where(function ($q) {
-                            $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                        })
-                        ->pluck('id')->toArray();
-                    $excludeEmployeeIds = array_merge($excludeEmployeeIds, $genEmpIds);
-                }
-            }
-            $excludeEmployeeIds = array_unique($excludeEmployeeIds);
-        }
-
-        if ($run->employee_ids && count($run->employee_ids) > 0) {
-            return Employee::whereIn('id', $run->employee_ids)
-                ->whereNotIn('id', $excludeEmployeeIds)
-                ->where('status', true)
-                ->where(function ($q) {
-                    $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-                })
-                ->get();
-        }
-
-        $employeesQuery = Employee::where('status', true)
-            ->where(function ($q) {
-                $q->whereNotNull('pay_group_id')->orWhereNotNull('salary_structure_id');
-            })
-            ->where(function ($q) use ($run) {
-                $q->whereNull('date_of_joining')->orWhere('date_of_joining', '<=', $run->end_date);
-            })
-            ->whereNotIn('id', $excludeEmployeeIds);
-
-        if ($run->pay_group_id) {
-            $employeesQuery->where('pay_group_id', $run->pay_group_id);
-        } else {
-            $otherProcessedPayGroupIds = PayrollRun::where('payroll_month', $run->payroll_month)
-                ->where('id', '!=', $run->id)
-                ->whereNotNull('pay_group_id')
-                ->pluck('pay_group_id')
-                ->toArray();
-
-            if (!empty($otherProcessedPayGroupIds)) {
-                $employeesQuery->where(function ($sub) use ($otherProcessedPayGroupIds) {
-                    $sub->whereNotIn('pay_group_id', $otherProcessedPayGroupIds)
-                        ->orWhereNull('pay_group_id');
-                });
-            }
-        }
-
-        return $employeesQuery->get();
+        return app(\App\Domains\HRMS\Repositories\PayrollRunRepository::class)->getRunEmployees($run);
     }
 
     /**

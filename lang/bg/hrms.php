@@ -4591,6 +4591,8 @@ return [
 
         // Statuses
         'status_pending' => 'Чакащ',
+        'status_l1_approved' => 'L1 Одобрен',
+        'status_partially_approved' => 'Частично одобрен',
         'status_approved' => 'Одобрен',
         'status_rejected' => 'Отхвърлен',
         'status_disbursed' => 'Изплатен',

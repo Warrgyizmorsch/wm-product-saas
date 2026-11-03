@@ -320,6 +320,16 @@ class Employee extends BaseModel
         return implode(' ', $parts);
     }
 
+    public function getPhoneNumberAttribute(): ?string
+    {
+        return $this->personal_mobile_number ?? $this->home_phone;
+    }
+
+    public function getEmergencyContactPhoneAttribute(): ?string
+    {
+        return $this->emergency_contact_number;
+    }
+
     public function getJobTitleAttribute($value): ?string
     {
         return $value ?: ($this->designation?->name ?? null);
@@ -328,6 +338,11 @@ class Employee extends BaseModel
     public function getDisplayNameAttribute(): string
     {
         return $this->full_name ?: trim($this->first_name . ' ' . $this->last_name);
+    }
+
+    public function getJoiningDateAttribute(): mixed
+    {
+        return $this->date_of_joining;
     }
 
     /**
@@ -630,7 +645,7 @@ class Employee extends BaseModel
     /**
      * Multi-tier resolution of Employee profile for a given User model.
      */
-    public static function resolveForUser(?\App\Models\User $user, ?int $tenantId = null): ?self
+    public static function resolveForUser(mixed $user, ?int $tenantId = null): ?self
     {
         if (!$user) {
             return null;

@@ -20,6 +20,7 @@ class EmployeeExitClearance extends BaseModel
         'cleared_at',
         'remarks',
         'deduction_amount',
+        'recovery_amount',
     ];
 
     protected $casts = [
@@ -63,6 +64,16 @@ class EmployeeExitClearance extends BaseModel
     public function setClearanceCategoryAttribute(string $value): void
     {
         $this->department = $value;
+    }
+
+    public function getRecoveryAmountAttribute(): float
+    {
+        return (float) ($this->attributes['deduction_amount'] ?? 0);
+    }
+
+    public function setRecoveryAmountAttribute($value): void
+    {
+        $this->attributes['deduction_amount'] = (float) $value;
     }
 
     /**

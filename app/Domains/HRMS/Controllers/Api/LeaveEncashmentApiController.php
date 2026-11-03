@@ -78,11 +78,7 @@ class LeaveEncashmentApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)->first()
-            ?? Employee::where(function ($q) use ($user) {
-                $q->where('office_email', $user->email)
-                  ->orWhere('personal_email', $user->email);
-            })->first();
+        return Employee::resolveForUser($user);
     }
 
     /**

@@ -198,6 +198,29 @@ class PenalizationPolicyApiController extends Controller
 
         $validated = $request->validate($validationRules);
 
+        // Monotonicity check for occurrence tiers
+        if (in_array($request->rule_type, ['late_arrival', 'missing_logs']) && $request->has('penalty_tiers') && is_array($request->penalty_tiers)) {
+            $prevMax = null;
+            foreach ($request->penalty_tiers as $index => $tier) {
+                $min = (int) $tier['min_occurrence'];
+                $max = isset($tier['max_occurrence']) && $tier['max_occurrence'] !== '' && $tier['max_occurrence'] !== null ? (int) $tier['max_occurrence'] : null;
+
+                if ($max !== null && $max < $min) {
+                    return $this->sendError("Tier " . ($index + 1) . " maximum occurrence ({$max}) cannot be less than minimum occurrence ({$min}).", 422);
+                }
+
+                if ($index > 0) {
+                    if ($prevMax === null) {
+                        return $this->sendError("Tier " . ($index + 1) . " cannot follow an unbounded tier. Preceding tier must specify a maximum occurrence.", 422);
+                    }
+                    if ($min <= $prevMax) {
+                        return $this->sendError("Tier " . ($index + 1) . " minimum occurrence ({$min}) must be strictly greater than preceding tier's maximum occurrence ({$prevMax}).", 422);
+                    }
+                }
+                $prevMax = $max;
+            }
+        }
+
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $updateData = [
@@ -263,12 +286,18 @@ class PenalizationPolicyApiController extends Controller
         }
 
         $companyId = $request->company_id ?: null;
+        $tenantId = tenant_id() ?? auth()->user()?->tenant_id;
+
+        $matchAttributes = [
+            'rule_type'  => $request->rule_type,
+            'company_id' => $companyId,
+        ];
+        if ($tenantId) {
+            $matchAttributes['tenant_id'] = $tenantId;
+        }
 
         $policy = AttendancePenalty::updateOrCreate(
-            [
-                'rule_type'  => $request->rule_type,
-                'company_id' => $companyId,
-            ],
+            $matchAttributes,
             $updateData
         );
 
