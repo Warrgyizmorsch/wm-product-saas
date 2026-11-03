@@ -8,6 +8,7 @@ use App\Domains\CRM\Models\CrmAccount;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
+use App\Domains\Sales\Models\PaymentAllocation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -188,14 +189,33 @@ class CustomerApiController extends Controller
         $totalPaid     = (float) CustomerPayment::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('amount');
         $balanceDue    = (float) Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('balance_due');
 
+        $postedPayments = CustomerPayment::where('tenant_id', $tenantId)
+            ->where('customer_id', $id)
+            ->whereIn('status', ['Posted', 'posted', 'completed', 'paid'])
+            ->with('allocations')
+            ->get();
+
+        $unallocatedAdvanceAllocs = (float) PaymentAllocation::whereHas('payment', function ($q) use ($id, $tenantId) {
+            $q->where('tenant_id', $tenantId)->where('customer_id', $id)->whereIn('status', ['Posted', 'posted', 'completed', 'paid']);
+        })->whereNull('invoice_id')->sum('allocated_amount');
+
+        $unallocatedPaymentsBal = (float) $postedPayments->sum(function ($p) {
+            return max(0, (float) $p->amount - (float) $p->allocations->sum('allocated_amount'));
+        });
+
+        $availableAdvance = round($unallocatedAdvanceAllocs + $unallocatedPaymentsBal, 2);
+        $netReceivables   = max(0, round($balanceDue - $availableAdvance, 2));
+
         return response()->json([
             'success' => true,
             'data'    => [
                 'customer' => $customer,
                 'stats'    => [
-                    'total_invoiced' => $totalInvoiced,
-                    'total_paid'     => $totalPaid,
-                    'balance_due'    => $balanceDue,
+                    'total_invoiced'    => $totalInvoiced,
+                    'total_paid'        => $totalPaid,
+                    'balance_due'       => $balanceDue,
+                    'available_advance' => $availableAdvance,
+                    'net_receivables'   => $netReceivables,
                 ],
             ],
         ]);

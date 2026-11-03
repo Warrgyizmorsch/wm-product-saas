@@ -104,6 +104,8 @@ class PurchaseRequisitionController extends Controller
 
         $pr = $this->requisitionService->storeRequisition($validated, $tenantId);
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRequisitionCreated($pr);
+
         return redirect()->route('purchase.requisitions.show', $pr->id)
             ->with('success', "Purchase Requisition {$pr->requisition_number} created successfully.");
     }
@@ -223,6 +225,8 @@ class PurchaseRequisitionController extends Controller
 
         $this->requisitionRepo->update($requisition, ['status' => 'Approved']);
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRequisitionApproved($requisition);
+
         return redirect()->back()->with('success', 'Purchase Requisition has been successfully approved.');
     }
 
@@ -244,6 +248,8 @@ class PurchaseRequisitionController extends Controller
             'status' => 'Cancelled',
             'rejection_reason' => $validated['rejection_reason'],
         ]);
+
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRequisitionRejected($requisition, $validated['rejection_reason']);
 
         return redirect()->back()->with('success', 'Purchase Requisition has been rejected.');
     }

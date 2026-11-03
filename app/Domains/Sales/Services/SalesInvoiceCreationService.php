@@ -244,19 +244,27 @@ class SalesInvoiceCreationService
         $company = $companyId
             ? DB::table('companies')->where('id', $companyId)->first()
             : DB::table('companies')->where('tenant_id', $tenantId)->first();
+
+        // 1. Primary rule: Check GSTIN state code prefix (first 2 digits)
+        $companyGstin = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
+        $customerGstin = strtoupper(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')));
+
+        $cleanCompany = preg_replace('/[^0-9A-Za-z]/', '', $companyGstin);
+        $cleanCustomer = preg_replace('/[^0-9A-Za-z]/', '', $customerGstin);
+
+        $companyPrefix = substr($cleanCompany, 0, 2);
+        $customerPrefix = substr($cleanCustomer, 0, 2);
+
+        if (!empty($companyPrefix) && !empty($customerPrefix)) {
+            return ($companyPrefix === $customerPrefix) ? 'cgst_sgst' : 'igst';
+        }
+
+        // 2. Fallback rule: State names comparison
         $companyState = strtolower(trim((string) ($company?->state ?? '')));
         $customerState = strtolower(trim((string) ($customer->billing_state ?? $customer->state ?? '')));
 
         if (!empty($companyState) && !empty($customerState)) {
             return ($companyState === $customerState) ? 'cgst_sgst' : 'igst';
-        }
-
-        // Check GSTIN state code prefix (first 2 digits)
-        $companyGstin = substr(trim((string) ($company?->tax_number ?? $company?->gstin ?? '')), 0, 2);
-        $customerGstin = substr(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')), 0, 2);
-
-        if (!empty($companyGstin) && !empty($customerGstin) && ctype_digit($companyGstin) && ctype_digit($customerGstin)) {
-            return ($companyGstin === $customerGstin) ? 'cgst_sgst' : 'igst';
         }
 
         return 'cgst_sgst';

@@ -147,8 +147,16 @@
         @endphp
 
         @php
-            $clientPhone = $invoice->customer?->phone ?: ($invoice->salesOrder?->customer?->phone ?: '');
-            $clientEmail = $invoice->customer?->email ?: ($invoice->salesOrder?->customer?->email ?: '');
+            $clientPhone = $invoice->customer?->phone 
+                ?: ($invoice->salesOrder?->customer?->phone 
+                ?: ($invoice->customer?->crmAccount?->phone 
+                ?: ($invoice->salesOrder?->quotation?->phone 
+                ?: ($invoice->salesOrder?->quotation?->prepared_for_phone !== '—' ? $invoice->salesOrder?->quotation?->prepared_for_phone : ''))));
+            $clientEmail = $invoice->customer?->email 
+                ?: ($invoice->salesOrder?->customer?->email 
+                ?: ($invoice->customer?->crmAccount?->email 
+                ?: ($invoice->salesOrder?->quotation?->email 
+                ?: ($invoice->salesOrder?->quotation?->prepared_for_email !== '—' ? $invoice->salesOrder?->quotation?->prepared_for_email : ''))));
         @endphp
 
         <!-- MORE Dropdown Button -->
@@ -156,7 +164,7 @@
             <button class="btn btn-sm btn-light border fw-bold px-3 dropdown-toggle d-inline-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More Invoice Actions">
                 <i class="feather-more-horizontal me-1"></i>MORE
             </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 290px;">
+            <ul class="dropdown-menu dropdown-menu-end shadow border p-1.5" style="min-width: 220px;">
                 <li>
                     <button type="button" 
                             class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium btn-open-send-invoice-wa-modal d-flex align-items-center text-nowrap" 
@@ -165,7 +173,7 @@
                             data-client-phone="{{ $clientPhone }}" 
                             data-total-amount="{{ format_currency($invoice->total_amount) }}"
                             data-balance-due="{{ format_currency($invoice->balance_due) }}">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" class="me-2.5"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 2.15.68 4.14 1.838 5.776L2.5 21.5l3.876-1.303A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.086-1.125l-.293-.174-2.295.771.785-2.238-.191-.304A7.96 7.96 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" fill="#25D366"/><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.521.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z" fill="#25D366"/></svg>
+                        <i class="feather-message-circle me-2.5 text-success fs-14"></i>
                         Send via WhatsApp
                     </button>
                 </li>
@@ -190,7 +198,7 @@
                 <li>
                     <a href="{{ route('sales.invoices.einvoice.export-json', $invoice->id) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium d-flex align-items-center text-success text-nowrap">
                         <i class="feather-code me-2.5 text-success fs-14"></i>
-                        Export NIC JSON (Govt Schema)
+                        Export NIC JSON
                     </a>
                 </li>
                 <li><hr class="dropdown-divider my-1"></li>
@@ -208,7 +216,7 @@
                         <li>
                             <a href="{{ route('sales.returns.create', ['invoice_id' => $invoice->id, 'sales_order_id' => $invoice->sales_order_id]) }}" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-warning d-flex align-items-center text-nowrap">
                                 <i class="feather-rotate-ccw me-2.5 text-warning fs-14"></i>
-                                <span>{{ __('crm.create_sales_return') }} ({{ __('crm.dispatched_items') }})</span>
+                                <span>{{ __('crm.create_sales_return') }}</span>
                             </a>
                         </li>
                     @else
@@ -216,7 +224,7 @@
                         <li>
                             <button type="button" class="dropdown-item py-2 px-3 pe-4 fs-12 fw-medium text-danger d-flex align-items-center text-nowrap" data-bs-toggle="modal" data-bs-target="#createCreditNoteModal">
                                 <i class="feather-file-minus me-2.5 text-danger fs-14"></i>
-                                <span>{{ __('crm.create_credit_note') }} ({{ __('crm.financial_only') }})</span>
+                                <span>{{ __('crm.create_credit_note') }}</span>
                             </button>
                         </li>
                     @endif
@@ -1502,7 +1510,10 @@
     <form id="sendInvoiceEmailForm" action="" method="POST" enctype="multipart/form-data">
         @csrf
         @php
-            $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+            $availableSmtps = \App\Models\EmailConfiguration::forCurrentContext()->where('is_active', true)->orderByDesc('is_default')->get();
+            if ($availableSmtps->isEmpty()) {
+                $availableSmtps = \App\Models\EmailConfiguration::where('is_active', true)->orderByDesc('is_default')->get();
+            }
         @endphp
         @if($availableSmtps->isNotEmpty())
             <div class="mb-3">
@@ -2099,6 +2110,18 @@
     </form>
 </x-ui.modal>
 
+<!-- RESULT NOTIFICATION MODAL (MATCHING CRM QUOTATION) -->
+<x-ui.modal id="waResultModal" title="<i class='feather-info me-1.5 text-primary'></i>System Notification" size="lg" :centered="true" :showFooter="false">
+    <div class="py-4 px-3 text-center">
+        <div id="waResultIcon" class="mb-3 d-flex justify-content-center"></div>
+        <h4 id="waResultTitle" class="fw-bold text-dark mb-3 fs-18"></h4>
+        <div id="waResultMessage" class="alert alert-light border text-center fs-13 mb-4 font-monospace p-3.5 text-break shadow-2xs rounded-3 mx-auto" style="max-width: 520px; background-color: #f8fafc; border-color: #e2e8f0 !important; color: #334155; line-height: 1.6;"></div>
+        <div class="d-flex justify-content-center mt-3">
+            <button type="button" class="btn btn-primary fw-bold px-5 py-2 fs-13 shadow-2xs rounded-3" data-bs-dismiss="modal" style="min-width: 140px;">OK</button>
+        </div>
+    </div>
+</x-ui.modal>
+
 @push('scripts')
 <script>
     const defaultInvoicePdfUrl = "{{ route('sales.invoices.previewPdf', $invoice->id) }}";
@@ -2106,7 +2129,7 @@
     let customWaPdfFile = null;
     let customEmailPdfFile = null;
 
-    function showNotificationModal(isSuccess, title, message) {
+    function showNotificationModal(isSuccess, title, message, reloadOnClose = false) {
         const iconHtml = isSuccess 
             ? '<div class="avatar avatar-xl bg-soft-success text-success rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(34, 197, 94, 0.2);"><i class="feather-check-circle fs-32"></i></div>'
             : '<div class="avatar avatar-xl bg-soft-danger text-danger rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center shadow-2xs" style="width: 64px; height: 64px; border: 2px solid rgba(239, 68, 68, 0.2);"><i class="feather-alert-triangle fs-32"></i></div>';
@@ -2116,8 +2139,21 @@
         $('#waResultMessage').text(message);
         
         const modalEl = document.getElementById('waResultModal');
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
+        if (modalEl) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            if (isSuccess && reloadOnClose) {
+                $(modalEl).one('hidden.bs.modal', function () {
+                    window.location.reload();
+                });
+                setTimeout(function () {
+                    window.location.reload();
+                }, 2000);
+            }
+        } else {
+            alert((isSuccess ? 'Success: ' : 'Error: ') + message);
+        }
     }
 
     function checkWhatsAppStatus() {
@@ -2265,7 +2301,7 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
 
-                showNotificationModal(true, "WhatsApp Message Delivered!", res.message);
+                showNotificationModal(true, "WhatsApp Message Delivered!", res.message, true);
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);
@@ -2370,7 +2406,7 @@
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
 
-                showNotificationModal(true, "Invoice Email Dispatched!", res.message);
+                showNotificationModal(true, "Invoice Email Dispatched!", res.message, true);
             },
             error: function (xhr) {
                 btn.prop('disabled', false).html(origHtml);

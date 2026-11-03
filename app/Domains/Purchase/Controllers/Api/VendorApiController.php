@@ -49,7 +49,7 @@ class VendorApiController extends Controller
 
         $query = Vendor::query()
             ->where('tenant_id', $tenantId)
-            ->withCount(['purchaseOrders', 'bills']);
+            ->withCount(['purchaseOrders', 'bills', 'advancePayments']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -176,6 +176,8 @@ class VendorApiController extends Controller
             ->with([
                 'purchaseOrders' => fn($q) => $q->latest()->limit(5),
                 'bills' => fn($q) => $q->latest()->limit(5),
+                'payments' => fn($q) => $q->latest()->limit(5),
+                'advancePayments' => fn($q) => $q->with('purchaseOrder')->latest()->limit(5),
             ])
             ->find($id);
 
@@ -186,20 +188,36 @@ class VendorApiController extends Controller
             ], 404);
         }
 
+        $bills = VendorBill::where('tenant_id', $tenantId)->where('vendor_id', $id)->get();
+        $payments = VendorPayment::where('tenant_id', $tenantId)->where('vendor_id', $id)->get();
+        $advances = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)->where('vendor_id', $id)->get();
+
         $totalPurchased = (float) PurchaseOrder::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('grand_total');
-        $totalBilled = (float) VendorBill::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('grand_total');
-        $totalPaid = (float) VendorPayment::where('tenant_id', $tenantId)->where('vendor_id', $id)->sum('amount');
-        $balancePayable = max(0, $totalBilled - $totalPaid);
+        $totalBilled = (float) $bills->where('status', '!=', 'cancelled')->sum('total_amount');
+        $totalPaid = (float) $payments
+            ->reject(fn ($p) => in_array(strtolower((string) $p->status), ['cancelled', 'void', 'draft', 'rejected'], true))
+            ->sum('amount');
+        $totalAdvancePaid = (float) $advances->where('status', '!=', 'cancelled')->sum('amount');
+        $availableAdvance = app(\App\Domains\Purchase\Services\VendorBillService::class)->getAvailableVendorAdvance($id, $tenantId);
+
+        $openingBalance = $vendor->signedOpeningBalance();
+        $netOutstanding = $openingBalance + $totalBilled - $totalPaid;
+        $balancePayable = max(0, $netOutstanding);
+        $vendorAdvanceCredit = max($availableAdvance, $netOutstanding < 0 ? abs($netOutstanding) : 0);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'vendor' => $vendor,
                 'stats' => [
-                    'total_purchased' => $totalPurchased,
-                    'total_billed' => $totalBilled,
-                    'total_paid' => $totalPaid,
-                    'balance_payable' => $balancePayable,
+                    'total_purchased' => round($totalPurchased, 2),
+                    'total_billed' => round($totalBilled, 2),
+                    'total_paid' => round($totalPaid, 2),
+                    'total_advance_paid' => round($totalAdvancePaid, 2),
+                    'available_advance' => round($availableAdvance, 2),
+                    'vendor_advance_credit' => round($vendorAdvanceCredit, 2),
+                    'net_outstanding' => round($netOutstanding, 2),
+                    'balance_payable' => round($balancePayable, 2),
                 ],
             ],
         ]);

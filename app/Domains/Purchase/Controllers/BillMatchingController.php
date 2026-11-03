@@ -78,6 +78,7 @@ class BillMatchingController extends Controller
 
         try {
             $released = $this->matcher->release($bill, (int) $request->user()->id, $validated['reason']);
+            \App\Domains\Purchase\Services\PurchaseNotificationService::notifyBillHoldReleased($released);
         } catch (InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }

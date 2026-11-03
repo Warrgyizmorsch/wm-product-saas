@@ -144,12 +144,7 @@ class StockAdjustmentController extends Controller
             return $adjustment;
         });
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.adjustment.pending', [
-            'doc_no' => $adjustment->adjustment_number,
-            'warehouse' => $adjustment->warehouse?->name ?? 'Warehouse',
-            'reason' => $adjustment->reason ?? 'Adjustment',
-            'created_by' => Auth::user()?->name ?? 'User',
-        ], route('inventory.adjustments.show', $adjustment->id), $adjustment);
+        \App\Domains\Inventory\Services\InventoryNotificationService::notifyAdjustmentPending($adjustment);
 
         return redirect()->route('inventory.adjustments.index')->with('success', 'Stock Adjustment Created successfully.');
     }
@@ -204,6 +199,8 @@ class StockAdjustmentController extends Controller
             ]);
         });
 
+        \App\Domains\Inventory\Services\InventoryNotificationService::notifyAdjustmentApproved($adjustment);
+
         return back()->with('success', 'Stock Adjustment Approved and inventory updated.');
     }
 
@@ -216,6 +213,9 @@ class StockAdjustmentController extends Controller
         }
 
         $adjustment->update(['status' => 'Cancelled']);
+
+        \App\Domains\Inventory\Services\InventoryNotificationService::notifyAdjustmentCancelled($adjustment);
+
         return back()->with('success', 'Stock Adjustment cancelled.');
     }
 }

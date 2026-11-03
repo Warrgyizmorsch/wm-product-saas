@@ -46,7 +46,7 @@ class PurchaseOrderApiController extends Controller
             'data'    => [
                 'statuses'       => ['Draft', 'Approved', 'Completed', 'Cancelled'],
                 'discount_types' => ['fixed', 'percentage'],
-                'tax_types'      => ['exclusive', 'inclusive'],
+                'tax_types'      => ['order_wise_tax', 'item_wise_tax', 'exclusive', 'inclusive'],
                 'gst_types'      => ['cgst_sgst', 'igst', 'none'],
                 'freight_terms'  => ['Prepaid', 'To Pay', 'Free on Board (FOB)', 'Cost & Freight (CFR)', 'Ex-Works'],
                 'vendors'        => $vendors,
@@ -170,10 +170,11 @@ class PurchaseOrderApiController extends Controller
                 $qty       = (float)$row['quantity'];
                 $price     = (float)$row['unit_price'];
                 $discount  = (float)($row['discount'] ?? 0);
-                $taxRate   = (float)($row['tax_rate'] ?? 0);
+                $taxType   = $validated['tax_type'] ?? 'exclusive';
+                $taxRate   = ($taxType === 'without_tax') ? 0 : (float)($row['tax_rate'] ?? 0);
 
                 $lineSubtotal = max(0, ($qty * $price) - $discount);
-                $lineTax      = $lineSubtotal * ($taxRate / 100);
+                $lineTax      = ($taxType === 'without_tax') ? 0 : ($lineSubtotal * ($taxRate / 100));
                 $lineTotal    = $lineSubtotal + $lineTax;
 
                 $subtotal += $lineSubtotal;
@@ -212,7 +213,7 @@ class PurchaseOrderApiController extends Controller
                 'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? null,
                 'discount_type'             => $validated['discount_type'] ?? 'fixed',
                 'tax_type'                  => $validated['tax_type'] ?? 'exclusive',
-                'gst_type'                  => $validated['gst_type'] ?? 'cgst_sgst',
+                'gst_type'                  => (!empty($validated['gst_type'])) ? $validated['gst_type'] : ((($validated['tax_type'] ?? '') !== 'without_tax' && !empty($validated['vendor_id'])) ? app(\App\Domains\Purchase\Services\PurchaseOrderService::class)->resolveGstType((int)$validated['vendor_id'], $companyId, $tenantId) : 'cgst_sgst'),
                 'subtotal'                  => $subtotal,
                 'tax_amount'                => $totalTax,
                 'freight_terms'             => $validated['freight_terms'] ?? null,
@@ -250,7 +251,7 @@ class PurchaseOrderApiController extends Controller
                 'items.product',
                 'goodsReceiptNotes',
                 'vendorBills',
-                'advancePayments',
+                'advancePayments.bankAccount',
             ])
             ->find($id);
 
@@ -261,9 +262,14 @@ class PurchaseOrderApiController extends Controller
             ], 404);
         }
 
+        $orderData = $order->toArray();
+        $orderData['remaining_advance_limit'] = $order->getRemainingAdvanceLimit();
+        $orderData['unbilled_advance']        = $order->getUnappliedAdvanceAmount();
+        $orderData['total_advance_paid']      = (float)$order->advancePayments->where('status', '!=', 'cancelled')->sum('amount');
+
         return response()->json([
             'success' => true,
-            'data'    => $order,
+            'data'    => $orderData,
         ]);
     }
 

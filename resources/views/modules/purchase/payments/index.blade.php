@@ -98,6 +98,9 @@
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">{{ $pay->payment_method ?: 'Bank Transfer' }}</span>
+                                @if($pay->bankAccount)
+                                    <div class="text-muted fs-11 mt-1 font-monospace">{{ $pay->bankAccount->name }}</div>
+                                @endif
                             </td>
                             <td class="font-monospace fs-12 text-secondary">{{ $pay->reference_number ?: 'N/A' }}</td>
                             <td class="text-end font-monospace fw-bold text-success">{{ format_currency($pay->amount) }}</td>

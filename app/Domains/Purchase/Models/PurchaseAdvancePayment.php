@@ -26,6 +26,7 @@ class PurchaseAdvancePayment extends BaseModel
         'payment_date',
         'amount',
         'payment_method',
+        'bank_account_id',
         'reference_number',
         'status',
         'notes',
@@ -55,5 +56,10 @@ class PurchaseAdvancePayment extends BaseModel
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'bank_account_id');
     }
 }

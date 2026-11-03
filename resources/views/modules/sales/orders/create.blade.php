@@ -32,19 +32,43 @@
             <div class="row g-4 mb-4 fs-13 text-dark">
                 <!-- Column 1: Customer, Sales Rep & Dates -->
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="customerSelect" :required="true">
+                        @php
+                            $activeCompany = company() ?? (current_company_id() ? \App\Domains\HRMS\Models\Company::find(current_company_id()) : null) ?? \App\Domains\HRMS\Models\Company::first();
+                            $companyGstin = strtoupper(trim((string) ($activeCompany?->gst_number ?? $activeCompany?->tax_number ?? $activeCompany?->gstin ?? '')));
+                            if (empty($companyGstin)) {
+                                $gstConfig = \App\Models\GstConfiguration::getForCurrentContext();
+                                if ($gstConfig && $gstConfig->seller_gstin) {
+                                    $companyGstin = strtoupper(trim((string) $gstConfig->seller_gstin));
+                                }
+                            }
+                            $companyCleanGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGstin);
+                            $companyGstPrefix = substr($companyCleanGst, 0, 2);
+                            $companyState = strtolower(trim((string) ($activeCompany?->state ?? '')));
+                        @endphp
+                        <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="customerSelect" :required="true" data-company-gst-prefix="{{ $companyGstPrefix }}" data-company-state="{{ $companyState }}">
                         <option value="">{{ __('crm.select_customer') }}</option>
                         <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="customer">{{ __('crm.add_new_customer') }}</option>
-                        @php
-                            $gstSupply = app(\App\Domains\Accounting\Services\Gst\Gstr1ReturnService::class);
-                            $gstSeller = $gstSupply->seller();
-                        @endphp
                         @foreach ($customers as $c)
-                            @php $supply = $gstSupply->supplyFor($c, $gstSeller); @endphp
+                            @php
+                                $custGstin = strtoupper(trim((string) ($c->gstin ?? $c->tax_number ?? '')));
+                                $custCleanGst = preg_replace('/[^0-9A-Za-z]/', '', $custGstin);
+                                $custGstPrefix = substr($custCleanGst, 0, 2);
+                                $custState = strtolower(trim((string) ($c->billing_state ?? $c->state ?? '')));
+
+                                // Determine GST type based on first 2 digits of Company GST vs Customer GSTIN
+                                if (!empty($companyGstPrefix) && !empty($custGstPrefix)) {
+                                    $computedGstType = ($companyGstPrefix === $custGstPrefix) ? 'cgst_sgst' : 'igst';
+                                } elseif (!empty($companyState) && !empty($custState)) {
+                                    $computedGstType = ($companyState === $custState) ? 'cgst_sgst' : 'igst';
+                                } else {
+                                    $computedGstType = 'cgst_sgst';
+                                }
+                            @endphp
                             <option value="{{ $c->id }}"
                                 data-billing="{{ $c->billing_address ?? '' }}"
                                 data-shipping="{{ $c->shipping_address ?? '' }}"
-                                data-gst-type="{{ $supply['inter'] === null ? '' : ($supply['inter'] ? 'igst' : 'cgst_sgst') }}"
+                                data-gst-prefix="{{ $custGstPrefix }}"
+                                data-gst-type="{{ $computedGstType }}"
                                 @selected(old('customer_id', $prefillQuotation?->customer_id ?? request('customer_id')) == $c->id)>
                                 {{ $c->name }} ({{ $c->email ?: $c->phone ?: 'No Contact' }})
                             </option>
@@ -113,6 +137,19 @@
                         $defaultGstType = 'cgst_sgst';
                         if ($prefillQuotation && $prefillQuotation->tax_type === 'inter_state') {
                             $defaultGstType = 'igst';
+                        } else {
+                            $initialCustId = old('customer_id', $prefillQuotation?->customer_id ?? request('customer_id'));
+                            if ($initialCustId) {
+                                $initialCust = $customers->firstWhere('id', $initialCustId);
+                                if ($initialCust) {
+                                    $iCustGstin = strtoupper(trim((string) ($initialCust->gstin ?? $initialCust->tax_number ?? '')));
+                                    $iCustClean = preg_replace('/[^0-9A-Za-z]/', '', $iCustGstin);
+                                    $iCustPrefix = substr($iCustClean, 0, 2);
+                                    if (!empty($companyGstPrefix) && !empty($iCustPrefix)) {
+                                        $defaultGstType = ($companyGstPrefix === $iCustPrefix) ? 'cgst_sgst' : 'igst';
+                                    }
+                                }
+                            }
                         }
 
                         $defaultTaxMode = $prefillQuotation?->effective_tax_mode ?? 'exclusive';
@@ -338,6 +375,7 @@
                         'sku' => $p->sku,
                         'selling_price' => convert_from_base($p->selling_price),
                         'is_service' => $p->isService(),
+                        'tax_rate' => $p->gst_rate ?? $p->tax_rate ?? null,
                     ];
                 });
             @endphp
@@ -372,7 +410,7 @@
                 productsList.forEach(function(p) {
                     const sel = (p.id == selectedId) ? ' selected' : '';
                     const tag = p.is_service ? ' [Service]' : '';
-                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}" data-is-service="${p.is_service ? 1 : 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})${tag}</option>`;
+                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}" data-tax-rate="${p.tax_rate ?? ''}" data-is-service="${p.is_service ? 1 : 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})${tag}</option>`;
                 });
                 return opts;
             }
@@ -536,15 +574,26 @@
                     isPrefilling = false;
                 }
 
-                // Auto-fill selling price from item master when product is changed (like Odoo/Zoho)
+                // Auto-fill selling price and tax rate from item master when product is changed (like Odoo/Zoho)
                 newRow.find('.item-name-input').on('change', function() {
                     if (isPrefilling) return;
                     const selectedOption = $(this).find('option:selected');
-                    const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
-                    if (sellingPrice > 0) {
+                    const productId = selectedOption.val();
+                    if (productId && productId !== '__ADD_NEW__') {
+                        const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
                         $(this).closest('tr').find('.price-input').val(sellingPrice.toFixed(2));
-                        calculateTotals();
+
+                        const taxRateAttr = selectedOption.attr('data-tax-rate');
+                        if (taxRateAttr !== undefined && taxRateAttr !== '' && taxRateAttr !== null) {
+                            const taxRate = parseFloat(taxRateAttr);
+                            if (!isNaN(taxRate) && taxRate >= 0) {
+                                $(this).closest('tr').find('.tax-input').val(taxRate.toFixed(2));
+                            }
+                        }
+                    } else if (!productId) {
+                        $(this).closest('tr').find('.price-input').val('0.00');
                     }
+                    calculateTotals();
                 });
 
                 rowIndex++;
@@ -692,25 +741,51 @@
 
             $('#freightTermsSelect, #freightAmountInput, #discountInput, #adjustmentInput').on('input change', calculateTotals);
 
-            // Customer select address prefill
-            let gstTypeChosenByUser = {{ old('gst_type') ? 'true' : 'false' }};
-            $('#gstTypeSelect').on('change', function (e) { if (e.originalEvent) gstTypeChosenByUser = true; });
-            $('#customerSelect').on('change', function() {
-                const selected = $(this).find('option:selected');
+            // Customer select address prefill and GST type auto-resolution
+            function applyCustomerGstAndAddress(isInitialLoad = false) {
+                const custId = $('#customerSelect').val();
+                if (!custId || custId === '__ADD_NEW__') return;
+
+                const selected = $('#customerSelect').find('option[value="' + custId + '"]');
                 const billing = selected.attr('data-billing') || '';
                 const shipping = selected.attr('data-shipping') || '';
-                if (billing && !$('textarea[name="billing_address"]').val()) {
+                if (billing && (!isInitialLoad || !$('textarea[name="billing_address"]').val())) {
                     $('textarea[name="billing_address"]').val(billing);
                 }
-                if (shipping && !$('textarea[name="shipping_address"]').val()) {
+                if (shipping && (!isInitialLoad || !$('textarea[name="shipping_address"]').val())) {
                     $('textarea[name="shipping_address"]').val(shipping);
                 }
-                // Customer in another state (by GSTIN / address) => IGST; same state => CGST+SGST.
-                const gstType = selected.attr('data-gst-type');
-                if (gstType && !gstTypeChosenByUser && $('#gstTypeSelect').val() !== gstType) {
-                    $('#gstTypeSelect').val(gstType).trigger('change');
+
+                // If on initial load and old('gst_type') was supplied, keep user's old input
+                if (isInitialLoad && {{ old('gst_type') ? 'true' : 'false' }}) {
+                    return;
                 }
-            }).trigger('change');
+
+                // Primary rule: Compare first 2 digits of Company GST vs Customer GSTIN
+                const companyPrefix = ($('#customerSelect').attr('data-company-gst-prefix') || '{{ $companyGstPrefix }}').trim().toUpperCase();
+                const custPrefix = (selected.attr('data-gst-prefix') || '').trim().toUpperCase();
+                let determinedGstType = selected.attr('data-gst-type');
+
+                if (companyPrefix && custPrefix) {
+                    determinedGstType = (companyPrefix === custPrefix) ? 'cgst_sgst' : 'igst';
+                }
+
+                if (determinedGstType) {
+                    $('#gstTypeSelect').val(determinedGstType).trigger('change');
+                }
+
+                if ($('#taxTypeSelect').val() !== 'without_tax') {
+                    calculateTotals();
+                }
+            }
+
+            $('#customerSelect').on('change select2:select', function() {
+                applyCustomerGstAndAddress(false);
+            });
+
+            if ($('#customerSelect').val()) {
+                applyCustomerGstAndAddress(true);
+            }
 
             // Prefill order items
             @php

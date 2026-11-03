@@ -44,6 +44,16 @@ class NotificationController extends Controller
             return response()->json(['unread_count' => 0, 'notifications' => []]);
         }
 
+        // Check and dispatch any due CRM follow-ups / meetings for this user
+        try {
+            app(\App\Domains\CRM\Services\CrmFollowupReminderService::class)->dispatchDueReminders(
+                tenantId: $user->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null),
+                userId: $user->id
+            );
+        } catch (\Throwable $e) {
+            // Silently continue if CRM reminder check fails
+        }
+
         $unreadCount = Notification::forUser($user->id)->unread()->count();
 
         $notifications = Notification::forUser($user->id)

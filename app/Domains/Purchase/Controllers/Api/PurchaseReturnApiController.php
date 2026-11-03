@@ -120,6 +120,30 @@ class PurchaseReturnApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
+        // Level 1: Auto-detect linked Vendor Bill if not explicitly provided
+        if (empty($validated['vendor_bill_id'])) {
+            $grnId = $validated['goods_receipt_note_id'] ?? null;
+            $poId  = $validated['purchase_order_id'] ?? null;
+            $foundBill = null;
+            if ($grnId) {
+                $foundBill = VendorBill::where('tenant_id', $tenantId)
+                    ->where('goods_receipt_note_id', $grnId)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest('id')
+                    ->first();
+            }
+            if (!$foundBill && $poId) {
+                $foundBill = VendorBill::where('tenant_id', $tenantId)
+                    ->where('purchase_order_id', $poId)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest('id')
+                    ->first();
+            }
+            if ($foundBill) {
+                $validated['vendor_bill_id'] = $foundBill->id;
+            }
+        }
+
         $return = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId) {
             $lastId   = (PurchaseReturn::where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
             $returnNo = 'PRET-' . str_pad((string)$lastId, 5, '0', STR_PAD_LEFT);
@@ -229,16 +253,31 @@ class PurchaseReturnApiController extends Controller
                     );
                 }
 
+                $bill = null;
                 if ($purchaseReturn->vendor_bill_id) {
                     $bill = VendorBill::where('tenant_id', $tenantId)->find($purchaseReturn->vendor_bill_id);
-                    if ($bill) {
-                        $due = (float)($bill->due_amount ?? $bill->balance_due);
-                        $apply = min((float)$purchaseReturn->total_refund_amount, $due);
-                        $bill->due_amount = max(0, $due - $apply);
-                        $bill->paid_amount = max(0, $bill->netPayable() - (float)$bill->due_amount);
-                        $bill->status = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
-                        $bill->save();
+                } elseif ($purchaseReturn->goods_receipt_note_id) {
+                    $bill = VendorBill::where('tenant_id', $tenantId)->where('goods_receipt_note_id', $purchaseReturn->goods_receipt_note_id)
+                        ->where('status', '!=', 'Cancelled')
+                        ->latest('id')
+                        ->first();
+                } elseif ($purchaseReturn->purchase_order_id) {
+                    $bill = VendorBill::where('tenant_id', $tenantId)->where('purchase_order_id', $purchaseReturn->purchase_order_id)
+                        ->where('status', '!=', 'Cancelled')
+                        ->latest('id')
+                        ->first();
+                }
+
+                if ($bill) {
+                    if (!$purchaseReturn->vendor_bill_id) {
+                        $purchaseReturn->vendor_bill_id = $bill->id;
+                        $purchaseReturn->save();
                     }
+                    $due = (float)($bill->due_amount ?? $bill->balance_due);
+                    $apply = min((float)$purchaseReturn->total_refund_amount, $due);
+                    $bill->due_amount = max(0, $due - $apply);
+                    $bill->status = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
+                    $bill->save();
                 }
 
                 $purchaseReturn->update(['status' => 'Completed']);

@@ -220,6 +220,8 @@ class PurchaseRfqController extends Controller
 
         $rfq = $this->rfqService->storeRfq($validated, $tenantId);
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRfqCreated($rfq);
+
         return redirect()->route('purchase.rfqs.show', $rfq->id)
             ->with('success', "RFQ {$rfq->rfq_number} created successfully.");
     }
@@ -484,6 +486,8 @@ class PurchaseRfqController extends Controller
         $this->authorize('update', $rfq);
 
         $this->rfqRepo->update($rfq, ['status' => 'Confirmed']);
+
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyRfqConfirmed($rfq);
 
         return redirect()->route('purchase.rfqs.show', $id)
             ->with('success', "RFQ {$rfq->rfq_number} confirmed.");

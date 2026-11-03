@@ -242,12 +242,7 @@ class GoodsReceiptNoteController extends Controller
 
         $grn = $this->grnService->storeGrn($validated, $tenantId);
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.grn.received', [
-            'grn_no' => $grn->grn_number,
-            'vendor_name' => $grn->vendor?->name ?? 'Vendor',
-            'warehouse' => $grn->warehouse?->name ?? 'Main Warehouse',
-            'po_no' => $grn->purchaseOrder?->purchase_order_number ?? $grn->purchaseOrder?->po_number ?? 'Direct Inward',
-        ], route('purchase.grns.show', $grn->id), $grn);
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyGrnReceived($grn);
 
         return redirect()->route('purchase.grns.show', $grn->id)
             ->with('success', "Goods Receipt Note {$grn->grn_number} created and approved successfully.");
@@ -317,6 +312,8 @@ class GoodsReceiptNoteController extends Controller
         }
 
         $this->grnRepo->update($grn, ['status' => 'Approved']);
+
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyGrnApproved($grn);
 
         return redirect()->back()
             ->with('success', "Goods Receipt Note {$grn->grn_number} has been Approved!");

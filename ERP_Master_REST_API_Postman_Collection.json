@@ -7681,7 +7681,7 @@
                                         "meta"
                                     ]
                                 },
-                                "description": "Get metadata, active vendors, products, warehouses, tax terms"
+                                "description": "Get PO statuses, discount types, tax modes (order_wise_tax, item_wise_tax, exclusive, inclusive), freight terms, active vendors, products, and warehouses"
                             },
                             "response": []
                         },
@@ -7789,7 +7789,7 @@
                                         "{{order_id}}"
                                     ]
                                 },
-                                "description": "View complete PO with GRNs, bills, advance payments linked"
+                                "description": "View PO details including line items, GRNs, bills, advance payments with bank account, remaining_advance_limit, unbilled_advance, and total_advance_paid"
                             },
                             "response": []
                         },
@@ -8742,7 +8742,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/purchase/bills/meta",
+                                    "raw": "{{base_url}}/api/purchase/bills/meta?vendor_id=1&purchase_order_id=1",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -8751,9 +8751,21 @@
                                         "purchase",
                                         "bills",
                                         "meta"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "vendor_id",
+                                            "value": "1",
+                                            "description": "Optional vendor ID to check available advance"
+                                        },
+                                        {
+                                            "key": "purchase_order_id",
+                                            "value": "1",
+                                            "description": "Optional PO ID to inherit tax modes and rates"
+                                        }
                                     ]
                                 },
-                                "description": "Get metadata, approved GRNs, POs, active vendors"
+                                "description": "Get bill statuses, vendors, available advance credit, and PO tax info (tax_type, order_tax_percent, item tax rates)"
                             },
                             "response": []
                         },
@@ -8820,10 +8832,10 @@
                                         "bills"
                                     ]
                                 },
-                                "description": "Create Vendor Bill against GRN / PO",
+                                "description": "Create vendor bill with 3-way matching. Tax rates automatically inherit from PO if tax_rate is null/omitted. Supports auto_apply_advance to automatically settle against advance credit and auto-posts to GL.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vendor_id\": 1,\n    \"purchase_order_id\": 1,\n    \"goods_receipt_note_id\": 1,\n    \"vendor_invoice_number\": \"INV-SUP-2026-88\",\n    \"bill_date\": \"2026-09-26\",\n    \"due_date\": \"2026-10-26\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 50,\n            \"unit_price\": 140,\n            \"tax_rate\": 18\n        }\n    ]\n}",
+                                    "raw": "{\n    \"vendor_id\": 1,\n    \"purchase_order_id\": 1,\n    \"goods_receipt_note_id\": 1,\n    \"vendor_invoice_number\": \"INV-SUP-2026-88\",\n    \"bill_date\": \"2026-09-26\",\n    \"due_date\": \"2026-10-26\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 50,\n            \"unit_price\": 140,\n            \"tax_rate\": null\n        }\n    ],\n    \"auto_apply_advance\": true\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -8907,7 +8919,7 @@
                                         "{{bill_id}}"
                                     ]
                                 },
-                                "description": "View bill with payment allocations, balance due, linked PO/GRN"
+                                "description": "View bill details, line items, PO, GRN, allocations with vendor payments & bank accounts, and available_advance credit."
                             },
                             "response": []
                         },
@@ -9024,7 +9036,7 @@
                                         "apply-advance"
                                     ]
                                 },
-                                "description": "Apply unallocated PO advance payment against vendor bill",
+                                "description": "Apply available advance credit to settle bill due balance, update allocation records, and auto-post advance settlement journal in General Ledger.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n    \"advance_payment_id\": 1,\n    \"amount\": 500\n}",
@@ -9139,6 +9151,45 @@
                     "name": "8. Purchase Advance Payments",
                     "item": [
                         {
+                            "name": "Advance Payment Meta",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Authorization",
+                                        "value": "Bearer {{auth_token}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/purchase/advances/meta?vendor_id=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "purchase",
+                                        "advances",
+                                        "meta"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "vendor_id",
+                                            "value": "1",
+                                            "description": "Filter open POs with remaining advance limits for this vendor"
+                                        }
+                                    ]
+                                },
+                                "description": "Get payment methods, bank accounts list (COA cash/bank ledgers), active vendors, and open POs with remaining_advance_limit"
+                            },
+                            "response": []
+                        },
+                        {
                             "name": "Get Advance Payments List",
                             "request": {
                                 "method": "GET",
@@ -9201,10 +9252,10 @@
                                         "advances"
                                     ]
                                 },
-                                "description": "Record advance payment to vendor against PO",
+                                "description": "Record advance payment to vendor against PO with bank account selection (Chart of Accounts) and unbilled advance headroom validation",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vendor_id\": 1,\n    \"purchase_order_id\": 1,\n    \"payment_date\": \"2026-09-26\",\n    \"amount\": 1000,\n    \"payment_method\": \"Bank Transfer\",\n    \"reference_number\": \"NEFT-ADV-2026-01\",\n    \"notes\": \"30% advance on PO confirmation\"\n}",
+                                    "raw": "{\n    \"vendor_id\": 1,\n    \"purchase_order_id\": 1,\n    \"payment_date\": \"2026-09-26\",\n    \"amount\": 1000,\n    \"payment_method\": \"Bank Transfer\",\n    \"reference_number\": \"NEFT-ADV-2026-01\",\n    \"notes\": \"30% advance on PO confirmation\",\n    \"bank_account_id\": 1\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -9242,7 +9293,7 @@
                                         "{{advance_id}}"
                                     ]
                                 },
-                                "description": "View advance payment record"
+                                "description": "View advance payment record with bank account, vendor, purchase order, bill allocations, allocated amount, and remaining unallocated balance"
                             },
                             "response": []
                         }
@@ -9268,7 +9319,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/purchase/payments/meta",
+                                    "raw": "{{base_url}}/api/purchase/payments/meta?vendor_id=1",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -9277,9 +9328,16 @@
                                         "purchase",
                                         "payments",
                                         "meta"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "vendor_id",
+                                            "value": "1",
+                                            "description": "Optional vendor ID to get unpaid bills and available advance credit"
+                                        }
                                     ]
                                 },
-                                "description": "Get payment methods, active vendors, outstanding bills"
+                                "description": "Get payment methods, active cash & bank accounts (COA), unpaid vendor bills with due balances, and available advance credit"
                             },
                             "response": []
                         },
@@ -9346,10 +9404,10 @@
                                         "payments"
                                     ]
                                 },
-                                "description": "Record vendor payment and allocate to one or multiple vendor bills",
+                                "description": "Record vendor payment with bank account selection (COA), auto-apply available advance credit to settle net bill payable, update bill statuses, and automatically post accounting GL journal entry",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vendor_id\": 1,\n    \"payment_date\": \"2026-09-26\",\n    \"amount\": 3000,\n    \"payment_method\": \"Bank Transfer\",\n    \"reference_number\": \"UTR-987654321\",\n    \"allocations\": [\n        {\n            \"vendor_bill_id\": 1,\n            \"amount\": 3000\n        }\n    ]\n}",
+                                    "raw": "{\n    \"vendor_id\": 1,\n    \"payment_date\": \"2026-09-26\",\n    \"amount\": 3000,\n    \"payment_method\": \"Bank Transfer\",\n    \"reference_number\": \"UTR-987654321\",\n    \"allocations\": [\n        {\n            \"vendor_bill_id\": 1,\n            \"amount\": 3000,\n            \"allocated_amount\": 3000\n        }\n    ],\n    \"bank_account_id\": 1,\n    \"auto_apply_advance\": true,\n    \"vendor_bill_id\": 1\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -9387,7 +9445,7 @@
                                         "{{payment_id}}"
                                     ]
                                 },
-                                "description": "View payment voucher and bill allocation breakdown"
+                                "description": "View payment voucher with bank account, creator, vendor, purchase order, bill allocations, advance_adjusted_total, advance_adjusted_vouchers, and total_settled_with_advance matching the web payment voucher"
                             },
                             "response": []
                         },

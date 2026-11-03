@@ -5,6 +5,9 @@ namespace App\Domains\Purchase\Services;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
+use App\Domains\Inventory\Models\Vendor;
+use App\Domains\HRMS\Models\Company;
+use App\Models\GstConfiguration;
 use Illuminate\Support\Facades\DB;
 
 class PurchaseOrderService
@@ -39,7 +42,14 @@ class PurchaseOrderService
 
             $discountType = $validated['discount_type'] ?? 'without_discount';
             $taxType = $validated['tax_type'] ?? 'order_wise_tax';
-            $gstType = $validated['gst_type'] ?? 'cgst_sgst';
+            $gstType = $validated['gst_type'] ?? null;
+
+            if (empty($gstType) && $taxType !== 'without_tax' && !empty($validated['vendor_id'])) {
+                $gstType = $this->resolveGstType((int)$validated['vendor_id'], $validated['company_id'] ?? null, $tenantId);
+            }
+            if (empty($gstType)) {
+                $gstType = 'cgst_sgst';
+            }
 
             $subtotal = $calculatedSubtotal;
 
@@ -65,7 +75,12 @@ class PurchaseOrderService
             $sgstAmount = isset($validated['sgst_amount']) ? (float)$validated['sgst_amount'] : 0;
             $igstAmount = isset($validated['igst_amount']) ? (float)$validated['igst_amount'] : 0;
 
-            if ($taxAmount > 0 && ($cgstAmount + $sgstAmount + $igstAmount) <= 0) {
+            if ($taxType === 'without_tax') {
+                $taxAmount = 0;
+                $cgstAmount = 0;
+                $sgstAmount = 0;
+                $igstAmount = 0;
+            } elseif ($taxAmount > 0 && ($cgstAmount + $sgstAmount + $igstAmount) <= 0) {
                 if ($gstType === 'igst') {
                     $igstAmount = $taxAmount;
                 } else {
@@ -80,6 +95,8 @@ class PurchaseOrderService
 
             $po = $this->orderRepo->create([
                 'tenant_id' => $tenantId,
+                'company_id' => $validated['company_id'] ?? current_company_id() ?? auth()->user()?->company_id,
+                'branch_id' => $validated['branch_id'] ?? current_branch_id() ?? auth()->user()?->branch_id,
                 'purchase_order_number' => $poNumber,
                 'date' => $validated['date'] ?? $validated['po_date'] ?? now()->toDateString(),
                 'delivery_date' => $validated['delivery_date'] ?? $validated['expected_delivery_date'] ?? null,
@@ -109,12 +126,32 @@ class PurchaseOrderService
                 $qty = (float)$item['quantity'];
                 $price = convert_to_base((float)($item['unit_price'] ?? $item['rate'] ?? 0));
                 $disc = convert_to_base((float)($item['discount'] ?? $item['discount_amount'] ?? 0));
-                $taxRate = (float)($item['tax_rate'] ?? $item['tax_percent'] ?? 0);
-
                 $lineSubtotal = ($qty * $price) - $disc;
-                $lineTax = $lineSubtotal * ($taxRate / 100);
+
+                if ($taxType === 'item_wise_tax') {
+                    $taxRate = (float)($item['tax_rate'] ?? $item['tax_percent'] ?? 0);
+                    $lineTax = $lineSubtotal * ($taxRate / 100);
+                    $cgstPct = ($gstType === 'cgst_sgst') ? round($taxRate / 2, 4) : 0;
+                    $sgstPct = ($gstType === 'cgst_sgst') ? round($taxRate / 2, 4) : 0;
+                    $igstPct = ($gstType === 'igst') ? $taxRate : 0;
+                    $cgstAmt = ($gstType === 'cgst_sgst') ? round($lineTax / 2, 4) : 0;
+                    $sgstAmt = ($gstType === 'cgst_sgst') ? round($lineTax / 2, 4) : 0;
+                    $igstAmt = ($gstType === 'igst') ? $lineTax : 0;
+                } else {
+                    $taxRate = 0;
+                    $lineTax = 0;
+                    $cgstPct = 0;
+                    $sgstPct = 0;
+                    $igstPct = 0;
+                    $cgstAmt = 0;
+                    $sgstAmt = 0;
+                    $igstAmt = 0;
+                }
 
                 PurchaseOrderItem::create([
+                    'tenant_id' => $tenantId,
+                    'company_id' => $po->company_id,
+                    'branch_id' => $po->branch_id,
                     'purchase_order_id' => $po->id,
                     'product_id' => $item['product_id'] ?? null,
                     'description' => $item['description'] ?? null,
@@ -128,12 +165,12 @@ class PurchaseOrderService
                     'discount_percent' => $item['discount_percent'] ?? 0,
                     'discount_amount' => $disc,
                     'tax_percent' => $taxRate,
-                    'cgst_percent' => $item['cgst_percent'] ?? 0,
-                    'sgst_percent' => $item['sgst_percent'] ?? 0,
-                    'igst_percent' => $item['igst_percent'] ?? 0,
-                    'cgst_amount' => $item['cgst_amount'] ?? 0,
-                    'sgst_amount' => $item['sgst_amount'] ?? 0,
-                    'igst_amount' => $item['igst_amount'] ?? 0,
+                    'cgst_percent' => $cgstPct,
+                    'sgst_percent' => $sgstPct,
+                    'igst_percent' => $igstPct,
+                    'cgst_amount' => $cgstAmt,
+                    'sgst_amount' => $sgstAmt,
+                    'igst_amount' => $igstAmt,
                     'tax_amount' => $lineTax,
                     'total_amount' => $lineSubtotal + $lineTax,
                 ]);
@@ -146,6 +183,168 @@ class PurchaseOrderService
             }
 
             return $po;
+        });
+    }
+
+    public function updateOrder(PurchaseOrder $order, array $validated): PurchaseOrder
+    {
+        return DB::transaction(function () use ($order, $validated) {
+            $discountType = $validated['discount_type'] ?? $order->discount_type ?? 'without_discount';
+            $taxType = $validated['tax_type'] ?? $order->tax_type ?? 'without_tax';
+            $gstType = $validated['gst_type'] ?? null;
+            $vendorId = $validated['vendor_id'] ?? $order->vendor_id;
+
+            if ($taxType === 'without_tax') {
+                $gstType = $validated['gst_type'] ?? 'cgst_sgst';
+            } elseif (empty($gstType) && !empty($vendorId)) {
+                $gstType = $this->resolveGstType((int)$vendorId, null, $order->tenant_id);
+            }
+
+            if (empty($gstType)) {
+                $gstType = 'cgst_sgst';
+            }
+
+            $updateData = [
+                'vendor_id' => $vendorId,
+                'date' => $validated['date'] ?? $validated['po_date'] ?? $order->date,
+                'delivery_date' => $validated['delivery_date'] ?? $validated['expected_delivery_date'] ?? $order->delivery_date,
+                'location' => $validated['location'] ?? $order->location,
+                'reference' => $validated['reference'] ?? $order->reference,
+                'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? $order->supplier_quotation_number,
+                'purchase_requisition_id' => $validated['purchase_requisition_id'] ?? $order->purchase_requisition_id,
+                'discount_type' => $discountType,
+                'tax_type' => $taxType,
+                'gst_type' => $gstType,
+                'freight_terms' => $validated['freight_terms'] ?? $order->freight_terms ?? 'to_pay',
+                'notes' => $validated['notes'] ?? $order->notes,
+            ];
+
+            if (isset($validated['items']) && is_array($validated['items'])) {
+                $calculatedSubtotal = 0;
+                $calculatedItemDiscount = 0;
+                $calculatedItemTax = 0;
+
+                foreach ($validated['items'] as $item) {
+                    $qty = (float)($item['quantity'] ?? 0);
+                    $price = convert_to_base((float)($item['unit_price'] ?? $item['rate'] ?? 0));
+                    $disc = convert_to_base((float)($item['discount'] ?? $item['discount_amount'] ?? 0));
+                    $taxRate = ($taxType === 'without_tax') ? 0 : (float)($item['tax_rate'] ?? $item['tax_percent'] ?? 0);
+
+                    $lineAmt = $qty * $price;
+                    $calculatedSubtotal += $lineAmt;
+                    $calculatedItemDiscount += $disc;
+                    $lineTaxable = max(0, $lineAmt - $disc);
+                    $calculatedItemTax += ($taxType === 'without_tax') ? 0 : ($lineTaxable * ($taxRate / 100));
+                }
+
+                $subtotal = $calculatedSubtotal;
+
+                if ($discountType === 'order_wise') {
+                    $discountAmount = convert_to_base((float)($validated['discount_amount'] ?? 0));
+                } elseif ($discountType === 'item_wise') {
+                    $discountAmount = $calculatedItemDiscount;
+                } else {
+                    $discountAmount = 0;
+                }
+
+                $grossTotal = max(0, $subtotal - $discountAmount);
+
+                if ($taxType === 'order_wise_tax') {
+                    $taxAmount = (float)($validated['tax_amount'] ?? 0);
+                } elseif ($taxType === 'item_wise_tax') {
+                    $taxAmount = $calculatedItemTax;
+                } else {
+                    $taxAmount = 0;
+                }
+
+                $cgstAmount = isset($validated['cgst_amount']) ? (float)$validated['cgst_amount'] : 0;
+                $sgstAmount = isset($validated['sgst_amount']) ? (float)$validated['sgst_amount'] : 0;
+                $igstAmount = isset($validated['igst_amount']) ? (float)$validated['igst_amount'] : 0;
+
+                if ($taxType === 'without_tax') {
+                    $cgstAmount = 0;
+                    $sgstAmount = 0;
+                    $igstAmount = 0;
+                    $taxAmount = 0;
+                } elseif ($taxAmount > 0 && ($cgstAmount + $sgstAmount + $igstAmount) <= 0) {
+                    if ($gstType === 'igst') {
+                        $igstAmount = $taxAmount;
+                    } else {
+                        $cgstAmount = round($taxAmount / 2, 4);
+                        $sgstAmount = round($taxAmount - $cgstAmount, 4);
+                    }
+                }
+
+                $freightAmt = convert_to_base((float)($validated['freight_amount'] ?? $order->freight_amount ?? 0));
+                $isFreightIncluded = in_array($updateData['freight_terms'], ['to_be_billed', 'prepaid']);
+                $grandTotal = $grossTotal + $taxAmount + ($isFreightIncluded ? $freightAmt : 0);
+
+                $updateData['subtotal'] = $subtotal;
+                $updateData['discount_amount'] = $discountAmount;
+                $updateData['tax_amount'] = $taxAmount;
+                $updateData['cgst_amount'] = $cgstAmount;
+                $updateData['sgst_amount'] = $sgstAmount;
+                $updateData['igst_amount'] = $igstAmount;
+                $updateData['freight_amount'] = $freightAmt;
+                $updateData['grand_total'] = $grandTotal;
+
+                $order->items()->delete();
+
+                foreach ($validated['items'] as $item) {
+                    $qty = (float)$item['quantity'];
+                    $price = convert_to_base((float)($item['unit_price'] ?? $item['rate'] ?? 0));
+                    $disc = convert_to_base((float)($item['discount'] ?? $item['discount_amount'] ?? 0));
+                    $lineSubtotal = ($qty * $price) - $disc;
+
+                    if ($taxType === 'item_wise_tax') {
+                        $taxRate = (float)($item['tax_rate'] ?? $item['tax_percent'] ?? 0);
+                        $lineTax = $lineSubtotal * ($taxRate / 100);
+                        $cgstPct = ($gstType === 'cgst_sgst') ? round($taxRate / 2, 4) : 0;
+                        $sgstPct = ($gstType === 'cgst_sgst') ? round($taxRate / 2, 4) : 0;
+                        $igstPct = ($gstType === 'igst') ? $taxRate : 0;
+                        $cgstAmt = ($gstType === 'cgst_sgst') ? round($lineTax / 2, 4) : 0;
+                        $sgstAmt = ($gstType === 'cgst_sgst') ? round($lineTax / 2, 4) : 0;
+                        $igstAmt = ($gstType === 'igst') ? $lineTax : 0;
+                    } else {
+                        $taxRate = 0;
+                        $lineTax = 0;
+                        $cgstPct = 0;
+                        $sgstPct = 0;
+                        $igstPct = 0;
+                        $cgstAmt = 0;
+                        $sgstAmt = 0;
+                        $igstAmt = 0;
+                    }
+
+                    PurchaseOrderItem::create([
+                        'purchase_order_id' => $order->id,
+                        'product_id' => $item['product_id'] ?? null,
+                        'description' => $item['description'] ?? null,
+                        'line_type' => $item['line_type'] ?? PurchaseOrderItem::LINE_TYPE_STOCK,
+                        'chart_of_account_id' => $item['chart_of_account_id'] ?? null,
+                        'asset_category_id' => $item['asset_category_id'] ?? null,
+                        'warehouse_id' => $item['warehouse_id'] ?? null,
+                        'quantity' => $qty,
+                        'rate' => $price,
+                        'amount' => $lineSubtotal,
+                        'discount_percent' => $item['discount_percent'] ?? 0,
+                        'discount_amount' => $disc,
+                        'tax_percent' => $taxRate,
+                        'cgst_percent' => $cgstPct,
+                        'sgst_percent' => $sgstPct,
+                        'igst_percent' => $igstPct,
+                        'cgst_amount' => $cgstAmt,
+                        'sgst_amount' => $sgstAmt,
+                        'igst_amount' => $igstAmt,
+                        'tax_amount' => $lineTax,
+                        'total_amount' => $lineSubtotal + $lineTax,
+                    ]);
+                }
+            }
+
+            $order->update($updateData);
+
+            return $order->fresh(['items', 'vendor']);
         });
     }
 
@@ -272,5 +471,65 @@ class PurchaseOrderService
                 $qtyToRevert -= $toDecrement;
             }
         }
+    }
+
+    /**
+     * Resolve GST type (cgst_sgst for Intra-state, igst for Inter-state)
+     * based on active company GST number starting 2 digits vs vendor GSTIN starting 2 digits.
+     */
+    public function resolveGstType(Vendor|int $vendor, ?int $companyId = null, ?int $tenantId = null): string
+    {
+        if (is_numeric($vendor)) {
+            $vendor = Vendor::find($vendor);
+        }
+        if (!$vendor) {
+            return 'cgst_sgst';
+        }
+
+        $tenantId ??= $vendor->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+
+        $company = null;
+        if ($companyId) {
+            $company = Company::find($companyId);
+        }
+        if (!$company && function_exists('company') && company()) {
+            $company = company();
+        }
+        if (!$company && function_exists('current_company_id') && current_company_id()) {
+            $company = Company::find(current_company_id());
+        }
+        if (!$company) {
+            $company = Company::where('tenant_id', $tenantId)->first();
+        }
+
+        $companyGst = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
+        if (empty($companyGst)) {
+            $gstConfig = GstConfiguration::getForCurrentContext();
+            if ($gstConfig && $gstConfig->seller_gstin) {
+                $companyGst = strtoupper(trim((string) $gstConfig->seller_gstin));
+            }
+        }
+
+        $vendorGst = strtoupper(trim((string) ($vendor->gstin ?? $vendor->tax_number ?? '')));
+
+        $cleanCompanyGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGst);
+        $cleanVendorGst = preg_replace('/[^0-9A-Za-z]/', '', $vendorGst);
+
+        $companyPrefix = substr($cleanCompanyGst, 0, 2);
+        $vendorPrefix = substr($cleanVendorGst, 0, 2);
+
+        // 1. Primary rule: Compare first 2 digits of company GST and vendor GSTIN
+        if (!empty($companyPrefix) && !empty($vendorPrefix)) {
+            return ($companyPrefix === $vendorPrefix) ? 'cgst_sgst' : 'igst';
+        }
+
+        // 2. Fallback: Compare states if GSTINs not available
+        $companyState = strtolower(trim((string) ($company?->state ?? '')));
+        $vendorState = strtolower(trim((string) ($vendor->billing_state ?? $vendor->state ?? '')));
+        if (!empty($companyState) && !empty($vendorState)) {
+            return ($companyState === $vendorState) ? 'cgst_sgst' : 'igst';
+        }
+
+        return 'cgst_sgst';
     }
 }

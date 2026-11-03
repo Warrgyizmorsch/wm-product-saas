@@ -45,11 +45,15 @@ class LeadFollowup extends Model
         'checkin_at',
         'selfie_path',
         'location_verified_at',
+        'advance_reminder_sent_at',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'followup_date' => 'datetime',
         'original_followup_date' => 'datetime',
+        'advance_reminder_sent_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
         'tagged_user_ids' => 'array',
         'is_google_meet' => 'boolean',
         'latitude' => 'float',
