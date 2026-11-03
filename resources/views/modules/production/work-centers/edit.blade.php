@@ -60,10 +60,20 @@
                     <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" :label="__('production.overhead_cost') . ' (' . active_currency_symbol() . ')'" name="overhead_cost" inputType="number" step="0.01" :value="old('overhead_cost', number_format(convert_from_base($workCenter->overhead_cost ?? 0), 2, '.', ''))" />
                         
+                        @php
+                            $defaultCalendar = $calendars->firstWhere('is_default', true) ?? $calendars->first();
+                            $selectedCalendarId = old('production_calendar_id', $workCenter->production_calendar_id ?? $defaultCalendar?->id);
+                        @endphp
                         <x-ui.odoo-form-ui type="select" label="Production Calendar" name="production_calendar_id">
-                            <option value="">-- Default Factory Calendar --</option>
-                            @foreach($calendars as $cal)
-                                <option value="{{ $cal->id }}" @selected(old('production_calendar_id', $workCenter->production_calendar_id) == $cal->id)>
+                            @if($defaultCalendar)
+                                <option value="{{ $defaultCalendar->id }}" @selected($selectedCalendarId == $defaultCalendar->id)>
+                                    -- Default Factory Calendar ({{ $defaultCalendar->name }}) --
+                                </option>
+                            @else
+                                <option value="">-- Default Factory Calendar --</option>
+                            @endif
+                            @foreach($calendars->where('id', '!=', $defaultCalendar?->id) as $cal)
+                                <option value="{{ $cal->id }}" @selected($selectedCalendarId == $cal->id)>
                                     {{ $cal->name }}{{ $cal->is_default ? ' (Default)' : '' }}
                                 </option>
                             @endforeach

@@ -546,6 +546,8 @@ return [
     'update_machine_asset' => 'Актуализирай машинния актив',
     'production_engineering' => 'Производствено инженерство',
     'bom' => 'Спецификация (BOM)',
+    'boms' => 'Спецификации (BOMs)',
+    'linked_boms' => 'Свързани спецификации (Linked BOMs)',
     'work_centers' => 'Работни центрове',
 
     // Production Planning (Plans)

@@ -537,6 +537,8 @@ return array (
   'update_machine_asset' => 'Update Machine Asset',
   'production_engineering' => 'Production Engineering',
   'bom' => 'BOM',
+  'boms' => 'BOMs',
+  'linked_boms' => 'Linked BOMs',
   'production_planning' => 'Production Planning',
   'mps_planning' => 'Master Production Schedule (MPS) & Planning',
   'create_production_plan' => 'Create Production Plan',

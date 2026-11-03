@@ -128,7 +128,7 @@
 
                 <div class="d-flex flex-column gap-3 mt-4 px-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">{{ __('production.boms') ?? 'Linked BOMs' }}:</span>
+                        <span class="text-muted fs-13">{{ __('production.linked_boms') }}:</span>
                         <span class="badge bg-soft-primary text-primary font-monospace fw-bold">
                             {{ $routing->boms->count() }} BOM(s)
                         </span>

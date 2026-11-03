@@ -152,6 +152,20 @@ class BomFormulaEvaluatorService
             }
         }
 
+        // 6. Safe baseline fallbacks for standard ERP formula tokens
+        if (!isset($context['base_qty'])) {
+            $context['base_qty'] = 1.0;
+        }
+        if (!isset($context['base_quantity'])) {
+            $context['base_quantity'] = $context['base_qty'];
+        }
+        if (!isset($context['quantity'])) {
+            $context['quantity'] = 1.0;
+        }
+        if (!isset($context['qty'])) {
+            $context['qty'] = $context['quantity'];
+        }
+
         return $context;
     }
 

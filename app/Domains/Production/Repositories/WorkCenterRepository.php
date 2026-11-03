@@ -9,7 +9,9 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
 {
     public function getAll(array $filters = []): Collection
     {
-        $query = WorkCenter::query()->withCount('machines');
+        $query = WorkCenter::query()
+            ->withCount('machines')
+            ->with('latestCalculation');
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -32,7 +34,9 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
 
     public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = WorkCenter::query()->withCount('machines');
+        $query = WorkCenter::query()
+            ->withCount('machines')
+            ->with('latestCalculation');
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);

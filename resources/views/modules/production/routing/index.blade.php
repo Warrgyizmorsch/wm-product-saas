@@ -276,7 +276,7 @@
                         <th style="width: 8%" class="text-center">{{ __('production.operations_count') }}</th>
                         <th style="width: 10%">{{ __('production.effective_from') }}</th>
                         <th style="width: 10%">{{ __('production.effective_to') }}</th>
-                        <th style="width: 12%">{{ __('production.boms') ?? 'Linked BOMs' }}</th>
+                        <th style="width: 12%">{{ __('production.linked_boms') }}</th>
                         <th style="width: 8%">{{ __('production.status') }}</th>
                         <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
@@ -310,7 +310,7 @@
                             <td class="text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}</td>
                             <td>
                                 <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fw-semibold">
-                                    <i class="feather-layers me-1 fs-10"></i>{{ $routing->boms_count ?? 0 }} {{ __('production.boms') ?? 'BOMs' }}
+                                    <i class="feather-layers me-1 fs-10"></i>{{ $routing->boms_count ?? 0 }} {{ __('production.boms') }}
                                 </span>
                             </td>
                             <td>

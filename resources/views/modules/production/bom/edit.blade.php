@@ -629,6 +629,11 @@
             padding-left: 8px !important;
             padding-right: 20px !important;
         }
+        .select2-container--bootstrap-5 .select2-selection.is-invalid,
+        select.is-invalid + .select2-container--bootstrap-5 .select2-selection,
+        select.is-invalid + .select2-container .select2-selection {
+            border-color: #dc3545 !important;
+        }
     </style>
 
     <script>
@@ -858,7 +863,10 @@
                         this.selectedRoutingId = routingVal;
                         this.updateAvailableOperations(routingVal, true);
                         this.expandAllOps();
-                        this.$nextTick(() => this.initAllRowSelects());
+                        this.$nextTick(() => {
+                            this.initAllRowSelects();
+                            this.validateDuplicateMaterials();
+                        });
                     });
 
                     // Initial header UOM on load
@@ -883,9 +891,13 @@
                                 $select.select2(self.select2RowOptions());
                             }
                         });
+                        this.validateDuplicateMaterials();
                     });
 
-                    this.$nextTick(() => this.initAllRowSelects());
+                    this.$nextTick(() => {
+                        this.initAllRowSelects();
+                        this.validateDuplicateMaterials();
+                    });
                 },
 
                 previewFormula(formula) {
@@ -1112,7 +1124,10 @@
                         child_bom_loading: false
                     });
                     this.expandedOps[opId] = true;
-                    this.$nextTick(() => this.initAllRowSelects());
+                    this.$nextTick(() => {
+                        this.initAllRowSelects();
+                        this.validateDuplicateMaterials();
+                    });
                 },
 
                 addItem() {
@@ -1137,6 +1152,77 @@
                         if (opId) {
                             this.refreshAltSelectsForOp(opId);
                         }
+                        this.validateDuplicateMaterials();
+                    });
+                },
+
+                validateDuplicateMaterials() {
+                    const parentProductId = String($('#product_id').val() || '');
+                    const seen = {};
+                    const updatedErrors = { ...this.errors };
+
+                    // 1. Clear previous live material errors
+                    Object.keys(updatedErrors).forEach(key => {
+                        if (key.startsWith('items.') && key.endsWith('.material_id')) {
+                            const val = Array.isArray(updatedErrors[key]) ? updatedErrors[key][0] : updatedErrors[key];
+                            if (
+                                typeof val === 'string' && (
+                                    val.includes('Duplicate material component') ||
+                                    val.includes('A finished product cannot be its own component')
+                                )
+                            ) {
+                                delete updatedErrors[key];
+                            }
+                        }
+                    });
+
+                    // 2. Evaluate duplicates per routing operation and self-material
+                    this.items.forEach((item, index) => {
+                        const matId = String(item.material_id || '');
+                        if (!matId) return;
+
+                        if (parentProductId && matId === parentProductId) {
+                            updatedErrors['items.' + index + '.material_id'] = 'A finished product cannot be its own component material.';
+                            return;
+                        }
+
+                        const opId = String(item.routing_operation_id || '0');
+                        const comboKey = matId + '_' + opId;
+
+                        if (!seen[comboKey]) {
+                            seen[comboKey] = [];
+                        }
+                        seen[comboKey].push(index);
+                    });
+
+                    // 3. Mark 2nd and subsequent duplicates with error message
+                    Object.keys(seen).forEach(comboKey => {
+                        const indices = seen[comboKey];
+                        if (indices.length > 1) {
+                            for (let i = 1; i < indices.length; i++) {
+                                updatedErrors['items.' + indices[i] + '.material_id'] = 'Duplicate material component found for the same routing operation.';
+                            }
+                        }
+                    });
+
+                    this.errors = updatedErrors;
+
+                    // 4. Update Select2 visual border in DOM
+                    this.$nextTick(() => {
+                        this.items.forEach((item, index) => {
+                            const hasErr = !!this.errors['items.' + index + '.material_id'];
+                            const $row = $('tr.bom-component-row[data-row-uid="' + item.uid + '"]');
+                            const $select = $row.find('select[name*="[material_id]"]');
+                            const $s2Selection = $select.next('.select2-container').find('.select2-selection');
+
+                            if (hasErr) {
+                                $select.addClass('is-invalid');
+                                $s2Selection.addClass('is-invalid');
+                            } else {
+                                $select.removeClass('is-invalid');
+                                $s2Selection.removeClass('is-invalid');
+                            }
+                        });
                     });
                 },
 
@@ -1172,6 +1258,31 @@
                         }
                         return false;
                     }
+
+                    this.validateDuplicateMaterials();
+                    const hasMaterialErrors = Object.keys(this.errors).some(k => 
+                        k.startsWith('items.') && k.endsWith('.material_id') && !!this.errors[k]
+                    );
+                    if (hasMaterialErrors) {
+                        e.preventDefault();
+                        const firstMsg = Object.keys(this.errors)
+                            .filter(k => k.startsWith('items.') && k.endsWith('.material_id'))
+                            .map(k => Array.isArray(this.errors[k]) ? this.errors[k][0] : this.errors[k])[0];
+
+                        if (typeof window.confirmAction === 'function') {
+                            window.confirmAction({
+                                title: 'Duplicate Component Error',
+                                message: firstMsg || 'Duplicate material components found for the same routing operation. Please resolve duplicate components before saving.',
+                                variant: 'warning',
+                                confirmText: 'OK',
+                                cancelButtonText: ''
+                            });
+                        } else {
+                            alert(firstMsg || 'Duplicate material components found for the same routing operation. Please resolve duplicate components before saving.');
+                        }
+                        return false;
+                    }
+
                     return true;
                 },
 
@@ -1264,6 +1375,7 @@
 
                                 self.fetchChildBomStatus(item);
                                 self.refreshAltSelectsForOp(item.routing_operation_id);
+                                self.validateDuplicateMaterials();
                             } else if (nameAttr.indexOf('uom_id') !== -1) {
                                 item.uom_id = val;
                             } else if (nameAttr.indexOf('child_bom_id') !== -1) {

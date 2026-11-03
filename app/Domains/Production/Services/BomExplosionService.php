@@ -106,7 +106,13 @@ class BomExplosionService
 
         foreach ($bom->items as $item) {
             if ($item->isFormula()) {
-                $unitQty = $evaluator->evaluate($item->formula, $parameters, $bom->product);
+                $evalParams = array_merge([
+                    'base_qty' => $baseQty,
+                    'base_quantity' => $baseQty,
+                    'quantity' => $parentQty,
+                    'qty' => $parentQty,
+                ], $parameters);
+                $unitQty = $evaluator->evaluate($item->formula, $evalParams, $bom->product);
             } else {
                 $unitQty = (float) $item->quantity;
             }

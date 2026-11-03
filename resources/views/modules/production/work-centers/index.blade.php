@@ -146,19 +146,22 @@
                             <input type="checkbox" class="form-check-input check-all-work-centers">
                         </th>
                         <th style="width: 12%">{{ __('production.work_center_code') }}</th>
-                        <th style="width: 20%">{{ __('production.work_center_name') }}</th>
-                        <th style="width: 12%">{{ __('production.work_center_type') }}</th>
-                        <th style="width: 12%">{{ __('production.physical_location') }}</th>
-                        <th style="width: 10%" class="text-end">{{ __('production.capacity_hr') }}</th>
-                        <th style="width: 8%" class="text-end">{{ __('production.efficiency') }}</th>
-                        <th style="width: 10%" class="text-end">{{ __('production.wc_labor_cost_per_hour') }}</th>
+                        <th style="width: 18%">{{ __('production.work_center_name') }}</th>
+                        <th style="width: 10%">{{ __('production.work_center_type') }}</th>
+                        <th style="width: 10%">{{ __('production.physical_location') }}</th>
+                        <th style="width: 11%" class="text-end">{{ __('production.capacity_hr') }}</th>
+                        <th style="width: 13%" class="text-end">{{ __('production.operating_cost_per_hour') }}</th>
+                        <th style="width: 13%" class="text-end">{{ __('production.wc_labor_cost_per_hour') }}</th>
                         <th style="width: 5%" class="text-center">{{ __('production.machines') }}</th>
-                        <th style="width: 4%">{{ __('production.status') }}</th>
+                        <th style="width: 5%">{{ __('production.status') }}</th>
                         <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($workCenters as $wc)
+                        @php
+                            $snapshot = $wc->latestCalculation;
+                        @endphp
                         <tr>
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input work-center-checkbox" value="{{ $wc->id }}" data-can-delete="{{ auth()->user()->can('delete', $wc) ? 'true' : 'false' }}">
@@ -178,9 +181,36 @@
                                 </span>
                             </td>
                             <td class="text-muted">{{ $wc->location ?? '—' }}</td>
-                            <td class="text-end fw-semibold">0</td>
-                            <td class="text-end text-muted">0</td>
-                            <td class="text-end fw-semibold text-dark">0</td>
+                            @if($snapshot)
+                                <td class="text-end">
+                                    <span class="fw-semibold font-monospace text-dark">{{ number_format((float) ($snapshot->capacity_per_hour ?? 0), 1) }}</span>
+                                    <small class="text-muted fs-10">u/h</small>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-semibold font-monospace text-dark">{{ format_currency((float) ($snapshot->total_cost_per_hour ?? 0)) }}</span>
+                                    <small class="text-muted fs-10">/hr</small>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-semibold font-monospace text-dark">{{ format_currency((float) ($snapshot->labor_cost_per_hour ?? 0)) }}</span>
+                                    <small class="text-muted fs-10">/hr</small>
+                                </td>
+                            @else
+                                <td class="text-end">
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 px-2 py-0.5" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculation snapshot has not been created yet.">
+                                        <i class="feather-alert-circle me-1"></i>Snapshot not created
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 px-2 py-0.5" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculation snapshot has not been created yet.">
+                                        <i class="feather-alert-circle me-1"></i>Snapshot not created
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-10 px-2 py-0.5" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculation snapshot has not been created yet.">
+                                        <i class="feather-alert-circle me-1"></i>Snapshot not created
+                                    </span>
+                                </td>
+                            @endif
                             <td class="text-center">
                                 @if($wc->machines_count > 0)
                                     <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"

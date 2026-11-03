@@ -59,10 +59,20 @@
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.calculation_countdown_minutes')" name="calculation_countdown_minutes" inputType="number" min="1" max="1440" step="1" placeholder="10" :value="old('calculation_countdown_minutes', 10)" :required="true" />
 
+                        @php
+                            $defaultCalendar = $calendars->firstWhere('is_default', true) ?? $calendars->first();
+                            $selectedCalendarId = old('production_calendar_id', $defaultCalendar?->id);
+                        @endphp
                         <x-ui.odoo-form-ui type="select" label="Production Calendar" name="production_calendar_id">
-                            <option value="">-- Default Factory Calendar --</option>
-                            @foreach($calendars as $cal)
-                                <option value="{{ $cal->id }}" @selected(old('production_calendar_id') == $cal->id)>
+                            @if($defaultCalendar)
+                                <option value="{{ $defaultCalendar->id }}" @selected($selectedCalendarId == $defaultCalendar->id)>
+                                    -- Default Factory Calendar ({{ $defaultCalendar->name }}) --
+                                </option>
+                            @else
+                                <option value="">-- Default Factory Calendar --</option>
+                            @endif
+                            @foreach($calendars->where('id', '!=', $defaultCalendar?->id) as $cal)
+                                <option value="{{ $cal->id }}" @selected($selectedCalendarId == $cal->id)>
                                     {{ $cal->name }}{{ $cal->is_default ? ' (Default)' : '' }}
                                 </option>
                             @endforeach

@@ -780,15 +780,21 @@
                             <span class="text-muted fs-11 text-uppercase">Operating Window</span>
                             <span class="fs-13 fw-bold text-dark font-monospace">{{ format_hours($latestSnapshot?->unique_operating_hours ?? 0, false) }} <span class="fs-10 fw-normal text-muted">hrs / day</span></span>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                            <span class="text-muted fs-11 text-uppercase">Production Calendar</span>
-                            <span class="fs-12 fw-semibold text-dark">
+                        <div class="pt-2 border-top">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1.5">Production Calendar</span>
+                            <div>
                                 @if ($workCenter->calendar)
-                                    <span class="badge bg-soft-primary text-primary fs-10"><i class="feather-calendar me-0.5"></i>{{ $workCenter->calendar->name }}</span>
+                                    <span class="badge bg-soft-primary text-primary fs-11 text-wrap text-start lh-base d-inline-flex align-items-center gap-1.5 px-2 py-1.5 w-100">
+                                        <i class="feather-calendar fs-12 flex-shrink-0 text-primary"></i>
+                                        <span class="text-break">{{ $workCenter->calendar->name }}</span>
+                                    </span>
                                 @else
-                                    <span class="text-muted fs-11 fst-italic">Default Factory Calendar</span>
+                                    <span class="text-muted fs-11 fst-italic d-inline-flex align-items-center gap-1">
+                                        <i class="feather-calendar fs-12 text-secondary"></i>
+                                        <span>Default Factory Calendar</span>
+                                    </span>
                                 @endif
-                            </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1007,27 +1013,62 @@
             </div>
 
             @php
-                $unproductiveSections = $workCenter->sections->filter(function($sec) {
-                    $secEmp = $sec->employeeAssignments ? $sec->employeeAssignments->where('active', true)->count() : 0;
-                    $secExt = $sec->externalWorkerAllocations ? (int) $sec->externalWorkerAllocations->where('active', true)->sum('number_of_external_workers') : 0;
-                    $hasLabor = ($secEmp + $secExt) > 0;
+                $unutilizedLaborSections = $workCenter->sections->filter(function($sec) {
                     $hasMach = $sec->machines && $sec->machines->count() > 0;
-                    $hasBatch = $sec->manualProductions && $sec->manualProductions->where('active', true)->count() > 0;
-                    return $hasLabor && !$hasMach && !$hasBatch;
+                    if ($hasMach) {
+                        return false;
+                    }
+
+                    $activeBatches = $sec->manualProductions ? $sec->manualProductions->where('active', true) : collect();
+                    $activeBatchIds = $activeBatches->pluck('id');
+
+                    $assignedEmpAssignmentIds = $activeBatches->flatMap(function($b) {
+                        return $b->employees ? $b->employees->pluck('id') : collect();
+                    })->unique();
+
+                    $activeEmpAssignments = $sec->employeeAssignments ? $sec->employeeAssignments->where('active', true) : collect();
+                    $unassignedEmpCount = $activeEmpAssignments->reject(function($a) use ($assignedEmpAssignmentIds) {
+                        return $assignedEmpAssignmentIds->contains($a->id);
+                    })->count();
+
+                    $activeExtAllocations = $sec->externalWorkerAllocations ? $sec->externalWorkerAllocations->where('active', true) : collect();
+                    $unassignedExtCount = (int) $activeExtAllocations->filter(function($alloc) use ($activeBatchIds) {
+                        return empty($alloc->manual_production_id) || !$activeBatchIds->contains($alloc->manual_production_id);
+                    })->sum('number_of_external_workers');
+
+                    $sec->setAttribute('_unassigned_internal_count', $unassignedEmpCount);
+                    $sec->setAttribute('_unassigned_external_count', $unassignedExtCount);
+                    $sec->setAttribute('_unassigned_total_labor', $unassignedEmpCount + $unassignedExtCount);
+                    $sec->setAttribute('_has_manual_batches', $activeBatches->isNotEmpty());
+
+                    return ($unassignedEmpCount + $unassignedExtCount) > 0;
                 });
             @endphp
-            @if($unproductiveSections->isNotEmpty())
+            @if($unutilizedLaborSections->isNotEmpty())
                 <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3">
                     <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
                     <div class="flex-grow-1">
                         <strong class="text-dark">Configuration Advisory:</strong>
-                        Labor is allocated to
-                        @if($unproductiveSections->count() === 1)
-                            section <span class="fw-semibold text-dark">"{{ $unproductiveSections->first()->name }}"</span>,
-                        @else
-                            sections <span class="fw-semibold text-dark">{{ $unproductiveSections->pluck('name')->map(fn($n) => '"' . $n . '"')->join(', ') }}</span>,
-                        @endif
-                        but no machines are assigned and no manual production batches are configured. Daily labor costs are being accrued without contributing production output.
+                        @foreach($unutilizedLaborSections as $uSec)
+                            @php
+                                $uTotal = (int) $uSec->_unassigned_total_labor;
+                                $uEmp = (int) $uSec->_unassigned_internal_count;
+                                $uExt = (int) $uSec->_unassigned_external_count;
+                                $uHasBatches = (bool) $uSec->_has_manual_batches;
+                                
+                                $uParts = [];
+                                if ($uEmp > 0) $uParts[] = $uEmp . ' ' . \Illuminate\Support\Str::plural('internal employee', $uEmp);
+                                if ($uExt > 0) $uParts[] = $uExt . ' external ' . \Illuminate\Support\Str::plural('worker', $uExt);
+                                $uDesc = implode(' and ', $uParts);
+                            @endphp
+                            <div class="{{ !$loop->first ? 'mt-1.5 pt-1.5 border-top border-warning-subtle' : '' }}">
+                                @if(!$uHasBatches)
+                                    Labor is allocated to section <span class="fw-semibold text-dark">"{{ $uSec->name }}"</span> ({{ $uDesc }}), but no machines are assigned and no manual production batches are configured. Daily labor costs are being accrued without contributing production output.
+                                @else
+                                    Section <span class="fw-semibold text-dark">"{{ $uSec->name }}"</span> has no machines assigned, and <span class="fw-semibold text-dark">{{ $uDesc }}</span> are not assigned to any manual production batch. Daily labor costs are being accrued without contributing production output.
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
                 </div>
             @endif
@@ -1104,9 +1145,27 @@
 
                                 $totalSecPersonnel = $activeSecEmpCount + $activeSecExtCount;
 
-                                // Assigned Machines
+                                // Assigned Machines & Stranded Labor Analysis
                                 $machineCount = $section->machines ? $section->machines->count() : 0;
-                                $hasLaborWithoutProduction = ($machineCount === 0) && ($activeBatchesCount === 0) && ($totalSecPersonnel > 0);
+                                $activeBatches = $section->manualProductions ? $section->manualProductions->where('active', true) : collect();
+                                $activeBatchIds = $activeBatches->pluck('id');
+                                $assignedEmpAssignmentIds = $activeBatches->flatMap(function($b) {
+                                    return $b->employees ? $b->employees->pluck('id') : collect();
+                                })->unique();
+
+                                $activeEmpAssignments = $section->employeeAssignments ? $section->employeeAssignments->where('active', true) : collect();
+                                $unassignedEmpCount = $activeEmpAssignments->reject(function($a) use ($assignedEmpAssignmentIds) {
+                                    return $assignedEmpAssignmentIds->contains($a->id);
+                                })->count();
+
+                                $unassignedExtCount = (int) $secExtAllocs->filter(function($alloc) use ($activeBatchIds) {
+                                    return empty($alloc->manual_production_id) || !$activeBatchIds->contains($alloc->manual_production_id);
+                                })->sum('number_of_external_workers');
+
+                                $unassignedTotalLabor = $unassignedEmpCount + $unassignedExtCount;
+                                $hasZeroOutputLabor = ($machineCount === 0) && ($activeBatchesCount === 0) && ($totalSecPersonnel > 0);
+                                $hasPartialUnutilizedLabor = ($machineCount === 0) && ($activeBatchesCount > 0) && ($unassignedTotalLabor > 0);
+                                $hasLaborWithoutProduction = $hasZeroOutputLabor || $hasPartialUnutilizedLabor;
                                 if ($machineCount > 0) {
                                     $machineListHtml = '<ul class="list-unstyled mb-0 text-start fs-12">';
                                     foreach ($section->machines as $sm) {
@@ -1289,13 +1348,32 @@
                                             <i class="feather-maximize-2 text-primary fs-10 ms-1.5 opacity-75"></i>
                                         </a>
                                     </div>
-                                    @if($hasLaborWithoutProduction)
+                                    @if($hasZeroOutputLabor)
                                         <div class="mt-1">
                                             <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill px-2 py-0.5 fs-10 d-inline-flex align-items-center gap-1"
                                                   data-bs-toggle="tooltip"
                                                   data-bs-placement="top"
                                                   title="Labor is allocated to this section, but no machines or active manual batches are configured. Daily labor costs are incurred with 0 output.">
-                                                <i class="feather-alert-triangle fs-10"></i>Cost with 0 Output
+                                                <i class="feather-alert-triangle fs-10"></i>Cost with 0 Output ({{ $unassignedTotalLabor }})
+                                            </span>
+                                        </div>
+                                    @elseif($hasPartialUnutilizedLabor)
+                                        <div class="mt-1">
+                                            @php
+                                                $unutilizedParts = [];
+                                                if ($unassignedEmpCount > 0) {
+                                                    $unutilizedParts[] = $unassignedEmpCount . ' ' . \Illuminate\Support\Str::plural('employee', $unassignedEmpCount);
+                                                }
+                                                if ($unassignedExtCount > 0) {
+                                                    $unutilizedParts[] = $unassignedExtCount . ' external ' . \Illuminate\Support\Str::plural('worker', $unassignedExtCount);
+                                                }
+                                                $unutilizedText = implode(' and ', $unutilizedParts) . ' not assigned to any manual batch (0 machines available).';
+                                            @endphp
+                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill px-2 py-0.5 fs-10 d-inline-flex align-items-center gap-1"
+                                                  data-bs-toggle="tooltip"
+                                                  data-bs-placement="top"
+                                                  title="{{ $unutilizedText }}">
+                                                <i class="feather-alert-triangle fs-10"></i>Unassigned Labor ({{ $unassignedTotalLabor }})
                                             </span>
                                         </div>
                                     @endif
@@ -1433,11 +1511,16 @@
                                                 {{ number_format($dailyCap, 1) }}
                                             </span>
                                             <small class="text-muted fs-10">units/day</small>
-                                            @if($hasLaborWithoutProduction)
+                                            @if($hasZeroOutputLabor)
                                                 <i class="feather-alert-triangle text-warning fs-11 ms-0.5" 
                                                    data-bs-toggle="tooltip" 
                                                    data-bs-placement="top"
                                                    title="Labor is active but output is 0.0 because no machines or manual batches are configured."></i>
+                                            @elseif($hasPartialUnutilizedLabor)
+                                                <i class="feather-alert-triangle text-warning fs-11 ms-0.5" 
+                                                   data-bs-toggle="tooltip" 
+                                                   data-bs-placement="top"
+                                                   title="{{ $unutilizedText }}"></i>
                                             @endif
                                             <i class="feather-info text-primary opacity-75 fs-11 ms-1" 
                                                role="button"
@@ -2189,8 +2272,27 @@
             $secDetailsUnitCost = $secDetailsTotalDailyCap > 0 ? round($secDetailsDailyOperatingCost / $secDetailsTotalDailyCap, 2) : 0.0;
 
             $secDetailsMachineCount = $section->machines ? $section->machines->count() : 0;
-            $secDetailsActiveBatchesCount = $section->manualProductions ? $section->manualProductions->where('active', true)->count() : 0;
-            $secDetailsHasLaborWithoutProduction = ($secDetailsMachineCount === 0) && ($secDetailsActiveBatchesCount === 0) && ($secDetailsTotalPersonnel > 0);
+            $secDetailsActiveBatches = $section->manualProductions ? $section->manualProductions->where('active', true) : collect();
+            $secDetailsActiveBatchesCount = $secDetailsActiveBatches->count();
+            $secDetailsActiveBatchIds = $secDetailsActiveBatches->pluck('id');
+
+            $secDetailsAssignedEmpIds = $secDetailsActiveBatches->flatMap(function($b) {
+                return $b->employees ? $b->employees->pluck('id') : collect();
+            })->unique();
+
+            $secDetailsActiveEmpAssignments = $section->employeeAssignments ? $section->employeeAssignments->where('active', true) : collect();
+            $secDetailsUnassignedEmpCount = $secDetailsActiveEmpAssignments->reject(function($a) use ($secDetailsAssignedEmpIds) {
+                return $secDetailsAssignedEmpIds->contains($a->id);
+            })->count();
+
+            $secDetailsUnassignedExtCount = (int) $secDetailsExtAllocs->filter(function($alloc) use ($secDetailsActiveBatchIds) {
+                return empty($alloc->manual_production_id) || !$secDetailsActiveBatchIds->contains($alloc->manual_production_id);
+            })->sum('number_of_external_workers');
+
+            $secDetailsUnassignedTotal = $secDetailsUnassignedEmpCount + $secDetailsUnassignedExtCount;
+            $secDetailsHasZeroOutput = ($secDetailsMachineCount === 0) && ($secDetailsActiveBatchesCount === 0) && ($secDetailsTotalPersonnel > 0);
+            $secDetailsHasPartialUnutilized = ($secDetailsMachineCount === 0) && ($secDetailsActiveBatchesCount > 0) && ($secDetailsUnassignedTotal > 0);
+            $secDetailsHasLaborWithoutProduction = $secDetailsHasZeroOutput || $secDetailsHasPartialUnutilized;
         @endphp
         <div class="modal fade section-details-modal" id="sectionDetailsModal_{{ $section->id }}" tabindex="-1" aria-labelledby="sectionDetailsModalLabel_{{ $section->id }}" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
@@ -2215,12 +2317,26 @@
                     </div>
 
                     <div class="modal-body p-4">
-                        @if($secDetailsHasLaborWithoutProduction)
+                        @if($secDetailsHasZeroOutput)
                             <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3">
                                 <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
                                 <div class="flex-grow-1">
                                     <strong class="text-dark d-block mb-0.5">Labor Cost Incurred with Zero Production Output</strong>
                                     <span>This section has <strong>{{ $secDetailsTotalPersonnel }} {{ \Illuminate\Support\Str::plural('personnel', $secDetailsTotalPersonnel) }}</strong> ({{ $secDetailsEmpCount }} internal, {{ $secDetailsExtCount }} external) allocated, but no machines are assigned and no manual production batches are configured. Daily labor costs of <strong>{{ format_currency($secDetailsDailyLaborCost) }}/day</strong> are being accrued without contributing production capacity. If intentional, this configuration can remain; otherwise, assign machines or configure manual batches to generate production output.</span>
+                                </div>
+                            </div>
+                        @elseif($secDetailsHasPartialUnutilized)
+                            <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-start gap-2.5 mb-3 py-2.5 px-3 fs-12 rounded-3">
+                                <i class="feather-alert-triangle text-warning fs-16 flex-shrink-0 mt-0.5"></i>
+                                <div class="flex-grow-1">
+                                    <strong class="text-dark d-block mb-0.5">Unutilized Labor in Manual-Only Section</strong>
+                                    <span>This section has no machines assigned, and <strong>{{ $secDetailsUnassignedTotal }} {{ \Illuminate\Support\Str::plural('worker', $secDetailsUnassignedTotal) }}</strong>
+                                    @php
+                                        $uParts = [];
+                                        if ($secDetailsUnassignedEmpCount > 0) $uParts[] = $secDetailsUnassignedEmpCount . ' internal ' . \Illuminate\Support\Str::plural('employee', $secDetailsUnassignedEmpCount);
+                                        if ($secDetailsUnassignedExtCount > 0) $uParts[] = $secDetailsUnassignedExtCount . ' external ' . \Illuminate\Support\Str::plural('worker', $secDetailsUnassignedExtCount);
+                                    @endphp
+                                    ({{ implode(' and ', $uParts) }}) are not assigned to any active manual production batch. Daily labor costs are being accrued without contributing production output. Configure or assign them to a manual batch, or assign machines to utilize them.</span>
                                 </div>
                             </div>
                         @endif
@@ -2629,10 +2745,15 @@
 
                             <!-- Pane 4: Manual Batches -->
                             <div class="tab-pane fade" id="sec-batches-pane-{{ $section->id }}" role="tabpanel">
-                                @if($secDetailsHasLaborWithoutProduction)
+                                @if($secDetailsHasZeroOutput)
                                     <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12 rounded-2">
                                         <i class="feather-alert-triangle text-warning fs-14 flex-shrink-0"></i>
                                         <span><strong>Advisory:</strong> Personnel are allocated to this section, but no manual production batches or machines exist. Configuring a manual batch will enable production output for your workforce.</span>
+                                    </div>
+                                @elseif($secDetailsHasPartialUnutilized)
+                                    <div class="alert alert-soft-warning border-warning-subtle d-flex align-items-center gap-2 mb-3 py-2 px-3 fs-12 rounded-2">
+                                        <i class="feather-alert-triangle text-warning fs-14 flex-shrink-0"></i>
+                                        <span><strong>Advisory:</strong> {{ $secDetailsUnassignedTotal }} {{ \Illuminate\Support\Str::plural('worker', $secDetailsUnassignedTotal) }} in this section (0 machines available) are not assigned to any manual batch. Adding them to a batch will utilize them for production output.</span>
                                     </div>
                                 @endif
                                 <div class="table-responsive border rounded-3">
@@ -5631,9 +5752,7 @@
     @foreach ($workCenter->sections as $section)
         @php
             $secActiveShifts = $section->shifts->filter(fn($s) => (bool) ($s->active ?? true));
-            $secInternalAssignments = $section->employeeAssignments->where('active', true)
-                ->concat($workCenter->employeeAssignments->whereNull('section_id')->where('active', true))
-                ->unique('id');
+            $secInternalAssignments = $section->employeeAssignments ? $section->employeeAssignments->where('active', true) : collect();
             $secExtAllocs = $section->externalWorkerAllocations->where('active', true);
             $hasBatches = $section->manualProductions->isNotEmpty();
         @endphp
@@ -5822,7 +5941,9 @@
                                                         $empShift = $emp->shift;
                                                         $empShiftId = $empShift?->id ?? '';
                                                         $empShiftName = $empShift?->name ?? 'Any Shift';
-                                                        $isWcLevel = is_null($assignment->section_id);
+                                                        $empShiftStart = $empShift ? substr($empShift->start_time, 0, 5) : '';
+                                                        $empShiftEnd = $empShift ? substr($empShift->end_time, 0, 5) : '';
+                                                        $empShiftTimeStr = ($empShiftStart && $empShiftEnd) ? ($empShiftStart . '–' . $empShiftEnd) : '';
 
                                                         $assignedBatchInfo = $occupiedEmpAssignments[$assignment->id] ?? ($emp ? ($occupiedEmployeeIds[$emp->id] ?? null) : null);
                                                         $isAssignedToOther = !empty($assignedBatchInfo);
@@ -5832,6 +5953,8 @@
                                                     <div class="worker-card-item rounded-2 mb-2 p-2.5 bg-white border worker-row internal-worker-row {{ $isAssignedToOther ? 'worker-occupied bg-light opacity-75' : '' }}"
                                                          data-worker-name="{{ strtolower($emp->full_name ?? $emp->name ?? '') }} {{ strtolower($emp->employee_id ?? '') }} {{ strtolower($emp->designation?->name ?? '') }}"
                                                          data-shift-id="{{ $empShiftId }}"
+                                                         data-shift-start="{{ $empShiftStart }}"
+                                                         data-shift-end="{{ $empShiftEnd }}"
                                                          data-assigned-batch-id="{{ $assignedBatchId }}"
                                                          data-assigned-batch-name="{{ $assignedBatchName }}">
                                                         <label class="d-flex align-items-start gap-2.5 w-100 {{ $isAssignedToOther ? 'cursor-not-allowed' : 'cursor-pointer' }} mb-0" for="sec_emp_{{ $section->id }}_{{ $assignment->id }}">
@@ -5859,12 +5982,9 @@
                                                                 <div class="d-flex align-items-center justify-content-between gap-2 mt-1">
                                                                     <span class="text-muted fs-11 text-truncate">
                                                                         {{ $emp->designation?->name ?? 'Staff' }}
-                                                                        @if($isWcLevel)
-                                                                            <span class="badge bg-soft-warning text-warning border border-warning-subtle rounded-pill font-monospace fs-9 py-0 ms-1">WC Level</span>
-                                                                        @endif
                                                                     </span>
-                                                                    <span class="badge bg-light text-muted border font-monospace fs-10 flex-shrink-0">
-                                                                        <i class="feather-clock me-1 text-primary"></i>{{ $empShiftName }}
+                                                                    <span class="badge bg-light text-muted border font-monospace fs-10 flex-shrink-0" title="{{ $empShiftName }}{{ $empShiftTimeStr ? ' ('.$empShiftTimeStr.')' : '' }}">
+                                                                        <i class="feather-clock me-1 text-primary"></i>{{ $empShiftName }}{{ ($empShiftTimeStr && !str_contains($empShiftName, $empShiftStart)) ? ' ('.$empShiftTimeStr.')' : '' }}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -5872,7 +5992,7 @@
                                                     </div>
                                                 @empty
                                                     <div class="text-center py-4 text-muted fs-11 fst-italic">
-                                                        No internal employees assigned to this section or work center.
+                                                        No internal employees assigned to this section.
                                                     </div>
                                                 @endforelse
                                             </div>
@@ -5914,6 +6034,9 @@
                                                     @php
                                                         $pg = $alloc->payGrade;
                                                         $allocShift = $alloc->shift;
+                                                        $allocShiftStart = $allocShift ? substr($allocShift->start_time, 0, 5) : '';
+                                                        $allocShiftEnd = $allocShift ? substr($allocShift->end_time, 0, 5) : '';
+                                                        $allocShiftTimeStr = ($allocShiftStart && $allocShiftEnd) ? ($allocShiftStart . '–' . $allocShiftEnd) : '';
                                                         $assignedBatchInfo = $occupiedExtAllocations[$alloc->id] ?? null;
                                                         $isAssignedToOther = !empty($assignedBatchInfo);
                                                         $assignedBatchId = $assignedBatchInfo['batch_id'] ?? '';
@@ -5922,6 +6045,8 @@
                                                     <div class="worker-card-item rounded-2 mb-2 p-2.5 bg-white border worker-row external-worker-row {{ $isAssignedToOther ? 'worker-occupied bg-light opacity-75' : '' }}"
                                                          data-worker-name="{{ strtolower($pg?->name ?? '') }} {{ strtolower($pg?->code ?? '') }} {{ strtolower($allocShift?->name ?? '') }}"
                                                          data-shift-id="{{ $alloc->shift_id }}"
+                                                         data-shift-start="{{ $allocShiftStart }}"
+                                                         data-shift-end="{{ $allocShiftEnd }}"
                                                          data-worker-count="{{ $alloc->number_of_external_workers }}"
                                                          data-assigned-batch-id="{{ $assignedBatchId }}"
                                                          data-assigned-batch-name="{{ $assignedBatchName }}">
@@ -5952,8 +6077,8 @@
                                                                     <span class="text-muted fs-11 font-monospace text-truncate">
                                                                         Rate: <strong class="text-dark">{{ format_currency((float) ($pg?->hourly_rate ?? 0)) }}</strong> / hr
                                                                     </span>
-                                                                    <span class="badge bg-light text-muted border font-monospace fs-10 flex-shrink-0">
-                                                                        <i class="feather-clock me-1 text-primary"></i>{{ $allocShift?->name ?? 'Shift #'.$alloc->shift_id }}
+                                                                    <span class="badge bg-light text-muted border font-monospace fs-10 flex-shrink-0" title="{{ $allocShift?->name ?? 'Shift #'.$alloc->shift_id }}{{ $allocShiftTimeStr ? ' ('.$allocShiftTimeStr.')' : '' }}">
+                                                                        <i class="feather-clock me-1 text-primary"></i>{{ $allocShift?->name ?? 'Shift #'.$alloc->shift_id }}{{ ($allocShiftTimeStr && !str_contains($allocShift?->name ?? '', $allocShiftStart)) ? ' ('.$allocShiftTimeStr.')' : '' }}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -6134,8 +6259,77 @@
                     });
                 }
 
+                function parseTimeToMinutes(tStr) {
+                    if (!tStr) return null;
+                    var parts = tStr.split(':');
+                    if (parts.length < 2) return null;
+                    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+                }
+
+                function computeIntervalOverlap(s1, e1, s2, e2) {
+                    var span1 = [];
+                    if (s1 < e1) {
+                        span1.push([s1, e1]);
+                    } else if (s1 > e1) {
+                        span1.push([s1, 1440], [0, e1]);
+                    }
+
+                    var span2 = [];
+                    if (s2 < e2) {
+                        span2.push([s2, e2]);
+                    } else if (s2 > e2) {
+                        span2.push([s2, 1440], [0, e2]);
+                    }
+
+                    var totalOverlap = 0;
+                    for (var i = 0; i < span1.length; i++) {
+                        for (var j = 0; j < span2.length; j++) {
+                            var overlapStart = Math.max(span1[i][0], span2[j][0]);
+                            var overlapEnd = Math.min(span1[i][1], span2[j][1]);
+                            if (overlapEnd > overlapStart) {
+                                totalOverlap += (overlapEnd - overlapStart);
+                            }
+                        }
+                    }
+                    return totalOverlap;
+                }
+
+                function isShiftTimingEligible(workerStartStr, workerEndStr, shiftStartStr, shiftEndStr) {
+                    if (!shiftStartStr || !shiftEndStr) return true;
+                    if (!workerStartStr || !workerEndStr) return true;
+
+                    var wStart = parseTimeToMinutes(workerStartStr);
+                    var wEnd = parseTimeToMinutes(workerEndStr);
+                    var sStart = parseTimeToMinutes(shiftStartStr);
+                    var sEnd = parseTimeToMinutes(shiftEndStr);
+
+                    if (wStart === null || wEnd === null || sStart === null || sEnd === null) return true;
+
+                    var wDuration = (wEnd > wStart) ? (wEnd - wStart) : (1440 - wStart + wEnd);
+                    var sDuration = (sEnd > sStart) ? (sEnd - sStart) : (1440 - sStart + sEnd);
+
+                    if (wDuration <= 0 || sDuration <= 0) return true;
+
+                    var overlapMin = computeIntervalOverlap(wStart, wEnd, sStart, sEnd);
+
+                    // Fully enclosed in either direction
+                    if (overlapMin >= wDuration || overlapMin >= sDuration) return true;
+
+                    // More than half (>= 50%) of worker shift falls inside operating shift
+                    if ((overlapMin / wDuration) >= 0.50) return true;
+
+                    // More than half (>= 50%) of operating shift covered by worker shift
+                    if ((overlapMin / sDuration) >= 0.50) return true;
+
+                    return false;
+                }
+
                 function filterWorkersByShiftAndSearch($modal) {
                     var selectedShiftId = String($modal.find('.shift-filter-select').val() || '');
+                    var $selectedOpt = $modal.find('.shift-filter-select option:selected');
+                    var selShiftStart = $selectedOpt.attr('data-start') || '';
+                    var selShiftEnd = $selectedOpt.attr('data-end') || '';
+
                     var internalSearch = ($modal.find('.search-internal-input').val() || '').toLowerCase().trim();
                     var externalSearch = ($modal.find('.search-external-input').val() || '').toLowerCase().trim();
 
@@ -6147,9 +6341,19 @@
                         var $row = $(this);
                         var rowShiftId = String($row.attr('data-shift-id') || '');
                         var workerName = ($row.attr('data-worker-name') || '').toLowerCase();
+                        var workerStart = $row.attr('data-shift-start') || '';
+                        var workerEnd = $row.attr('data-shift-end') || '';
+                        var isChecked = $row.find('.internal-cb').is(':checked');
 
-                        // Match shift: if employee has no specific master shift (blank), or matches selected shift
+                        // Match shift: exact shift ID match, unassigned shift, or timing overlap >= 50%
                         var matchesShift = (selectedShiftId === '' || rowShiftId === '' || rowShiftId === selectedShiftId);
+                        if (!matchesShift && isShiftTimingEligible(workerStart, workerEnd, selShiftStart, selShiftEnd)) {
+                            matchesShift = true;
+                        }
+                        if (isChecked) {
+                            matchesShift = true; // Retain currently selected workers in edit mode
+                        }
+
                         var matchesSearch = (internalSearch === '' || workerName.indexOf(internalSearch) !== -1);
 
                         if (matchesShift && matchesSearch) {
@@ -6158,7 +6362,7 @@
                             var isLocked = $row.find('.internal-cb').is(':disabled');
                             if (!isLocked) {
                                 availableInternalCount++;
-                                if (!$row.find('.internal-cb').is(':checked')) {
+                                if (!isChecked) {
                                     allInternalChecked = false;
                                 }
                             }
@@ -6185,8 +6389,18 @@
                         var $row = $(this);
                         var rowShiftId = String($row.attr('data-shift-id') || '');
                         var workerName = ($row.attr('data-worker-name') || '').toLowerCase();
+                        var workerStart = $row.attr('data-shift-start') || '';
+                        var workerEnd = $row.attr('data-shift-end') || '';
+                        var isChecked = $row.find('.external-cb').is(':checked');
 
                         var matchesShift = (selectedShiftId === '' || rowShiftId === selectedShiftId);
+                        if (!matchesShift && isShiftTimingEligible(workerStart, workerEnd, selShiftStart, selShiftEnd)) {
+                            matchesShift = true;
+                        }
+                        if (isChecked) {
+                            matchesShift = true;
+                        }
+
                         var matchesSearch = (externalSearch === '' || workerName.indexOf(externalSearch) !== -1);
 
                         if (matchesShift && matchesSearch) {
@@ -6195,7 +6409,7 @@
                             var isLocked = $row.find('.external-cb').is(':disabled');
                             if (!isLocked) {
                                 availableExternalCount++;
-                                if (!$row.find('.external-cb').is(':checked')) {
+                                if (!isChecked) {
                                     allExternalChecked = false;
                                 }
                             }

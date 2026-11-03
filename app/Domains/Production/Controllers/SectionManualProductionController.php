@@ -39,12 +39,30 @@ class SectionManualProductionController extends Controller
             'external_allocation_ids.*' => 'integer|exists:production_external_worker_allocations,id',
         ]);
 
-        $validator->after(function ($validator) use ($request, $tenantId) {
+        $validator->after(function ($validator) use ($request, $tenantId, $section) {
             $empIds = array_filter((array) $request->input('employee_ids', []));
             $extIds = array_filter((array) $request->input('external_allocation_ids', []));
             if (empty($empIds) && empty($extIds)) {
                 $validator->errors()->add('employee_ids', 'A manual production batch cannot be created without selecting at least one worker or employee.');
                 return;
+            }
+
+            // Enforce that only employees assigned directly to this section can be selected
+            // Work Center-level employees (section_id IS NULL) and other section employees cannot be section-level operators
+            if (!empty($empIds)) {
+                $invalidSectionEmps = DB::table('production_work_center_employees')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('id', $empIds)
+                    ->where(function($q) use ($section) {
+                        $q->whereNull('section_id')
+                          ->orWhere('section_id', '!=', $section->id);
+                    })
+                    ->exists();
+
+                if ($invalidSectionEmps) {
+                    $validator->errors()->add('employee_ids', 'Only employees assigned directly to this section can be selected. Work Center-level employees cannot be assigned to section batches.');
+                    return;
+                }
             }
 
             $this->validateWorkerExclusivity($validator, $tenantId, $empIds, $extIds);
@@ -142,12 +160,30 @@ class SectionManualProductionController extends Controller
             'external_allocation_ids.*' => 'integer|exists:production_external_worker_allocations,id',
         ]);
 
-        $validator->after(function ($validator) use ($request, $tenantId, $batch) {
+        $validator->after(function ($validator) use ($request, $tenantId, $batch, $section) {
             $empIds = array_filter((array) $request->input('employee_ids', []));
             $extIds = array_filter((array) $request->input('external_allocation_ids', []));
             if (empty($empIds) && empty($extIds)) {
                 $validator->errors()->add('employee_ids', 'A manual production batch cannot be updated without selecting at least one worker or employee.');
                 return;
+            }
+
+            // Enforce that only employees assigned directly to this section can be selected
+            // Work Center-level employees (section_id IS NULL) and other section employees cannot be section-level operators
+            if (!empty($empIds)) {
+                $invalidSectionEmps = DB::table('production_work_center_employees')
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('id', $empIds)
+                    ->where(function($q) use ($section) {
+                        $q->whereNull('section_id')
+                          ->orWhere('section_id', '!=', $section->id);
+                    })
+                    ->exists();
+
+                if ($invalidSectionEmps) {
+                    $validator->errors()->add('employee_ids', 'Only employees assigned directly to this section can be selected. Work Center-level employees cannot be assigned to section batches.');
+                    return;
+                }
             }
 
             $this->validateWorkerExclusivity($validator, $tenantId, $empIds, $extIds, (int) $batch->id);

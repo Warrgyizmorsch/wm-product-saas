@@ -546,6 +546,8 @@ return [
     'update_machine_asset' => 'मशीन परिसंपत्ति अपडेट करें',
     'production_engineering' => 'उत्पादन इंजीनियरिंग',
     'bom' => 'बीओएम (BOM)',
+    'boms' => 'बीओएम (BOMs)',
+    'linked_boms' => 'संबंधित बीओएम (Linked BOMs)',
     'work_centers' => 'कार्य केंद्र',
 
     // Production Planning (Plans)

@@ -24,9 +24,17 @@ class WorkCenterService
             );
         }
 
-        return $this->repository->create(
-            array_merge($dto->toArray(), ['tenant_id' => $tenantId])
-        );
+        $data = array_merge($dto->toArray(), ['tenant_id' => $tenantId]);
+        if (empty($data['production_calendar_id'])) {
+            $defaultCalId = \App\Domains\Production\Models\ProductionCalendar::where('tenant_id', $tenantId)
+                ->where('is_default', true)
+                ->value('id');
+            if ($defaultCalId) {
+                $data['production_calendar_id'] = $defaultCalId;
+            }
+        }
+
+        return $this->repository->create($data);
     }
 
     public function update(int $id, WorkCenterDTO $dto): WorkCenter
@@ -45,7 +53,17 @@ class WorkCenterService
             );
         }
 
-        $updated = $this->repository->update($id, $dto->toArray());
+        $data = $dto->toArray();
+        if (empty($data['production_calendar_id'])) {
+            $defaultCalId = \App\Domains\Production\Models\ProductionCalendar::where('tenant_id', $workCenter->tenant_id)
+                ->where('is_default', true)
+                ->value('id');
+            if ($defaultCalId) {
+                $data['production_calendar_id'] = $defaultCalId;
+            }
+        }
+
+        $updated = $this->repository->update($id, $data);
         app(CountdownCalculationEngine::class)->triggerCountdown($updated, null);
 
         return $updated;
