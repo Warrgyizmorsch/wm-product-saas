@@ -359,7 +359,17 @@ class WfhRequestController extends Controller
     public function approveCancellation(WfhRequest $wfhRequest): RedirectResponse
     {
         $user = auth()->user();
-        abort_unless($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.wfh_requests.approve') || $user->hasHrPermission('hrms.wfh_requests.manage') || $user->hasHrPermission('hrms.leave_requests.approve') || $user->hasHrPermission('hrms.leaves.manage')), 403);
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $user && (
+            ($wfhRequest->employee && $workflowService->canApprove($user, $wfhRequest->employee, $wfhRequest))
+            || $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.wfh_requests.approve')
+            || $user->hasHrPermission('hrms.wfh_requests.manage')
+            || $user->hasHrPermission('hrms.leave_requests.approve')
+            || $user->hasHrPermission('hrms.leaves.manage')
+            || $workflowService->isHrOrAdminActor($user)
+        );
+        abort_unless($canApprove, 403, 'Unauthorized to approve WFH cancellation.');
 
         if ($wfhRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
@@ -393,7 +403,17 @@ class WfhRequestController extends Controller
     public function denyCancellation(WfhRequest $wfhRequest): RedirectResponse
     {
         $user = auth()->user();
-        abort_unless($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.wfh_requests.approve') || $user->hasHrPermission('hrms.wfh_requests.manage') || $user->hasHrPermission('hrms.leave_requests.approve') || $user->hasHrPermission('hrms.leaves.manage')), 403);
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $canApprove = $user && (
+            ($wfhRequest->employee && $workflowService->canApprove($user, $wfhRequest->employee, $wfhRequest))
+            || $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hrms.wfh_requests.approve')
+            || $user->hasHrPermission('hrms.wfh_requests.manage')
+            || $user->hasHrPermission('hrms.leave_requests.approve')
+            || $user->hasHrPermission('hrms.leaves.manage')
+            || $workflowService->isHrOrAdminActor($user)
+        );
+        abort_unless($canApprove, 403, 'Unauthorized to deny WFH cancellation.');
 
         if ($wfhRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
