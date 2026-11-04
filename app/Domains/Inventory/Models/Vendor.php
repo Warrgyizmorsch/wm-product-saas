@@ -77,6 +77,11 @@ class Vendor extends BaseModel
         return $this->hasMany(\App\Domains\Purchase\Models\PurchaseOrder::class, 'vendor_id');
     }
 
+    public function advancePayments(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Purchase\Models\PurchaseAdvancePayment::class, 'vendor_id');
+    }
+
     /**
      * Opening balance as this party's statements show it: an amount owed to the vendor (credit) is positive; an advance paid (debit) is negative.
      */

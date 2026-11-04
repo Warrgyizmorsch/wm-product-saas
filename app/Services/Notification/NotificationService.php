@@ -79,6 +79,25 @@ class NotificationService
                 }
             }
 
+            // Real-time Pusher WebSockets Broadcast
+            try {
+                \App\Services\Pusher\PusherBroadcastService::broadcast(
+                    channels: ["user-{$userId}"],
+                    eventName: 'notification',
+                    data: [
+                        'id' => $notification->id,
+                        'title' => $title,
+                        'message' => $message,
+                        'action_url' => self::resolveUrl($actionUrl),
+                        'module' => (string) $module,
+                        'type' => (string) $type,
+                        'icon_class' => $iconClass,
+                    ]
+                );
+            } catch (\Throwable $pusherEx) {
+                \Illuminate\Support\Facades\Log::info("Pusher broadcast dispatch skipped: " . $pusherEx->getMessage());
+            }
+
             return $notification;
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("Notification creation failed: " . $e->getMessage());

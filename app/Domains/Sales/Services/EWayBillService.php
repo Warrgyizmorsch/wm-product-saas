@@ -279,6 +279,8 @@ class EWayBillService
             'eway_bill_error'      => null,
         ]);
 
+        \App\Domains\Sales\Services\SalesNotificationService::notifyEWayBillGenerated($invoice, $ewbNo, (string) $validTill);
+
         return [
             'success'      => true,
             'message'      => "E-Way Bill generated successfully! EWB No: {$ewbNo}",
@@ -311,6 +313,8 @@ class EWayBillService
             'distance_km'          => (int)($transportData['distance_km'] ?? 100),
             'eway_bill_error'      => null,
         ]);
+
+        \App\Domains\Sales\Services\SalesNotificationService::notifyEWayBillGenerated($invoice, $ewbNo, (string) $validTill);
 
         return [
             'success'      => true,

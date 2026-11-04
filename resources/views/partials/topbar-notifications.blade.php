@@ -268,14 +268,18 @@
             document.body.appendChild(toastContainer);
         }
 
-        const isSuccess = data.type === 'approved';
-        const isDanger = data.type === 'rejected';
+        const isWon = data.type === 'deal_won' || data.type === 'quotation_accepted';
+        const isSuccess = data.type === 'approved' || data.type === 'quotation_approved';
+        const isDanger = data.type === 'rejected' || data.type === 'quotation_rejected' || data.type === 'deal_lost' || data.type === 'lead_lost';
         const isRequest = data.type === 'approval_request';
+        const isLead = data.type === 'lead_assigned' || data.type === 'deal_assigned';
+        const isDue = data.type === 'followup_due';
+        const isUpcoming = data.type === 'followup_upcoming';
 
-        const borderColor = isSuccess ? '#10b981' : (isDanger ? '#ef4444' : '#3b82f6');
-        const badgeBg = isSuccess ? '#d1fae5' : (isDanger ? '#fee2e2' : '#dbeafe');
-        const badgeColor = isSuccess ? '#065f46' : (isDanger ? '#991b1b' : '#1e40af');
-        const iconClass = isSuccess ? 'feather-check-circle' : (isDanger ? 'feather-x-circle' : 'feather-user-check');
+        const borderColor = isWon ? '#10b981' : (isSuccess ? '#10b981' : (isDanger ? '#ef4444' : (isUpcoming ? '#3b82f6' : (isDue ? '#f59e0b' : (isLead ? '#6366f1' : '#3b82f6')))));
+        const badgeBg = isWon ? '#d1fae5' : (isSuccess ? '#d1fae5' : (isDanger ? '#fee2e2' : (isUpcoming ? '#dbeafe' : (isDue ? '#fef3c7' : (isLead ? '#e0e7ff' : '#dbeafe')))));
+        const badgeColor = isWon ? '#065f46' : (isSuccess ? '#065f46' : (isDanger ? '#991b1b' : (isUpcoming ? '#1e40af' : (isDue ? '#92400e' : (isLead ? '#4338ca' : '#1e40af')))));
+        const iconClass = isWon ? 'feather-award' : (isSuccess ? 'feather-check-circle' : (isDanger ? 'feather-x-circle' : (isUpcoming ? 'feather-clock' : (isDue ? 'feather-calendar' : (isLead ? 'feather-user-check' : (data.icon_class || 'feather-bell'))))));
 
         const toast = document.createElement('div');
         toast.style.cssText = `
@@ -297,12 +301,12 @@
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-                        <span style="font-size: 13px; font-weight: 700; color: #1e293b;">${data.title || 'Visitor Update'}</span>
+                        <span style="font-size: 13px; font-weight: 700; color: #1e293b;">${data.title || 'Notification'}</span>
                         <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 6px; border-radius: 4px;">Real-Time</span>
                     </div>
                     <div style="font-size: 12px; color: #475569; line-height: 1.4; margin-bottom: 8px;">${data.message || ''}</div>
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                        ${data.action_url ? `<a href="${data.action_url}" style="font-size: 11px; font-weight: 600; color: ${borderColor}; text-decoration: underline;">View Pass Details &rarr;</a>` : '<span></span>'}
+                        ${data.action_url ? `<a href="${data.action_url}" style="font-size: 11px; font-weight: 600; color: ${borderColor}; text-decoration: underline;">View Details &rarr;</a>` : '<span></span>'}
                         <button type="button" class="btn-close-toast" style="background: none; border: none; font-size: 11px; color: #94a3b8; cursor: pointer; padding: 2px 6px;">Dismiss</button>
                     </div>
                 </div>
@@ -356,25 +360,31 @@
         if (eventName === 'visitor.approval_request') type = 'approval_request';
         if (eventName === 'visitor.approved') type = 'approved';
         if (eventName === 'visitor.rejected') type = 'rejected';
+        if (payload.type === 'lead_assigned' || eventName === 'crm.lead.assigned') type = 'lead_assigned';
+        if (payload.type === 'followup_due' || eventName === 'crm.lead.followup_due' || eventName === 'crm.deal.followup_due') type = 'followup_due';
+        if (payload.type === 'followup_upcoming' || eventName === 'crm.lead.followup_upcoming' || eventName === 'crm.deal.followup_upcoming') type = 'followup_upcoming';
+        if (payload.type === 'sales_order_confirmed' || payload.type === 'invoice_paid' || payload.type === 'dispatch_delivered') type = 'approved';
+        if (payload.type === 'sales_order_cancelled') type = 'rejected';
 
         // 1. Play Audio Chime (Only once across all tabs)
         playNotificationSound(type);
 
         // 2. Flash Tab Title when outside the tab
-        flashTabTitle(payload.title || 'Visitor Alert');
+        flashTabTitle(payload.title || 'Notification Alert');
 
         // 3. Show Floating On-Screen Toast
         showFloatingPushToast({
             type: type,
-            title: payload.title || 'Visitor Management Alert',
-            message: payload.message || 'You have a new visitor update.',
-            action_url: payload.action_url || payload.url || null
+            title: payload.title || 'System Notification',
+            message: payload.message || 'You have a new update.',
+            action_url: payload.action_url || payload.url || null,
+            icon_class: payload.icon_class || 'feather-bell'
         });
 
         // 4. Trigger Native OS / Desktop Notification (Coalesced via unique tag)
         showBrowserDesktopNotification(
-            payload.title || 'Visitor Management',
-            payload.message || 'You have a new visitor notification.',
+            payload.title || 'System Notification',
+            payload.message || 'You have a new update.',
             payload.action_url || payload.url || null,
             null,
             notifTag
@@ -396,7 +406,14 @@
                 forceTLS: true
             });
 
-            const visitorEvents = [
+            const systemUserEvents = [
+                'notification',
+                'crm.lead.assigned',
+                'crm.lead.created',
+                'crm.lead.followup_due',
+                'crm.deal.followup_due',
+                'crm.lead.followup_upcoming',
+                'crm.deal.followup_upcoming',
                 'visitor.approval_request',
                 'visitor.approved',
                 'visitor.rejected',
@@ -410,12 +427,12 @@
                 'visitor.host_ping'
             ];
 
-            // 1. User Channel (Host specific alerts)
+            // 1. User Channel (User & Host specific real-time alerts)
             if (currentUserId > 0) {
                 const userChannelName = 'user-' + currentUserId;
                 const userChannel = pusher.subscribe(userChannelName);
 
-                visitorEvents.forEach(ev => {
+                systemUserEvents.forEach(ev => {
                     userChannel.bind(ev, function(data) {
                         handleLiveNotificationEvent(ev, data);
                     });

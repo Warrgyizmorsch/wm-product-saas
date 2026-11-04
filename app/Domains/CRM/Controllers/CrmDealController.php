@@ -276,6 +276,8 @@ class CrmDealController extends Controller
             }
         }
 
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealCreated($deal);
+
         return redirect()->route('crm.deals.show', $deal)->with('success', 'Deal created successfully.');
     }
 
@@ -549,20 +551,14 @@ class CrmDealController extends Controller
         $targetStatus = $dealStatuses->firstWhere('name', $stage);
         $prob = $targetStatus ? $targetStatus->probability : ($probMap[$stage] ?? $deal->probability);
 
+        $oldStage = $deal->stage ?: 'Qualification';
         $deal->update([
             'stage'        => $stage,
             'probability'  => $prob,
             'close_reason' => $validated['close_reason'] ?? $deal->close_reason,
         ]);
 
-        if (in_array($stage, ['Won', 'Closed Won'])) {
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.deal.won', [
-                'deal_title' => $deal->title,
-                'customer_name' => $deal->account?->name ?? 'Customer',
-                'amount' => number_format((float)($deal->estimated_value ?? $deal->amount ?? 0), 2),
-                'won_by' => auth()->user()?->name ?? 'User',
-            ], route('crm.deals.show', $deal->id), $deal);
-        }
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealStageUpdated($deal, $oldStage, $stage);
 
         $msg = "Deal stage updated to {$stage} successfully!";
 
@@ -1149,6 +1145,10 @@ class CrmDealController extends Controller
             }
         }
 
+        if ($ownerId) {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyDealAssigned($deal, $ownerId, auth()->id());
+        }
+
         $targetUser = $ownerId ? \App\Models\User::find($ownerId) : null;
         $ownerName = $targetUser ? $targetUser->name : 'Unassigned';
         $message = "Deal owner successfully updated to {$ownerName}!";
@@ -1215,6 +1215,11 @@ class CrmDealController extends Controller
                     );
                 }
             }
+
+            if ($ownerId) {
+                \App\Domains\CRM\Services\CrmNotificationService::notifyDealAssigned($deal, $ownerId, auth()->id());
+            }
+
             $updatedCount++;
         }
 

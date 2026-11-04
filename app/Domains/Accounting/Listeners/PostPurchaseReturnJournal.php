@@ -77,6 +77,8 @@ class PostPurchaseReturnJournal
                 $bill = VendorBill::with('items')->find($return->vendor_bill_id);
             } elseif ($return->goods_receipt_note_id) {
                 $bill = VendorBill::with('items')->where('goods_receipt_note_id', $return->goods_receipt_note_id)->first();
+            } elseif ($return->purchase_order_id) {
+                $bill = VendorBill::with('items')->where('purchase_order_id', $return->purchase_order_id)->first();
             }
 
             foreach ($return->items as $item) {

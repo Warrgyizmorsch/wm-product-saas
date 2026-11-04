@@ -78,4 +78,9 @@ class VendorPayment extends BaseModel
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Accounting\Models\ChartOfAccount::class, 'bank_account_id');
+    }
 }

@@ -461,6 +461,8 @@ class EInvoiceService
             'einvoice_error'  => null,
         ]);
 
+        \App\Domains\Sales\Services\SalesNotificationService::notifyEInvoiceGenerated($invoice);
+
         return [
             'success'   => true,
             'message'   => "E-Invoice generated successfully! IRN: {$irn}",
@@ -491,6 +493,8 @@ class EInvoiceService
             'signed_invoice'  => is_array($signedInv) ? json_encode($signedInv) : $signedInv,
             'einvoice_error'  => null,
         ]);
+
+        \App\Domains\Sales\Services\SalesNotificationService::notifyEInvoiceGenerated($invoice);
 
         return [
             'success'  => true,

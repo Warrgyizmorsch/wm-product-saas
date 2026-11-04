@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\DB;
 
 class VendorBillApiController extends Controller
 {
+    public function __construct(
+        protected \App\Domains\Purchase\Services\VendorBillService $billService
+    ) {}
+
     private function resolveTenantContext(): array
     {
         $user      = auth()->user();
@@ -27,16 +31,39 @@ class VendorBillApiController extends Controller
     /**
      * GET /api/purchase/bills/meta
      */
-    public function meta(): JsonResponse
+    public function meta(Request $request): JsonResponse
     {
         [$tenantId] = $this->resolveTenantContext();
         $vendors    = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone', 'gstin']);
 
+        $vendorId = $request->input('vendor_id');
+        $poId     = $request->input('purchase_order_id');
+
+        $availableAdvance = 0.0;
+        if ($vendorId) {
+            $availableAdvance = $this->billService->getAvailableVendorAdvance((int)$vendorId, $tenantId, $poId ? (int)$poId : null);
+        }
+
+        $poTaxInfo = null;
+        if ($poId) {
+            $po = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)->with('items')->find($poId);
+            if ($po) {
+                $poTaxInfo = [
+                    'tax_type'          => $po->tax_type ?? 'order_wise_tax',
+                    'order_tax_percent' => (float)($po->tax_percent ?? 0),
+                    'gst_type'          => $po->gst_type ?? 'cgst_sgst',
+                    'items_tax_rates'   => $po->items->pluck('tax_percent', 'product_id'),
+                ];
+            }
+        }
+
         return response()->json([
             'success' => true,
             'data'    => [
-                'statuses' => ['Draft', 'Approved', 'Paid', 'Partial', 'Cancelled'],
-                'vendors'  => $vendors,
+                'statuses'          => ['Draft', 'Approved', 'Paid', 'Partial', 'Cancelled'],
+                'vendors'           => $vendors,
+                'available_advance' => $availableAdvance,
+                'po_tax_info'       => $poTaxInfo,
             ],
         ]);
     }
@@ -100,6 +127,7 @@ class VendorBillApiController extends Controller
             'vendor_invoice_no'     => ['nullable', 'string', 'max:100'],
             'bill_date'             => ['required', 'date'],
             'due_date'              => ['nullable', 'date'],
+            'auto_apply_advance'    => ['nullable', 'boolean'],
             'notes'                 => ['nullable', 'string'],
             'items'                 => ['required', 'array', 'min:1'],
             'items.*.product_id'    => ['required', 'integer'],
@@ -119,7 +147,11 @@ class VendorBillApiController extends Controller
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
         $validated = $validator->validated();
 
-        $bill = DB::transaction(function () use ($validated, $tenantId, $companyId, $branchId) {
+        $po = !empty($validated['purchase_order_id'])
+            ? \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)->with('items')->find($validated['purchase_order_id'])
+            : null;
+
+        $bill = DB::transaction(function () use ($validated, $po, $tenantId, $companyId, $branchId) {
             $lastId = (VendorBill::where('tenant_id', $tenantId)->max('id') ?? 0) + 1;
             $billNo = 'BILL-' . str_pad((string)$lastId, 5, '0', STR_PAD_LEFT);
 
@@ -128,9 +160,18 @@ class VendorBillApiController extends Controller
             $itemRecords = [];
 
             foreach ($validated['items'] as $row) {
-                $qty     = (float)$row['quantity'];
-                $price   = (float)$row['unit_price'];
-                $taxRate = (float)($row['tax_rate'] ?? 0);
+                $qty   = (float)$row['quantity'];
+                $price = (float)$row['unit_price'];
+
+                // Inherit PO tax if tax_rate is not explicitly supplied (matches web logic)
+                if (isset($row['tax_rate']) && $row['tax_rate'] !== null) {
+                    $taxRate = (float)$row['tax_rate'];
+                } elseif ($po) {
+                    $poItem = $po->items->firstWhere('product_id', $row['product_id']);
+                    $taxRate = $poItem ? (float)$poItem->tax_percent : (float)($po->tax_percent ?? 0);
+                } else {
+                    $taxRate = 0.0;
+                }
 
                 $lineSubtotal = $qty * $price;
                 $lineTax      = $lineSubtotal * ($taxRate / 100);
@@ -182,6 +223,15 @@ class VendorBillApiController extends Controller
             // 3-way match against the PO/GRN on the header; may put it On Hold.
             app(\App\Domains\Purchase\Services\ThreeWayMatchService::class)->apply($vb);
 
+            // Auto-apply advance if enabled and bill is not held
+            $autoApply = !array_key_exists('auto_apply_advance', $validated) || (bool)$validated['auto_apply_advance'];
+            if ($autoApply && !$vb->isOnHold()) {
+                $availAdv = $this->billService->getAvailableVendorAdvance($vb->vendor_id, $tenantId, $vb->purchase_order_id);
+                if ($availAdv > 0.001) {
+                    $this->billService->applyAdvanceCredit($vb, $tenantId);
+                }
+            }
+
             return $vb->load(['items.product', 'vendor']);
         });
 
@@ -202,7 +252,7 @@ class VendorBillApiController extends Controller
         [$tenantId] = $this->resolveTenantContext();
 
         $bill = VendorBill::where('tenant_id', $tenantId)
-            ->with(['vendor', 'purchaseOrder', 'items.product'])
+            ->with(['vendor', 'purchaseOrder', 'goodsReceiptNote', 'items.product', 'allocations.vendorPayment.bankAccount', 'purchaseReturns'])
             ->find($id);
 
         if (!$bill) {
@@ -212,9 +262,14 @@ class VendorBillApiController extends Controller
             ], 404);
         }
 
+        $billData = $bill->toArray();
+        $billData['returns_total'] = $bill->returnsTotal();
+        $billData['net_payable']   = $bill->netPayable();
+        $billData['available_advance'] = $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId, $bill->purchase_order_id);
+
         return response()->json([
             'success' => true,
-            'data'    => $bill,
+            'data'    => $billData,
         ]);
     }
 
@@ -466,37 +521,33 @@ class VendorBillApiController extends Controller
             ], 422);
         }
 
-        $validator = Validator::make($request->all(), [
-            'advance_payment_id' => ['required', 'integer'],
-            'amount'             => ['required', 'numeric', 'min:0.01'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'Validation error', 'errors' => $validator->errors()], 422);
-        }
-
-        $advance = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)->find($request->input('advance_payment_id'));
-
-        if (!$advance) {
+        if ((float)($bill->due_amount ?? $bill->balance_due) <= 0.001) {
             return response()->json([
                 'success' => false,
-                'message' => 'Advance Payment record not found',
-            ], 404);
+                'message' => 'Bill is already fully paid.',
+            ], 422);
         }
 
-        $dueAmt       = (float)($bill->due_amount ?? $bill->balance_due);
-        $allocatedAmt = min((float)$request->input('amount'), $dueAmt);
+        try {
+            $applied = $this->billService->applyAdvanceCredit($bill, $tenantId);
 
-        $bill->paid_amount = (float)($bill->paid_amount ?? 0) + $allocatedAmt;
-        $bill->due_amount  = $bill->dueAfterPaying((float)$bill->paid_amount);
-        $bill->status      = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
-        $bill->save();
+            if (!$applied) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No advance credit available for this vendor / purchase order.',
+                ], 422);
+            }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Advance applied to bill successfully',
-            'data'    => $bill,
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Advance applied to bill successfully',
+                'data'    => $bill->fresh(['vendor', 'allocations.vendorPayment.bankAccount']),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to apply advance: ' . $e->getMessage()], 500);
+        }
     }
 
     /**

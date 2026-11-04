@@ -234,12 +234,7 @@ class VendorBillController extends Controller
 
         event(new BillPosted($bill));
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('purchase.bill.created', [
-            'bill_no' => $bill->bill_number ?? $bill->vendor_bill_number ?? 'BILL',
-            'vendor_name' => $bill->vendor?->name ?? 'Vendor',
-            'amount' => number_format((float)($bill->grand_total ?? $bill->total_amount ?? 0), 2),
-            'due_date' => $bill->due_date ? (is_string($bill->due_date) ? $bill->due_date : $bill->due_date->format('Y-m-d')) : 'N/A',
-        ], route('purchase.bills.show', $bill->id), $bill);
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyBillCreated($bill);
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");
@@ -561,6 +556,8 @@ class VendorBillController extends Controller
 
         // Dispatch BillPosted event to trigger GL Journal Entry Posting
         event(new \App\Domains\Purchase\Events\BillPosted($bill));
+
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyBillCreated($bill);
 
         return redirect()->route('purchase.bills.show', $bill->id)
             ->with('success', "Service Bill {$bill->bill_number} created successfully.");

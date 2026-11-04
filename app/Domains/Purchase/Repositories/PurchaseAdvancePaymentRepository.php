@@ -12,7 +12,7 @@ class PurchaseAdvancePaymentRepository
         $tenantId = require_tenant_id();
 
         $query = PurchaseAdvancePayment::where('tenant_id', $tenantId)
-            ->with(['vendor', 'purchaseOrder']);
+            ->with(['vendor', 'purchaseOrder', 'bankAccount']);
 
         if (!empty($filters['search'])) {
             $search = '%' . trim($filters['search']) . '%';

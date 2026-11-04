@@ -84,14 +84,45 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_name') }}" name="vendor_id" id="vendorSelect" required="true">
+                            @php
+                                $activeCompany = company() ?? (current_company_id() ? \App\Domains\HRMS\Models\Company::find(current_company_id()) : null) ?? \App\Domains\HRMS\Models\Company::first();
+                                $companyGstin = strtoupper(trim((string) ($activeCompany?->gst_number ?? $activeCompany?->tax_number ?? $activeCompany?->gstin ?? '')));
+                                if (empty($companyGstin)) {
+                                    $gstConfig = \App\Models\GstConfiguration::getForCurrentContext();
+                                    if ($gstConfig && $gstConfig->seller_gstin) {
+                                        $companyGstin = strtoupper(trim((string) $gstConfig->seller_gstin));
+                                    }
+                                }
+                                $companyCleanGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGstin);
+                                $companyGstPrefix = substr($companyCleanGst, 0, 2);
+                                $companyState = strtolower(trim((string) ($activeCompany?->state ?? '')));
+                            @endphp
+
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_name') }}" name="vendor_id" id="vendorSelect" required="true" data-company-gst-prefix="{{ $companyGstPrefix }}" data-company-state="{{ $companyState }}">
                                 <option value="">{{ __('purchase.select_supplier') }}</option>
                                 @foreach($vendors as $v)
+                                    @php
+                                        $vendorGstin = strtoupper(trim((string) ($v->gstin ?? $v->tax_number ?? '')));
+                                        $vendorCleanGst = preg_replace('/[^0-9A-Za-z]/', '', $vendorGstin);
+                                        $vendorGstPrefix = substr($vendorCleanGst, 0, 2);
+                                        $vendorState = strtolower(trim((string) ($v->billing_state ?? $v->state ?? '')));
+
+                                        // Determine GST type based on first 2 digits of Company GST vs Vendor GSTIN
+                                        if (!empty($companyGstPrefix) && !empty($vendorGstPrefix)) {
+                                            $computedGstType = ($companyGstPrefix === $vendorGstPrefix) ? 'cgst_sgst' : 'igst';
+                                        } elseif (!empty($companyState) && !empty($vendorState)) {
+                                            $computedGstType = ($companyState === $vendorState) ? 'cgst_sgst' : 'igst';
+                                        } else {
+                                            $computedGstType = 'cgst_sgst';
+                                        }
+                                    @endphp
                                     <option value="{{ $v->id }}" 
                                         data-code="{{ $v->code }}" 
                                         data-phone="{{ $v->phone }}" 
                                         data-email="{{ $v->email }}"
                                         data-address="{{ $v->address }}"
+                                        data-gst-prefix="{{ $vendorGstPrefix }}"
+                                        data-gst-type="{{ $computedGstType }}"
                                         @selected($order->vendor_id == $v->id)>
                                         {{ $v->name }} {{ $v->code ? '('.$v->code.')' : '' }}
                                     </option>
@@ -137,10 +168,21 @@
                                 <option value="order_wise_tax" @selected(old('tax_type', $order->tax_type) === 'order_wise_tax')>{{ __('purchase.order_wise_tax') }}</option>
                             </x-ui.odoo-form-ui>
 
+                            @php
+                                $defaultGstType = $order->gst_type ?? 'cgst_sgst';
+                                if (empty($order->gst_type) && $order->vendor) {
+                                    $oVGstin = strtoupper(trim((string) ($order->vendor->gstin ?? $order->vendor->tax_number ?? '')));
+                                    $oVClean = preg_replace('/[^0-9A-Za-z]/', '', $oVGstin);
+                                    $oVPrefix = substr($oVClean, 0, 2);
+                                    if (!empty($companyGstPrefix) && !empty($oVPrefix)) {
+                                        $defaultGstType = ($companyGstPrefix === $oVPrefix) ? 'cgst_sgst' : 'igst';
+                                    }
+                                }
+                            @endphp
                             <div id="gstTypeContainer">
                                 <x-ui.odoo-form-ui type="select" label="{{ __('purchase.gst_type') }}" name="gst_type" id="gstTypeSelect" required="true">
-                                    <option value="cgst_sgst" @selected(old('gst_type', $order->gst_type ?? 'cgst_sgst') === 'cgst_sgst')>{{ __('purchase.gst_intra_state') }}</option>
-                                    <option value="igst" @selected(old('gst_type', $order->gst_type) === 'igst')>{{ __('purchase.gst_inter_state') }}</option>
+                                    <option value="cgst_sgst" @selected(old('gst_type', $defaultGstType) === 'cgst_sgst')>{{ __('purchase.gst_intra_state') }}</option>
+                                    <option value="igst" @selected(old('gst_type', $defaultGstType) === 'igst')>{{ __('purchase.gst_inter_state') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
@@ -186,7 +228,7 @@
                                                 <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
                                                     <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" @selected($p->id == $item->product_id)>
+                                                        <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" data-tax-rate="{{ $p->gst_rate ?? 0.00 }}" @selected($p->id == $item->product_id)>
                                                             {{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})
                                                         </option>
                                                     @endforeach
@@ -492,6 +534,7 @@
                         $row.find('.tax-amount-input').val(rowTax.toFixed(2));
                         totalItemTax += rowTax;
                     } else {
+                        $row.find('.tax-percent-input').val('0.00');
                         $row.find('.tax-amount-input').val('0.00');
                         $row.find('.cgst-percent-input, .sgst-percent-input, .igst-percent-input').val('0.00');
                         $row.find('.cgst-amount-input, .sgst-amount-input, .igst-amount-input').val('0.00');
@@ -597,11 +640,59 @@
             $(document).on('input change', '.qty-input, .rate-input, .disc-percent-input, .tax-percent-input, #freightAmountInput, #summaryDiscount, #orderTaxPercent', calculateAll);
             $('#summaryDiscount, #orderTaxPercent').on('input', calculateAll);
 
-            // Handle Product Selection - prefill rate
-            $(document).on('change', '.product-select', function() {
+            // Vendor select GST type auto-resolution
+            function applyVendorGstType(isInitialLoad = false) {
+                const vendorId = $('#vendorSelect').val();
+                if (!vendorId) return;
+
+                const selected = $('#vendorSelect').find('option[value="' + vendorId + '"]');
+
+                // If on initial load and old('gst_type') or $order->gst_type was supplied, keep it
+                if (isInitialLoad && {{ (old('gst_type') || !empty($order->gst_type)) ? 'true' : 'false' }}) {
+                    return;
+                }
+
+                // Primary rule: Compare first 2 digits of Company GST vs Vendor GSTIN
+                const companyPrefix = ($('#vendorSelect').attr('data-company-gst-prefix') || '{{ $companyGstPrefix }}').trim().toUpperCase();
+                const vendorPrefix = (selected.attr('data-gst-prefix') || '').trim().toUpperCase();
+                let determinedGstType = selected.attr('data-gst-type');
+
+                if (companyPrefix && vendorPrefix) {
+                    determinedGstType = (companyPrefix === vendorPrefix) ? 'cgst_sgst' : 'igst';
+                }
+
+                if (determinedGstType) {
+                    $('#gstTypeSelect').val(determinedGstType).trigger('change');
+                }
+
+                if ($('#taxTypeSelect').val() !== 'without_tax') {
+                    calculateAll();
+                }
+            }
+
+            $('#vendorSelect').on('change select2:select', function() {
+                applyVendorGstType(false);
+            });
+
+            if ($('#vendorSelect').val() && !'{{ $order->gst_type }}') {
+                applyVendorGstType(true);
+            }
+
+            // Handle Product Selection - prefill rate & tax (only prefill tax if item_wise_tax)
+            $(document).on('change select2:select', '.product-select', function() {
                 const opt = this.options[this.selectedIndex];
+                if (!opt) return;
                 const cost = parseFloat($(opt).attr('data-cost')) || 0.00;
                 $(this).closest('tr').find('.rate-input').val(cost.toFixed(2)).trigger('input');
+                const currentTaxType = $('select[name="tax_type"]').val() || $('#taxTypeSelect').val();
+                if (currentTaxType === 'item_wise_tax') {
+                    const taxRate = parseFloat($(opt).attr('data-tax-rate'));
+                    if (!isNaN(taxRate) && taxRate >= 0) {
+                        $(this).closest('tr').find('.tax-percent-input').val(taxRate.toFixed(2)).trigger('input');
+                    }
+                } else {
+                    $(this).closest('tr').find('.tax-percent-input').val('0.00');
+                }
             });
 
             // Dynamic Rows Addition
@@ -615,7 +706,7 @@
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                 <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
-                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
+                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" data-tax-rate="{{ $p->gst_rate ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                 @endforeach
                             </select>
                         </td>
@@ -709,7 +800,7 @@
                                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
                                                 <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
-                                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}">${item.product_name}</option>
+                                                    <option value="{{ $p->id }}" data-cost="{{ convert_from_base($p->unit_cost ?? $p->cost_price ?? 0.00) }}" data-tax-rate="{{ $p->gst_rate ?? 0.00 }}">${item.product_name}</option>
                                                 @endforeach
                                             </select>
                                         </td>

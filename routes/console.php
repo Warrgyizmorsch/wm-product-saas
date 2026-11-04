@@ -34,6 +34,14 @@ Schedule::command('attendance:prune-location-logs')
 // Daily check for expiring and expired statutory employee documents
 Schedule::command('hrms:check-document-expiry')
     ->dailyAt('06:00')
+// CRM Lead and Deal Follow-up / Meeting Due Reminders (every minute)
+Schedule::command('crm:send-followup-reminders')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+// Inventory FEFO Expiring Batches Alert (daily morning scan)
+Schedule::command('inventory:check-expiring-batches')
+    ->dailyAt('08:00')
     ->withoutOverlapping();
 
 Artisan::command('fcm:test {target : User ID, Email, or FCM registration token} {--title=MossiERP Push Notification Test} {--message=Firebase Cloud Messaging is active and working! 🚀}', function ($target) {

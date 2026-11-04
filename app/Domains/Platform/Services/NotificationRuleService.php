@@ -145,7 +145,7 @@ class NotificationRuleService
             roles: $defaultRoles,
             userIds: [],
             notifyCreator: false,
-            notifyAssignedUser: false,
+            notifyAssignedUser: (bool) ($eventDetails['notify_assigned_user'] ?? true),
             data: $data,
             subjectModel: $subjectModel,
             tenantId: $tenantId
@@ -256,6 +256,12 @@ class NotificationRuleService
             if ($assignedId) {
                 $finalIds[] = (int) $assignedId;
             }
+        }
+
+        // 5. Exclude Users (prevent duplicate notification if already sent directly)
+        if (!empty($data['exclude_user_ids'])) {
+            $exclude = is_array($data['exclude_user_ids']) ? $data['exclude_user_ids'] : [$data['exclude_user_ids']];
+            $finalIds = array_diff($finalIds, array_map('intval', $exclude));
         }
 
         return array_values(array_unique(array_filter($finalIds)));
