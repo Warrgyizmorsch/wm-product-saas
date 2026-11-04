@@ -25,7 +25,7 @@ class NotificationRuleService
         mixed $subjectModel = null
     ): void {
         try {
-            $resolvedActionUrl = null;
+            $resolvedActionUrl = !empty($data['action_url']) ? (string)$data['action_url'] : null;
             $resolvedSubjectModel = null;
             $resolvedTenantId = null;
 
@@ -49,7 +49,9 @@ class NotificationRuleService
 
             // 3. Fallback Tenant ID resolution
             if (!$resolvedTenantId) {
-                if ($resolvedSubjectModel && isset($resolvedSubjectModel->tenant_id)) {
+                if (!empty($data['tenant_id'])) {
+                    $resolvedTenantId = (int)$data['tenant_id'];
+                } elseif ($resolvedSubjectModel && isset($resolvedSubjectModel->tenant_id)) {
                     $resolvedTenantId = (int)$resolvedSubjectModel->tenant_id;
                 } else {
                     $resolvedTenantId = (function_exists('tenant_id') && tenant_id())
@@ -111,7 +113,7 @@ class NotificationRuleService
 
         $title = $rule->renderTitle($data);
         $message = $rule->renderBody($data);
-        $url = $actionUrl ?: ($rule->action_route ? self::resolveRoute($rule->action_route, $subjectModel) : null);
+        $url = $actionUrl ?: ($data['action_url'] ?? ($rule->action_route ? self::resolveRoute($rule->action_route, $subjectModel) : null));
         $icon = $rule->icon_class ?: 'feather-bell';
 
         // Dispatch In-App header bell notifications
@@ -155,7 +157,7 @@ class NotificationRuleService
 
         $title = NotificationRule::interpolate($eventDetails['default_title'] ?? 'System Notification', $data);
         $message = NotificationRule::interpolate($eventDetails['default_body'] ?? '', $data);
-        $url = $actionUrl ?: (isset($eventDetails['action_route']) ? self::resolveRoute($eventDetails['action_route'], $subjectModel) : null);
+        $url = $actionUrl ?: ($data['action_url'] ?? (isset($eventDetails['action_route']) ? self::resolveRoute($eventDetails['action_route'], $subjectModel) : null));
         $icon = $eventDetails['icon'] ?? 'feather-bell';
 
         NotificationService::sendToUserIds(
@@ -206,6 +208,10 @@ class NotificationRuleService
                       ->orWhereHas('roles', function ($rq) use ($cleanRole) {
                           $rq->where('name', 'like', "%{$cleanRole}%");
                       });
+
+                    if (strcasecmp($cleanRole, 'Employee') === 0) {
+                        $q->orWhereHas('employee');
+                    }
                 }
             });
             $roleUserIds = $query->pluck('id')->toArray();
@@ -214,10 +220,16 @@ class NotificationRuleService
 
         // 3. Dynamic Creator
         if ($notifyCreator) {
-            $creatorId = $data['created_by_user_id']
-                ?? $subjectModel?->created_by
-                ?? $subjectModel?->requested_by
-                ?? null;
+            $creatorId = $data['created_by_user_id'] ?? $data['user_id'] ?? $subjectModel?->created_by ?? null;
+            if (!$creatorId && $subjectModel && isset($subjectModel->employee_id)) {
+                $creatorId = $subjectModel->employee?->user_id;
+            }
+            if (!$creatorId && $subjectModel && method_exists($subjectModel, 'documentable') && $subjectModel->documentable instanceof \App\Domains\HRMS\Models\Employee) {
+                $creatorId = $subjectModel->documentable->user_id;
+            }
+            if (!$creatorId && !empty($data['employee_id'])) {
+                $creatorId = \App\Domains\HRMS\Models\Employee::where('tenant_id', $tenantId)->find($data['employee_id'])?->user_id;
+            }
             if ($creatorId) {
                 $finalIds[] = (int) $creatorId;
             }
@@ -225,16 +237,22 @@ class NotificationRuleService
 
         // 4. Dynamic Assigned User
         if ($notifyAssignedUser) {
-            $assignedId = $data['assigned_user_id']
-                ?? $subjectModel?->lead_owner_id
-                ?? $subjectModel?->owner_id
-                ?? $subjectModel?->sales_person_id
-                ?? $subjectModel?->salesOrder?->sales_person_id
-                ?? $subjectModel?->purchaseOrder?->created_by
-                ?? $subjectModel?->requested_by
-                ?? $subjectModel?->assigned_to
-                ?? $subjectModel?->user_id
-                ?? null;
+            $assignedId = $data['assigned_user_id'] ?? $subjectModel?->assigned_to ?? $subjectModel?->user_id ?? null;
+            if (!$assignedId && $subjectModel && method_exists($subjectModel, 'assignedAgent')) {
+                $assignedId = $subjectModel->assignedAgent?->user_id;
+            }
+            if (!$assignedId && $subjectModel && method_exists($subjectModel, 'manager')) {
+                $assignedId = $subjectModel->manager?->user_id;
+            }
+            if (!$assignedId && $subjectModel && isset($subjectModel->employee)) {
+                $assignedId = $subjectModel->employee?->reportingManager?->user_id;
+            }
+            if (!$assignedId && $subjectModel instanceof \App\Domains\HRMS\Models\Employee) {
+                $assignedId = $subjectModel->reportingManager?->user_id;
+            }
+            if (!$assignedId && $subjectModel instanceof \App\Domains\HRMS\Models\Document) {
+                $assignedId = $subjectModel->requested_by_id;
+            }
             if ($assignedId) {
                 $finalIds[] = (int) $assignedId;
             }
@@ -259,11 +277,34 @@ class NotificationRuleService
         }
 
         try {
-            if ($subjectModel && $subjectModel->getKey()) {
-                return route($routeName, $subjectModel->getKey());
+            $route = \Illuminate\Support\Facades\Route::getRoutes()->getByName($routeName);
+            $paramNames = $route ? $route->parameterNames() : [];
+
+            if (!empty($paramNames)) {
+                if ($subjectModel && $subjectModel->getKey()) {
+                    return route($routeName, $subjectModel->getKey());
+                }
+                // Parameter required but no subject model key available: fallback to index
+                if (str_ends_with($routeName, '.show')) {
+                    $indexRoute = substr($routeName, 0, -5) . '.index';
+                    if (\Illuminate\Support\Facades\Route::has($indexRoute)) {
+                        return route($indexRoute);
+                    }
+                }
+                return route($routeName, 1);
             }
+
             return route($routeName);
         } catch (\Throwable $e) {
+            // If route required parameter but none was provided, attempt fallback to index route
+            if (str_ends_with($routeName, '.show')) {
+                $indexRoute = substr($routeName, 0, -5) . '.index';
+                if (\Illuminate\Support\Facades\Route::has($indexRoute)) {
+                    try {
+                        return route($indexRoute);
+                    } catch (\Throwable) {}
+                }
+            }
             return null;
         }
     }

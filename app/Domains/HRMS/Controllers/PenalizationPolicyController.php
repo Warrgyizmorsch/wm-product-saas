@@ -17,7 +17,7 @@ class PenalizationPolicyController extends Controller
 
     public function index(Request $request): View
     {
-        $this->authorize('viewAny', \App\Domains\HRMS\Models\AttendancePenaltyRule::class);
+        $this->authorize('viewAny', \App\Domains\HRMS\Models\AttendancePenalty::class);
 
         $data = $this->penalizationPolicyRepository->getIndexData($request->all());
 
@@ -26,7 +26,7 @@ class PenalizationPolicyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\AttendancePenaltyRule::class);
+        $this->authorize('create', \App\Domains\HRMS\Models\AttendancePenalty::class);
 
         $rules = [
             'rule_type' => 'required|in:late_arrival,under_hours,missing_logs,overtime_rules',
@@ -101,7 +101,7 @@ class PenalizationPolicyController extends Controller
 
     public function saveAttendanceRule(Request $request): RedirectResponse|JsonResponse
     {
-        $this->authorize('create', \App\Domains\HRMS\Models\AttendancePenaltyRule::class);
+        $this->authorize('create', \App\Domains\HRMS\Models\AttendancePenalty::class);
 
         $validated = $request->validate([
             'company_id'             => 'required|integer|exists:companies,id',

@@ -169,64 +169,126 @@ class ExitClearanceService
      */
     public function generateClearancesForExit(EmployeeExit $exit, ?int $tenantId = null): void
     {
-        if ($exit->clearances()->count() > 0) {
-            $this->cleanDuplicateClearancesForExit($exit);
-            return;
-        }
-
         $tenantId = $tenantId ?: $exit->tenant_id ?: tenant_id();
+        $this->syncExitClearancesWithPolicies($exit, false);
+    }
+
+    /**
+     * Synchronize an employee exit's clearance checkpoints with the active Offboarding Policies.
+     */
+    public function syncExitClearancesWithPolicies(EmployeeExit $exit, bool $forceCleanLegacy = false): void
+    {
+        $tenantId = $exit->tenant_id ?: tenant_id();
         $companyId = $exit->employee?->company_id;
 
         $templates = $this->getActiveTemplatesForCompany($companyId, $tenantId);
+        if ($templates->isEmpty()) {
+            $templates = collect(ExitClearanceTemplate::DEFAULT_TEMPLATES)->map(fn($item) => (object) $item);
+        }
+
+        $existing = EmployeeExitClearance::where('employee_exit_id', $exit->id)->get();
 
         $hasAllocatedAssets = \App\Domains\HRMS\Models\AssetAllocation::where('employee_id', $exit->employee_id)->whereNull('returned_at')->exists()
             || \App\Domains\HRMS\Models\Asset::where('assigned_employee_id', $exit->employee_id)->where('status', '!=', 'available')->exists();
 
-        $createItem = function ($catKey, $itemName) use ($tenantId, $exit, $hasAllocatedAssets) {
+        // Check if legacy department sign-offs exist (to preserve department approval state when syncing)
+        $clearedDepts = [];
+        foreach ($existing as $item) {
+            $normDept = ExitClearanceTemplate::normalizeCategoryKey($item->getRawOriginal('department') ?? $item->department);
+            if (in_array($item->status, ['cleared', 'waived'])) {
+                $clearedDepts[$normDept] = [
+                    'cleared_by' => $item->cleared_by,
+                    'cleared_at' => $item->cleared_at,
+                ];
+            }
+        }
+
+        // Build mapping of active policy items
+        $policyItemNames = [];
+        $policyItems = [];
+        foreach ($templates as $t) {
+            $catKey = is_object($t) ? $t->clearance_category : $t['clearance_category'];
+            $itemName = is_object($t) ? $t->item_name : $t['item_name'];
             $normCat = ExitClearanceTemplate::normalizeCategoryKey($catKey);
-            $isHardwarePoint = in_array($normCat, ['it_assets', 'it', 'facilities_admin']) 
-                && (str_contains(strtolower($itemName), 'hardware') || str_contains(strtolower($itemName), 'laptop') || str_contains(strtolower($itemName), 'asset recovery'));
-
-            $isAutoCleared = $isHardwarePoint && !$hasAllocatedAssets;
-
-            EmployeeExitClearance::create([
-                'tenant_id' => $tenantId,
-                'employee_exit_id' => $exit->id,
+            $key = $normCat . '::' . strtolower(trim($itemName));
+            $policyItemNames[$key] = true;
+            $policyItems[] = [
                 'department' => $normCat,
                 'item_name' => $itemName,
-                'status' => $isAutoCleared ? 'cleared' : 'pending',
-                'remarks' => $isAutoCleared ? 'Auto-cleared: No company physical assets assigned (BYOD/Digital Only)' : null,
-                'cleared_at' => $isAutoCleared ? now() : null,
-                'deduction_amount' => 0.00,
-            ]);
-        };
+            ];
+        }
 
-        if ($templates->isEmpty()) {
-            foreach (ExitClearanceTemplate::DEFAULT_TEMPLATES as $item) {
-                $createItem($item['clearance_category'], $item['item_name']);
+        // If forceCleanLegacy is true, clean up items that don't match any policy template
+        if ($forceCleanLegacy) {
+            foreach ($existing as $c) {
+                $normDept = ExitClearanceTemplate::normalizeCategoryKey($c->getRawOriginal('department') ?? $c->department);
+                $key = $normDept . '::' . strtolower(trim($c->item_name));
+
+                if (!isset($policyItemNames[$key])) {
+                    $c->delete();
+                }
             }
-        } else {
-            foreach ($templates as $template) {
-                $catKey = is_object($template) ? $template->clearance_category : $template['clearance_category'];
-                $itemName = is_object($template) ? $template->item_name : $template['item_name'];
-                $createItem($catKey, $itemName);
+            $existing = EmployeeExitClearance::where('employee_exit_id', $exit->id)->get();
+        }
+
+        // Ensure each active policy item exists in the exit's clearances
+        foreach ($policyItems as $p) {
+            $cat = $p['department'];
+            $name = $p['item_name'];
+
+            $matching = $existing->first(function ($c) use ($cat, $name) {
+                $cDept = ExitClearanceTemplate::normalizeCategoryKey($c->getRawOriginal('department') ?? $c->department);
+                return $cDept === $cat && strcasecmp(trim($c->item_name), trim($name)) === 0;
+            });
+
+            if (!$matching) {
+                $isHardwarePoint = in_array($cat, ['it_assets', 'it', 'facilities_admin']) 
+                    && (str_contains(strtolower($name), 'hardware') || str_contains(strtolower($name), 'laptop') || str_contains(strtolower($name), 'asset recovery'));
+                $isAutoCleared = $isHardwarePoint && !$hasAllocatedAssets;
+
+                // If department was already cleared in legacy data, preserve cleared status
+                $wasDeptCleared = isset($clearedDepts[$cat]);
+
+                EmployeeExitClearance::create([
+                    'tenant_id' => $tenantId,
+                    'employee_exit_id' => $exit->id,
+                    'department' => $cat,
+                    'item_name' => $name,
+                    'status' => $wasDeptCleared ? 'cleared' : ($isAutoCleared ? 'cleared' : 'pending'),
+                    'remarks' => $isAutoCleared ? 'Auto-cleared: No company physical assets assigned (BYOD/Digital Only)' : null,
+                    'cleared_by' => $wasDeptCleared ? ($clearedDepts[$cat]['cleared_by'] ?? null) : null,
+                    'cleared_at' => $wasDeptCleared ? ($clearedDepts[$cat]['cleared_at'] ?? now()) : ($isAutoCleared ? now() : null),
+                    'deduction_amount' => 0.00,
+                ]);
             }
         }
 
-        // Automatic Inventory Asset Recovery Safeguard:
-        // If employee has assigned assets, ensure IT / Equipment Recovery clearance point is present
-        $hasItClearance = $exit->clearances()->whereIn('department', ['it_assets', 'it'])->exists();
+        $this->cleanDuplicateClearancesForExit($exit);
+        $this->checkAllClearancesCompleted($exit);
+    }
 
-        if ($hasAllocatedAssets && !$hasItClearance) {
-            EmployeeExitClearance::create([
-                'tenant_id' => $tenantId,
-                'employee_exit_id' => $exit->id,
-                'department' => 'it_assets',
-                'item_name' => 'Company Hardware & Equipment Recovery',
-                'status' => 'pending',
-                'deduction_amount' => 0.00,
-            ]);
+    /**
+     * Synchronize all active exits (not settled, not rejected) with the latest Offboarding Policies.
+     */
+    public function syncAllActiveExitsWithPolicies(?int $tenantId = null, ?int $companyId = null, bool $forceCleanLegacy = false): int
+    {
+        $tenantId = $tenantId ?: tenant_id();
+        $query = EmployeeExit::whereNotIn('status', ['settled', 'rejected']);
+
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
         }
+
+        if ($companyId) {
+            $query->whereHas('employee', fn($q) => $q->where('company_id', $companyId));
+        }
+
+        $exits = $query->get();
+        foreach ($exits as $exit) {
+            $this->syncExitClearancesWithPolicies($exit, $forceCleanLegacy);
+        }
+
+        return $exits->count();
     }
 
     /**

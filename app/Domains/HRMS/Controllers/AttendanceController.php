@@ -44,7 +44,7 @@ class AttendanceController extends Controller
         $scopeService->applyRelatedScope($todayAttQuery, $user);
 
         $stats = [
-            'total_present' => (clone $todayAttQuery)->whereIn('status', ['present', 'late', 'half_day', 'wfh'])->count(),
+            'total_present' => (clone $todayAttQuery)->whereIn('status', ['present', 'late', 'half_day', 'wfh', 'onsite', 'missing_logs'])->whereNotNull('check_in')->count(),
             'total_on_break' => (clone $todayAttQuery)
                 ->whereHas('breaks', function($q) {
                     $q->whereNull('break_out');
@@ -188,15 +188,18 @@ class AttendanceController extends Controller
                 }
                 $allEmployees = $allEmployeesQuery->get();
                 
-                // Fetch attendances for these dates
-                $allAttendances = Attendance::whereIn('date', $dateStrings)
-                    ->forUserScope($user)
-                    ->get()
-                    ->groupBy(fn($a) => $a->date->format('Y-m-d'));
-                
                 // Fetch holidays overlapping these dates
                 $minDate = min($dateStrings);
                 $maxDate = max($dateStrings);
+
+                // Fetch attendances for these dates
+                $allAttendances = Attendance::whereBetween('date', [$minDate, $maxDate])
+                    ->forUserScope($user)
+                    ->get()
+                    ->groupBy(function ($a) {
+                        return $a->date instanceof \Carbon\Carbon ? $a->date->format('Y-m-d') : substr((string)$a->date, 0, 10);
+                    });
+                
                 $allHolidays = \App\Domains\HRMS\Models\HolidayCalendar::where('status', true)
                     ->whereBetween('holiday_date', [$minDate, $maxDate])
                     ->get();
@@ -227,7 +230,7 @@ class AttendanceController extends Controller
                     $dateAttendances = $allAttendances->get($dStr, collect())->keyBy('employee_id');
                     
                     $counts = [
-                        'present' => 0, 'wfh' => 0, 'late' => 0, 'half_day' => 0,
+                        'present' => 0, 'wfh' => 0, 'onsite' => 0, 'missing_logs' => 0, 'late' => 0, 'half_day' => 0,
                         'absent' => 0, 'on_leave' => 0, 'week_off' => 0, 'holiday' => 0,
                         'overtime' => $allOvertimes->get($dStr, collect())->count(),
                     ];
@@ -371,7 +374,7 @@ class AttendanceController extends Controller
                 $empOvertimes = $monthOvertimes->get($employee->id, collect());
 
                 $counts = [
-                    'present' => 0, 'wfh' => 0, 'late' => 0, 'half_day' => 0,
+                    'present' => 0, 'wfh' => 0, 'onsite' => 0, 'missing_logs' => 0, 'late' => 0, 'half_day' => 0,
                     'absent' => 0, 'on_leave' => 0, 'week_off' => 0, 'holiday' => 0
                 ];
 
@@ -408,9 +411,10 @@ class AttendanceController extends Controller
                     $currentDate->addDay();
                 }
 
-                $employee->computed_present = $counts['present'];
+                $employee->computed_present = $counts['present'] + $counts['wfh'] + ($counts['onsite'] ?? 0) + ($counts['missing_logs'] ?? 0);
                 $employee->computed_late = $counts['late'];
                 $employee->computed_wfh = $counts['wfh'];
+                $employee->computed_onsite = $counts['onsite'] ?? 0;
                 $employee->computed_half_day = $counts['half_day'];
                 $employee->computed_absent = $counts['absent'];
                 $employee->computed_on_leave = $counts['on_leave'];
@@ -974,6 +978,7 @@ class AttendanceController extends Controller
             $log->total_distance_km = $attRecord ? (float)($attRecord->total_distance_km ?? 0) : 0;
             $log->route_snapshot_url = $snapshotUrl;
             $log->route_summary = $attRecord ? $attRecord->route_summary : [];
+            $log->route_polyline = $attRecord ? $attRecord->route_polyline : null;
             $log->formatted_location_logs = $attRecord ? $attRecord->formatted_location_logs : [];
 
             $calendarDays[] = $log;
@@ -1016,6 +1021,8 @@ class AttendanceController extends Controller
                     $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
                 } elseif ($status === 'wfh') {
                     $statusBadge = '<span class="badge bg-soft-info text-info">WFH</span>';
+                } elseif ($status === 'onsite' || $status === 'site' || $status === 'on-site') {
+                    $statusBadge = '<span class="badge bg-soft-warning text-warning">On-Site</span>';
                 } elseif ($status === 'late') {
                     $statusBadge = '<span class="badge bg-soft-warning text-warning">Late</span>';
                 } elseif ($status === 'half_day') {
@@ -1090,6 +1097,8 @@ class AttendanceController extends Controller
                     'total_distance_km' => $log->total_distance_km,
                     'route_snapshot_url' => $log->route_snapshot_url,
                     'route_summary' => $log->route_summary,
+                    'route_polyline' => $log->route_polyline,
+                    'last_known_location' => $log->route_summary['last_known_location'] ?? ($log->route_summary['end_point'] ?? null),
                     'location_logs' => !empty($log->formatted_location_logs) ? $log->formatted_location_logs : $log->locationLogs->map(fn($l) => [
                         'lat' => (float)$l->latitude,
                         'lng' => (float)$l->longitude,
@@ -1220,6 +1229,7 @@ class AttendanceController extends Controller
             }
             $log->route_snapshot_url = $snapshotUrl;
             $log->route_summary = $attRecord ? $attRecord->route_summary : [];
+            $log->route_polyline = $attRecord ? $attRecord->route_polyline : null;
             $log->formatted_location_logs = $attRecord ? $attRecord->formatted_location_logs : [];
             $log->locationLogs = $attRecord ? $attRecord->locationLogs : collect();
 
@@ -1251,6 +1261,8 @@ class AttendanceController extends Controller
                     $statusBadge = '<span class="badge bg-soft-success text-success">Present</span>';
                 } elseif ($status === 'wfh') {
                     $statusBadge = '<span class="badge bg-soft-info text-info">WFH</span>';
+                } elseif ($status === 'onsite' || $status === 'site' || $status === 'on-site') {
+                    $statusBadge = '<span class="badge bg-soft-warning text-warning">On-Site</span>';
                 } elseif ($status === 'late') {
                     $statusBadge = '<span class="badge bg-soft-warning text-warning">Late</span>';
                 } elseif ($status === 'half_day') {
@@ -1327,6 +1339,8 @@ class AttendanceController extends Controller
                     'total_distance_km' => $log->total_distance_km,
                     'route_snapshot_url' => $log->route_snapshot_url,
                     'route_summary' => $log->route_summary,
+                    'route_polyline' => $log->route_polyline,
+                    'last_known_location' => $log->route_summary['last_known_location'] ?? ($log->route_summary['end_point'] ?? null),
                     'location_logs' => $log->formatted_location_logs,
                 ];
             }),
@@ -1812,10 +1826,28 @@ class AttendanceController extends Controller
     ) {
         // 1. If a real punch record exists, use its status
         if ($attendanceRecord) {
+            // Auto-heal / flag past unclosed attendance without check_out as missing_logs
+            if (empty($attendanceRecord->check_out) && $date->copy()->startOfDay()->lt(\Carbon\Carbon::today()->startOfDay())) {
+                $statusChanged = false;
+                if ($attendanceRecord->status !== 'missing_logs') {
+                    $attendanceRecord->update(['status' => 'missing_logs']);
+                    $statusChanged = true;
+                }
+
+                if ($statusChanged || empty($attendanceRecord->route_summary)) {
+                    try {
+                        app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendanceRecord, false);
+                    } catch (\Throwable $e) {}
+                }
+            }
+
             $status = $attendanceRecord->status ?: 'present';
-            // WFH can be determined by location_type too
-            if (strtolower($attendanceRecord->location_type) === 'wfh' && $status === 'present') {
+            // WFH and On-Site can be determined by location_type too
+            $normLoc = strtolower(trim((string) $attendanceRecord->location_type));
+            if ($normLoc === 'wfh' && $status === 'present') {
                 $status = 'wfh';
+            } elseif (in_array($normLoc, ['onsite', 'on-site', 'site']) && $status === 'present') {
+                $status = 'onsite';
             }
             return [
                 'status' => $status,

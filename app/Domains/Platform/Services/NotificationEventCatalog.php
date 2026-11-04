@@ -761,9 +761,11 @@ class NotificationEventCatalog
                     ],
                 ],
             ],
-            'document' => [
-                'label' => 'Document Management & Compliance',
+            'hrms' => [
+                'label' => 'HRMS & Employee Self-Service',
                 'events' => [
+
+                    // Document Management & Statutory Compliance
                     'hrms.document.uploaded' => [
                         'label' => 'Document Uploaded for Verification',
                         'description' => 'Triggered when an employee uploads a KYC, identity, degree or statutory document.',
@@ -771,7 +773,7 @@ class NotificationEventCatalog
                         'default_roles' => ['HR Manager', 'Admin'],
                         'default_title' => '📄 Document Uploaded: {{employee_name}} - {{document_type}}',
                         'default_body' => '{{employee_name}} uploaded a new {{document_type}} under {{category_name}} for verification.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_type', 'category_name', 'uploaded_at'],
                     ],
                     'hrms.document.approved' => [
@@ -781,7 +783,7 @@ class NotificationEventCatalog
                         'default_roles' => ['HR Manager', 'Employee'],
                         'default_title' => '✅ Document Approved: {{document_type}}',
                         'default_body' => 'Your document {{document_type}} has been verified and approved by {{approved_by}}.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_type', 'approved_by', 'date'],
                     ],
                     'hrms.document.rejected' => [
@@ -791,7 +793,7 @@ class NotificationEventCatalog
                         'default_roles' => ['Employee', 'HR Manager'],
                         'default_title' => '⚠️ Document Rejected: {{document_type}}',
                         'default_body' => 'Your document {{document_type}} was rejected by {{rejected_by}}. Reason: {{reason}}. Please re-upload.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_type', 'reason', 'rejected_by'],
                     ],
                     'hrms.document.signature_requested' => [
@@ -801,7 +803,7 @@ class NotificationEventCatalog
                         'default_roles' => ['Employee', 'HR Manager'],
                         'default_title' => '✍️ Signature Required: {{document_title}}',
                         'default_body' => 'Please review and digitally sign {{document_title}} issued for {{employee_name}} by {{due_date}}.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_title', 'due_date'],
                     ],
                     'hrms.document.signed' => [
@@ -811,7 +813,7 @@ class NotificationEventCatalog
                         'default_roles' => ['HR Manager', 'Admin'],
                         'default_title' => '📝 Document E-Signed: {{document_title}}',
                         'default_body' => '{{employee_name}} has digitally signed and completed the document {{document_title}}.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_title', 'signed_at'],
                     ],
                     'hrms.document.expiring_soon' => [
@@ -821,7 +823,7 @@ class NotificationEventCatalog
                         'default_roles' => ['HR Manager', 'Employee'],
                         'default_title' => '⏰ Document Expiring Soon: {{document_type}} - {{employee_name}}',
                         'default_body' => '{{document_type}} for {{employee_name}} will expire on {{expiry_date}} (in {{days_left}} days). Please initiate renewal.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_type', 'expiry_date', 'days_left'],
                     ],
                     'hrms.document.expired' => [
@@ -831,7 +833,7 @@ class NotificationEventCatalog
                         'default_roles' => ['HR Manager', 'Admin'],
                         'default_title' => '🔴 Document Expired: {{document_type}} - {{employee_name}}',
                         'default_body' => '{{document_type}} for {{employee_name}} expired on {{expired_on}}. Immediate renewal or re-submission is required.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_type', 'expired_on'],
                     ],
                     'hrms.document.letter_issued' => [
@@ -841,7 +843,7 @@ class NotificationEventCatalog
                         'default_roles' => ['Employee', 'HR Manager'],
                         'default_title' => '📑 Official Letter Issued: {{letter_type}}',
                         'default_body' => 'A new {{letter_type}} (Ref: {{ref_no}}) has been issued to {{employee_name}}.',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'letter_type', 'ref_no', 'issued_date'],
                     ],
                     'hrms.document.exit_cleared' => [
@@ -851,14 +853,9 @@ class NotificationEventCatalog
                         'default_roles' => ['Employee', 'HR Manager', 'Accountant'],
                         'default_title' => '🏁 Exit Certificate Issued: {{document_type}} for {{employee_name}}',
                         'default_body' => 'Official {{document_type}} has been generated and released for {{employee_name}} (Relieved on: {{exit_date}}).',
-                        'action_route' => 'hrms.employees.index',
+                        'action_route' => 'hrms.documents.index',
                         'variables' => ['employee_name', 'document_type', 'exit_date'],
                     ],
-                ],
-            ],
-            'hrms' => [
-                'label' => 'HRMS & Employee Self-Service',
-                'events' => [
 
                     // Leave Management
                     'hrms.leave.applied' => [
@@ -1018,7 +1015,7 @@ class NotificationEventCatalog
                         'default_roles' => ['Employee'],
                         'default_title' => '📄 Payslip Available: {{month_year}}',
                         'default_body' => 'Your salary payslip for {{month_year}} (Net Pay: {{net_salary}}) is now available for download.',
-                        'action_route' => 'hrms.payslips.index',
+                        'action_route' => 'hrms.payroll.mySalary',
                         'variables' => ['employee_name', 'month_year', 'net_salary'],
                     ],
 
@@ -1036,14 +1033,14 @@ class NotificationEventCatalog
 
                     // Helpdesk & Grievance Tickets
                     'hrms.ticket.created' => [
-                        'label' => 'HR / IT Helpdesk Ticket Raised',
-                        'description' => 'Triggered when an employee files a support or grievance ticket.',
+                        'label' => 'Helpdesk Ticket Submitted',
+                        'description' => 'Triggered when an employee submits a new helpdesk support ticket.',
                         'icon' => 'feather-help-circle',
                         'default_roles' => ['HR Manager', 'Admin'],
                         'default_title' => '🎫 New Ticket #{{ticket_no}}: {{subject}}',
                         'default_body' => '{{employee_name}} raised ticket #{{ticket_no}} (Category: {{category}}, Priority: {{priority}}).',
-                        'action_route' => 'hrms.tickets.index',
-                        'variables' => ['ticket_no', 'subject', 'category', 'priority', 'employee_name'],
+                        'action_route' => 'hrms.helpdesk.tickets.index',
+                        'variables' => ['ticket_no', 'subject', 'category', 'priority', 'employee_name', 'action_url'],
                     ],
                     'hrms.ticket.resolved' => [
                         'label' => 'Helpdesk Ticket Resolved',
@@ -1052,8 +1049,8 @@ class NotificationEventCatalog
                         'default_roles' => ['Employee', 'HR Manager'],
                         'default_title' => '✅ Ticket #{{ticket_no}} Resolved',
                         'default_body' => 'Your ticket #{{ticket_no}} ({{subject}}) has been resolved by {{resolved_by}}.',
-                        'action_route' => 'hrms.tickets.index',
-                        'variables' => ['ticket_no', 'subject', 'resolved_by'],
+                        'action_route' => 'hrms.helpdesk.tickets.index',
+                        'variables' => ['ticket_no', 'subject', 'resolved_by', 'action_url'],
                     ],
 
                     // Employee Lifecycle
@@ -1066,6 +1063,38 @@ class NotificationEventCatalog
                         'default_body' => '{{employee_name}} has joined as {{designation}} in {{department}} (Employee ID: {{employee_code}}).',
                         'action_route' => 'hrms.employees.index',
                         'variables' => ['employee_name', 'employee_code', 'designation', 'department', 'joining_date'],
+                    ],
+
+                    // Performance & Goals
+                    'hrms.kra_kpi.submitted' => [
+                        'label' => 'KRA / KPI Scorecard Submitted',
+                        'description' => 'Triggered when an employee submits their KPI goal sheet for manager approval.',
+                        'icon' => 'feather-target',
+                        'default_roles' => ['Department Head', 'HR Manager'],
+                        'default_title' => 'KPI Scorecard Submitted: {{employee_name}}',
+                        'default_body' => '{{employee_name}} submitted their KPI goals for {{cycle_name}} (Total Goals: {{items_count}}).',
+                        'action_route' => 'hrms.kra-kpi.index',
+                        'variables' => ['employee_name', 'cycle_name', 'items_count'],
+                    ],
+                    'hrms.kra_kpi.approved' => [
+                        'label' => 'KRA / KPI Scorecard Approved',
+                        'description' => 'Triggered when a manager approves the employee KPI scorecard.',
+                        'icon' => 'feather-check-circle',
+                        'default_roles' => ['Employee', 'HR Manager'],
+                        'default_title' => '✅ KPI Goals Approved: {{cycle_name}}',
+                        'default_body' => 'Your KPI scorecard for {{cycle_name}} has been signed off and approved by {{approved_by}}.',
+                        'action_route' => 'hrms.kra-kpi.index',
+                        'variables' => ['employee_name', 'cycle_name', 'approved_by'],
+                    ],
+                    'hrms.goal.approved' => [
+                        'label' => 'Strategic Goal / OKR Approved',
+                        'description' => 'Triggered when a strategic goal or OKR is approved and activated.',
+                        'icon' => 'feather-award',
+                        'default_roles' => ['Employee', 'Department Head'],
+                        'default_title' => '✅ Goal Approved: {{goal_title}}',
+                        'default_body' => 'Your goal "{{goal_title}}" has been approved by {{approved_by}} and is now active.',
+                        'action_route' => 'hrms.goals.index',
+                        'variables' => ['employee_name', 'goal_title', 'approved_by'],
                     ],
                 ],
             ],
@@ -1261,31 +1290,6 @@ class NotificationEventCatalog
                         'default_body' => 'Project "{{name}}" was formally closed as {{status}} by {{actor}}.',
                         'action_route' => 'projects.show',
                         'variables' => ['code', 'name', 'status', 'actor'],
-                    ],
-                ],
-            ],
-            'hrms' => [
-                'label' => 'HRMS & Employee Support',
-                'events' => [
-                    'hrms.ticket.created' => [
-                        'label' => 'Helpdesk Ticket Submitted',
-                        'description' => 'Triggered when an employee submits a new helpdesk support ticket.',
-                        'icon' => 'feather-help-circle',
-                        'default_roles' => ['HR Manager', 'HR Executive', 'Support Agent'],
-                        'default_title' => 'New Ticket {{ticket_no}}: {{subject}}',
-                        'default_body' => 'Ticket {{ticket_no}} (Category: {{category}}, Priority: {{priority}}) submitted by {{employee_name}}.',
-                        'action_route' => 'hrms.helpdesk.tickets.show',
-                        'variables' => ['ticket_no', 'subject', 'category', 'priority', 'employee_name', 'action_url'],
-                    ],
-                    'hrms.ticket.resolved' => [
-                        'label' => 'Helpdesk Ticket Resolved',
-                        'description' => 'Triggered when a support agent marks a helpdesk ticket as resolved.',
-                        'icon' => 'feather-check-circle',
-                        'default_roles' => ['Employee', 'HR Manager'],
-                        'default_title' => 'Ticket Resolved: {{ticket_no}}',
-                        'default_body' => 'Ticket {{ticket_no}} ("{{subject}}") has been marked as resolved by {{resolved_by}}.',
-                        'action_route' => 'hrms.helpdesk.tickets.show',
-                        'variables' => ['ticket_no', 'subject', 'resolved_by', 'action_url'],
                     ],
                 ],
             ],

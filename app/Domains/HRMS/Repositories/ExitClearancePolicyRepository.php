@@ -241,6 +241,12 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
 
             return $createdCount;
         });
+
+        if ($createdCount > 0) {
+            $this->clearanceService->syncAllActiveExitsWithPolicies($tenantId, $companyId);
+        }
+
+        return $createdCount;
     }
 
     public function updateTemplate(ExitClearanceTemplate $template, array $validated, Request $request): bool
@@ -251,7 +257,7 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
         $categoryName = !empty($validated['category_name']) ? trim($validated['category_name']) : $meta['name'];
         $companyId = !empty($validated['company_id']) ? (int)$validated['company_id'] : null;
 
-        return DB::transaction(function () use ($template, $validated, $companyId, $categoryKey, $categoryName, $request) {
+        $updated = DB::transaction(function () use ($template, $validated, $companyId, $categoryKey, $categoryName, $request) {
             $isMandatory = isset($validated['is_mandatory']) && ($validated['is_mandatory'] == '1' || $validated['is_mandatory'] === true || $validated['is_mandatory'] === 'on');
             $status = isset($validated['status']) 
                 ? ($validated['status'] == '1' || $validated['status'] === true || $validated['status'] === 'on' || $validated['status'] === 'active') 
@@ -271,11 +277,25 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
                 'status'             => $status,
             ]);
         });
+
+        if ($updated) {
+            $this->clearanceService->syncAllActiveExitsWithPolicies($template->tenant_id, $companyId);
+        }
+
+        return $updated;
     }
 
     public function deleteTemplate(ExitClearanceTemplate $template): bool
     {
-        return (bool) $template->delete();
+        $tenantId = $template->tenant_id;
+        $companyId = $template->company_id;
+        $deleted = (bool) $template->delete();
+
+        if ($deleted) {
+            $this->clearanceService->syncAllActiveExitsWithPolicies($tenantId, $companyId, true);
+        }
+
+        return $deleted;
     }
 
     public function deleteCategory(string $categoryKey, ?int $companyId): int
@@ -294,6 +314,10 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
         $count = $query->count();
         $query->delete();
 
+        if ($count > 0) {
+            $this->clearanceService->syncAllActiveExitsWithPolicies($tenantId, $companyId, true);
+        }
+
         return $count;
     }
 
@@ -301,5 +325,6 @@ class ExitClearancePolicyRepository implements ExitClearancePolicyRepositoryInte
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
         $this->clearanceService->resetTemplatesToDefaults($tenantId, $companyId);
+        $this->clearanceService->syncAllActiveExitsWithPolicies($tenantId, $companyId, true);
     }
 }

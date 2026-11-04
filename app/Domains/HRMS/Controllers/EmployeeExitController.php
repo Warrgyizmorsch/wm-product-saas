@@ -191,6 +191,26 @@ class EmployeeExitController extends Controller
         return $this->updateDepartmentClearances($request, $exit, 'all');
     }
 
+    public function syncClearanceCheckpoints(Request $request, EmployeeExit $exit): RedirectResponse
+    {
+        $this->authorize('update', $exit);
+
+        $this->clearanceService->syncExitClearancesWithPolicies($exit, true);
+        $this->exitRepository->recalculateFnf($exit);
+
+        return redirect()->back()->with('success', "Clearance checkpoints for {$exit->employee->full_name} have been synchronized with Offboarding Policies.");
+    }
+
+    public function syncAllClearanceCheckpoints(Request $request): RedirectResponse
+    {
+        $this->authorize('viewAny', EmployeeExit::class);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+        $count = $this->clearanceService->syncAllActiveExitsWithPolicies($tenantId, null, true);
+
+        return redirect()->back()->with('success', "Successfully synchronized {$count} active exit cards with current Offboarding Policies.");
+    }
+
     public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
     {
         $validated = $request->validate([
@@ -204,17 +224,19 @@ class EmployeeExitController extends Controller
         $tenantId = $exit->tenant_id ?: (tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id());
         $department = $validated['department'] ?? ($validated['clearance_category'] ?? 'hr_operations');
 
-        EmployeeExitClearance::create([
-            'tenant_id'        => $tenantId,
-            'employee_exit_id' => $exit->id,
-            'department'       => $department,
-            'item_name'        => $validated['item_name'],
-            'status'           => 'pending',
-            'remarks'          => $validated['remarks'] ?? null,
-            'deduction_amount' => $validated['deduction_amount'] ?? 0.00,
-        ]);
+        DB::transaction(function () use ($tenantId, $exit, $department, $validated) {
+            EmployeeExitClearance::create([
+                'tenant_id'        => $tenantId,
+                'employee_exit_id' => $exit->id,
+                'department'       => $department,
+                'item_name'        => $validated['item_name'],
+                'status'           => 'pending',
+                'remarks'          => $validated['remarks'] ?? null,
+                'deduction_amount' => $validated['deduction_amount'] ?? 0.00,
+            ]);
 
-        $this->exitRepository->recalculateFnf($exit);
+            $this->exitRepository->recalculateFnf($exit);
+        });
 
         return redirect()->back()->with('success', "Ad-hoc clearance item '{$validated['item_name']}' added.");
     }
@@ -223,11 +245,14 @@ class EmployeeExitController extends Controller
     {
         $exit = $clearance->employeeExit;
         $name = $clearance->item_name;
-        $clearance->delete();
 
-        if ($exit) {
-            $this->exitRepository->recalculateFnf($exit);
-        }
+        DB::transaction(function () use ($clearance, $exit) {
+            $clearance->delete();
+
+            if ($exit) {
+                $this->exitRepository->recalculateFnf($exit);
+            }
+        });
 
         return redirect()->back()->with('success', "Clearance item '{$name}' removed.");
     }

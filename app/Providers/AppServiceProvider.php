@@ -1045,7 +1045,7 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\HRMS\Models\AttendancePenaltyRule::class,
+            \App\Domains\HRMS\Models\AttendancePenalty::class,
             \App\Domains\HRMS\Policies\PenalizationPolicy::class
         );
 
@@ -1069,10 +1069,6 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
         );
 
-        \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\HRMS\Models\DocumentType::class,
-            \App\Domains\HRMS\Policies\DocumentMasterPolicy::class
-        );
 
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\Document::class,
@@ -1089,10 +1085,6 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Policies\ExpensePolicyPolicy::class
         );
 
-        \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\HRMS\Models\ExitClearanceItem::class,
-            \App\Domains\HRMS\Policies\ExitClearancePolicy::class
-        );
 
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\HRMS\Models\ExitClearanceTemplate::class,
@@ -1191,5 +1183,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Models\Access\Role::class,
             \App\Domains\Access\Policies\RolePolicy::class
         );
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \App\Domains\HRMS\Commands\CheckDocumentExpiryCommand::class,
+            ]);
+        }
     }
 }

@@ -35,19 +35,27 @@ class BiometricWebhookController extends Controller
         }
 
         $syncedCount = 0;
+        $recordsToInsert = [];
+        $affectedPairs = [];
+        $employeeCache = [];
+        $now = now();
+
         foreach ($validated['logs'] as $log) {
             $bioId = (string) $log['biometric_id'];
-            $cleanBio = str_replace('-', '', $bioId);
-            $employee = Employee::where(function ($q) use ($bioId, $cleanBio) {
-                $q->where('employee_id', $bioId)
-                  ->orWhereRaw("REPLACE(employee_id, '-', '') = ?", [$cleanBio]);
-                if (is_numeric($bioId)) {
-                    $q->orWhere('id', (int) $bioId);
-                }
-            })
-            ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
-            ->first();
+            if (!array_key_exists($bioId, $employeeCache)) {
+                $cleanBio = str_replace('-', '', $bioId);
+                $employeeCache[$bioId] = Employee::where(function ($q) use ($bioId, $cleanBio) {
+                    $q->where('employee_id', $bioId)
+                      ->orWhereRaw("REPLACE(employee_id, '-', '') = ?", [$cleanBio]);
+                    if (is_numeric($bioId)) {
+                        $q->orWhere('id', (int) $bioId);
+                    }
+                })
+                ->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId))
+                ->first();
+            }
 
+            $employee = $employeeCache[$bioId];
             if (!$employee) {
                 continue;
             }
@@ -58,17 +66,38 @@ class BiometricWebhookController extends Controller
                 continue;
             }
 
-            BiometricPunchLog::create([
+            $recordsToInsert[] = [
                 'tenant_id'           => $tenantId ?? $employee->tenant_id,
                 'biometric_device_id' => $validated['biometric_device_id'] ?? null,
                 'employee_id'         => $employee->id,
-                'punch_time'          => $punchTime,
+                'punch_time'          => $punchTime->toDateTimeString(),
                 'punch_type'          => $log['punch_type'],
                 'processed'           => false,
-                'raw_data'            => array_merge($log, ['ip' => $request->ip()]),
-            ]);
+                'raw_data'            => json_encode(array_merge($log, ['ip' => $request->ip()])),
+                'created_at'          => $now,
+                'updated_at'          => $now,
+            ];
+
+            $dateStr = $punchTime->toDateString();
+            $affectedPairs["{$employee->id}_{$dateStr}"] = [
+                'employee_id' => $employee->id,
+                'date'        => $dateStr,
+            ];
 
             $syncedCount++;
+        }
+
+        if (!empty($recordsToInsert)) {
+            foreach (array_chunk($recordsToInsert, 500) as $chunk) {
+                BiometricPunchLog::insert($chunk);
+            }
+        }
+
+        foreach ($affectedPairs as $pair) {
+            \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatch(
+                $pair['employee_id'],
+                $pair['date']
+            )->afterResponse();
         }
 
         return response()->json([
@@ -105,6 +134,10 @@ class BiometricWebhookController extends Controller
         }
 
         $lines = explode("\n", $rawContent);
+        $recordsToInsert = [];
+        $affectedPairs = [];
+        $employeeCache = [];
+        $now = now();
         $count = 0;
 
         foreach ($lines as $line) {
@@ -125,18 +158,21 @@ class BiometricWebhookController extends Controller
             $stateRaw = isset($parts[2]) ? preg_replace('/^(CHECKTYPE|state|status)=/i', '', trim($parts[2])) : '0';
             $stateVal = is_numeric($stateRaw) ? (int) $stateRaw : 0;
 
-            $cleanBioId = str_replace('-', '', $biometricId);
-            $employee = Employee::withoutGlobalScopes()
-                ->where('tenant_id', $device->tenant_id)
-                ->where(function ($q) use ($biometricId, $cleanBioId) {
-                    $q->where('employee_id', $biometricId)
-                      ->orWhereRaw("REPLACE(employee_id, '-', '') = ?", [$cleanBioId]);
-                    if (is_numeric($biometricId)) {
-                        $q->orWhere('id', (int) $biometricId);
-                    }
-                })
-                ->first();
+            if (!array_key_exists($biometricId, $employeeCache)) {
+                $cleanBioId = str_replace('-', '', $biometricId);
+                $employeeCache[$biometricId] = Employee::withoutGlobalScopes()
+                    ->where('tenant_id', $device->tenant_id)
+                    ->where(function ($q) use ($biometricId, $cleanBioId) {
+                        $q->where('employee_id', $biometricId)
+                          ->orWhereRaw("REPLACE(employee_id, '-', '') = ?", [$cleanBioId]);
+                        if (is_numeric($biometricId)) {
+                            $q->orWhere('id', (int) $biometricId);
+                        }
+                    })
+                    ->first();
+            }
 
+            $employee = $employeeCache[$biometricId];
             if (!$employee) {
                 continue;
             }
@@ -153,17 +189,38 @@ class BiometricWebhookController extends Controller
                 continue;
             }
 
-            BiometricPunchLog::create([
+            $recordsToInsert[] = [
                 'tenant_id'           => $device->tenant_id,
                 'biometric_device_id' => $device->id,
                 'employee_id'         => $employee->id,
-                'punch_time'          => $punchTime,
+                'punch_time'          => $punchTime->toDateTimeString(),
                 'punch_type'          => $punchType,
                 'processed'           => false,
-                'raw_data'            => ['raw_line' => $line],
-            ]);
+                'raw_data'            => json_encode(['raw_line' => $line]),
+                'created_at'          => $now,
+                'updated_at'          => $now,
+            ];
+
+            $dateStr = $punchTime->toDateString();
+            $affectedPairs["{$employee->id}_{$dateStr}"] = [
+                'employee_id' => $employee->id,
+                'date'        => $dateStr,
+            ];
 
             $count++;
+        }
+
+        if (!empty($recordsToInsert)) {
+            foreach (array_chunk($recordsToInsert, 500) as $chunk) {
+                BiometricPunchLog::insert($chunk);
+            }
+        }
+
+        foreach ($affectedPairs as $pair) {
+            \App\Domains\HRMS\Jobs\ProcessBiometricAttendance::dispatch(
+                $pair['employee_id'],
+                $pair['date']
+            )->afterResponse();
         }
 
         return response("OK\n");

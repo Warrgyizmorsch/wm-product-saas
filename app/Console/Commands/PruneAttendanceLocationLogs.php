@@ -12,31 +12,31 @@ class PruneAttendanceLocationLogs extends Command
      *
      * @var string
      */
-    protected $signature = 'attendance:prune-location-logs {--hours= : Cutoff in hours for deleting completed shift logs}';
+    protected $signature = 'attendance:prune-location-logs {--days=35 : Cutoff in days for deleting closed payroll/past shift logs}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Safely purge raw periodic location breadcrumbs for completed attendance shifts older than N hours.';
+    protected $description = 'Safely purge raw periodic location breadcrumbs for closed payroll periods/completed shifts older than N days.';
 
     /**
      * Execute the console command.
      */
     public function handle(AttendanceRouteService $routeService): int
     {
-        $hoursOption = $this->option('hours');
-        $hours = ($hoursOption !== null && $hoursOption !== '') ? (int) $hoursOption : 24;
-        if ($hours < 1) {
-            $hours = 24;
+        $daysOption = $this->option('days');
+        $days = ($daysOption !== null && $daysOption !== '') ? (int) $daysOption : 35;
+        if ($days < 1) {
+            $days = 35;
         }
 
-        $this->info("Pruning raw location logs older than {$hours} hours for completed shifts...");
+        $this->info("Pruning raw location logs older than {$days} days (post-payroll retention window)...");
 
-        $deletedCount = $routeService->pruneOldLogs($hours);
+        $deletedCount = $routeService->pruneOldLogs($days);
 
-        $this->info("Successfully pruned {$deletedCount} stale location log records.");
+        $this->info("Successfully pruned {$deletedCount} stale location log records while preserving Last Known Locations & polylines.");
 
         return Command::SUCCESS;
     }

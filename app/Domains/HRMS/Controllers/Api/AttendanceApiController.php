@@ -1204,7 +1204,7 @@ class AttendanceApiController extends Controller
             $hours = 24;
         }
 
-        $deletedCount = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->pruneOldLogs($hours);
+        $deletedCount = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->pruneOldLogs(null, $hours);
 
         return $this->sendSuccess([
             'pruned_count'     => $deletedCount,

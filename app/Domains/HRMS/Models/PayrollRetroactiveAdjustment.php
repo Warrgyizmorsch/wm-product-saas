@@ -12,6 +12,7 @@ class PayrollRetroactiveAdjustment extends BaseModel
         'tenant_id',
         'employee_id',
         'target_payroll_month',
+        'adjustment_type',
         'reversal_days',
         'amount_reversal',
         'status',

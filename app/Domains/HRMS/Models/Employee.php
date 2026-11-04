@@ -4,9 +4,11 @@ namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\HRMS\Traits\HasHrmsScope;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Employee extends BaseModel
 {
@@ -89,47 +91,81 @@ class Employee extends BaseModel
         'weekly_pattern' => 'array',
     ];
 
+    public function save(array $options = []): bool
+    {
+        // Ensure auto-generated employee_id sequence creation is wrapped in a pessimistic lock transaction
+        if (!$this->exists && empty($this->employee_id)) {
+            return DB::transaction(function () use ($options) {
+                return parent::save($options);
+            });
+        }
+
+        return parent::save($options);
+    }
+
+    public static function generateUniqueEmployeeId(self $employee): string
+    {
+        // 1. Acquire pessimistic lock on the company record to serialize concurrent generation per company
+        $company = null;
+        if (!empty($employee->company_id)) {
+            $company = Company::where('id', $employee->company_id)->lockForUpdate()->first();
+        } elseif (!empty($employee->tenant_id)) {
+            Tenant::where('id', $employee->tenant_id)->lockForUpdate()->first();
+        }
+
+        // 2. Build prefix from company name (or fallback to 'EMP')
+        $prefix = 'EMP';
+        if ($company && !empty($company->company_name)) {
+            $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', '', $company->company_name))) ?: [];
+
+            if (count($words) >= 2) {
+                $prefix = '';
+                foreach (array_slice($words, 0, 3) as $word) {
+                    $prefix .= substr($word, 0, 1);
+                }
+            } elseif (isset($words[0]) && strlen($words[0]) > 0) {
+                $prefix = substr($words[0], 0, 3);
+            }
+            $prefix = strtoupper($prefix);
+        }
+
+        // 3. Find the highest sequence number among existing employees using pessimistic lock
+        $maxEmployee = self::withTrashed()
+            ->where('company_id', $employee->company_id)
+            ->where('employee_id', 'LIKE', $prefix . '-%')
+            ->orderByRaw('CAST(SUBSTRING(employee_id, LENGTH(?) + 2) AS UNSIGNED) DESC', [$prefix])
+            ->lockForUpdate()
+            ->first();
+
+        $nextSequence = 1;
+        if ($maxEmployee) {
+            $parts = explode('-', $maxEmployee->employee_id);
+            $lastNum = (int) end($parts);
+            if ($lastNum > 0) {
+                $nextSequence = $lastNum + 1;
+            }
+        }
+
+        // 4. Ensure atomic uniqueness by advancing if a code already exists
+        do {
+            $candidateId = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
+            $exists = self::withTrashed()
+                ->where('company_id', $employee->company_id)
+                ->where('employee_id', $candidateId)
+                ->exists();
+            if ($exists) {
+                $nextSequence++;
+            }
+        } while ($exists);
+
+        return $candidateId;
+    }
+
     protected static function booted(): void
     {
         static::creating(function ($employee): void {
             if (empty($employee->employee_id)) {
-                // Load company name to generate the prefix
-                $company = $employee->company ?: \App\Domains\HRMS\Models\Company::find($employee->company_id);
-                $prefix = 'EMP';
-
-                if ($company && !empty($company->company_name)) {
-                    // Extract words
-                    $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', '', $company->company_name))) ?: [];
-                    
-                    if (count($words) >= 2) {
-                        $prefix = '';
-                        foreach (array_slice($words, 0, 3) as $word) {
-                            $prefix .= substr($word, 0, 1);
-                        }
-                    } else if (isset($words[0]) && strlen($words[0]) > 0) {
-                        $prefix = substr($words[0], 0, 3);
-                    }
-                    $prefix = strtoupper($prefix);
-                }
-
-                // Find the highest sequence number among existing employees (including soft deleted ones)
-                $maxEmployee = self::withTrashed()
-                    ->where('company_id', $employee->company_id)
-                    ->where('employee_id', 'LIKE', $prefix . '-%')
-                    ->orderByRaw('CAST(SUBSTRING(employee_id, LENGTH(?) + 2) AS UNSIGNED) DESC', [$prefix])
-                    ->first();
-
-                $nextSequence = 1;
-                if ($maxEmployee) {
-                    $parts = explode('-', $maxEmployee->employee_id);
-                    $lastNum = (int) end($parts);
-                    if ($lastNum > 0) {
-                        $nextSequence = $lastNum + 1;
-                    }
-                }
-
-                // Format: PREFIX-XXXX (e.g. ACM-0001)
-                $employee->employee_id = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
+                $employee->employee_id = self::generateUniqueEmployeeId($employee);
             }
         });
 

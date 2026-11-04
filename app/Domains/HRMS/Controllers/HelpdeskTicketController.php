@@ -63,14 +63,17 @@ class HelpdeskTicketController extends Controller
 
         try {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.created', [
-                'tenant_id'     => $ticket->tenant_id,
-                'ticket_no'     => $ticket->ticket_number ?? ('#' . $ticket->id),
-                'subject'       => $ticket->subject,
-                'category'      => $ticket->category?->name ?? 'General',
-                'priority'      => ucfirst($ticket->priority),
-                'employee_name' => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
-                'action_url'    => route('hrms.helpdesk.tickets.show', $ticket->id),
-            ]);
+                'tenant_id'        => $ticket->tenant_id,
+                'ticket_no'        => $ticket->ticket_number ?? ('#' . $ticket->id),
+                'subject'          => $ticket->subject,
+                'category'         => $ticket->category?->name ?? 'General',
+                'priority'         => ucfirst($ticket->priority),
+                'employee_name'    => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
+                'action_url'       => route('hrms.helpdesk.tickets.show', $ticket->id),
+                'employee_id'      => $ticket->employee_id,
+                'user_id'          => $ticket->employee?->user_id,
+                'assigned_user_id' => $ticket->assignedAgent?->user_id,
+            ], $ticket);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
@@ -248,7 +251,9 @@ class HelpdeskTicketController extends Controller
                     'subject'     => $ticket->subject,
                     'resolved_by' => auth()->user()?->name ?? 'Support Agent',
                     'action_url'  => route('hrms.helpdesk.tickets.show', $ticket->id),
-                ]);
+                    'employee_id' => $ticket->employee_id,
+                    'user_id'     => $ticket->employee?->user_id,
+                ], $ticket);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
             }
