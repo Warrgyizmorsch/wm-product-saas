@@ -34,6 +34,7 @@ Schedule::command('attendance:prune-location-logs')
 // Daily check for expiring and expired statutory employee documents
 Schedule::command('hrms:check-document-expiry')
     ->dailyAt('06:00')
+    ->withoutOverlapping();
 // CRM Lead and Deal Follow-up / Meeting Due Reminders (every minute)
 Schedule::command('crm:send-followup-reminders')
     ->everyMinute()
