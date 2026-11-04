@@ -36,15 +36,19 @@ class Document extends BaseModel
         'signature_ip',
         'signed_file_path',
         'signature_metadata',
+        'alert_history',
+        'last_expiry_alert_at',
     ];
 
     protected $casts = [
-        'expiry_date'         => 'date',
-        'has_expiry'          => 'boolean',
-        'is_signed'           => 'boolean',
-        'requires_signature'  => 'boolean',
-        'signed_at'           => 'datetime',
-        'signature_metadata'  => 'array',
+        'expiry_date'          => 'date',
+        'has_expiry'           => 'boolean',
+        'is_signed'            => 'boolean',
+        'requires_signature'   => 'boolean',
+        'signed_at'            => 'datetime',
+        'signature_metadata'   => 'array',
+        'alert_history'        => 'array',
+        'last_expiry_alert_at' => 'datetime',
     ];
 
     public function documentable(): MorphTo

@@ -99,6 +99,49 @@ class Attendance extends BaseModel
     }
 
     /**
+     * Get total distance traveled in km dynamically if not yet consolidated.
+     */
+    public function getTotalDistanceKmAttribute(?float $value): float
+    {
+        if ($value !== null && (float) $value > 0) {
+            return (float) $value;
+        }
+
+        $logs = $this->formatted_location_logs;
+        $points = [];
+        if (!empty($this->check_in_latitude) && !empty($this->check_in_longitude)) {
+            $points[] = [(float)$this->check_in_latitude, (float)$this->check_in_longitude];
+        }
+        foreach ($logs as $l) {
+            if (!empty($l['lat']) && !empty($l['lng'])) {
+                $points[] = [(float)$l['lat'], (float)$l['lng']];
+            }
+        }
+        if (!empty($this->check_out_latitude) && !empty($this->check_out_longitude)) {
+            $points[] = [(float)$this->check_out_latitude, (float)$this->check_out_longitude];
+        }
+
+        if (count($points) >= 2) {
+            $dist = 0.0;
+            for ($i = 1; $i < count($points); $i++) {
+                $dLat = deg2rad($points[$i][0] - $points[$i - 1][0]);
+                $dLon = deg2rad($points[$i][1] - $points[$i - 1][1]);
+                $a = sin($dLat / 2) * sin($dLat / 2) +
+                     cos(deg2rad($points[$i - 1][0])) * cos(deg2rad($points[$i][0])) *
+                     sin($dLon / 2) * sin($dLon / 2);
+                $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+                $seg = 6371 * $c;
+                if ($seg >= 0.01) { // Filter stationary jitter below 10m
+                    $dist += $seg;
+                }
+            }
+            return round($dist, 2);
+        }
+
+        return (float) ($value ?? 0);
+    }
+
+    /**
      * Get location logs seamlessly: uses live raw logs if present,
      * or decoded polyline points if raw logs have been purged after checkout.
      */
@@ -115,7 +158,16 @@ class Attendance extends BaseModel
         if (!empty($this->route_polyline)) {
             $summary = is_array($this->route_summary) ? $this->route_summary : (json_decode($this->route_summary, true) ?: []);
             $times = $summary['waypoint_times'] ?? [];
-            return app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->decodePolyline($this->route_polyline, $times);
+            $decoded = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->decodePolyline($this->route_polyline, $times);
+            if (!empty($decoded)) {
+                return $decoded;
+            }
+        }
+
+        $summary = is_array($this->route_summary) ? $this->route_summary : (json_decode($this->route_summary, true) ?: []);
+        $lastKnown = $summary['last_known_location'] ?? ($summary['end_point'] ?? null);
+        if ($lastKnown && !empty($lastKnown['lat']) && !empty($lastKnown['lng'])) {
+            return [$lastKnown];
         }
 
         return [];

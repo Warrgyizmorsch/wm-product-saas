@@ -32,13 +32,23 @@ class NotificationService
         }
 
         $employee = Employee::where('user_id', $userId)->first();
+        if (!$employee && !empty($recipientUser->email)) {
+            $employee = Employee::where(function ($q) use ($recipientUser) {
+                $q->where('office_email', $recipientUser->email)
+                  ->orWhere('personal_email', $recipientUser->email);
+            })->first();
+            if ($employee && !$employee->user_id) {
+                $employee->user_id = $userId;
+                $employee->saveQuietly();
+            }
+        }
 
         try {
             $notification = Notification::create([
                 'tenant_id' => $recipientUser->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1) ?? 1,
-                'company_id' => $employee?->company_id,
+                'company_id' => $employee?->company_id ?? $recipientUser->company_id,
                 'business_unit_id' => $employee?->business_unit_id,
-                'branch_id' => $employee?->branch_id,
+                'branch_id' => $employee?->branch_id ?? $recipientUser->branch_id,
                 'user_id' => $userId,
                 'employee_id' => $employee?->id,
                 'module' => strtolower($module),
@@ -97,6 +107,37 @@ class NotificationService
     }
 
     /**
+     * Send notification to a specific user (supports User object, integer user_id, or named parameter userId).
+     */
+    public static function sendToUser(
+        User|int|null $user = null,
+        string $title = '',
+        string $message = '',
+        ?string $actionUrl = null,
+        string $module = 'hrms',
+        string $type = 'general',
+        string $iconClass = 'feather-bell',
+        ?array $extraData = null,
+        User|int|null $userId = null
+    ): ?Notification {
+        $target = $user ?? $userId;
+        if (!$target) {
+            return null;
+        }
+
+        return self::send(
+            user: $target,
+            title: $title,
+            message: $message,
+            actionUrl: $actionUrl,
+            module: $module,
+            type: $type,
+            iconClass: $iconClass,
+            extraData: $extraData
+        );
+    }
+
+    /**
      * Send notification to an Employee model instance or Employee ID.
      */
     public static function sendToEmployee(
@@ -116,6 +157,9 @@ class NotificationService
         }
 
         $employeeModel = $target instanceof Employee ? $target : Employee::find($target);
+        if (!$employeeModel && is_string($target)) {
+            $employeeModel = Employee::where('employee_id', $target)->first();
+        }
         if (!$employeeModel) {
             return null;
         }
@@ -228,7 +272,7 @@ class NotificationService
         ?array $extraData = null
     ): void {
         self::sendToRoles(
-            roles: ['HR', 'Admin', 'Super'],
+            roles: ['HR', 'Admin', 'Super', 'owner', 'tenant_owner', 'company_admin', 'director'],
             title: $title,
             message: $message,
             actionUrl: $actionUrl,

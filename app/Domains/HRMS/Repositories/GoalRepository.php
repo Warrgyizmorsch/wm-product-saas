@@ -338,6 +338,32 @@ class GoalRepository implements GoalRepositoryInterface
             'approved_by' => $user?->id,
             'approved_at' => now(),
         ]);
+
+        try {
+            if ($goal->employee_id) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $goal->employee_id,
+                    title: 'Goal Approved',
+                    message: "Your goal \"{$goal->title}\" has been approved and is now active.",
+                    actionUrl: route('hrms.goals.show', $goal->id),
+                    module: 'hrms',
+                    type: 'goal_approved',
+                    iconClass: 'feather-check-circle'
+                );
+
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.goal.approved', [
+                    'tenant_id'     => $goal->tenant_id,
+                    'employee_name' => $goal->employee?->full_name ?? 'Employee',
+                    'goal_title'    => $goal->title,
+                    'approved_by'   => $user?->name ?? 'Manager',
+                    'employee_id'   => $goal->employee_id,
+                    'user_id'       => $goal->employee?->user_id,
+                ], $goal);
+            }
+        } catch (\Throwable $e) {
+            // Silently skip if notification fails
+        }
+
         return $goal;
     }
 

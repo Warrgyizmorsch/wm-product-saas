@@ -46,14 +46,16 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             ->whereNull('check_out')
             ->where(function ($q) use ($shiftCutoff, $today) {
                 $q->where('check_in', '<', $shiftCutoff)
-                  ->orWhere('date', '<', Carbon::yesterday()->format('Y-m-d'));
+                  ->orWhere('date', '<', $today);
             })
             ->get();
 
         if ($pastMissingLogs->isNotEmpty()) {
             foreach ($pastMissingLogs as $pastLog) {
+                $statusChanged = false;
                 if ($pastLog->status !== 'missing_logs') {
                     $pastLog->update(['status' => 'missing_logs']);
+                    $statusChanged = true;
 
                     $pastMissingCount = Attendance::where('employee_id', $employeeId)
                         ->where('status', 'missing_logs')
@@ -61,6 +63,12 @@ class AttendanceRepository implements AttendanceRepositoryInterface
                         ->count();
 
                     $this->applyMissingLogsPenalty(Employee::find($employeeId), $pastLog->date->toDateString(), $pastMissingCount);
+                }
+
+                if ($statusChanged || empty($pastLog->route_summary)) {
+                    try {
+                        app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($pastLog, false);
+                    } catch (\Throwable $e) {}
                 }
             }
         }
@@ -517,9 +525,9 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
         $attendance->update($updateData);
 
-        // Consolidate location tracking route into polyline and calculate distance, purge raw logs
+        // Consolidate location tracking route into polyline and calculate distance (raw logs retained until payroll runs)
         try {
-            app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendance);
+            app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendance, false);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("Route consolidation skipped for Attendance #{$attendance->id}: " . $e->getMessage());
         }

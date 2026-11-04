@@ -211,6 +211,18 @@ class BroadcastService
             ->whereNull('delivered_at')
             ->update(['delivered_at' => Carbon::now()]);
 
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.broadcast.published', [
+                'tenant_id'    => $broadcast->tenant_id,
+                'broadcast_no' => 'BC-' . str_pad($broadcast->id, 4, '0', STR_PAD_LEFT),
+                'title'        => $broadcast->title,
+                'priority'     => ucfirst($broadcast->priority),
+                'published_by' => auth()->user()?->name ?? 'HR Management',
+            ], $broadcast);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed for broadcast: " . $e->getMessage());
+        }
+
         if (!empty($broadcast->send_email)) {
             $this->dispatchBroadcastEmails($broadcast);
         }

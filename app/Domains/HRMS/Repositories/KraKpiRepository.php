@@ -553,6 +553,33 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $plan->submitted_at = Carbon::now();
         $plan->save();
 
+        try {
+            $plan->loadMissing(['employee', 'manager', 'employee.reportingManager', 'appraisalCycle']);
+            $mgr = $plan->manager ?? $plan->employee?->reportingManager;
+            if ($mgr) {
+                NotificationService::sendToEmployee(
+                    employee: $mgr,
+                    title: 'KPI Goals Submitted for Approval',
+                    message: "{$plan->employee?->full_name} submitted their KPI scorecard for {$plan->appraisalCycle?->name} for your approval.",
+                    actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                    module: 'hrms',
+                    type: 'performance',
+                    iconClass: 'feather-target'
+                );
+            }
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.kra_kpi.submitted', [
+                'tenant_id'     => $plan->tenant_id,
+                'employee_name' => $plan->employee?->full_name ?? 'Employee',
+                'cycle_name'    => $plan->appraisalCycle?->name ?? 'Cycle',
+                'items_count'   => (string) $plan->items()->count(),
+                'employee_id'   => $plan->employee_id,
+                'user_id'       => $plan->employee?->user_id,
+            ], $plan);
+        } catch (\Throwable $e) {
+            // Silently skip if notification fails
+        }
+
         return $plan;
     }
 
@@ -584,6 +611,32 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $plan->status = 'approved';
         $plan->approved_at = Carbon::now();
         $plan->save();
+
+        try {
+            $plan->loadMissing(['employee', 'appraisalCycle']);
+            if ($plan->employee_id) {
+                NotificationService::sendToEmployee(
+                    employee: $plan->employee_id,
+                    title: 'KPI Goals Approved',
+                    message: "Your KPI scorecard for {$plan->appraisalCycle?->name} has been approved by your manager.",
+                    actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                    module: 'hrms',
+                    type: 'performance',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.kra_kpi.approved', [
+                'tenant_id'     => $plan->tenant_id,
+                'employee_name' => $plan->employee?->full_name ?? 'Employee',
+                'cycle_name'    => $plan->appraisalCycle?->name ?? 'Cycle',
+                'approved_by'   => auth()->user()?->name ?? 'Manager',
+                'employee_id'   => $plan->employee_id,
+                'user_id'       => $plan->employee?->user_id,
+            ], $plan);
+        } catch (\Throwable $e) {
+            // Silently skip if notification fails
+        }
 
         return $plan;
     }

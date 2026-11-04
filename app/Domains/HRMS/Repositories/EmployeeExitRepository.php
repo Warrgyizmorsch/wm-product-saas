@@ -20,7 +20,9 @@ use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
 use Carbon\Carbon;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 {
@@ -114,6 +116,14 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
 
         $exits = $exitsQuery->paginate(15)->appends($inputs);
 
+        // Ensure active exits have clearance checklist items generated from Offboarding Policies
+        foreach ($exits as $exitItem) {
+            if ($exitItem->status !== 'rejected' && $exitItem->clearances->isEmpty()) {
+                $this->clearanceService->generateClearancesForExit($exitItem, $tenantId);
+                $exitItem->load('clearances.clearedByUser');
+            }
+        }
+
         $employees = Employee::where('tenant_id', $tenantId)->where('status', true)->orderBy('full_name')->get();
         $companies = Company::where('tenant_id', $tenantId)->get();
         $departments = Department::where('status', true)->get();
@@ -151,6 +161,11 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             'documents.generatedByUser'
         ])->where('tenant_id', $tenantId)->findOrFail($id);
 
+        if ($exit->status !== 'rejected' && $exit->clearances->isEmpty()) {
+            $this->clearanceService->generateClearancesForExit($exit, $tenantId);
+            $exit->load('clearances.clearedByUser');
+        }
+
         $computedFnF = $this->fnfService->calculateFnF($exit);
         $departments = Department::where('status', true)->get();
 
@@ -176,12 +191,32 @@ class EmployeeExitRepository implements EmployeeExitRepositoryInterface
             $validated['approved_at'] = now();
         }
 
+        // Auto-heal missing feedback_text column or fallback gracefully to prevent SQLSTATE[42S22]
+        if (!Schema::hasColumn('employee_exits', 'feedback_text')) {
+            try {
+                Schema::table('employee_exits', function (Blueprint $table) {
+                    $table->text('feedback_text')->nullable()->after('reason_details');
+                });
+            } catch (\Throwable $e) {
+                if (isset($validated['feedback_text'])) {
+                    if (Schema::hasColumn('employee_exits', 'exit_interview_notes')) {
+                        $validated['exit_interview_notes'] = $validated['feedback_text'];
+                    } elseif (!empty($validated['feedback_text'])) {
+                        $validated['reason_details'] = trim(($validated['reason_details'] ?? '') . "\n\nExit Feedback: " . $validated['feedback_text']);
+                    }
+                    unset($validated['feedback_text']);
+                }
+            }
+        }
+
         $exit = EmployeeExit::create($validated);
 
+        // Always initialize clearance checklist from Offboarding Policies upon exit creation
+        $this->clearanceService->generateClearancesForExit($exit, $tenantId);
+        $computedFnF = $this->fnfService->calculateFnF($exit);
+        $this->fnfService->saveSettlement($exit, $computedFnF);
+
         if ($exit->status === 'in_clearance') {
-            $this->clearanceService->generateClearancesForExit($exit, $tenantId);
-            $computedFnF = $this->fnfService->calculateFnF($exit);
-            $this->fnfService->saveSettlement($exit, $computedFnF);
             $employee->update(['employee_stage' => 'Notice Period']);
         }
 

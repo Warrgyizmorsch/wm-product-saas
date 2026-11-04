@@ -311,7 +311,7 @@
                                 @php
                                     $dStr = $dateItem->date->format('Y-m-d');
                                     $dayStats = $statsByDate->get($dStr, []);
-                                    $presentCount = $dayStats['present'] ?? 0;
+                                    $presentCount = ($dayStats['present'] ?? 0) + ($dayStats['wfh'] ?? 0) + ($dayStats['onsite'] ?? 0) + ($dayStats['missing_logs'] ?? 0);
                                     $lateCount = $dayStats['late'] ?? 0;
                                     $wfhCount = $dayStats['wfh'] ?? 0;
                                     $halfDayCount = $dayStats['half_day'] ?? 0;
@@ -653,7 +653,9 @@
                 if (filterStatus !== 'all') {
                     logs = logs.filter(log => {
                         if (filterStatus === 'present') {
-                            return log.status_raw === 'present';
+                            return ['present', 'wfh', 'onsite'].includes(log.status_raw) ||
+                                   (log.status_raw === 'missing_logs' && log.check_in && log.check_in !== '-') ||
+                                   (['office', 'wfh', 'onsite', 'on-site', 'site'].includes((log.location_type || '').toLowerCase()) && ['present', 'wfh', 'onsite'].includes(log.status_raw));
                         }
                         if (filterStatus === 'late') {
                             return log.status_raw === 'late';
@@ -718,6 +720,28 @@
                         `;
                         
                         // Collapsible details row
+                        const isMissingCheckout = (log.status_raw === 'missing_logs') || !log.check_out || log.check_out === '-' || log.check_out.trim() === '';
+                        const locLogs = Array.isArray(log.location_logs) ? log.location_logs : [];
+                        const lastLogPoint = (locLogs.length > 0 ? locLogs[locLogs.length - 1] : null)
+                            || log.last_known_location 
+                            || (log.route_summary && (log.route_summary.last_known_location || log.route_summary.end_point) ? (log.route_summary.last_known_location || log.route_summary.end_point) : null);
+
+                        let checkoutTimeHtml = `<span class="fw-semibold text-dark fs-12">${log.check_out}</span>`;
+                        let checkoutCoordsHtml = `<span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>`;
+                        let checkoutSelfieHtml = log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`;
+
+                        if (isMissingCheckout) {
+                            checkoutTimeHtml = `<span class="badge bg-soft-warning text-warning border border-warning px-2 py-0.5 rounded-pill fs-11 fw-bold">Missed Check-Out</span>`;
+                            if (lastLogPoint && lastLogPoint.lat && lastLogPoint.lng) {
+                                checkoutCoordsHtml = `<span class="text-dark fs-11 d-block mt-1 fw-semibold"><i class="feather-map-pin text-warning me-1"></i>Last Tracked: ${lastLogPoint.time || ''}</span><span class="text-muted fs-10 d-block mt-0.5">Lat: ${parseFloat(lastLogPoint.lat).toFixed(6)}, Lng: ${parseFloat(lastLogPoint.lng).toFixed(6)}</span>`;
+                            } else if (log.check_in_latitude) {
+                                checkoutCoordsHtml = `<span class="text-muted fs-10 d-block mt-1"><i class="feather-info me-1"></i>Last known at Check-In point</span>`;
+                            } else {
+                                checkoutCoordsHtml = `<span class="text-muted fs-10 d-block mt-0.5">No check-out punch recorded</span>`;
+                            }
+                            checkoutSelfieHtml = `<span class="text-muted fs-10 text-center"><i class="feather-alert-circle text-warning d-block mb-0.5 fs-14"></i> Unpunched</span>`;
+                        }
+
                         const detailsTr = document.createElement('tr');
                         detailsTr.id = `details-row-${log.id}`;
                         detailsTr.className = 'attendance-details-row d-none bg-light';
@@ -758,13 +782,13 @@
                                                    </div>
                                                    <div class="mb-2">
                                                         <span class="text-muted fs-10 d-block">${@json(__('hrms.attendance.time_coordinates'))}</span>
-                                                        <span class="fw-semibold text-dark fs-12">${log.check_out}</span>
-                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>
+                                                        ${checkoutTimeHtml}
+                                                        ${checkoutCoordsHtml}
                                                    </div>
                                                    <div>
                                                         <span class="text-muted fs-10 d-block mb-1">${@json(__('hrms.attendance.selfie'))}</span>
                                                         <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
-                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`}
+                                                            ${checkoutSelfieHtml}
                                                         </div>
                                                    </div>
                                               </div>
@@ -778,6 +802,11 @@
                                                     <i class="feather-map-pin text-primary"></i> ${@json(__('hrms.attendance.location_map'))}
                                                </span>
                                                <div class="d-flex align-items-center gap-1">
+                                                    ${log.route_summary && log.route_summary.has_tracking_gaps && log.route_summary.total_untracked_minutes > 0 ? `
+                                                        <span class="badge bg-soft-warning text-warning border px-2 py-0.5 rounded-pill fs-11 fw-semibold" title="Telemetry Gap Detected">
+                                                            <i class="feather-alert-triangle fs-11 me-1"></i>${log.route_summary.total_untracked_minutes}m Untracked
+                                                        </span>
+                                                    ` : ''}
                                                     ${log.total_distance_km > 0 ? `
                                                         <span class="badge bg-soft-primary text-primary border px-2 py-0.5 rounded-pill fs-11 fw-semibold">
                                                             <i class="feather-navigation fs-11 me-1"></i>${parseFloat(log.total_distance_km).toFixed(2)} KM
@@ -888,7 +917,9 @@
                 if (filterStatus !== 'all') {
                     logs = logs.filter(log => {
                         if (filterStatus === 'present') {
-                            return log.status_raw === 'present';
+                            return ['present', 'wfh', 'onsite'].includes(log.status_raw) ||
+                                   (log.status_raw === 'missing_logs' && log.check_in && log.check_in !== '-') ||
+                                   (['office', 'wfh', 'onsite', 'on-site', 'site'].includes((log.location_type || '').toLowerCase()) && ['present', 'wfh', 'onsite'].includes(log.status_raw));
                         }
                         if (filterStatus === 'late') {
                             return log.status_raw === 'late';
@@ -968,6 +999,28 @@
                         `;
                         
                         // Collapsible details row
+                        const isMissingDailyCheckout = (log.status_raw === 'missing_logs') || !log.check_out || log.check_out === '-' || log.check_out.trim() === '';
+                        const dailyLocLogs = Array.isArray(log.location_logs) ? log.location_logs : [];
+                        const lastDailyLogPoint = (dailyLocLogs.length > 0 ? dailyLocLogs[dailyLocLogs.length - 1] : null)
+                            || log.last_known_location 
+                            || (log.route_summary && (log.route_summary.last_known_location || log.route_summary.end_point) ? (log.route_summary.last_known_location || log.route_summary.end_point) : null);
+
+                        let dailyCheckoutTimeHtml = `<span class="fw-semibold text-dark fs-12">${log.check_out}</span>`;
+                        let dailyCheckoutCoordsHtml = `<span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>`;
+                        let dailyCheckoutSelfieHtml = log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`;
+
+                        if (isMissingDailyCheckout) {
+                            dailyCheckoutTimeHtml = `<span class="badge bg-soft-warning text-warning border border-warning px-2 py-0.5 rounded-pill fs-11 fw-bold">Missed Check-Out</span>`;
+                            if (lastDailyLogPoint && lastDailyLogPoint.lat && lastDailyLogPoint.lng) {
+                                dailyCheckoutCoordsHtml = `<span class="text-dark fs-11 d-block mt-1 fw-semibold"><i class="feather-map-pin text-warning me-1"></i>Last Tracked: ${lastDailyLogPoint.time || ''}</span><span class="text-muted fs-10 d-block mt-0.5">Lat: ${parseFloat(lastDailyLogPoint.lat).toFixed(6)}, Lng: ${parseFloat(lastDailyLogPoint.lng).toFixed(6)}</span>`;
+                            } else if (log.check_in_latitude) {
+                                dailyCheckoutCoordsHtml = `<span class="text-muted fs-10 d-block mt-1"><i class="feather-info me-1"></i>Last known at Check-In point</span>`;
+                            } else {
+                                dailyCheckoutCoordsHtml = `<span class="text-muted fs-10 d-block mt-0.5">No check-out punch recorded</span>`;
+                            }
+                            dailyCheckoutSelfieHtml = `<span class="text-muted fs-10 text-center"><i class="feather-alert-circle text-warning d-block mb-0.5 fs-14"></i> Unpunched</span>`;
+                        }
+
                         const detailsTr = document.createElement('tr');
                         detailsTr.id = `details-row-${log.id}`;
                         detailsTr.className = 'attendance-details-row d-none bg-light';
@@ -1015,13 +1068,13 @@
                                                    </div>
                                                    <div class="mb-2">
                                                         <span class="text-muted fs-10 d-block">${@json(__('hrms.attendance.time_coordinates'))}</span>
-                                                        <span class="fw-semibold text-dark fs-12">${log.check_out}</span>
-                                                        <span class="text-muted fs-10 d-block mt-0.5">${log.check_out_latitude ? 'Lat: ' + parseFloat(log.check_out_latitude).toFixed(6) + ', Lng: ' + parseFloat(log.check_out_longitude).toFixed(6) : @json(__('hrms.attendance.no_coordinates'))}</span>
+                                                        ${dailyCheckoutTimeHtml}
+                                                        ${dailyCheckoutCoordsHtml}
                                                    </div>
                                                    <div>
                                                         <span class="text-muted fs-10 d-block mb-1">${@json(__('hrms.attendance.selfie'))}</span>
                                                         <div class="bg-light border border-dashed rounded p-1.5 d-flex align-items-center justify-content-center" style="height: 80px;">
-                                                            ${log.check_out_selfie_url ? `<img src="${log.check_out_selfie_url}" class="rounded border shadow-sm" style="max-height: 70px; max-width: 100%; object-fit: contain;">` : `<span class="text-muted fs-10 text-center"><i class="feather-image d-block mb-0.5 fs-12"></i> -</span>`}
+                                                            ${dailyCheckoutSelfieHtml}
                                                         </div>
                                                    </div>
                                               </div>
@@ -1035,6 +1088,11 @@
                                                     <i class="feather-map-pin text-primary"></i> ${@json(__('hrms.attendance.location_map'))}
                                                </span>
                                                <div class="d-flex align-items-center gap-1">
+                                                    ${log.route_summary && log.route_summary.has_tracking_gaps && log.route_summary.total_untracked_minutes > 0 ? `
+                                                        <span class="badge bg-soft-warning text-warning border px-2 py-0.5 rounded-pill fs-11 fw-semibold" title="Telemetry Gap Detected">
+                                                            <i class="feather-alert-triangle fs-11 me-1"></i>${log.route_summary.total_untracked_minutes}m Untracked
+                                                        </span>
+                                                    ` : ''}
                                                     ${log.total_distance_km > 0 ? `
                                                         <span class="badge bg-soft-primary text-primary border px-2 py-0.5 rounded-pill fs-11 fw-semibold">
                                                             <i class="feather-navigation fs-11 me-1"></i>${parseFloat(log.total_distance_km).toFixed(2)} KM
@@ -1116,6 +1174,34 @@
         }
     }
 
+    function decodeGooglePolyline(encoded) {
+        if (!encoded) return [];
+        var points = [];
+        var index = 0, len = encoded.length;
+        var lat = 0, lng = 0;
+        while (index < len) {
+            var b, shift = 0, result = 0;
+            do {
+                b = encoded.charCodeAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            var dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charCodeAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            var dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+            points.push([lat / 1e5, lng / 1e5]);
+        }
+        return points;
+    }
+
     window.activeRowMaps = window.activeRowMaps || {};
 
     // Initialize Leaflet Map or display App Route Snapshot for a specific details row
@@ -1148,12 +1234,15 @@
         const checkoutLat = parseFloat(log.check_out_latitude);
         const checkoutLng = parseFloat(log.check_out_longitude);
         const locationLogs = Array.isArray(log.location_logs) ? log.location_logs : [];
+        const lastKnownLoc = log.last_known_location 
+            || (log.route_summary && (log.route_summary.last_known_location || log.route_summary.end_point) ? (log.route_summary.last_known_location || log.route_summary.end_point) : null);
         
         const hasCheckin = !isNaN(checkinLat) && !isNaN(checkinLng) && checkinLat !== 0 && checkinLng !== 0;
         const hasCheckout = !isNaN(checkoutLat) && !isNaN(checkoutLng) && checkoutLat !== 0 && checkoutLng !== 0;
         const hasLogs = locationLogs.length > 0;
+        const hasLastKnown = !!(lastKnownLoc && !isNaN(parseFloat(lastKnownLoc.lat)) && !isNaN(parseFloat(lastKnownLoc.lng)));
         
-        if (!hasCheckin && !hasCheckout && !hasLogs) {
+        if (!hasCheckin && !hasCheckout && !hasLogs && !hasLastKnown) {
             if (mapWrap) mapWrap.style.display = 'none';
             if (mapNone) mapNone.style.display = 'block';
             return;
@@ -1185,7 +1274,7 @@
         mapEl.innerHTML = '';
         
         // Base center
-        const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : (hasCheckout ? [checkoutLat, checkoutLng] : [20.5937, 78.9629]);
+        const defaultCenter = hasCheckin ? [checkinLat, checkinLng] : (hasCheckout ? [checkoutLat, checkoutLng] : (hasLastKnown ? [parseFloat(lastKnownLoc.lat), parseFloat(lastKnownLoc.lng)] : [20.5937, 78.9629]));
         
         const map = L.map(mapEl, {
             zoomControl: true,
@@ -1201,6 +1290,14 @@
         window.activeRowMaps[logId] = map;
         
         const pathLatLngs = [];
+
+        // If raw location logs were purged (post-payroll release), decode polyline to reconstruct route!
+        if (!hasLogs && log.route_polyline && typeof decodeGooglePolyline === 'function') {
+            const decodedPoints = decodeGooglePolyline(log.route_polyline);
+            if (Array.isArray(decodedPoints) && decodedPoints.length > 0) {
+                decodedPoints.forEach(pt => pathLatLngs.push(pt));
+            }
+        }
         
         const isSameSpot = hasCheckin && hasCheckout &&
             (Math.abs(checkinLat - checkoutLat) < 0.00035) &&
@@ -1250,7 +1347,7 @@
             });
         }
         
-        // 3. Add Check-Out Marker (Red)
+        // 3. Add Check-Out Marker (Red) or Last Known Location Marker (Amber)
         if (hasCheckout) {
             const checkoutLatLng = [checkoutLat, checkoutLng];
             pathLatLngs.push(checkoutLatLng);
@@ -1258,6 +1355,28 @@
             L.marker(checkoutLatLng, { icon: redIcon, title: 'Check Out Point', zIndexOffset: 500 })
                 .addTo(map)
                 .bindPopup(`<b>Check Out Point</b><br>Lat: ${checkoutLat.toFixed(6)}<br>Lng: ${checkoutLng.toFixed(6)}`);
+        } else if (hasLogs || hasLastKnown) {
+            // Check-out was missed: Place Amber Marker at the last known tracking point
+            const lastLog = hasLogs ? locationLogs[locationLogs.length - 1] : lastKnownLoc;
+            if (lastLog && lastLog.lat && lastLog.lng) {
+                const lastLatLng = [parseFloat(lastLog.lat), parseFloat(lastLog.lng)];
+                if (pathLatLngs.length === 0 || (pathLatLngs.length === 1 && hasCheckin)) {
+                    pathLatLngs.push(lastLatLng);
+                }
+                const lastSpotIsCheckin = hasCheckin && (Math.abs(checkinLat - lastLatLng[0]) < 0.00035) && (Math.abs(checkinLng - lastLatLng[1]) < 0.00035);
+
+                const amberIcon = L.divIcon({
+                    className: 'custom-attendance-pin',
+                    html: `<div style="background-color: #f59e0b; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; border: 2.5px solid #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-weight: bold;"><i class="feather-map-pin" style="font-size: 13px;"></i></div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: lastSpotIsCheckin ? [-2, 14] : [14, 14],
+                    popupAnchor: lastSpotIsCheckin ? [16, -14] : [0, -14]
+                });
+
+                L.marker(lastLatLng, { icon: amberIcon, title: 'Last Known Location', zIndexOffset: 700 })
+                    .addTo(map)
+                    .bindPopup(`<b>Last Tracked Location</b><br>Time: ${lastLog.time || ''}<br>Lat: ${lastLatLng[0].toFixed(6)}<br>Lng: ${lastLatLng[1].toFixed(6)}<br><span class="badge bg-warning text-dark mt-1">Check-Out Missed</span>`);
+            }
         }
         
         // 4. Indigo Path Connecting Line

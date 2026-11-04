@@ -1,7 +1,7 @@
 @extends('layouts.duralux')
 
-@section('title', __('hrms.pip.meta_workspace_title', ['number' => $pip->pip_number]))
-@section('page-title', __('hrms.pip.workspace_title', ['number' => $pip->pip_number]))
+@section('title', __('hrms.pip.meta_workspace_title', ['number' => $pip->pip_number, 'pip' => $pip->pip_number]))
+@section('page-title', __('hrms.pip.workspace_title', ['number' => $pip->pip_number, 'pip' => $pip->pip_number]))
 @section('breadcrumb', __('hrms.pip.breadcrumb_workspace'))
 
 @section('page-actions')

@@ -270,12 +270,15 @@ class LeaveRequestController extends Controller
 
         try {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.applied', [
+                'tenant_id'     => $employee->tenant_id,
                 'employee_name' => $employee->full_name,
                 'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
                 'from_date'     => $startDate->format('d M Y'),
                 'to_date'       => $endDate->format('d M Y'),
                 'days'          => (string) $duration,
-            ]);
+                'employee_id'   => $employee->id,
+                'user_id'       => $employee->user_id,
+            ], $leaveRequest);
 
             $unitDisplay = $isHourly ? 'hour(s)' : 'day(s)';
 
@@ -361,22 +364,28 @@ class LeaveRequestController extends Controller
         try {
             if ($validated['action'] === 'approved') {
                 \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.approved', [
+                    'tenant_id'     => $leaveRequest->tenant_id,
                     'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
                     'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
                     'from_date'     => $startFormatted,
                     'to_date'       => $endFormatted,
                     'days'          => (string) ($leaveRequest->duration ?? 1),
                     'approved_by'   => auth()->user()?->name ?? 'Manager',
-                ]);
+                    'employee_id'   => $leaveRequest->employee_id,
+                    'user_id'       => $leaveRequest->employee?->user_id,
+                ], $leaveRequest);
             } elseif ($validated['action'] === 'rejected') {
                 \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.leave.rejected', [
+                    'tenant_id'     => $leaveRequest->tenant_id,
                     'employee_name' => $leaveRequest->employee?->full_name ?? 'Employee',
                     'leave_type'    => $leaveRequest->leaveType?->name ?? 'Leave',
                     'from_date'     => $startFormatted,
                     'to_date'       => $endFormatted,
                     'reason'        => $validated['rejection_reason'] ?? 'Not specified',
                     'rejected_by'   => auth()->user()?->name ?? 'Manager',
-                ]);
+                    'employee_id'   => $leaveRequest->employee_id,
+                    'user_id'       => $leaveRequest->employee?->user_id,
+                ], $leaveRequest);
             }
 
             // Send Status Notification to Employee
@@ -484,6 +493,31 @@ class LeaveRequestController extends Controller
             'cancellation_reason' => $validated['cancellation_reason'],
         ]);
 
+        try {
+            $leaveRequest->loadMissing(['employee.reportingManager', 'leaveType']);
+            $empName = $leaveRequest->employee?->full_name ?: 'Employee';
+            $leaveName = $leaveRequest->leaveType?->name ?: 'Leave';
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Leave Cancellation Requested',
+                message: "{$empName} requested cancellation for {$leaveName} ({$leaveRequest->start_date} to {$leaveRequest->end_date}).",
+                actionUrl: route('hrms.leaves.index'),
+                type: 'leave_cancellation_requested',
+                iconClass: 'feather-alert-circle'
+            );
+            if ($leaveRequest->employee?->reportingManager) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $leaveRequest->employee->reportingManager,
+                    title: 'Leave Cancellation Requested',
+                    message: "{$empName} requested cancellation for {$leaveName} ({$leaveRequest->start_date} to {$leaveRequest->end_date}).",
+                    actionUrl: route('hrms.leaves.index'),
+                    type: 'leave_cancellation_requested',
+                    iconClass: 'feather-alert-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Leave cancellation notification failed: ' . $e->getMessage());
+        }
+
         return redirect()->back()->with('success', __('hrms.leave.app.cancellation_submitted'));
     }
 
@@ -502,6 +536,22 @@ class LeaveRequestController extends Controller
 
         // Cancel and restore the leave balance
         $this->leaveRequestRepository->cancelLeaveRequest($leaveRequest);
+
+        try {
+            $leaveRequest->loadMissing('employee');
+            if ($leaveRequest->employee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $leaveRequest->employee,
+                    title: 'Leave Cancellation Approved',
+                    message: "Your leave cancellation request ({$leaveRequest->start_date} to {$leaveRequest->end_date}) has been approved and leave balance restored.",
+                    actionUrl: route('hrms.leaves.index'),
+                    type: 'leave_cancellation_approved',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Leave cancellation approval notification failed: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', __('hrms.leave.app.cancellation_approved_restored'));
     }
@@ -523,6 +573,22 @@ class LeaveRequestController extends Controller
             'status'              => 'approved',
             'cancellation_reason' => null,
         ]);
+
+        try {
+            $leaveRequest->loadMissing('employee');
+            if ($leaveRequest->employee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $leaveRequest->employee,
+                    title: 'Leave Cancellation Denied',
+                    message: "Your leave cancellation request ({$leaveRequest->start_date} to {$leaveRequest->end_date}) was denied. The leave remains approved.",
+                    actionUrl: route('hrms.leaves.index'),
+                    type: 'leave_cancellation_denied',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Leave cancellation deny notification failed: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', __('hrms.leave.app.cancellation_denied'));
     }

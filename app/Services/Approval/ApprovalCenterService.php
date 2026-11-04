@@ -8,9 +8,11 @@ use App\Domains\HRMS\Models\AttendanceCorrection;
 use App\Domains\HRMS\Models\CashAdvance;
 use App\Domains\HRMS\Models\Document;
 use App\Domains\HRMS\Models\EmployeeExit;
+use App\Domains\HRMS\Models\EmployeeGoalPlan;
 use App\Domains\HRMS\Models\EmployeeProfileUpdateRequest;
 use App\Domains\HRMS\Models\ExpenseReport;
 use App\Domains\HRMS\Models\Feedback360Nomination;
+use App\Domains\HRMS\Models\Goal;
 use App\Domains\HRMS\Models\JobRequisition;
 use App\Domains\HRMS\Models\LeaveEncashment;
 use App\Domains\HRMS\Models\LeaveRequest;
@@ -243,24 +245,47 @@ class ApprovalCenterService
         // 2. HRMS Module Approvals
         // ==========================================
         if ($isHrmsEnabled && $this->canApproveHrms($user)) {
-            $isHrAdmin = $user->role === 'admin' || (method_exists($user, 'hasHrPermission') && $user->hasHrPermission('hr.settings.manage'));
-            $canApproveLeave = $isHrAdmin || $this->hasPermission($user, 'hrms.leave.approve') || $this->hasPermission($user, 'hrms.leaves.manage') || $this->hasPermission($user, 'hrms.leave_requests.approve') || $this->hasPermission($user, 'hrms.leave_encashments.approve');
-            $canApproveWfh = $isHrAdmin || $this->hasPermission($user, 'hrms.wfh_requests.approve') || $this->hasPermission($user, 'hrms.wfh_requests.manage') || $this->hasPermission($user, 'hrms.wfh.approve') || $this->hasPermission($user, 'hrms.leaves.manage');
-            $canApproveOvertime = $isHrAdmin || $this->hasPermission($user, 'hrms.overtime.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
-            $canApproveShift = $isHrAdmin || $this->hasPermission($user, 'hrms.shift.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
-            $canApproveAttendance = $isHrAdmin || $this->hasPermission($user, 'hrms.attendance.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
-            $canApproveExpense = $isHrAdmin || $this->hasPermission($user, 'hrms.travel_expenses.approve');
+            $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+            $isHrAdmin = $user->role === 'admin'
+                || (bool) ($user->is_super_admin ?? false)
+                || $user->role === 'super_admin'
+                || $scopeService->isCompanyAdmin($user)
+                || (method_exists($user, 'hasHrPermission') && $user->hasHrPermission('hr.settings.manage'));
+
+            $scopeSummary = $scopeService->getScopeSummary($user);
+            $isManagerOrLead = !empty($scopeSummary['is_reporting_manager'])
+                || !empty($scopeSummary['department_ids'])
+                || !empty($scopeSummary['branch_ids'])
+                || !empty($scopeSummary['business_unit_ids']);
+
+            $canApproveLeave = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.leave.approve') || $this->hasPermission($user, 'hrms.leaves.manage') || $this->hasPermission($user, 'hrms.leave_requests.approve') || $this->hasPermission($user, 'hrms.leave_encashments.approve');
+            $canApproveWfh = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.wfh_requests.approve') || $this->hasPermission($user, 'hrms.wfh_requests.manage') || $this->hasPermission($user, 'hrms.wfh.approve') || $this->hasPermission($user, 'hrms.leaves.manage');
+            $canApproveOvertime = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.overtime.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
+            $canApproveShift = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.shift.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
+            $canApproveAttendance = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.attendance.approve') || $this->hasPermission($user, 'hrms.attendance.manage');
+            $canApproveExpense = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.travel_expenses.approve');
             $canApproveAsset = $isHrAdmin || $this->hasPermission($user, 'hrms.assets.allocate') || $this->hasPermission($user, 'hrms.assets.manage');
-            $canApproveExit = $isHrAdmin || $this->hasPermission($user, 'hrms.exits.approve') || $this->hasPermission($user, 'hrms.employees.update');
-            $canApprovePip = $isHrAdmin || $this->hasPermission($user, 'hrms.pip.evaluate') || $this->hasPermission($user, 'hrms.employees.update');
+            $canApproveExit = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.exits.approve') || $this->hasPermission($user, 'hrms.employees.update');
+            $canApprovePip = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.pip.evaluate') || $this->hasPermission($user, 'hrms.employees.update');
             $canApproveDoc = $isHrAdmin || $this->hasPermission($user, 'hrms.documents.approve') || $this->hasPermission($user, 'hrms.employees.update');
             $canApproveProfileRequest = $isHrAdmin || $this->hasPermission($user, 'hrms.employees.update');
             $canApproveRecruitment = $isHrAdmin || $this->hasPermission($user, 'hrms.recruitment.manage') || $this->hasPermission($user, 'hrms.recruitment.approve') || $this->hasPermission($user, 'hrms.employees.update');
-            $canApproveFeedback360 = $isHrAdmin || $this->hasPermission($user, 'hrms.performance.manage') || $this->hasPermission($user, 'hrms.feedback_360.manage') || $this->hasPermission($user, 'hrms.employees.update');
+            $canApproveFeedback360 = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.performance.manage') || $this->hasPermission($user, 'hrms.feedback_360.manage') || $this->hasPermission($user, 'hrms.employees.update');
+
+            $applyEmpScope = function ($query, string $empCol = 'employee_id') use ($scopeService, $user, $isHrAdmin) {
+                if (!$isHrAdmin) {
+                    $scopeService->applyRelatedScope($query, $user, $empCol);
+                    $currentEmp = $scopeService->resolveEmployee($user);
+                    if ($currentEmp) {
+                        $query->where($empCol, '!=', $currentEmp->id);
+                    }
+                }
+            };
 
             // Leave Requests
             if ($canApproveLeave) {
-                $leaveQuery = LeaveRequest::query()->where('status', 'pending');
+                $leaveQuery = LeaveRequest::query()->whereIn('status', ['pending', 'cancellation_requested']);
+                $applyEmpScope($leaveQuery);
                 $leaveCount = (clone $leaveQuery)->count();
                 $totalActionableCount += $leaveCount;
                 if ($leaveCount > 0) {
@@ -271,11 +296,12 @@ class ApprovalCenterService
                     foreach ($leaves as $leave) {
                         $empName = $leave->employee?->full_name ?: 'Employee';
                         $leaveTypeName = $leave->leaveType?->name ?: 'Leave';
+                        $isCancel = $leave->status === 'cancellation_requested';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Leave Request',
-                            'title' => "{$empName} - {$leaveTypeName}",
-                            'subtitle' => "{$leave->duration} day(s) requested",
+                            'title' => "{$empName} - {$leaveTypeName}" . ($isCancel ? ' (Cancellation)' : ''),
+                            'subtitle' => $isCancel ? 'Leave cancellation awaiting approval' : "{$leave->duration} day(s) requested",
                             'url' => Route::has('hrms.leaves.index') ? route('hrms.leaves.index') : url('/hrms/leaves'),
                             'icon' => 'feather-calendar',
                             'time' => $leave->created_at?->diffForHumans(),
@@ -287,7 +313,8 @@ class ApprovalCenterService
 
             // WFH Requests
             if ($canApproveWfh) {
-                $wfhQuery = WfhRequest::query()->where('status', 'pending');
+                $wfhQuery = WfhRequest::query()->whereIn('status', ['pending', 'cancellation_requested']);
+                $applyEmpScope($wfhQuery);
                 $wfhCount = (clone $wfhQuery)->count();
                 $totalActionableCount += $wfhCount;
                 if ($wfhCount > 0) {
@@ -297,11 +324,12 @@ class ApprovalCenterService
                         ->get();
                     foreach ($wfhs as $wfh) {
                         $empName = $wfh->employee?->full_name ?: 'Employee';
+                        $isCancel = $wfh->status === 'cancellation_requested';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'WFH Request',
-                            'title' => "{$empName} - WFH",
-                            'subtitle' => "{$wfh->duration} day(s) WFH requested",
+                            'title' => "{$empName} - WFH" . ($isCancel ? ' (Cancellation)' : ''),
+                            'subtitle' => $isCancel ? 'WFH cancellation awaiting approval' : "{$wfh->duration} day(s) WFH requested",
                             'url' => Route::has('hrms.wfh.index') ? route('hrms.wfh.index') : url('/hrms/wfh'),
                             'icon' => 'feather-home',
                             'time' => $wfh->created_at?->diffForHumans(),
@@ -313,7 +341,8 @@ class ApprovalCenterService
 
             // Overtime Requests
             if ($canApproveOvertime) {
-                $otQuery = OvertimeRequest::query()->where('status', 'pending');
+                $otQuery = OvertimeRequest::query()->whereIn('status', ['pending', 'cancellation_requested']);
+                $applyEmpScope($otQuery);
                 $otCount = (clone $otQuery)->count();
                 $totalActionableCount += $otCount;
                 if ($otCount > 0) {
@@ -323,12 +352,13 @@ class ApprovalCenterService
                         ->get();
                     foreach ($ots as $ot) {
                         $empName = $ot->employee?->full_name ?: 'Employee';
+                        $isCancel = $ot->status === 'cancellation_requested';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Overtime Request',
-                            'title' => "{$empName} - Overtime",
-                            'subtitle' => "{$ot->duration_hours} hr(s) Overtime requested",
-                            'url' => Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime'),
+                            'title' => "{$empName} - Overtime" . ($isCancel ? ' (Cancellation)' : ''),
+                            'subtitle' => $isCancel ? 'Overtime cancellation awaiting decision' : "{$ot->duration_hours} hr(s) Overtime requested",
+                            'url' => Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime'),
                             'icon' => 'feather-clock',
                             'time' => $ot->created_at?->diffForHumans(),
                             'created_at' => $ot->created_at?->toIso8601String(),
@@ -339,7 +369,8 @@ class ApprovalCenterService
 
             // Shift Change Requests
             if ($canApproveShift) {
-                $shiftQuery = ShiftChangeRequest::query()->where('status', 'pending');
+                $shiftQuery = ShiftChangeRequest::query()->whereIn('status', ['pending', 'cancellation_requested']);
+                $applyEmpScope($shiftQuery);
                 $shiftCount = (clone $shiftQuery)->count();
                 $totalActionableCount += $shiftCount;
                 if ($shiftCount > 0) {
@@ -349,12 +380,13 @@ class ApprovalCenterService
                         ->get();
                     foreach ($shifts as $shift) {
                         $empName = $shift->employee?->full_name ?: 'Employee';
+                        $isCancel = $shift->status === 'cancellation_requested';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Shift Change',
-                            'title' => "{$empName} - Shift Swap",
-                            'subtitle' => 'Shift change approval requested',
-                            'url' => Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index') : url('/hrms/shift-overtime'),
+                            'title' => "{$empName} - Shift Swap" . ($isCancel ? ' (Cancellation)' : ''),
+                            'subtitle' => $isCancel ? 'Shift change cancellation requested' : 'Shift change approval requested',
+                            'url' => Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'shift']) : url('/hrms/shift-overtime?tab=shift'),
                             'icon' => 'feather-repeat',
                             'time' => $shift->created_at?->diffForHumans(),
                             'created_at' => $shift->created_at?->toIso8601String(),
@@ -365,7 +397,8 @@ class ApprovalCenterService
 
             // Attendance Corrections
             if ($canApproveAttendance) {
-                $corrQuery = AttendanceCorrection::query()->where('status', 'pending');
+                $corrQuery = AttendanceCorrection::query()->whereIn('status', ['pending', 'cancellation_requested']);
+                $applyEmpScope($corrQuery);
                 $corrCount = (clone $corrQuery)->count();
                 $totalActionableCount += $corrCount;
                 if ($corrCount > 0) {
@@ -375,12 +408,13 @@ class ApprovalCenterService
                         ->get();
                     foreach ($corrs as $corr) {
                         $empName = $corr->employee?->full_name ?: 'Employee';
+                        $isCancel = $corr->status === 'cancellation_requested';
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Attendance Correction',
-                            'title' => "{$empName} - Attendance Punch",
-                            'subtitle' => 'Attendance correction approval requested',
-                            'url' => Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : url('/hrms/attendance'),
+                            'title' => "{$empName} - Attendance Punch" . ($isCancel ? ' (Cancellation)' : ''),
+                            'subtitle' => $isCancel ? 'Attendance correction cancellation requested' : 'Attendance correction approval requested',
+                            'url' => Route::has('hrms.attendance.index') ? route('hrms.attendance.index', ['view' => 'corrections']) : url('/hrms/attendance?view=corrections'),
                             'icon' => 'feather-check-circle',
                             'time' => $corr->created_at?->diffForHumans(),
                             'created_at' => $corr->created_at?->toIso8601String(),
@@ -392,6 +426,7 @@ class ApprovalCenterService
             // Expense Reports
             if ($canApproveExpense) {
                 $expQuery = ExpenseReport::query()->whereIn('status', ['pending', 'submitted', 'l1_approved']);
+                $applyEmpScope($expQuery);
                 $expCount = (clone $expQuery)->count();
                 $totalActionableCount += $expCount;
                 if ($expCount > 0) {
@@ -408,7 +443,7 @@ class ApprovalCenterService
                             'type' => 'Expense Report',
                             'title' => (string) ($exp->title ?: "Expense #{$exp->id}") . $stageLabel,
                             'subtitle' => "{$empName} • Total: \${$amount}",
-                            'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index') : url('/hrms/travel-expense'),
+                            'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index', ['tab' => 'report']) : url('/hrms/travel-expense?tab=report'),
                             'icon' => 'feather-dollar-sign',
                             'time' => $exp->created_at?->diffForHumans(),
                             'created_at' => $exp->created_at?->toIso8601String(),
@@ -418,6 +453,7 @@ class ApprovalCenterService
 
                 // Travel Requests
                 $travelQuery = TravelRequest::query()->whereIn('status', ['pending', 'l1_approved']);
+                $applyEmpScope($travelQuery);
                 $travelCount = (clone $travelQuery)->count();
                 $totalActionableCount += $travelCount;
                 if ($travelCount > 0) {
@@ -433,7 +469,7 @@ class ApprovalCenterService
                             'type' => 'Travel Request',
                             'title' => "{$empName} - Travel{$stageLabel}",
                             'subtitle' => "Destination: {$travel->destination}",
-                            'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index') : url('/hrms/travel-expense'),
+                            'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index', ['tab' => 'travel']) : url('/hrms/travel-expense?tab=travel'),
                             'icon' => 'feather-briefcase',
                             'time' => $travel->created_at?->diffForHumans(),
                             'created_at' => $travel->created_at?->toIso8601String(),
@@ -443,6 +479,7 @@ class ApprovalCenterService
 
                 // Cash Advances
                 $advQuery = CashAdvance::query()->whereIn('status', ['pending', 'l1_approved']);
+                $applyEmpScope($advQuery);
                 $advCount = (clone $advQuery)->count();
                 $totalActionableCount += $advCount;
                 if ($advCount > 0) {
@@ -459,7 +496,7 @@ class ApprovalCenterService
                             'type' => 'Cash Advance',
                             'title' => "{$empName} - Cash Advance{$stageLabel}",
                             'subtitle' => "Amount: \${$amount}",
-                            'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index') : url('/hrms/travel-expense'),
+                            'url' => Route::has('hrms.travel-expense.index') ? route('hrms.travel-expense.index', ['tab' => 'advance']) : url('/hrms/travel-expense?tab=advance'),
                             'icon' => 'feather-credit-card',
                             'time' => $adv->created_at?->diffForHumans(),
                             'created_at' => $adv->created_at?->toIso8601String(),
@@ -471,6 +508,7 @@ class ApprovalCenterService
             // Asset Requests
             if ($canApproveAsset) {
                 $assetReqQuery = AssetRequest::query()->whereIn('status', ['pending', 'partially_allocated']);
+                $applyEmpScope($assetReqQuery);
                 $assetReqCount = (clone $assetReqQuery)->count();
                 $totalActionableCount += $assetReqCount;
                 if ($assetReqCount > 0) {
@@ -497,7 +535,8 @@ class ApprovalCenterService
 
             // Employee Exits
             if ($canApproveExit) {
-                $exitQuery = EmployeeExit::query()->where('status', 'pending');
+                $exitQuery = EmployeeExit::query()->whereIn('status', ['pending_manager', 'pending_hr', 'pending']);
+                $applyEmpScope($exitQuery);
                 $exitCount = (clone $exitQuery)->count();
                 $totalActionableCount += $exitCount;
                 if ($exitCount > 0) {
@@ -507,10 +546,11 @@ class ApprovalCenterService
                         ->get();
                     foreach ($exits as $exit) {
                         $empName = $exit->employee?->full_name ?: 'Employee';
+                        $stageLabel = $exit->status === 'pending_manager' ? ' (Manager Endorsement)' : ($exit->status === 'pending_hr' ? ' (HR Clearance)' : '');
                         $candidateItems[] = [
                             'module' => 'HRMS',
                             'type' => 'Employee Exit',
-                            'title' => "{$empName} - Exit Approval",
+                            'title' => "{$empName} - Exit Approval{$stageLabel}",
                             'subtitle' => 'Offboarding & exit clearance required',
                             'url' => Route::has('hrms.exits.index') ? route('hrms.exits.index') : url('/hrms/exits'),
                             'icon' => 'feather-user-minus',
@@ -524,6 +564,7 @@ class ApprovalCenterService
             // PIP Reviews
             if ($canApprovePip) {
                 $pipQuery = PerformanceImprovementPlan::query()->whereIn('status', ['pending', 'under_review']);
+                $applyEmpScope($pipQuery);
                 $pipCount = (clone $pipQuery)->count();
                 $totalActionableCount += $pipCount;
                 if ($pipCount > 0) {
@@ -575,6 +616,7 @@ class ApprovalCenterService
             // Leave Encashments
             if ($canApproveLeave && class_exists(LeaveEncashment::class)) {
                 $encashQuery = LeaveEncashment::query()->where('status', 'pending');
+                $applyEmpScope($encashQuery);
                 $encashCount = (clone $encashQuery)->count();
                 $totalActionableCount += $encashCount;
                 if ($encashCount > 0) {
@@ -603,6 +645,7 @@ class ApprovalCenterService
             // Employee Profile Update Requests
             if ($canApproveProfileRequest && class_exists(EmployeeProfileUpdateRequest::class)) {
                 $profileReqQuery = EmployeeProfileUpdateRequest::query()->where('status', 'pending');
+                $applyEmpScope($profileReqQuery);
                 $profileReqCount = (clone $profileReqQuery)->count();
                 $totalActionableCount += $profileReqCount;
                 if ($profileReqCount > 0) {
@@ -644,7 +687,7 @@ class ApprovalCenterService
                             'type' => 'Job Requisition',
                             'title' => (string) ($jReq->job_title ?: ($jReq->requisition_code ?: "Requisition #{$jReq->id}")),
                             'subtitle' => "{$deptPart}{$vacancies} vacancy(ies)",
-                            'url' => Route::has('hrms.requisitions.index') ? route('hrms.requisitions.index') : url('/hrms/requisitions'),
+                            'url' => Route::has('hrms.recruitment.requisitions.index') ? route('hrms.recruitment.requisitions.index') : (Route::has('hrms.requisitions.index') ? route('hrms.requisitions.index') : url('/hrms/recruitment/requisitions')),
                             'icon' => 'feather-user-plus',
                             'time' => $jReq->created_at?->diffForHumans(),
                             'created_at' => $jReq->created_at?->toIso8601String(),
@@ -671,11 +714,72 @@ class ApprovalCenterService
                             'type' => '360 Nomination',
                             'title' => "{$empName} - 360 Nomination",
                             'subtitle' => "Reviewer: {$reviewerName} • Approval required",
-                            'url' => Route::has('hrms.feedback-360.index') ? route('hrms.feedback-360.index') : url('/hrms/feedback-360'),
+                            'url' => Route::has('hrms.feedback360.index') ? route('hrms.feedback360.index') : (Route::has('hrms.feedback-360.index') ? route('hrms.feedback-360.index') : url('/hrms/feedback-360')),
                             'icon' => 'feather-users',
                             'time' => $nom->created_at?->diffForHumans(),
                             'created_at' => $nom->created_at?->toIso8601String(),
                         ];
+                    }
+                }
+            }
+
+            // KPI Scorecards (Goal Plans submitted for manager approval)
+            if (class_exists(EmployeeGoalPlan::class)) {
+                $canApproveKra = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.performance.manage');
+                if ($canApproveKra) {
+                    $kraQuery = EmployeeGoalPlan::query()->where('status', 'submitted');
+                    $applyEmpScope($kraQuery);
+                    $kraCount = (clone $kraQuery)->count();
+                    $totalActionableCount += $kraCount;
+                    if ($kraCount > 0) {
+                        $plans = $kraQuery->with(['employee', 'appraisalCycle'])
+                            ->orderBy('created_at', 'asc')
+                            ->take(self::MAX_HEADER_ITEMS)
+                            ->get();
+                        foreach ($plans as $plan) {
+                            $empName = $plan->employee?->full_name ?: 'Employee';
+                            $cycleName = $plan->appraisalCycle?->name ?: 'Appraisal';
+                            $candidateItems[] = [
+                                'module' => 'HRMS',
+                                'type' => 'KPI Scorecard',
+                                'title' => "{$empName} - {$cycleName}",
+                                'subtitle' => 'Goal sheet submitted for sign-off',
+                                'url' => Route::has('hrms.kra-kpi.show') ? route('hrms.kra-kpi.show', $plan->id) : (Route::has('hrms.kra-kpi.index') ? route('hrms.kra-kpi.index') : url('/hrms/kra-kpi')),
+                                'icon' => 'feather-target',
+                                'time' => $plan->created_at?->diffForHumans(),
+                                'created_at' => $plan->created_at?->toIso8601String(),
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Goals & OKRs (Pending sign-off)
+            if (class_exists(Goal::class)) {
+                $canApproveGoals = $isHrAdmin || $isManagerOrLead || $this->hasPermission($user, 'hrms.goals.manage') || $this->hasPermission($user, 'hrms.performance.manage');
+                if ($canApproveGoals) {
+                    $goalQuery = Goal::query()->whereIn('status', ['submitted', 'pending']);
+                    $applyEmpScope($goalQuery);
+                    $goalCount = (clone $goalQuery)->count();
+                    $totalActionableCount += $goalCount;
+                    if ($goalCount > 0) {
+                        $goals = $goalQuery->with(['employee'])
+                            ->orderBy('created_at', 'asc')
+                            ->take(self::MAX_HEADER_ITEMS)
+                            ->get();
+                        foreach ($goals as $goal) {
+                            $empName = $goal->employee?->full_name ?: 'Team';
+                            $candidateItems[] = [
+                                'module' => 'HRMS',
+                                'type' => 'Goal Approval',
+                                'title' => (string) ($goal->title ?: "Goal #{$goal->id}"),
+                                'subtitle' => "{$empName} • Approval required",
+                                'url' => Route::has('hrms.goals.show') ? route('hrms.goals.show', $goal->id) : (Route::has('hrms.goals.index') ? route('hrms.goals.index') : url('/hrms/goals')),
+                                'icon' => 'feather-award',
+                                'time' => $goal->created_at?->diffForHumans(),
+                                'created_at' => $goal->created_at?->toIso8601String(),
+                            ];
+                        }
                     }
                 }
             }
@@ -1068,8 +1172,20 @@ class ApprovalCenterService
      */
     private function canApproveHrms(User $user): bool
     {
-        if ($user->role === 'admin') {
+        if ($user->role === 'admin' || (bool) ($user->is_super_admin ?? false) || $user->role === 'super_admin') {
             return true;
+        }
+
+        if (class_exists(\App\Domains\HRMS\Services\HrmsScopeService::class)) {
+            $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+            if ($scopeService->isCompanyAdmin($user)) {
+                return true;
+            }
+
+            $summary = $scopeService->getScopeSummary($user);
+            if (!empty($summary['is_reporting_manager']) || !empty($summary['department_ids']) || !empty($summary['branch_ids']) || !empty($summary['business_unit_ids'])) {
+                return true;
+            }
         }
 
         if (method_exists($user, 'hasHrPermission') && $user->hasHrPermission('hr.settings.manage')) {
@@ -1081,6 +1197,9 @@ class ApprovalCenterService
             || $this->hasPermission($user, 'hrms.leaves.manage')
             || $this->hasPermission($user, 'hrms.leave_requests.approve')
             || $this->hasPermission($user, 'hrms.leave_encashments.approve')
+            || $this->hasPermission($user, 'hrms.wfh_requests.approve')
+            || $this->hasPermission($user, 'hrms.wfh_requests.manage')
+            || $this->hasPermission($user, 'hrms.wfh.approve')
             || $this->hasPermission($user, 'hrms.attendance.approve')
             || $this->hasPermission($user, 'hrms.attendance.manage')
             || $this->hasPermission($user, 'hrms.travel_expenses.approve')
@@ -1089,6 +1208,7 @@ class ApprovalCenterService
             || $this->hasPermission($user, 'hrms.recruitment.manage')
             || $this->hasPermission($user, 'hrms.recruitment.approve')
             || $this->hasPermission($user, 'hrms.performance.manage')
+            || $this->hasPermission($user, 'hrms.goals.manage')
             || $this->hasPermission($user, 'hrms.feedback_360.manage');
     }
 

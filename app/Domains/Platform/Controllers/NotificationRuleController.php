@@ -215,6 +215,23 @@ class NotificationRuleController extends Controller
             'lwd' => now()->addDays(30)->format('d M Y'),
             'published_by' => auth()->user()?->name ?? 'HR Management',
             'resolved_by' => auth()->user()?->name ?? 'IT Support Agent',
+            'hours' => '4.5',
+            'check_in' => '09:00 AM',
+            'check_out' => '06:30 PM',
+            'reason' => 'Client meeting & network maintenance',
+            'month_year' => now()->format('F Y'),
+            'total_employees' => '45',
+            'gross_amount' => '$125,000.00',
+            'net_salary' => '$3,250.00',
+            'cycle_name' => 'Q4 Performance Cycle ' . date('Y'),
+            'items_count' => '5',
+            'goal_title' => 'Accelerate Enterprise Revenue Growth',
+            'expiry_date' => now()->addDays(15)->format('d M Y'),
+            'days_left' => '15',
+            'expired_on' => now()->format('d M Y'),
+            'letter_type' => 'Promotion & Increment Letter',
+            'ref_no' => 'INC-' . date('Y') . '-084',
+            'exit_date' => now()->addDays(30)->format('d M Y'),
         ];
 
         $resolvedUrl = '#';

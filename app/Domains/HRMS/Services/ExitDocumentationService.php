@@ -33,7 +33,7 @@ class ExitDocumentationService
             'separation_type' => ucfirst(str_replace('_', ' ', $exit->separation_type)),
         ];
 
-        return EmployeeExitDocument::updateOrCreate(
+        $doc = EmployeeExitDocument::updateOrCreate(
             [
                 'employee_exit_id' => $exit->id,
                 'document_type' => 'relieving_letter',
@@ -46,6 +46,10 @@ class ExitDocumentationService
                 'content_data' => $contentData,
             ]
         );
+
+        $this->triggerExitNotification($exit, 'Relieving Letter', $lwd);
+
+        return $doc;
     }
 
     /**
@@ -82,7 +86,7 @@ class ExitDocumentationService
             'conduct_statement' => 'During their tenure, we found their character, dedication, and professional conduct to be exemplary.',
         ];
 
-        return EmployeeExitDocument::updateOrCreate(
+        $doc = EmployeeExitDocument::updateOrCreate(
             [
                 'employee_exit_id' => $exit->id,
                 'document_type' => 'experience_certificate',
@@ -95,6 +99,10 @@ class ExitDocumentationService
                 'content_data' => $contentData,
             ]
         );
+
+        $this->triggerExitNotification($exit, 'Experience Certificate', $lwd);
+
+        return $doc;
     }
 
     /**
@@ -120,7 +128,7 @@ class ExitDocumentationService
             'clearance_status' => 'All company assets, dues, files, and accounts have been fully cleared across IT, Finance, HR, Admin, and Operations departments.',
         ];
 
-        return EmployeeExitDocument::updateOrCreate(
+        $doc = EmployeeExitDocument::updateOrCreate(
             [
                 'employee_exit_id' => $exit->id,
                 'document_type' => 'noc_certificate',
@@ -133,5 +141,28 @@ class ExitDocumentationService
                 'content_data' => $contentData,
             ]
         );
+
+        $this->triggerExitNotification($exit, 'NOC Certificate', $lwd);
+
+        return $doc;
+    }
+
+    private function triggerExitNotification(EmployeeExit $exit, string $docType, mixed $lwd): void
+    {
+        try {
+            $employee = $exit->employee;
+            if ($employee) {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.exit_cleared', [
+                    'tenant_id'     => $exit->tenant_id,
+                    'employee_name' => $employee->full_name,
+                    'document_type' => $docType,
+                    'exit_date'     => Carbon::parse($lwd)->format('d M Y'),
+                    'employee_id'   => $employee->id,
+                    'user_id'       => $employee->user_id,
+                ], $exit);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed for exit document: " . $e->getMessage());
+        }
     }
 }

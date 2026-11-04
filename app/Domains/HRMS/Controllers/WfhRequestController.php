@@ -112,14 +112,17 @@ class WfhRequestController extends Controller
         $validated['employee_id'] = $employee->id;
         $validated['company_id']  = $employee->company_id;
 
-        $this->wfhRequestRepository->storeWfhRequest($validated, $request);
+        $wfhRequest = $this->wfhRequestRepository->storeWfhRequest($validated, $request);
 
         try {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.wfh.applied', [
+                'tenant_id'     => $employee->tenant_id,
                 'employee_name' => $employee->full_name,
                 'date'          => $startDate->format('d M Y') . ($duration > 1 ? ' to ' . $endDate->format('d M Y') : ''),
                 'reason'        => $validated['reason'] ?? '',
-            ]);
+                'employee_id'   => $employee->id,
+                'user_id'       => $employee->user_id,
+            ], $wfhRequest);
 
             \App\Services\Notification\NotificationService::sendToHrAdmins(
                 title: 'New WFH Request',
@@ -212,17 +215,23 @@ class WfhRequestController extends Controller
         try {
             if ($action === 'approved') {
                 \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.wfh.approved', [
+                    'tenant_id'     => $wfhRequest->tenant_id,
                     'employee_name' => $wfhRequest->employee?->full_name ?? 'Employee',
                     'date'          => $wfhDateStr,
                     'approved_by'   => auth()->user()?->name ?? 'Manager',
-                ]);
+                    'employee_id'   => $wfhRequest->employee_id,
+                    'user_id'       => $wfhRequest->employee?->user_id,
+                ], $wfhRequest);
             } elseif ($action === 'rejected') {
                 \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.wfh.rejected', [
+                    'tenant_id'     => $wfhRequest->tenant_id,
                     'employee_name' => $wfhRequest->employee?->full_name ?? 'Employee',
                     'date'          => $wfhDateStr,
                     'reason'        => $reason ?? 'No reason provided',
                     'rejected_by'   => auth()->user()?->name ?? 'Manager',
-                ]);
+                    'employee_id'   => $wfhRequest->employee_id,
+                    'user_id'       => $wfhRequest->employee?->user_id,
+                ], $wfhRequest);
             }
 
             if ($wfhRequest->employee) {
@@ -316,6 +325,30 @@ class WfhRequestController extends Controller
             'cancellation_reason' => $validated['cancellation_reason'],
         ]);
 
+        try {
+            $wfhRequest->loadMissing(['employee.reportingManager']);
+            $empName = $wfhRequest->employee?->full_name ?: 'Employee';
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'WFH Cancellation Requested',
+                message: "{$empName} requested cancellation for WFH ({$wfhRequest->start_date} to {$wfhRequest->end_date}).",
+                actionUrl: route('hrms.wfh.index'),
+                type: 'wfh_cancellation_requested',
+                iconClass: 'feather-alert-circle'
+            );
+            if ($wfhRequest->employee?->reportingManager) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $wfhRequest->employee->reportingManager,
+                    title: 'WFH Cancellation Requested',
+                    message: "{$empName} requested cancellation for WFH ({$wfhRequest->start_date} to {$wfhRequest->end_date}).",
+                    actionUrl: route('hrms.wfh.index'),
+                    type: 'wfh_cancellation_requested',
+                    iconClass: 'feather-alert-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('WFH cancellation notification failed: ' . $e->getMessage());
+        }
+
         return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
     }
 
@@ -333,6 +366,22 @@ class WfhRequestController extends Controller
         }
 
         $this->wfhRequestRepository->cancelWfhRequest($wfhRequest);
+
+        try {
+            $wfhRequest->loadMissing('employee');
+            if ($wfhRequest->employee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $wfhRequest->employee,
+                    title: 'WFH Cancellation Approved',
+                    message: "Your WFH cancellation request ({$wfhRequest->start_date} to {$wfhRequest->end_date}) has been approved.",
+                    actionUrl: route('hrms.wfh.index'),
+                    type: 'wfh_cancellation_approved',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('WFH cancellation approval notification failed: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'WFH cancellation approved.');
     }
@@ -354,6 +403,22 @@ class WfhRequestController extends Controller
             'status'              => 'approved',
             'cancellation_reason' => null,
         ]);
+
+        try {
+            $wfhRequest->loadMissing('employee');
+            if ($wfhRequest->employee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $wfhRequest->employee,
+                    title: 'WFH Cancellation Denied',
+                    message: "Your WFH cancellation request ({$wfhRequest->start_date} to {$wfhRequest->end_date}) was denied. The WFH remains approved.",
+                    actionUrl: route('hrms.wfh.index'),
+                    type: 'wfh_cancellation_denied',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('WFH cancellation deny notification failed: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Cancellation request denied. Application remains approved.');
     }

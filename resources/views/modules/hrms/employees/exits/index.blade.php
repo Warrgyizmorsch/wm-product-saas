@@ -53,6 +53,26 @@
             border-color: #cbd5e1;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
         }
+        .clearance-modal-avatar {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            min-height: 38px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 16px;
+        }
+        .bg-soft-primary { background-color: rgba(52, 84, 209, 0.1) !important; color: #3454d1 !important; }
+        .bg-soft-secondary { background-color: rgba(100, 116, 139, 0.1) !important; color: #64748b !important; }
+        .bg-soft-success { background-color: rgba(23, 198, 102, 0.1) !important; color: #17c666 !important; }
+        .bg-soft-danger { background-color: rgba(234, 77, 77, 0.1) !important; color: #ea4d4d !important; }
+        .bg-soft-warning { background-color: rgba(255, 162, 29, 0.1) !important; color: #ffa21d !important; }
+        .bg-soft-info { background-color: rgba(61, 199, 190, 0.1) !important; color: #3dc7be !important; }
+        .bg-soft-indigo { background-color: rgba(102, 16, 242, 0.1) !important; color: #6610f2 !important; }
+        .text-indigo { color: #6610f2 !important; }
     </style>
 @endpush
 
@@ -133,6 +153,15 @@
 
             {{-- Right: Actions Toolbar (Search, Sort, Filter) --}}
             <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                @if($activeTab === 'clearances')
+                    <form method="POST" action="{{ route('hrms.exits.clearances.sync-all') }}" class="d-inline m-0">
+                        @csrf
+                        <x-ui.button variant="light" size="sm" icon="feather-refresh-cw" type="submit" class="border text-dark fw-semibold" title="Sync all active clearance cards with current Offboarding Policies">
+                            Sync All with Policies
+                        </x-ui.button>
+                    </form>
+                @endif
+
                 {{-- Search Form --}}
                 <form method="GET" action="{{ route('hrms.exits.index') }}" class="m-0" id="exitSearchForm" style="width: 220px;">
                     <input type="hidden" name="tab" value="{{ $activeTab }}">
@@ -359,10 +388,22 @@
                                 <div class="card-body p-3">
                                     <div class="row g-2">
                                         @php
-                                            $allCategories = $deptClearances->keys();
-                                            if ($allCategories->isEmpty()) {
-                                                $allCategories = collect(['it_assets', 'facilities_admin', 'finance_payroll', 'hr_operations', 'reporting_manager']);
+                                            $policyCategories = \App\Domains\HRMS\Models\ExitClearanceTemplate::where('tenant_id', $exit->tenant_id)
+                                                ->where(function($q) use ($exit) {
+                                                    $q->whereNull('company_id');
+                                                    if ($exit->employee?->company_id) {
+                                                        $q->orWhere('company_id', $exit->employee->company_id);
+                                                    }
+                                                })
+                                                ->where('status', true)
+                                                ->orderBy('sort_order')
+                                                ->pluck('clearance_category')
+                                                ->unique();
+
+                                            if ($policyCategories->isEmpty()) {
+                                                $policyCategories = collect(['it_assets', 'facilities_admin', 'finance_payroll', 'hr_operations', 'reporting_manager']);
                                             }
+                                            $allCategories = $policyCategories->merge($deptClearances->keys())->unique();
                                         @endphp
                                         @foreach($allCategories as $catKey)
                                             @php
@@ -413,9 +454,17 @@
                                     </div>
                                 </div>
                                 <div class="card-footer bg-light border-top p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <x-ui.button variant="primary" size="sm" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#allClearanceModal_{{ $exit->id }}" class="fw-bold shadow-sm">
-                                        Review All Checklists
-                                    </x-ui.button>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <x-ui.button variant="primary" size="sm" icon="feather-check-square" data-bs-toggle="modal" data-bs-target="#allClearanceModal_{{ $exit->id }}" class="fw-bold shadow-sm">
+                                            Review All Checklists
+                                        </x-ui.button>
+                                        <form method="POST" action="{{ route('hrms.exits.clearances.sync', $exit->id) }}" class="d-inline m-0">
+                                            @csrf
+                                            <x-ui.button variant="light" size="sm" icon="feather-refresh-cw" type="submit" class="border text-dark fw-semibold" title="Sync and refresh checklist points from Offboarding Policies">
+                                                Sync Policies
+                                            </x-ui.button>
+                                        </form>
+                                    </div>
                                     @if($progress === 100)
                                         <span class="text-success fw-bold fs-13"><i class="feather-check-circle me-1"></i> {{ __('hrms.exits.status_ready_settle') }}</span>
                                     @else
@@ -795,7 +844,7 @@
         <!-- 2.5 Unified All-in-One Clearance Checklist Sign-off Modal -->
         <x-ui.modal 
             id="allClearanceModal_{{ $exit->id }}" 
-            title="<div class='d-flex align-items-center gap-2'><div class='avatar-text avatar-xs bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center'><i class='feather-shield fs-12'></i></div><div><span class='fw-bold text-dark d-block fs-14'>Clearance & NOC Checklist Sign-Off</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
+            title="<div class='d-flex align-items-center gap-2.5'><div class='clearance-modal-avatar bg-soft-primary text-primary'><i class='feather-shield'></i></div><div><span class='fw-bold text-dark d-block fs-15 lh-sm mb-0.5'>Clearance & NOC Checklist Sign-Off</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong class='text-dark'>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
             size="xl" 
             formAction="{{ route('hrms.exits.clearances.batch-update-all', $exit->id) }}" 
             formMethod="POST"
@@ -805,6 +854,12 @@
             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
                 <span class="text-muted fs-12"><i class="feather-info me-1"></i> Review and sign off verification points across all departments. Flags with penalty amounts auto-sync to FnF settlement.</span>
                 <div class="d-flex gap-2">
+                    <form method="POST" action="{{ route('hrms.exits.clearances.sync', $exit->id) }}" class="d-inline m-0">
+                        @csrf
+                        <x-ui.button type="submit" variant="outline-primary" size="xs" class="fw-semibold px-2 py-1 fs-11" title="Reload active checkpoints directly from Offboarding Policies">
+                            <i class="feather-refresh-cw me-1"></i> Reset to Policy Checklist
+                        </x-ui.button>
+                    </form>
                     <x-ui.button type="button" variant="outline-success" size="xs" class="fw-semibold px-2 py-1 fs-11" onclick="setClearanceBatchStatus('allClearanceModal_{{ $exit->id }}', 'cleared')">
                         <i class="feather-check-circle me-1"></i> Mark All Cleared
                     </x-ui.button>
@@ -923,7 +978,7 @@
             @endphp
             <x-ui.modal 
                 id="clearanceModal_{{ $exit->id }}_{{ $deptKey }}" 
-                title="<div class='d-flex align-items-center gap-2'><div class='avatar-text avatar-xs bg-soft-{{ $meta['color'] }} text-{{ $meta['color'] }} rounded-circle d-flex align-items-center justify-content-center'><i class='{{ $meta['icon'] }} fs-12'></i></div><div><span class='fw-bold text-dark d-block fs-14'>{{ __('hrms.exits.clearance_checklist_title', ['department' => $meta['name']]) }}</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
+                title="<div class='d-flex align-items-center gap-2.5'><div class='clearance-modal-avatar bg-soft-{{ $meta['color'] }} text-{{ $meta['color'] }}'><i class='{{ $meta['icon'] }}'></i></div><div><span class='fw-bold text-dark d-block fs-15 lh-sm mb-0.5'>{{ __('hrms.exits.clearance_checklist_title', ['department' => $meta['name']]) }}</span><span class='text-muted fs-11 fw-normal'>{{ __('hrms.exits.employee_label') }}: <strong class='text-dark'>{{ $exit->employee->full_name }}</strong> ({{ $exit->employee->employee_id }})</span></div></div>" 
                 size="lg" 
                 formAction="{{ route('hrms.exits.clearances.batch-update', ['exit' => $exit->id, 'department' => $deptKey]) }}" 
                 formMethod="POST"

@@ -31,6 +31,11 @@ Schedule::command('attendance:prune-location-logs')
     ->dailyAt('02:00')
     ->withoutOverlapping();
 
+// Daily check for expiring and expired statutory employee documents
+Schedule::command('hrms:check-document-expiry')
+    ->dailyAt('06:00')
+    ->withoutOverlapping();
+
 Artisan::command('fcm:test {target : User ID, Email, or FCM registration token} {--title=MossiERP Push Notification Test} {--message=Firebase Cloud Messaging is active and working! 🚀}', function ($target) {
     $this->info("Checking Firebase configuration...");
 

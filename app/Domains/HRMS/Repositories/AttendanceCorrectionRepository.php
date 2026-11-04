@@ -211,7 +211,45 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             'status'              => 'pending',
         ]);
 
-        $correction->load(['employee', 'attendance']);
+        $correction->load(['employee.reportingManager', 'attendance']);
+
+        // Dispatch notifications to HR Admins & Reporting Manager
+        try {
+            $emp = $correction->employee ?? Employee::find($employeeId);
+            $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : url('/hrms/attendance');
+            $dateFormatted = Carbon::parse($date)->format('d M Y');
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Attendance Regularization Requested',
+                message: "{$emp?->full_name} submitted an attendance regularization request for {$dateFormatted}.",
+                actionUrl: $actionUrl,
+                type: 'attendance_correction_request',
+                iconClass: 'feather-clock'
+            );
+
+            if ($emp && $emp->reportingManager) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $emp->reportingManager,
+                    title: 'Attendance Regularization Requested',
+                    message: "{$emp->full_name} submitted an attendance regularization request for {$dateFormatted}.",
+                    actionUrl: $actionUrl,
+                    type: 'attendance_correction_request',
+                    iconClass: 'feather-clock'
+                );
+            }
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.attendance.regularization_applied', [
+                'tenant_id'     => $tenantId,
+                'employee_name' => $emp?->full_name ?? 'Employee',
+                'date'          => $dateFormatted,
+                'check_in'      => $validated['requested_check_in'] ?? 'N/A',
+                'check_out'     => $validated['requested_check_out'] ?? 'N/A',
+                'reason'        => $validated['reason'] ?? '',
+                'employee_id'   => $emp?->id,
+                'user_id'       => $emp?->user_id,
+            ], $correction);
+        } catch (\Throwable $notifEx) {
+            Log::warning('Attendance correction submit notification failed: ' . $notifEx->getMessage());
+        }
 
         return [
             'success' => true,
@@ -327,6 +365,13 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
                 $correction->update(['attendance_id' => $attendance->id]);
             }
 
+            // Consolidate shift route summary without purging raw logs (retained until payroll release)
+            try {
+                app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->consolidateShiftRoute($attendance, false);
+            } catch (\Throwable $e) {
+                Log::warning("Route consolidation skipped on correction approval for Attendance #{$attendance->id}: " . $e->getMessage());
+            }
+
             // Waive penalties by setting status to excused with a tracking marker so payroll skips them,
             // but the records remain intact for restoration if the correction is subsequently cancelled.
             $penaltyMarker = "[Waived by correction #{$correction->id}]";
@@ -341,6 +386,34 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
             DB::commit();
 
             $correction->load(['employee', 'attendance']);
+
+            // Notify Employee of approval
+            try {
+                $emp = $correction->employee ?? Employee::find($correction->employee_id);
+                $dateFormatted = $correction->date ? $correction->date->format('d M Y') : 'requested date';
+                $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : url('/hrms/attendance');
+                if ($emp) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $emp,
+                        title: 'Attendance Regularization Approved',
+                        message: "Your attendance regularization request for {$dateFormatted} has been approved.",
+                        actionUrl: $actionUrl,
+                        type: 'attendance_regularization_approved',
+                        iconClass: 'feather-check-circle'
+                    );
+                }
+
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.attendance.regularization_approved', [
+                    'tenant_id'     => $correction->tenant_id,
+                    'employee_name' => $emp?->full_name ?? 'Employee',
+                    'date'          => $dateFormatted,
+                    'approved_by'   => $user?->name ?? 'Manager',
+                    'employee_id'   => $emp?->id,
+                    'user_id'       => $emp?->user_id,
+                ], $correction);
+            } catch (\Throwable $notifEx) {
+                Log::warning('Attendance regularization approval notification failed: ' . $notifEx->getMessage());
+            }
 
             return [
                 'success' => true,
@@ -387,6 +460,26 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
         $correction->update($updatePayload);
 
         $correction->load(['employee', 'attendance']);
+
+        // Notify Employee of rejection
+        try {
+            $emp = $correction->employee ?? Employee::find($correction->employee_id);
+            $dateFormatted = $correction->date ? $correction->date->format('d M Y') : 'requested date';
+            $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.attendance.index') ? route('hrms.attendance.index') : url('/hrms/attendance');
+            if ($emp) {
+                $reasonMsg = $reason ? " Reason: {$reason}" : '';
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $emp,
+                    title: 'Attendance Regularization Rejected',
+                    message: "Your attendance regularization request for {$dateFormatted} has been rejected.{$reasonMsg}",
+                    actionUrl: $actionUrl,
+                    type: 'attendance_regularization_rejected',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $notifEx) {
+            Log::warning('Attendance regularization rejection notification failed: ' . $notifEx->getMessage());
+        }
 
         return [
             'success' => true,
@@ -442,6 +535,34 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
         }
 
         $correction->update($updatePayload);
+
+        try {
+            $correction->loadMissing(['employee.reportingManager']);
+            $emp = $correction->employee;
+            $dateFormatted = $correction->date ? $correction->date->format('d M Y') : 'Attendance Date';
+            $actionUrl = route('hrms.attendance.index', ['view' => 'corrections']);
+
+            \App\Services\Notification\NotificationService::sendToHrAdmins(
+                title: 'Attendance Regularization Cancellation Requested',
+                message: "{$emp?->full_name} requested cancellation for attendance regularization on {$dateFormatted}.",
+                actionUrl: $actionUrl,
+                type: 'attendance_regularization_cancellation_requested',
+                iconClass: 'feather-alert-circle'
+            );
+
+            if ($emp?->reportingManager) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $emp->reportingManager,
+                    title: 'Attendance Regularization Cancellation Requested',
+                    message: "{$emp->full_name} requested cancellation for attendance regularization on {$dateFormatted}.",
+                    actionUrl: $actionUrl,
+                    type: 'attendance_regularization_cancellation_requested',
+                    iconClass: 'feather-alert-circle'
+                );
+            }
+        } catch (\Throwable $notifEx) {
+            Log::warning('Attendance regularization cancellation request notification failed: ' . $notifEx->getMessage());
+        }
 
         return [
             'success' => true,
@@ -577,6 +698,23 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
 
             DB::commit();
 
+            try {
+                $correction->loadMissing('employee');
+                $dateFormatted = $correction->date ? $correction->date->format('d M Y') : 'Attendance Date';
+                if ($correction->employee) {
+                    \App\Services\Notification\NotificationService::sendToEmployee(
+                        employee: $correction->employee,
+                        title: 'Attendance Regularization Cancellation Approved',
+                        message: "Your cancellation request for attendance regularization on {$dateFormatted} has been approved.",
+                        actionUrl: route('hrms.attendance.index', ['view' => 'corrections']),
+                        type: 'attendance_regularization_cancellation_approved',
+                        iconClass: 'feather-check-circle'
+                    );
+                }
+            } catch (\Throwable $notifEx) {
+                Log::warning('Attendance regularization cancellation approve notification failed: ' . $notifEx->getMessage());
+            }
+
             return [
                 'success' => true,
                 'status_code' => 200,
@@ -619,6 +757,23 @@ class AttendanceCorrectionRepository implements AttendanceCorrectionRepositoryIn
         }
 
         $correction->update($denyPayload);
+
+        try {
+            $correction->loadMissing('employee');
+            $dateFormatted = $correction->date ? $correction->date->format('d M Y') : 'Attendance Date';
+            if ($correction->employee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $correction->employee,
+                    title: 'Attendance Regularization Cancellation Denied',
+                    message: "Your cancellation request for attendance regularization on {$dateFormatted} was denied. The regularization remains approved.",
+                    actionUrl: route('hrms.attendance.index', ['view' => 'corrections']),
+                    type: 'attendance_regularization_cancellation_denied',
+                    iconClass: 'feather-x-circle'
+                );
+            }
+        } catch (\Throwable $notifEx) {
+            Log::warning('Attendance regularization cancellation deny notification failed: ' . $notifEx->getMessage());
+        }
 
         return [
             'success' => true,

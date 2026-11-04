@@ -65,7 +65,10 @@ class HrmsDashboardController extends Controller
         $todayAttendances = Attendance::where('tenant_id', $tenantId)
             ->whereDate('date', $today)
             ->get();
-        $presentCount = $todayAttendances->whereIn('status', ['present', 'late', 'half_day'])->count();
+        $presentCount = $todayAttendances->where(function ($att) {
+            return in_array($att->status, ['present', 'late', 'half_day', 'wfh', 'onsite'], true)
+                || ($att->status === 'missing_logs' && !empty($att->check_in));
+        })->count();
         $lateCount = $todayAttendances->where('status', 'late')->count();
 
         $wfhCount = WfhRequest::where('tenant_id', $tenantId)
@@ -916,7 +919,10 @@ class HrmsDashboardController extends Controller
         $attQuery = Attendance::where('tenant_id', $tenantId)->whereDate('date', $today);
         $scopeService->applyRelatedScope($attQuery, $user);
         $todayAttendances = $attQuery->get();
-        $presentCount = $todayAttendances->whereIn('status', ['present', 'late', 'half_day'])->count();
+        $presentCount = $todayAttendances->where(function ($att) {
+            return in_array($att->status, ['present', 'late', 'half_day', 'wfh', 'onsite'], true)
+                || ($att->status === 'missing_logs' && !empty($att->check_in));
+        })->count();
         $lateCount = $todayAttendances->where('status', 'late')->count();
 
         $wfhQuery = WfhRequest::where('tenant_id', $tenantId)->where('status', 'approved')->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today);

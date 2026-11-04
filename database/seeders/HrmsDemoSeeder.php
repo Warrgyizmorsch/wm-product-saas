@@ -3139,14 +3139,11 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $clearanceChecklist = [
-            ['department' => 'it', 'item_name' => 'Hardware Asset Recovery (Laptop, Docks, Keys)', 'status' => 'pending'],
-            ['department' => 'it', 'item_name' => 'Email, ERP & Jira System Logins Revocation', 'status' => 'pending'],
-            ['department' => 'admin', 'item_name' => 'Company Physical ID Badge & Plant Entry Pass Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'admin', 'item_name' => 'Plant Locker & Tool Storage Key Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'finance', 'item_name' => 'Verify Open Cash Advances & Expense Claims Reconciliation', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'finance', 'item_name' => 'Notice Period Shortfall / Gratuity Verification', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
-            ['department' => 'hr', 'item_name' => 'Exit Interview & Knowledge Transfer Feedback Completed', 'status' => 'cleared', 'cleared_by' => $hrManagerUser->id, 'cleared_at' => now()],
-            ['department' => 'manager', 'item_name' => 'Production SOPs, Blueprints & Tooling Handover Sign-off', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
+            ['department' => 'it_assets', 'item_name' => 'System & Email Access Deactivation', 'status' => 'pending'],
+            ['department' => 'facilities_admin', 'item_name' => 'Building Access Badge & Office Keys Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
+            ['department' => 'finance_payroll', 'item_name' => 'Expense Claims & Financial Dues Clearance', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
+            ['department' => 'hr_operations', 'item_name' => 'Exit Formalities & Benefits De-enrollment', 'status' => 'cleared', 'cleared_by' => $hrManagerUser->id, 'cleared_at' => now()],
+            ['department' => 'reporting_manager', 'item_name' => 'Knowledge Transfer & Project Handover', 'status' => 'cleared', 'cleared_by' => $companyAdminUser->id, 'cleared_at' => now()],
         ];
 
         foreach ($clearanceChecklist as $item) {

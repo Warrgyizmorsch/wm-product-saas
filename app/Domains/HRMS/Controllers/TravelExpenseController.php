@@ -1087,7 +1087,9 @@ class TravelExpenseController extends Controller
                 'amount'        => number_format((float) $expenseReport->total_amount, 2),
                 'purpose'       => $expenseReport->title,
                 'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
-            ]);
+                'employee_id'   => $emp?->id,
+                'user_id'       => $emp?->user_id,
+            ], $expenseReport);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
@@ -1366,7 +1368,9 @@ class TravelExpenseController extends Controller
                     'amount'        => number_format((float) $approvedAmount, 2),
                     'approved_by'   => auth()->user()?->name ?? 'HR Manager',
                     'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
-                ]);
+                    'employee_id'   => $expenseReport->employee_id,
+                    'user_id'       => $expenseReport->employee?->user_id,
+                ], $expenseReport);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
             }
@@ -1479,7 +1483,9 @@ class TravelExpenseController extends Controller
                 'amount'        => number_format((float) ($expenseReport->approved_net_reimbursement ?? $expenseReport->approved_amount ?? $expenseReport->total_amount), 2),
                 'payment_mode'  => ucfirst($expenseReport->payout_channel ?? 'Bank Transfer / Payroll'),
                 'action_url'    => route('hrms.travel-expense.index', ['tab' => 'report']),
-            ]);
+                'employee_id'   => $expenseReport->employee_id,
+                'user_id'       => $expenseReport->employee?->user_id,
+            ], $expenseReport);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }

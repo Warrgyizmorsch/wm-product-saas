@@ -13,12 +13,13 @@ class AttendanceRouteService
 {
     /**
      * Consolidate 1-minute location logs into an optimized polyline and snapshot,
-     * calculate total distance, and purge raw logs from database.
+     * calculate total distance, and optionally purge raw logs from database.
      *
      * @param Attendance|int $attendance
+     * @param bool $purgeRawLogs Whether to purge raw AttendanceLocationLog rows (defaults to false; purged on payroll run)
      * @return array
      */
-    public function consolidateShiftRoute(Attendance|int $attendance): array
+    public function consolidateShiftRoute(Attendance|int $attendance, bool $purgeRawLogs = false): array
     {
         if (is_numeric($attendance)) {
             $attendance = Attendance::findOrFail($attendance);
@@ -29,7 +30,7 @@ class AttendanceRouteService
             ->orderBy('created_at', 'asc')
             ->get();
 
-        if ($rawLogs->isEmpty() && !empty($attendance->route_snapshot_url) && !empty($attendance->route_polyline)) {
+        if ($rawLogs->isEmpty() && !empty($attendance->route_polyline)) {
             return [
                 'success'              => true,
                 'already_consolidated' => true,
@@ -186,6 +187,7 @@ class AttendanceRouteService
                 'retained_points_count'   => count($points),
                 'start_point'             => $startPoint,
                 'end_point'               => $endPoint,
+                'last_known_location'     => $endPoint,
                 'waypoint_times'          => array_column($points, 'time'),
                 'waypoint_timestamps'     => array_column($points, 'timestamp'),
                 'has_tracking_gaps'       => count($unapprovedGaps) > 0,
@@ -197,9 +199,9 @@ class AttendanceRouteService
 
         $attendance->update($updateFields);
 
-        // 5. PURGE raw periodic logs once polyline has been consolidated
+        // 5. PURGE raw periodic logs only when explicit purge is requested (e.g. after payroll release)
         $purgedCount = 0;
-        if (!empty($polylineString)) {
+        if ($purgeRawLogs) {
             $purgedCount = AttendanceLocationLog::where('attendance_id', $attendance->id)->delete();
         }
 
@@ -213,6 +215,39 @@ class AttendanceRouteService
             'purged_rows'        => $purgedCount,
             'points_count'       => count($points),
         ];
+    }
+
+    /**
+     * Purge raw location logs for attendances within a specific period (e.g. during monthly payroll release).
+     * Ensures all shifts in that period have their route consolidated, total distance calculated,
+     * and Last Known Location permanently archived into `route_summary` before raw rows are deleted.
+     *
+     * @param string $startDate (Y-m-d)
+     * @param string $endDate (Y-m-d)
+     * @param array|null $employeeIds
+     * @return int Number of purged raw location log rows
+     */
+    public function purgeLocationLogsForPeriod(string $startDate, string $endDate, ?array $employeeIds = null): int
+    {
+        $query = Attendance::whereBetween('date', [$startDate, $endDate]);
+
+        if (!empty($employeeIds)) {
+            $query->whereIn('employee_id', $employeeIds);
+        }
+
+        $attendances = $query->with('locationLogs')->get();
+        $totalPurged = 0;
+
+        foreach ($attendances as $attendance) {
+            if ($attendance->locationLogs->isNotEmpty()) {
+                $res = $this->consolidateShiftRoute($attendance, true);
+                $totalPurged += ($res['purged_rows'] ?? 0);
+            } elseif (empty($attendance->route_summary) && (!empty($attendance->check_in_latitude) || !empty($attendance->check_out_latitude))) {
+                $this->consolidateShiftRoute($attendance, false);
+            }
+        }
+
+        return $totalPurged;
     }
 
     /**
@@ -792,40 +827,53 @@ SVG;
     }
 
     /**
-     * Purge old raw location logs for shifts that have already checked out.
-     * Ensures any missing route snapshot/polyline is generated before purging!
+     * Purge old raw location logs for shifts older than the retention cutoff (supports hours or days).
+     * Defaults to 35 days if neither is provided (for closed payroll retention).
+     * Ensures any missing route summary, polyline, and Last Known Location are permanently archived before purging!
+     *
+     * @param int|null $olderThanDays Cutoff in days (defaults to 35 if both days and hours are null)
+     * @param int|null $olderThanHours Cutoff in hours
+     * @return int Number of purged raw location log rows
      */
-    public function pruneOldLogs(?int $olderThanHours = null): int
+    public function pruneOldLogs(?int $olderThanDays = null, ?int $olderThanHours = null): int
     {
-        $hours = $olderThanHours ?: 24;
-        $cutoff = Carbon::now()->subHours($hours);
+        if ($olderThanHours !== null && $olderThanHours > 0) {
+            $cutoff = Carbon::now()->subHours($olderThanHours);
+        } else {
+            $days = $olderThanDays ?: 35;
+            $cutoff = Carbon::now()->subDays($days);
+        }
 
-        // 1. Recover and consolidate any completed attendances that still have raw logs but no snapshot/polyline
-        $unconsolidatedAttendances = Attendance::whereNotNull('check_out')
-            ->where('check_out', '<', $cutoff)
-            ->where(function ($q) {
-                $q->whereNull('route_snapshot_url')
-                  ->orWhereNull('route_polyline');
+        // Recover and consolidate any attendances older than the cutoff that have raw logs
+        $unconsolidatedAttendances = Attendance::where(function ($query) use ($cutoff) {
+                $query->where('date', '<', $cutoff->toDateString())
+                    ->orWhere(function ($q) use ($cutoff) {
+                        $q->whereNotNull('check_out')
+                          ->where('check_out', '<', $cutoff);
+                    });
             })
             ->whereHas('locationLogs')
             ->get();
 
+        $purgedCount = 0;
         foreach ($unconsolidatedAttendances as $att) {
             try {
-                $this->consolidateShiftRoute($att);
+                $res = $this->consolidateShiftRoute($att, true);
+                $purgedCount += ($res['purged_rows'] ?? 0);
             } catch (\Throwable $e) {
                 Log::warning("Auto-consolidation during prune failed for Attendance #{$att->id}: " . $e->getMessage());
             }
         }
 
-        // 2. Only delete raw logs for completed shifts that have CONFIRMED saved route snapshot and polyline!
-        return AttendanceLocationLog::whereHas('attendance', function ($q) use ($cutoff) {
-                $q->whereNotNull('check_out')
-                  ->where('check_out', '<', $cutoff)
-                  ->whereNotNull('route_snapshot_url')
-                  ->whereNotNull('route_polyline');
-            })
-            ->delete();
+        return $purgedCount;
+    }
+
+    /**
+     * Convenience method to purge raw location logs older than N hours.
+     */
+    public function pruneOldLogsByHours(int $hours = 24): int
+    {
+        return $this->pruneOldLogs(null, $hours);
     }
 
     protected function encodeChunk(int $num): string

@@ -242,17 +242,26 @@ class ApprovalWorkflowService
             if ($this->isSuperAdmin($actor)) {
                 return true;
             }
+            if (app(HrmsScopeService::class)->isCompanyAdmin($actor)) {
+                return true;
+            }
             $userRole = strtolower($actor->role ?? '');
-            if (in_array($userRole, ['super_admin', 'super-admin', 'admin', 'company_admin', 'hr', 'hr_manager', 'hr_director'])) {
+            if (in_array($userRole, ['super_admin', 'super-admin', 'admin', 'company_admin', 'tenant_owner', 'owner', 'hr', 'hr_manager', 'hr_director'])) {
                 return true;
             }
             if (method_exists($actor, 'hasHrPermission') && (
                 $actor->hasHrPermission('hrms.leave_requests.approve') ||
+                $actor->hasHrPermission('hrms.leave.approve') ||
+                $actor->hasHrPermission('hrms.leaves.manage') ||
                 $actor->hasHrPermission('hr.settings.manage') ||
                 $actor->hasHrPermission('hrms.wfh.approve') ||
                 $actor->hasHrPermission('hrms.wfh_requests.approve') ||
                 $actor->hasHrPermission('hrms.wfh_requests.manage') ||
-                $actor->hasHrPermission('hrms.leave_encashments.approve')
+                $actor->hasHrPermission('hrms.leave_encashments.approve') ||
+                $actor->hasHrPermission('hrms.attendance.approve') ||
+                $actor->hasHrPermission('hrms.attendance.manage') ||
+                $actor->hasHrPermission('hrms.travel_expenses.approve') ||
+                $actor->hasHrPermission('hrms.employees.update')
             )) {
                 return true;
             }
@@ -472,7 +481,8 @@ class ApprovalWorkflowService
      */
     private function isSuperAdmin(User $user): bool
     {
-        return strtolower($user->role ?? '') === 'super_admin' 
+        return (bool) ($user->is_super_admin ?? false)
+            || strtolower($user->role ?? '') === 'super_admin' 
             || strtolower($user->role ?? '') === 'super-admin'
             || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin());
     }

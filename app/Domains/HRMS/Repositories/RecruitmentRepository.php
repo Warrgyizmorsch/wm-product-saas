@@ -203,7 +203,25 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             $updateData['approved_at'] = null;
         }
 
-        return $requisition->update($updateData);
+        $updated = $requisition->update($updateData);
+
+        if ($updated && $requisition->requested_by_employee_id) {
+            try {
+                $statusLabel = ucfirst(str_replace('_', ' ', $status));
+                NotificationService::sendToEmployee(
+                    employee: $requisition->requested_by_employee_id,
+                    title: "Job Requisition {$statusLabel}",
+                    message: "Job Requisition #{$requisition->requisition_code} ({$requisition->job_title}) is now {$statusLabel}.",
+                    actionUrl: route('hrms.recruitment.requisitions.index'),
+                    type: 'requisition_' . $status,
+                    iconClass: $status === 'approved' ? 'feather-check-circle' : 'feather-briefcase'
+                );
+            } catch (\Throwable $e) {
+                // Silently skip if notification fails
+            }
+        }
+
+        return $updated;
     }
 
     public function getCandidatesData(array $inputs, ?int $tenantId): array
@@ -672,6 +690,14 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
                 'job_offer_created',
                 'feather-file-text'
             );
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.letter_issued', [
+                'tenant_id'     => $tenantId,
+                'employee_name' => $candidateName,
+                'letter_type'   => 'Job Offer Letter',
+                'ref_no'        => $code,
+                'issued_date'   => now()->format('d M Y'),
+            ], $offer);
         } catch (\Throwable $e) {
             // Suppress notification errors
         }

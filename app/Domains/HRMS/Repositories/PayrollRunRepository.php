@@ -288,6 +288,19 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
             return ['success' => false, 'message' => 'Payroll not locked due to an unexpected error: ' . $e->getMessage()];
         }
 
+        try {
+            $employees = $this->getRunEmployees($run);
+            $totalGross = PayrollPayslip::where('payroll_run_id', $run->id)->sum('gross_earnings');
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.payroll.processed', [
+                'tenant_id'       => $run->tenant_id ?? (tenant_id() ?? 1),
+                'month_year'      => Carbon::parse($run->payroll_month . '-01')->format('F Y'),
+                'total_employees' => (string) $employees->count(),
+                'gross_amount'    => number_format((float) $totalGross, 2),
+            ], $run);
+        } catch (\Throwable $e) {
+            Log::warning("NotificationRule trigger failed for payroll run: " . $e->getMessage());
+        }
+
         return ['success' => true];
     }
 
@@ -511,6 +524,55 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
                 Log::warning("Could not auto-settle exit FnF during payroll release: " . $e->getMessage());
             }
         }
+
+        // Auto-purge raw location tracking logs for the closed payroll period
+        // Ensures database stays lean while route_summary permanently preserves the Last Known Location & polyline
+        if (!empty($processedEmployeeIds)) {
+            try {
+                $runStart = $run->start_date instanceof Carbon 
+                    ? $run->start_date->format('Y-m-d') 
+                    : ($run->start_date ? Carbon::parse($run->start_date)->format('Y-m-d') : Carbon::parse($run->payroll_month . '-01')->startOfMonth()->format('Y-m-d'));
+                $runEnd = $run->end_date instanceof Carbon 
+                    ? $run->end_date->format('Y-m-d') 
+                    : ($run->end_date ? Carbon::parse($run->end_date)->format('Y-m-d') : Carbon::parse($run->payroll_month . '-01')->endOfMonth()->format('Y-m-d'));
+
+                app(\App\Domains\HRMS\Services\AttendanceRouteService::class)
+                    ->purgeLocationLogsForPeriod($runStart, $runEnd, $processedEmployeeIds);
+            } catch (\Throwable $e) {
+                Log::warning("Could not purge location logs during payroll release for Run #{$run->id}: " . $e->getMessage());
+            }
+        }
+
+        // Notify employees that their payslip is published & available
+        if (!empty($employees)) {
+            try {
+                $monthStr = Carbon::parse($run->payroll_month . '-01')->format('F Y');
+                $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.payroll.mySalary') ? route('hrms.payroll.mySalary') : url('/hrms/payroll/my-salary');
+                foreach ($employees as $employee) {
+                    if ($employee->user_id) {
+                        \App\Services\Notification\NotificationService::sendToUser(
+                            userId: $employee->user_id,
+                            title: "Payslip Available: {$monthStr}",
+                            message: "Your salary payslip for {$monthStr} has been released and is available for download.",
+                            actionUrl: $actionUrl,
+                            type: 'payslip_published',
+                            iconClass: 'feather-file-text'
+                        );
+                    }
+
+                    \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.payslip.published', [
+                        'tenant_id'     => $run->tenant_id ?? (tenant_id() ?? 1),
+                        'employee_name' => $employee->full_name,
+                        'month_year'    => $monthStr,
+                        'net_salary'    => 'Released',
+                        'employee_id'   => $employee->id,
+                        'user_id'       => $employee->user_id,
+                    ], $employee);
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Could not dispatch payslip published notifications: " . $e->getMessage());
+            }
+        }
     }
 
     public function toggleHold(Employee $employee, string $month, ?string $targetMonth): string
@@ -532,20 +594,32 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
                     if ($netPayout > 0) {
                         $targetMonthStr = $targetMonth ?: Carbon::parse($month . '-01')->addMonth()->format('Y-m');
                         
-                        $adjustmentExists = PayrollRetroactiveAdjustment::where('employee_id', $employee->id)
+                        $hasAdjustmentType = \Illuminate\Support\Facades\Schema::hasColumn('payroll_retroactive_adjustments', 'adjustment_type');
+
+                        $adjustmentQuery = PayrollRetroactiveAdjustment::where('employee_id', $employee->id)
                             ->where('target_payroll_month', $targetMonthStr)
-                            ->where('amount_reversal', $netPayout)
-                            ->exists();
+                            ->where('amount_reversal', $netPayout);
+
+                        if ($hasAdjustmentType) {
+                            $adjustmentQuery->where('adjustment_type', 'hold_release');
+                        }
+
+                        $adjustmentExists = $adjustmentQuery->exists();
 
                         if (!$adjustmentExists) {
-                            PayrollRetroactiveAdjustment::create([
+                            $createData = [
                                 'tenant_id'            => $employee->tenant_id,
                                 'employee_id'          => $employee->id,
                                 'target_payroll_month' => $targetMonthStr,
                                 'reversal_days'        => 0,
                                 'amount_reversal'      => $netPayout,
                                 'status'               => 'pending',
-                            ]);
+                            ];
+                            if ($hasAdjustmentType) {
+                                $createData['adjustment_type'] = 'hold_release';
+                            }
+
+                            PayrollRetroactiveAdjustment::create($createData);
                             $msg .= '. It has been added as Arrears for ' . $targetMonthStr . '.';
                         }
                     }
@@ -557,11 +631,21 @@ class PayrollRunRepository implements PayrollRunRepositoryInterface
                 $run = PayrollRun::where('payroll_month', $month)->first();
                 $calc = $this->payrollCalculationService->calculateSalary($employee, $month, $run);
                 $netPayout = $calc['summary']['net_payout'] ?? 0.00;
+                $targetMonthStr = $targetMonth ?: Carbon::parse($month . '-01')->addMonth()->format('Y-m');
 
-                PayrollRetroactiveAdjustment::where('employee_id', $employee->id)
+                $deleteQuery = PayrollRetroactiveAdjustment::where('employee_id', $employee->id)
+                    ->where('target_payroll_month', $targetMonthStr)
                     ->where('status', 'pending')
-                    ->where('amount_reversal', $netPayout)
-                    ->delete();
+                    ->where('amount_reversal', $netPayout);
+
+                if (\Illuminate\Support\Facades\Schema::hasColumn('payroll_retroactive_adjustments', 'adjustment_type')) {
+                    $deleteQuery->where(function ($q) {
+                        $q->where('adjustment_type', 'hold_release')
+                          ->orWhereNull('adjustment_type');
+                    });
+                }
+
+                $deleteQuery->delete();
             }
         } else {
             PayrollHold::create([
