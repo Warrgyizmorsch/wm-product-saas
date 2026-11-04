@@ -102,7 +102,8 @@ class CrmFollowupReminderService
 
         if (!empty($userId)) {
             $query->where(function ($q) use ($userId) {
-                $q->whereHas('lead', function ($lq) use ($userId) {
+                $q->where('assigned_to_id', $userId)
+                ->orWhereHas('lead', function ($lq) use ($userId) {
                     $lq->where('lead_owner_id', $userId);
                 })
                 ->orWhereHas('deal', function ($dq) use ($userId) {
@@ -340,6 +341,9 @@ class CrmFollowupReminderService
     protected function resolveTargetUserIds(?int $ownerId, LeadFollowup $followup): array
     {
         $targetUserIds = [];
+        if (!empty($followup->assigned_to_id)) {
+            $targetUserIds[] = (int) $followup->assigned_to_id;
+        }
         if (!empty($ownerId)) {
             $targetUserIds[] = (int) $ownerId;
         }

@@ -66,26 +66,24 @@ class DealActivityApiController extends Controller
                         'id'    => $u->id,
                         'name'  => $u->name,
                         'email' => $u->email,
-                    ]),
+                    ])->values()->all(),
+                    'tagged_user_ids'              => $followup->tagged_user_ids ?? ($followup->tagged_user_id ? [$followup->tagged_user_id] : []),
                     'tagged_user'                  => $followup->taggedUser ? [
                         'id'    => $followup->taggedUser->id,
                         'name'  => $followup->taggedUser->name,
                         'email' => $followup->taggedUser->email,
                     ] : null,
-                    'assigned_to'                  => $followup->taggedUser ? [
-                        'id'    => $followup->taggedUser->id,
-                        'name'  => $followup->taggedUser->name,
-                        'email' => $followup->taggedUser->email,
+                    'assigned_to_id'               => $followup->assigned_to_id ?: ($deal->owner_id ?? $followup->tagged_user_id),
+                    'assigned_to'                  => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser)) ? [
+                        'id'    => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser))->id,
+                        'name'  => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser))->name,
+                        'email' => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser))->email,
                     ] : null,
-                    'meeting_owner'                => $followup->taggedUser ? [
-                        'id'    => $followup->taggedUser->id,
-                        'name'  => $followup->taggedUser->name,
-                        'email' => $followup->taggedUser->email,
-                    ] : ($deal->owner ? [
-                        'id'    => $deal->owner->id,
-                        'name'  => $deal->owner->name,
-                        'email' => $deal->owner->email,
-                    ] : null),
+                    'meeting_owner'                => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser)) ? [
+                        'id'    => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser))->id,
+                        'name'  => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser))->name,
+                        'email' => ($followup->assignedTo ?: ($deal->owner ?: $followup->taggedUser))->email,
+                    ] : null,
                     'created_at'                   => $followup->created_at?->toIso8601String(),
                 ];
             });
@@ -114,6 +112,8 @@ class DealActivityApiController extends Controller
             'title'                => 'nullable|string|max:255',
             'duration_minutes'     => 'nullable|integer|min:1',
             'guest_emails'         => 'nullable|string|max:500',
+            'assigned_to_id'       => 'nullable|exists:users,id',
+            'tagged_user_id'       => 'nullable|exists:users,id',
             'tagged_user_ids'      => 'nullable|array',
             'tagged_user_ids.*'    => 'integer|exists:users,id',
             'sync_google_calendar' => 'nullable|boolean',
@@ -214,6 +214,7 @@ class DealActivityApiController extends Controller
             'branch_id'            => $branchId,
             'crm_deal_id'          => $deal->id,
             'lead_id'              => $deal->lead?->id,
+            'assigned_to_id'       => $validated['assigned_to_id'] ?? ($deal->owner_id ?? auth()->id()),
             'followup_date'        => $followupDateTime,
             'type'                 => $activityType,
             'title'                => $title,
@@ -229,6 +230,10 @@ class DealActivityApiController extends Controller
             'selfie_path'          => $verificationData['selfie_path'] ?? null,
             'location_verified_at' => $verificationData['location_verified_at'] ?? null,
         ]);
+
+        if ($targetStatus === 'Pending') {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyMeetingScheduled($followup, auth()->id());
+        }
 
         $syncGoogle = !empty($validated['sync_google_calendar']) || !empty($validated['create_meet_link']);
         if ($actionMode === 'schedule' && $syncGoogle) {

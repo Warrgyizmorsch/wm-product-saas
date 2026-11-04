@@ -4,6 +4,7 @@ namespace App\Domains\CRM\Services;
 
 use App\Domains\CRM\Models\CrmDeal;
 use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\LeadFollowup;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Platform\Services\NotificationRuleService;
 use App\Models\User;
@@ -511,6 +512,133 @@ class CrmNotificationService
             );
         } catch (\Throwable $e) {
             Log::warning("CRM Notification failed (crm.quotation.accepted): " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Trigger when a new meeting / followup is scheduled.
+     * Notifies:
+     * 1. The assigned primary host (if different from creator).
+     * 2. All tagged attendees (if different from creator).
+     */
+    public static function notifyMeetingScheduled(LeadFollowup $followup, ?int $createdByUserId = null): void
+    {
+        try {
+            $lead = $followup->lead;
+            $deal = $followup->deal;
+            $clientName = $deal?->customer_name ?: ($lead?->company_name ?: ($lead?->contact_person ?: 'Client'));
+            $activityType = $followup->type ?: 'Meeting';
+            $timeFormatted = $followup->followup_date ? $followup->followup_date->format('d M, h:i A') : 'Scheduled time';
+            $title = $followup->title ?: "{$activityType} with {$clientName}";
+            $actionUrl = route('crm.meetings.index', ['tab' => 'planned']);
+
+            $hostUser = $followup->assignedTo ?: ($lead?->owner ?: ($deal?->owner ?: null));
+            $hostName = $hostUser?->name ?: 'Lead Owner';
+
+            // 1. Notify Assigned Host (if not self)
+            if ($hostUser && $hostUser->id !== $createdByUserId) {
+                NotificationService::send(
+                    user: $hostUser->id,
+                    title: "📅 New Meeting Assigned: {$title}",
+                    message: "You are the assigned Host for {$activityType} with {$clientName} on {$timeFormatted}.",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'meeting_assigned',
+                    iconClass: 'feather-calendar',
+                    extraData: [
+                        'followup_id' => $followup->id,
+                        'lead_id' => $lead?->id,
+                        'deal_id' => $deal?->id,
+                        'role' => 'host',
+                    ]
+                );
+            }
+
+            // 2. Notify Tagged Attendees (if not self)
+            $taggedAttendees = $followup->tagged_users ?: collect();
+            foreach ($taggedAttendees as $attendee) {
+                if ($attendee->id === $createdByUserId || ($hostUser && $attendee->id === $hostUser->id)) {
+                    continue;
+                }
+                NotificationService::send(
+                    user: $attendee->id,
+                    title: "👥 Meeting Invitation: {$title}",
+                    message: "You have been tagged as an attendee for {$activityType} with {$clientName} on {$timeFormatted}. Host: {$hostName}.",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'meeting_tagged',
+                    iconClass: 'feather-users',
+                    extraData: [
+                        'followup_id' => $followup->id,
+                        'lead_id' => $lead?->id,
+                        'deal_id' => $deal?->id,
+                        'role' => 'attendee',
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning("CRM Notification failed (notifyMeetingScheduled): " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Trigger when an existing meeting is assigned / delegated to a new host.
+     */
+    public static function notifyMeetingAssigned(LeadFollowup $followup, User $newAssignee, ?int $assignedByUserId = null): void
+    {
+        try {
+            $lead = $followup->lead;
+            $deal = $followup->deal;
+            $clientName = $deal?->customer_name ?: ($lead?->company_name ?: ($lead?->contact_person ?: 'Client'));
+            $activityType = $followup->type ?: 'Meeting';
+            $timeFormatted = $followup->followup_date ? $followup->followup_date->format('d M, h:i A') : 'Scheduled time';
+            $title = $followup->title ?: "{$activityType} with {$clientName}";
+            $actionUrl = route('crm.meetings.index', ['tab' => 'planned']);
+
+            $assignedByUser = $assignedByUserId ? User::find($assignedByUserId) : auth()->user();
+            $assignedByName = $assignedByUser?->name ?: 'Admin';
+
+            // 1. Notify the new host
+            NotificationService::send(
+                user: $newAssignee->id,
+                title: "📅 Meeting Assigned to You: {$title}",
+                message: "You have been assigned as the Host for {$activityType} with {$clientName} on {$timeFormatted} by {$assignedByName}.",
+                actionUrl: $actionUrl,
+                module: 'crm',
+                type: 'meeting_assigned',
+                iconClass: 'feather-user-check',
+                extraData: [
+                    'followup_id' => $followup->id,
+                    'lead_id' => $lead?->id,
+                    'deal_id' => $deal?->id,
+                    'role' => 'host',
+                ]
+            );
+
+            // 2. Notify existing attendees about the new host
+            $taggedAttendees = $followup->tagged_users ?: collect();
+            foreach ($taggedAttendees as $attendee) {
+                if ($attendee->id === $newAssignee->id || $attendee->id === $assignedByUserId) {
+                    continue;
+                }
+                NotificationService::send(
+                    user: $attendee->id,
+                    title: "ℹ️ Meeting Host Updated: {$title}",
+                    message: "The Host for {$activityType} with {$clientName} on {$timeFormatted} has been assigned to {$newAssignee->name}.",
+                    actionUrl: $actionUrl,
+                    module: 'crm',
+                    type: 'meeting_host_updated',
+                    iconClass: 'feather-info',
+                    extraData: [
+                        'followup_id' => $followup->id,
+                        'lead_id' => $lead?->id,
+                        'deal_id' => $deal?->id,
+                        'role' => 'attendee',
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning("CRM Notification failed (notifyMeetingAssigned): " . $e->getMessage());
         }
     }
 }

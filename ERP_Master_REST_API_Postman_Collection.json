@@ -148,7 +148,48 @@
                         },
                         "description": "Send user_id (and optionally lead_id) to receive categorized meetings: Today (due today), Planned / Next Activity (future scheduled), Overdue (missed past due), and Activity Logs / Past Logs (completed history with selfie/GPS). Each meeting includes complete scheduled venue location (latitude, longitude, location_address, address, scheduled_venue_location) where the meeting is scheduled."
                     },
-                    "description": "Fetch categorized meetings (today, planned / next_activity, overdue, activity_logs / past_logs) for the logged-in user or filtered by user_id/lead_id/deal_id. Each meeting object contains scheduled venue map location (latitude, longitude, location_address, address, scheduled_latitude, scheduled_longitude, scheduled_address, scheduled_venue_location), actual verification location from selfie check-in (checkin_latitude, checkin_longitude, checkin_address, actual_verification_location), checkin_status, checkin_distance_meters, selfie_url, meeting_owner, and assigned_to."
+                    "description": "Fetch categorized meetings (today, planned / next_activity, overdue, activity_logs / past_logs) for the logged-in user or filtered by user_id/lead_id/deal_id. Each meeting object contains scheduled venue map location (latitude, longitude, location_address, address, scheduled_latitude, scheduled_longitude, scheduled_address, scheduled_venue_location), actual verification location from selfie check-in (checkin_latitude, checkin_longitude, checkin_address, actual_verification_location), checkin_status, checkin_distance_meters, selfie_url, primary assigned host (assigned_to_id, assigned_to, meeting_owner), and tagged attendees (tagged_users, tagged_user_ids)."
+                },
+                {
+                    "name": "1b. Schedule Meeting with Assigned Host & Tagged Attendees",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"action_mode\": \"schedule\",\n    \"type\": \"Meeting\",\n    \"title\": \"Enterprise Solution Pitch & Technical Demo\",\n    \"status\": \"Pending\",\n    \"followup_date\": \"2026-11-06 14:30:00\",\n    \"duration_minutes\": 45,\n    \"assigned_to_id\": 1,\n    \"tagged_user_ids\": [2, 3],\n    \"notes\": \"Client demo with procurement team. Assigned to Host (Demo Admin) with Aarti Mehta and Amit Patel attending.\",\n    \"location_address\": \"Tech Hub Tower, Building B, Sector 62, Noida, Uttar Pradesh, 201301\",\n    \"latitude\": 28.6280,\n    \"longitude\": 77.3649,\n    \"sync_google_calendar\": true,\n    \"create_meet_link\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/crm/leads/1/followups",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "crm",
+                                "leads",
+                                "1",
+                                "followups"
+                            ]
+                        },
+                        "description": "Schedule a new meeting/followup specifying: (1) 'assigned_to_id': Primary host conducting the meeting (2) 'tagged_user_ids': Array of attendees joining the meeting (3) 'type': 'Meeting', 'Call', 'Demo' (4) 'location_address', 'latitude', 'longitude' for field visits. Automatically dispatches in-app bell notifications to the assigned host and all tagged attendees."
+                    }
                 },
                 {
                     "name": "2. Get Single Meeting / Followup Details by ID",
@@ -368,7 +409,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"tagged_user_id\": 2,\n    \"notes\": \"Reassigned client field meeting to technical sales executive.\"\n}"
+                            "raw": "{\n    \"assigned_to_id\": 2,\n    \"tagged_user_id\": 2,\n    \"notes\": \"Reassigned client field meeting host to technical sales executive. Existing tagged attendees remain intact.\"\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/crm/meetings/7/assign",
@@ -383,7 +424,7 @@
                                 "assign"
                             ]
                         },
-                        "description": "Universal Route: Assign or delegate a meeting to another team member or sales executive. Accepts 'tagged_user_id', 'user_id', or 'meeting_owner_id'. Supported endpoints: (1) /api/crm/meetings/{id}/assign (2) /api/crm/followups/{id}/assign (3) /api/crm/leads/{lead}/followups/{id}/assign."
+                        "description": "Universal Route: Assign or delegate a meeting to another team member or sales executive. Accepts 'assigned_to_id', 'tagged_user_id', 'user_id', or 'meeting_owner_id'. Sets the primary assigned host while preserving all tagged attendees. Supported endpoints: (1) /api/crm/meetings/{id}/assign (2) /api/crm/followups/{id}/assign (3) /api/crm/leads/{lead}/followups/{id}/assign."
                     }
                 }
             ]
@@ -1421,7 +1462,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"followup_date\": \"2026-09-30 12:45:33\",\n    \"followup_type\": \"Call\",\n    \"notes\": \"Discuss technical architecture and delivery schedules with client team.\",\n    \"status\": \"pending\"\n}"
+                                    "raw": "{\n    \"followup_date\": \"2026-09-30 12:45:33\",\n    \"followup_type\": \"Call\",\n    \"assigned_to_id\": 1,\n    \"tagged_user_ids\": [2, 3],\n    \"notes\": \"Discuss technical architecture and delivery schedules with client team.\",\n    \"status\": \"pending\"\n}"
                                 }
                             }
                         },

@@ -41,6 +41,7 @@ class LeadFollowupService
             'company_id' => $lead->company_id ?? (company_id() ?? auth()->user()?->company_id),
             'branch_id' => $lead->branch_id ?? (branch_id() ?? auth()->user()?->branch_id),
             'lead_id' => $lead->id,
+            'assigned_to_id' => $validated['assigned_to_id'] ?? ($lead->lead_owner_id ?? (auth()->id() ?? null)),
             'followup_date' => $followupDateTime,
             'type' => $validated['type'],
             'title' => $titleInput,
@@ -140,6 +141,10 @@ class LeadFollowupService
 
         $this->followupRepo->syncLeadNextFollowupDate($lead);
 
+        if ($followup->status === 'Pending') {
+            CrmNotificationService::notifyMeetingScheduled($followup, auth()->id());
+        }
+
         return $followup;
     }
 
@@ -161,9 +166,10 @@ class LeadFollowupService
 
                 $this->followupRepo->update($followup, ['status' => 'Rescheduled']);
 
-                $this->followupRepo->create([
+                $newFollowup = $this->followupRepo->create([
                     'lead_id' => $followup->lead_id,
                     'crm_deal_id' => $followup->crm_deal_id,
+                    'assigned_to_id' => $validated['assigned_to_id'] ?? $followup->assigned_to_id,
                     'type' => $validated['type'] ?? $followup->type,
                     'followup_date' => $newFollowupDateTime,
                     'status' => 'Pending',
@@ -173,6 +179,8 @@ class LeadFollowupService
                     'rescheduled_from_id' => $followup->id,
                     'original_followup_date' => $followup->original_followup_date ?: $followup->followup_date,
                 ]);
+
+                CrmNotificationService::notifyMeetingScheduled($newFollowup, auth()->id());
 
                 if ($lead) {
                     LeadHistory::logEvent(
@@ -197,6 +205,9 @@ class LeadFollowupService
             $updateData['notes'] = $validated['notes'];
         if (isset($validated['type']))
             $updateData['type'] = $validated['type'];
+        if (array_key_exists('assigned_to_id', $validated)) {
+            $updateData['assigned_to_id'] = $validated['assigned_to_id'] ?: null;
+        }
         if (array_key_exists('tagged_user_ids', $validated)) {
             $updateData['tagged_user_ids'] = $taggedUserIds;
             $updateData['tagged_user_id'] = $primaryTaggedId;

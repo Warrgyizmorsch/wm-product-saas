@@ -222,25 +222,59 @@
                                     @endif
                                 @endif
 
-                                {{-- Delegation / Assignment Badge if applicable --}}
+                                {{-- Host & Attendee Badges and Details --}}
                                 @php
-                                    $assignedTo = $item['assigned_to'] ?? $item['tagged_user'] ?? null;
-                                    if (!$assignedTo && !empty($item['tagged_users'])) {
-                                        $tUsers = $item['tagged_users'];
-                                        $assignedTo = is_array($tUsers) ? ($tUsers[0] ?? null) : (is_object($tUsers) && method_exists($tUsers, 'first') ? $tUsers->first() : null);
-                                    }
-                                    $assignedBy = $item['assigned_by'] ?? ($deal['deal_owner'] ?? ($lead['lead_owner'] ?? null));
                                     $currentUserId = auth()->id();
-                                    $isAssignedToMe = $assignedTo && (($assignedTo['id'] ?? null) == $currentUserId);
+                                    $hostObj = $item['assigned_to'] ?? ($item['meeting_owner'] ?? ($lead['lead_owner'] ?? ($deal['deal_owner'] ?? null)));
+                                    $hostId = $item['assigned_to_id'] ?? ($hostObj['id'] ?? null);
+                                    $isHost = !empty($item['is_host']) || ($hostId == $currentUserId) || (empty($hostId) && (($lead['lead_owner']['id'] ?? ($deal['deal_owner']['id'] ?? null)) == $currentUserId));
+
+                                    $taggedUsersList = collect($item['tagged_users'] ?? []);
+                                    $taggedUserIds = (array) ($item['tagged_user_ids'] ?? []);
+                                    $isAttendee = in_array($currentUserId, $taggedUserIds) || !empty($item['is_tagged_attendee']);
+
+                                    $hostName = $hostObj['name'] ?? ($lead['lead_owner']['name'] ?? ($deal['deal_owner']['name'] ?? 'Lead Owner'));
+                                    $currentUser = auth()->user();
+                                    $isAdminUser = $currentUser && in_array(strtolower(str_replace([' ', '_', '-'], '', (string) ($currentUser->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+                                    $canManageMeeting = $isHost || ($lead && ($lead['lead_owner']['id'] ?? null) == $currentUserId) || ($deal && ($deal['deal_owner']['id'] ?? null) == $currentUserId) || $isAdminUser;
                                 @endphp
 
-                                @if(!empty($assignedTo))
-                                    <div class="text-truncate">
-                                        <span class="badge bg-light text-secondary border px-1.5 py-0 fs-10 fw-normal">
-                                            <i class="feather-user me-0.5 fs-9 text-muted"></i>{{ $isAssignedToMe ? 'By: ' . ($assignedBy['name'] ?? 'Owner') : 'To: ' . $assignedTo['name'] }}
+                                <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
+                                    {{-- Role badge for current user --}}
+                                    @if($isHost)
+                                        <span class="badge px-1.5 py-0.5 fs-10 d-inline-flex align-items-center gap-1 shadow-2xs"
+                                            style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc !important;"
+                                            title="You are the primary host of this meeting">
+                                            <i class="feather-user-check fs-10" style="color: #0284c7;"></i>
+                                            <strong style="color: #0c4a6e;">Host</strong>
                                         </span>
-                                    </div>
-                                @endif
+                                    @elseif($isAttendee)
+                                        <span class="badge px-1.5 py-0.5 fs-10 d-inline-flex align-items-center gap-1 shadow-2xs"
+                                            style="background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0 !important;"
+                                            title="You are an invited attendee in this meeting">
+                                            <i class="feather-users fs-10" style="color: #059669;"></i>
+                                            <strong style="color: #064e3b;">Attendee</strong>
+                                        </span>
+                                    @endif
+
+                                    {{-- Host details badge --}}
+                                    <span class="badge bg-light text-dark border px-1.5 py-0.5 fs-10 d-inline-flex align-items-center gap-1"
+                                        title="Primary Meeting Host: {{ $hostName }}">
+                                        <i class="feather-user fs-9 text-primary"></i>
+                                        <span class="text-muted">Host:</span>
+                                        <strong>{{ $isHost ? 'You (' . $hostName . ')' : $hostName }}</strong>
+                                    </span>
+
+                                    {{-- Tagged Attendees badge if any --}}
+                                    @if($taggedUsersList->isNotEmpty())
+                                        <span class="badge bg-light text-secondary border px-1.5 py-0.5 fs-10 d-inline-flex align-items-center gap-1"
+                                            title="Tagged Attendees: {{ $taggedUsersList->pluck('name')->implode(', ') }}">
+                                            <i class="feather-users fs-9 text-success"></i>
+                                            <span>Attendees:</span>
+                                            <strong class="text-dark">{{ $taggedUsersList->pluck('name')->implode(', ') }}</strong>
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                         </td>
 
@@ -390,25 +424,38 @@
                             <x-ui.action-dropdown :align="'end'">
                                 <x-slot:extraActions>
                                     @if($isPending)
-                                        {{-- Connected Icon Button --}}
-                                        <button type="button" class="action-dropdown-btn text-success" title="{{ __('crm.meetings_mark_connected') }}"
-                                            data-bs-toggle="modal" data-bs-target="#meetingModal_{{ $item['id'] }}_Connected"
-                                            onclick="crmInitVisitModal('{{ $item['id'] }}', 'Connected')">
-                                            <i class="feather-check text-success"></i>
-                                        </button>
+                                        @if($canManageMeeting)
+                                            {{-- Connected Icon Button --}}
+                                            <button type="button" class="action-dropdown-btn text-success" title="{{ __('crm.meetings_mark_connected') }}"
+                                                data-bs-toggle="modal" data-bs-target="#meetingModal_{{ $item['id'] }}_Connected"
+                                                onclick="crmInitVisitModal('{{ $item['id'] }}', 'Connected')">
+                                                <i class="feather-check text-success"></i>
+                                            </button>
 
-                                        {{-- Not Connected Icon Button --}}
-                                        <button type="button" class="action-dropdown-btn text-warning" title="{{ __('crm.meetings_mark_not_connected') }}"
-                                            data-bs-toggle="modal" data-bs-target="#meetingModal_{{ $item['id'] }}_NotConnected"
-                                            onclick="crmInitVisitModal('{{ $item['id'] }}', 'NotConnected')">
-                                            <i class="feather-phone-off text-warning"></i>
-                                        </button>
+                                            {{-- Not Connected Icon Button --}}
+                                            <button type="button" class="action-dropdown-btn text-warning" title="{{ __('crm.meetings_mark_not_connected') }}"
+                                                data-bs-toggle="modal" data-bs-target="#meetingModal_{{ $item['id'] }}_NotConnected"
+                                                onclick="crmInitVisitModal('{{ $item['id'] }}', 'NotConnected')">
+                                                <i class="feather-phone-off text-warning"></i>
+                                            </button>
 
-                                        {{-- Reschedule Icon Button --}}
-                                        <button type="button" class="action-dropdown-btn text-info" title="{{ __('crm.meetings_reschedule') }}"
-                                            data-bs-toggle="modal" data-bs-target="#meetingRescheduleModal_{{ $item['id'] }}">
-                                            <i class="feather-calendar text-info"></i>
-                                        </button>
+                                            {{-- Reschedule Icon Button --}}
+                                            <button type="button" class="action-dropdown-btn text-info" title="{{ __('crm.meetings_reschedule') }}"
+                                                data-bs-toggle="modal" data-bs-target="#meetingRescheduleModal_{{ $item['id'] }}">
+                                                <i class="feather-calendar text-info"></i>
+                                            </button>
+                                        @else
+                                            @if(!empty($item['google_meet_link']))
+                                                <a href="{{ $item['google_meet_link'] }}" target="_blank" rel="noopener noreferrer"
+                                                    class="action-dropdown-btn text-success" title="Join Google Meet">
+                                                    <i class="feather-video text-success"></i>
+                                                </a>
+                                            @endif
+                                            <span class="badge bg-light text-muted border px-1.5 py-1 fs-10"
+                                                title="Only the primary host ({{ $hostName }}) can update meeting status">
+                                                <i class="feather-eye me-1"></i>View Only
+                                            </span>
+                                        @endif
                                     @else
                                         @if(!empty($item['selfie_url']))
                                             @php
@@ -435,7 +482,7 @@
                                 </x-slot:extraActions>
 
                                 {{-- More Actions Dropdown Slot --}}
-                                @if($isPending)
+                                @if($isPending && $canManageMeeting)
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item py-1.5 text-primary"
                                             data-bs-toggle="modal" data-bs-target="#meetingAssignModal_{{ $item['id'] }}">
@@ -447,6 +494,11 @@
                                             data-bs-target="#meetingCancelModal_{{ $item['id'] }}">
                                             <i class="feather-x-circle me-2 text-danger fs-12"></i>{{ __('crm.meetings_cancel_meeting') }}
                                         </a>
+                                    </li>
+                                    <div class="dropdown-divider my-1"></div>
+                                @elseif($isPending && !$canManageMeeting)
+                                    <li class="px-3 py-1.5 text-muted fs-11">
+                                        <i class="feather-shield me-1 text-primary"></i>Managed by Host ({{ $hostName }})
                                     </li>
                                     <div class="dropdown-divider my-1"></div>
                                 @endif
@@ -1228,10 +1280,10 @@
                                 <div class="mb-3">
                                     <label class="form-label fs-12 fw-semibold text-dark">{{ __('crm.meetings_assign_to_sales_person') }} <span
                                             class="text-danger">*</span></label>
-                                    <select name="tagged_user_id" class="form-select fs-12" required>
+                                    <select name="assigned_to_id" class="form-select fs-12" required>
                                         <option value="">{{ __('crm.meetings_choose_sales_person') }}</option>
                                         @php
-                                            $selectedAssigneeId = $item['tagged_user']['id'] ?? ($item['assigned_to']['id'] ?? null);
+                                            $selectedAssigneeId = $item['assigned_to_id'] ?? ($item['assigned_to']['id'] ?? ($item['tagged_user']['id'] ?? null));
                                             if (!$selectedAssigneeId && !empty($item['tagged_users'])) {
                                                 $tUsers = $item['tagged_users'];
                                                 $firstUser = is_array($tUsers) ? ($tUsers[0] ?? null) : (is_object($tUsers) && method_exists($tUsers, 'first') ? $tUsers->first() : null);

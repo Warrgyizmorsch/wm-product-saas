@@ -18,6 +18,7 @@ class LeadFollowup extends Model
         'branch_id',
         'lead_id',
         'crm_deal_id',
+        'assigned_to_id',
         'google_event_id',
         'google_meet_link',
         'is_google_meet',
@@ -50,6 +51,7 @@ class LeadFollowup extends Model
     ];
 
     protected $casts = [
+        'assigned_to_id' => 'integer',
         'followup_date' => 'datetime',
         'original_followup_date' => 'datetime',
         'advance_reminder_sent_at' => 'datetime',
@@ -85,6 +87,46 @@ class LeadFollowup extends Model
         }
 
         return asset('storage/' . $path);
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function (LeadFollowup $model) {
+            if (empty($model->assigned_to_id)) {
+                if (!empty($model->lead_id)) {
+                    $lead = $model->lead ?: Lead::find($model->lead_id);
+                    if ($lead && !empty($lead->lead_owner_id)) {
+                        $model->assigned_to_id = $lead->lead_owner_id;
+                    }
+                } elseif (!empty($model->crm_deal_id)) {
+                    $deal = $model->deal ?: CrmDeal::find($model->crm_deal_id);
+                    if ($deal && !empty($deal->owner_id)) {
+                        $model->assigned_to_id = $deal->owner_id;
+                    }
+                }
+                if (empty($model->assigned_to_id) && auth()->check()) {
+                    $model->assigned_to_id = auth()->id();
+                }
+            }
+        });
+    }
+
+    /**
+     * Get the primary assigned user (host / responsible executive).
+     */
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'assigned_to_id');
+    }
+
+    /**
+     * Get the effective assigned user (falls back to lead/deal owner or tagged user).
+     */
+    public function getAssignedUserAttribute(): ?\App\Models\User
+    {
+        return $this->assignedTo ?: ($this->lead?->owner ?: ($this->deal?->owner ?: $this->taggedUser));
     }
 
     /**
