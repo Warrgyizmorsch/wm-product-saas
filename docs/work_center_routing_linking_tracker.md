@@ -73,6 +73,8 @@
 | **WC-TRACK-06** | Deletion, Inactivation & Integrity Safeguards | **Point 6.1** (Inactive Resource Handling) ✅<br>**Point 6.2** (Section/Resource Deletion Safeguards) ✅ | 🟢 **Agreed / Defined** | `WorkCenterSectionService::delete()`, `WorkCenterService::delete()`, `hasProductionHistory()` |
 | **WC-TRACK-07** | Downstream Order Execution & Scheduling | Execution propagation (`ProductionOrderOperation`, MES) | ⏸️ On Hold / Deferred | `ProductionOrderOperation`, `SchedulingService`, `CapacityPlanningService` |
 | **WC-TRACK-08** | Seeders & Feature Test Suite Alignment | Comprehensive tests for Section-aware Routings | 🟡 Discussion / Proposed | `tests/Feature/Production/`, `ProductionTestWorkCenterSeeder` |
+| **WC-TRACK-09** | Parallel Operations & Collision Safeguards | Parallel groups & physical resource collision checks | ⏸️ On Hold / Deferred | `create.blade.php`, `edit.blade.php`, Requests |
+| **WC-TRACK-10** | Routing Details Header & Cost Statistics Alignment | **Point 10.1** (Header stats calculation on new snapshot/unit cost fields, primary vs alternative breakdown alignment in show view) | 🟢 **Applied & Verified** | `routing/show.blade.php`, `RoutingCostService`, `Routing.php`, `RoutingOperation.php` |
 
 ---
 
@@ -476,6 +478,74 @@
   4. **UI/UX Cleanup:**
      - Neatly align `[✓] Parallel` checkbox and the group selector on the same row.
      - Auto-clear group assignment and resource warnings when `Parallel` is unchecked.
+
+---
+
+### Area 10: Routing Details Header & Live Calculation Alignment (WC-TRACK-10)
+* **Status:** 🟢 **Applied & Verified**
+* **Area:** Frontend Views (`resources/views/modules/production/routing/show.blade.php`), Costing Services (`RoutingCostService.php`), Requests (`StoreRoutingRequest.php`, `UpdateRoutingRequest.php`), and Models (`Routing.php`, `RoutingOperation.php`)
+
+#### Point 10.1: Header Statistics & Cost Calculation Alignment
+* **Context & Applied Fixes:**
+  1. **Discrepancy Between Unit Cost & Contribution Breakdown (Resolved):**
+     In `RoutingCostService.php` and `show.blade.php`, primary operations strictly determine total routing unit cost (`!$operation->is_alternative`). The contribution breakdown reconciles proportionally so that:
+     $$\text{Routing Cost Per Unit} = \text{Primary Labor Cost} + \text{Primary Machine Cost} + \text{Primary Subcontract Cost}$$
+  2. **Whitelisting & Backend Persistence (Resolved):**
+     - Whitelisted `cost_per_unit`, `resource_snapshot`, and `replaces_sequence` in `StoreRoutingRequest.php` and `UpdateRoutingRequest.php`.
+     - Added `cost_per_unit` and `resource_snapshot` to `$fillable` and `$casts` (`'resource_snapshot' => 'array'`) in `RoutingOperation.php`.
+     - Saved full snapshot details (`operating_cost_per_hour`, `operator_labor_cost_per_machine_per_hour`, `labor_cost_per_hour`, `machine_cost_per_unit`, `labor_cost_per_unit`, `cost_per_unit`) in `create.blade.php` and `edit.blade.php`.
+  3. **Live Dynamic Fallback in Show View (Resolved):**
+     If `resource_snapshot` is empty (e.g., historical records or API imports), `show.blade.php` queries `SectionCalculationService::getSectionResourceCosts()` to dynamically resolve Machine and Manual Batch cards with complete details (Capacity, Run Speed, Machine Cost, Operator Cost, and Operation / Labor Cost).
+  4. **Setup Time Included in Row Unit Cost (Resolved):**
+     Updated `RoutingOperation::estimatedCostPerUnit()` to compute:
+     $$\text{Active Minutes} = \text{setup\_time\_minutes} + \text{processing\_time\_minutes}$$
+     $$\text{Cost} = \text{Active Minutes} \times (\text{labor\_cost\_rate} + \text{machine\_cost\_rate}) \times \text{yield\_factor}$$
+     Ensures that row-level unit cost in both form and show page includes setup time.
+  5. **Column Width Rebalance (Resolved):**
+     In `show.blade.php`, rebalanced widths:
+     - `Work Center`: 14% (min-width: 160px)
+     - `Section`: 14% (min-width: 160px)
+     - `Resource`: 22% (min-width: 240px)
+     - Table container wrapped with `style="min-width: 1300px;"` to prevent card squeezing and awkward text wrapping.
+
+---
+
+#### Point 10.2: Interactive Alternative Route Simulation Modal & Explanatory Context
+* **Status:** 🟢 **Applied & Verified**
+* **Design Decision:**
+  1. **Primary Ground Truth:** Header values continue displaying standard Primary Route calculations (excluding alternatives).
+  2. **Explanatory Note:** A clear note in the header explains that displayed totals reflect the primary sequence and exclude alternative operations.
+  3. **Interactive Simulation Modal:**
+     - Button triggers a live scenario simulator modal.
+     - Operations with no alternatives are locked/fixed.
+     - Operations with alternatives allow selecting the active variant (Primary vs Alternative).
+     - **Multi-Alternative & Multi-Stage Rules:**
+       - If an operation has multiple alternatives (e.g., Primary + Alt 1 [Pri 1] + Alt 2 [Pri 2]), they form a mutually exclusive single-select radio group: exactly **one** option can be selected at once.
+       - If multiple operations have alternatives, each stage has its own independent radio group (`stage_{primary_id}`).
+     - **Calculation Execution:** Selection does not trigger auto-calculation. A dedicated **"RUN CALCULATIONS"** button executes the simulation and displays the scenario results (Total Cost, Labor, Machine, Setup, Cycle Time, and Delta vs Baseline).
+     - UI layout to be provided by user before coding.
+
+---
+
+#### Point 10.3: Universal Clock Time Duration Formatting
+* **Status:** 🟢 **Applied & Verified**
+* **Context & Core ERP Principle:**
+  Users and shop-floor planners should never be forced to mentally calculate raw decimal minutes (e.g., calculating that `0.2 min = 12s`, `11.5 min = 11m 30s`, or `29.1 min = 29m 05s`). All durations and speeds across routing displays are now rendered in human-readable clock notation.
+* **Applied Enhancements:**
+  1. **Global PHP Helper (`app/helpers.php`):**
+     - Implemented `format_duration($minutes, bool $includeSeconds = true): string` converting decimal minutes to clock units (`1h 27m`, `22m 30s`, `12s`, etc.).
+  2. **Routing Show View (`resources/views/modules/production/routing/show.blade.php`):**
+     - **Setup Duration Estimate KPI:** Formatted with `format_duration()` (e.g. `22m 30s`) and small subtitle `(22.5m)`.
+     - **Total Cycle Running Time KPI:** Formatted with `format_duration()` (e.g. `29m 05s`) and small subtitle `(29.1m)`.
+     - **Machine & Manual Batch Spec Cards:** `Run Speed` displays clock duration alongside units (e.g., `4m (4.00 m/u)`, `12s (0.20 m/u)`).
+     - **Operations Sequence Table:** `Setup`, `Run`, and `Wait` columns display clock duration with subtitle decimal minutes (e.g., `8m 30s` with `8.5m`, `12s` with `0.2m`).
+     - **Cost / Unit Tooltips:** Displays `Setup: 5m + Run: 4m = 9m active time`.
+     - **Queue Threshold Lag:** Formatted with `format_duration()` (e.g. `Lag: 10m`).
+  3. **Interactive Simulation Modal (`#routeSimulationModal`):**
+     - Integrated `formatDuration(minutes)` inside the Alpine.js `routeSimulator` component.
+     - Stage and variant cards display `9m (5m setup + 4m run)`.
+     - Scenario results display Total Cycle Time formatted (e.g. `29m 05s (29.1m)`).
+     - Time Delta displays relative clock comparison (e.g., `1m 30s Faster`, `+45s Longer`, `0s (Identical)`).
 
 ---
 

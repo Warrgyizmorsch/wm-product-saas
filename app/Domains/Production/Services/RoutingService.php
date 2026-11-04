@@ -430,48 +430,101 @@ class RoutingService
             // Unset replaces_operation_id for Pass 1 to prevent FK violations
             unset($data['replaces_operation_id']);
 
+            // Calculate cost_per_unit if not explicitly provided
+            if (!isset($data['cost_per_unit']) || $data['cost_per_unit'] === null || (float) $data['cost_per_unit'] <= 0.0) {
+                $activeMinutes = (float) $opDto->setup_time_minutes + (float) $opDto->processing_time_minutes;
+                $yieldFactor = $opDto->expected_yield_percentage > 0 ? (100 / $opDto->expected_yield_percentage) : 1.0;
+                if ($opDto->is_external) {
+                    $data['cost_per_unit'] = round(((float) $opDto->subcontract_cost_per_unit) * $yieldFactor, 4);
+                } else {
+                    $laborRate = (float) $opDto->labor_cost_rate;
+                    $machineRate = (float) $opDto->machine_cost_rate;
+                    if ($opDto->section_manual_production_id && $opDto->section_id && $laborRate <= 0.0) {
+                        $section = \App\Domains\Production\Models\WorkCenterSection::find($opDto->section_id);
+                        if ($section) {
+                            $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($section);
+                            foreach ($sectionCosts['manual_batches'] as $mb) {
+                                if ((int) $mb['id'] === (int) $opDto->section_manual_production_id) {
+                                    $laborRate = ($mb['labor_cost_per_hour'] ?? 0.0) / 60.0;
+                                    break;
+                                }
+                            }
+                        }
+                    } elseif ($opDto->machine_id) {
+                        if ($machineRate <= 0.0) {
+                            $machine = \App\Domains\Production\Models\Machine::find($opDto->machine_id);
+                            if ($machine) {
+                                $machineRate = ((float) $machine->operating_cost_per_hour) / 60.0;
+                            }
+                        }
+                        if ($opDto->section_id && $laborRate <= 0.0) {
+                            $section = \App\Domains\Production\Models\WorkCenterSection::find($opDto->section_id);
+                            if ($section) {
+                                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($section);
+                                $laborRate = ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0) / 60.0;
+                            }
+                        }
+                    } elseif ($opDto->work_center_id && $laborRate <= 0.0) {
+                        $wc = \App\Domains\Production\Models\WorkCenter::find($opDto->work_center_id);
+                        if ($wc) {
+                            $laborRate = ((float) $wc->cost_per_hour) / 60.0;
+                        }
+                    }
+                    $data['cost_per_unit'] = round(($activeMinutes * ($laborRate + $machineRate)) * $yieldFactor, 4);
+                }
+            }
+
             $createdOp = RoutingOperation::create($data);
             $createdOps[] = ['model' => $createdOp, 'dto' => $opDto];
             $opsBySeq[$seq] = $createdOp->id;
 
             if (!empty($opDto->row_uid)) {
                 $uidToOpMap[$opDto->row_uid] = $createdOp;
+                $uidToOpMap['uid:' . $opDto->row_uid] = $createdOp;
             }
-            $uidToOpMap[(string) $index] = $createdOp;
-            $uidToOpMap[(string) $seq] = $createdOp;
+            $uidToOpMap['seq:' . $seq] = $createdOp;
             if (!empty($data['operation_number'])) {
                 $uidToOpMap[$data['operation_number']] = $createdOp;
             }
-
-            // [INVERSION-DECOUPLE-TRACK-03] Material assignment moved to BOM creation/edit.
-            // RoutingOperationMaterial is now populated by ProductionBomService when BOM is saved.
-            /*
-            $materialsToSync = !empty($opDto->materials) 
-                ? $opDto->materials 
-                : (!empty($opDto->material_id) ? [['material_id' => $opDto->material_id, 'quantity' => 1.0]] : []);
-
-            foreach ($materialsToSync as $matIndex => $mat) {
-                if (empty($mat['material_id'])) {
-                    continue;
-                }
-                $matProd = \App\Domains\Inventory\Models\Product::find($mat['material_id']);
-                $uomId = !empty($mat['uom_id']) ? (int) $mat['uom_id'] : ($matProd?->uom_id ?? \App\Domains\Inventory\Models\Uom::first()?->id ?? 1);
-                $qty = isset($mat['quantity']) ? (float) $mat['quantity'] : 1.0;
-
-                \App\Domains\Production\Models\RoutingOperationMaterial::create([
-                    'tenant_id'            => $tenantId,
-                    'routing_operation_id' => $createdOp->id,
-                    'material_id'          => (int) $mat['material_id'],
-                    'quantity'             => $qty,
-                    'uom_id'               => $uomId,
-                    'consumption_type'     => $mat['consumption_type'] ?? null,
-                    'sequence'             => $matIndex + 1,
-                ]);
-            }
-            */
         }
 
-        // Pass 2: Bind dependencies (previous_operation_id) and alternatives (replaces_operation_id)
+        // Pass 2: Bind alternative replacements (replaces_operation_id)
+        foreach ($createdOps as $item) {
+            $model = $item['model'];
+            $dto = $item['dto'];
+
+            if ($dto->is_alternative) {
+                $resolvedReplacesId = null;
+
+                if (!empty($dto->replaces_sequence) && isset($opsBySeq[$dto->replaces_sequence])) {
+                    $resolvedReplacesId = $opsBySeq[$dto->replaces_sequence];
+                } elseif (!empty($dto->replaces_row_uid) && isset($uidToOpMap[$dto->replaces_row_uid])) {
+                    $resolvedReplacesId = $uidToOpMap[$dto->replaces_row_uid]->id;
+                } elseif (!empty($dto->replaces_operation_id)) {
+                    $target = (string) $dto->replaces_operation_id;
+                    if (isset($opsBySeq[(int) $target])) {
+                        $resolvedReplacesId = $opsBySeq[(int) $target];
+                    } elseif (isset($uidToOpMap[$target])) {
+                        $resolvedReplacesId = $uidToOpMap[$target]->id;
+                    } elseif (RoutingOperation::where('tenant_id', $tenantId)->where('id', $dto->replaces_operation_id)->exists()) {
+                        $resolvedReplacesId = $dto->replaces_operation_id;
+                    }
+                }
+
+                // Guard: an operation can NEVER replace itself
+                if ($resolvedReplacesId === $model->id) {
+                    $resolvedReplacesId = null;
+                }
+
+                $model->replaces_operation_id = $resolvedReplacesId;
+            } else {
+                $model->replaces_operation_id = null;
+            }
+        }
+
+        // Pass 3: Bind dependencies (previous_operation_id)
+        // Rule 1: Non-alternatives resolve predecessor (-- Auto skips alternatives)
+        // Rule 2: Alternatives mirror their primary operation's predecessor
         foreach ($createdOps as $index => $item) {
             $model = $item['model'];
             $dto = $item['dto'];
@@ -479,35 +532,40 @@ class RoutingService
             if ($dto->is_parallel) {
                 // Parallel operations are independent of previous operations
                 $model->previous_operation_id = null;
+            } elseif ($dto->is_alternative) {
+                // Rule: Alternative operation follows the EXACT same predecessor as the main op it replaces
+                if ($model->replaces_operation_id) {
+                    $primaryOp = collect($createdOps)->first(fn($c) => $c['model']->id === $model->replaces_operation_id);
+                    $model->previous_operation_id = $primaryOp ? $primaryOp['model']->previous_operation_id : null;
+                } else {
+                    $model->previous_operation_id = null;
+                }
             } elseif ($dto->predecessor_sequence !== null) {
                 if ($dto->predecessor_sequence <= 0) {
                     // Explicitly marked independent / none
                     $model->previous_operation_id = null;
                 } else {
-                    $model->previous_operation_id = $opsBySeq[$dto->predecessor_sequence] ?? null;
-                }
-            } elseif ($index > 0) {
-                // Default sequential fallback: depends on the immediate preceding operation
-                $prevModel = $createdOps[$index - 1]['model'];
-                $model->previous_operation_id = $prevModel->id;
-            } else {
-                $model->previous_operation_id = null;
-            }
-
-            // Bind alternative replacement
-            if ($dto->is_alternative) {
-                if (!empty($dto->replaces_row_uid) && isset($uidToOpMap[$dto->replaces_row_uid])) {
-                    $model->replaces_operation_id = $uidToOpMap[$dto->replaces_row_uid]->id;
-                } elseif (!empty($dto->replaces_operation_id)) {
-                    $target = (string) $dto->replaces_operation_id;
-                    if (isset($uidToOpMap[$target])) {
-                        $model->replaces_operation_id = $uidToOpMap[$target]->id;
-                    } elseif (RoutingOperation::where('tenant_id', $tenantId)->where('id', $dto->replaces_operation_id)->exists()) {
-                        $model->replaces_operation_id = $dto->replaces_operation_id;
+                    $targetPredId = $opsBySeq[$dto->predecessor_sequence] ?? null;
+                    // Guard: if chosen predecessor was an alternative, redirect to its primary replacement
+                    $targetPredItem = collect($createdOps)->first(fn($c) => $c['model']->id === $targetPredId);
+                    if ($targetPredItem && $targetPredItem['dto']->is_alternative) {
+                        $model->previous_operation_id = $targetPredItem['model']->replaces_operation_id ?? null;
+                    } else {
+                        $model->previous_operation_id = $targetPredId;
                     }
                 }
+            } elseif ($index > 0) {
+                // Default sequential fallback: find immediate preceding NON-ALTERNATIVE operation
+                $prevModel = null;
+                for ($p = $index - 1; $p >= 0; $p--) {
+                    if (!$createdOps[$p]['dto']->is_alternative) {
+                        $prevModel = $createdOps[$p]['model'];
+                        break;
+                    }
+                }
+                $model->previous_operation_id = $prevModel?->id;
             } else {
-                $model->replaces_operation_id = null;
+                $model->previous_operation_id = null;
             }
 
             $model->save();

@@ -416,5 +416,60 @@ if (! function_exists('format_hours')) {
     }
 }
 
+if (! function_exists('format_duration')) {
+    /**
+     * Format minutes into human-readable clock duration string (e.g. "1h 15m 30s", "11m 30s", "12s").
+     *
+     * Example: 0.20  -> "12s"
+     *          0.19  -> "11s"
+     *          1.36  -> "1m 22s"
+     *          8.50  -> "8m 30s"
+     *          11.50 -> "11m 30s"
+     *          29.09 -> "29m 05s"
+     *          60.00 -> "1h"
+     *          90.00 -> "1h 30m"
+     */
+    function format_duration($minutes, bool $includeSeconds = true): string
+    {
+        if ($minutes === null || $minutes === '' || (float) $minutes <= 0.0) {
+            return '0s';
+        }
+
+        $mFloat = (float) $minutes;
+        $totalSeconds = (int) round($mFloat * 60);
+        if ($totalSeconds <= 0) {
+            return '0s';
+        }
+
+        $hours = intdiv($totalSeconds, 3600);
+        $remainingSecs = $totalSeconds % 3600;
+        $mins = intdiv($remainingSecs, 60);
+        $secs = $remainingSecs % 60;
+
+        if ($hours > 0) {
+            if ($mins > 0 && $secs > 0 && $includeSeconds) {
+                return sprintf('%dh %dm %02ds', $hours, $mins, $secs);
+            }
+            if ($mins > 0) {
+                return sprintf('%dh %dm', $hours, $mins);
+            }
+            if ($secs > 0 && $includeSeconds) {
+                return sprintf('%dh %02ds', $hours, $secs);
+            }
+            return sprintf('%dh', $hours);
+        }
+
+        if ($mins > 0) {
+            if ($secs > 0 && $includeSeconds) {
+                return sprintf('%dm %02ds', $mins, $secs);
+            }
+            return sprintf('%dm', $mins);
+        }
+
+        return sprintf('%ds', $secs);
+    }
+}
+
+
 
 

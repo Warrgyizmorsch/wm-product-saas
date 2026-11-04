@@ -41,6 +41,7 @@ class RoutingCostService
         $totalCost         = 0.0;
         $totalLaborCost    = 0.0;
         $totalMachineCost  = 0.0;
+        $totalSubcontractCost = 0.0;
         $totalOverheadCost = 0.0;
 
         foreach ($routing->operations as $operation) {
@@ -50,22 +51,24 @@ class RoutingCostService
                 $totalCost += $cost['total_cost'];
                 $totalLaborCost += $cost['labor_cost'] ?? 0.0;
                 $totalMachineCost += $cost['machine_cost'] ?? 0.0;
+                $totalSubcontractCost += $cost['subcontract_cost'] ?? 0.0;
                 $totalOverheadCost += $cost['overhead_cost'] ?? 0.0;
             }
         }
 
         return [
-            'routing_id'      => $routing->id,
-            'routing_number'  => $routing->routing_number,
-            'routing_name'    => $routing->name,
-            'quantity'        => $quantity,
-            'operations'      => $operationCosts,
-            'total_cost'      => round($totalCost, 4),
-            'labor_cost'      => round($totalLaborCost, 4),
-            'machine_cost'    => round($totalMachineCost, 4),
-            'overhead_cost'   => round($totalOverheadCost, 4),
-            'cost_per_unit'   => $quantity > 0 ? round($totalCost / $quantity, 4) : 0.0,
-            'total_time_min'  => $routing->totalCycleTimeMinutes(),
+            'routing_id'        => $routing->id,
+            'routing_number'    => $routing->routing_number,
+            'routing_name'      => $routing->name,
+            'quantity'          => $quantity,
+            'operations'        => $operationCosts,
+            'total_cost'        => round($totalCost, 4),
+            'labor_cost'        => round($totalLaborCost, 4),
+            'machine_cost'      => round($totalMachineCost, 4),
+            'subcontract_cost'  => round($totalSubcontractCost, 4),
+            'overhead_cost'     => round($totalOverheadCost, 4),
+            'cost_per_unit'     => $quantity > 0 ? round($totalCost / $quantity, 4) : 0.0,
+            'total_time_min'    => $routing->totalCycleTimeMinutes(),
         ];
     }
 
@@ -112,44 +115,72 @@ class RoutingCostService
             ];
         }
 
-        $laborRate = (float) $operation->labor_cost_rate;
-        $machineRate = (float) $operation->machine_cost_rate;
+        $laborRate = 0.0;
+        $machineRate = 0.0;
         $resourceName = '';
+        $snap = is_array($operation->resource_snapshot) ? $operation->resource_snapshot : null;
 
         if ($operation->section_manual_production_id) {
             $machineRate = 0.0;
             $batch = $operation->manualProduction;
             $resourceName = $batch ? "Manual: {$batch->batch_name}" : 'Manual Batch';
-            if ($laborRate <= 0.0 && $operation->section) {
+            if ($snap && isset($snap['labor_cost_per_hour'])) {
+                $laborRate = ((float) $snap['labor_cost_per_hour']) / 60.0;
+            } elseif ($operation->section) {
                 $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($operation->section);
                 foreach ($sectionCosts['manual_batches'] as $mb) {
                     if ((int) $mb['id'] === (int) $operation->section_manual_production_id) {
-                        $laborRate = ($mb['labor_cost_per_hour'] ?? 0.0) / 60.0;
+                        $laborRate = ((float) ($mb['labor_cost_per_hour'] ?? 0.0)) / 60.0;
                         break;
                     }
                 }
             }
+            if ($laborRate <= 0.0) {
+                $laborRate = (float) $operation->labor_cost_rate;
+            }
         } elseif ($operation->machine_id) {
             $machine = $operation->machine;
             $resourceName = $machine ? "Machine: {$machine->name} ({$machine->code})" : 'Machine';
-            if ($machineRate <= 0.0 && $machine) {
+            if ($snap && (isset($snap['operating_cost_per_hour']) || isset($snap['machine_cost_per_hour']))) {
+                $machineRate = ((float) ($snap['operating_cost_per_hour'] ?? $snap['machine_cost_per_hour'])) / 60.0;
+            } elseif ($machine) {
                 $machineRate = ((float) $machine->operating_cost_per_hour) / 60.0;
             }
-            if ($laborRate <= 0.0 && $operation->section) {
+            if ($machineRate <= 0.0) {
+                $machineRate = (float) $operation->machine_cost_rate;
+            }
+
+            if ($snap && isset($snap['operator_labor_cost_per_machine_per_hour'])) {
+                $laborRate = ((float) $snap['operator_labor_cost_per_machine_per_hour']) / 60.0;
+            } elseif ($operation->section) {
                 $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($operation->section);
-                $laborRate = ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0) / 60.0;
+                $laborRate = ((float) ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0)) / 60.0;
+            }
+            if ($laborRate <= 0.0) {
+                $laborRate = (float) $operation->labor_cost_rate;
             }
         } else {
             $wcLaborRate = $operation->workCenter ? ((float) $operation->workCenter->cost_per_hour / 60.0) : 0.0;
-            if ($laborRate <= 0.0) {
-                $laborRate = $wcLaborRate;
-            }
+            $laborRate = $wcLaborRate > 0.0 ? $wcLaborRate : (float) $operation->labor_cost_rate;
         }
 
         $laborCost   = $activeMinutes * $laborRate * $quantity * $yieldFactor;
         $machineCost = $activeMinutes * $machineRate * $quantity * $yieldFactor;
         $totalCost   = $laborCost + $machineCost;
         $costPerUnit = $quantity > 0 ? ($totalCost / $quantity) : 0.0;
+
+        if ($operation->cost_per_unit !== null && (float) $operation->cost_per_unit > 0.0) {
+            $costPerUnit = (float) $operation->cost_per_unit;
+            $totalCost   = $costPerUnit * $quantity;
+            $rawSum = $laborCost + $machineCost;
+            if ($rawSum > 0.0) {
+                $laborCost = ($laborCost / $rawSum) * $totalCost;
+                $machineCost = ($machineCost / $rawSum) * $totalCost;
+            } else {
+                $laborCost = $totalCost;
+                $machineCost = 0.0;
+            }
+        }
 
         return [
             'operation_id'              => $operation->id,

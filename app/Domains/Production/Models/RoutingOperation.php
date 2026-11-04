@@ -45,6 +45,8 @@ class RoutingOperation extends BaseModel
         'is_alternative',
         'replaces_operation_id',
         'priority',
+        'cost_per_unit',
+        'resource_snapshot',
         'setup_time_minutes',
         'processing_time_minutes',
         'wait_time_minutes',
@@ -78,6 +80,8 @@ class RoutingOperation extends BaseModel
         'is_alternative'            => 'boolean',
         'replaces_operation_id'     => 'integer',
         'priority'                  => 'integer',
+        'cost_per_unit'             => 'float',
+        'resource_snapshot'         => 'array',
         'setup_time_minutes'        => 'float',
         'processing_time_minutes'   => 'float',
         'wait_time_minutes'         => 'float',
@@ -223,19 +227,66 @@ class RoutingOperation extends BaseModel
 
     /**
      * Estimated operation cost per unit (1-unit baseline).
+     * Reconciles setup time, cycle run time, machine power/maintenance, and operator labor.
      */
     public function estimatedCostPerUnit(): float
     {
-        if ($this->is_external) {
-            return (float) $this->subcontract_cost_per_unit;
+        if ($this->cost_per_unit !== null && (float) $this->cost_per_unit > 0.0) {
+            return (float) $this->cost_per_unit;
         }
 
-        $totalMinutes = (float) $this->processing_time_minutes;
-        $laborRate = (float) $this->labor_cost_rate;
-        $machineRate = (float) $this->machine_cost_rate > 0.0
-            ? (float) $this->machine_cost_rate
-            : ($this->machine ? ((float) $this->machine->operating_cost_per_hour / 60.0) : 0.0);
+        $yieldFactor = $this->expected_yield_percentage > 0 ? (100 / $this->expected_yield_percentage) : 1.0;
 
-        return ($totalMinutes * $laborRate) + ($totalMinutes * $machineRate);
+        if ($this->is_external) {
+            return round(((float) $this->subcontract_cost_per_unit) * $yieldFactor, 4);
+        }
+
+        $activeMinutes = (float) $this->setup_time_minutes + (float) $this->processing_time_minutes;
+        $laborRate = 0.0;
+        $machineRate = 0.0;
+        $snap = is_array($this->resource_snapshot) ? $this->resource_snapshot : null;
+
+        if ($this->section_manual_production_id) {
+            $machineRate = 0.0;
+            if ($snap && isset($snap['labor_cost_per_hour'])) {
+                $laborRate = ((float) $snap['labor_cost_per_hour']) / 60.0;
+            } elseif ($this->section) {
+                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($this->section);
+                foreach ($sectionCosts['manual_batches'] as $mb) {
+                    if ((int) $mb['id'] === (int) $this->section_manual_production_id) {
+                        $laborRate = ((float) ($mb['labor_cost_per_hour'] ?? 0.0)) / 60.0;
+                        break;
+                    }
+                }
+            }
+            if ($laborRate <= 0.0) {
+                $laborRate = (float) $this->labor_cost_rate;
+            }
+        } elseif ($this->machine_id) {
+            if ($snap && (isset($snap['operating_cost_per_hour']) || isset($snap['machine_cost_per_hour']))) {
+                $machineRate = ((float) ($snap['operating_cost_per_hour'] ?? $snap['machine_cost_per_hour'])) / 60.0;
+            } elseif ($this->machine) {
+                $machineRate = ((float) $this->machine->operating_cost_per_hour) / 60.0;
+            }
+            if ($machineRate <= 0.0) {
+                $machineRate = (float) $this->machine_cost_rate;
+            }
+
+            if ($snap && isset($snap['operator_labor_cost_per_machine_per_hour'])) {
+                $laborRate = ((float) $snap['operator_labor_cost_per_machine_per_hour']) / 60.0;
+            } elseif ($this->section) {
+                $sectionCosts = app(\App\Domains\Production\Services\SectionCalculationService::class)->getSectionResourceCosts($this->section);
+                $laborRate = ((float) ($sectionCosts['operator_labor_cost_per_machine_per_hour'] ?? 0.0)) / 60.0;
+            }
+            if ($laborRate <= 0.0) {
+                $laborRate = (float) $this->labor_cost_rate;
+            }
+        } elseif ($this->work_center_id) {
+            $wc = $this->workCenter;
+            $wcLaborRate = $wc ? ((float) $wc->cost_per_hour / 60.0) : 0.0;
+            $laborRate = $wcLaborRate > 0.0 ? $wcLaborRate : (float) $this->labor_cost_rate;
+        }
+
+        return round(($activeMinutes * ($laborRate + $machineRate)) * $yieldFactor, 4);
     }
 }

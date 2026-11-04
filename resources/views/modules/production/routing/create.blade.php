@@ -206,7 +206,9 @@
                                     <th style="width: 85px; min-width: 85px;" class="text-end">{{ __('production.setup') }} (m)</th>
                                     <th style="width: 85px; min-width: 85px;" class="text-end">{{ __('production.run') }} (m)</th>
                                     <th style="width: 85px; min-width: 85px;" class="text-end" title="Buffer / wait / cure / cool-down time (minutes)">Wait (m)</th>
-                                    <th style="width: 95px; min-width: 95px;" class="text-end" title="Calculated Cost Per Unit (Labor + Machine or Subcontract)">Cost / Unit</th>
+                                    <th style="width: 105px; min-width: 105px;" class="text-end" title="Total Cost Per Unit: includes setup time + cycle run time, machine power/maintenance, and allocated operator labor.">
+                                        Cost / Unit <i class="feather-info text-primary ms-0.5 fs-11" data-bs-toggle="tooltip" data-bs-placement="top" title="Total Cost Per Unit: includes setup time + cycle run time, machine power/maintenance, and allocated operator labor."></i>
+                                    </th>
                                     <th style="width: 45px; min-width: 45px;" class="text-center">{{ __('production.qc_gate') }}</th>
                                     <th style="width: 170px; min-width: 170px;">Type / Alt</th>
                                     <th style="width: 120px; min-width: 120px;" class="text-end">{{ __('production.actions') }}</th>
@@ -223,9 +225,12 @@
                                             <input type="hidden" x-bind:name="'operations['+index+'][is_alternative]'" :value="operation.is_alternative ? 1 : 0" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][replaces_row_uid]'" :value="operation.is_alternative ? (operation.replaces_row_uid || '') : ''" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][replaces_operation_id]'" :value="operation.is_alternative ? (operation.replaces_operation_id || '') : ''" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][replaces_sequence]'" :value="operation.is_alternative ? (operation.replaces_sequence || '') : ''" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][priority]'" :value="operation.is_alternative ? (operation.priority || 1) : ''" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][labor_cost_rate]'" :value="operation.labor_cost_rate" />
                                             <input type="hidden" x-bind:name="'operations['+index+'][machine_cost_rate]'" :value="operation.machine_cost_rate" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][cost_per_unit]'" :value="calculateUnitCost(operation)" />
+                                            <input type="hidden" x-bind:name="'operations['+index+'][resource_snapshot]'" :value="JSON.stringify(getResourceSnapshot(operation))" />
                                         </td>
                                         
                                         <!-- Operation Name & Details -->
@@ -287,16 +292,27 @@
                                                 <textarea x-bind:name="'operations['+index+'][instructions]'" class="odoo-table-input fs-11 text-muted bg-white" rows="2" placeholder="Detailed shop-floor SOP instructions for operators..." x-model="operation.instructions"></textarea>
                                             </div>
 
-                                            <div class="mt-1.5 d-flex align-items-center gap-1.5" x-show="!operation.is_parallel && index > 0">
-                                                <span class="fs-10 text-muted text-nowrap"><i class="feather-git-commit me-1"></i>Predecessor:</span>
-                                                <div class="flex-grow-1" style="min-width: 170px;">
-                                                    <select x-bind:name="'operations['+index+'][predecessor_sequence]'"
-                                                        class="form-select form-select-sm fs-11 routing-pred-select"
-                                                        :data-row-uid="operation.uid">
-                                                        <option value="">-- Auto (Previous Op) --</option>
-                                                        <option value="-1">-- None (Independent / Starts Immediately) --</option>
-                                                    </select>
-                                                </div>
+                                            <!-- Predecessor Selector or Mirror Info for Alternatives -->
+                                            <div class="mt-1.5" x-show="!operation.is_parallel && index > 0">
+                                                <template x-if="operation.is_alternative">
+                                                    <div class="d-flex align-items-center gap-1.5 text-muted fs-11">
+                                                        <span class="fs-10 text-muted text-nowrap"><i class="feather-git-commit me-1"></i>Predecessor:</span>
+                                                        <span class="badge bg-light text-secondary border fs-10 font-monospace py-1" x-text="getAlternativePredecessorLabel(operation)"></span>
+                                                    </div>
+                                                </template>
+                                                <template x-if="!operation.is_alternative">
+                                                    <div class="d-flex align-items-center gap-1.5">
+                                                        <span class="fs-10 text-muted text-nowrap"><i class="feather-git-commit me-1"></i>Predecessor:</span>
+                                                        <div class="flex-grow-1" style="min-width: 170px;">
+                                                            <select x-bind:name="'operations['+index+'][predecessor_sequence]'"
+                                                                class="form-select form-select-sm fs-11 routing-pred-select"
+                                                                :data-row-uid="operation.uid">
+                                                                <option value="">-- Auto (Previous Op) --</option>
+                                                                <option value="-1">-- None (Independent / Starts Immediately) --</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </template>
                                             </div>
                                         </td>
                                         
@@ -407,8 +423,16 @@
                                                         <span><i class="feather-clock me-1 text-muted"></i>Run Speed:</span>
                                                         <span class="fw-bold text-dark font-monospace" x-text="formatDuration(getSelectedMachine(operation).speed_minutes_per_unit) + ' (' + parseFloat(getSelectedMachine(operation).speed_minutes_per_unit || 0).toFixed(2) + ' m/u)'"></span>
                                                     </div>
+                                                    <div class="d-flex justify-content-between align-items-center fs-10 text-secondary mb-1">
+                                                        <span><i class="feather-cpu me-1 text-muted"></i>Machine Cost:</span>
+                                                        <span class="fw-semibold text-dark font-monospace" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedMachine(operation).machine_cost_per_unit || 0).toFixed(2)"></span>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between align-items-center fs-10 text-secondary mb-1">
+                                                        <span><i class="feather-user me-1 text-muted"></i>Operator Cost:</span>
+                                                        <span class="fw-semibold text-dark font-monospace" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedMachine(operation).labor_cost_per_unit || 0).toFixed(2)"></span>
+                                                    </div>
                                                     <div class="d-flex justify-content-between align-items-center fs-10 text-secondary pt-1 border-top border-light-subtle">
-                                                        <span><i class="feather-dollar-sign me-0.5 text-muted"></i>Unit Cost:</span>
+                                                        <span class="fw-semibold text-dark"><i class="feather-dollar-sign me-0.5 text-muted"></i>Operation Cost:</span>
                                                         <span class="fw-bold text-primary font-monospace fs-11" x-text="'{{ active_currency_symbol() }}' + parseFloat(getSelectedMachine(operation).cost_per_unit || 0).toFixed(2)"></span>
                                                     </div>
                                                 </div>
@@ -513,8 +537,8 @@
                                         </td>
                                         
                                         <!-- Cost / Unit -->
-                                        <td class="align-middle text-end font-monospace fw-semibold" style="width: 95px; min-width: 95px;">
-                                            <span class="fs-12 text-primary" x-text="'{{ active_currency_symbol() }}' + calculateUnitCost(operation)"></span>
+                                        <td class="align-middle text-end font-monospace fw-semibold" style="width: 105px; min-width: 105px;">
+                                            <span class="fs-12 text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Total unit cost: (setup time + cycle run time) × rates × yield" x-text="'{{ active_currency_symbol() }}' + calculateUnitCost(operation)"></span>
                                         </td>
                                         
                                         <!-- Quality Required -->
@@ -688,13 +712,14 @@
                     if (rawOpsList.length > 0) {
                         rawOpsList.forEach((op, opIndex) => {
                             const newOp = {
-                                uid: self.uidCounter++,
+                                uid: 'row_' + (self.uidCounter++),
                                 sequence: op.sequence ? parseInt(op.sequence) : (opIndex + 1) * 10,
                                 name: op.name || '',
                                 operation_type: op.operation_type || 'manufacturing',
                                 is_alternative: op.is_alternative == 1 || op.is_alternative === '1' || op.is_alternative === true,
                                 replaces_row_uid: op.replaces_row_uid || '',
                                 replaces_operation_id: op.replaces_operation_id || '',
+                                replaces_sequence: op.replaces_sequence || '',
                                 priority: parseInt(op.priority || 1),
                                 work_center_id: op.work_center_id || '',
                                 section_id: op.section_id || '',
@@ -768,13 +793,14 @@
                         : 10;
 
                     this.operations.push({
-                        uid: this.uidCounter++,
+                        uid: 'row_' + (this.uidCounter++),
                         sequence: nextSeq,
                         name: '',
                         operation_type: 'manufacturing',
                         is_alternative: false,
                         replaces_row_uid: '',
                         replaces_operation_id: '',
+                        replaces_sequence: '',
                         priority: 1,
                         work_center_id: '',
                         section_id: '',
@@ -922,9 +948,15 @@
                         $altSelect.off('change.routing-alt select2:select.routing-alt select2:clear.routing-alt')
                                   .on('change.routing-alt select2:select.routing-alt select2:clear.routing-alt', function() {
                             const val = $(this).val() || '';
-                            if (String(operation.replaces_row_uid) !== String(val)) {
+                            if (String(operation.replaces_row_uid || '') !== String(val)) {
                                 operation.replaces_row_uid = val;
+                                const targetOp = self.operations.find(o => String(o.uid) === String(val));
+                                operation.replaces_sequence = targetOp ? targetOp.sequence : '';
+                                if (targetOp) {
+                                    operation.predecessor_sequence = targetOp.predecessor_sequence || '';
+                                }
                             }
+                            self.refreshAllPredSelect2();
                         });
                     }
 
@@ -941,6 +973,12 @@
                             const val = $(this).val() || '';
                             if (String(operation.predecessor_sequence || '') !== String(val)) {
                                 operation.predecessor_sequence = val;
+                                // If this operation has alternative operations, sync their predecessor too!
+                                self.operations.forEach(other => {
+                                    if (other.is_alternative && (String(other.replaces_row_uid) === String(operation.uid) || (other.replaces_sequence && String(other.replaces_sequence) === String(operation.sequence)))) {
+                                        other.predecessor_sequence = val;
+                                    }
+                                });
                             }
                         });
                     }
@@ -1112,6 +1150,39 @@
                     });
                 },
 
+                getAutoPredecessorTarget(operation, index) {
+                    if (index === undefined || index === null) {
+                        index = this.operations.findIndex(o => String(o.uid) === String(operation.uid));
+                    }
+                    if (index <= 0) return null;
+                    // Look backwards from index - 1 to find the first non-alternative operation
+                    for (let p = index - 1; p >= 0; p--) {
+                        const prev = this.operations[p];
+                        const isAlt = prev.is_alternative == 1 || prev.is_alternative === '1' || prev.is_alternative === true;
+                        if (!isAlt) {
+                            return prev;
+                        }
+                    }
+                    return null;
+                },
+
+                getAlternativePredecessorLabel(operation) {
+                    const mainOp = this.operations.find(o => String(o.uid) === String(operation.replaces_row_uid) || (operation.replaces_sequence && String(o.sequence) === String(operation.replaces_sequence)));
+                    if (!mainOp) {
+                        return 'Select Primary Op first';
+                    }
+                    const mainPredSeq = mainOp.predecessor_sequence;
+                    if (mainPredSeq === '-1') {
+                        return `Mirrors Op ${mainOp.sequence} (Independent)`;
+                    }
+                    if (mainPredSeq && mainPredSeq !== '') {
+                        const predOp = this.operations.find(o => String(o.sequence) === String(mainPredSeq));
+                        return `Mirrors Op ${mainOp.sequence} (Predecessor: Op ${mainPredSeq}${predOp?.name ? ': ' + predOp.name : ''})`;
+                    }
+                    const autoTarget = this.getAutoPredecessorTarget(mainOp);
+                    return `Mirrors Op ${mainOp.sequence} (Predecessor: ${autoTarget ? 'Op ' + autoTarget.sequence : 'Initial Op'})`;
+                },
+
                 refreshPredSelect2($row, operation, index) {
                     if (!$row || !$row.length) return;
                     const $predSelect = $row.find('.routing-pred-select');
@@ -1125,18 +1196,42 @@
                         ? String(operation.predecessor_sequence)
                         : '';
 
+                    const autoTarget = this.getAutoPredecessorTarget(operation, index);
+                    const autoLabel = autoTarget 
+                        ? `-- Auto (Op ${autoTarget.sequence}${autoTarget.name ? ': ' + autoTarget.name : ''}) --` 
+                        : '-- Auto (Previous Op) --';
+
                     $predSelect.empty();
-                    $predSelect.append(new Option('-- Auto (Previous Op) --', '', currentVal === '', currentVal === ''));
+                    $predSelect.append(new Option(autoLabel, '', currentVal === '', currentVal === ''));
                     $predSelect.append(new Option('-- None (Independent / Starts Immediately) --', '-1', currentVal === '-1', currentVal === '-1'));
 
                     priorOps.forEach(prevOp => {
-                        const label = 'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '');
+                        const isAlt = prevOp.is_alternative == 1 || prevOp.is_alternative === '1' || prevOp.is_alternative === true;
+                        let label = 'Op ' + prevOp.sequence + (prevOp.name ? ': ' + prevOp.name : '');
                         const valStr = String(prevOp.sequence);
-                        const isSelected = valStr === currentVal;
-                        $predSelect.append(new Option(label, valStr, isSelected, isSelected));
+
+                        if (isAlt) {
+                            const mainOp = this.operations.find(o => String(o.uid) === String(prevOp.replaces_row_uid) || (prevOp.replaces_sequence && String(o.sequence) === String(prevOp.replaces_sequence)));
+                            const mainLabel = mainOp ? 'Op ' + mainOp.sequence : 'Primary Op';
+                            label += ` (Disabled: Alternative of ${mainLabel} — cannot be predecessor)`;
+                            const opt = new Option(label, valStr, false, false);
+                            opt.disabled = true;
+                            $predSelect.append(opt);
+                        } else {
+                            const isSelected = valStr === currentVal;
+                            $predSelect.append(new Option(label, valStr, isSelected, isSelected));
+                        }
                     });
 
-                    $predSelect.val(currentVal);
+                    // Guard: if current selected predecessor was an alternative, reset to auto
+                    const currentTargetOp = priorOps.find(o => String(o.sequence) === currentVal);
+                    if (currentTargetOp && (currentTargetOp.is_alternative == 1 || currentTargetOp.is_alternative === '1' || currentTargetOp.is_alternative === true)) {
+                        operation.predecessor_sequence = '';
+                        $predSelect.val('');
+                    } else {
+                        $predSelect.val(currentVal);
+                    }
+
                     if ($predSelect.data('select2')) {
                         $predSelect.trigger('change.select2');
                     }
@@ -1207,6 +1302,7 @@
                     if (!operation.is_alternative) {
                         operation.replaces_row_uid = '';
                         operation.replaces_operation_id = '';
+                        operation.replaces_sequence = '';
                         operation.priority = 1;
                     } else {
                         if (!operation.priority || operation.priority < 1) {
@@ -1217,9 +1313,11 @@
                             if (other.is_alternative && (String(other.replaces_row_uid) === String(operation.uid) || String(other.replaces_operation_id) === String(operation.uid))) {
                                 other.replaces_row_uid = '';
                                 other.replaces_operation_id = '';
+                                other.replaces_sequence = '';
                             }
                         });
                     }
+                    this.refreshAllPredSelect2();
                     this.$nextTick(() => {
                         const $row = $('tr[data-row-uid="' + operation.uid + '"]');
                         const $altSelect = $row.find('.routing-alt-select');
@@ -1234,11 +1332,58 @@
                                 const val = $(this).val() || '';
                                 if (String(operation.replaces_row_uid || '') !== String(val)) {
                                     operation.replaces_row_uid = val;
+                                    const targetOp = self.operations.find(o => String(o.uid) === String(val));
+                                    operation.replaces_sequence = targetOp ? targetOp.sequence : '';
+                                    if (targetOp) {
+                                        operation.predecessor_sequence = targetOp.predecessor_sequence || '';
+                                    }
                                 }
+                                self.refreshAllPredSelect2();
                             });
                         }
                         this.refreshAllAltSelect2();
                     });
+                },
+
+                getResourceSnapshot(operation) {
+                    if (operation.is_external) {
+                        return {
+                            type: 'outsourced',
+                            vendor_id: operation.vendor_id || null,
+                            cost_per_unit: parseFloat(operation.subcontract_cost_per_unit || 0)
+                        };
+                    }
+                    const machine = this.getSelectedMachine(operation);
+                    if (machine) {
+                        return {
+                            type: 'machine',
+                            machine_id: machine.id,
+                            code: machine.code,
+                            name: machine.name,
+                            capacity: parseFloat(machine.capacity || 0),
+                            speed_minutes_per_unit: parseFloat(machine.speed_minutes_per_unit || 0),
+                            operating_cost_per_hour: parseFloat(machine.operating_cost_per_hour || 0),
+                            operator_labor_cost_per_machine_per_hour: parseFloat(operation.operator_labor_cost_per_machine_per_hour || machine.operator_labor_cost_per_hour || 0),
+                            machine_cost_per_unit: parseFloat(machine.machine_cost_per_unit || 0),
+                            labor_cost_per_unit: parseFloat(machine.labor_cost_per_unit || 0),
+                            cost_per_unit: parseFloat(machine.cost_per_unit || 0)
+                        };
+                    }
+                    const batch = this.getSelectedBatch(operation);
+                    if (batch) {
+                        return {
+                            type: 'manual_batch',
+                            batch_id: batch.id,
+                            batch_name: batch.batch_name,
+                            shift_name: batch.shift_name,
+                            capacity: parseFloat(batch.capacity_per_hour || 0),
+                            speed_minutes_per_unit: parseFloat(batch.speed_minutes_per_unit || 0),
+                            labor_cost_per_hour: parseFloat(batch.labor_cost_per_hour || 0),
+                            labor_cost_per_unit: parseFloat(batch.labor_cost_per_unit || 0),
+                            cost_per_unit: parseFloat(batch.cost_per_unit || 0)
+                        };
+                    }
+                    return null;
                 },
 
                 onExternalToggle(operation) {

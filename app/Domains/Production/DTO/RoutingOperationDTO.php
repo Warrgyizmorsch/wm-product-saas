@@ -45,6 +45,9 @@ class RoutingOperationDTO
         public readonly ?string $parallel_group = null,
         public readonly ?int    $predecessor_sequence = null,
         public readonly ?int    $previous_operation_id = null,
+        public readonly ?float  $cost_per_unit = null,
+        public readonly ?array  $resource_snapshot = null,
+        public readonly ?int    $replaces_sequence = null,
         public readonly array   $materials = [],
     ) {}
 
@@ -123,6 +126,9 @@ class RoutingOperationDTO
             parallel_group:                !empty($data['parallel_group']) ? trim((string) $data['parallel_group']) : null,
             predecessor_sequence:          isset($data['predecessor_sequence']) && $data['predecessor_sequence'] !== '' && $data['predecessor_sequence'] !== 'none' ? (int) $data['predecessor_sequence'] : null,
             previous_operation_id:         !empty($data['previous_operation_id']) ? (int) $data['previous_operation_id'] : null,
+            cost_per_unit:                 isset($data['cost_per_unit']) && $data['cost_per_unit'] !== '' ? (float) $data['cost_per_unit'] : null,
+            resource_snapshot:             !empty($data['resource_snapshot']) ? (is_array($data['resource_snapshot']) ? $data['resource_snapshot'] : json_decode((string) $data['resource_snapshot'], true)) : null,
+            replaces_sequence:             isset($data['replaces_sequence']) && $data['replaces_sequence'] !== '' ? (int) $data['replaces_sequence'] : null,
             materials:                     $materials,
         );
     }
@@ -141,6 +147,8 @@ class RoutingOperationDTO
             'is_alternative'                 => $this->is_alternative,
             'replaces_operation_id'          => $this->replaces_operation_id,
             'priority'                       => $this->priority,
+            'cost_per_unit'                  => $this->cost_per_unit,
+            'resource_snapshot'              => $this->resource_snapshot,
             'setup_time_minutes'             => $this->setup_time_minutes,
             'processing_time_minutes'        => $this->processing_time_minutes,
             'wait_time_minutes'              => $this->wait_time_minutes,

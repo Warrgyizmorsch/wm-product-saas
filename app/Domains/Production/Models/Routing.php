@@ -233,7 +233,7 @@ class Routing extends BaseModel
      */
     public function totalCycleTimeMinutes(): float
     {
-        return $this->operations->sum(function (RoutingOperation $op): float {
+        return $this->operations->where('is_alternative', false)->sum(function (RoutingOperation $op): float {
             return $op->setup_time_minutes + $op->processing_time_minutes + $op->wait_time_minutes;
         });
     }
