@@ -400,6 +400,12 @@ class AppServiceProvider extends ServiceProvider
         );
 
 
+        // ── Accounting: Integration kit ───────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Services\Integration\IntegrationRefRepositoryInterface::class,
+            \App\Domains\Accounting\Services\Integration\IntegrationRefRepository::class
+        );
+
         // ── Accounting: Chart of Accounts ─────────────────────────────────────
         $this->app->bind(
             \App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface::class,
@@ -524,6 +530,27 @@ class AppServiceProvider extends ServiceProvider
             $client = $request->user()?->id ? "u:{$request->user()->id}" : "ip:{$request->ip()}";
             return "t:{$tenantId}:{$client}";
         };
+
+        // Accounting integration kit: the relay polls and reports one job at a time.
+        \Illuminate\Support\Facades\RateLimiter::for('accounting-integration', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
+            return \Illuminate\Cache\RateLimiting\Limit::perMinute(600)->by($productionRateLimitKey($request));
+        });
+
+        // A connector token works on the integration API and nowhere else, so a
+        // token sitting on a customer's PC can't reach the rest of the ERP.
+        \Laravel\Sanctum\Sanctum::authenticateAccessTokensUsing(function ($token, bool $isValid) {
+            if (! $isValid) {
+                return false;
+            }
+
+            foreach ((array) $token->abilities as $ability) {
+                if (str_starts_with((string) $ability, \App\Domains\Accounting\Models\IntegrationConnection::abilityPrefix())) {
+                    return request()->is('api/v1/accounting/integrations/*');
+                }
+            }
+
+            return true;
+        });
 
         \Illuminate\Support\Facades\RateLimiter::for('production-api', function (\Illuminate\Http\Request $request) use ($productionRateLimitKey) {
             return \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($productionRateLimitKey($request));

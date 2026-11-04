@@ -91,6 +91,9 @@ Route::prefix('notifications')
 // Production Module API v1
 Route::prefix('v1/production')->group(base_path('app/Domains/Production/Routes/api.php'));
 
+// Accounting integration kit API v1 (Tally etc.)
+Route::prefix('v1/accounting/integrations')->group(base_path('app/Domains/Accounting/Routes/integration_api.php'));
+
 // Twilio Voice Telephony Webhook Routes (Public endpoints called by Twilio Cloud)
 Route::match(['get', 'post'], 'crm/webhooks/twilio/voice', [\App\Domains\CRM\Controllers\CrmCallAssistantController::class, 'handleTwilioVoiceWebhook'])
     ->name('api.crm.webhooks.twilio.voice');

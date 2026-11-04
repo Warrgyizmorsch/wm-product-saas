@@ -1,0 +1,2601 @@
+{
+  "info": {
+    "name": "Accounting Integration API - Admin",
+    "description": "Two-way accounting sync API, full set.\n\n**Internal use. Contains login, token minting and admin calls. Do not share this file outside your team; give partners the Partner collection instead.**\n\n## Security rules\n- Keep tokens only in an environment's **current value**. Never put them in a collection, a shared workspace, or a screenshot.\n- Never export or commit an environment that has tokens in it.\n- Requests are blocked unless base_url is https (plain http is allowed only for localhost and .test hosts).\n- Requests that change data are blocked until you set allow_writes to true. Test on a test tenant first.\n- Tokens don't expire on their own. Revoke them when a person or a machine no longer needs access.\n- If a token may have leaked, revoke it straight away and check the sync log.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{admin_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Safety checks that run before every request. They can only stop a request, never change it.",
+          "(function () {",
+          "    const stop = function (message) {",
+          "        console.error('[Blocked] ' + message);",
+          "        if (pm.execution && pm.execution.skipRequest) { pm.execution.skipRequest(); }",
+          "        throw new Error(message);",
+          "    };",
+          "    const baseUrl = String(pm.variables.get('base_url') || '').trim();",
+          "    const isLocal = /^http:\\/\\/(localhost|127\\.0\\.0\\.1|\\[::1\\]|[^\\/:]+\\.test)(:\\d+)?(\\/|$)/i.test(baseUrl);",
+          "    if (!baseUrl) { stop('Set base_url in the environment.'); }",
+          "    if (!/^https:\\/\\//i.test(baseUrl) && !isLocal) { stop('base_url must use https:// so tokens are not sent in clear text. Plain http is allowed only for localhost and .test hosts.'); }",
+          "",
+          "    const url = pm.request.url.toString();",
+          "    const isLogin = url.indexOf('/api/auth/') !== -1;",
+          "    if (!String(pm.variables.get('tenant_slug') || '').trim()) { stop('Set tenant_slug in the environment.'); }",
+          "",
+          "    const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(pm.request.method) !== -1;",
+          "    if (isWrite && !isLogin && String(pm.variables.get('allow_writes')) !== 'true') {",
+          "        stop('This request changes data, and allow_writes is not \"true\" in the environment. Use a test tenant first.');",
+          "    }",
+          "})();"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Sign in (admin only)",
+      "item": [
+        {
+          "name": "Log in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Saves a full-access token to admin_token and clears admin_password. This token can do anything the user can do across the ERP, so never share it. Log out when finished. Limit: 5 attempts a minute.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.token; if (value !== undefined && value !== null) { pm.environment.set('admin_token', String(value)); } }",
+                  "if (pm.response.code === 200) { pm.environment.set('admin_password', ''); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Connections (admin only)",
+      "item": [
+        {
+          "name": "List connections",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections?per_page=25",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "25"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections"
+              ]
+            },
+            "description": "product is tally or custom. Saves the new id to connection_id. Always set export_from, or all journal history goes out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman test {{$timestamp}}\",\n  \"product\": \"tally\",\n  \"external_company\": \"Exact Company Name In Tally\",\n  \"settings\": {\n    \"direction\": \"both\",\n    \"sync_from\": \"{{voucher_date}}\",\n    \"export_from\": \"{{voucher_date}}\",\n    \"auto_sync_minutes\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.expect([201]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.id; if (value !== undefined && value !== null) { pm.environment.set('connection_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Show connection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pause connection",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            },
+            "description": "Use this first if a token may have leaked.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"paused\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resume connection",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Connector tokens (admin only)",
+      "item": [
+        {
+          "name": "Mint connector token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tokens",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tokens"
+              ]
+            },
+            "description": "A token acts as whoever mints it, so log in as the dedicated service user, not an owner. Works for this connection and this API only. Shown once; saved to connector_token. Send it to a partner through a password manager or other secret-sharing tool, never email or chat.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman connector\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.expect([201]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.token; if (value !== undefined && value !== null) { pm.environment.set('connector_token', String(value)); } }",
+                  "if (pm.response.code < 300) { const value = body?.data?.id; if (value !== undefined && value !== null) { pm.environment.set('token_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Mappings (admin only)",
+      "item": [
+        {
+          "name": "List mappings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/mappings?entity_type=ledger&per_page=25",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "mappings"
+              ],
+              "query": [
+                {
+                  "key": "entity_type",
+                  "value": "ledger"
+                },
+                {
+                  "key": "per_page",
+                  "value": "25"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Map external ledger to local ledger",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/mappings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "mappings"
+              ]
+            },
+            "description": "Set local_ledger_id to a chart of accounts id in this tenant. 422 means that id was not found.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entity_type\": \"ledger\",\n  \"external_id\": \"EXTERNAL-LEDGER-ID\",\n  \"external_name\": \"Name in the other system\",\n  \"local_id\": \"{{local_ledger_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Send data in",
+      "item": [
+        {
+          "name": "Send ledger groups",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/ledger-groups/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "ledger-groups",
+                "batch"
+              ]
+            },
+            "description": "Send groups, then ledgers, then vouchers. Up to 500 items. Idempotency-Key is a new GUID here so each click is a new request; a real connector must store its key and reuse it when retrying.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"SAMPLE-GROUP\",\n      \"name\": \"Sample Group (Postman)\",\n      \"nature\": \"expense\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 200', function () { pm.expect([201, 200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.id; if (value !== undefined && value !== null) { pm.environment.set('batch_id', String(value)); } }",
+                  "pm.test('No record failed', function () { pm.expect(body?.data?.failed_count ?? 0).to.eql(0); });",
+                  "pm.test('No record in conflict', function () { pm.expect(body?.data?.conflict_count ?? 0).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send ledgers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/ledgers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "ledgers",
+                "batch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"SAMPLE-BANK\",\n      \"name\": \"Sample Bank (Postman)\",\n      \"type\": \"asset\",\n      \"subtype\": \"current_asset\",\n      \"is_cash_or_bank\": true\n    },\n    {\n      \"external_id\": \"SAMPLE-RENT\",\n      \"name\": \"Sample Rent (Postman)\",\n      \"type\": \"expense\",\n      \"subtype\": \"indirect_expense\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 200', function () { pm.expect([201, 200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.id; if (value !== undefined && value !== null) { pm.environment.set('batch_id', String(value)); } }",
+                  "pm.test('No record failed', function () { pm.expect(body?.data?.failed_count ?? 0).to.eql(0); });",
+                  "pm.test('No record in conflict', function () { pm.expect(body?.data?.conflict_count ?? 0).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send vouchers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/vouchers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "vouchers",
+                "batch"
+              ]
+            },
+            "description": "Lines must balance. external_id must never change, because it is what prevents duplicates. Set voucher_date inside an open fiscal period.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"SAMPLE-VOUCHER-1\",\n      \"voucher_type\": \"payment\",\n      \"date\": \"{{voucher_date}}\",\n      \"number\": \"PM-1\",\n      \"narration\": \"Postman sample payment\",\n      \"lines\": [\n        {\n          \"ledger_external_id\": \"SAMPLE-RENT\",\n          \"debit\": 1000,\n          \"credit\": 0\n        },\n        {\n          \"ledger_external_id\": \"SAMPLE-BANK\",\n          \"debit\": 0,\n          \"credit\": 1000\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 200', function () { pm.expect([201, 200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.id; if (value !== undefined && value !== null) { pm.environment.set('batch_id', String(value)); } }",
+                  "pm.test('No record failed', function () { pm.expect(body?.data?.failed_count ?? 0).to.eql(0); });",
+                  "pm.test('No record in conflict', function () { pm.expect(body?.data?.conflict_count ?? 0).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel a voucher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/vouchers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "vouchers",
+                "batch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"SAMPLE-VOUCHER-1\",\n      \"is_cancelled\": true\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 200', function () { pm.expect([201, 200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.id; if (value !== undefined && value !== null) { pm.environment.set('batch_id', String(value)); } }",
+                  "pm.test('No record failed', function () { pm.expect(body?.data?.failed_count ?? 0).to.eql(0); });",
+                  "pm.test('No record in conflict', function () { pm.expect(body?.data?.conflict_count ?? 0).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Read data out",
+      "item": [
+        {
+          "name": "Read ledger group feed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/feed/ledger-groups?limit=100",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "feed",
+                "ledger-groups"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.[0]?.local_id; if (value !== undefined && value !== null) { pm.environment.set('feed_ledger_groups_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acknowledge ledger groups",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/feed/ledger-groups/ack",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "feed",
+                "ledger-groups",
+                "ack"
+              ]
+            },
+            "description": "Call only after you have safely stored the record. Unacknowledged records keep appearing in the feed. 422 means the feed was empty or the id was not found.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"local_id\": \"{{feed_ledger_groups_id}}\",\n      \"external_id\": \"ID-IN-YOUR-SYSTEM\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read ledger feed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/feed/ledgers?limit=100",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "feed",
+                "ledgers"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.[0]?.local_id; if (value !== undefined && value !== null) { pm.environment.set('feed_ledgers_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acknowledge ledgers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/feed/ledgers/ack",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "feed",
+                "ledgers",
+                "ack"
+              ]
+            },
+            "description": "Call only after you have safely stored the record. Unacknowledged records keep appearing in the feed. 422 means the feed was empty or the id was not found.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"local_id\": \"{{feed_ledgers_id}}\",\n      \"external_id\": \"ID-IN-YOUR-SYSTEM\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read voucher feed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/feed/vouchers?limit=100",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "feed",
+                "vouchers"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.[0]?.local_id; if (value !== undefined && value !== null) { pm.environment.set('feed_vouchers_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acknowledge vouchers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/feed/vouchers/ack",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "feed",
+                "vouchers",
+                "ack"
+              ]
+            },
+            "description": "Call only after you have safely stored the record. Unacknowledged records keep appearing in the feed. 422 means the feed was empty or the id was not found.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"local_id\": \"{{feed_vouchers_id}}\",\n      \"external_id\": \"ID-IN-YOUR-SYSTEM\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Sync log and conflicts",
+      "item": [
+        {
+          "name": "Show my connection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List batches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/batches?per_page=25",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "batches"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "25"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Show batch with records",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/batches/{{batch_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "batches",
+                "{{batch_id}}"
+              ]
+            },
+            "description": "Uses the batch_id saved by the last Send request. Read each record's outcome and error_code."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retry failed records",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/batches/{{batch_id}}/retry",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "batches",
+                "{{batch_id}}",
+                "retry"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404 or 422', function () { pm.expect([200, 404, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List open conflicts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/conflicts?status=open&per_page=25",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "conflicts"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "open"
+                },
+                {
+                  "key": "per_page",
+                  "value": "25"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.[0]?.id; if (value !== undefined && value !== null) { pm.environment.set('conflict_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/conflicts/{{conflict_id}}/resolve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "conflicts",
+                "{{conflict_id}}",
+                "resolve"
+              ]
+            },
+            "description": "keep_local or apply_incoming. Needs accounting.integrations.resolve, which a service user should not have.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": \"keep_local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404 or 422', function () { pm.expect([200, 404, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Tally relay and files",
+      "item": [
+        {
+          "name": "Queue a sync cycle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/sync",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "sync"
+              ]
+            },
+            "description": "Tally connections only. Start with one month, inbound only, on a test company.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"direction\": \"inbound\",\n  \"from\": \"{{voucher_date}}\",\n  \"to\": \"{{voucher_date}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retry failed pushes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/retry-pushes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "retry-pushes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Relay: poll for jobs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/agent/poll",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "agent",
+                "poll"
+              ]
+            },
+            "description": "Normally called by the relay. Leases jobs for five minutes, so polling here takes them away from a running relay.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 1,\n  \"agent_version\": \"postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) { /* not JSON */ }",
+                  "if (pm.response.code < 300) { const value = body?.data?.[0]?.id; if (value !== undefined && value !== null) { pm.environment.set('job_id', String(value)); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Relay: report job result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/agent/jobs/{{job_id}}/result",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "agent",
+                "jobs",
+                "{{job_id}}",
+                "result"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transport_error\": \"Postman test: Tally not reached\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload Tally XML file",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/import-file",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "import-file"
+              ]
+            },
+            "description": "Choose an XML file under the Body tab. Upload ledger-groups, then ledgers, then vouchers.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "entity",
+                  "value": "ledgers",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201 or 422', function () { pm.expect([201, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download ledgers XML",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/export-file?entity=ledgers&limit=100",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "export-file"
+              ],
+              "query": [
+                {
+                  "key": "entity",
+                  "value": "ledgers"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Ledgers are marked sent as soon as they are downloaded."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download vouchers XML",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tally/export-file?entity=vouchers&limit=100",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tally",
+                "export-file"
+              ],
+              "query": [
+                {
+                  "key": "entity",
+                  "value": "vouchers"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Confirm with the voucher acknowledge call, using the ids in the X-Accounting-Local-Ids response header."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', function () { pm.expect([200, 422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Security checks",
+      "description": "Each request here should be refused. A pass means the API refused it. The idempotency checks create one harmless test ledger, so use a test tenant.",
+      "item": [
+        {
+          "name": "No token is refused",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.expect([401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid token is refused",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "0|not-a-real-token",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.expect([401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Connector token cannot reach the rest of the ERP",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', function () { pm.expect([401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Connector token cannot reach another connection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{other_connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{other_connection_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403 or 404', function () { pm.expect([403, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Connector token lists only its own connection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test('Only this connection is listed', function () { const ids = (pm.response.json().data || []).map(function (c) { return String(c.id); }); pm.expect(ids).to.eql([String(pm.environment.get('connection_id'))]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Another tenant is refused",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{other_tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401 or 403 or 404', function () { pm.expect([401, 403, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing Idempotency-Key is refused",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/ledgers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "ledgers",
+                "batch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"POSTMAN-IDEMPOTENCY-CHECK\",\n      \"name\": \"Never created\",\n      \"type\": \"expense\",\n      \"subtype\": \"indirect_expense\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.expect([400]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency: first send",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idem_test_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/ledgers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "ledgers",
+                "batch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"POSTMAN-IDEMPOTENCY-CHECK\",\n      \"name\": \"Postman idempotency check\",\n      \"type\": \"expense\",\n      \"subtype\": \"indirect_expense\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('idem_test_key', 'postman-security-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency: same send is replayed, not repeated",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idem_test_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/ledgers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "ledgers",
+                "batch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"POSTMAN-IDEMPOTENCY-CHECK\",\n      \"name\": \"Postman idempotency check\",\n      \"type\": \"expense\",\n      \"subtype\": \"indirect_expense\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "pm.test('Marked as a replay', function () { pm.expect(pm.response.headers.get('X-Idempotent-Replay')).to.eql('true'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency: same key with other data is refused",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idem_test_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/ledgers/batch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "ledgers",
+                "batch"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"external_id\": \"POSTMAN-IDEMPOTENCY-CHECK\",\n      \"name\": \"Different data\",\n      \"type\": \"expense\",\n      \"subtype\": \"indirect_expense\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{connector_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', function () { pm.expect([409]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Revoke access (admin only)",
+      "item": [
+        {
+          "name": "Revoke connector token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}/tokens/{{token_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}",
+                "tokens",
+                "{{token_id}}"
+              ]
+            },
+            "description": "Works only for tokens minted by the logged-in user."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 404', function () { pm.expect([200, 404]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove connection",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/accounting/integrations/connections/{{connection_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounting",
+                "integrations",
+                "connections",
+                "{{connection_id}}"
+              ]
+            },
+            "description": "Posted journals are not affected."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Sign out (admin only)",
+      "item": [
+        {
+          "name": "Log out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant",
+                "value": "{{tenant_slug}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revokes the login token on the server and clears admin_token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.expect([200]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) { pm.environment.set('admin_token', ''); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
