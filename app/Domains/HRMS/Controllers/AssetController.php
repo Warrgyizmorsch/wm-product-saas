@@ -478,13 +478,15 @@ class AssetController extends Controller
         $employee    = \App\Domains\HRMS\Models\Employee::findOrFail($validated['employee_id']);
         $user        = auth()->user();
         $isOwner     = $user && (int) $employee->user_id === (int) $user->id;
+        $isScopedManager = $user && \App\Domains\HRMS\Services\HrmsScopeService::canAccessEmployee($user, $employee->id);
+        $isAdmin     = $user && \App\Domains\HRMS\Services\HrmsScopeService::isCompanyAdmin($user);
         $canManage   = $user && (
             $user->hasHrPermission('hrms.assets.manage') ||
             $user->hasHrPermission('hrms.assets.create') ||
             $user->hasHrPermission('hr.settings.manage')
         );
 
-        if (!$isOwner && !$canManage) {
+        if (!$isOwner && !$isScopedManager && !$isAdmin && !$canManage) {
             abort(403, __('hrms.assets.error_unauthorized_request'));
         }
 

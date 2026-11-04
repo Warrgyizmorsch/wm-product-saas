@@ -580,8 +580,7 @@ class KraKpiController extends Controller
         $isHrOrAdmin = $this->isHrOrAdminUser($user);
 
         $plan = \App\Domains\HRMS\Models\EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
-        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
-            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+        $isManager = $this->isManagerOrScopedHead($currentEmployee, $user, $plan);
         if (!$isManager && !$isHrOrAdmin) {
             return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_approve_goals'));
         }
@@ -607,8 +606,7 @@ class KraKpiController extends Controller
         $item = \App\Domains\HRMS\Models\EmployeeGoalItem::where('tenant_id', $tenantId)->findOrFail($itemId);
         $plan = $item->goalPlan;
         $isOwner = ($currentEmployee && $plan->employee_id == $currentEmployee->id) || ($user && $plan->employee?->user_id == $user->id);
-        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
-            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+        $isManager = $this->isManagerOrScopedHead($currentEmployee, $user, $plan);
 
         if (!$isOwner && !$isManager && !$isHrOrAdmin) {
             return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_log_progress'));
@@ -666,8 +664,7 @@ class KraKpiController extends Controller
         $isHrOrAdmin = $this->isHrOrAdminUser($user);
 
         $plan = \App\Domains\HRMS\Models\EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
-        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
-            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+        $isManager = $this->isManagerOrScopedHead($currentEmployee, $user, $plan);
         if (!$isManager && !$isHrOrAdmin) {
             return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_manager_appraisal'));
         }
@@ -708,8 +705,7 @@ class KraKpiController extends Controller
         $isHrOrAdmin = $this->isHrOrAdminUser($user);
 
         $plan = \App\Domains\HRMS\Models\EmployeeGoalPlan::where('tenant_id', $tenantId)->findOrFail($planId);
-        $isManager = ($currentEmployee && ($plan->manager_id == $currentEmployee->id || $plan->employee?->reporting_manager_id == $currentEmployee->id))
-            || ($user && ($plan->manager?->user_id == $user->id || $plan->employee?->reportingManager?->user_id == $user->id));
+        $isManager = $this->isManagerOrScopedHead($currentEmployee, $user, $plan);
         if (!$isManager && !$isHrOrAdmin) {
             return redirect()->back()->with('error', __('hrms.kra_kpi.unauthorized_initiate_pip'));
         }
@@ -718,6 +714,34 @@ class KraKpiController extends Controller
 
         return redirect()->route('hrms.pip.show', $pip->id)
             ->with('success', __('hrms.kra_kpi.pip_initiated_success', ['pip' => $pip->pip_number]));
+    }
+
+    /**
+     * Determine whether the actor is a direct reporting manager or scoped organizational head (Department/Branch/BU Head).
+     * Strictly enforces anti-self-action / conflict-of-interest prevention.
+     */
+    protected function isManagerOrScopedHead(?Employee $currentEmployee, ?\App\Models\User $user, \App\Domains\HRMS\Models\EmployeeGoalPlan $plan): bool
+    {
+        $isOwner = ($currentEmployee && (int) $plan->employee_id === (int) $currentEmployee->id)
+            || ($user && (int) $plan->employee?->user_id === (int) $user->id);
+
+        if ($isOwner) {
+            return false;
+        }
+
+        if ($currentEmployee && ((int) $plan->manager_id === (int) $currentEmployee->id || (int) $plan->employee?->reporting_manager_id === (int) $currentEmployee->id)) {
+            return true;
+        }
+
+        if ($user && ((int) $plan->manager?->user_id === (int) $user->id || (int) $plan->employee?->reportingManager?->user_id === (int) $user->id)) {
+            return true;
+        }
+
+        if ($currentEmployee && $plan->employee_id) {
+            return $this->scopeService->canAccessEmployee($user ?? $currentEmployee, $plan->employee_id);
+        }
+
+        return false;
     }
 
     /**

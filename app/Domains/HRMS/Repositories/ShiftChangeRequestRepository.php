@@ -15,7 +15,13 @@ class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterf
     public function getIndexData(array $inputs): array
     {
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.shift_changes.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         $isAdmin = $isHrAdmin;
 
         $employee = Employee::resolveForUser($user);

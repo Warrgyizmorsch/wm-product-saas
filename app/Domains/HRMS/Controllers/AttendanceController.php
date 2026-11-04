@@ -16,10 +16,17 @@ class AttendanceController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless(
-            auth()->user() && (auth()->user()->hasHrPermission('hrms.attendance.view') || auth()->user()->hasHrPermission('hr.settings.manage')),
-            403
+        $user = auth()->user();
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $canView = $user && (
+            $scopeService->isCompanyAdmin($user)
+            || $user->hasHrPermission('hrms.attendance.view')
+            || $user->hasHrPermission('hrms.attendance.view_all')
+            || $user->hasHrPermission('hrms.attendance.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || ($user->employee !== null || \App\Domains\HRMS\Models\Employee::resolveForUser($user) !== null)
         );
+        abort_unless($canView, 403);
         $filters = $request->only(['date', 'department_id', 'search', 'status', 'month']);
         if (!isset($filters['month']) && !isset($filters['date'])) {
             $filters['month'] = now()->format('Y-m');

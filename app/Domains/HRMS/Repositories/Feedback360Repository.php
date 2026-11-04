@@ -67,6 +67,10 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             return false;
         }
 
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
+            return true;
+        }
+
         $access = app(AccessService::class);
         $context = ['tenant_id' => $tenantId];
 
@@ -77,7 +81,7 @@ class Feedback360Repository implements Feedback360RepositoryInterface
     }
 
     /**
-     * Determine if a given manager is the direct supervisor of a subordinate employee.
+     * Determine if a given manager is the direct supervisor or scoped organizational head of a subordinate employee.
      */
     public function isManagerOf(?Employee $manager, ?Employee $subordinate, int $tenantId): bool
     {
@@ -85,7 +89,11 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             return false;
         }
 
-        return (int) $subordinate->reporting_manager_id === (int) $manager->id;
+        if ((int) $subordinate->reporting_manager_id === (int) $manager->id) {
+            return true;
+        }
+
+        return app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($manager, $subordinate->id);
     }
 
     /**
@@ -422,12 +430,17 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 $p->manager_id === $currentEmployee->id ||
                 $p->employee?->reporting_manager_id === $currentEmployee->id
             );
+            $isScopedManager = false;
+            if ($currentEmployee && $p->employee_id && (int) $p->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $p->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
             $isSelf = $currentEmployee && ($p->employee_id === $currentEmployee->id);
 
             $p->capabilities = [
                 'can_view'           => true,
-                'can_nominate_peers' => ($isHrAdmin || $isDirectManager || ($isSelf && ($cycle->allow_self_nomination ?? true))) && in_array($cycle->status ?? '', ['nomination', 'draft', 'in_progress']),
-                'can_publish_report' => ($isHrAdmin || $isDirectManager) && in_array($cycle->status ?? '', ['review', 'completed']),
+                'can_nominate_peers' => ($isHrAdmin || $isManager || ($isSelf && ($cycle->allow_self_nomination ?? true))) && in_array($cycle->status ?? '', ['nomination', 'draft', 'in_progress']),
+                'can_publish_report' => ($isHrAdmin || $isManager) && in_array($cycle->status ?? '', ['review', 'completed']),
             ];
             return $p;
         });
@@ -1036,13 +1049,18 @@ class Feedback360Repository implements Feedback360RepositoryInterface
             $participant->manager_id === $currentEmployee->id ||
             $participant->employee?->reporting_manager_id === $currentEmployee->id
         );
+        $isScopedManager = false;
+        if ($currentEmployee && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+            $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+        }
+        $isManager = $isDirectManager || $isScopedManager;
         $isSelf = $currentEmployee && ($participant->employee_id === $currentEmployee->id);
 
-        if (!$isHrAdmin && !$isDirectManager && !$isSelf) {
+        if (!$isHrAdmin && !$isManager && !$isSelf) {
             throw new Exception("Unauthorized to nominate reviewers for this employee.");
         }
 
-        if ($isSelf && !$cycle->allow_self_nomination && !$isHrAdmin && !$isDirectManager) {
+        if ($isSelf && !$cycle->allow_self_nomination && !$isHrAdmin && !$isManager) {
             throw new Exception("Self-nomination is disabled for this feedback cycle.");
         }
 
@@ -1171,9 +1189,14 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 $participant->manager_id === $currentEmployee->id ||
                 $participant->employee?->reporting_manager_id === $currentEmployee->id
             );
+            $isScopedManager = false;
+            if ($currentEmployee && $participant && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
 
-            if (!$isHrAdmin && !$isDirectManager) {
-                throw new Exception("Unauthorized. Only the direct manager or HR can remove raters from the roster.");
+            if (!$isHrAdmin && !$isManager) {
+                throw new Exception("Unauthorized. Only the direct manager, department head, or HR can remove raters from the roster.");
             }
         }
 
@@ -1210,9 +1233,14 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 $participant->manager_id === $currentEmployee->id ||
                 $participant->employee?->reporting_manager_id === $currentEmployee->id
             );
+            $isScopedManager = false;
+            if ($currentEmployee && $participant->employee_id && (int) $participant->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $participant->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
 
-            if (!$isHrAdmin && !$isDirectManager) {
-                throw new Exception("Unauthorized. Only the direct manager or HR can add raters to the roster.");
+            if (!$isHrAdmin && !$isManager) {
+                throw new Exception("Unauthorized. Only the direct manager, department head, or HR can add raters to the roster.");
             }
         }
 
@@ -1265,9 +1293,14 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 $nomination->participant?->manager_id === $currentEmployee->id ||
                 $nomination->employee?->reporting_manager_id === $currentEmployee->id
             );
+            $isScopedManager = false;
+            if ($currentEmployee && $nomination->employee_id && (int) $nomination->employee_id !== (int) $currentEmployee->id) {
+                $isScopedManager = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($currentEmployee, $nomination->employee_id);
+            }
+            $isManager = $isDirectManager || $isScopedManager;
 
-            if (!$isHrAdmin && !$isDirectManager) {
-                throw new Exception("Unauthorized. Only the direct manager or HR Admin can approve peer nominations.");
+            if (!$isHrAdmin && !$isManager) {
+                throw new Exception("Unauthorized. Only the direct manager, department head, or HR Admin can approve peer nominations.");
             }
         }
 
@@ -1301,10 +1334,11 @@ class Feedback360Repository implements Feedback360RepositoryInterface
                 if (!$currentEmployee) {
                     throw new Exception("Unauthorized to approve nominations.");
                 }
-                // Only allow nominations for direct subordinates
-                $query->whereHas('employee', function ($q) use ($currentEmployee) {
-                    $q->where('reporting_manager_id', $currentEmployee->id);
-                });
+                // Only allow nominations for subordinates within the manager's organizational scope
+                $accessibleIds = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->getAccessibleEmployeeIds($user ?? $currentEmployee);
+                if ($accessibleIds !== null) {
+                    $query->whereIn('employee_id', $accessibleIds);
+                }
             }
         }
 

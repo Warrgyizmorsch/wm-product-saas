@@ -55,10 +55,13 @@ class KraKpiRepository implements KraKpiRepositoryInterface
             ->where('tenant_id', $tenantId);
 
         if (!$isHrOrAdmin && $currentEmployee) {
-            $plansQuery->where(function ($q) use ($currentEmployee) {
-                $q->where('employee_id', $currentEmployee->id)
-                  ->orWhere('manager_id', $currentEmployee->id);
-            });
+            $accessibleEmpIds = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->getAccessibleEmployeeIds($currentEmployee);
+            if ($accessibleEmpIds !== null) {
+                $plansQuery->where(function ($q) use ($currentEmployee, $accessibleEmpIds) {
+                    $q->whereIn('employee_id', $accessibleEmpIds)
+                      ->orWhere('manager_id', $currentEmployee->id);
+                });
+            }
         }
 
         // Filter: Cycle
@@ -191,11 +194,20 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $kpiMasters = KpiMaster::with('kraCategory')->where('tenant_id', $tenantId)->orderBy('name')->get();
 
         $authUserId = auth()->id();
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+
         $isOwner = ($currentEmployee && $currentEmployee->id === $plan->employee_id)
             || ($authUserId && $plan->employee?->user_id === $authUserId);
 
-        $isManager = ($currentEmployee && ($currentEmployee->id === $plan->manager_id || $currentEmployee->id === $plan->employee?->reporting_manager_id))
+        $isDirectManager = ($currentEmployee && ($currentEmployee->id === $plan->manager_id || $currentEmployee->id === $plan->employee?->reporting_manager_id))
             || ($authUserId && ($plan->manager?->user_id === $authUserId || $plan->employee?->reportingManager?->user_id === $authUserId));
+
+        $isScopedHead = false;
+        if (!$isOwner && $currentEmployee && $plan->employee_id) {
+            $isScopedHead = $scopeService->canAccessEmployee($currentEmployee, $plan->employee_id);
+        }
+
+        $isManager = (!$isOwner && $isDirectManager) || $isScopedHead;
 
         $plan->capabilities = [
             'can_view'             => true,

@@ -286,7 +286,7 @@ class TravelExpenseController extends Controller
 
     public function approveTravelRequest(Request $request, TravelRequest $travelRequest): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $travelRequest);
 
         $user = $request->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
@@ -364,7 +364,7 @@ class TravelExpenseController extends Controller
 
     public function rejectTravelRequest(TravelRequest $travelRequest): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $travelRequest);
 
         $travelRequest->update(['status' => 'rejected']);
         $travelRequest->cashAdvances()->where('status', 'pending')->update(['status' => 'rejected']);
@@ -463,7 +463,7 @@ class TravelExpenseController extends Controller
 
     public function approveCashAdvance(Request $request, CashAdvance $cashAdvance): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $cashAdvance);
 
         $user = $request->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
@@ -555,7 +555,7 @@ class TravelExpenseController extends Controller
 
     public function rejectCashAdvance(CashAdvance $cashAdvance): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $cashAdvance);
 
         $cashAdvance->update(['status' => 'rejected']);
 
@@ -1099,7 +1099,7 @@ class TravelExpenseController extends Controller
 
     public function approveExpenseReport(Request $request, ExpenseReport $expenseReport): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $expenseReport);
 
         $user = $request->user();
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
@@ -1383,7 +1383,7 @@ class TravelExpenseController extends Controller
 
     public function rejectExpenseReport(ExpenseReport $expenseReport): RedirectResponse
     {
-        $this->authorizeHrms('hrms.travel_expenses.approve');
+        $this->authorizeHrms('hrms.travel_expenses.approve', $expenseReport);
 
         $expenseReport->update(['status' => 'rejected']);
 
@@ -1924,13 +1924,39 @@ class TravelExpenseController extends Controller
         return ['approval_levels' => 1, 'workflow' => null, 'policy' => null];
     }
 
-    private function authorizeHrms(string $permission): void
+    private function authorizeHrms(string $permission, mixed $model = null): void
     {
-        abort_unless(
-            app(AccessService::class)->allows(auth()->user(), $permission, [
-                'tenant_id' => auth()->user()?->tenant_id,
-            ]),
-            403
-        );
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+
+        $isAuthorized = false;
+
+        // Scoped Line Manager / Department Head / Branch Manager check
+        if ($model && $model->employee) {
+            $isAuthorized = $workflowService->canApprove($user, $model->employee, $model, $permission);
+        }
+
+        if (!$isAuthorized) {
+            $context = [
+                'tenant_id'     => $user->tenant_id,
+                'company_id'    => $user->company_id,
+                'branch_id'     => $user->branch_id,
+                'department_id' => $user->department_id,
+                'owner_id'      => $model?->employee_id,
+            ];
+
+            $access = app(AccessService::class);
+            $isAuthorized = $scopeService->isCompanyAdmin($user)
+                || $workflowService->isHrOrAdminActor($user)
+                || $user->hasHrPermission('hr.settings.manage')
+                || $access->allows($user, $permission, $context);
+        }
+
+        abort_unless($isAuthorized, 403, 'Unauthorized to approve or process this expense request.');
     }
 }
