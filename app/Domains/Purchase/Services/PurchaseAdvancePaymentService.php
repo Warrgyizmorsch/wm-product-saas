@@ -33,6 +33,7 @@ class PurchaseAdvancePaymentService
                 'purchase_order_id' => $validated['purchase_order_id'] ?? null,
                 'amount' => $baseAmount,
                 'payment_method' => $validated['payment_method'],
+                'bank_account_id' => $validated['bank_account_id'] ?? null,
                 'reference_number' => $validated['reference_number'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'status' => 'Posted',
@@ -51,6 +52,7 @@ class PurchaseAdvancePaymentService
                     'purchase_order_id' => $advance->purchase_order_id,
                     'payment_type' => 'Advance',
                     'payment_method' => $advance->payment_method,
+                    'bank_account_id' => $advance->bank_account_id,
                     'payment_date' => $advance->payment_date,
                     'amount' => $advance->amount,
                     'reference_number' => $advance->reference_number,
@@ -70,11 +72,18 @@ class PurchaseAdvancePaymentService
     protected function postAccountingJournal(PurchaseAdvancePayment $advance, int $tenantId): void
     {
         try {
-            // Find Asset / Cash / Bank account based on payment method
-            $bankCode = ($advance->payment_method === 'Cash') ? '1010' : '1020';
-            $paymentAccount = $this->accountRepo->findByCode($bankCode, $tenantId);
-            if (!$paymentAccount) {
-                $paymentAccount = $this->accountRepo->getByType('asset')->first();
+            // Find Asset / Cash / Bank account based on user selection or payment method fallback
+            if ($advance->bank_account_id) {
+                $paymentAccount = \App\Domains\Accounting\Models\ChartOfAccount::withoutGlobalScope('tenant')
+                    ->where('tenant_id', $tenantId)
+                    ->whereKey($advance->bank_account_id)
+                    ->first();
+            } else {
+                $bankCode = ($advance->payment_method === 'Cash') ? '1010' : '1020';
+                $paymentAccount = $this->accountRepo->findByCode($bankCode, $tenantId);
+                if (!$paymentAccount) {
+                    $paymentAccount = $this->accountRepo->getByType('asset')->first();
+                }
             }
 
             // Find Advance to Vendor / Accounts Payable liability or asset account
@@ -92,6 +101,8 @@ class PurchaseAdvancePaymentService
                 $lines = [
                     [
                         'chart_of_account_id' => $advanceAccount->id,
+                        'party_type' => \App\Domains\Accounting\Models\JournalEntry::PARTY_VENDOR,
+                        'party_id' => $advance->vendor_id,
                         'debit' => (float)$advance->amount,
                         'description' => "Advance to Vendor (" . ($advance->vendor?->name ?? 'Vendor #' . $advance->vendor_id) . ")",
                     ],

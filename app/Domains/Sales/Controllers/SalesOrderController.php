@@ -160,16 +160,8 @@ class SalesOrderController extends Controller
 
         $order = $this->salesOrders->create($validated, $request->input('items', []));
 
-        // Trigger Notification Master Rules
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.order.created', [
-            'doc_no' => $order->sales_order_number,
-            'customer_name' => $order->customer?->name ?? 'Customer',
-            'amount' => format_currency($order->total_amount ?? 0),
-            'created_by' => auth()->user()?->name ?? 'User',
-            'created_by_user_id' => auth()->id(),
-            'assigned_user_id' => $order->sales_person_id,
-            'date' => now()->format('d M Y h:i A'),
-        ], route('sales.orders.show', $order->id), $order);
+        // Trigger Notification Master Rules & Pusher Alerts
+        \App\Domains\Sales\Services\SalesNotificationService::notifyOrderCreated($order);
 
         return redirect()->route('sales.orders.show', $order->id)->with('success', 'Sales Order successfully created!');
     }
@@ -305,16 +297,8 @@ class SalesOrderController extends Controller
         $nextRequirementNumber = $isServiceOnly ? '' : $this->materialRequirementService->getNextRequirementNumber();
         $delivery = $this->orderRepo->confirmOrder($order, $nextRequirementNumber);
 
-        // Trigger Notification Master Rules
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.order.confirmed', [
-            'doc_no' => $order->sales_order_number,
-            'customer_name' => $order->customer?->name ?? 'Customer',
-            'amount' => format_currency($order->total_amount ?? 0),
-            'confirmed_by' => auth()->user()?->name ?? 'User',
-            'created_by_user_id' => $order->created_by,
-            'assigned_user_id' => $order->sales_person_id,
-            'date' => now()->format('d M Y h:i A'),
-        ], route('sales.orders.show', $order->id), $order);
+        // Trigger Notification Master Rules & Pusher Alerts
+        \App\Domains\Sales\Services\SalesNotificationService::notifyOrderConfirmed($order);
 
         $successMsg = $isServiceOnly
             ? 'Sales Order confirmed successfully! (Service order: Material requirement and dispatch are bypassed; direct billing is enabled).'
@@ -338,6 +322,7 @@ class SalesOrderController extends Controller
 
         try {
             $this->orderRepo->cancelOrder($order, $reason);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyOrderCancelled($order, $reason);
             return back()->with('success', 'Sales Order and associated un-shipped dispatch orders cancelled successfully.');
         } catch (\Exception $e) {
             return back()->withErrors(['status' => $e->getMessage()]);
@@ -359,8 +344,11 @@ class SalesOrderController extends Controller
             'reason' => 'required|string|max:500',
         ]);
 
+        $reason = $request->input('reason');
+
         try {
-            $this->orderRepo->shortCloseOrder($order, $request->input('reason'));
+            $this->orderRepo->shortCloseOrder($order, $reason);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyOrderShortClosed($order, $reason);
             return back()->with('success', "Sales Order {$order->sales_order_number} has been Short-Closed. Remaining open quantities have been cleanly cancelled.");
         } catch (\Exception $e) {
             return back()->withErrors(['status' => $e->getMessage()]);

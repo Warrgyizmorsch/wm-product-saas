@@ -341,6 +341,45 @@ class PurchaseAccountingAutoPostingTest extends TestCase
     }
 
     /** @test */
+    public function vendor_payment_with_specific_bank_account_credits_selected_bank_ledger(): void
+    {
+        $customBank = ChartOfAccount::create([
+            'tenant_id' => $this->tenant->id,
+            'code' => '1025',
+            'name' => 'Custom HDFC Bank',
+            'type' => ChartOfAccount::TYPE_ASSET,
+            'subtype' => ChartOfAccount::SUBTYPE_CURRENT_ASSET,
+            'normal_balance' => ChartOfAccount::BALANCE_DEBIT,
+            'is_cash_or_bank' => true,
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('purchase.payments.store'), [
+                'payment_date' => now()->toDateString(),
+                'vendor_id' => $this->vendor->id,
+                'amount' => 500,
+                'payment_method' => 'Bank Transfer',
+                'bank_account_id' => $customBank->id,
+            ]);
+
+        $response->assertRedirect();
+
+        $payment = VendorPayment::withoutGlobalScopes()->where('vendor_id', $this->vendor->id)->latest('id')->firstOrFail();
+        $this->assertSame($customBank->id, $payment->bank_account_id);
+
+        $journals = Journal::withoutGlobalScopes()
+            ->where('reference_type', 'vendor_payment')
+            ->where('reference_id', $payment->id)
+            ->get();
+        $this->assertCount(1, $journals);
+
+        $entries = $journals->first()->entries;
+        $this->assertEqualsWithDelta(500.0, (float) $entries->firstWhere('chart_of_account_id', $customBank->id)->credit, 0.01);
+    }
+
+    /** @test */
     public function dispatching_vendor_payment_recorded_twice_does_not_double_post(): void
     {
         $payment = VendorPayment::create([

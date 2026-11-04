@@ -112,6 +112,62 @@ class User extends Authenticatable
         return (bool) ($this->settings['is_deactivated'] ?? false);
     }
 
+    /**
+     * Check if the user has any of the given roles.
+     * Checks user.role string attribute, primaryRole relationship, and userRoles/roles relationship.
+     */
+    public function hasAnyRole(array|string ...$roles): bool
+    {
+        $flattened = [];
+        foreach ($roles as $item) {
+            if (is_array($item)) {
+                $flattened = array_merge($flattened, $item);
+            } else {
+                $flattened[] = $item;
+            }
+        }
+
+        $normalizedTargets = array_map(fn($r) => strtolower(str_replace([' ', '_', '-'], '', (string) $r)), $flattened);
+
+        // 1. Direct role string column
+        if (!empty($this->role)) {
+            $userRoleNorm = strtolower(str_replace([' ', '_', '-'], '', $this->role));
+            if (in_array($userRoleNorm, $normalizedTargets, true)) {
+                return true;
+            }
+        }
+
+        // 2. Primary role relation
+        if ($this->primaryRole) {
+            $primarySlug = strtolower(str_replace([' ', '_', '-'], '', (string) $this->primaryRole->slug));
+            $primaryName = strtolower(str_replace([' ', '_', '-'], '', (string) $this->primaryRole->name));
+            if (in_array($primarySlug, $normalizedTargets, true) || in_array($primaryName, $normalizedTargets, true)) {
+                return true;
+            }
+        }
+
+        // 3. User roles / roles relations
+        if ($this->relationLoaded('roles')) {
+            foreach ($this->roles as $r) {
+                $slug = strtolower(str_replace([' ', '_', '-'], '', (string) $r->slug));
+                $name = strtolower(str_replace([' ', '_', '-'], '', (string) $r->name));
+                if (in_array($slug, $normalizedTargets, true) || in_array($name, $normalizedTargets, true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if user has a specific role.
+     */
+    public function hasRole(string ...$roles): bool
+    {
+        return $this->hasAnyRole(...$roles);
+    }
+
     public function primaryRole(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'role_id');

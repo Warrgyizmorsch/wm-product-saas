@@ -140,6 +140,7 @@ Route::prefix('api/purchase')->name('api.purchase.')->group(function () {
 
     // Purchase Advance Payment APIs
     Route::prefix('advances')->name('advances.')->group(function () {
+        Route::get('/meta', [PurchaseAdvancePaymentApiController::class, 'meta'])->name('meta');
         Route::get('/', [PurchaseAdvancePaymentApiController::class, 'index'])->name('index');
         Route::post('/', [PurchaseAdvancePaymentApiController::class, 'store'])->name('store');
         Route::get('/{id}', [PurchaseAdvancePaymentApiController::class, 'show'])->name('show');

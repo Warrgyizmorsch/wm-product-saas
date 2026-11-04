@@ -105,12 +105,27 @@ class VendorBill extends BaseModel
     }
 
     /**
+     * Total refund amount from completed purchase returns / debit notes against this bill.
+     */
+    public function returnsTotal(): float
+    {
+        if ($this->relationLoaded('purchaseReturns')) {
+            return (float) $this->purchaseReturns->where('status', 'Completed')->sum('total_refund_amount');
+        }
+        return (float) $this->purchaseReturns()->where('status', 'Completed')->sum('total_refund_amount');
+    }
+
+    /**
      * What the vendor is owed for this bill in total: the bill less the TDS
-     * withheld. Paid + due always adds up to this, never to grand_total.
+     * withheld and less any completed Purchase Returns / Debit Notes.
+     * Paid + due always adds up to this, never to grand_total.
      */
     public function netPayable(): float
     {
-        return round((float) ($this->grand_total ?: ($this->attributes['total_amount'] ?? 0)) - (float) ($this->tds_amount ?? 0), 4);
+        $gross = (float) ($this->grand_total ?: ($this->attributes['total_amount'] ?? 0));
+        $tds = (float) ($this->tds_amount ?? 0);
+        $returns = $this->returnsTotal();
+        return max(0.0, round($gross - $tds - $returns, 4));
     }
 
     /** What is still due once $paid has been paid against the bill in total. */
@@ -159,6 +174,11 @@ class VendorBill extends BaseModel
     public function dispatchOrder(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Sales\Models\DispatchOrder::class, 'dispatch_order_id');
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class, 'vendor_bill_id');
     }
 
     public function creator(): BelongsTo

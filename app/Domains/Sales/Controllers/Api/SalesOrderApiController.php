@@ -257,6 +257,11 @@ class SalesOrderApiController extends Controller
             $adjustment = (float)($validated['adjustment'] ?? 0);
             $grandTotal = $subtotal + $totalTax + $freight + $shipping + $adjustment;
 
+            $resolvedGstType = $validated['gst_type'] ?? null;
+            if (empty($resolvedGstType) && ($validated['tax_type'] ?? '') !== 'without_tax') {
+                $resolvedGstType = app(\App\Domains\Sales\Services\SalesOrderService::class)->resolveGstType((int)$validated['customer_id'], $companyId, $tenantId);
+            }
+
             $so = SalesOrder::create([
                 'tenant_id'          => $tenantId,
                 'company_id'         => $companyId,
@@ -273,7 +278,7 @@ class SalesOrderApiController extends Controller
                 'sales_person_id'    => $validated['sales_person_id'] ?? null,
                 'discount_type'      => $validated['discount_type'] ?? 'fixed',
                 'tax_type'           => $validated['tax_type'] ?? 'exclusive',
-                'gst_type'           => $validated['gst_type'] ?? 'cgst_sgst',
+                'gst_type'           => $resolvedGstType ?? 'cgst_sgst',
                 'subtotal'           => $subtotal,
                 'tax'                => $totalTax,
                 'discount'           => 0,

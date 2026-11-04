@@ -151,6 +151,28 @@ class PurchaseReturnController extends Controller
             }
         }
 
+        // Level 1: Auto-detect linked Vendor Bill if not explicitly provided
+        if (!$request->filled('vendor_bill_id')) {
+            $grnId = $request->input('goods_receipt_note_id');
+            $poId  = $request->input('purchase_order_id');
+            $foundBill = null;
+            if ($grnId) {
+                $foundBill = \App\Domains\Purchase\Models\VendorBill::where('goods_receipt_note_id', $grnId)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest('id')
+                    ->first();
+            }
+            if (!$foundBill && $poId) {
+                $foundBill = \App\Domains\Purchase\Models\VendorBill::where('purchase_order_id', $poId)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest('id')
+                    ->first();
+            }
+            if ($foundBill) {
+                $request->merge(['vendor_bill_id' => $foundBill->id]);
+            }
+        }
+
         $validated = $request->validate([
             'vendor_id'             => ['required', 'exists:vendors,id'],
             'purchase_order_id'     => ['nullable', 'exists:purchase_orders,id'],
@@ -204,6 +226,8 @@ class PurchaseReturnController extends Controller
             return $purchaseReturn;
         });
 
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyReturnCreated($return);
+
         return redirect()->route('purchase.returns.show', $return->id)
             ->with('success', "Purchase Return {$return->return_number} recorded successfully.");
     }
@@ -215,7 +239,45 @@ class PurchaseReturnController extends Controller
         $return = $this->returnRepo->find($id);
         if (!$return) abort(404);
 
+        $return->load([
+            'vendor',
+            'purchaseOrder',
+            'goodsReceiptNote',
+            'vendorBill',
+            'items.product',
+            'items.warehouse',
+        ]);
+
         return view('modules.purchase.returns.show', compact('return'));
+    }
+
+    public function downloadPdf(int $id)
+    {
+        $this->authorizePurchase('purchase.returns.view');
+
+        $return = $this->returnRepo->find($id);
+        if (!$return) abort(404);
+
+        $return->load([
+            'vendor',
+            'purchaseOrder',
+            'goodsReceiptNote',
+            'vendorBill',
+            'items.product',
+            'items.warehouse',
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.returns.pdf', compact('return'))
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'isPhpEnabled' => true,
+            ]);
+
+        $fileName = 'Debit_Note_' . str_replace(['/', '\\', ' '], '_', $return->return_number) . '.pdf';
+
+        return $pdf->download($fileName);
     }
 
     public function approve(int $id): RedirectResponse
@@ -249,21 +311,38 @@ class PurchaseReturnController extends Controller
                 );
             }
 
+            // Level 1: Auto-resolve bill if not explicitly linked, and adjust due amount
+            $bill = null;
             if ($purchaseReturn->vendor_bill_id) {
                 $bill = \App\Domains\Purchase\Models\VendorBill::find($purchaseReturn->vendor_bill_id);
-                if ($bill) {
-                    $apply = min((float) $purchaseReturn->total_refund_amount, (float) $bill->due_amount);
-                    $bill->due_amount = max(0, (float) $bill->due_amount - $apply);
-                    $bill->status = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
-                    $bill->save();
+            } elseif ($purchaseReturn->goods_receipt_note_id) {
+                $bill = \App\Domains\Purchase\Models\VendorBill::where('goods_receipt_note_id', $purchaseReturn->goods_receipt_note_id)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest('id')
+                    ->first();
+            } elseif ($purchaseReturn->purchase_order_id) {
+                $bill = \App\Domains\Purchase\Models\VendorBill::where('purchase_order_id', $purchaseReturn->purchase_order_id)
+                    ->where('status', '!=', 'Cancelled')
+                    ->latest('id')
+                    ->first();
+            }
+
+            if ($bill) {
+                if (!$purchaseReturn->vendor_bill_id) {
+                    $purchaseReturn->vendor_bill_id = $bill->id;
+                    $purchaseReturn->save();
                 }
+                $apply = min((float) $purchaseReturn->total_refund_amount, (float) $bill->due_amount);
+                $bill->due_amount = max(0, (float) $bill->due_amount - $apply);
+                $bill->status = $bill->due_amount <= 0.001 ? 'Paid' : 'Partially Paid';
+                $bill->save();
             }
 
             $purchaseReturn->update(['status' => 'Completed']);
             event(new PurchaseReturnApproved($purchaseReturn));
         });
 
-        event(new PurchaseReturnApproved($purchaseReturn));
+        \App\Domains\Purchase\Services\PurchaseNotificationService::notifyReturnApproved($purchaseReturn);
 
         return redirect()->route('purchase.returns.show', $purchaseReturn->id)
             ->with('success', "Purchase Return {$purchaseReturn->return_number} approved and stock removed from inventory successfully.");

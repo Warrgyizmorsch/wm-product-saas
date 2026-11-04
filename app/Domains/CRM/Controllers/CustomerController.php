@@ -35,11 +35,11 @@ class CustomerController extends Controller
         $query = Customer::query()->where('tenant_id', $tenantId)->with('crmAccount');
 
         if ($search = $request->input('search')) {
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('gstin', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('gstin', 'like', "%{$search}%");
             });
         }
 
@@ -83,7 +83,7 @@ class CustomerController extends Controller
             'status' => ['required', 'string', 'in:active,inactive'],
         ], [
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
-            'phone.max'   => 'Phone number cannot exceed 20 digits.',
+            'phone.max' => 'Phone number cannot exceed 20 digits.',
         ]);
 
         $validated['opening_balance'] = isset($validated['opening_balance'])
@@ -116,7 +116,7 @@ class CustomerController extends Controller
             'shipping_address' => ['nullable', 'string'],
         ], [
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
-            'phone.max'   => 'Phone number cannot exceed 20 digits.',
+            'phone.max' => 'Phone number cannot exceed 20 digits.',
         ]);
 
         $validated['tenant_id'] = $tenantId;
@@ -124,11 +124,11 @@ class CustomerController extends Controller
         $customer = $this->customers->create($validated);
 
         return response()->json([
-            'id'               => $customer->id,
-            'name'             => $customer->name . ($customer->email ? " ({$customer->email})" : ''),
-            'email'            => $customer->email,
-            'phone'            => $customer->phone,
-            'billing_address'  => $customer->billing_address,
+            'id' => $customer->id,
+            'name' => $customer->name . ($customer->email ? " ({$customer->email})" : ''),
+            'email' => $customer->email,
+            'phone' => $customer->phone,
+            'billing_address' => $customer->billing_address,
             'shipping_address' => $customer->shipping_address,
         ]);
     }
@@ -152,7 +152,7 @@ class CustomerController extends Controller
         if ($totalPaid == 0 && $payments->isNotEmpty()) {
             $totalPaid = $payments->where('status', 'completed')->sum('amount');
         }
-        $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function($r) {
+        $totalReturns = $salesReturns->where('status', '!=', 'cancelled')->sum(function ($r) {
             return floatval($r->total_amount ?: $r->total_refund_amount);
         });
 
@@ -160,9 +160,9 @@ class CustomerController extends Controller
         $netOutstanding = $openingBalance + $totalBilled - $totalPaid - $totalReturns;
         $outstandingBalance = max(0, $netOutstanding);
         $customerCreditBalance = $netOutstanding < 0 ? abs($netOutstanding) : 0;
-        
+
         $overdueAmount = $invoices->where('status', 'unpaid')
-            ->filter(function($inv) {
+            ->filter(function ($inv) {
                 return $inv->due_date && \Carbon\Carbon::parse($inv->due_date)->isPast();
             })->sum('balance_due');
 
@@ -210,19 +210,19 @@ class CustomerController extends Controller
         $this->authorize('update', $customer);
 
         $validated = $request->validate([
-            'name'                 => ['required', 'string', 'max:255'],
-            'company_name'         => ['nullable', 'string', 'max:255'],
-            'email'                => ['required', 'email', 'max:255'],
-            'phone'                => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
-            'gstin'                => TaxIdentityService::gstinRules(false),
-            'billing_address'      => ['nullable', 'string'],
-            'shipping_address'     => ['nullable', 'string'],
-            'opening_balance'      => ['nullable', 'numeric', 'min:0'],
+            'name' => ['required', 'string', 'max:255'],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],
+            'gstin' => TaxIdentityService::gstinRules(false),
+            'billing_address' => ['nullable', 'string'],
+            'shipping_address' => ['nullable', 'string'],
+            'opening_balance' => ['nullable', 'numeric', 'min:0'],
             'opening_balance_type' => ['nullable', 'in:debit,credit'],
-            'status'               => ['required', 'string', 'in:active,inactive'],
+            'status' => ['required', 'string', 'in:active,inactive'],
         ], [
             'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
-            'phone.max'   => 'Phone number cannot exceed 20 digits.',
+            'phone.max' => 'Phone number cannot exceed 20 digits.',
         ]);
 
         if (array_key_exists('opening_balance', $validated)) {
@@ -235,10 +235,10 @@ class CustomerController extends Controller
 
         if ($customer->crmAccount) {
             $customer->crmAccount->update([
-                'name'   => $validated['name'],
-                'email'  => $validated['email'],
-                'phone'  => $validated['phone'] ?? null,
-                'gstin'  => $validated['gstin'] ?? null,
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'gstin' => $validated['gstin'] ?? null,
                 'status' => $validated['status'],
             ]);
         }

@@ -36,8 +36,8 @@ class EmailService
         }
         if (!$account) {
             $account = EmailConfiguration::forCurrentContext()->where('is_default', true)->where('is_active', true)->first()
-                    ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
-                    ?: EmailConfiguration::where('is_active', true)->first();
+                ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
+                ?: EmailConfiguration::where('is_active', true)->first();
         }
 
         if (!$account || empty($account->host) || empty($account->username)) {
@@ -135,29 +135,37 @@ class EmailService
         }
         if (!$account) {
             $account = EmailConfiguration::forCurrentContext()->where('is_default', true)->where('is_active', true)->first()
-                    ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
-                    ?: EmailConfiguration::where('is_active', true)->first();
+                ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
+                ?: EmailConfiguration::where('is_active', true)->first();
         }
 
         if (!$account || empty($account->host) || empty($account->username)) {
-            throw new \RuntimeException('No active Email SMTP account found in Database for the current Tenant/Company/Branch. Please configure SMTP under Email Settings.');
+            if (config('mail.default') && config('mail.default') !== 'smtp') {
+                $fromEmail = config('mail.from.address', 'noreply@saaserp.com');
+                $fromName = config('mail.from.name', config('app.name'));
+            } elseif (config('mail.mailers.smtp.host') && config('mail.mailers.smtp.username')) {
+                $fromEmail = config('mail.from.address', 'noreply@saaserp.com');
+                $fromName = config('mail.from.name', config('app.name'));
+            } else {
+                throw new \RuntimeException('No active Email SMTP account found in Database for the current Tenant/Company/Branch. Please configure SMTP under Email Settings.');
+            }
+        } else {
+            $fromEmail = $account->email_address;
+            $fromName = $account->from_name ?: $account->name;
+
+            // Dynamic Mail configuration strictly from DB Account
+            config([
+                'mail.default' => 'smtp',
+                'mail.mailers.smtp.host' => $account->host,
+                'mail.mailers.smtp.port' => (int) $account->port,
+                'mail.mailers.smtp.encryption' => $account->encryption === 'none' ? null : ($account->encryption ?: 'tls'),
+                'mail.mailers.smtp.username' => $account->username,
+                'mail.mailers.smtp.password' => $account->password,
+                'mail.from.address' => $fromEmail,
+                'mail.from.name' => $fromName,
+            ]);
+            Mail::purge('smtp');
         }
-
-        $fromEmail = $account->email_address;
-        $fromName = $account->from_name ?: $account->name;
-
-        // Dynamic Mail configuration strictly from DB Account
-        config([
-            'mail.default' => 'smtp',
-            'mail.mailers.smtp.host' => $account->host,
-            'mail.mailers.smtp.port' => (int) $account->port,
-            'mail.mailers.smtp.encryption' => $account->encryption === 'none' ? null : ($account->encryption ?: 'tls'),
-            'mail.mailers.smtp.username' => $account->username,
-            'mail.mailers.smtp.password' => $account->password,
-            'mail.from.address' => $fromEmail,
-            'mail.from.name' => $fromName,
-        ]);
-        Mail::purge('smtp');
 
         $mailable = new QuotationMailable($subject, nl2br($bodyHtml), $pdfBinary, $pdfFileName);
         Mail::to($toEmail)->send($mailable);
@@ -201,7 +209,7 @@ class EmailService
             $pdfFileName = $customPdfFile->getClientOriginalName() ?: "Tax_Invoice_{$invoice->invoice_number}.pdf";
         } else {
             $adjustedAmount = $invoice->allocations->sum('allocated_amount');
-            $balanceDue     = $invoice->balance_due;
+            $balanceDue = $invoice->balance_due;
 
             // Generate PDF Binary using Dompdf
             $pdf = Pdf::loadView('modules.sales.invoices.pdf', compact('invoice', 'adjustedAmount', 'balanceDue'));
@@ -227,29 +235,37 @@ class EmailService
         }
         if (!$account) {
             $account = EmailConfiguration::forCurrentContext()->where('is_default', true)->where('is_active', true)->first()
-                    ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
-                    ?: EmailConfiguration::where('is_active', true)->first();
+                ?: EmailConfiguration::forCurrentContext()->where('is_active', true)->first()
+                ?: EmailConfiguration::where('is_active', true)->first();
         }
 
         if (!$account || empty($account->host) || empty($account->username)) {
-            throw new \RuntimeException('No active Email SMTP account found in Database for the current Tenant/Company/Branch. Please configure SMTP under Email Settings.');
+            if (config('mail.default') && config('mail.default') !== 'smtp') {
+                $fromEmail = config('mail.from.address', 'noreply@saaserp.com');
+                $fromName = config('mail.from.name', $companyName);
+            } elseif (config('mail.mailers.smtp.host') && config('mail.mailers.smtp.username')) {
+                $fromEmail = config('mail.from.address', 'noreply@saaserp.com');
+                $fromName = config('mail.from.name', $companyName);
+            } else {
+                throw new \RuntimeException('No active Email SMTP account found in Database for the current Tenant/Company/Branch. Please configure SMTP under Email Settings.');
+            }
+        } else {
+            $fromEmail = $account->email_address;
+            $fromName = $account->from_name ?: $account->name;
+
+            // Dynamic Mail configuration strictly from DB Account
+            config([
+                'mail.default' => 'smtp',
+                'mail.mailers.smtp.host' => $account->host,
+                'mail.mailers.smtp.port' => (int) $account->port,
+                'mail.mailers.smtp.encryption' => $account->encryption === 'none' ? null : ($account->encryption ?: 'tls'),
+                'mail.mailers.smtp.username' => $account->username,
+                'mail.mailers.smtp.password' => $account->password,
+                'mail.from.address' => $fromEmail,
+                'mail.from.name' => $fromName,
+            ]);
+            Mail::purge('smtp');
         }
-
-        $fromEmail = $account->email_address;
-        $fromName = $account->from_name ?: $account->name;
-
-        // Dynamic Mail configuration strictly from DB Account
-        config([
-            'mail.default' => 'smtp',
-            'mail.mailers.smtp.host' => $account->host,
-            'mail.mailers.smtp.port' => (int) $account->port,
-            'mail.mailers.smtp.encryption' => $account->encryption === 'none' ? null : ($account->encryption ?: 'tls'),
-            'mail.mailers.smtp.username' => $account->username,
-            'mail.mailers.smtp.password' => $account->password,
-            'mail.from.address' => $fromEmail,
-            'mail.from.name' => $fromName,
-        ]);
-        Mail::purge('smtp');
 
         $mailable = new InvoiceMailable($subject, nl2br($bodyHtml), $pdfBinary, $pdfFileName);
         Mail::to($toEmail)->send($mailable);
@@ -319,11 +335,12 @@ class EmailService
             $user = '"' . addcslashes($account->incoming_username ?: $account->email_address, "\\\"") . '"';
             $password = '"' . addcslashes((string) $account->incoming_password, "\\\"") . '"';
             fwrite($imap, "T1 LOGIN {$user} {$password}\r\n");
-            
+
             $response = '';
             while (($line = fgets($imap)) !== false) {
                 $response .= $line;
-                if (str_starts_with($line, 'T1 ')) break;
+                if (str_starts_with($line, 'T1 '))
+                    break;
             }
             fclose($imap);
 
@@ -338,10 +355,12 @@ class EmailService
 
     private function openSocket(?string $host, int $port, bool $ssl)
     {
-        if (!$host || $port < 1) throw new \RuntimeException('Invalid host or port.');
+        if (!$host || $port < 1)
+            throw new \RuntimeException('Invalid host or port.');
         $proto = $ssl ? 'ssl://' : 'tcp://';
         $socket = @stream_socket_client($proto . $host . ':' . $port, $errno, $errstr, 10);
-        if (!$socket) throw new \RuntimeException("Socket connection failed to {$host}:{$port} - {$errstr} ({$errno})");
+        if (!$socket)
+            throw new \RuntimeException("Socket connection failed to {$host}:{$port} - {$errstr} ({$errno})");
         stream_set_timeout($socket, 10);
         return $socket;
     }
@@ -351,7 +370,8 @@ class EmailService
         $res = '';
         while (($line = fgets($socket)) !== false) {
             $res .= $line;
-            if (strlen($line) < 4 || $line[3] !== '-') break;
+            if (strlen($line) < 4 || $line[3] !== '-')
+                break;
         }
         $code = (int) substr($res, 0, 3);
         if (!in_array($code, $codes, true)) {

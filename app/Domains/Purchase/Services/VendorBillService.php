@@ -59,8 +59,22 @@ class VendorBillService
             $isFreightBilledOnInvoice = in_array($freightTerms, ['to_be_billed', 'prepaid']);
             $rawFreight = $validated['freight_amount'] ?? null;
             $freightAmount = $isFreightBilledOnInvoice ? ($rawFreight !== null ? convert_to_base((float)$rawFreight) : (float)($po?->freight_amount ?? 0)) : 0.0;
-            $freightTaxPercent = $isFreightBilledOnInvoice ? (float)($validated['freight_tax_percent'] ?? 18.0) : 0.0;
-            $orderTaxPercent = (float)($validated['order_tax_percent'] ?? $validated['tax_rate'] ?? 0);
+
+            // Inherit order tax percent from PO if not explicitly provided
+            $poOrderTaxPercent = 0.0;
+            if ($po && $po->tax_type === 'order_wise_tax') {
+                $poTaxable = max(0, (float)$po->subtotal - (float)$po->discount_amount);
+                $poTax = (float)$po->tax_amount ?: ((float)$po->cgst_amount + (float)$po->sgst_amount + (float)$po->igst_amount);
+                if ($poTaxable > 0 && $poTax > 0) {
+                    $poOrderTaxPercent = round(($poTax / $poTaxable) * 100, 2);
+                }
+            }
+
+            $orderTaxPercent = isset($validated['order_tax_percent'])
+                ? (float)$validated['order_tax_percent']
+                : (isset($validated['tax_rate']) ? (float)$validated['tax_rate'] : $poOrderTaxPercent);
+
+            $freightTaxPercent = $isFreightBilledOnInvoice ? (float)($validated['freight_tax_percent'] ?? $orderTaxPercent) : 0.0;
 
             $subtotal = 0;
             $sumItemDiscounts = 0;
@@ -148,7 +162,6 @@ class VendorBillService
                             }
                         }
                     }
-                    if ($maxTaxRate <= 0) $maxTaxRate = 18.0;
                     $freightTaxAmount = $freightAmount * ($maxTaxRate / 100);
                 }
             }

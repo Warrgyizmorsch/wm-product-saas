@@ -143,7 +143,7 @@ class NotificationRuleService
             roles: $defaultRoles,
             userIds: [],
             notifyCreator: false,
-            notifyAssignedUser: false,
+            notifyAssignedUser: (bool) ($eventDetails['notify_assigned_user'] ?? true),
             data: $data,
             subjectModel: $subjectModel,
             tenantId: $tenantId
@@ -214,7 +214,10 @@ class NotificationRuleService
 
         // 3. Dynamic Creator
         if ($notifyCreator) {
-            $creatorId = $data['created_by_user_id'] ?? $subjectModel?->created_by ?? null;
+            $creatorId = $data['created_by_user_id']
+                ?? $subjectModel?->created_by
+                ?? $subjectModel?->requested_by
+                ?? null;
             if ($creatorId) {
                 $finalIds[] = (int) $creatorId;
             }
@@ -222,10 +225,25 @@ class NotificationRuleService
 
         // 4. Dynamic Assigned User
         if ($notifyAssignedUser) {
-            $assignedId = $data['assigned_user_id'] ?? $subjectModel?->assigned_to ?? $subjectModel?->user_id ?? null;
+            $assignedId = $data['assigned_user_id']
+                ?? $subjectModel?->lead_owner_id
+                ?? $subjectModel?->owner_id
+                ?? $subjectModel?->sales_person_id
+                ?? $subjectModel?->salesOrder?->sales_person_id
+                ?? $subjectModel?->purchaseOrder?->created_by
+                ?? $subjectModel?->requested_by
+                ?? $subjectModel?->assigned_to
+                ?? $subjectModel?->user_id
+                ?? null;
             if ($assignedId) {
                 $finalIds[] = (int) $assignedId;
             }
+        }
+
+        // 5. Exclude Users (prevent duplicate notification if already sent directly)
+        if (!empty($data['exclude_user_ids'])) {
+            $exclude = is_array($data['exclude_user_ids']) ? $data['exclude_user_ids'] : [$data['exclude_user_ids']];
+            $finalIds = array_diff($finalIds, array_map('intval', $exclude));
         }
 
         return array_values(array_unique(array_filter($finalIds)));

@@ -163,6 +163,9 @@
                                 <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">
                                     {{ \Illuminate\Support\Facades\Lang::has($methodKey) ? __($methodKey) : ($adv->payment_method ?: 'Bank Transfer') }}
                                 </span>
+                                @if($adv->bankAccount)
+                                    <div class="text-muted fs-11 mt-1 font-monospace">{{ $adv->bankAccount->name }}</div>
+                                @endif
                             </td>
                             <td class="font-monospace fs-12 text-secondary">
                                 {{ $adv->reference_number ?: 'N/A' }}
