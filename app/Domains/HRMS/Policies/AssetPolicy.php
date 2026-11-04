@@ -3,6 +3,7 @@
 namespace App\Domains\HRMS\Policies;
 
 use App\Domains\HRMS\Models\Asset;
+use App\Domains\HRMS\Services\HrmsScopeService;
 use App\Models\User;
 use App\Services\Access\AccessService;
 
@@ -14,6 +15,10 @@ class AssetPolicy
 
     public function viewAny(User $user): bool
     {
+        if (HrmsScopeService::isCompanyAdmin($user)) {
+            return true;
+        }
+
         return $this->access->allows($user, 'hrms.assets.view', [
             'tenant_id' => $user->tenant_id,
         ]) || $this->access->allows($user, 'hrms.assets.manage', [
@@ -25,6 +30,10 @@ class AssetPolicy
 
     public function create(User $user): bool
     {
+        if (HrmsScopeService::isCompanyAdmin($user)) {
+            return true;
+        }
+
         return $this->access->allows($user, 'hrms.assets.create', [
             'tenant_id' => $user->tenant_id,
         ]) || $this->access->allows($user, 'hrms.assets.manage', [
@@ -36,6 +45,10 @@ class AssetPolicy
 
     public function update(User $user, mixed $asset = null): bool
     {
+        if (HrmsScopeService::isCompanyAdmin($user)) {
+            return true;
+        }
+
         $tenantId = $asset instanceof Asset ? $asset->tenant_id : $user->tenant_id;
 
         return $this->access->allows($user, 'hrms.assets.update', [
@@ -49,6 +62,10 @@ class AssetPolicy
 
     public function delete(User $user, mixed $asset = null): bool
     {
+        if (HrmsScopeService::isCompanyAdmin($user)) {
+            return true;
+        }
+
         $tenantId = $asset instanceof Asset ? $asset->tenant_id : $user->tenant_id;
 
         return $this->access->allows($user, 'hrms.assets.delete', [
@@ -62,6 +79,10 @@ class AssetPolicy
 
     public function approve(User $user, mixed $asset = null): bool
     {
+        if (HrmsScopeService::isCompanyAdmin($user)) {
+            return true;
+        }
+
         $tenantId = $asset instanceof Asset ? $asset->tenant_id : $user->tenant_id;
 
         return $this->access->allows($user, 'hrms.assets.approve', [

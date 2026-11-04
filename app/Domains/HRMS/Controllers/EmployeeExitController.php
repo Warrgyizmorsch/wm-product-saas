@@ -136,6 +136,18 @@ class EmployeeExitController extends Controller
 
     public function updateClearance(Request $request, EmployeeExitClearance $clearance): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $clearance->employeeExit)
+            || $user->can('approveManager', $clearance->employeeExit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $clearance->employeeExit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to update clearance items.');
+
         $validated = $request->validate([
             'status'           => 'required|in:cleared,pending,waived,issue_found,issues_found',
             'remarks'          => 'nullable|string',
@@ -157,6 +169,18 @@ class EmployeeExitController extends Controller
 
     public function updateDepartmentClearances(Request $request, EmployeeExit $exit, string $department): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to update departmental clearances.');
+
         $items = $request->input('clearances') ?: $request->input('items', []);
         $userId = auth()->id();
 
@@ -213,6 +237,18 @@ class EmployeeExitController extends Controller
 
     public function storeAdhocExitClearance(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to add clearance items.');
+
         $validated = $request->validate([
             'department'         => 'nullable|string|max:100',
             'clearance_category' => 'nullable|string|max:100',
@@ -244,6 +280,18 @@ class EmployeeExitController extends Controller
     public function destroyExitClearance(EmployeeExitClearance $clearance): RedirectResponse
     {
         $exit = $clearance->employeeExit;
+        $user = auth()->user();
+        $canClear = $user && $exit && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.exit_policies.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to delete clearance items.');
+
         $name = $clearance->item_name;
 
         DB::transaction(function () use ($clearance, $exit) {
@@ -259,6 +307,17 @@ class EmployeeExitController extends Controller
 
     public function returnAssetDirect(Request $request, EmployeeExit $exit, Asset $asset): RedirectResponse
     {
+        $user = auth()->user();
+        $canClear = $user && (
+            $user->can('approve', $exit)
+            || $user->can('approveManager', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.assets.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->canAccessEmployee($user, $exit->employee_id)
+        );
+        abort_unless($canClear, 403, 'Unauthorized to process asset return.');
         $validated = $request->validate([
             'condition'           => 'nullable|string|in:good,fair,damaged,lost,scrapped,new',
             'condition_on_return' => 'nullable|string|in:good,fair,damaged,lost,scrapped,new',
@@ -348,6 +407,16 @@ class EmployeeExitController extends Controller
 
     public function finalizeFnF(Request $request, EmployeeExit $exit): RedirectResponse
     {
+        $user = auth()->user();
+        $canFinalize = $user && (
+            $user->can('approve', $exit)
+            || $user->hasHrPermission('hrms.employee_exits.approve')
+            || $user->hasHrPermission('hrms.payroll.manage')
+            || $user->hasHrPermission('hr.settings.manage')
+            || app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
+        abort_unless($canFinalize, 403, 'Unauthorized to finalize Full and Final settlement.');
+
         $validated = $request->validate([
             'payment_method'      => 'nullable|string|max:100',
             'payment_mode'        => 'nullable|string|max:100',

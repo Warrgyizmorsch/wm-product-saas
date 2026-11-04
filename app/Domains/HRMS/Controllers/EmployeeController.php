@@ -1183,8 +1183,12 @@ class EmployeeController extends Controller
 
     private function authorizeHrms(string|array $permission): void
     {
-        $permissions = is_array($permission) ? $permission : [$permission];
         $user = auth()->user();
+        if (\App\Domains\HRMS\Services\HrmsScopeService::isCompanyAdmin($user)) {
+            return;
+        }
+
+        $permissions = is_array($permission) ? $permission : [$permission];
         $tenantId = $user?->tenant_id;
 
         $access = app(AccessService::class);

@@ -51,7 +51,11 @@ class LeaveRequestController extends Controller
         ]);
 
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.leave_requests.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $currentEmp = Employee::resolveForUser($user);
             if (!$currentEmp) {
@@ -303,12 +307,14 @@ class LeaveRequestController extends Controller
 
             if (!empty($validated['notified_contacts'])) {
                 $contacts = Employee::whereIn('id', $validated['notified_contacts'])->get();
-                foreach ($contacts as $contact) {
-                    \App\Services\Notification\NotificationService::sendToEmployee(
-                        employee: $contact,
+                $contactUserIds = $contacts->pluck('user_id')->filter()->unique()->all();
+                if (!empty($contactUserIds)) {
+                    \App\Services\Notification\NotificationService::sendToUserIds(
+                        userIds: $contactUserIds,
                         title: 'Colleague Leave Notice',
                         message: "{$employee->full_name} will be on leave ({$startDate->format('M d')} - {$endDate->format('M d')}).",
                         actionUrl: route('hrms.leaves.index'),
+                        module: 'hrms',
                         type: 'leave_request',
                         iconClass: 'feather-calendar'
                     );
@@ -404,12 +410,14 @@ class LeaveRequestController extends Controller
 
             if ($validated['action'] === 'approved' && !empty($leaveRequest->notified_contacts)) {
                 $contacts = Employee::whereIn('id', $leaveRequest->notified_contacts)->get();
-                foreach ($contacts as $contact) {
-                    \App\Services\Notification\NotificationService::sendToEmployee(
-                        employee: $contact,
+                $contactUserIds = $contacts->pluck('user_id')->filter()->unique()->all();
+                if (!empty($contactUserIds)) {
+                    \App\Services\Notification\NotificationService::sendToUserIds(
+                        userIds: $contactUserIds,
                         title: 'Colleague Leave Approved',
                         message: "{$leaveRequest->employee?->full_name}'s leave ({$startFormatted} - {$endFormatted}) has been approved.",
                         actionUrl: route('hrms.leaves.index'),
+                        module: 'hrms',
                         type: 'leave_approved',
                         iconClass: 'feather-calendar'
                     );
@@ -448,7 +456,11 @@ class LeaveRequestController extends Controller
     public function withdraw(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.leave_requests.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $leaveRequest->employee_id !== $employee->id) {
@@ -472,7 +484,11 @@ class LeaveRequestController extends Controller
     public function requestCancellation(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.leave_requests.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $leaveRequest->employee_id !== $employee->id) {
@@ -528,7 +544,7 @@ class LeaveRequestController extends Controller
     public function approveCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
         $user = auth()->user();
-        abort_unless($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve')), 403, 'Unauthorized to approve cancellation.');
+        abort_unless($this->canApproveLeaveRequest($user, $leaveRequest), 403, 'Unauthorized to approve cancellation.');
 
         if ($leaveRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', __('hrms.leave.app.no_pending_cancellation'));
@@ -563,7 +579,7 @@ class LeaveRequestController extends Controller
     public function denyCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
         $user = auth()->user();
-        abort_unless($user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve')), 403, 'Unauthorized to deny cancellation.');
+        abort_unless($this->canApproveLeaveRequest($user, $leaveRequest), 403, 'Unauthorized to deny cancellation.');
 
         if ($leaveRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', __('hrms.leave.app.no_pending_cancellation'));
@@ -720,7 +736,11 @@ class LeaveRequestController extends Controller
     public function destroy(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.leave_requests.approve'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.leave_requests.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
 
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);

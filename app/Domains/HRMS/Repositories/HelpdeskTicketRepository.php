@@ -58,20 +58,37 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
         $tenantId = $this->resolveTenantId();
         $employee = Employee::resolveForUser($user, $tenantId);
 
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $employee?->branch_id,
+            'department_id' => $user?->department_id ?? $employee?->department_id,
+        ];
+
         $canManage = $user && ($user->is_admin
-            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
+
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $accessibleEmpIds = $scopeService->getAccessibleEmployeeIds($user ?? $employee);
 
         $query = HelpdeskTicket::query()
             ->with(['employee', 'category', 'assignedAgent', 'rating'])
             ->where('tenant_id', $tenantId);
 
-        // Access Scoping: Non-management users can only view tickets they requested or are assigned to
+        // Access Scoping: Non-management users can view tickets they requested, are assigned to, or for Department Heads/Managers, their team's non-confidential tickets
         if (!$canManage) {
             if ($employee) {
-                $query->where(function ($q) use ($employee) {
+                $query->where(function ($q) use ($employee, $accessibleEmpIds) {
                     $q->where('employee_id', $employee->id)
                       ->orWhere('assigned_to', $employee->id);
+
+                    if (!empty($accessibleEmpIds)) {
+                        $q->orWhere(function ($sq) use ($accessibleEmpIds) {
+                            $sq->whereIn('employee_id', $accessibleEmpIds)
+                               ->where('is_confidential', false);
+                        });
+                    }
                 });
             } else {
                 $query->whereRaw('1 = 0');
@@ -142,9 +159,16 @@ class HelpdeskTicketRepository implements HelpdeskTicketRepositoryInterface
         $statsQuery = HelpdeskTicket::query()->where('tenant_id', $tenantId);
         if (!$canManage) {
             if ($employee) {
-                $statsQuery->where(function ($q) use ($employee) {
+                $statsQuery->where(function ($q) use ($employee, $accessibleEmpIds) {
                     $q->where('employee_id', $employee->id)
                       ->orWhere('assigned_to', $employee->id);
+
+                    if (!empty($accessibleEmpIds)) {
+                        $q->orWhere(function ($sq) use ($accessibleEmpIds) {
+                            $sq->whereIn('employee_id', $accessibleEmpIds)
+                               ->where('is_confidential', false);
+                        });
+                    }
                 });
             } else {
                 $statsQuery->whereRaw('1 = 0');

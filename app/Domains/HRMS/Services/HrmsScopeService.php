@@ -62,33 +62,56 @@ class HrmsScopeService
             return true;
         }
 
+        // Dynamic RBAC platform admin check
+        if (app(\App\Services\Access\AccessService::class)->holdsPlatformAdminRole($user)) {
+            return true;
+        }
+
+        // Dynamic HR administrative permissions check (works for any custom role in RBAC)
+        if (method_exists($user, 'hasHrPermission') && (
+            $user->hasHrPermission('hr.settings.manage') || 
+            $user->hasHrPermission('hrms.employees.manage') || 
+            $user->hasHrPermission('hrms.org.manage') ||
+            $user->hasHrPermission('hr.organization_settings.manage') ||
+            $user->hasHrPermission('hrms.attendance.manage') ||
+            $user->hasHrPermission('hrms.attendance.view_all')
+        )) {
+            return true;
+        }
+
+        // Check if any assigned dynamic role grants administrative HR permissions
+        if (method_exists($user, 'roles')) {
+            $hasDynamicAdminGrant = $user->roles()
+                ->where(function ($rq) {
+                    $rq->whereIn('level', [1, 10, 20])
+                       ->orWhereHas('rolePermissions.permission', function ($pq) {
+                           $pq->whereIn('name', ['hr.settings.manage', 'hrms.employees.manage', 'hrms.org.manage']);
+                       });
+                })->exists();
+
+            if ($hasDynamicAdminGrant) {
+                return true;
+            }
+        }
+
         $adminRoles = [
             'admin', 'superadmin', 'super_admin', 'super-admin', 'company_admin', 
             'tenant_owner', 'owner', 'hr_director', 'hr_manager', 'hr_admin', 
             'director', 'general_manager'
         ];
 
-        // Direct user role string check
+        // Direct user role string check (legacy backwards compatibility)
         if (!empty($user->role) && in_array(strtolower($user->role), $adminRoles, true)) {
             return true;
         }
 
-        // Employee model role check if attached
+        // Employee model role check if attached (legacy backwards compatibility)
         $employee = $this->resolveEmployee($actor);
         if ($employee && !empty($employee->role) && in_array(strtolower($employee->role), $adminRoles, true)) {
             return true;
         }
 
-        // HR permission check
-        if (method_exists($user, 'hasHrPermission') && (
-            $user->hasHrPermission('hr.settings.manage') || 
-            $user->hasHrPermission('hrms.employees.manage') || 
-            $user->hasHrPermission('hrms.attendance.view_all')
-        )) {
-            return true;
-        }
-
-        // Dynamic / UserRole check
+        // Dynamic / UserRole check against standard admin role slugs
         if (method_exists($user, 'roles')) {
             $hasAdminRole = $user->roles()->whereIn('slug', $adminRoles)->exists();
             if ($hasAdminRole) {
@@ -249,7 +272,7 @@ class HrmsScopeService
             $accessibleIds = array_merge($accessibleIds, $directReportIds);
         }
 
-        return array_values(array_unique($accessibleIds));
+        return array_values(array_unique(array_map('intval', $accessibleIds)));
     }
 
     /**
