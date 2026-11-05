@@ -179,7 +179,7 @@
                         @forelse ($attendances as $attendance)
                             @php
                                 $statusVal = $attendance->status ?: 'present';
-                                $isAbsentOrLeave = in_array($statusVal, ['absent', 'on_leave']);
+                                $isAbsentOrLeave = in_array($statusVal, ['absent', 'on_leave', 'week_off', 'holiday', 'not_joined', 'scheduled', 'not_clocked_in']);
 
                                 // Location Badge Class & Translated Label
                                 $locLower = strtolower((string)$attendance->location_type);
@@ -223,6 +223,15 @@
                                 } elseif ($statusVal === 'absent') {
                                     $statusBadgeClass = 'bg-soft-danger text-danger';
                                     $statusText = __('hrms.my_attendance.absent');
+                                } elseif ($statusVal === 'missing_logs') {
+                                    $statusBadgeClass = 'bg-soft-danger text-danger';
+                                    $statusText = 'Missing Check-Out';
+                                } elseif ($statusVal === 'not_clocked_in' || $statusVal === 'unmarked') {
+                                    $statusBadgeClass = 'bg-soft-secondary text-secondary';
+                                    $statusText = 'Not Clocked In';
+                                } elseif ($statusVal === 'scheduled') {
+                                    $statusBadgeClass = 'bg-soft-secondary text-secondary';
+                                    $statusText = 'Scheduled';
                                 } elseif ($statusVal === 'week_off' || $statusVal === 'weekly_off') {
                                     $statusBadgeClass = 'bg-soft-secondary text-secondary';
                                     $statusText = __('hrms.my_attendance.weekly_off');
@@ -269,16 +278,31 @@
                                 <td>
                                     @if ($attendance->breaks->isNotEmpty() && !$isAbsentOrLeave)
                                         <div class="d-flex flex-column gap-0.5">
+                                            @php
+                                                $totalBreakMinutesCalculated = 0;
+                                            @endphp
                                             @foreach($attendance->breaks as $brk)
                                                 @php
                                                     $brkIn = \Carbon\Carbon::parse($brk->break_in)->format('h:i A');
                                                     $brkOut = $brk->break_out ? \Carbon\Carbon::parse($brk->break_out)->format('h:i A') : __('hrms.my_attendance.active');
-                                                    $brkDur = $brk->duration_minutes !== null ? $brk->duration_minutes . 'm' : __('hrms.my_attendance.active');
+                                                    $durMin = $brk->duration_minutes;
+                                                    if ($brk->break_out) {
+                                                        if ($durMin === null || (int)$durMin <= 0) {
+                                                            $durMin = max(1, (int) round(\Carbon\Carbon::parse($brk->break_in)->diffInMinutes(\Carbon\Carbon::parse($brk->break_out))));
+                                                        }
+                                                        $totalBreakMinutesCalculated += $durMin;
+                                                        $brkDur = $durMin . 'm';
+                                                    } else {
+                                                        $brkDur = __('hrms.my_attendance.active');
+                                                    }
                                                 @endphp
                                                 <span class="fs-10 text-muted" style="line-height: 1.2;">{{ $brkIn }} - {{ $brkOut }} ({{ $brkDur }})</span>
                                             @endforeach
-                                            @if($attendance->total_break_hours > 0)
-                                                <span class="fw-bold mt-1 text-dark" style="font-size: 10px;">{{ __('hrms.my_attendance.total_break') }}: {{ $attendance->formatted_break_hours }}</span>
+                                            @if($attendance->total_break_hours > 0 || $totalBreakMinutesCalculated > 0)
+                                                @php
+                                                    $displayBreakHrs = $attendance->total_break_hours > 0 ? $attendance->formatted_break_hours : ($totalBreakMinutesCalculated < 60 ? $totalBreakMinutesCalculated . 'm' : floor($totalBreakMinutesCalculated / 60) . 'hr ' . ($totalBreakMinutesCalculated % 60) . 'm');
+                                                @endphp
+                                                <span class="fw-bold mt-1 text-dark" style="font-size: 10px;">{{ __('hrms.my_attendance.total_break') }}: {{ $displayBreakHrs }}</span>
                                             @endif
                                         </div>
                                     @else

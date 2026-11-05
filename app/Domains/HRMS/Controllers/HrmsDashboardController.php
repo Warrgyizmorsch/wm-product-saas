@@ -96,21 +96,28 @@ class HrmsDashboardController extends Controller
         ];
 
         if ($currentEmployee) {
-            $shiftCutoff = $now->copy()->subHours(18);
+            $myTodayAttendance = $this->resolveActiveAttendance($currentEmployee, $tenantId, $now);
 
-            $myTodayAttendance = Attendance::with('breaks')
-                ->where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->where(function ($q) use ($today, $shiftCutoff) {
-                    $q->whereDate('date', $today)
-                      ->orWhere(function ($sub) use ($shiftCutoff) {
-                          $sub->whereNotNull('check_in')
-                              ->whereNull('check_out')
-                              ->where('check_in', '>=', $shiftCutoff);
-                      });
-                })
-                ->latest('check_in')
-                ->first();
+            // Self-heal open break state if latest punch was a break start
+            if ($myTodayAttendance && !$myTodayAttendance->activeBreak()) {
+                $latestPunch = BiometricPunchLog::where('employee_id', $currentEmployee->id)
+                    ->whereDate('punch_time', $myTodayAttendance->date)
+                    ->latest('punch_time')
+                    ->first();
+                if ($latestPunch && in_array(strtolower((string) $latestPunch->punch_type), ['start_break', 'break_out'], true)) {
+                    AttendanceBreak::firstOrCreate(
+                        [
+                            'attendance_id' => $myTodayAttendance->id,
+                            'break_out' => null,
+                        ],
+                        [
+                            'break_in' => $latestPunch->punch_time,
+                            'duration_minutes' => 0,
+                        ]
+                    );
+                    $myTodayAttendance->load('breaks');
+                }
+            }
 
             // 7-day recent punch history (for 7-day visual mini-strip)
             for ($i = 6; $i >= 0; $i--) {
@@ -569,6 +576,65 @@ class HrmsDashboardController extends Controller
         return app(\App\Domains\HRMS\Services\HrmsScopeService::class)->resolveEmployee($user, $tenantId);
     }
 
+    /**
+     * Resolves the active Attendance record for the current shift.
+     * Prevents previous day unclosed shifts from bleeding into today unless on an active overnight shift.
+     */
+    private function resolveActiveAttendance(Employee $employee, int $tenantId, Carbon $now): ?Attendance
+    {
+        $today = $now->format('Y-m-d');
+
+        // 1. Check for TODAY's attendance record first
+        $todayAttendance = Attendance::with('breaks')
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $employee->id)
+            ->whereDate('date', $today)
+            ->latest('check_in')
+            ->first();
+
+        if ($todayAttendance) {
+            return $todayAttendance;
+        }
+
+        // 2. Only consider yesterday's unclosed attendance IF employee is on an actual OVERNIGHT shift
+        $yesterday = $now->copy()->subDay()->format('Y-m-d');
+        $yesterdayShift = $employee->resolveShiftForDate($yesterday);
+
+        if ($yesterdayShift && $yesterdayShift->isOvernight()) {
+            $shiftEndTime = Carbon::parse($today . ' ' . $yesterdayShift->end_time);
+            if ($now->lte($shiftEndTime->copy()->addHours(3))) {
+                $overnightAttendance = Attendance::with('breaks')
+                    ->where('tenant_id', $tenantId)
+                    ->where('employee_id', $employee->id)
+                    ->whereDate('date', $yesterday)
+                    ->whereNotNull('check_in')
+                    ->whereNull('check_out')
+                    ->latest('check_in')
+                    ->first();
+
+                if ($overnightAttendance) {
+                    return $overnightAttendance;
+                }
+            }
+        }
+
+        // 3. Yesterday's shift was a day shift or overnight shift that already ended.
+        // Auto-close / flag past unclosed attendance as missing_logs so it never bleeds into today.
+        $pastUnclosed = Attendance::where('tenant_id', $tenantId)
+            ->where('employee_id', $employee->id)
+            ->whereDate('date', '<', $today)
+            ->whereNotNull('check_in')
+            ->whereNull('check_out')
+            ->latest('check_in')
+            ->first();
+
+        if ($pastUnclosed && $pastUnclosed->status !== 'missing_logs') {
+            $pastUnclosed->update(['status' => 'missing_logs']);
+        }
+
+        return null;
+    }
+
     public function getWebPunchData(?\App\Models\User $user, int $tenantId): array
     {
         $today = Carbon::today()->format('Y-m-d');
@@ -580,21 +646,28 @@ class HrmsDashboardController extends Controller
         $activeShift = null;
 
         if ($currentEmployee) {
-            $shiftCutoff = $now->copy()->subHours(18);
+            $myTodayAttendance = $this->resolveActiveAttendance($currentEmployee, $tenantId, $now);
 
-            $myTodayAttendance = Attendance::with('breaks')
-                ->where('tenant_id', $tenantId)
-                ->where('employee_id', $currentEmployee->id)
-                ->where(function ($q) use ($today, $shiftCutoff) {
-                    $q->whereDate('date', $today)
-                      ->orWhere(function ($sub) use ($shiftCutoff) {
-                          $sub->whereNotNull('check_in')
-                              ->whereNull('check_out')
-                              ->where('check_in', '>=', $shiftCutoff);
-                      });
-                })
-                ->latest('check_in')
-                ->first();
+            // Self-heal open break state if latest punch was a break start
+            if ($myTodayAttendance && !$myTodayAttendance->activeBreak()) {
+                $latestPunch = BiometricPunchLog::where('employee_id', $currentEmployee->id)
+                    ->whereDate('punch_time', $myTodayAttendance->date)
+                    ->latest('punch_time')
+                    ->first();
+                if ($latestPunch && in_array(strtolower((string) $latestPunch->punch_type), ['start_break', 'break_out'], true)) {
+                    AttendanceBreak::firstOrCreate(
+                        [
+                            'attendance_id' => $myTodayAttendance->id,
+                            'break_out' => null,
+                        ],
+                        [
+                            'break_in' => $latestPunch->punch_time,
+                            'duration_minutes' => 0,
+                        ]
+                    );
+                    $myTodayAttendance->load('breaks');
+                }
+            }
 
             for ($i = 6; $i >= 0; $i--) {
                 $pastDate = $now->copy()->subDays($i);
@@ -1121,23 +1194,11 @@ class HrmsDashboardController extends Controller
 
         }
 
-        // Fetch active/today's Attendance record (supports overnight shifts within last 18 hours)
-        $shiftCutoff = $now->copy()->subHours(18);
-        $attendance = Attendance::where('tenant_id', $tenantId)
-            ->where('employee_id', $employee->id)
-            ->where(function ($q) use ($today, $shiftCutoff) {
-                $q->whereDate('date', $today)
-                  ->orWhere(function ($sub) use ($shiftCutoff) {
-                      $sub->whereNotNull('check_in')
-                          ->whereNull('check_out')
-                          ->where('check_in', '>=', $shiftCutoff);
-                  });
-            })
-            ->latest('check_in')
-            ->first();
+        // Fetch active/today's Attendance record
+        $attendance = $this->resolveActiveAttendance($employee, $tenantId, $now);
 
-        // Graceful fallback for clock-out or breaks if shift started before 18h window
-        if (!$attendance && in_array($action, ['out', 'break_out', 'break_in'])) {
+        // Graceful fallback for clock-out or breaks if shift started before overnight cutoff
+        if (!$attendance && in_array($action, ['out', 'break_out', 'break_in', 'start_break', 'end_break'], true)) {
             $attendance = Attendance::where('tenant_id', $tenantId)
                 ->where('employee_id', $employee->id)
                 ->whereNotNull('check_in')
@@ -1182,7 +1243,7 @@ class HrmsDashboardController extends Controller
         }
 
         // 2. Start Break (Take Break)
-        if ($action === 'break_out') {
+        if ($action === 'start_break' || $action === 'break_out') {
             if (!$attendance->check_in) {
                 return redirect()->back()->with('error', 'Please clock-in first before taking a break.');
             }
@@ -1198,33 +1259,26 @@ class HrmsDashboardController extends Controller
                 'tenant_id' => $tenantId,
                 'employee_id' => $employee->id,
                 'punch_time' => $now,
-                'punch_type' => 'break_out',
+                'punch_type' => 'start_break',
             ]);
 
             return redirect()->back()->with('success', 'Break started at ' . $now->format('h:i A') . '. Enjoy your break!');
         }
 
         // 3. End Break (Resume Work)
-        if ($action === 'break_in') {
-            $activeBreak = AttendanceBreak::where('attendance_id', $attendance->id)
-                ->whereNull('break_out')
-                ->latest()
-                ->first();
-
-            if ($activeBreak) {
-                try {
-                    $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
-                } catch (\Illuminate\Validation\ValidationException $exception) {
-                    $message = collect($exception->errors())->flatten()->first() ?? 'Unable to end break.';
-                    return redirect()->back()->with('error', $message);
-                }
+        if ($action === 'end_break' || $action === 'break_in') {
+            try {
+                $this->attendanceRepository->breakOut($attendance->id, $latitude, $longitude);
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $message = collect($exception->errors())->flatten()->first() ?? 'Unable to end break.';
+                return redirect()->back()->with('error', $message);
             }
 
             BiometricPunchLog::create([
                 'tenant_id' => $tenantId,
                 'employee_id' => $employee->id,
                 'punch_time' => $now,
-                'punch_type' => 'break_in',
+                'punch_type' => 'end_break',
             ]);
 
             return redirect()->back()->with('success', 'Break concluded at ' . $now->format('h:i A') . '. Resumed work!');

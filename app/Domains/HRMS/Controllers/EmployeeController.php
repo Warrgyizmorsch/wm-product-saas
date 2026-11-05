@@ -1184,7 +1184,7 @@ class EmployeeController extends Controller
     private function authorizeHrms(string|array $permission): void
     {
         $user = auth()->user();
-        if (\App\Domains\HRMS\Services\HrmsScopeService::isCompanyAdmin($user)) {
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
             return;
         }
 

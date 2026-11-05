@@ -118,36 +118,51 @@ class ProcessBiometricAttendance implements ShouldQueue
         $checkOutTime = null;
         $breaks = [];
 
+        $isCurrentlyOnBreak = false;
+        $activeBreakStart = null;
+
         if ($logCount === 2) {
-            $checkOutTime = Carbon::parse($filteredLogs[1]->punch_time);
+            $lastPunch = $filteredLogs[1];
+            $lastPunchType = strtolower((string) ($lastPunch->punch_type ?? 'auto'));
+            if (in_array($lastPunchType, ['break_out', 'start_break'], true)) {
+                $checkOutTime = null;
+                $isCurrentlyOnBreak = true;
+                $activeBreakStart = Carbon::parse($lastPunch->punch_time);
+            } else {
+                $checkOutTime = Carbon::parse($filteredLogs[1]->punch_time);
+            }
         } elseif ($logCount > 2) {
             // Check explicit punch_type of the last punch
             $lastPunch = $filteredLogs[$logCount - 1];
             $lastPunchType = strtolower((string) ($lastPunch->punch_type ?? 'auto'));
 
-            if (in_array($lastPunchType, ['out', 'break_in'], true) || ($logCount % 2 === 0)) {
+            if ($lastPunchType === 'out' || ($logCount % 2 === 0 && !in_array($lastPunchType, ['in', 'break_in', 'end_break', 'break_out', 'start_break'], true))) {
                 // Last punch represents an exit/check-out
                 $checkOutTime = Carbon::parse($lastPunch->punch_time);
                 $breakLimit = $logCount - 2;
             } else {
-                // Odd punches with 'in' or 'auto' => employee is currently clocked in / returned from break
+                // Currently clocked in or currently on break
                 $checkOutTime = null;
-                $breakLimit = $logCount - 1;
+                if (in_array($lastPunchType, ['break_out', 'start_break'], true)) {
+                    $isCurrentlyOnBreak = true;
+                    $activeBreakStart = Carbon::parse($lastPunch->punch_time);
+                    $breakLimit = $logCount - 1;
+                } else {
+                    $breakLimit = $logCount;
+                }
             }
 
-            // Intermediate punches between 1st punch and the final punch form break intervals
+            // Intermediate punches form completed break intervals
             for ($i = 1; $i < $breakLimit; $i += 2) {
                 if (isset($filteredLogs[$i + 1])) {
                     $bIn = Carbon::parse($filteredLogs[$i]->punch_time);
                     $bOut = Carbon::parse($filteredLogs[$i + 1]->punch_time);
-                    $dur = max(0, (int) $bIn->diffInMinutes($bOut));
-                    if ($dur > 0) {
-                        $breaks[] = [
-                            'break_in'         => $bIn,
-                            'break_out'        => $bOut,
-                            'duration_minutes' => $dur,
-                        ];
-                    }
+                    $dur = max(1, (int) round($bIn->diffInMinutes($bOut)));
+                    $breaks[] = [
+                        'break_in'         => $bIn,
+                        'break_out'        => $bOut,
+                        'duration_minutes' => $dur,
+                    ];
                 }
             }
         }
@@ -173,10 +188,13 @@ class ProcessBiometricAttendance implements ShouldQueue
         }
 
         // 7. Update or create the Attendance and AttendanceBreak records
-        DB::transaction(function () use ($employee, $date, $checkInTime, $checkOutTime, $netWorkHours, $totalBreakHours, $status, $breaks) {
+        DB::transaction(function () use ($employee, $date, $checkInTime, $checkOutTime, $netWorkHours, $totalBreakHours, $status, $breaks, $isCurrentlyOnBreak, $activeBreakStart) {
             $attendance = Attendance::where('employee_id', $employee->id)
                 ->whereDate('date', $date)
                 ->first();
+
+            // Preserve any existing active (unclosed) break before deleting completed breaks
+            $existingActiveBreak = $attendance ? $attendance->activeBreak() : null;
 
             if ($attendance) {
                 $attendanceStatus = in_array($attendance->status, ['on_leave', 'holiday'])
@@ -186,7 +204,7 @@ class ProcessBiometricAttendance implements ShouldQueue
                 $attendance->update([
                     'check_in'          => $checkInTime,
                     'check_out'         => $checkOutTime,
-                    'location_type'     => 'office',
+                    'location_type'     => $attendance->location_type ?: 'office',
                     'status'            => $attendanceStatus,
                     'total_work_hours'  => $netWorkHours,
                     'total_break_hours' => $totalBreakHours,
@@ -205,16 +223,42 @@ class ProcessBiometricAttendance implements ShouldQueue
                 ]);
             }
 
-            // Sync intermediate breaks
-            AttendanceBreak::where('attendance_id', $attendance->id)->delete();
+            // Sync intermediate completed breaks without deleting existing breaks
             foreach ($breaks as $b) {
-                AttendanceBreak::create([
-                    'attendance_id'    => $attendance->id,
-                    'break_in'         => $b['break_in'],
-                    'break_out'        => $b['break_out'],
-                    'duration_minutes' => $b['duration_minutes'],
-                ]);
+                AttendanceBreak::firstOrCreate(
+                    [
+                        'attendance_id' => $attendance->id,
+                        'break_in'      => $b['break_in'],
+                    ],
+                    [
+                        'break_out'        => $b['break_out'],
+                        'duration_minutes' => $b['duration_minutes'],
+                    ]
+                );
             }
+
+            // If employee is actively on break, restore or create the active break
+            if ($isCurrentlyOnBreak || $existingActiveBreak) {
+                $start = $activeBreakStart ?: ($existingActiveBreak?->break_in ?: Carbon::now());
+                AttendanceBreak::firstOrCreate(
+                    [
+                        'attendance_id' => $attendance->id,
+                        'break_out'     => null,
+                    ],
+                    [
+                        'break_in'         => $start,
+                        'duration_minutes' => 0,
+                    ]
+                );
+            }
+
+            // Recalculate total break hours from all breaks
+            $attendance->load('breaks');
+            $actualBreakMinutes = $attendance->breaks->sum('duration_minutes');
+            $actualBreakHours = round($actualBreakMinutes / 60, 2);
+            $attendance->update([
+                'total_break_hours' => $actualBreakHours,
+            ]);
         });
 
         // 8. Mark raw logs in the window as processed
