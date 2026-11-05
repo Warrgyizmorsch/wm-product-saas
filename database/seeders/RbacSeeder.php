@@ -105,7 +105,6 @@ class RbacSeeder extends Seeder
             'crm.leads.create' => $permissions['crm.leads.create'],
             'crm.deals.create' => $permissions['crm.deals.create'],
             'crm.quotations.create' => $permissions['crm.quotations.create'],
-            'crm.customers.view' => $permissions['crm.customers.view'],
             'crm.customers.create' => $permissions['crm.customers.create'],
         ], RolePermission::SCOPE_TENANT);
 
@@ -115,6 +114,7 @@ class RbacSeeder extends Seeder
             'crm.leads.update' => $permissions['crm.leads.update'],
             'crm.deals.view' => $permissions['crm.deals.view'],
             'crm.deals.update' => $permissions['crm.deals.update'],
+            'crm.customers.view' => $permissions['crm.customers.view'],
             'crm.quotations.view' => $permissions['crm.quotations.view'],
         ], RolePermission::SCOPE_OWN);
 
@@ -125,6 +125,21 @@ class RbacSeeder extends Seeder
             'inventory.products.delete' => $permissions['inventory.products.delete'],
             'inventory.warehouses.manage' => $permissions['inventory.warehouses.manage'],
             'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
+            'inventory.transfers.view' => $permissions['inventory.transfers.view'],
+            'inventory.transfers.create' => $permissions['inventory.transfers.create'],
+            'inventory.transfers.manage' => $permissions['inventory.transfers.manage'],
+            'inventory.adjustments.view' => $permissions['inventory.adjustments.view'],
+            'inventory.adjustments.create' => $permissions['inventory.adjustments.create'],
+            'inventory.adjustments.manage' => $permissions['inventory.adjustments.manage'],
+            'inventory.batches.view' => $permissions['inventory.batches.view'],
+            'inventory.batches.manage' => $permissions['inventory.batches.manage'],
+            'inventory.serials.view' => $permissions['inventory.serials.view'],
+            'inventory.serials.manage' => $permissions['inventory.serials.manage'],
+            'inventory.transactions.view' => $permissions['inventory.transactions.view'],
+            'inventory.reservations.view' => $permissions['inventory.reservations.view'],
+            'inventory.reservations.manage' => $permissions['inventory.reservations.manage'],
+            'inventory.barcodes.manage' => $permissions['inventory.barcodes.manage'],
+            'inventory.reports.view' => $permissions['inventory.reports.view'],
             'inventory.material_requirements.view' => $permissions['inventory.material_requirements.view'],
             'inventory.material_requirements.ship' => $permissions['inventory.material_requirements.ship'],
             'inventory.dispatches.view' => $permissions['inventory.dispatches.view'],
@@ -165,22 +180,22 @@ class RbacSeeder extends Seeder
             'sales.material_requirements.create' => $permissions['sales.material_requirements.create'],
             'sales.dispatches.view' => $permissions['sales.dispatches.view'],
             'sales.dispatches.create' => $permissions['sales.dispatches.create'],
-            'sales.invoices.view' => $permissions['sales.invoices.view'],
             'sales.invoices.create' => $permissions['sales.invoices.create'],
             'sales.invoices.send' => $permissions['sales.invoices.send'],
-            'sales.payments.view' => $permissions['sales.payments.view'],
             'sales.payments.create' => $permissions['sales.payments.create'],
-            'sales.returns.view' => $permissions['sales.returns.view'],
             'sales.returns.create' => $permissions['sales.returns.create'],
         ], RolePermission::SCOPE_TENANT);
 
-        // Viewing, updating, confirming, and cancelling orders is restricted to
-        // orders this sales rep is assigned as sales_person_id on.
+        // Viewing, updating, confirming, and cancelling orders, invoices, payments, and returns
+        // is restricted to own records or accounts managed.
         $this->grant($roles['sales_executive'], [
             'sales.orders.view' => $permissions['sales.orders.view'],
             'sales.orders.update' => $permissions['sales.orders.update'],
             'sales.orders.confirm' => $permissions['sales.orders.confirm'],
             'sales.orders.cancel' => $permissions['sales.orders.cancel'],
+            'sales.invoices.view' => $permissions['sales.invoices.view'],
+            'sales.payments.view' => $permissions['sales.payments.view'],
+            'sales.returns.view' => $permissions['sales.returns.view'],
         ], RolePermission::SCOPE_OWN);
 
         // Quick-create is an inline "add a missing product/uom while filling out
@@ -189,6 +204,7 @@ class RbacSeeder extends Seeder
         // to any role that references products in its own workflow.
         foreach (['production_manager', 'production_engineer', 'sales_manager', 'sales_executive'] as $roleSlug) {
             $this->grant($roles[$roleSlug], [
+                'inventory.products.view' => $permissions['inventory.products.view'],
                 'inventory.products.create' => $permissions['inventory.products.create'],
                 'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
             ], RolePermission::SCOPE_TENANT);
@@ -700,6 +716,21 @@ class RbacSeeder extends Seeder
             ['name' => 'inventory.products.delete', 'module' => 'inventory', 'entity' => 'products', 'action' => 'delete'],
             ['name' => 'inventory.warehouses.manage', 'module' => 'inventory', 'entity' => 'warehouses', 'action' => 'manage'],
             ['name' => 'inventory.uoms.manage', 'module' => 'inventory', 'entity' => 'uoms', 'action' => 'manage'],
+            ['name' => 'inventory.transfers.view', 'module' => 'inventory', 'entity' => 'transfers', 'action' => 'view'],
+            ['name' => 'inventory.transfers.create', 'module' => 'inventory', 'entity' => 'transfers', 'action' => 'create'],
+            ['name' => 'inventory.transfers.manage', 'module' => 'inventory', 'entity' => 'transfers', 'action' => 'manage'],
+            ['name' => 'inventory.adjustments.view', 'module' => 'inventory', 'entity' => 'adjustments', 'action' => 'view'],
+            ['name' => 'inventory.adjustments.create', 'module' => 'inventory', 'entity' => 'adjustments', 'action' => 'create'],
+            ['name' => 'inventory.adjustments.manage', 'module' => 'inventory', 'entity' => 'adjustments', 'action' => 'manage'],
+            ['name' => 'inventory.batches.view', 'module' => 'inventory', 'entity' => 'batches', 'action' => 'view'],
+            ['name' => 'inventory.batches.manage', 'module' => 'inventory', 'entity' => 'batches', 'action' => 'manage'],
+            ['name' => 'inventory.serials.view', 'module' => 'inventory', 'entity' => 'serials', 'action' => 'view'],
+            ['name' => 'inventory.serials.manage', 'module' => 'inventory', 'entity' => 'serials', 'action' => 'manage'],
+            ['name' => 'inventory.transactions.view', 'module' => 'inventory', 'entity' => 'transactions', 'action' => 'view'],
+            ['name' => 'inventory.reservations.view', 'module' => 'inventory', 'entity' => 'reservations', 'action' => 'view'],
+            ['name' => 'inventory.reservations.manage', 'module' => 'inventory', 'entity' => 'reservations', 'action' => 'manage'],
+            ['name' => 'inventory.barcodes.manage', 'module' => 'inventory', 'entity' => 'barcodes', 'action' => 'manage'],
+            ['name' => 'inventory.reports.view', 'module' => 'inventory', 'entity' => 'reports', 'action' => 'view'],
             ['name' => 'grns.view', 'module' => 'grns', 'entity' => 'grns', 'action' => 'view'],
             ['name' => 'grns.create', 'module' => 'grns', 'entity' => 'grns', 'action' => 'create'],
             ['name' => 'grns.update', 'module' => 'grns', 'entity' => 'grns', 'action' => 'update'],

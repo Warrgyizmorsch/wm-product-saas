@@ -20,6 +20,14 @@ class InvoiceExport implements FromCollection, WithHeadings, WithMapping, Should
         $query = Invoice::where('tenant_id', $this->tenantId)
             ->with(['customer', 'salesOrder', 'allocations']);
 
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'sales.invoices.view', ['tenant_id' => $this->tenantId])) {
+            $query->where(function ($q) use ($currentUser) {
+                $q->whereHas('salesOrder', fn($soq) => $soq->where('sales_person_id', $currentUser->id))
+                  ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('owner_id', $currentUser->id));
+            });
+        }
+
         // 1. Status filter
         if (!empty($this->filters['status']) && $this->filters['status'] !== 'all') {
             $status = $this->filters['status'];

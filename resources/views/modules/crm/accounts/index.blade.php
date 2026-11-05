@@ -263,6 +263,7 @@
                             </td>
                             <td class="text-end pe-3">
                                 <x-ui.action-dropdown :viewUrl="route('crm.accounts.show', $acc)">
+                                    @can('update', $acc)
                                     {{-- Assign / Change Account Manager --}}
                                     <li>
                                         <a href="javascript:void(0)" class="dropdown-item fs-12 py-1.5 text-dark" onclick="openSingleAssignDrawer({{ $acc->id }}, '{{ e($acc->name) }}', '{{ $acc->owner_id }}', '{{ e($acc->owner?->name ?: __('crm.unassigned')) }}')">
@@ -274,6 +275,8 @@
                                             <i class="feather-edit me-2 text-muted"></i>{{ __('crm.edit_account') }}
                                         </a>
                                     </li>
+                                    @endcan
+                                    @can('delete', $acc)
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form action="{{ route('crm.accounts.destroy', $acc->id) }}" method="POST" id="deleteAccountForm_{{ $acc->id }}">
@@ -284,6 +287,7 @@
                                             </button>
                                         </form>
                                     </li>
+                                    @endcan
                                 </x-ui.action-dropdown>
                             </td>
                         </tr>

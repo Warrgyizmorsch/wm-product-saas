@@ -9,7 +9,11 @@ class CustomerPaymentRepository
 {
     public function getPaginated(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = CustomerPayment::query()->with(['customer', 'allocations.invoice']);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $query = CustomerPayment::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['customer.crmAccount', 'allocations.invoice']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
@@ -26,7 +30,7 @@ class CustomerPaymentRepository
 
     public function find(int $id): ?CustomerPayment
     {
-        return CustomerPayment::with(['customer', 'allocations.invoice', 'allocations.salesOrder'])->find($id);
+        return CustomerPayment::withoutGlobalScope('rbac_scope')->with(['customer', 'allocations.invoice', 'allocations.salesOrder'])->find($id);
     }
 
     public function create(array $data): CustomerPayment

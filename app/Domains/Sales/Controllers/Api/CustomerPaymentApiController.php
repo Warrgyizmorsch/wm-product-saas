@@ -29,6 +29,7 @@ class CustomerPaymentApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', CustomerPayment::class);
         [$tenantId] = $this->resolveTenantContext();
         $customers = Customer::where('tenant_id', $tenantId)->where('status', 'active')->orderBy('name')->get(['id', 'name', 'company_name', 'email', 'phone']);
 
@@ -47,6 +48,7 @@ class CustomerPaymentApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CustomerPayment::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = CustomerPayment::query()
@@ -94,6 +96,8 @@ class CustomerPaymentApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', CustomerPayment::class);
+
         $validator = Validator::make($request->all(), [
             'customer_id' => ['required', 'integer'],
             'invoice_id' => ['nullable', 'integer'],
@@ -266,6 +270,16 @@ class CustomerPaymentApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        $ownerId = $payment->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.payments.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this payment.'], 403);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $payment,
@@ -285,6 +299,16 @@ class CustomerPaymentApiController extends Controller
                 'success' => false,
                 'message' => 'Customer Payment not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $payment->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.payments.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this payment.'], 403);
         }
 
         $payment->update(['status' => 'Posted']);
@@ -311,6 +335,16 @@ class CustomerPaymentApiController extends Controller
                 'success' => false,
                 'message' => 'Customer Payment not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        $ownerId = $payment->customer?->crmAccount?->owner_id;
+
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'sales.payments.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $ownerId,
+        ])) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized to view this payment.'], 403);
         }
 
         DB::transaction(function () use ($payment) {

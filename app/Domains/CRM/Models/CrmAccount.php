@@ -21,6 +21,9 @@ class CrmAccount extends BaseModel
 {
     use HasFactory, SoftDeletes, BelongsToCompany, BelongsToBranch, NormalizesTaxIdentity;
 
+    protected ?string $rbacPermission = 'crm.customers.view';
+    protected ?string $rbacOwnerColumn = 'owner_id';
+
     protected $table = 'crm_accounts';
 
     protected static function boot()

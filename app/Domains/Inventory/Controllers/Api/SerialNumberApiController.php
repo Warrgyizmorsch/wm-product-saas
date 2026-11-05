@@ -27,6 +27,7 @@ class SerialNumberApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', SerialNumber::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = SerialNumber::query()
@@ -67,6 +68,8 @@ class SerialNumberApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', SerialNumber::class);
+
         $validator = Validator::make($request->all(), [
             'product_id'     => ['required', 'integer'],
             'warehouse_id'   => ['nullable', 'integer'],
@@ -124,6 +127,8 @@ class SerialNumberApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $serial);
+
         return response()->json([
             'success' => true,
             'data'    => $serial,
@@ -135,6 +140,7 @@ class SerialNumberApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', SerialNumber::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = SerialNumber::query()
@@ -200,6 +206,8 @@ class SerialNumberApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('update', $serial);
+
         $validator = Validator::make($request->all(), [
             'warehouse_id'  => ['nullable', 'integer'],
             'batch_id'      => ['nullable', 'integer'],
@@ -241,6 +249,8 @@ class SerialNumberApiController extends Controller
                 'message' => 'Serial Number not found',
             ], 404);
         }
+
+        $this->authorize('delete', $serial);
 
         $serial->delete();
 

@@ -16,10 +16,33 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Builder;
 
 class SalesOrder extends BaseModel
 {
     use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+
+    protected ?string $rbacPermission = 'sales.orders.view';
+
+    public function applyRbacScope(Builder $builder, User $user): void
+    {
+        $builder->where(function (Builder $sub) use ($user) {
+            $sub->where('sales_orders.sales_person_id', $user->id)
+                ->orWhereHas('customer.crmAccount', fn($caq) => $caq->where('owner_id', $user->id))
+                ->orWhereHas('quotation', fn($qq) => $qq->where('sales_person_id', $user->id));
+        });
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($order) {
+            if (empty($order->sales_person_id) && auth()->check()) {
+                $order->sales_person_id = auth()->id();
+            }
+        });
+    }
 
     protected $table = 'sales_orders';
 

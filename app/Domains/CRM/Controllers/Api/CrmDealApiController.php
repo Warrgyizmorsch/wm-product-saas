@@ -129,6 +129,7 @@ class CrmDealApiController extends Controller
         if ($request->filled('crm_contact_id')) {
             $query->where('crm_contact_id', (int)$request->input('crm_contact_id'));
         }
+        $authUser = auth()->user();
         if ($request->filled('owner_id')) {
             $query->where('owner_id', (int)$request->input('owner_id'));
         }
@@ -156,7 +157,8 @@ class CrmDealApiController extends Controller
         $paginated = $query->paginate($perPage);
 
         // 7. Stage Counts Summary
-        $stageCounts = CrmDeal::where('tenant_id', $tenantId)
+        $stageCountsQuery = CrmDeal::where('tenant_id', $tenantId);
+        $stageCounts = $stageCountsQuery
             ->select('stage', DB::raw('count(*) as count'), DB::raw('sum(estimated_value) as total_value'))
             ->groupBy('stage')
             ->get()
@@ -372,6 +374,8 @@ class CrmDealApiController extends Controller
             'product_items'   => $validated['product_items'] ?? null,
         ]);
 
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealCreated($deal);
+
         return response()->json([
             'success' => true,
             'message' => 'Deal created successfully.',
@@ -423,7 +427,12 @@ class CrmDealApiController extends Controller
             $validated['closing_date'] = Carbon::parse($validated['closing_date']);
         }
 
+        $oldStage = $deal->stage;
         $deal->update($validated);
+
+        if ($oldStage && isset($validated['stage']) && $oldStage !== $deal->stage) {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyDealStageUpdated($deal, $oldStage, $deal->stage);
+        }
 
         return response()->json([
             'success' => true,
@@ -532,6 +541,7 @@ class CrmDealApiController extends Controller
             $newStage = 'Won';
         }
 
+        $oldStage = $deal->stage;
         $deal->stage = $newStage;
         if (!empty($validated['close_reason'])) {
             $deal->close_reason = $validated['close_reason'];
@@ -545,6 +555,10 @@ class CrmDealApiController extends Controller
         }
 
         $deal->save();
+
+        if ($oldStage !== $deal->stage) {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyDealStageUpdated($deal, $oldStage, $deal->stage);
+        }
 
         return response()->json([
             'success' => true,
@@ -597,10 +611,13 @@ class CrmDealApiController extends Controller
             'close_reason' => 'nullable|string|max:255',
         ]);
 
+        $oldStage = $deal->stage;
         $deal->stage = 'Won';
         $deal->probability = 100;
         $deal->close_reason = $validated['close_reason'] ?? 'Lowest Price & Quality';
         $deal->save();
+
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealWon($deal);
 
         return response()->json([
             'success' => true,
@@ -641,10 +658,13 @@ class CrmDealApiController extends Controller
 
         $validated = $validator->validated();
 
+        $oldStage = $deal->stage;
         $deal->stage = 'Lost';
         $deal->probability = 0;
         $deal->close_reason = $validated['close_reason'];
         $deal->save();
+
+        \App\Domains\CRM\Services\CrmNotificationService::notifyDealLost($deal, $deal->close_reason);
 
         return response()->json([
             'success' => true,
@@ -1043,8 +1063,6 @@ class CrmDealApiController extends Controller
             ->orWhere(function ($q) use ($deal) {
                 if ($deal->lead_id) {
                     $q->where('id', $deal->lead_id);
-                } elseif ($deal->crm_account_id) {
-                    $q->where('crm_account_id', $deal->crm_account_id);
                 }
             })
             ->with('leadDocuments')
@@ -1095,8 +1113,6 @@ class CrmDealApiController extends Controller
             ->orWhere(function ($q) use ($deal) {
                 if ($deal->lead_id) {
                     $q->where('id', $deal->lead_id);
-                } elseif ($deal->crm_account_id) {
-                    $q->where('crm_account_id', $deal->crm_account_id);
                 }
             })
             ->first();
