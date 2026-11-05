@@ -211,18 +211,6 @@
         <div class="col-12">
             <!-- Toast Notifications -->
 
-            @if($rfq->status === 'Confirmed')
-                <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="feather-check-circle fs-18 text-success"></i>
-                        <div>
-                            <strong class="text-dark">{{ __('purchase.po_created_rfq_confirmed') }}</strong>
-                            <div class="fs-12 text-muted">{{ __('purchase.po_already_generated_from_rfq') }}</div>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             <!-- Main Single RFQ Card -->
             <div class="card border-0 shadow-sm bg-white mb-4 print-area odoo-sheet">
                 <div class="card-header bg-white border-bottom py-0 px-4 d-print-none d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height: 52px;">
@@ -233,6 +221,7 @@
                                 'Draft' => 'bg-soft-secondary text-secondary',
                                 'Sent' => 'bg-soft-info text-info',
                                 'Received' => 'bg-soft-warning text-warning',
+                                'Partially Ordered' => 'bg-soft-primary text-primary',
                                 'Confirmed' => 'bg-soft-success text-success',
                                 'Cancelled' => 'bg-soft-danger text-danger',
                                 default => 'bg-soft-dark text-dark',
@@ -241,6 +230,7 @@
                                 'Draft' => __('purchase.status_draft'),
                                 'Sent' => __('purchase.status_sent'),
                                 'Received' => __('purchase.rates_received'),
+                                'Partially Ordered' => __('purchase.partially_ordered'),
                                 'Confirmed' => __('purchase.status_confirmed'),
                                 'Cancelled' => __('purchase.status_cancelled'),
                                 default => $rfq->status,
@@ -256,6 +246,7 @@
                                 'Draft' => __('purchase.status_draft'),
                                 'Sent' => __('purchase.status_sent'),
                                 'Received' => __('purchase.rates_received'),
+                                'Partially Ordered' => __('purchase.partially_ordered'),
                                 'Confirmed' => __('purchase.status_confirmed')
                             ];
                             if ($rfq->status === 'Cancelled') {
@@ -374,11 +365,24 @@
                                                         {{ $rv->vendor?->name }}
                                                     </label>
                                                 </div>
-                                                <div>
+                                                <div class="d-flex align-items-center gap-1.5">
                                                     @if(in_array($rv->status, ['Received', 'Submitted']))
                                                         <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-1"></i>{{ __('purchase.submitted') }}</span>
                                                     @else
                                                         <span class="badge bg-soft-secondary text-secondary fs-10 fw-bold"><i class="feather-clock me-1"></i>{{ __('purchase.pending') }}</span>
+                                                    @endif
+
+                                                    @php
+                                                        $mobVendorLinkedPo = $linkedOrders->firstWhere('vendor_id', $rv->vendor_id);
+                                                    @endphp
+                                                    @if($mobVendorLinkedPo)
+                                                        <a href="{{ route('purchase.orders.show', $mobVendorLinkedPo->id) }}" 
+                                                           class="badge bg-white text-primary border border-primary-subtle fs-10 py-1 px-1.5 text-decoration-none shadow-2xs d-inline-flex align-items-center gap-1" 
+                                                           target="_blank">
+                                                            <i class="feather-file-text"></i>
+                                                            <span class="font-monospace fw-bold">{{ $mobVendorLinkedPo->purchase_order_number }}</span>
+                                                            <i class="feather-external-link fs-9 text-muted"></i>
+                                                        </a>
                                                     @endif
                                                 </div>
                                             </div>
@@ -443,9 +447,24 @@
                                                             $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
                                                             $totalCost = $quote ? ((float)$quote->rate) * ((float)$quotedQty) : 0;
                                                         @endphp
+                                                        @php
+                                                            $mobOrderInfo = $orderedItemsMap[$item->product_id] ?? null;
+                                                            $mobIsOrdered = $mobOrderInfo['is_fully_ordered'] ?? false;
+                                                            $mobPos = $mobOrderInfo['orders'] ?? [];
+                                                        @endphp
                                                         <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
-                                                            <div class="fw-bold text-dark mb-1"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
-                                                            <div class="text-muted fs-11 mb-2">{{ __('purchase.required_qty') }}: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong></div>
+                                                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1">
+                                                                <div class="fw-bold text-dark"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
+                                                                @if($mobIsOrdered)
+                                                                    <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-0.5"></i>{{ __('purchase.status_ordered') }}</span>
+                                                                @endif
+                                                            </div>
+                                                            <div class="text-muted fs-11 mb-2">
+                                                                {{ __('purchase.required_qty') }}: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong>
+                                                                @if(!empty($mobPos))
+                                                                    <span class="ms-1 text-primary fw-semibold">({{ __('purchase.ordered_in') }}: {{ implode(', ', array_column($mobPos, 'po_number')) }})</span>
+                                                                @endif
+                                                            </div>
 
                                                             <div class="row g-2">
                                                                 <div class="col-6">
@@ -548,6 +567,22 @@
                                                 @else
                                                     <span class="badge bg-soft-secondary text-secondary fs-9 fw-bold">{{ __('purchase.pending') }}</span>
                                                 @endif
+
+                                                @php
+                                                    $vendorLinkedPo = $linkedOrders->firstWhere('vendor_id', $rv->vendor_id);
+                                                @endphp
+                                                @if($vendorLinkedPo)
+                                                    <div class="mt-1">
+                                                        <a href="{{ route('purchase.orders.show', $vendorLinkedPo->id) }}" 
+                                                           class="badge bg-white text-primary border border-primary-subtle fs-10 py-1 px-1.5 text-decoration-none shadow-2xs d-inline-flex align-items-center gap-1 hover-primary" 
+                                                           target="_blank" 
+                                                           title="{{ __('purchase.view_po') }}: {{ $vendorLinkedPo->purchase_order_number }}">
+                                                            <i class="feather-file-text"></i>
+                                                            <span class="font-monospace fw-bold">{{ $vendorLinkedPo->purchase_order_number }}</span>
+                                                            <i class="feather-external-link fs-9 text-muted"></i>
+                                                        </a>
+                                                    </div>
+                                                @endif
                                             </th>
                                         @endforeach
                                     </tr>
@@ -556,32 +591,70 @@
                                     @foreach($rfq->items as $index => $item)
                                         @php
                                             $expectedDate = $rfq->requisition?->requisition_date ? $rfq->requisition->requisition_date->format('d-M-Y') : $rfq->rfq_date->format('d-M-Y');
+                                            $itemOrderInfo = $orderedItemsMap[$item->product_id] ?? null;
+                                            $isFullyOrdered = $itemOrderInfo['is_fully_ordered'] ?? false;
+                                            $itemOrderedQty = $itemOrderInfo['ordered_qty'] ?? 0;
+                                            $itemPendingQty = $itemOrderInfo['pending_qty'] ?? (float)$item->quantity;
+                                            $itemPos = $itemOrderInfo['orders'] ?? [];
                                         @endphp
                                         <!-- Row 1: Rate/Unit -->
                                         <tr class="po-item-row"
                                             data-product-id="{{ $item->product_id }}"
                                             data-product-name="{{ $item->product?->name }}"
-                                            data-req-qty="{{ (float)$item->quantity }}">
+                                            data-req-qty="{{ $itemPendingQty }}">
                                             <td rowspan="5" class="text-center align-middle bg-white">
-                                                <input type="checkbox"
-                                                    class="form-check-input item-select-cb"
-                                                    data-product-id="{{ $item->product_id }}"
-                                                    data-product-name="{{ $item->product?->name }}"
-                                                    data-req-qty="{{ (float)$item->quantity }}"
-                                                >
+                                                @if($isFullyOrdered)
+                                                    <span class="badge bg-soft-success text-success p-1 rounded-circle" title="{{ __('purchase.item_already_ordered') }}">
+                                                        <i class="feather-check fs-14"></i>
+                                                    </span>
+                                                    <input type="checkbox" class="d-none item-select-cb" disabled data-already-ordered="1" data-product-id="{{ $item->product_id }}">
+                                                @else
+                                                    <input type="checkbox"
+                                                        class="form-check-input item-select-cb"
+                                                        data-product-id="{{ $item->product_id }}"
+                                                        data-product-name="{{ $item->product?->name }}"
+                                                        data-req-qty="{{ $itemPendingQty }}"
+                                                    >
+                                                @endif
                                             </td>
                                             <td rowspan="5" class="text-center fw-semibold align-middle bg-white">{{ $index + 1 }}</td>
                                             <td rowspan="5" class="align-middle bg-white">
-                                                <div class="fw-bold text-dark">{{ $item->product?->name }}</div>
+                                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                                    <span class="fw-bold text-dark">{{ $item->product?->name }}</span>
+                                                    @if($isFullyOrdered)
+                                                        <span class="badge bg-soft-success text-success fs-10 fw-bold">
+                                                            <i class="feather-check-circle me-1"></i>{{ __('purchase.status_ordered') }}
+                                                        </span>
+                                                    @elseif($itemOrderedQty > 0)
+                                                        <span class="badge bg-soft-warning text-warning fs-10 fw-bold">
+                                                            <i class="feather-pie-chart me-1"></i>{{ __('purchase.partially_ordered') }} ({{ $itemOrderedQty }}/{{ (float)$item->quantity }})
+                                                        </span>
+                                                    @endif
+                                                </div>
                                                 <div class="d-flex flex-column gap-0.5 mt-1">
                                                     <small class="text-muted font-monospace fs-10">SKU: {{ $item->product?->sku ?: '—' }}</small>
                                                     <small class="text-info fs-10 fw-semibold">
                                                         <i class="feather-calendar me-1"></i>{{ __('purchase.expected') }}: {{ $expectedDate }}
                                                     </small>
+                                                    @if(!empty($itemPos))
+                                                        <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+                                                            <span class="text-muted fs-10 fw-semibold">{{ __('purchase.ordered_in') }}:</span>
+                                                            @foreach($itemPos as $ipo)
+                                                                <a href="{{ route('purchase.orders.show', $ipo['id']) }}" class="badge bg-soft-primary text-primary fs-10 text-decoration-none shadow-2xs" target="_blank" title="{{ $ipo['vendor_name'] }}: {{ $ipo['quantity'] }}">
+                                                                    <i class="feather-file-text me-0.5"></i>{{ $ipo['po_number'] }} ({{ $ipo['vendor_name'] }})
+                                                                </a>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             </td>
                                             <td rowspan="5" class="text-center font-monospace fw-bold text-dark align-middle bg-white">
                                                 {{ (float)$item->quantity }} <span class="text-muted small">({{ $item->product?->uom?->name ?? 'Pcs' }})</span>
+                                                @if($isFullyOrdered)
+                                                    <div class="text-success fs-10 fw-semibold mt-0.5"><i class="feather-check me-0.5"></i>{{ __('purchase.status_ordered') }}</div>
+                                                @elseif($itemOrderedQty > 0)
+                                                    <div class="text-warning fs-10 fw-semibold mt-0.5">{{ __('purchase.pending_to_order') }}: {{ $itemPendingQty }}</div>
+                                                @endif
                                             </td>
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">{{ __('purchase.rate_unit') }} ({{ $currency }}):</td>
                                             @foreach($rfq->rfqVendors as $rv)
@@ -754,7 +827,12 @@
     </div>
 
     {{-- ===================== Fixed Bottom PO Action Bar ===================== --}}
-    @if($rfq->status !== 'Confirmed')
+    @php
+        $hasPendingItems = collect($orderedItemsMap ?? [])->contains(function($map) {
+            return !($map['is_fully_ordered'] ?? false);
+        });
+    @endphp
+    @if($hasPendingItems && $rfq->status !== 'Cancelled')
     <div id="po-action-bar"
          style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:1040;
                 background:linear-gradient(135deg,#1a7a4a 0%,#00a76f 100%);
@@ -783,225 +861,22 @@
                 <button type="button"
                         id="btn-open-po-modal"
                         class="btn btn-white btn-sm fw-bold px-4"
-                        style="background:#fff; color:#00a76f; border:none;"
-                        data-bs-toggle="modal"
-                        data-bs-target="#createPoModal">
+                        style="background:#fff; color:#00a76f; border:none;">
                     <i class="feather-check-circle me-2"></i>{{ __('purchase.create_po') }}
                     <span id="po-selection-count" class="badge ms-1" style="background:#00a76f; color:#fff;">0</span>
                 </button>
             </div>
         </div>
     </div>
+
+    {{-- Hidden form to post directly to Create PO full page --}}
+    <form id="createPoRedirectForm" action="{{ route('purchase.orders.create') }}" method="POST" style="display:none;">
+        @csrf
+        <input type="hidden" name="rfq_id" value="{{ $rfq->id }}">
+        <input type="hidden" name="vendor_id" id="redirect-po-vendor-id" value="">
+        <div id="redirect-po-items-container"></div>
+    </form>
     @endif
-
-    {{-- ===================== Create PO Modal ===================== --}}
-    @php
-        $requestedWarehouseName = null;
-
-        // 1. Check from Requisition items
-        if ($rfq->requisition && $rfq->requisition->items) {
-            $firstWhItem = $rfq->requisition->items->first(function($item) {
-                return !empty($item->warehouse_id) || !empty($item->warehouse);
-            });
-            if ($firstWhItem) {
-                if ($firstWhItem->warehouse) {
-                    $requestedWarehouseName = $firstWhItem->warehouse->name;
-                } elseif ($firstWhItem->warehouse_id) {
-                    $wh = $warehouses->firstWhere('id', $firstWhItem->warehouse_id);
-                    if ($wh) $requestedWarehouseName = $wh->name;
-                }
-            }
-        }
-
-        // 2. Check from RFQ items directly
-        if (!$requestedWarehouseName && $rfq->items) {
-            $firstRfqWhItem = $rfq->items->first(function($item) {
-                return !empty($item->warehouse_id);
-            });
-            if ($firstRfqWhItem && $firstRfqWhItem->warehouse_id) {
-                $wh = $warehouses->firstWhere('id', $firstRfqWhItem->warehouse_id);
-                if ($wh) $requestedWarehouseName = $wh->name;
-            }
-        }
-
-        // 3. Fallback to default tenant warehouse or first warehouse
-        if (!$requestedWarehouseName && $warehouses->isNotEmpty()) {
-            $defaultWh = $warehouses->firstWhere('is_default', 1) ?? $warehouses->first();
-            if ($defaultWh) $requestedWarehouseName = $defaultWh->name;
-        }
-    @endphp
-    <x-ui.modal id="createPoModal" title="{{ __('purchase.create_purchase_order') }}" size="xl" :centered="true" :showFooter="true" formAction="{{ route('purchase.rfqs.create-po', $rfq->id) }}" formMethod="POST">
-        <input type="hidden" name="vendor_id" id="po-form-vendor-id" value="">
-        <input type="hidden" name="source_type" value="rfq">
-        <div id="po-form-items-inputs"></div>
-
-        <div class="fs-13">
-
-            {{-- Selected Supplier --}}
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">{{ __('purchase.selected_supplier') }}</label>
-                <div class="p-2 rounded border bg-soft-success">
-                    <span class="fw-bold text-success fs-13">
-                        <i class="feather-user me-1"></i><span id="po-supplier-name">{{ __('purchase.none_selected') }}</span>
-                    </span>
-                </div>
-            </div>
-
-            <input type="hidden" name="reference" id="po-reference" value="{{ $rfq->rfq_number }}">
-            <input type="hidden" name="supplier_quotation_number" id="po-supplier-quotation-number" value="">
-
-            <div class="row g-3 mb-3">
-                {{-- Location / Warehouse --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.location_warehouse') }}" name="location" id="po-location" required="true">
-                        <option value="">{{ __('purchase.select_warehouse') }}</option>
-                        @foreach($warehouses as $w)
-                            <option value="{{ $w->name }}" @selected($requestedWarehouseName === $w->name)>{{ $w->name }}</option>
-                        @endforeach
-                    </x-ui.odoo-form-ui>
-                </div>
-                {{-- PO Date --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.po_date') }}" name="date" id="po-date" :value="now()->format('Y-m-d')" required="true" />
-                </div>
-                {{-- Delivery Date --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.delivery_date') }}" name="delivery_date" id="po-delivery-date" />
-                </div>
-            </div>
-
-            <div class="row g-3 mb-3">
-                {{-- Discount Option --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.discount_option') }}" name="discount_type" id="po-discount-type" required="true">
-                        <option value="without_discount" selected>{{ __('purchase.without_discount') }}</option>
-                        <option value="item_wise">{{ __('purchase.discount_item_level') }}</option>
-                        <option value="order_wise">{{ __('purchase.discount_order_level') }}</option>
-                    </x-ui.odoo-form-ui>
-                </div>
-                {{-- Tax Option --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.tax_option') }}" name="tax_type" id="po-tax-type" required="true">
-                        <option value="without_tax" selected>{{ __('purchase.without_tax') }}</option>
-                        <option value="item_wise_tax">{{ __('purchase.item_wise_tax') }}</option>
-                        <option value="order_wise_tax">{{ __('purchase.order_wise_tax') }}</option>
-                    </x-ui.odoo-form-ui>
-                </div>
-                {{-- GST Type --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.gst_type') }}" name="gst_type" id="po-gst-type" required="true">
-                        <option value="cgst_sgst" selected>{{ __('purchase.gst_intra_state') }}</option>
-                        <option value="igst">{{ __('purchase.gst_inter_state') }}</option>
-                    </x-ui.odoo-form-ui>
-                </div>
-            </div>
-
-            {{-- Items preview table --}}
-            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">{{ __('purchase.selected_items') }}</label>
-            <div class="table-responsive mb-3" style="max-height:280px; overflow-y:auto;">
-                <x-ui.odoo-form-ui type="table" id="poItemsTableModal" style="table-layout: fixed; width: 100%;">
-                    <thead>
-                        <tr>
-                            <th style="width: 4%;">#</th>
-                            <th style="width: 25%;">{{ __('purchase.product') }}</th>
-                            <th class="text-end" style="width: 10%;">{{ __('purchase.qty') }} <span class="text-danger">*</span></th>
-                            <th class="text-end" style="width: 10%;">{{ __('purchase.rate') }} <span class="text-danger">*</span></th>
-                            <th class="text-end" style="width: 12%;">{{ __('purchase.amount') }}</th>
-                            <!-- Discount Columns -->
-                            <th class="text-end discount-column" style="width: 8%;">{{ __('purchase.disc_percent') }}</th>
-                            <th class="text-end discount-column" style="width: 10%;">{{ __('purchase.disc_amt') }}</th>
-                            <!-- Tax Columns -->
-                            <th class="text-end tax-column" style="width: 8%;">{{ __('purchase.tax_percent') }}</th>
-                            <th class="text-end tax-column" style="width: 10%;">{{ __('purchase.tax_amt') }}</th>
-                            <th class="text-end" style="width: 13%;">{{ __('purchase.total_amt') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody id="po-preview-tbody">
-                        <tr id="po-no-items-row">
-                            <td colspan="10" class="text-center text-muted py-4">
-                                <i class="feather-package fs-2 d-block mb-2 text-light"></i>
-                                {{ __('purchase.tick_items_from_matrix') }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </x-ui.odoo-form-ui>
-            </div>
-
-            <!-- Calculation Summary Grid -->
-            <div class="row mb-3">
-                <!-- Left side: Terms & Notes Editor -->
-                <div class="col-md-7">
-                    <x-ui.odoo-form-ui type="editor" label="{{ __('purchase.terms_notes') }}" name="notes" id="po-notes" placeholder="{{ __('purchase.notes_placeholder') }}">
-                    </x-ui.odoo-form-ui>
-                </div>
-
-                <!-- Right side: Calculation Card -->
-                <div class="col-md-5 d-flex flex-column align-items-end fs-13">
-                    <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
-                        <div class="fw-bold py-2 px-3 text-white" style="background-color: #2563eb; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
-                            {{ __('purchase.order_summary') }}
-                        </div>
-                        <div class="p-3 bg-white text-dark">
-                            <!-- Taxable Subtotal -->
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.taxable_subtotal') }}</span>
-                                <input type="text" id="summarySubtotalTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                                <input type="hidden" name="subtotal" id="summarySubtotalModal" value="0.00">
-                            </div>
-
-                            <!-- Total Discount -->
-                            <div class="d-flex justify-content-between align-items-center mb-2" id="summaryDiscountRowModal">
-                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.discount_amount') }}</span>
-                                <input type="number" name="discount_amount" id="summaryDiscountModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="0.00">
-                            </div>
-
-                            <!-- Gross Total -->
-                            <div class="d-flex justify-content-between align-items-center mb-2" id="summaryGrossRowModal">
-                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.gross_total_before_tax') }}</span>
-                                <input type="text" id="summaryGrossTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                            </div>
-
-                            <!-- Tax Rate (Percent) -->
-                            <div class="d-flex justify-content-between align-items-center mb-2" id="orderTaxPercentRowModal">
-                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.tax_rate_percent') }}</span>
-                                <input type="number" id="orderTaxPercentModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="0.00">
-                            </div>
-
-                            <!-- Hidden splits submitted to backend -->
-                            <input type="hidden" name="cgst_amount" id="summaryCgstModal" value="0.00">
-                            <input type="hidden" name="sgst_amount" id="summarySgstModal" value="0.00">
-                            <input type="hidden" name="igst_amount" id="summaryIgstModal" value="0.00">
-
-                            <!-- Tax Amount -->
-                            <div class="d-flex justify-content-between align-items-center mb-2" id="summaryTaxRowModal">
-                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.tax_amount') }}</span>
-                                <input type="text" id="summaryTaxTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
-                                <input type="hidden" name="tax_amount" id="summaryTaxModal" value="0.00">
-                            </div>
-
-                            <!-- Grand Total -->
-                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                <span class="fw-bold fs-13" style="color: #2563eb;">{{ __('purchase.grand_total') }}</span>
-                                <input type="text" id="summaryGrandtotalTextModal" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="0.00">
-                                <input type="hidden" name="grand_total" id="summaryGrandtotalModal" value="0.00">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Validation --}}
-            <div id="po-alert" class="alert alert-warning py-2 fs-12 mb-0 d-none"></div>
-
-        </div>
-
-        <x-slot name="footer">
-            <x-ui.button variant="light" class="border" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</x-ui.button>
-            <x-ui.button variant="primary" icon="feather-check" id="btn-confirm-po" type="submit" style="background-color: #714B67; border-color: #714B67;">
-                {{ __('purchase.confirm_create_po') }}
-            </x-ui.button>
-        </x-slot>
-    </x-ui.modal>
 
     <!-- RFQ SEND WHATSAPP STATUS MODAL -->
     <x-ui.modal id="rfqSendStatusModal" title="<i class='feather-message-circle me-1.5 text-success'></i>WhatsApp Dispatch Status" size="md" :centered="true" :showFooter="false">
@@ -1168,11 +1043,16 @@
             $(document).on('change', '.supplier-select-radio, .supplier-po-radio', function() {
                 const selectedVendorId = $(this).attr('data-vendor-id');
                 
-                // Re-enable and reset style for all items first
-                $('.item-select-cb').prop('disabled', false).closest('tr').css('opacity', '1');
+                // Re-enable and reset style for all items first (excluding already ordered)
+                $('.item-select-cb:not([data-already-ordered="1"])').prop('disabled', false).closest('tr').css('opacity', '1');
                 
                 if (selectedVendorId) {
                     $('.item-select-cb').each(function() {
+                        const isAlreadyOrdered = $(this).attr('data-already-ordered') === '1';
+                        if (isAlreadyOrdered) {
+                            $(this).prop('checked', false).prop('disabled', true);
+                            return;
+                        }
                         const productId = $(this).attr('data-product-id');
                         const rateInput = $(`.vendor-rate-input[data-vendor="${selectedVendorId}"][data-product="${productId}"]`);
                         if (!rateInput.length) {
@@ -1187,28 +1067,32 @@
                 syncPoPreview();
             });
 
-            // ---- Sync when modal opens ----
-            document.getElementById('createPoModal').addEventListener('show.bs.modal', function() {
-                syncPoPreview();
-            });
+            // ---- Direct PO Create Form Submit ----
+            $('#btn-open-po-modal').on('click', function(e) {
+                e.preventDefault();
 
-            // Handle form submission to validate inputs and set vendor ID
-            $('#createPoModal form').on('submit', function(e) {
                 const vendorRadio = $('.supplier-select-radio:checked, .supplier-po-radio:checked');
-                const vendorId = vendorRadio.attr('data-vendor-id');
+                const rfqVendorId = vendorRadio.attr('data-vendor-id');
                 const dbVendorId = vendorRadio.attr('data-db-vendor-id');
                 const items = $('.item-select-cb:checked');
-                const alertEl = $('#po-alert');
-                alertEl.addClass('d-none').text('');
 
-                if (!vendorId || !dbVendorId) {
-                    e.preventDefault();
-                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> {{ __('purchase.js_select_supplier_header') }}');
+                const showAlert = function(title, msg) {
+                    if (typeof showRfqSendModal === 'function') {
+                        showRfqSendModal('warning', title, msg);
+                    } else if (typeof toastr !== 'undefined') {
+                        toastr.warning(msg);
+                    } else {
+                        alert(msg);
+                    }
+                };
+
+                if (!rfqVendorId || !dbVendorId) {
+                    showAlert('{{ __('purchase.supplier_required') ?? "Supplier Required" }}', '{{ __('purchase.js_select_supplier_header') }}');
                     return false;
                 }
+
                 if (!items.length) {
-                    e.preventDefault();
-                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> {{ __('purchase.js_select_at_least_one_item') }}');
+                    showAlert('{{ __('purchase.items_required') ?? "Items Required" }}', '{{ __('purchase.js_select_at_least_one_item') }}');
                     return false;
                 }
 
@@ -1217,36 +1101,48 @@
                 items.each(function() {
                     const productId = $(this).attr('data-product-id');
                     const productName = $(this).attr('data-product-name');
-                    const rateInput = $(`.vendor-rate-input[data-vendor="${vendorId}"][data-product="${productId}"]`);
+                    const rateInput = $(`.vendor-rate-input[data-vendor="${rfqVendorId}"][data-product="${productId}"]`);
                     if (!rateInput.length) {
                         unmappedProducts.push(productName);
                     }
                 });
 
                 if (unmappedProducts.length > 0) {
-                    e.preventDefault();
-                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> {{ __('purchase.js_supplier_not_invited_prefix') }} <strong>' + unmappedProducts.join(', ') + '</strong>. {{ __('purchase.js_supplier_not_invited_suffix') }}');
+                    showAlert('{{ __('purchase.warning') ?? "Warning" }}', '{{ __('purchase.js_supplier_not_invited_prefix') }} ' + unmappedProducts.join(', ') + '. {{ __('purchase.js_supplier_not_invited_suffix') }}');
                     return false;
                 }
 
-                $('#po-form-vendor-id').val(dbVendorId);
-                return true;
+                const $form = $('#createPoRedirectForm');
+                $form.find('#redirect-po-vendor-id').val(dbVendorId);
+                const $itemsContainer = $form.find('#redirect-po-items-container');
+                $itemsContainer.empty();
+
+                let itemIndex = 0;
+                items.each(function() {
+                    const productId = $(this).attr('data-product-id');
+                    const rateInput = $(`.vendor-rate-input[data-vendor="${rfqVendorId}"][data-product="${productId}"]`);
+                    const rateVal = rateInput.length ? (parseFloat(rateInput.val()) || 0) : 0;
+                    const qtyInput = $(`.vendor-qty-input[data-vendor="${rfqVendorId}"][data-product="${productId}"]`);
+                    const qtyVal = qtyInput.length ? (parseFloat(qtyInput.val()) || 0) : (parseFloat($(this).attr('data-req-qty')) || 1);
+
+                    $itemsContainer.append(`
+                        <input type="hidden" name="items[${itemIndex}][product_id]" value="${productId}">
+                        <input type="hidden" name="items[${itemIndex}][quantity]" value="${qtyVal}">
+                        <input type="hidden" name="items[${itemIndex}][rate]" value="${rateVal}">
+                    `);
+                    itemIndex++;
+                });
+
+                $form.submit();
             });
-
-            // Toggle Layout in Modal
-            $(document).on('change', '#po-discount-type, #po-tax-type, #po-gst-type', adjustModalLayout);
-
-            // Calculation Triggers in Modal
-            $(document).on('input', '#poItemsTableModal tbody tr.item-row input', calculateAllModal);
-            $('#summaryDiscountModal, #orderTaxPercentModal').on('input', calculateAllModal);
 
         });
 
         function updatePoBtn() {
-            const items      = $('.item-select-cb:checked').length;
+            const items       = $('.item-select-cb:checked').length;
             const vendorRadio = $('.supplier-select-radio:checked, .supplier-po-radio:checked');
-            const vendorName = vendorRadio.attr('data-vendor-name') || 'None';
-            const bar        = document.getElementById('po-action-bar');
+            const vendorName  = vendorRadio.attr('data-vendor-name') || 'None';
+            const bar         = document.getElementById('po-action-bar');
 
             $('#po-selection-count').text(items);
             $('#po-bar-items').text(items);
@@ -1273,311 +1169,7 @@
         }
 
         function syncPoPreview() {
-            const vendorRadio = $('.supplier-select-radio:checked, .supplier-po-radio:checked');
-            const vendorId   = vendorRadio.attr('data-vendor-id')   || '';
-            const vendorName = vendorRadio.attr('data-vendor-name') || 'None selected';
-            const quoteNo    = vendorRadio.attr('data-quotation-number') || '';
-            let delivDate = vendorRadio.attr('data-delivery-date') || '';
-            if (vendorId) {
-                const matrixDeliv = $(`.vendor-deliv-input[data-vendor="${vendorId}"]`).filter(function() { return $(this).val(); }).first().val();
-                if (matrixDeliv) {
-                    delivDate = matrixDeliv;
-                }
-            }
-            const termsCond = vendorRadio.attr('data-terms-conditions') || '';
-            const currency   = '{{ $currency }}';
-
-            $('#po-supplier-name').text(vendorName);
-
-            $('#po-reference').val("{{ $rfq->rfq_number }}");
-            $('#po-supplier-quotation-number').val(quoteNo);
-
-            if (delivDate) {
-                $('#po-delivery-date').val(delivDate);
-            }
-            if (termsCond) {
-                let editorEl = document.getElementById('po-notes');
-                if (typeof Quill !== 'undefined' && editorEl) {
-                    let qInstance = Quill.find(editorEl);
-                    if (qInstance) {
-                        qInstance.root.innerHTML = termsCond;
-                    }
-                }
-                $('#po-notes_input').val(termsCond);
-            }
-
-            const tbody = $('#po-preview-tbody');
-            const checked = $('.item-select-cb:checked');
-            tbody.empty();
-
-            if (!checked.length) {
-                tbody.html('<tr id="po-no-items-row"><td colspan="10" class="text-center text-muted py-4"><i class="feather-package fs-2 d-block mb-2 text-light"></i>Tick items from the matrix</td></tr>');
-                adjustModalLayout();
-                return;
-            }
-
-            let rowNum = 1;
-            checked.each(function() {
-                const productId   = $(this).attr('data-product-id');
-                const productName = $(this).attr('data-product-name');
-                const rateInput = $(`.vendor-rate-input[data-vendor="${vendorId}"][data-product="${productId}"]`);
-                const rateVal = rateInput.length ? (parseFloat(rateInput.val()) || 0) : 0;
-                const qtyInput = $(`.vendor-qty-input[data-vendor="${vendorId}"][data-product="${productId}"]`);
-                const qtyVal  = qtyInput.length ? (parseFloat(qtyInput.val()) || 0) : 0;
-
-                tbody.append(`<tr class="item-row" data-product-id="${productId}">
-                    <td class="text-muted">${rowNum++}</td>
-                    <td class="fw-semibold text-truncate" style="max-width: 150px;" title="${productName}">
-                        ${productName}
-                        <input type="hidden" name="items[${productId}][product_id]" value="${productId}">
-                    </td>
-                    <td>
-                        <input type="number" name="items[${productId}][quantity]" class="odoo-table-input text-end qty-input" step="0.0001" min="0.0001" required value="${qtyVal.toFixed(4)}">
-                    </td>
-                    <td>
-                        <input type="number" name="items[${productId}][rate]" class="odoo-table-input text-end rate-input" step="0.01" min="0" required value="${rateVal.toFixed(2)}">
-                    </td>
-                    <td>
-                        <input type="number" name="items[${productId}][amount]" class="odoo-table-input text-end amount-input" step="0.01" readonly value="${(qtyVal * rateVal).toFixed(2)}" style="background-color: #f8fafc;">
-                    </td>
-                    <!-- Discount Columns -->
-                    <td class="discount-column">
-                        <input type="number" name="items[${productId}][discount_percent]" class="odoo-table-input text-end disc-percent-input" step="0.01" min="0" max="100" value="0.00">
-                    </td>
-                    <td class="discount-column">
-                        <input type="number" name="items[${productId}][discount_amount]" class="odoo-table-input text-end disc-amount-input" step="0.01" readonly value="0.00" style="background-color: #f8fafc;">
-                    </td>
-                    <!-- Tax Columns -->
-                    <td class="tax-column">
-                        <input type="number" name="items[${productId}][tax_percent]" class="odoo-table-input text-end tax-percent-input" step="0.01" min="0" value="0.00">
-                        <input type="hidden" name="items[${productId}][cgst_percent]" class="cgst-percent-input" value="0.00">
-                        <input type="hidden" name="items[${productId}][sgst_percent]" class="sgst-percent-input" value="0.00">
-                        <input type="hidden" name="items[${productId}][igst_percent]" class="igst-percent-input" value="0.00">
-                        <input type="hidden" name="items[${productId}][cgst_amount]" class="cgst-amount-input" value="0.00">
-                        <input type="hidden" name="items[${productId}][sgst_amount]" class="sgst-amount-input" value="0.00">
-                        <input type="hidden" name="items[${productId}][igst_amount]" class="igst-amount-input" value="0.00">
-                    </td>
-                    <td class="tax-column">
-                        <input type="number" name="items[${productId}][tax_amount]" class="odoo-table-input text-end tax-amount-input" step="0.01" readonly value="0.00" style="background-color: #f8fafc;">
-                    </td>
-                    <td>
-                        <input type="number" name="items[${productId}][total_amount]" class="odoo-table-input text-end total-amount-input" step="0.01" readonly value="${(qtyVal * rateVal).toFixed(2)}" style="background-color: #f8fafc;">
-                    </td>
-                </tr>`);
-            });
-
-            adjustModalLayout();
-        }
-
-        // Modal Layout and Calculation Engines
-        function adjustModalLayout() {
-            const discType = $('#po-discount-type').val();
-            const taxType = $('#po-tax-type').val();
-
-            // 1. Discount option changes
-            if (discType === 'item_wise') {
-                $('#poItemsTableModal .discount-column').show();
-                $('#summaryDiscountRowModal').show();
-                $('#summaryGrossRowModal').show();
-                $('#summaryDiscountModal').prop('readonly', true).css('background-color', '#f8fafc');
-            } else if (discType === 'order_wise') {
-                $('#poItemsTableModal .discount-column').hide();
-                $('#poItemsTableModal .disc-percent-input').val('0.00');
-                $('#poItemsTableModal .disc-amount-input').val('0.00');
-                $('#summaryDiscountRowModal').show();
-                $('#summaryGrossRowModal').show();
-                $('#summaryDiscountModal').prop('readonly', false).css('background-color', '#ffffff');
-            } else {
-                // without_discount
-                $('#poItemsTableModal .discount-column').hide();
-                $('#poItemsTableModal .disc-percent-input').val('0.00');
-                $('#poItemsTableModal .disc-amount-input').val('0.00');
-                $('#summaryDiscountRowModal').hide();
-                $('#summaryGrossRowModal').hide();
-                $('#summaryDiscountModal').val('0.00');
-            }
-
-            // 2. Tax option changes
-            if (taxType === 'item_wise_tax') {
-                $('#poItemsTableModal .tax-column').show();
-                $('#orderTaxPercentRowModal').hide().find('#orderTaxPercentModal').val('0.00');
-                $('#summaryTaxRowModal').show();
-                $('#gstTypeContainerModal').show();
-            } else if (taxType === 'order_wise_tax') {
-                $('#poItemsTableModal .tax-column').hide();
-                $('#poItemsTableModal .tax-percent-input, #poItemsTableModal .tax-amount-input').val('0.00');
-                $('#poItemsTableModal .cgst-percent-input, #poItemsTableModal .sgst-percent-input, #poItemsTableModal .igst-percent-input').val('0.00');
-                $('#poItemsTableModal .cgst-amount-input, #poItemsTableModal .sgst-amount-input, #poItemsTableModal .igst-amount-input').val('0.00');
-                $('#orderTaxPercentRowModal').show();
-                $('#orderTaxPercentModal').prop('readonly', false).css('background-color', '#ffffff');
-                $('#summaryTaxRowModal').show();
-                $('#gstTypeContainerModal').show();
-            } else {
-                // without_tax
-                $('#poItemsTableModal .tax-column').hide();
-                $('#poItemsTableModal .tax-percent-input, #poItemsTableModal .tax-amount-input').val('0.00');
-                $('#poItemsTableModal .cgst-percent-input, #poItemsTableModal .sgst-percent-input, #poItemsTableModal .igst-percent-input').val('0.00');
-                $('#poItemsTableModal .cgst-amount-input, #poItemsTableModal .sgst-amount-input, #poItemsTableModal .igst-amount-input').val('0.00');
-                $('#orderTaxPercentRowModal').hide().find('#orderTaxPercentModal').val('0.00');
-                $('#summaryTaxRowModal').hide();
-                $('#gstTypeContainerModal').hide();
-                $('#summaryCgstModal, #summarySgstModal, #summaryIgstModal, #summaryTaxModal').val('0.00');
-            }
-
-            calculateAllModal();
-        }
-
-        function calculateAllModal() {
-            const discType = $('#po-discount-type').val();
-            const taxType = $('#po-tax-type').val();
-            const gstType = $('#po-gst-type').val();
-            
-            let subtotal = 0.00;
-            let totalItemDiscount = 0.00;
-            let totalItemTax = 0.00;
-
-            let totalCgst = 0.00;
-            let totalSgst = 0.00;
-            let totalIgst = 0.00;
-
-            $('#poItemsTableModal tbody tr.item-row').each(function() {
-                const $row = $(this);
-                const qty = parseFloat($row.find('.qty-input').val()) || 0;
-                const rate = parseFloat($row.find('.rate-input').val()) || 0;
-                
-                const amount = qty * rate;
-                $row.find('.amount-input').val(amount.toFixed(2));
-                subtotal += amount;
-
-                // Row Discount calculations
-                let rowDiscount = 0.00;
-                if (discType === 'item_wise') {
-                    const discPercent = parseFloat($row.find('.disc-percent-input').val()) || 0;
-                    rowDiscount = amount * (discPercent / 100);
-                    $row.find('.disc-amount-input').val(rowDiscount.toFixed(2));
-                    totalItemDiscount += rowDiscount;
-                } else {
-                    $row.find('.disc-amount-input').val('0.00');
-                }
-
-                const taxableAmount = amount - rowDiscount;
-
-                // Row Tax calculations
-                let rowTax = 0.00;
-                if (taxType === 'item_wise_tax') {
-                    const taxPercent = parseFloat($row.find('.tax-percent-input').val()) || 0;
-                    
-                    let cgstPct = 0.00;
-                    let sgstPct = 0.00;
-                    let igstPct = 0.00;
-
-                    if (gstType === 'cgst_sgst') {
-                        cgstPct = taxPercent / 2;
-                        sgstPct = taxPercent / 2;
-                        igstPct = 0;
-                    } else {
-                        cgstPct = 0;
-                        sgstPct = 0;
-                        igstPct = taxPercent;
-                    }
-
-                    $row.find('.cgst-percent-input').val(cgstPct.toFixed(2));
-                    $row.find('.sgst-percent-input').val(sgstPct.toFixed(2));
-                    $row.find('.igst-percent-input').val(igstPct.toFixed(2));
-
-                    const cgstAmt = taxableAmount * (cgstPct / 100);
-                    const sgstAmt = taxableAmount * (sgstPct / 100);
-                    const igstAmt = taxableAmount * (igstPct / 100);
-
-                    $row.find('.cgst-amount-input').val(cgstAmt.toFixed(2));
-                    $row.find('.sgst-amount-input').val(sgstAmt.toFixed(2));
-                    $row.find('.igst-amount-input').val(igstAmt.toFixed(2));
-
-                    totalCgst += cgstAmt;
-                    totalSgst += sgstAmt;
-                    totalIgst += igstAmt;
-
-                    rowTax = cgstAmt + sgstAmt + igstAmt;
-                    $row.find('.tax-amount-input').val(rowTax.toFixed(2));
-                    totalItemTax += rowTax;
-                } else {
-                    $row.find('.tax-amount-input').val('0.00');
-                    $row.find('.cgst-percent-input, .sgst-percent-input, .igst-percent-input').val('0.00');
-                    $row.find('.cgst-amount-input, .sgst-amount-input, .igst-amount-input').val('0.00');
-                }
-
-                const rowTotal = taxableAmount + rowTax;
-                $row.find('.total-amount-input').val(rowTotal.toFixed(2));
-            });
-
-            // Update subtotal
-            $('#summarySubtotalModal').val(subtotal.toFixed(2));
-            $('#summarySubtotalTextModal').val(subtotal.toFixed(2));
-
-            // Resolve discount
-            let finalDiscount = 0.00;
-            if (discType === 'item_wise') {
-                finalDiscount = totalItemDiscount;
-                $('#summaryDiscountModal').val(finalDiscount.toFixed(2));
-            } else if (discType === 'order_wise') {
-                finalDiscount = parseFloat($('#summaryDiscountModal').val()) || 0.00;
-            } else {
-                finalDiscount = 0.00;
-                $('#summaryDiscountModal').val('0.00');
-            }
-
-            const grossTotal = subtotal - finalDiscount;
-            $('#summaryGrossTextModal').val(grossTotal.toFixed(2));
-
-            // Resolve tax totals
-            let finalTax = 0.00;
-            if (taxType === 'item_wise_tax') {
-                finalTax = totalItemTax;
-                $('#summaryCgstModal').val(totalCgst.toFixed(2));
-                $('#summarySgstModal').val(totalSgst.toFixed(2));
-                $('#summaryIgstModal').val(totalIgst.toFixed(2));
-                
-                $('#summaryTaxTextModal').val(finalTax.toFixed(2));
-            } else if (taxType === 'order_wise_tax') {
-                const orderTaxPercent = parseFloat($('#orderTaxPercentModal').val()) || 0;
-
-                let cgstPct = 0;
-                let sgstPct = 0;
-                let igstPct = 0;
-
-                if (gstType === 'cgst_sgst') {
-                    cgstPct = orderTaxPercent / 2;
-                    sgstPct = orderTaxPercent / 2;
-                    igstPct = 0;
-                } else {
-                    cgstPct = 0;
-                    sgstPct = 0;
-                    igstPct = orderTaxPercent;
-                }
-
-                const cgstAmt = grossTotal * (cgstPct / 100);
-                const sgstAmt = grossTotal * (sgstPct / 100);
-                const igstAmt = grossTotal * (igstPct / 100);
-
-                finalTax = cgstAmt + sgstAmt + igstAmt;
-
-                $('#summaryCgstModal').val(cgstAmt.toFixed(2));
-                $('#summarySgstModal').val(sgstAmt.toFixed(2));
-                $('#summaryIgstModal').val(igstAmt.toFixed(2));
-                
-                $('#summaryTaxTextModal').val(finalTax.toFixed(2));
-            } else {
-                $('#summaryCgstModal').val('0.00');
-                $('#summarySgstModal').val('0.00');
-                $('#summaryIgstModal').val('0.00');
-                $('#summaryTaxTextModal').val('0.00');
-            }
-
-            $('#summaryTaxModal').val(finalTax.toFixed(2));
-
-            const grandTotal = grossTotal + finalTax;
-            $('#summaryGrandtotalModal').val(grandTotal.toFixed(2));
-            $('#summaryGrandtotalTextModal').val(grandTotal.toFixed(2));
+            // PO creation now directly redirects to the full PO screen with all items & quotes prefilled
         }
     </script>
 @endpush
