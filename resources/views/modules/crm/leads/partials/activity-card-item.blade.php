@@ -61,7 +61,16 @@
     }
 
     // Assigned / Tagged user string
-    $assignedNames = $item->taggedUsers->pluck('name')->join(', ') ?: ($lead->owner?->name ?: 'Unassigned');
+    $currentAuthId = auth()->id();
+    $currentUser = auth()->user();
+    $assigneeUser = $item->assignedTo ?: ($lead->owner ?: ($item->taggedUser ?: ($item->taggedUsers ? $item->taggedUsers->first() : null)));
+    $leadOwnerUser = $lead->owner;
+    $taggedAttendeesList = $item->tagged_users ?: collect();
+    $isAdminUser = $currentUser && in_array(strtolower(str_replace([' ', '_', '-'], '', (string) ($currentUser->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+    $canManageActivity = ($assigneeUser && $assigneeUser->id == $currentAuthId)
+        || ($lead->lead_owner_id == $currentAuthId)
+        || $isAdminUser;
+    $assignedNames = $taggedAttendeesList->pluck('name')->join(', ') ?: ($assigneeUser?->name ?: 'Unassigned');
 
     // Phone
     $phoneToCall = $lead->phone ?: ($lead->mobile ?: '');
@@ -169,37 +178,44 @@
                         <span class="text-secondary ms-1">for {{ $lead->contact_person ?: $lead->company_name }}</span>
                     @endif
 
-                    @php
-                        $assigneeUser = $item->taggedUser ?: ($item->taggedUsers ? $item->taggedUsers->first() : null);
-                        $leadOwnerUser = $lead->owner;
-                        $currentAuthId = auth()->id();
-                    @endphp
-
                     @if($assigneeUser)
                         @if($assigneeUser->id == $currentAuthId)
                             <span class="badge px-2 py-0.5 fs-10 d-inline-flex align-items-center gap-1 ms-1 shadow-2xs"
                                 style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc !important;"
                                 title="Assigned by {{ $leadOwnerUser?->name ?: 'Lead Owner' }}">
                                 <i class="feather-user-check fs-10" style="color: #0284c7;"></i>
-                                <span style="color: #075985;">Assigned by:</span>
-                                <strong style="color: #0c4a6e;">{{ $leadOwnerUser?->name ?: 'Lead Owner' }}</strong>
+                                <span style="color: #075985;">Assigned to:</span>
+                                <strong style="color: #0c4a6e;">You ({{ $assigneeUser->name }})</strong>
                             </span>
                         @else
                             <span class="badge px-2 py-0.5 fs-10 d-inline-flex align-items-center gap-1 ms-1 shadow-2xs"
                                 style="background-color: #f3e8ff; color: #6b21a8; border: 1px solid #d8b4fe !important;"
-                                title="Assigned to {{ $assigneeUser->name }}">
-                                <i class="feather-share-2 fs-10" style="color: #9333ea;"></i>
+                                title="Assigned Host: {{ $assigneeUser->name }}">
+                                <i class="feather-user fs-10" style="color: #9333ea;"></i>
                                 <span style="color: #6b21a8;">Assigned to:</span>
                                 <strong style="color: #3b0764;">{{ $assigneeUser->name }}</strong>
                             </span>
                         @endif
                     @endif
 
+                    @if($taggedAttendeesList->isNotEmpty())
+                        @php
+                            $isUserInAttendees = $taggedAttendeesList->contains('id', $currentAuthId);
+                        @endphp
+                        <span class="badge px-2 py-0.5 fs-10 d-inline-flex align-items-center gap-1 ms-1 shadow-2xs"
+                            style="background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0 !important;"
+                            title="Attendees / Tagged: {{ $taggedAttendeesList->pluck('name')->implode(', ') }}">
+                            <i class="feather-users fs-10" style="color: #059669;"></i>
+                            <span style="color: #065f46;">Attendees:</span>
+                            <strong style="color: #064e3b;">{{ $taggedAttendeesList->count() }} {{ $isUserInAttendees ? '(Including You)' : '' }}</strong>
+                        </span>
+                    @endif
+
                     <!-- Info (i) Tooltip/Popover Icon -->
                     <i class="feather-info text-muted ms-1 odoo-info-icon cursor-pointer" data-bs-toggle="popover"
                         data-bs-trigger="hover focus" data-bs-placement="top" data-bs-html="true"
                         data-bs-title="{{ __('crm.activity_details') }}"
-                        data-bs-content="<div class='fs-11'><strong>{{ __('crm.activity_type_label') }}</strong> {{ $item->type }}<br><strong>{{ __('crm.created_on_label') }}</strong> {{ $item->created_at->format('d/m/Y h:i A') }}<br><strong>{{ __('crm.created_by_label') }}</strong> {{ $lead->owner?->name ?: 'System' }}<br><strong>{{ __('crm.assigned_to_label') }}</strong> {{ $assignedNames }}<br><strong>{{ __('crm.due_on_label') }}</strong> {{ $item->followup_date->format('d/m/Y h:i A') }}</div>"
+                        data-bs-content="<div class='fs-11'><strong>{{ __('crm.activity_type_label') }}</strong> {{ $item->type }}<br><strong>{{ __('crm.created_on_label') }}</strong> {{ $item->created_at->format('d/m/Y h:i A') }}<br><strong>{{ __('crm.created_by_label') }}</strong> {{ $lead->owner?->name ?: 'System' }}<br><strong>Primary Host:</strong> {{ $assigneeUser?->name ?: 'Lead Owner' }}<br><strong>Attendees:</strong> {{ $taggedAttendeesList->pluck('name')->implode(', ') ?: 'None' }}<br><strong>{{ __('crm.due_on_label') }}</strong> {{ $item->followup_date->format('d/m/Y h:i A') }}</div>"
                         style="font-size: 12px;"></i>
                 @else
                     <strong
@@ -362,56 +378,80 @@
 
             <!-- Line 3: Direct Action Options (Connected, Not Connected, Reschedule, Cancel, Call) -->
             @if($isPending)
-                <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
-                    <!-- Connected -->
-                    <a href="javascript:void(0)"
-                        class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
-                        data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed"
-                        onclick="crmInitVisitModal('{{ $item->id }}', 'Completed')">
-                        <i class="feather-check fs-12"></i> <span>{{ __('crm.connected') }}</span>
-                    </a>
-
-                    <!-- Not Connected -->
-                    <a href="javascript:void(0)"
-                        class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
-                        data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected"
-                        onclick="crmInitVisitModal('{{ $item->id }}', 'NotConnected')">
-                        <i class="feather-phone-off fs-12"></i> <span>{{ __('crm.not_connected') }}</span>
-                    </a>
-
-                    <!-- Reschedule -->
-                    <a href="javascript:void(0)"
-                        class="text-info text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
-                        data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">
-                        <i class="feather-repeat fs-12"></i> <span>{{ __('crm.reschedule') }}</span>
-                    </a>
-
-                    <!-- Cancel -->
-                    <a href="javascript:void(0)"
-                        class="text-danger text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
-                        data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">
-                        <i class="feather-x fs-12"></i> <span>{{ __('crm.cancel') }}</span>
-                    </a>
-
-                    <!-- Assign / Delegate -->
-                    <a href="javascript:void(0)"
-                        class="text-primary text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
-                        data-bs-toggle="modal" data-bs-target="#assignModal_{{ $item->id }}"
-                        title="Assign to another sales person">
-                        <i class="feather-user-plus fs-12"></i> <span>Assign / Delegate</span>
-                    </a>
-
-                    @if($phoneToCall)
-                        <!-- Call Now Button -->
+                @if($canManageActivity)
+                    <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 16px; row-gap: 6px;">
+                        <!-- Connected -->
                         <a href="javascript:void(0)"
-                            class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity btn-crm-click-to-call ms-auto"
-                            data-lead-id="{{ $lead->id }}" data-lead-name="{{ $lead->contact_person ?: $lead->company_name }}"
-                            data-lead-company="{{ $lead->company_name }}" data-lead-phone="{{ $phoneToCall }}"
-                            title="{{ __('crm.click_to_call_softphone') }}">
-                            <i class="feather-phone-call fs-10"></i> <span>{{ __('crm.call') }} {{ $phoneToCall }}</span>
+                            class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
+                            data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Completed"
+                            onclick="crmInitVisitModal('{{ $item->id }}', 'Completed')">
+                            <i class="feather-check fs-12"></i> <span>{{ __('crm.connected') }}</span>
                         </a>
-                    @endif
-                </div>
+
+                        <!-- Not Connected -->
+                        <a href="javascript:void(0)"
+                            class="text-warning text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
+                            data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_NotConnected"
+                            onclick="crmInitVisitModal('{{ $item->id }}', 'NotConnected')">
+                            <i class="feather-phone-off fs-12"></i> <span>{{ __('crm.not_connected') }}</span>
+                        </a>
+
+                        <!-- Reschedule -->
+                        <a href="javascript:void(0)"
+                            class="text-info text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
+                            data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">
+                            <i class="feather-repeat fs-12"></i> <span>{{ __('crm.reschedule') }}</span>
+                        </a>
+
+                        <!-- Cancel -->
+                        <a href="javascript:void(0)"
+                            class="text-danger text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
+                            data-bs-toggle="modal" data-bs-target="#statusModal_{{ $item->id }}_Cancelled">
+                            <i class="feather-x fs-12"></i> <span>{{ __('crm.cancel') }}</span>
+                        </a>
+
+                        <!-- Assign / Delegate -->
+                        <a href="javascript:void(0)"
+                            class="text-primary text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline"
+                            data-bs-toggle="modal" data-bs-target="#assignModal_{{ $item->id }}"
+                            title="Assign to another sales person">
+                            <i class="feather-user-plus fs-12"></i> <span>Assign / Delegate</span>
+                        </a>
+
+                        @if($phoneToCall)
+                            <!-- Call Now Button -->
+                            <a href="javascript:void(0)"
+                                class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity btn-crm-click-to-call ms-auto"
+                                data-lead-id="{{ $lead->id }}" data-lead-name="{{ $lead->contact_person ?: $lead->company_name }}"
+                                data-lead-company="{{ $lead->company_name }}" data-lead-phone="{{ $phoneToCall }}"
+                                title="{{ __('crm.click_to_call_softphone') }}">
+                                <i class="feather-phone-call fs-10"></i> <span>{{ __('crm.call') }} {{ $phoneToCall }}</span>
+                            </a>
+                        @endif
+                    </div>
+                @else
+                    <div class="d-flex align-items-center flex-wrap pt-1.5 fs-12" style="column-gap: 12px; row-gap: 6px;">
+                        <span class="badge bg-light text-muted border px-2 py-1 fs-11"
+                            title="Only the primary host ({{ $assigneeUser?->name ?: 'Lead Owner' }}) can update status">
+                            <i class="feather-eye me-1 text-primary"></i>Attendee (View Only)
+                        </span>
+                        @if($meetLink)
+                            <a href="{{ $meetLink }}" target="_blank"
+                                class="text-success text-decoration-none fw-semibold d-inline-flex align-items-center gap-1 hover-underline">
+                                <i class="feather-video fs-12"></i> <span>{{ __('crm.join_google_meet') ?? 'Join Google Meet' }}</span>
+                            </a>
+                        @endif
+                        @if($phoneToCall)
+                            <a href="javascript:void(0)"
+                                class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 fs-10 fw-semibold text-decoration-none d-inline-flex align-items-center gap-1 hover-opacity btn-crm-click-to-call ms-auto"
+                                data-lead-id="{{ $lead->id }}" data-lead-name="{{ $lead->contact_person ?: $lead->company_name }}"
+                                data-lead-company="{{ $lead->company_name }}" data-lead-phone="{{ $phoneToCall }}"
+                                title="{{ __('crm.click_to_call_softphone') }}">
+                                <i class="feather-phone-call fs-10"></i> <span>{{ __('crm.call') }} {{ $phoneToCall }}</span>
+                            </a>
+                        @endif
+                    </div>
+                @endif
 
                 @php
                     $currentTaggedIds = $item->taggedUsers->pluck('id')->toArray();
@@ -772,21 +812,21 @@
                 </x-ui.modal>
 
                 <!-- Assign / Delegate Modal -->
-                <x-ui.modal :id="'assignModal_' . $item->id" title="Assign / Delegate Meeting" size="md" :centered="true"
+                <x-ui.modal :id="'assignModal_' . $item->id" title="Assign / Delegate Meeting Host" size="md" :centered="true"
                     :formAction="route('crm.meetings.assign', $item->id)" formMethod="POST" submitText="Confirm Assignment"
                     :closeText="__('crm.cancel')">
                     <p class="text-muted fs-11 mb-3">
                         <i class="feather-user-check me-1 text-primary"></i>
-                        Select another sales person / team member to attend or take responsibility for this
-                        {{ strtolower($item->type ?: 'meeting') }}.
+                        Select another sales person / team member to take primary responsibility (Host) for this
+                        {{ strtolower($item->type ?: 'meeting') }}. Existing tagged attendees will remain invited.
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fs-11 fw-semibold text-secondary mb-1">Select Sales Person <span
+                        <label class="form-label fs-11 fw-semibold text-secondary mb-1">Select Assigned Executive (Host) <span
                                 class="text-danger">*</span></label>
-                        <select name="tagged_user_id" class="form-select form-select-sm" required>
+                        <select name="assigned_to_id" class="form-select form-select-sm" required>
                             <option value="">-- Choose Sales Person --</option>
                             @foreach($users as $u)
-                                <option value="{{ $u->id }}" @selected($u->id == ($item->tagged_user_id ?: ($currentTaggedIds[0] ?? null)))>
+                                <option value="{{ $u->id }}" @selected($u->id == ($item->assigned_to_id ?: ($item->tagged_user_id ?: ($lead->lead_owner_id ?? null))))>
                                     {{ $u->name }} ({{ $u->email }})
                                 </option>
                             @endforeach

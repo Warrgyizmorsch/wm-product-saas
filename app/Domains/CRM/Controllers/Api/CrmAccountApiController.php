@@ -96,6 +96,35 @@ class CrmAccountApiController extends Controller
             return response()->json(['success' => false, 'message' => "Account #{$id} not found."], 404);
         }
 
+        if ($account->customer) {
+            $customer = $account->customer;
+            $invoices = $customer->invoices()->whereNotIn('status', ['cancelled', 'void'])->get();
+            $invoiceOutstanding = (float) $invoices->sum('balance_due');
+            $postedPayments = $customer->payments()
+                ->whereIn('status', ['Posted', 'posted', 'completed', 'paid'])
+                ->with('allocations')
+                ->get();
+
+            $unallocatedAdvance = (float) \App\Domains\Sales\Models\PaymentAllocation::whereHas('payment', function ($q) use ($customer) {
+                $q->where('customer_id', $customer->id)->whereIn('status', ['Posted', 'posted', 'completed', 'paid']);
+            })->whereNull('invoice_id')->sum('allocated_amount');
+
+            $paymentsWithoutAlloc = (float) $postedPayments->sum(function ($p) {
+                return max(0, (float) $p->amount - (float) $p->allocations->sum('allocated_amount'));
+            });
+
+            $totalAdvanceHold = round($unallocatedAdvance + $paymentsWithoutAlloc, 2);
+            $grossReceivables = max(0, (float) $customer->signedOpeningBalance() + $invoiceOutstanding);
+            $netReceivables   = max(0, round($grossReceivables - $totalAdvanceHold, 2));
+
+            $account->financial_summary = [
+                'total_billed'            => round((float) $invoices->sum('total_amount'), 2),
+                'outstanding_receivables' => round($grossReceivables, 2),
+                'available_advance'       => $totalAdvanceHold,
+                'net_due_balance'         => $netReceivables,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data'    => $account,

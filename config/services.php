@@ -71,4 +71,13 @@ return [
         'cluster'    => env('PUSHER_APP_CLUSTER', 'ap2'),
     ],
 
+    // Mossie chat assistant, loaded on every ERP page by
+    // partials/mossie-widget. Leave MOSSIE_WIDGET_URL unset to hide it.
+    'mossie' => [
+        'url'   => env('MOSSIE_WIDGET_URL'),
+        'key'   => env('MOSSIE_WIDGET_KEY'),
+        'title' => env('MOSSIE_WIDGET_TITLE', 'Mossie Assistant'),
+        'open'  => env('MOSSIE_WIDGET_OPEN', false),
+    ],
+
 ];

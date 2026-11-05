@@ -55,10 +55,13 @@ class KraKpiRepository implements KraKpiRepositoryInterface
             ->where('tenant_id', $tenantId);
 
         if (!$isHrOrAdmin && $currentEmployee) {
-            $plansQuery->where(function ($q) use ($currentEmployee) {
-                $q->where('employee_id', $currentEmployee->id)
-                  ->orWhere('manager_id', $currentEmployee->id);
-            });
+            $accessibleEmpIds = app(\App\Domains\HRMS\Services\HrmsScopeService::class)->getAccessibleEmployeeIds($currentEmployee);
+            if ($accessibleEmpIds !== null) {
+                $plansQuery->where(function ($q) use ($currentEmployee, $accessibleEmpIds) {
+                    $q->whereIn('employee_id', $accessibleEmpIds)
+                      ->orWhere('manager_id', $currentEmployee->id);
+                });
+            }
         }
 
         // Filter: Cycle
@@ -191,11 +194,20 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $kpiMasters = KpiMaster::with('kraCategory')->where('tenant_id', $tenantId)->orderBy('name')->get();
 
         $authUserId = auth()->id();
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+
         $isOwner = ($currentEmployee && $currentEmployee->id === $plan->employee_id)
             || ($authUserId && $plan->employee?->user_id === $authUserId);
 
-        $isManager = ($currentEmployee && ($currentEmployee->id === $plan->manager_id || $currentEmployee->id === $plan->employee?->reporting_manager_id))
+        $isDirectManager = ($currentEmployee && ($currentEmployee->id === $plan->manager_id || $currentEmployee->id === $plan->employee?->reporting_manager_id))
             || ($authUserId && ($plan->manager?->user_id === $authUserId || $plan->employee?->reportingManager?->user_id === $authUserId));
+
+        $isScopedHead = false;
+        if (!$isOwner && $currentEmployee && $plan->employee_id) {
+            $isScopedHead = $scopeService->canAccessEmployee($currentEmployee, $plan->employee_id);
+        }
+
+        $isManager = (!$isOwner && $isDirectManager) || $isScopedHead;
 
         $plan->capabilities = [
             'can_view'             => true,
@@ -553,6 +565,33 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $plan->submitted_at = Carbon::now();
         $plan->save();
 
+        try {
+            $plan->loadMissing(['employee', 'manager', 'employee.reportingManager', 'appraisalCycle']);
+            $mgr = $plan->manager ?? $plan->employee?->reportingManager;
+            if ($mgr) {
+                NotificationService::sendToEmployee(
+                    employee: $mgr,
+                    title: 'KPI Goals Submitted for Approval',
+                    message: "{$plan->employee?->full_name} submitted their KPI scorecard for {$plan->appraisalCycle?->name} for your approval.",
+                    actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                    module: 'hrms',
+                    type: 'performance',
+                    iconClass: 'feather-target'
+                );
+            }
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.kra_kpi.submitted', [
+                'tenant_id'     => $plan->tenant_id,
+                'employee_name' => $plan->employee?->full_name ?? 'Employee',
+                'cycle_name'    => $plan->appraisalCycle?->name ?? 'Cycle',
+                'items_count'   => (string) $plan->items()->count(),
+                'employee_id'   => $plan->employee_id,
+                'user_id'       => $plan->employee?->user_id,
+            ], $plan);
+        } catch (\Throwable $e) {
+            // Silently skip if notification fails
+        }
+
         return $plan;
     }
 
@@ -584,6 +623,32 @@ class KraKpiRepository implements KraKpiRepositoryInterface
         $plan->status = 'approved';
         $plan->approved_at = Carbon::now();
         $plan->save();
+
+        try {
+            $plan->loadMissing(['employee', 'appraisalCycle']);
+            if ($plan->employee_id) {
+                NotificationService::sendToEmployee(
+                    employee: $plan->employee_id,
+                    title: 'KPI Goals Approved',
+                    message: "Your KPI scorecard for {$plan->appraisalCycle?->name} has been approved by your manager.",
+                    actionUrl: route('hrms.kra-kpi.show', $plan->id),
+                    module: 'hrms',
+                    type: 'performance',
+                    iconClass: 'feather-check-circle'
+                );
+            }
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.kra_kpi.approved', [
+                'tenant_id'     => $plan->tenant_id,
+                'employee_name' => $plan->employee?->full_name ?? 'Employee',
+                'cycle_name'    => $plan->appraisalCycle?->name ?? 'Cycle',
+                'approved_by'   => auth()->user()?->name ?? 'Manager',
+                'employee_id'   => $plan->employee_id,
+                'user_id'       => $plan->employee?->user_id,
+            ], $plan);
+        } catch (\Throwable $e) {
+            // Silently skip if notification fails
+        }
 
         return $plan;
     }

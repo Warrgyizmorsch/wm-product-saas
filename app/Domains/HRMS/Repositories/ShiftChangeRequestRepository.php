@@ -9,23 +9,19 @@ use App\Domains\Production\Models\ProductionShift;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schema;
 
 class ShiftChangeRequestRepository implements ShiftChangeRequestRepositoryInterface
 {
     public function getIndexData(array $inputs): array
     {
-        try {
-            if (!Schema::hasTable('shift_change_requests')) {
-                Artisan::call('migrate', ['--force' => true]);
-            }
-        } catch (\Exception $e) {
-            // Silently log or ignore migration execution errors
-        }
-
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.shift_changes.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         $isAdmin = $isHrAdmin;
 
         $employee = Employee::resolveForUser($user);

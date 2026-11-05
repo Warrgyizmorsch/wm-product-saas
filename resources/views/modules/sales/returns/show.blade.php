@@ -347,19 +347,32 @@
                 <!-- 1. Document Header -->
                 <div class="row align-items-start pb-4 border-bottom mb-4">
                     <div class="col-7">
+                        @php
+                            $sellerOrg = billing_organization_details($return);
+                        @endphp
                         <div class="d-flex align-items-center mb-3">
                             <div class="avatar-text return-avatar-box text-white fs-2 fw-bold me-3 shadow-sm d-flex align-items-center justify-content-center" style="border-radius: 8px; width: 50px; height: 50px; flex-shrink: 0;">
-                                {{ strtoupper(substr(tenant() ? tenant()->name : 'R', 0, 1)) }}
+                                {{ $sellerOrg['avatar_char'] }}
                             </div>
                             <div>
-                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
-                                <span class="fs-11 text-muted">{{ __('crm.sales_return_unit') }}</span>
+                                <h4 class="fw-bold text-dark mb-0 fs-17">{{ $sellerOrg['name'] }}</h4>
+                                <span class="fs-11 text-muted">{{ $sellerOrg['unit_subtext'] }}</span>
                             </div>
                         </div>
                         <div class="fs-12 text-secondary leading-relaxed">
-                            <div>H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India</div>
-                            <div><strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)</div>
-                            <div><strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'billing@sasserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230</div>
+                            <div>{{ $sellerOrg['address'] }}</div>
+                            <div><strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }} &nbsp;|&nbsp; <strong>State Code:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] }})</div>
+                            <div>
+                                @if($sellerOrg['email'])
+                                    <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                                @endif
+                                @if($sellerOrg['email'] && $sellerOrg['phone'])
+                                    &nbsp;|&nbsp;
+                                @endif
+                                @if($sellerOrg['phone'])
+                                    <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                                @endif
+                            </div>
                         </div>
                     </div>
 

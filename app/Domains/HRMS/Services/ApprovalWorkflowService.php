@@ -35,7 +35,21 @@ class ApprovalWorkflowService
         // Level 2 / Escalation: HR Manager / HR Director / Department Head
         $hrApprover = Employee::where('company_id', $requester->company_id)
             ->where('id', '!=', $requester->id)
-            ->whereIn('role', ['hr_director', 'hr_manager', 'hr', 'admin', 'director'])
+            ->where(function ($q) {
+                $q->whereIn('role', ['hr_director', 'hr_manager', 'hr', 'admin', 'director'])
+                  ->orWhereHas('user.roles', function ($rq) {
+                      $rq->whereIn('slug', ['hr_manager', 'tenant_owner', 'company_admin', 'super_admin'])
+                         ->orWhereHas('rolePermissions.permission', function ($pq) {
+                             $pq->whereIn('name', ['hr.settings.manage', 'hrms.leave_requests.approve']);
+                         });
+                  })
+                  ->orWhereHas('user.primaryRole', function ($rq) {
+                      $rq->whereIn('slug', ['hr_manager', 'tenant_owner', 'company_admin', 'super_admin'])
+                         ->orWhereHas('rolePermissions.permission', function ($pq) {
+                             $pq->whereIn('name', ['hr.settings.manage', 'hrms.leave_requests.approve']);
+                         });
+                  });
+            })
             ->first();
 
         if ($hrApprover) {
@@ -242,17 +256,35 @@ class ApprovalWorkflowService
             if ($this->isSuperAdmin($actor)) {
                 return true;
             }
+            if (app(HrmsScopeService::class)->isCompanyAdmin($actor)) {
+                return true;
+            }
             $userRole = strtolower($actor->role ?? '');
-            if (in_array($userRole, ['super_admin', 'super-admin', 'admin', 'company_admin', 'hr', 'hr_manager', 'hr_director'])) {
+            if (in_array($userRole, ['super_admin', 'super-admin', 'admin', 'company_admin', 'tenant_owner', 'owner', 'hr', 'hr_manager', 'hr_director'])) {
                 return true;
             }
             if (method_exists($actor, 'hasHrPermission') && (
                 $actor->hasHrPermission('hrms.leave_requests.approve') ||
+                $actor->hasHrPermission('hrms.leave.approve') ||
+                $actor->hasHrPermission('hrms.leaves.manage') ||
                 $actor->hasHrPermission('hr.settings.manage') ||
                 $actor->hasHrPermission('hrms.wfh.approve') ||
                 $actor->hasHrPermission('hrms.wfh_requests.approve') ||
                 $actor->hasHrPermission('hrms.wfh_requests.manage') ||
-                $actor->hasHrPermission('hrms.leave_encashments.approve')
+                $actor->hasHrPermission('hrms.leave_encashments.approve') ||
+                $actor->hasHrPermission('hrms.attendance.approve') ||
+                $actor->hasHrPermission('hrms.attendance.manage') ||
+                $actor->hasHrPermission('hrms.attendance_corrections.approve') ||
+                $actor->hasHrPermission('hrms.overtime.approve') ||
+                $actor->hasHrPermission('hrms.shift_changes.approve') ||
+                $actor->hasHrPermission('hrms.employee_exits.approve') ||
+                $actor->hasHrPermission('hrms.assets.approve') ||
+                $actor->hasHrPermission('hrms.payroll_runs.approve') ||
+                $actor->hasHrPermission('hrms.travel_expenses.approve') ||
+                $actor->hasHrPermission('hrms.performance.manage') ||
+                $actor->hasHrPermission('hrms.goals.manage') ||
+                $actor->hasHrPermission('hrms.employees.manage') ||
+                $actor->hasHrPermission('hrms.employees.update')
             )) {
                 return true;
             }
@@ -332,7 +364,15 @@ class ApprovalWorkflowService
         $user = $actor instanceof User ? $actor : $this->getUserFromEmployee($actor);
 
         if ($user) {
-            if ($user->is_admin || $access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId]) || $access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId])) {
+            $context = [
+                'tenant_id'     => $tenantId,
+                'company_id'    => $user->company_id,
+                'branch_id'     => $user->branch_id,
+                'department_id' => $user->department_id,
+                'owner_id'      => $ticket->employee_id,
+            ];
+
+            if ($user->is_admin || $access->allows($user, 'hrms.helpdesk.manage', $context) || $access->allows($user, 'hr.settings.manage', $context)) {
                 return;
             }
         }
@@ -340,6 +380,14 @@ class ApprovalWorkflowService
         $actorEmployeeId = $this->getEmployeeIdForActor($actor);
         if ($actorEmployeeId && $ticket->assigned_to && (int) $actorEmployeeId === (int) $ticket->assigned_to) {
             return;
+        }
+
+        // Scoped triage: Department Head / Branch Manager / Reporting Manager for non-confidential tickets of their team members
+        if ($actorEmployeeId && $ticket->employee_id && !$ticket->is_confidential) {
+            $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+            if ($scopeService->canAccessEmployee($actor, $ticket->employee_id)) {
+                return;
+            }
         }
 
         abort(403, 'Unauthorized to manage or update status on this support ticket.');
@@ -472,7 +520,8 @@ class ApprovalWorkflowService
      */
     private function isSuperAdmin(User $user): bool
     {
-        return strtolower($user->role ?? '') === 'super_admin' 
+        return (bool) ($user->is_super_admin ?? false)
+            || strtolower($user->role ?? '') === 'super_admin' 
             || strtolower($user->role ?? '') === 'super-admin'
             || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin());
     }

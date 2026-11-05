@@ -103,7 +103,7 @@
             width: 160px !important;
         }
         .modal .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-            padding-right: 24px !important;
+            padding-right: 54px !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             white-space: nowrap !important;

@@ -158,10 +158,11 @@ class EWayBillService
         $tenant = tenant();
         $customer = $invoice->customer ?: $invoice->salesOrder?->customer;
 
-        $sellerGstin = $tenant?->gstin ?: '08AAFCS1234E1Z0';
-        $sellerStateCode = (int)substr($sellerGstin, 0, 2) ?: 8;
-        $buyerGstin = $customer?->gstin ?: '27AABCU9603R1ZM';
-        $buyerStateCode = (int)substr($buyerGstin, 0, 2) ?: 27;
+        $comp = $invoice->company ?: company();
+        $sellerGstin = $comp?->gst_number ?: ($tenant?->gstin ?: ($tenant?->billing_gstin ?: ''));
+        $sellerStateCode = (int)substr($sellerGstin, 0, 2) ?: 0;
+        $buyerGstin = $customer?->gstin ?: '';
+        $buyerStateCode = (int)substr($buyerGstin, 0, 2) ?: 0;
 
         $items = [];
         $totTaxable = 0;
@@ -278,6 +279,8 @@ class EWayBillService
             'eway_bill_error'      => null,
         ]);
 
+        \App\Domains\Sales\Services\SalesNotificationService::notifyEWayBillGenerated($invoice, $ewbNo, (string) $validTill);
+
         return [
             'success'      => true,
             'message'      => "E-Way Bill generated successfully! EWB No: {$ewbNo}",
@@ -310,6 +313,8 @@ class EWayBillService
             'distance_km'          => (int)($transportData['distance_km'] ?? 100),
             'eway_bill_error'      => null,
         ]);
+
+        \App\Domains\Sales\Services\SalesNotificationService::notifyEWayBillGenerated($invoice, $ewbNo, (string) $validTill);
 
         return [
             'success'      => true,

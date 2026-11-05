@@ -11,6 +11,9 @@
         <a href="{{ route('purchase.bills.index') }}" class="btn btn-light border fs-12">
             <i class="feather-arrow-left me-2"></i>{{ __('purchase.back_to_bills') }}
         </a>
+        <a href="{{ route('purchase.bills.pdf', $bill->id) }}" class="btn btn-outline-secondary border fs-12 fw-semibold" target="_blank">
+            <i class="feather-printer me-1.5"></i>PDF / Print
+        </a>
 
         {{-- A bill held by 3-way match can't be paid or offset until released. --}}
         @if($bill->due_amount > 0 && !$bill->isOnHold())
@@ -358,32 +361,55 @@
                             <span>Less: TDS {{ $bill->tdsSection?->code }} @ {{ rtrim(rtrim(number_format((float) $bill->tds_rate, 3), '0'), '.') }}% on {{ format_currency((float) $bill->tds_base_amount + (float) $bill->tds_catchup_base) }}:</span>
                             <strong class="font-monospace">-{{ format_currency($bill->tds_amount) }}</strong>
                         </div>
-                        <div class="d-flex justify-content-between fw-bold">
-                            <span>Net payable to vendor:</span>
-                            <strong class="font-monospace">{{ format_currency($bill->netPayable()) }}</strong>
-                        </div>
                     @elseif($bill->tds_section_id && $bill->tds_reason === 'below_threshold')
                         <div class="small text-muted mt-2">TDS {{ $bill->tdsSection?->code }}: below the threshold, nothing deducted.</div>
+                    @endif
+
+                    @if($bill->returnsTotal() > 0)
+                        <div class="d-flex justify-content-between text-warning mt-2">
+                            <span>Less: Debit Notes / Returns:</span>
+                            <strong class="font-monospace">-{{ format_currency($bill->returnsTotal()) }}</strong>
+                        </div>
+                    @endif
+
+                    @if((float) $bill->tds_amount > 0 || $bill->returnsTotal() > 0)
+                        <div class="d-flex justify-content-between fw-bold text-dark mt-2 pt-2 border-top">
+                            <span>Net Payable to Vendor:</span>
+                            <strong class="font-monospace">{{ format_currency($bill->netPayable()) }}</strong>
+                        </div>
                     @endif
                 </div>
             </div>
         </div>
 
+        @php
+            $returnsTotal = (float) $bill->purchaseReturns->where('status', 'Completed')->sum('total_refund_amount');
+        @endphp
         <!-- Payment Breakdown Cards -->
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="{{ $returnsTotal > 0 ? 'col-md-3' : 'col-md-4' }}">
                 <div class="p-3 border rounded bg-light-50">
                     <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('purchase.grand_total') }}</span>
                     <h4 class="fw-bold text-dark mb-0">{{ format_currency($bill->grand_total) }}</h4>
                 </div>
             </div>
-            <div class="col-md-4">
+            @if($returnsTotal > 0)
+                <div class="col-md-3">
+                    <div class="p-3 border rounded bg-light-50 border-warning-subtle">
+                        <span class="fs-11 text-uppercase text-warning fw-bold d-block mb-1">
+                            <i class="feather-corner-up-left me-1"></i>Debit Notes / Returns
+                        </span>
+                        <h4 class="fw-bold text-warning mb-0">-{{ format_currency($returnsTotal) }}</h4>
+                    </div>
+                </div>
+            @endif
+            <div class="{{ $returnsTotal > 0 ? 'col-md-3' : 'col-md-4' }}">
                 <div class="p-3 border rounded bg-light-50">
                     <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">{{ __('purchase.paid_settled_amount') }}</span>
                     <h4 class="fw-bold text-success mb-0">{{ format_currency($bill->paid_amount) }}</h4>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="{{ $returnsTotal > 0 ? 'col-md-3' : 'col-md-4' }}">
                 <div class="p-3 border rounded bg-light-50">
                     <span class="fs-11 text-uppercase text-danger fw-bold d-block mb-1">{{ __('purchase.net_balance_due') }}</span>
                     <h4 class="fw-bold text-danger mb-0">{{ format_currency($bill->due_amount) }}</h4>
@@ -429,6 +455,47 @@
         @else
             <div class="text-center py-3 text-muted fs-12 border rounded mb-4">
                 <i class="feather-info me-1"></i>{{ __('purchase.no_payments_registered_yet') }}
+            </div>
+        @endif
+
+        @if($bill->purchaseReturns->count() > 0)
+            <!-- Debit Notes & Purchase Returns Applied -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold text-dark mb-0">
+                    <i class="feather-corner-up-left text-warning me-1"></i>{{ __('purchase.purchase_returns') }} & Debit Notes Applied
+                </h6>
+            </div>
+            <div class="table-responsive rounded border mb-4">
+                <table class="table table-bordered table-sm align-middle fs-13 text-dark mb-0">
+                    <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
+                        <tr>
+                            <th class="ps-3">{{ __('purchase.return_number') }}</th>
+                            <th>{{ __('purchase.date') }}</th>
+                            <th>{{ __('purchase.status') }}</th>
+                            <th>{{ __('purchase.reason') }}</th>
+                            <th class="text-end pe-3">Adjusted / Refund Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($bill->purchaseReturns as $ret)
+                            <tr>
+                                <td class="ps-3 fw-bold">
+                                    <a href="{{ route('purchase.returns.show', $ret->id) }}" class="text-primary text-decoration-none">
+                                        <i class="feather-file-text me-1"></i>{{ $ret->return_number }}
+                                    </a>
+                                </td>
+                                <td>{{ $ret->return_date ? \Carbon\Carbon::parse($ret->return_date)->format('d-M-Y') : '—' }}</td>
+                                <td>
+                                    <span class="badge {{ $ret->status === 'Completed' ? 'bg-success' : 'bg-warning text-dark' }} fs-11 fw-semibold">
+                                        {{ $ret->status }}
+                                    </span>
+                                </td>
+                                <td class="text-muted">{{ $ret->reason ?: 'Goods Return / Quality Rejection' }}</td>
+                                <td class="text-end pe-3 font-monospace fw-bold text-warning">-{{ format_currency($ret->total_refund_amount) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
         @endif
 

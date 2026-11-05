@@ -835,6 +835,11 @@ class RbacSeeder extends Seeder
             ['name' => 'accounting.tax_rates.update', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'update'],
             ['name' => 'accounting.tax_rates.delete', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'delete'],
             ['name' => 'accounting.reports.view', 'module' => 'accounting', 'entity' => 'reports', 'action' => 'view'],
+            // Integration kit (Tally etc.): held by owner and admin only.
+            ['name' => 'accounting.integrations.view', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'view'],
+            ['name' => 'accounting.integrations.manage', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'manage'],
+            ['name' => 'accounting.integrations.sync', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'sync'],
+            ['name' => 'accounting.integrations.resolve', 'module' => 'accounting', 'entity' => 'integrations', 'action' => 'resolve'],
             ['name' => 'accounting.vouchers.payment.view', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'view'],
             ['name' => 'accounting.vouchers.payment.post', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'post'],
             ['name' => 'accounting.vouchers.payment.reverse', 'module' => 'accounting', 'entity' => 'vouchers_payment', 'action' => 'reverse'],

@@ -317,14 +317,22 @@
             <div class="doc-header">
                 <div class="company-brand">
                     @php
-                        $tenant = auth()->user()?->tenant;
-                        $companyName = $tenant?->name ?? config('app.name', 'ERP SAAS');
+                        $sellerOrg = billing_organization_details($dispatch);
+                        $companyName = $sellerOrg['name'];
                         $initials = strtoupper(substr($companyName, 0, 2));
                     @endphp
                     <div class="company-logo-avatar">{{ $initials }}</div>
                     <div>
                         <div class="company-name">{{ $companyName }}</div>
                         <div class="company-sub">Authorized Outward Material Delivery Challan</div>
+                        @if(!empty($sellerOrg['address']))
+                            <div style="font-size: 11px; color: #64748b; margin-top: 2px; max-width: 500px;">{{ $sellerOrg['address'] }}</div>
+                        @endif
+                        <div style="font-size: 10.5px; color: #64748b; margin-top: 1px;">
+                            @if(!empty($sellerOrg['gstin'])) <strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }} @endif
+                            @if(!empty($sellerOrg['state_code'])) &nbsp;|&nbsp; <strong>State:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] ?? '' }}) @endif
+                            @if(!empty($sellerOrg['phone'])) &nbsp;|&nbsp; <strong>Tel:</strong> {{ $sellerOrg['phone'] }} @endif
+                        </div>
                     </div>
                 </div>
                 <div class="challan-title-block">

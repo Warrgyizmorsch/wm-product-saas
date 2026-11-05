@@ -4,12 +4,119 @@
 @section('page-title', __('hrms.payroll.my_salary_title'))
 @section('breadcrumb', __('hrms.payroll.my_salary_breadcrumb'))
 
+@section('page-actions')
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.button type="button" variant="primary" icon="feather-download" data-bs-toggle="modal" data-bs-target="#downloadRangeModal" class="fw-bold text-uppercase" style="height: 38px;">
+            {{ __('hrms.payroll.download_range_payslips') }}
+        </x-ui.button>
+    </div>
+@endsection
+
 @section('content')
 <div class="row">
     <div class="col-12">
+        @if(session('success'))
+            <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
+                <i class="feather-check-circle me-2"></i>{{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
+                <i class="feather-alert-triangle me-2"></i>{{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
         <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
-            <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
-                <h5 class="mb-0 fs-14 fw-bold text-dark"><i class="feather-file-text text-primary me-2"></i>{{ __('hrms.payroll.my_salary_history_heading') }}</h5>
+            <!-- Header Toolbar: Heading + Search, Sort, Filter -->
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 border-bottom pb-3 mb-4">
+                <div>
+                    <h5 class="mb-0 fs-15 fw-bold text-dark">
+                        <i class="feather-file-text text-primary me-2"></i>{{ __('hrms.payroll.my_salary_history_heading') }}
+                    </h5>
+                </div>
+
+                <!-- Search & Filters (Standard Theme Toolbar) -->
+                <form method="GET" action="{{ route('hrms.payroll.mySalary') }}" id="mySalaryFilterForm" class="d-flex align-items-center gap-2 flex-wrap">
+                    <input type="hidden" name="sort" id="salarySortInput" value="{{ $inputs['sort'] ?? 'newest' }}">
+
+                    <!-- Search Field -->
+                    <div class="d-flex align-items-center bg-light border rounded px-3 py-1" style="height: 38px;">
+                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                        <input 
+                            type="text" 
+                            name="search" 
+                            class="form-control border-0 bg-transparent p-0 fs-13" 
+                            placeholder="{{ __('hrms.payroll.search_payslips_placeholder') }}" 
+                            value="{{ $inputs['search'] ?? '' }}"
+                            style="box-shadow: none; width: 190px;"
+                        >
+                    </div>
+
+                    <!-- Sort Dropdown -->
+                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
+                        @php $currentSort = $inputs['sort'] ?? 'newest'; @endphp
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $currentSort === 'newest' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('newest')">
+                            <span>{{ __('hrms.payroll.sort_newest') }}</span>
+                            @if($currentSort === 'newest') <i class="feather-check ms-3 text-primary"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $currentSort === 'oldest' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('oldest')">
+                            <span>{{ __('hrms.payroll.sort_oldest') }}</span>
+                            @if($currentSort === 'oldest') <i class="feather-check ms-3 text-primary"></i> @endif
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $currentSort === 'payout_high' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('payout_high')">
+                            <span>{{ __('hrms.payroll.sort_payout_high') }}</span>
+                            @if($currentSort === 'payout_high') <i class="feather-check ms-3 text-primary"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $currentSort === 'payout_low' ? 'active' : '' }}" href="javascript:void(0)" onclick="applySort('payout_low')">
+                            <span>{{ __('hrms.payroll.sort_payout_low') }}</span>
+                            @if($currentSort === 'payout_low') <i class="feather-check ms-3 text-primary"></i> @endif
+                        </a>
+                    </x-ui.sort-dropdown>
+
+                    <!-- Filter Dropdown -->
+                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.payroll.year') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="year" select2-selector="default">
+                                <option value="">{{ __('hrms.payroll.all_years') }}</option>
+                                @if(!empty($availableYears))
+                                    @foreach($availableYears as $yr)
+                                        <option value="{{ $yr }}" @selected(($inputs['year'] ?? '') == $yr)>{{ $yr }}</option>
+                                    @endforeach
+                                @else
+                                    @for($y = (int)date('Y'); $y >= (int)date('Y') - 5; $y--)
+                                        <option value="{{ $y }}" @selected(($inputs['year'] ?? '') == $y)>{{ $y }}</option>
+                                    @endfor
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.payroll.month') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="month" select2-selector="default">
+                                <option value="">{{ __('hrms.payroll.all_months') }}</option>
+                                @for($m = 1; $m <= 12; $m++)
+                                    @php
+                                        $monthVal = str_pad($m, 2, '0', STR_PAD_LEFT);
+                                        $monthName = \Carbon\Carbon::create(null, $m, 1)->locale(app()->getLocale())->translatedFormat('F');
+                                    @endphp
+                                    <option value="{{ $monthVal }}" @selected(($inputs['month'] ?? '') == $monthVal)>{{ $monthName }}</option>
+                                @endfor
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{{ route('hrms.payroll.mySalary') }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary text-white">{{ __('hrms.common.apply') }}</button>
+                        </div>
+                    </x-ui.filter>
+                </form>
             </div>
 
             @if($salaryHistory->isEmpty())
@@ -190,16 +297,147 @@
         </div>
     </div>
 </div>
+
+<!-- Download Range Modal -->
+<div class="modal fade" id="downloadRangeModal" tabindex="-1" aria-labelledby="downloadRangeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+            <div class="modal-header border-bottom py-3 px-4">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="feather-download text-primary fs-18"></i>
+                    <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="downloadRangeModalLabel">
+                        {{ __('hrms.payroll.download_range_modal_title') }}
+                    </h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.payroll.payslip.download-range') }}" method="GET" target="_blank">
+                <div class="modal-body p-4 text-dark">
+                    <div class="alert alert-soft-primary d-flex align-items-start gap-2 mb-3 py-2.5 px-3 fs-12 border-0 rounded-3">
+                        <i class="feather-info text-primary fs-15 mt-0.5"></i>
+                        <div>
+                            {{ __('hrms.payroll.download_range_info') }}
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">
+                                {{ __('hrms.payroll.from_month') }} <span class="text-danger">*</span>
+                            </label>
+                            <x-ui.odoo-form-ui type="select" name="from_month" select2-selector="default" required>
+                                @if(!empty($availableMonths))
+                                    @foreach($availableMonths as $mCode)
+                                        <option value="{{ $mCode }}" @selected($loop->first)>
+                                            {{ \Carbon\Carbon::parse($mCode . '-01')->locale(app()->getLocale())->translatedFormat('F Y') }}
+                                        </option>
+                                    @endforeach
+                                @else
+                                    @for($i = 5; $i >= 0; $i--)
+                                        @php $mCode = now()->subMonths($i)->format('Y-m'); @endphp
+                                        <option value="{{ $mCode }}" @selected($i === 2)>
+                                            {{ now()->subMonths($i)->locale(app()->getLocale())->translatedFormat('F Y') }}
+                                        </option>
+                                    @endfor
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">
+                                {{ __('hrms.payroll.to_month') }} <span class="text-danger">*</span>
+                            </label>
+                            <x-ui.odoo-form-ui type="select" name="to_month" select2-selector="default" required>
+                                @if(!empty($availableMonths))
+                                    @foreach($availableMonths as $mCode)
+                                        <option value="{{ $mCode }}" @selected($loop->last)>
+                                            {{ \Carbon\Carbon::parse($mCode . '-01')->locale(app()->getLocale())->translatedFormat('F Y') }}
+                                        </option>
+                                    @endforeach
+                                @else
+                                    @for($i = 5; $i >= 0; $i--)
+                                        @php $mCode = now()->subMonths($i)->format('Y-m'); @endphp
+                                        <option value="{{ $mCode }}" @selected($i === 0)>
+                                            {{ now()->subMonths($i)->locale(app()->getLocale())->translatedFormat('F Y') }}
+                                        </option>
+                                    @endfor
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top py-2.5 px-4">
+                    <x-ui.button type="button" variant="light" class="border px-3" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" icon="feather-download" class="px-4">
+                        {{ __('hrms.payroll.btn_download') }}
+                    </x-ui.button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
+    function submitCleanForm(form) {
+        if (!form) return;
+        const inputs = form.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            if (input.name && (input.value === null || input.value === undefined || input.value.trim() === '')) {
+                input.disabled = true;
+            }
+            if (input.name === 'sort' && input.value === 'newest') {
+                input.disabled = true;
+            }
+        });
+        form.submit();
+    }
+
+    function applySort(val) {
+        const form = document.getElementById('mySalaryFilterForm');
+        document.getElementById('salarySortInput').value = val;
+        submitCleanForm(form);
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
-        // Move all payslip modals to document body to prevent blurry backdrop overlay bugs
-        const modals = document.querySelectorAll('[id^="payslipModal-"]');
+        // Move all modals to document body to prevent blurry backdrop overlay bugs
+        const modals = document.querySelectorAll('[id^="payslipModal-"], #downloadRangeModal');
         modals.forEach(function(modal) {
             document.body.appendChild(modal);
         });
+
+        // Initialize modal select dropdowns when range modal is shown
+        $('#downloadRangeModal').on('shown.bs.modal', function () {
+            $(this).find('select').each(function() {
+                if ($(this).hasClass('select2-hidden-accessible')) {
+                    $(this).select2('destroy');
+                }
+                $(this).select2({
+                    dropdownParent: $('#downloadRangeModal'),
+                    width: '100%'
+                });
+            });
+        });
+
+        // Live Search with Debounce and automatic focus restoration
+        const form = document.getElementById('mySalaryFilterForm');
+        const searchInput = form ? form.querySelector('input[name="search"]') : null;
+        if (searchInput && form) {
+            if (searchInput.value.length > 0) {
+                searchInput.focus();
+                const val = searchInput.value;
+                searchInput.value = '';
+                searchInput.value = val;
+            }
+
+            let timeout = null;
+            searchInput.addEventListener('input', function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    submitCleanForm(form);
+                }, 500);
+            });
+        }
     });
 </script>
 @endpush

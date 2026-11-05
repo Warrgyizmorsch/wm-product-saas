@@ -623,6 +623,7 @@
         }, true);
     </script>
     @stack('scripts')
+    @include('partials.mossie-widget')
 </body>
 
 </html>

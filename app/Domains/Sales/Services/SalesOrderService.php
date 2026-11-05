@@ -8,6 +8,9 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\CrmDeal;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\HRMS\Models\Company;
+use App\Models\GstConfiguration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -84,6 +87,11 @@ class SalesOrderService
             $discountType = $data['discount_type'] ?? 'item_wise';
             $taxType = $data['tax_type'] ?? 'item_wise_tax';
             $orderTaxRate = floatval($data['order_tax_rate'] ?? 0);
+
+            // Auto-resolve gst_type if empty and tax_type is not without_tax
+            if (empty($data['gst_type']) && $taxType !== 'without_tax' && !empty($data['customer_id'])) {
+                $data['gst_type'] = $this->resolveGstType((int)$data['customer_id'], $data['company_id'] ?? null, $data['tenant_id'] ?? null);
+            }
 
             $subtotal = 0;
             $rawLines = [];
@@ -253,6 +261,14 @@ class SalesOrderService
             $taxType = $data['tax_type'] ?? $salesOrder->tax_type ?? 'item_wise_tax';
             $orderTaxRate = floatval($data['order_tax_rate'] ?? $salesOrder->order_tax_rate ?? 0);
 
+            // Auto-resolve gst_type if empty and tax_type is not without_tax
+            if (empty($data['gst_type']) && $taxType !== 'without_tax') {
+                $customerId = $data['customer_id'] ?? $salesOrder->customer_id;
+                if ($customerId) {
+                    $data['gst_type'] = $this->resolveGstType((int)$customerId, $data['company_id'] ?? $salesOrder->company_id, $data['tenant_id'] ?? $salesOrder->tenant_id);
+                }
+            }
+
             $subtotal = 0;
             $rawLines = [];
 
@@ -386,5 +402,66 @@ class SalesOrderService
     public function delete(SalesOrder $salesOrder): bool
     {
         return $salesOrder->delete();
+    }
+
+    /**
+     * Resolve GST type (cgst_sgst for Intra-state, igst for Inter-state)
+     * based on active company GST number starting 2 digits vs customer GSTIN starting 2 digits.
+     */
+    public function resolveGstType(Customer|int $customer, ?int $companyId = null, ?int $tenantId = null): string
+    {
+        if (is_numeric($customer)) {
+            $customer = Customer::find($customer);
+        }
+        if (!$customer) {
+            return 'cgst_sgst';
+        }
+
+        $tenantId ??= $customer->tenant_id ?? (tenant_id() ?? auth()->user()?->tenant_id ?? 1);
+
+        $company = null;
+        if ($companyId) {
+            $company = Company::find($companyId);
+        }
+        if (!$company && function_exists('company') && company()) {
+            $company = company();
+        }
+        if (!$company && function_exists('current_company_id') && current_company_id()) {
+            $company = Company::find(current_company_id());
+        }
+        if (!$company) {
+            $company = Company::where('tenant_id', $tenantId)->first();
+        }
+
+        // Active company GST number (or tax_number / gstin / GstConfiguration seller_gstin)
+        $companyGst = strtoupper(trim((string) ($company?->gst_number ?? $company?->tax_number ?? $company?->gstin ?? '')));
+        if (empty($companyGst)) {
+            $gstConfig = GstConfiguration::getForCurrentContext();
+            if ($gstConfig && $gstConfig->seller_gstin) {
+                $companyGst = strtoupper(trim((string) $gstConfig->seller_gstin));
+            }
+        }
+
+        $customerGst = strtoupper(trim((string) ($customer->gstin ?? $customer->tax_number ?? '')));
+
+        $cleanCompanyGst = preg_replace('/[^0-9A-Za-z]/', '', $companyGst);
+        $cleanCustomerGst = preg_replace('/[^0-9A-Za-z]/', '', $customerGst);
+
+        $companyPrefix = substr($cleanCompanyGst, 0, 2);
+        $customerPrefix = substr($cleanCustomerGst, 0, 2);
+
+        // 1. Primary rule: Compare first 2 digits of company GST and customer GSTIN
+        if (!empty($companyPrefix) && !empty($customerPrefix)) {
+            return ($companyPrefix === $customerPrefix) ? 'cgst_sgst' : 'igst';
+        }
+
+        // 2. Fallback: Compare state names if GST numbers are not available
+        $companyState = strtolower(trim((string) ($company?->state ?? '')));
+        $customerState = strtolower(trim((string) ($customer->billing_state ?? $customer->state ?? '')));
+        if (!empty($companyState) && !empty($customerState)) {
+            return ($companyState === $customerState) ? 'cgst_sgst' : 'igst';
+        }
+
+        return 'cgst_sgst';
     }
 }

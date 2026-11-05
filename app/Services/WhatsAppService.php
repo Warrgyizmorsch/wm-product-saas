@@ -67,7 +67,7 @@ class WhatsAppService
         } catch (ConnectionException $e) {
             $config->update(['status' => 'offline']);
             return [
-                'status'  => 'offline',
+                'status' => 'offline',
                 'message' => 'WhatsApp bridge service is offline. Please start the Node.js bridge server.',
             ];
         }
@@ -133,7 +133,7 @@ class WhatsAppService
         $url = $this->getBridgeUrl() . '/sessions/' . $config->session_key . '/send-message';
 
         $payload = [
-            'number'  => $targetNumber,
+            'number' => $targetNumber,
             'message' => $message,
         ];
         if ($quotedMsgId) {
@@ -150,25 +150,26 @@ class WhatsAppService
                 $resData = $response->json();
                 try {
                     \App\Models\WhatsAppMessage::create([
-                        'tenant_id'     => $config->tenant_id,
-                        'company_id'    => $config->company_id,
-                        'branch_id'     => $config->branch_id,
-                        'session_key'   => $config->session_key,
+                        'tenant_id' => $config->tenant_id,
+                        'company_id' => $config->company_id,
+                        'branch_id' => $config->branch_id,
+                        'session_key' => $config->session_key,
                         'sender_number' => $targetNumber,
-                        'sender_name'   => 'Outbound ERP',
-                        'direction'     => 'outbound',
-                        'message_type'  => 'text',
-                        'message_body'  => $message,
-                        'message_id'    => $resData['messageId'] ?? null,
-                        'status'        => 'sent',
-                        'received_at'   => now(),
+                        'sender_name' => 'Outbound ERP',
+                        'direction' => 'outbound',
+                        'message_type' => 'text',
+                        'message_body' => $message,
+                        'message_id' => $resData['messageId'] ?? null,
+                        'status' => 'sent',
+                        'received_at' => now(),
                     ]);
-                } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {
+                }
 
                 return [
                     'success' => true,
                     'message' => "✓ WhatsApp test message successfully sent to {$targetNumber}!",
-                    'data'    => $resData,
+                    'data' => $resData,
                 ];
             }
 
@@ -176,13 +177,13 @@ class WhatsAppService
             return [
                 'success' => false,
                 'message' => $resJson['message'] ?? 'Failed to send WhatsApp message.',
-                'status'  => $resJson['status'] ?? 'error',
+                'status' => $resJson['status'] ?? 'error',
             ];
         } catch (ConnectionException $e) {
             return [
                 'success' => false,
                 'message' => 'WhatsApp bridge server is offline or unreachable.',
-                'status'  => 'offline',
+                'status' => 'offline',
             ];
         }
     }
@@ -211,10 +212,10 @@ class WhatsAppService
                 ->withToken($this->getBridgeToken())
                 ->timeout(45)
                 ->post($url, [
-                    'number'   => $targetNumber,
+                    'number' => $targetNumber,
                     'filename' => $filename,
                     'mimetype' => $mimetype,
-                    'caption'  => $caption,
+                    'caption' => $caption,
                     'document' => base64_encode($binary),
                 ]);
 
@@ -222,25 +223,26 @@ class WhatsAppService
                 $resData = $response->json();
                 try {
                     \App\Models\WhatsAppMessage::create([
-                        'tenant_id'     => $config->tenant_id,
-                        'company_id'    => $config->company_id,
-                        'branch_id'     => $config->branch_id,
-                        'session_key'   => $config->session_key,
+                        'tenant_id' => $config->tenant_id,
+                        'company_id' => $config->company_id,
+                        'branch_id' => $config->branch_id,
+                        'session_key' => $config->session_key,
                         'sender_number' => $targetNumber,
-                        'sender_name'   => 'Outbound ERP',
-                        'direction'     => 'outbound',
-                        'message_type'  => 'document',
-                        'message_body'  => "[Document: {$filename}] " . $caption,
-                        'message_id'    => $resData['messageId'] ?? null,
-                        'status'        => 'sent',
-                        'received_at'   => now(),
+                        'sender_name' => 'Outbound ERP',
+                        'direction' => 'outbound',
+                        'message_type' => 'document',
+                        'message_body' => "[Document: {$filename}] " . $caption,
+                        'message_id' => $resData['messageId'] ?? null,
+                        'status' => 'sent',
+                        'received_at' => now(),
                     ]);
-                } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {
+                }
 
                 return [
                     'success' => true,
                     'message' => "✓ WhatsApp document successfully sent to {$targetNumber}!",
-                    'data'    => $resData,
+                    'data' => $resData,
                 ];
             }
 
@@ -248,13 +250,13 @@ class WhatsAppService
             return [
                 'success' => false,
                 'message' => $resJson['message'] ?? 'Failed to send WhatsApp document.',
-                'status'  => $resJson['status'] ?? 'error',
+                'status' => $resJson['status'] ?? 'error',
             ];
         } catch (ConnectionException $e) {
             return [
                 'success' => false,
                 'message' => 'WhatsApp bridge server is offline or unreachable. Please start Node.js bridge server.',
-                'status'  => 'offline',
+                'status' => 'offline',
             ];
         }
     }
@@ -298,7 +300,8 @@ class WhatsAppService
         if (isset($updateData['status'])) {
             try {
                 app(\App\Domains\CRM\Services\QuotationService::class)->handleQuotationStatusChange($quotation, 'Quotation Sent');
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+            }
         }
 
         return $this->sendDocument(
@@ -318,7 +321,7 @@ class WhatsAppService
             $filename = $customPdfFile->getClientOriginalName() ?: "Tax_Invoice_{$invoice->invoice_number}.pdf";
         } else {
             $adjustedAmount = $invoice->allocations->sum('allocated_amount');
-            $balanceDue     = $invoice->balance_due;
+            $balanceDue = $invoice->balance_due;
 
             $pdf = Pdf::loadView('modules.sales.invoices.pdf', compact('invoice', 'adjustedAmount', 'balanceDue'));
             $pdfBinary = $pdf->output();
@@ -340,6 +343,15 @@ class WhatsAppService
 
         if ($invoice->status === 'Draft') {
             $invoice->update(['status' => 'Sent']);
+        }
+
+        // Save phone to customer if customer exists and had empty phone
+        if ($invoice->customer && empty($invoice->customer->phone) && !empty($mobile)) {
+            $cleanMobile = preg_replace('/\D/', '', trim($mobile));
+            if (strlen($cleanMobile) === 10) {
+                $cleanMobile = '91' . $cleanMobile;
+            }
+            $invoice->customer->update(['phone' => $cleanMobile ?: $mobile]);
         }
 
         return $this->sendDocument(

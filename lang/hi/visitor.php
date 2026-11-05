@@ -179,7 +179,7 @@ return [
     'first_time_visitors'         => 'पहली बार आए विज़िटर्स',
     'extend_minutes'              => 'बढ़ाए जाने वाले मिनट',
     'incident_details'            => 'सुरक्षा घटना का विवरण',
-    'blacklist_visitor'           => 'भविष्य में प्रवेश प्रतिबंधित (Blacklist) करें',
+    'blacklist_visitor'           => 'विज़िटर ब्लैकलिस्ट करें',
     'convert_to_lead'             => 'CRM लीड में बदलें (Convert to Lead)',
     'convert_lead_modal_title'    => 'आगंतुक को CRM लीड में बदलें',
     'converted_to_lead'           => 'CRM लीड में परिवर्तित',

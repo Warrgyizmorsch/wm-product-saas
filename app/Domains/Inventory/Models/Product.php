@@ -321,5 +321,15 @@ class Product extends BaseModel
         $tenantId = $tenantId ?? $this->tenant_id ?? (tenant_id() ?? 1);
         return app(\App\Domains\Accounting\Services\AccountResolverService::class)->resolveInventoryAccount($this, $tenantId);
     }
+
+    public function getHsnCodeAttribute(): ?string
+    {
+        return $this->hsn_sac;
+    }
+
+    public function getHsnAttribute(): ?string
+    {
+        return $this->hsn_sac;
+    }
 }
 

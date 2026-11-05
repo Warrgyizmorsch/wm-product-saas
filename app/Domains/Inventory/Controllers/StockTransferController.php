@@ -112,7 +112,7 @@ class StockTransferController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($validated, $tenantId) {
+            $transfer = DB::transaction(function () use ($validated, $tenantId) {
                 // Stock Availability Verification against From Warehouse
                 foreach ($validated['items'] as $item) {
                     $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
@@ -159,7 +159,11 @@ class StockTransferController extends Controller
                         'serial_numbers' => !empty($item['serial_numbers']) ? explode(',', $item['serial_numbers']) : null,
                     ]);
                 }
+
+                return $transfer;
             });
+
+            \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferCreated($transfer);
         } catch (\Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
@@ -205,12 +209,7 @@ class StockTransferController extends Controller
             ]);
         });
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.transfer.dispatched', [
-            'transfer_no' => $transfer->transfer_number,
-            'from_warehouse' => $transfer->fromWarehouse?->name ?? 'Origin Warehouse',
-            'to_warehouse' => $transfer->toWarehouse?->name ?? 'Destination Warehouse',
-            'items_count' => (string) $transfer->items()->count(),
-        ], route('inventory.transfers.show', $transfer->id), $transfer);
+        \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferDispatched($transfer);
 
         return back()->with('success', 'Stock Transfer dispatched and items are now In-Transit.');
     }
@@ -258,12 +257,7 @@ class StockTransferController extends Controller
             ]);
         });
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('inventory.transfer.received', [
-            'transfer_no' => $transfer->transfer_number,
-            'from_warehouse' => $transfer->fromWarehouse?->name ?? 'Origin Warehouse',
-            'to_warehouse' => $transfer->toWarehouse?->name ?? 'Destination Warehouse',
-            'received_by' => Auth::user()?->name ?? 'Warehouse Staff',
-        ], route('inventory.transfers.show', $transfer->id), $transfer);
+        \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferReceived($transfer);
 
         return back()->with('success', 'Stock Transfer successfully received at destination warehouse.');
     }
@@ -277,6 +271,9 @@ class StockTransferController extends Controller
         }
 
         $transfer->update(['status' => 'Cancelled']);
+
+        \App\Domains\Inventory\Services\InventoryNotificationService::notifyTransferCancelled($transfer);
+
         return back()->with('success', 'Stock Transfer cancelled.');
     }
 }

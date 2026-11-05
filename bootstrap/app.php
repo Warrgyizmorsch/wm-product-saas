@@ -36,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \App\Http\Middleware\RequirePermission::class,
             'platform.admin' => \App\Http\Middleware\EnsurePlatformAdmin::class,
             'platform.audit' => \App\Http\Middleware\RecordPlatformAudit::class,
+            'accounting.api.module' => \App\Http\Middleware\EnsureAccountingApiModule::class,
             'production.api.secret' => \App\Http\Middleware\ProductionApiSecretMiddleware::class,
             'production.api.tenant' => \App\Http\Middleware\ProductionTenantEnforcementMiddleware::class,
             'production.api.idempotency' => \App\Http\Middleware\ProductionIdempotencyMiddleware::class,

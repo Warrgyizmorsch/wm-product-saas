@@ -81,9 +81,7 @@ class PipApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', $this->getTenantId())
-            ->first();
+        return Employee::resolveForUser($user, $this->getTenantId());
     }
 
     /**

@@ -130,6 +130,7 @@
     </main>
 
     @include('layouts.partials.scripts')
+    @include('partials.mossie-widget')
 </body>
 
 </html>

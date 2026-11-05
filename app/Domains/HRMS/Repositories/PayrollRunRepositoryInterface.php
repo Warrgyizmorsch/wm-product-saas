@@ -21,7 +21,9 @@ interface PayrollRunRepositoryInterface
 
     public function toggleHold(Employee $employee, string $month, ?string $targetMonth): string;
 
-    public function getMySalaryData(Employee $employee): array;
+    public function getMySalaryData(Employee $employee, array $inputs = []): array;
+
+    public function getRangePayslipsData(Employee $employee, string $fromMonth, string $toMonth): array;
 
     public function storeBulkAdhoc(array $validated): array;
 

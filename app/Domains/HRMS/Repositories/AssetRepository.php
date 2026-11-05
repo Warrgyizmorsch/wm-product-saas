@@ -402,6 +402,12 @@ class AssetRepository implements AssetRepositoryInterface
 
     public function allocateAsset(Asset $asset, array $validated): bool
     {
+        if ($asset->status !== 'available' || $asset->assigned_employee_id !== null) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'asset' => "Asset '{$asset->asset_code}' is currently {$asset->status} and cannot be allocated. Only available assets can be allocated.",
+            ]);
+        }
+
         $hasRequestColumn = Schema::hasColumn('assets', 'asset_request_id');
         $updateData = [
             'status'               => 'allocated',
@@ -445,6 +451,12 @@ class AssetRepository implements AssetRepositoryInterface
 
     public function returnAsset(Asset $asset, array $validated): bool
     {
+        if ($asset->status !== 'allocated' && $asset->assigned_employee_id === null) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'asset' => "Asset '{$asset->asset_code}' is not currently allocated to any employee.",
+            ]);
+        }
+
         $returnCondition = $validated['condition_on_return'] ?? ($validated['return_condition'] ?? $asset->condition);
         $newStatus = 'available';
         if ($returnCondition === 'damaged') {

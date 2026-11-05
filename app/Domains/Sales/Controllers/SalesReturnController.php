@@ -371,12 +371,7 @@ class SalesReturnController extends Controller
             return $salesReturn;
         });
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.return.created', [
-            'doc_no' => $returnOrder->return_number,
-            'customer_name' => $returnOrder->customer?->name ?? 'Customer',
-            'reason' => $returnOrder->reason ?? 'Return requested',
-            'date' => $returnOrder->return_date ? (is_string($returnOrder->return_date) ? $returnOrder->return_date : $returnOrder->return_date->format('Y-m-d')) : now()->format('Y-m-d'),
-        ], route('sales.returns.show', $returnOrder->id), $returnOrder);
+        \App\Domains\Sales\Services\SalesNotificationService::notifyReturnCreated($returnOrder);
 
         return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} recorded successfully.");
     }
@@ -508,6 +503,8 @@ class SalesReturnController extends Controller
         });
 
         event(new \App\Domains\Sales\Events\SalesReturnApproved($returnOrder));
+
+        \App\Domains\Sales\Services\SalesNotificationService::notifyReturnApproved($returnOrder);
 
         return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} approved and stock restored to inventory successfully.");
     }

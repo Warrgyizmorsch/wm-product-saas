@@ -67,12 +67,7 @@ class AssetApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -384,6 +379,10 @@ class AssetApiController extends Controller
             return $this->sendError("Asset with ID '{$id}' not found.", 404);
         }
 
+        if ($asset->status !== 'available' || $asset->assigned_employee_id !== null) {
+            return $this->sendError("Cannot allocate asset '{$asset->asset_code}' because its current status is '{$asset->status}'. Only available assets can be allocated.", 422);
+        }
+
         $validated = $request->validate([
             'assigned_employee_id' => 'required|exists:employees,id',
             'allocated_at'         => 'required|date',
@@ -430,6 +429,10 @@ class AssetApiController extends Controller
         $asset = Asset::find($id);
         if (!$asset) {
             return $this->sendError("Asset with ID '{$id}' not found.", 404);
+        }
+
+        if ($asset->status !== 'allocated' && $asset->assigned_employee_id === null) {
+            return $this->sendError("Cannot return asset '{$asset->asset_code}' because it is not currently allocated to any employee.", 422);
         }
 
         $validated = $request->validate([

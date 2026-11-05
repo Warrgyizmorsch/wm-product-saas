@@ -255,16 +255,16 @@ class PipService
 
             // Handle Employee Stage side-effects according to enterprise standards
             if ($pip->employee) {
-                if (in_array($outcome, ['successful_completion', 'completed_success'])) {
+                if (in_array($canonicalOutcome, ['successful_completion', 'completed_success'])) {
                     $pip->employee->update(['employee_stage' => 'Active']);
-                } elseif (in_array($outcome, ['termination', 'failed_terminated'])) {
+                } elseif (in_array($canonicalOutcome, ['termination', 'failed_terminated'])) {
                     $pip->employee->update(['employee_stage' => 'Terminated']);
                 }
             }
 
             // Dispatch Outcome Notifications
             try {
-                $outcomeLabel = ucwords(str_replace('_', ' ', $outcome));
+                $outcomeLabel = ucwords(str_replace('_', ' ', $canonicalOutcome));
                 $pip->loadMissing(['employee', 'manager']);
 
                 if ($pip->employee) {

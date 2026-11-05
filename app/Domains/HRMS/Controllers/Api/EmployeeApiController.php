@@ -73,12 +73,7 @@ class EmployeeApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -519,7 +514,7 @@ class EmployeeApiController extends Controller
 
         $validated = $request->validate([
             'salary_component_id' => 'required|exists:salary_components,id',
-            'amount'              => 'required|numeric|min:0',
+            'amount'              => 'required|numeric|min:0|max:99999999.99',
             'payroll_month'       => 'required|regex:/^\d{4}-\d{2}$/',
             'remarks'             => 'nullable|string|max:500',
         ]);
@@ -901,11 +896,11 @@ class EmployeeApiController extends Controller
             return $this->sendError('Unauthorized action.', 403);
         }
 
-        $columns = ['full_name', 'personal_email', 'employee_id', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
+        $columns = ['full_name', 'personal_email', 'employee_id', 'company_id', 'department_id', 'designation_id', 'job_title', 'date_of_joining', 'gender'];
         $callback = static function () use ($columns): void {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
-            fputcsv($file, ['Jane Doe', 'jane.doe@example.com', 'EMP-0001', '1', '1', '1', '2026-01-15', 'female']);
+            fputcsv($file, ['Jane Doe', 'jane.doe@example.com', 'EMP-0001', '1', '1', '1', 'Software Engineer', '2026-01-15', 'Female']);
             fclose($file);
         };
 
@@ -947,7 +942,7 @@ class EmployeeApiController extends Controller
 
         $header = array_map(static fn ($value) => strtolower(trim((string) $value)), $header);
         $required = ['full_name', 'company_id', 'department_id', 'designation_id', 'date_of_joining', 'gender'];
-        $optional = ['employee_id', 'personal_email'];
+        $optional = ['employee_id', 'personal_email', 'job_title', 'office_email'];
         $colIndex = [];
         foreach (array_merge($required, $optional) as $column) {
             $colIndex[$column] = array_search($column, $header, true);
@@ -970,6 +965,13 @@ class EmployeeApiController extends Controller
                 continue;
             }
 
+            $rawGender = trim($row[$colIndex['gender']] ?? '');
+            $normalizedGender = ucfirst(strtolower($rawGender));
+            $designationId = trim($row[$colIndex['designation_id']] ?? '');
+            $jobTitle = ($colIndex['job_title'] !== false && !empty($row[$colIndex['job_title']]))
+                ? trim($row[$colIndex['job_title']])
+                : (Designation::find($designationId)?->name ?: 'Employee');
+
             $rowData = [
                 'tenant_id' => $tenantId,
                 'full_name' => trim($row[$colIndex['full_name']] ?? ''),
@@ -977,9 +979,10 @@ class EmployeeApiController extends Controller
                 'employee_id' => $colIndex['employee_id'] !== false ? trim($row[$colIndex['employee_id']] ?? '') : null,
                 'company_id' => trim($row[$colIndex['company_id']] ?? ''),
                 'department_id' => trim($row[$colIndex['department_id']] ?? ''),
-                'designation_id' => trim($row[$colIndex['designation_id']] ?? ''),
+                'designation_id' => $designationId,
+                'job_title' => $jobTitle,
                 'date_of_joining' => trim($row[$colIndex['date_of_joining']] ?? ''),
-                'gender' => trim($row[$colIndex['gender']] ?? ''),
+                'gender' => $normalizedGender,
                 'status' => true,
             ];
 
@@ -992,13 +995,38 @@ class EmployeeApiController extends Controller
                 'company_id' => 'required|exists:companies,id',
                 'department_id' => 'required|exists:departments,id',
                 'designation_id' => 'required|exists:designations,id',
+                'job_title' => 'required|string|max:255',
                 'date_of_joining' => 'required|date',
-                'gender' => 'required|string|max:50',
+                'gender' => ['required', Rule::in(['Male', 'Female', 'Other'])],
             ]);
 
             if ($validator->fails()) {
                 $warnings[] = 'Row ' . $rowNum . ': ' . implode(' ', $validator->errors()->all());
                 continue;
+            }
+
+            // Provision User account so imported employee can log in
+            $userEmail = !empty($rowData['personal_email']) ? $rowData['personal_email'] : null;
+            if (empty($userEmail) && !empty($rowData['employee_id'])) {
+                $appHost = parse_url(config('app.url', 'company.com'), PHP_URL_HOST) ?: 'company.com';
+                $userEmail = strtolower($rowData['employee_id']) . '@' . $appHost;
+            }
+
+            if (!empty($userEmail)) {
+                $existingUser = \App\Models\User::where('tenant_id', $tenantId)->where('email', $userEmail)->first();
+                if ($existingUser) {
+                    $rowData['user_id'] = $existingUser->id;
+                } else {
+                    $newUser = \App\Models\User::create([
+                        'tenant_id'     => $tenantId,
+                        'company_id'    => $rowData['company_id'],
+                        'department_id' => $rowData['department_id'],
+                        'name'          => $rowData['full_name'],
+                        'email'         => $userEmail,
+                        'password'      => \Illuminate\Support\Facades\Hash::make('password123'),
+                    ]);
+                    $rowData['user_id'] = $newUser->id;
+                }
             }
 
             Employee::create($rowData);

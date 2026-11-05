@@ -39,4 +39,9 @@ class PayrollRun extends BaseModel
     {
         return $this->belongsTo(User::class, 'processed_by');
     }
+
+    public function payslips()
+    {
+        return $this->hasMany(PayrollPayslip::class, 'payroll_run_id');
+    }
 }

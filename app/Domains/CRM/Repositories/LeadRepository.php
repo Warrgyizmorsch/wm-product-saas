@@ -267,6 +267,8 @@ class LeadRepository
             "Lead converted into Deal #{$deal->deal_number}"
         );
 
+        \App\Domains\CRM\Services\CrmNotificationService::notifyLeadConverted($lead, $deal);
+
         return $updated;
     }
 
@@ -288,6 +290,9 @@ class LeadRepository
                 $newOwnerName,
                 "Lead owner updated from {$oldOwnerName} to {$newOwnerName}"
             );
+            if (!empty($ownerId)) {
+                \App\Domains\CRM\Services\LeadService::notifyLeadAssigned($lead, $ownerId, auth()->id());
+            }
         }
 
         return $updated;

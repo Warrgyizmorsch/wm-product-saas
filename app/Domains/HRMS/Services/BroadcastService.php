@@ -211,6 +211,46 @@ class BroadcastService
             ->whereNull('delivered_at')
             ->update(['delivered_at' => Carbon::now()]);
 
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.broadcast.published', [
+                'tenant_id'    => $broadcast->tenant_id,
+                'broadcast_no' => 'BC-' . str_pad($broadcast->id, 4, '0', STR_PAD_LEFT),
+                'title'        => $broadcast->title,
+                'priority'     => ucfirst($broadcast->priority),
+                'published_by' => auth()->user()?->name ?? 'HR Management',
+            ], $broadcast);
+
+            // Dispatch Real-time Pusher & In-App Bell Notifications to all targeted employees
+            $receipts = BroadcastReceipt::where('broadcast_id', $broadcast->id)
+                ->with(['employee'])
+                ->get();
+            $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.broadcasts.show')
+                ? route('hrms.broadcasts.show', $broadcast->id)
+                : url('/hrms/broadcasts/' . $broadcast->id);
+            $cleanTitle = '📢 ' . ($broadcast->title ?: 'Company Announcement');
+            $cleanMsg = \Illuminate\Support\Str::limit(strip_tags($broadcast->message ?? $broadcast->content ?? ''), 120);
+
+            $targetUserIds = $receipts->pluck('employee.user_id')->filter()->unique()->all();
+            if (!empty($targetUserIds)) {
+                \App\Services\Notification\NotificationService::sendToUserIds(
+                    userIds: $targetUserIds,
+                    title: $cleanTitle,
+                    message: $cleanMsg,
+                    actionUrl: $actionUrl,
+                    module: 'hrms',
+                    type: 'broadcast_published',
+                    iconClass: 'feather-volume-2',
+                    extraData: [
+                        'broadcast_id' => $broadcast->id,
+                        'priority'     => $broadcast->priority,
+                        'tenant_id'    => $broadcast->tenant_id,
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed for broadcast: " . $e->getMessage());
+        }
+
         if (!empty($broadcast->send_email)) {
             $this->dispatchBroadcastEmails($broadcast);
         }

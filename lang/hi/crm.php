@@ -2311,5 +2311,12 @@ return array (
   'date_label' => 'दिनांक',
   'meetings_geo_verification' => 'भू-सत्यापन (Geo-Verification):',
   'download_pdf' => 'PDF डाउनलोड करें',
+
+  // Customer Edit Screen
+  'edit_customer' => 'ग्राहक संपादित करें',
+  'opening_balance' => 'प्रारंभिक शेष',
+  'linked_to_crm_account' => 'सीआरएम खाते से लिंक',
+  'update_customer' => 'ग्राहक अपडेट करें',
+  'update' => 'अपडेट करें',
 );
 

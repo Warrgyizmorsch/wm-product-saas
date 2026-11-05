@@ -198,6 +198,11 @@ class ShiftChangeRequestApiController extends Controller
             'attachment'         => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
+        // Default boundary for recurring shift if omitted by the client to prevent unbounded recurring schedules
+        if ($validated['type'] === 'recurring' && empty($validated['end_date'])) {
+            $validated['end_date'] = Carbon::parse($validated['start_date'])->addDays(90)->toDateString();
+        }
+
         $employee = $this->getAuthenticatedEmployee();
         $isHrAdmin = $this->isHrAdmin();
 

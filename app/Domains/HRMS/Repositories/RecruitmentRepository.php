@@ -203,7 +203,25 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             $updateData['approved_at'] = null;
         }
 
-        return $requisition->update($updateData);
+        $updated = $requisition->update($updateData);
+
+        if ($updated && $requisition->requested_by_employee_id) {
+            try {
+                $statusLabel = ucfirst(str_replace('_', ' ', $status));
+                NotificationService::sendToEmployee(
+                    employee: $requisition->requested_by_employee_id,
+                    title: "Job Requisition {$statusLabel}",
+                    message: "Job Requisition #{$requisition->requisition_code} ({$requisition->job_title}) is now {$statusLabel}.",
+                    actionUrl: route('hrms.recruitment.requisitions.index'),
+                    type: 'requisition_' . $status,
+                    iconClass: $status === 'approved' ? 'feather-check-circle' : 'feather-briefcase'
+                );
+            } catch (\Throwable $e) {
+                // Silently skip if notification fails
+            }
+        }
+
+        return $updated;
     }
 
     public function getCandidatesData(array $inputs, ?int $tenantId): array
@@ -391,11 +409,19 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         $req = $application->requisition;
         if ($req) {
             if ($oldStage !== 'hired' && $newStage === 'hired') {
-                if ($req->vacancies > 0) {
-                    $req->decrement('vacancies');
-                    if ($req->fresh()->vacancies === 0) {
-                        $req->update(['status' => 'closed']);
-                    }
+                if ($req->vacancies <= 0) {
+                    return ['success' => false, 'message' => 'Cannot hire candidate. All vacancies for this job requisition have already been filled.'];
+                }
+                $affected = JobRequisition::where('id', $req->id)
+                    ->where('vacancies', '>', 0)
+                    ->decrement('vacancies');
+
+                if ($affected === 0) {
+                    return ['success' => false, 'message' => 'Concurrent hire conflict: all vacancies for this requisition have already been filled.'];
+                }
+
+                if ($req->fresh()->vacancies === 0) {
+                    $req->update(['status' => 'closed']);
                 }
             } elseif ($oldStage === 'hired' && $newStage !== 'hired') {
                 $req->increment('vacancies');
@@ -664,6 +690,14 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
                 'job_offer_created',
                 'feather-file-text'
             );
+
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.letter_issued', [
+                'tenant_id'     => $tenantId,
+                'employee_name' => $candidateName,
+                'letter_type'   => 'Job Offer Letter',
+                'ref_no'        => $code,
+                'issued_date'   => now()->format('d M Y'),
+            ], $offer);
         } catch (\Throwable $e) {
             // Suppress notification errors
         }
@@ -735,14 +769,13 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             </html>
         ";
 
-        $tempPath = storage_path("app/public/recruitment/offers/{$pdfFileName}");
-        if (!file_exists(dirname($tempPath))) {
-            mkdir(dirname($tempPath), 0755, true);
-        }
+        $storagePath = "tenants/{$tenantId}/recruitment/offers/{$pdfFileName}";
+        $pdfOutput = null;
 
         try {
             $pdf = Pdf::loadHTML($pdfHtml)->setPaper('a4', 'portrait');
-            file_put_contents($tempPath, $pdf->output());
+            $pdfOutput = $pdf->output();
+            tenant_storage()->put('public', $storagePath, $pdfOutput, (int) $tenantId);
         } catch (\Throwable $pe) {
             Log::error("Failed to generate offer PDF: " . $pe->getMessage());
         }
@@ -770,9 +803,18 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
         ";
 
         $attachments = [];
-        if (file_exists($tempPath)) {
+        $resolvedPath = null;
+        if (Storage::disk('public')->exists($storagePath)) {
+            try {
+                $resolvedPath = Storage::disk('public')->path($storagePath);
+            } catch (\Throwable $te) {
+                $resolvedPath = null;
+            }
+        }
+
+        if ($resolvedPath && file_exists($resolvedPath)) {
             $attachments[] = [
-                'path' => $tempPath,
+                'path' => $resolvedPath,
                 'name' => $pdfFileName,
                 'mime' => 'application/pdf',
             ];
@@ -792,14 +834,18 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             return ['success' => true, 'message' => "📧 Job Offer PDF document (#{$offer->offer_code}) sent successfully to {$validated['to_email']}!"];
         } catch (\Throwable $e) {
             try {
-                Mail::send([], [], function ($msg) use ($validated, $coverEmailBody, $tempPath, $pdfFileName) {
+                Mail::send([], [], function ($msg) use ($validated, $coverEmailBody, $resolvedPath, $pdfOutput, $pdfFileName) {
                     $msg->to($validated['to_email'])
                         ->subject($validated['subject'])
                         ->html($coverEmailBody);
 
-                    if (file_exists($tempPath)) {
-                        $msg->attach($tempPath, [
+                    if ($resolvedPath && file_exists($resolvedPath)) {
+                        $msg->attach($resolvedPath, [
                             'as'   => $pdfFileName,
+                            'mime' => 'application/pdf',
+                        ]);
+                    } elseif ($pdfOutput) {
+                        $msg->attachData($pdfOutput, $pdfFileName, [
                             'mime' => 'application/pdf',
                         ]);
                     }
@@ -904,9 +950,15 @@ class RecruitmentRepository implements RecruitmentRepositoryInterface
             ]);
 
             $req = $application->requisition;
-            if ($req && $req->vacancies > 0) {
-                $req->decrement('vacancies');
-                if ($req->fresh()->vacancies === 0) {
+            if ($req) {
+                if ($req->vacancies <= 0) {
+                    return ['success' => false, 'message' => 'Cannot convert candidate to employee. All vacancies for this requisition have already been filled.'];
+                }
+                $affected = JobRequisition::where('id', $req->id)
+                    ->where('vacancies', '>', 0)
+                    ->decrement('vacancies');
+
+                if ($affected > 0 && $req->fresh()->vacancies === 0) {
                     $req->update(['status' => 'closed']);
                 }
             }

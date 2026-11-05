@@ -29,6 +29,10 @@ class RecruitmentController extends Controller
             abort(401);
         }
 
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
+            return;
+        }
+
         $access = app(AccessService::class);
         $context = ['tenant_id' => $user->tenant_id];
 

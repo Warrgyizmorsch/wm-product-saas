@@ -143,6 +143,12 @@ class LeadAssignmentService
             } catch (\Throwable $e) {
                 Log::warning('LeadAssignmentService LeadHistory log error: ' . $e->getMessage());
             }
+
+            try {
+                LeadService::notifyLeadAssigned($lead, $assignedOwnerId, auth()->id());
+            } catch (\Throwable $e) {
+                Log::warning('LeadAssignmentService notifyLeadAssigned error: ' . $e->getMessage());
+            }
         }
 
         return [

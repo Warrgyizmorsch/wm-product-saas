@@ -95,9 +95,6 @@
                 <a href="{{ route('platform.notification-rules.index', ['module' => 'hrms']) }}" class="btn btn-sm {{ request('module') === 'hrms' ? 'btn-primary' : 'btn-light border' }}">
                     {{ __('ui.hrms') }}
                 </a>
-                <a href="{{ route('platform.notification-rules.index', ['module' => 'document']) }}" class="btn btn-sm {{ request('module') === 'document' ? 'btn-primary' : 'btn-light border' }}">
-                    Documents
-                </a>
             </div>
 
             <form method="GET" action="{{ route('platform.notification-rules.index') }}" class="d-flex align-items-center gap-2">

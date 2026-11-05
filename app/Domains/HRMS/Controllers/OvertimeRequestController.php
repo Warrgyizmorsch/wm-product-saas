@@ -37,7 +37,14 @@ class OvertimeRequestController extends Controller
         ]);
 
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.overtime.approve') ||
+            $user->hasHrPermission('hrms.overtime.view') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $currentEmp = Employee::resolveForUser($user);
             if ($currentEmp) {
@@ -124,12 +131,22 @@ class OvertimeRequestController extends Controller
         $validated['employee_id']             = $employee->id;
         $validated['company_id']              = $employee->company_id ?? ($user?->company_id ?? 1);
 
-        DB::transaction(function () use ($validated, $request) {
+        $otRequest = DB::transaction(function () use ($validated, $request) {
             return $this->overtimeRepository->storeOvertimeRequest($validated, $request);
         });
 
         // Safely dispatch notifications to HR Admins & Reporting Manager
         try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.overtime.applied', [
+                'tenant_id'     => $employee->tenant_id,
+                'employee_name' => $employee->full_name,
+                'hours'         => (string) $durationHours,
+                'date'          => \Carbon\Carbon::parse($validated['date'])->format('d M Y'),
+                'reason'        => $validated['reason'] ?? 'Not specified',
+                'employee_id'   => $employee->id,
+                'user_id'       => $employee->user_id,
+            ], $otRequest);
+
             $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
             \App\Services\Notification\NotificationService::sendToHrAdmins(
                 title: 'New Overtime Request',
@@ -172,11 +189,20 @@ class OvertimeRequestController extends Controller
         $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $actorEmpId = $workflowService->getEmployeeIdForActor($user);
         if ($actorEmpId && (int) $actorEmpId === (int) $overtimeRequest->employee_id) {
-            abort(403, 'Self-approval is prohibited. You cannot approve your own Overtime request.');
+            if (!$workflowService->allowsSelfApproval($user, $overtimeRequest, 'hrms.overtime.approve')) {
+                abort(403, 'Self-approval is prohibited. You cannot approve your own Overtime request.');
+            }
         }
 
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
+        $canApprove = $workflowService->canApprove($user, $overtimeRequest->employee, $overtimeRequest, 'hrms.overtime.approve')
+            || ($user && (
+                $user->hasHrPermission('hrms.overtime.approve') ||
+                $user->hasHrPermission('hr.settings.manage') ||
+                $user->hasHrPermission('hrms.roster.manage') ||
+                $user->hasHrPermission('hrms.shift_roster.manage') ||
+                $workflowService->isHrOrAdminActor($user)
+            ));
+        abort_unless($canApprove, 403, 'Unauthorized to process this overtime request.');
 
         if ($overtimeRequest->status === 'cancelled') {
             return redirect()->back()->with('error', __('hrms.overtime.cancelled_status_error'));
@@ -209,6 +235,18 @@ class OvertimeRequestController extends Controller
 
         // Safely notify Employee
         try {
+            if ($action === 'approved') {
+                \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.overtime.approved', [
+                    'tenant_id'     => $overtimeRequest->tenant_id,
+                    'employee_name' => $overtimeRequest->employee?->full_name ?? 'Employee',
+                    'date'          => \Carbon\Carbon::parse($overtimeRequest->date)->format('d M Y'),
+                    'hours'         => (string) ($approvedHours ?? $overtimeRequest->duration_hours),
+                    'approved_by'   => auth()->user()?->name ?? 'Manager',
+                    'employee_id'   => $overtimeRequest->employee_id,
+                    'user_id'       => $overtimeRequest->employee?->user_id,
+                ], $overtimeRequest);
+            }
+
             if ($overtimeRequest->employee_id) {
                 $actionUrl = Route::has('hrms.shift-overtime.index') ? route('hrms.shift-overtime.index', ['tab' => 'overtime']) : url('/hrms/shift-overtime?tab=overtime');
                 \App\Services\Notification\NotificationService::sendToEmployee(
@@ -230,7 +268,13 @@ class OvertimeRequestController extends Controller
     public function withdraw(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.overtime.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $overtimeRequest->employee_id !== $employee->id) {
@@ -256,7 +300,13 @@ class OvertimeRequestController extends Controller
     public function requestCancellation(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.overtime.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $overtimeRequest->employee_id !== $employee->id) {
@@ -308,9 +358,18 @@ class OvertimeRequestController extends Controller
 
     public function approveCancellation(OvertimeRequest $overtimeRequest): RedirectResponse
     {
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
+        $canApprove = $user && (
+            ($overtimeRequest->employee && $workflowService->canApprove($user, $overtimeRequest->employee, $overtimeRequest, 'hrms.overtime.approve'))
+            || (
+                $user->hasHrPermission('hrms.overtime.approve') ||
+                $user->hasHrPermission('hr.settings.manage') ||
+                $user->hasHrPermission('hrms.roster.manage') ||
+                $user->hasHrPermission('hrms.shift_roster.manage') ||
+                $workflowService->isHrOrAdminActor($user)
+            ));
+        abort_unless($canApprove, 403, 'Unauthorized to process this overtime cancellation.');
 
         DB::transaction(function () use ($overtimeRequest) {
             $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();
@@ -344,9 +403,18 @@ class OvertimeRequestController extends Controller
 
     public function denyCancellation(OvertimeRequest $overtimeRequest): RedirectResponse
     {
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
+        $canApprove = $user && (
+            ($overtimeRequest->employee && $workflowService->canApprove($user, $overtimeRequest->employee, $overtimeRequest, 'hrms.overtime.approve'))
+            || (
+                $user->hasHrPermission('hrms.overtime.approve') ||
+                $user->hasHrPermission('hr.settings.manage') ||
+                $user->hasHrPermission('hrms.roster.manage') ||
+                $user->hasHrPermission('hrms.shift_roster.manage') ||
+                $workflowService->isHrOrAdminActor($user)
+            ));
+        abort_unless($canApprove, 403, 'Unauthorized to process this overtime cancellation.');
 
         DB::transaction(function () use ($overtimeRequest) {
             $locked = OvertimeRequest::whereKey($overtimeRequest->id)->lockForUpdate()->firstOrFail();

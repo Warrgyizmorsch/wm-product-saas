@@ -69,7 +69,10 @@
                                     <option value="" disabled>{{ __('crm.no_unbilled_sales_orders') }}</option>
                                 @endif
                                 @foreach ($salesOrders as $so)
-                                    <option value="{{ $so->id }}" @selected($salesOrder?->id == $so->id)>
+                                    <option value="{{ $so->id }}" 
+                                        data-billing="{{ $so->billing_address ?: $so->customer?->billing_address }}" 
+                                        data-shipping="{{ $so->shipping_address ?: ($so->customer?->shipping_address ?: ($so->billing_address ?: $so->customer?->billing_address)) }}"
+                                        @selected($salesOrder?->id == $so->id)>
                                         {{ $so->sales_order_number }} (Customer: {{ $so->customer?->name }})
                                     </option>
                                 @endforeach
@@ -82,7 +85,10 @@
                             <x-ui.odoo-form-ui type="select" :label="__('crm.dispatch_order_reference')" name="dispatch_order_id" id="dispatchOrderSelect" class="odoo-select2" :required="true">
                                 <option value="">{{ __('crm.select_dispatch_order_ph') }}</option>
                                 @foreach ($dispatchOrders as $do)
-                                    <option value="{{ $do->id }}" @selected($dispatchOrder?->id == $do->id)>
+                                    <option value="{{ $do->id }}" 
+                                        data-billing="{{ $do->salesOrder?->billing_address ?: $do->salesOrder?->customer?->billing_address }}" 
+                                        data-shipping="{{ $do->salesOrder?->shipping_address ?: ($do->salesOrder?->customer?->shipping_address ?: ($do->salesOrder?->billing_address ?: $do->salesOrder?->customer?->billing_address)) }}"
+                                        @selected($dispatchOrder?->id == $do->id)>
                                         {{ $do->dispatch_number }} (SO: {{ $do->salesOrder?->sales_order_number }} - Customer: {{ $do->salesOrder?->customer?->name }})
                                     </option>
                                 @endforeach
@@ -98,7 +104,10 @@
                             <x-ui.odoo-form-ui type="select" :label="__('crm.customer')" name="customer_id" id="directCustomerSelect" class="odoo-select2" :required="true">
                                 <option value="">{{ __('crm.select_customer_ph') }}</option>
                                 @foreach ($customers as $c)
-                                    <option value="{{ $c->id }}" @selected(old('customer_id', $customerId ?? request('customer_id')) == $c->id)>
+                                    <option value="{{ $c->id }}" 
+                                        data-billing="{{ $c->billing_address ?? '' }}" 
+                                        data-shipping="{{ $c->shipping_address ?? ($c->billing_address ?? '') }}"
+                                        @selected(old('customer_id', $customerId ?? request('customer_id')) == $c->id)>
                                         {{ $c->name }} ({{ $c->company_name ?: 'Individual' }})
                                     </option>
                                 @endforeach
@@ -190,6 +199,50 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Billing & Shipping Address Section -->
+                @php
+                    $initialBilling = old('billing_address', $salesOrder?->billing_address ?: ($dispatchOrder?->salesOrder?->billing_address ?: ($salesOrder?->customer?->billing_address ?: ($dispatchOrder?->salesOrder?->customer?->billing_address ?: null))));
+                    if (!$initialBilling && isset($customerId)) {
+                        $initCust = $customers->firstWhere('id', $customerId);
+                        $initialBilling = $initCust?->billing_address;
+                    }
+                    $initialShipping = old('shipping_address', $salesOrder?->shipping_address ?: ($dispatchOrder?->salesOrder?->shipping_address ?: ($salesOrder?->customer?->shipping_address ?: ($dispatchOrder?->salesOrder?->customer?->shipping_address ?: $initialBilling))));
+                @endphp
+                <div class="row g-4 mt-1 border-top pt-3 fs-13 text-dark">
+                    <!-- Left: Billing Address -->
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1" style="height: 24px;">
+                            <label class="form-label mb-0 fs-12 fw-bold text-dark" for="invoiceBillingAddress">
+                                <i class="feather-map-pin me-1 text-primary"></i>{{ __('crm.billing_address') }}
+                            </label>
+                        </div>
+                        <textarea name="billing_address" 
+                                  id="invoiceBillingAddress" 
+                                  rows="2" 
+                                  class="form-control odoo-form-control" 
+                                  style="font-size: 13px; border: 1px solid #ced4da !important; border-radius: 4px !important; padding: 6px 8px !important; width: 100%;" 
+                                  placeholder="Street, Area, City, State - Pincode">{{ $initialBilling }}</textarea>
+                    </div>
+
+                    <!-- Right: Shipping Address -->
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1" style="height: 24px;">
+                            <label class="form-label mb-0 fs-12 fw-bold text-dark" for="invoiceShippingAddress">
+                                <i class="feather-truck me-1 text-info"></i>{{ __('crm.shipping_address') }}
+                            </label>
+                            <a href="javascript:void(0)" class="fs-11 text-primary fw-semibold d-inline-flex align-items-center" id="btnCopyBillingToShipping" title="Copy from Billing Address">
+                                <i class="feather-copy me-1"></i>Same as Billing
+                            </a>
+                        </div>
+                        <textarea name="shipping_address" 
+                                  id="invoiceShippingAddress" 
+                                  rows="2" 
+                                  class="form-control odoo-form-control" 
+                                  style="font-size: 13px; border: 1px solid #ced4da !important; border-radius: 4px !important; padding: 6px 8px !important; width: 100%;" 
+                                  placeholder="Destination site or delivery address">{{ $initialShipping }}</textarea>
                     </div>
                 </div>
 
@@ -1111,6 +1164,35 @@
 
             $(document).on('change', 'select[name="payment_terms"]', updateDueDateFromTerms);
             $(document).on('change', 'input[name="invoice_date"]', updateDueDateFromTerms);
+
+            // Auto-populate Billing & Shipping Address on Customer / SO / DO selection
+            $('#directCustomerSelect').on('change', function() {
+                var selected = $(this).find(':selected');
+                var billing = selected.data('billing') || '';
+                var shipping = selected.data('shipping') || billing;
+                $('#invoiceBillingAddress').val(billing);
+                $('#invoiceShippingAddress').val(shipping);
+            });
+
+            $('#salesOrderSelect').on('change', function() {
+                var selected = $(this).find(':selected');
+                var billing = selected.data('billing') || '';
+                var shipping = selected.data('shipping') || billing;
+                if (billing) $('#invoiceBillingAddress').val(billing);
+                if (shipping) $('#invoiceShippingAddress').val(shipping);
+            });
+
+            $('#dispatchOrderSelect').on('change', function() {
+                var selected = $(this).find(':selected');
+                var billing = selected.data('billing') || '';
+                var shipping = selected.data('shipping') || billing;
+                if (billing) $('#invoiceBillingAddress').val(billing);
+                if (shipping) $('#invoiceShippingAddress').val(shipping);
+            });
+
+            $('#btnCopyBillingToShipping').on('click', function() {
+                $('#invoiceShippingAddress').val($('#invoiceBillingAddress').val());
+            });
         });
     </script>
 @endpush

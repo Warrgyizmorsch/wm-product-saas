@@ -51,7 +51,8 @@ class VendorBillRepository
                 'vendor',
                 'purchaseOrder',
                 'items.product',
-                'payments'
+                'payments',
+                'purchaseReturns'
             ])
             ->findOrFail($id);
     }

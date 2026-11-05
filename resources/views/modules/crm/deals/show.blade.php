@@ -2697,11 +2697,11 @@
                                             @endif
 
                                             <!-- Dropdown Menu for More Options -->
-                                            <div class="dropdown">
-                                                <button class="btn btn-sm btn-light border fw-bold px-2.5 py-1.5 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ __('crm.more') }}">
+                                            <div class="dropdown position-relative">
+                                                <button class="btn btn-sm btn-light border fw-bold px-2.5 py-1.5 dropdown-toggle" type="button" id="dealQuotationMoreDropdown" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" title="{{ __('crm.more') }}">
                                                     <i class="feather-more-horizontal me-1"></i>{{ __('crm.more') }}
                                                 </button>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 fs-12">
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 fs-12 mt-1" aria-labelledby="dealQuotationMoreDropdown" style="min-width: 210px; right: 0 !important; left: auto !important; transform: none !important;">
                                                     <li>
                                                         <a class="dropdown-item" href="{{ route('crm.quotations.show', $activeQuotation->id) }}">
                                                             <i class="feather-eye me-2 text-info"></i>{{ __('crm.view_full_quotation_sheet') }}

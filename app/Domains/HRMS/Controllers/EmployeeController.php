@@ -325,12 +325,15 @@ class EmployeeController extends Controller
         }
 
         \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.employee.onboarded', [
+            'tenant_id'     => $employee->tenant_id,
             'employee_name' => $employee->full_name,
             'employee_code' => $employee->employee_id ?? ('EMP-' . $employee->id),
             'designation'   => $employee->designation?->name ?? 'Staff',
             'department'    => $employee->department?->name ?? 'General',
             'joining_date'  => $employee->date_of_joining ? \Carbon\Carbon::parse($employee->date_of_joining)->format('d M Y') : now()->format('d M Y'),
-        ]);
+            'employee_id'   => $employee->id,
+            'user_id'       => $employee->user_id,
+        ], $employee);
 
         return redirect()
             ->route('hrms.employees.index')
@@ -497,8 +500,10 @@ class EmployeeController extends Controller
                 }
             }
 
+            $tenantId = tenant_id() ?? $authUser->tenant_id ?? $employee->tenant_id;
+
             if ($request->hasFile('photo')) {
-                $tempPath = $request->file('photo')->storeTenantFile('employees/temp_requests', 'public');
+                $tempPath = $request->file('photo')->storeTenantFile("tenants/{$tenantId}/employees/temp_requests", 'public');
                 $changes['photo'] = [
                     'label'    => 'Profile Photo',
                     'old'      => $employee->photo ?: '—',
@@ -510,8 +515,6 @@ class EmployeeController extends Controller
             if (empty($changes)) {
                 return redirect()->back()->with('info', 'No changes were detected in your profile details.');
             }
-
-            $tenantId = tenant_id() ?? $authUser->tenant_id ?? $employee->tenant_id;
 
             \App\Domains\HRMS\Models\EmployeeProfileUpdateRequest::updateOrCreate(
                 [
@@ -527,6 +530,21 @@ class EmployeeController extends Controller
                     'reviewed_at'      => null,
                 ]
             );
+
+            try {
+                $actionUrl = \Illuminate\Support\Facades\Route::has('hrms.employees.profile-requests.index')
+                    ? route('hrms.employees.profile-requests.index')
+                    : url('/hrms/employees/profile-requests');
+                \App\Services\Notification\NotificationService::sendToHrAdmins(
+                    title: 'New Profile Update Request',
+                    message: "{$employee->full_name} submitted a request to update profile details.",
+                    actionUrl: $actionUrl,
+                    type: 'profile_update_request',
+                    iconClass: 'feather-user-check'
+                );
+            } catch (\Throwable $notifEx) {
+                \Illuminate\Support\Facades\Log::warning('Profile update request notification failed: ' . $notifEx->getMessage());
+            }
 
             return redirect()->back()->with('success', 'Your profile update request has been submitted to HR for review and approval.');
         }
@@ -667,17 +685,41 @@ class EmployeeController extends Controller
             'remarks'             => 'nullable|string|max:500',
         ]);
 
+        $payrollMonth = $validated['payroll_month'];
+
+        // Enforce: Check if payroll for this month is already locked or paid for this employee
+        $isLockedOrPaid = \App\Domains\HRMS\Models\PayrollRun::where('payroll_month', $payrollMonth)
+            ->whereIn('status', ['locked', 'paid'])
+            ->where(function ($q) use ($employee) {
+                $q->whereNull('employee_ids')
+                  ->orWhere('employee_ids', '[]')
+                  ->orWhereJsonContains('employee_ids', (int) $employee->id)
+                  ->orWhereJsonContains('employee_ids', (string) $employee->id);
+            })
+            ->when($employee->company_id, fn($q) => $q->where('company_id', $employee->company_id))
+            ->when($employee->pay_group_id, function ($q) use ($employee) {
+                $q->where(function ($sub) use ($employee) {
+                    $sub->whereNull('pay_group_id')
+                        ->orWhere('pay_group_id', $employee->pay_group_id);
+                });
+            })
+            ->exists();
+
+        if ($isLockedOrPaid) {
+            return redirect()->back()->with('error', "Cannot add ad-hoc component: Payroll for {$payrollMonth} is already locked or paid.");
+        }
+
         // Enforce Pay Group Variable / Ad-hoc Inputs Lock Day
         $employee->loadMissing('payGroup');
         if ($employee->payGroup && is_array($employee->payGroup->payroll_rules)) {
             $lockDay = (int) ($employee->payGroup->payroll_rules['variable_lock_day'] ?? 25);
-            $payrollMonth = $validated['payroll_month'];
             $currentMonth = \Carbon\Carbon::now()->format('Y-m');
             if ($payrollMonth === $currentMonth && \Carbon\Carbon::now()->day > $lockDay) {
                 return redirect()->back()->with('error', "Ad-hoc / Variable inputs for {$payrollMonth} are locked after day {$lockDay} of the month.");
             }
         }
 
+        $validated['tenant_id']   = $employee->tenant_id ?? tenant_id() ?? auth()->user()?->tenant_id ?? 1;
         $validated['employee_id'] = $employee->id;
         $validated['status']      = 'pending';
 
@@ -894,19 +936,27 @@ class EmployeeController extends Controller
             $catName = $documentMaster->category?->name ?? 'General';
         }
 
+        $targetDocModel = $document ?? ($existingDoc ?? ($createdDoc ?? null));
+
         \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.uploaded', [
+            'tenant_id'     => $tenantId,
             'employee_name' => $employee->full_name,
             'document_type' => $documentName ?? ($file->getClientOriginalName()),
             'category_name' => $catName ?? 'General Documents',
             'uploaded_at'   => now()->format('d M Y, h:i A'),
-        ]);
+            'employee_id'   => $employee->id,
+            'user_id'       => $employee->user_id,
+        ], $targetDocModel);
 
         if ($status === 'pending_signature') {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signature_requested', [
+                'tenant_id'      => $tenantId,
                 'employee_name'  => $employee->full_name,
                 'document_title' => $documentName ?? ($file->getClientOriginalName()),
                 'due_date'       => now()->addDays(7)->format('d M Y'),
-            ]);
+                'employee_id'    => $employee->id,
+                'user_id'        => $employee->user_id,
+            ], $targetDocModel);
         }
 
         return redirect()->back()->with('success', 'Document uploaded successfully.');
@@ -946,11 +996,14 @@ class EmployeeController extends Controller
 
         $emp = $document->documentable;
         \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.approved', [
+            'tenant_id'     => $document->tenant_id,
             'employee_name' => $emp?->full_name ?? 'Employee',
             'document_type' => $document->name ?? 'Document',
             'approved_by'   => auth()->user()?->name ?? 'HR Department',
             'date'          => now()->format('d M Y'),
-        ]);
+            'employee_id'   => $emp?->id,
+            'user_id'       => $emp?->user_id,
+        ], $document);
 
         return redirect()->back()->with('success', 'Document approved successfully.');
     }
@@ -965,11 +1018,14 @@ class EmployeeController extends Controller
 
         $emp = $document->documentable;
         \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.rejected', [
+            'tenant_id'     => $document->tenant_id,
             'employee_name' => $emp?->full_name ?? 'Employee',
             'document_type' => $document->name ?? 'Document',
             'reason'        => request('reason', 'Document rejected upon verification'),
             'rejected_by'   => auth()->user()?->name ?? 'HR Department',
-        ]);
+            'employee_id'   => $emp?->id,
+            'user_id'       => $emp?->user_id,
+        ], $document);
 
         return redirect()->back()->with('success', 'Document rejected successfully.');
     }
@@ -1031,10 +1087,13 @@ class EmployeeController extends Controller
 
         $emp = $document->documentable;
         \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.document.signed', [
+            'tenant_id'      => $document->tenant_id,
             'employee_name'  => $emp?->full_name ?? (auth()->user()?->name ?? 'Employee'),
             'document_title' => $document->name ?? 'Document',
             'signed_at'      => now()->format('d M Y, h:i A'),
-        ]);
+            'employee_id'    => $emp?->id,
+            'user_id'        => $emp?->user_id,
+        ], $document);
 
         return redirect()->back()->with('success', 'Document digitally signed successfully.');
     }
@@ -1124,8 +1183,12 @@ class EmployeeController extends Controller
 
     private function authorizeHrms(string|array $permission): void
     {
-        $permissions = is_array($permission) ? $permission : [$permission];
         $user = auth()->user();
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
+            return;
+        }
+
+        $permissions = is_array($permission) ? $permission : [$permission];
         $tenantId = $user?->tenant_id;
 
         $access = app(AccessService::class);

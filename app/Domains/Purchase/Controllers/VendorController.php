@@ -329,6 +329,15 @@ class VendorController extends Controller
             return $entry;
         });
 
+        $advances = \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('tenant_id', $tenantId)
+            ->where('vendor_id', $vendor->id)
+            ->with(['purchaseOrder', 'bankAccount'])
+            ->latest()
+            ->get();
+
+        $totalAdvancePaid = (float) $advances->where('status', '!=', 'cancelled')->sum('amount');
+        $availableAdvance = app(\App\Domains\Purchase\Services\VendorBillService::class)->getAvailableVendorAdvance($vendor->id, $tenantId);
+
         // With Accounting, the figures come from the books, so this page agrees
         // with Party Ledger and Bill Settlement: assets bought on credit,
         // vouchers and settlements count, not only Purchase's own documents.
@@ -338,12 +347,14 @@ class VendorController extends Controller
         if ($partyAccount->available()) {
             $summary = $partyAccount->summary('vendor', (int) $vendor->id);
             $totalBilled = $summary['billed'];
-            $totalPaid = $summary['paid'];
-            $billCount = $summary['bills'];
+            $totalPaid = max($totalPaid, (float) $summary['paid']);
+            $billCount = $summary['bills'] ?: $bills->count();
             $outstandingPayable = $summary['outstanding'];
-            $vendorAdvanceCredit = $summary['advance'];
+            $vendorAdvanceCredit = max((float) $summary['advance'], $availableAdvance);
             $overdueAmount = $summary['overdue'];
             $statement = $partyAccount->statement('vendor', (int) $vendor->id);
+        } else {
+            $vendorAdvanceCredit = max($vendorAdvanceCredit, $availableAdvance);
         }
 
         return view('modules.purchase.vendors.show', compact(
@@ -352,9 +363,12 @@ class VendorController extends Controller
             'vendor',
             'bills',
             'payments',
+            'advances',
             'purchaseOrders',
             'totalBilled',
             'totalPaid',
+            'totalAdvancePaid',
+            'availableAdvance',
             'outstandingPayable',
             'vendorAdvanceCredit',
             'overdueAmount',

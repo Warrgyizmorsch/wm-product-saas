@@ -114,9 +114,9 @@
 
                     var willShow = !menu.hasClass('show');
 
-                    // Close any other open dropdowns
-                    $('.dropdown-menu.show').not(menu).removeClass('show');
-                    $('.dropdown.show').not(parent).removeClass('show');
+                    // Close any other open action dropdowns
+                    $('.action-dropdown-wrapper .dropdown-menu.show').not(menu).removeClass('show');
+                    $('.action-dropdown-wrapper.show').not(parent).removeClass('show');
 
                     if (willShow) {
                         // Temporarily measure dimensions
@@ -168,26 +168,26 @@
 
                 // Close dropdown when clicking an item
                 $(document).on('click', '.action-dropdown-wrapper .dropdown-item', function () {
-                    $('.dropdown-menu.show').removeClass('show');
-                    $('.dropdown.show').removeClass('show');
+                    $('.action-dropdown-wrapper .dropdown-menu.show').removeClass('show');
+                    $('.action-dropdown-wrapper.show').removeClass('show');
                 });
 
                 // Close dropdown when clicking outside
                 $(document).on('click', function (e) {
-                    if (!$(e.target).closest('.dropdown-menu').length && !$(e.target).closest('.dropdown-toggle-custom').length) {
-                        $('.dropdown-menu.show').removeClass('show');
-                        $('.dropdown.show').removeClass('show');
+                    if (!$(e.target).closest('.action-dropdown-wrapper .dropdown-menu').length && !$(e.target).closest('.action-dropdown-wrapper .dropdown-toggle-custom').length) {
+                        $('.action-dropdown-wrapper .dropdown-menu.show').removeClass('show');
+                        $('.action-dropdown-wrapper.show').removeClass('show');
                     }
                 });
 
                 // Close dropdown when scrolling table or window so it doesn't float disconnected
                 window.addEventListener('scroll', function (e) {
-                    if (e.target && $(e.target).closest('.dropdown-menu').length) {
+                    if (e.target && $(e.target).closest('.action-dropdown-wrapper .dropdown-menu').length) {
                         return;
                     }
-                    if ($('.dropdown-menu.show').length) {
-                        $('.dropdown-menu.show').removeClass('show');
-                        $('.dropdown.show').removeClass('show');
+                    if ($('.action-dropdown-wrapper .dropdown-menu.show').length) {
+                        $('.action-dropdown-wrapper .dropdown-menu.show').removeClass('show');
+                        $('.action-dropdown-wrapper.show').removeClass('show');
                     }
                 }, true);
             });

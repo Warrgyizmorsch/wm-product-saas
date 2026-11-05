@@ -504,6 +504,12 @@ class QuotationController extends Controller
             );
         }
 
+        if (strcasecmp($newStatus, 'Accepted') === 0) {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyQuotationAccepted($quotation);
+        } elseif (strcasecmp($newStatus, 'Rejected') === 0) {
+            \App\Domains\CRM\Services\CrmNotificationService::notifyQuotationRejected($quotation, $updateFields['rejection_reason'] ?? null);
+        }
+
         $this->quotationService->handleQuotationStatusChange($quotation, $newStatus, $quotation->lead_id);
         return back()->with('success', 'Quotation status updated to ' . $newStatus . ' successfully!');
     }
@@ -523,6 +529,8 @@ class QuotationController extends Controller
                 "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Approved'"
             );
         }
+
+        \App\Domains\CRM\Services\CrmNotificationService::notifyQuotationApproved($quotation);
 
         $this->quotationService->handleQuotationStatusChange($quotation, 'Approved', $quotation->lead_id);
         return back()->with('success', 'Quotation approved successfully!');
@@ -556,6 +564,8 @@ class QuotationController extends Controller
                 $logMessage
             );
         }
+
+        \App\Domains\CRM\Services\CrmNotificationService::notifyQuotationRejected($quotation, $reason);
 
         $this->quotationService->handleQuotationStatusChange($quotation, 'Rejected', $quotation->lead_id);
         return back()->with('success', 'Quotation rejected successfully!');

@@ -190,7 +190,8 @@
 </head>
 <body>
     @php
-        $companyName = $document->content_data['company_name'] ?? 'Warrgyizmorsch Pvt Ltd';
+        $document = $document ?? ($doc ?? null);
+        $companyName = $document->content_data['company_name'] ?? ($company->company_name ?? 'Warrgyizmorsch Pvt Ltd');
         $companyInitials = strtoupper(substr($companyName, 0, 2));
     @endphp
 

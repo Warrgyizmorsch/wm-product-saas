@@ -4,9 +4,11 @@ namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\HRMS\Traits\HasHrmsScope;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Employee extends BaseModel
 {
@@ -89,47 +91,81 @@ class Employee extends BaseModel
         'weekly_pattern' => 'array',
     ];
 
+    public function save(array $options = []): bool
+    {
+        // Ensure auto-generated employee_id sequence creation is wrapped in a pessimistic lock transaction
+        if (!$this->exists && empty($this->employee_id)) {
+            return DB::transaction(function () use ($options) {
+                return parent::save($options);
+            });
+        }
+
+        return parent::save($options);
+    }
+
+    public static function generateUniqueEmployeeId(self $employee): string
+    {
+        // 1. Acquire pessimistic lock on the company record to serialize concurrent generation per company
+        $company = null;
+        if (!empty($employee->company_id)) {
+            $company = Company::where('id', $employee->company_id)->lockForUpdate()->first();
+        } elseif (!empty($employee->tenant_id)) {
+            Tenant::where('id', $employee->tenant_id)->lockForUpdate()->first();
+        }
+
+        // 2. Build prefix from company name (or fallback to 'EMP')
+        $prefix = 'EMP';
+        if ($company && !empty($company->company_name)) {
+            $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', '', $company->company_name))) ?: [];
+
+            if (count($words) >= 2) {
+                $prefix = '';
+                foreach (array_slice($words, 0, 3) as $word) {
+                    $prefix .= substr($word, 0, 1);
+                }
+            } elseif (isset($words[0]) && strlen($words[0]) > 0) {
+                $prefix = substr($words[0], 0, 3);
+            }
+            $prefix = strtoupper($prefix);
+        }
+
+        // 3. Find the highest sequence number among existing employees using pessimistic lock
+        $maxEmployee = self::withTrashed()
+            ->where('company_id', $employee->company_id)
+            ->where('employee_id', 'LIKE', $prefix . '-%')
+            ->orderByRaw('CAST(SUBSTRING(employee_id, LENGTH(?) + 2) AS UNSIGNED) DESC', [$prefix])
+            ->lockForUpdate()
+            ->first();
+
+        $nextSequence = 1;
+        if ($maxEmployee) {
+            $parts = explode('-', $maxEmployee->employee_id);
+            $lastNum = (int) end($parts);
+            if ($lastNum > 0) {
+                $nextSequence = $lastNum + 1;
+            }
+        }
+
+        // 4. Ensure atomic uniqueness by advancing if a code already exists
+        do {
+            $candidateId = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
+            $exists = self::withTrashed()
+                ->where('company_id', $employee->company_id)
+                ->where('employee_id', $candidateId)
+                ->exists();
+            if ($exists) {
+                $nextSequence++;
+            }
+        } while ($exists);
+
+        return $candidateId;
+    }
+
     protected static function booted(): void
     {
         static::creating(function ($employee): void {
             if (empty($employee->employee_id)) {
-                // Load company name to generate the prefix
-                $company = $employee->company ?: \App\Domains\HRMS\Models\Company::find($employee->company_id);
-                $prefix = 'EMP';
-
-                if ($company && !empty($company->company_name)) {
-                    // Extract words
-                    $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', '', $company->company_name))) ?: [];
-                    
-                    if (count($words) >= 2) {
-                        $prefix = '';
-                        foreach (array_slice($words, 0, 3) as $word) {
-                            $prefix .= substr($word, 0, 1);
-                        }
-                    } else if (isset($words[0]) && strlen($words[0]) > 0) {
-                        $prefix = substr($words[0], 0, 3);
-                    }
-                    $prefix = strtoupper($prefix);
-                }
-
-                // Find the highest sequence number among existing employees (including soft deleted ones)
-                $maxEmployee = self::withTrashed()
-                    ->where('company_id', $employee->company_id)
-                    ->where('employee_id', 'LIKE', $prefix . '-%')
-                    ->orderByRaw('CAST(SUBSTRING(employee_id, LENGTH(?) + 2) AS UNSIGNED) DESC', [$prefix])
-                    ->first();
-
-                $nextSequence = 1;
-                if ($maxEmployee) {
-                    $parts = explode('-', $maxEmployee->employee_id);
-                    $lastNum = (int) end($parts);
-                    if ($lastNum > 0) {
-                        $nextSequence = $lastNum + 1;
-                    }
-                }
-
-                // Format: PREFIX-XXXX (e.g. ACM-0001)
-                $employee->employee_id = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
+                $employee->employee_id = self::generateUniqueEmployeeId($employee);
             }
         });
 
@@ -320,6 +356,16 @@ class Employee extends BaseModel
         return implode(' ', $parts);
     }
 
+    public function getPhoneNumberAttribute(): ?string
+    {
+        return $this->personal_mobile_number ?? $this->home_phone;
+    }
+
+    public function getEmergencyContactPhoneAttribute(): ?string
+    {
+        return $this->emergency_contact_number;
+    }
+
     public function getJobTitleAttribute($value): ?string
     {
         return $value ?: ($this->designation?->name ?? null);
@@ -328,6 +374,11 @@ class Employee extends BaseModel
     public function getDisplayNameAttribute(): string
     {
         return $this->full_name ?: trim($this->first_name . ' ' . $this->last_name);
+    }
+
+    public function getJoiningDateAttribute(): mixed
+    {
+        return $this->date_of_joining;
     }
 
     /**
@@ -628,18 +679,25 @@ class Employee extends BaseModel
     }
 
     /**
-     * Multi-tier resolution of Employee profile for a given User model.
+     * Multi-tier resolution of Employee profile for a given User model or user ID.
      */
-    public static function resolveForUser(?\App\Models\User $user, ?int $tenantId = null): ?self
+    public static function resolveForUser(mixed $user, ?int $tenantId = null): ?self
     {
         if (!$user) {
             return null;
         }
 
+        $userId = is_object($user) ? ($user->id ?? null) : (is_numeric($user) ? (int) $user : null);
+        if (!$userId) {
+            return null;
+        }
+
+        $userObj = is_object($user) ? $user : \App\Models\User::find($userId);
+
         $tenantId = $tenantId
             ?? (function_exists('tenant_id') ? tenant_id() : null)
             ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
-            ?? $user->tenant_id;
+            ?? ($userObj?->tenant_id ?? null);
 
         $scoped = function () use ($tenantId) {
             $q = static::query();
@@ -650,33 +708,33 @@ class Employee extends BaseModel
         };
 
         // 1. Primary check: by user_id link
-        $employee = $scoped()->where('user_id', $user->id)->first();
+        $employee = $scoped()->where('user_id', $userId)->first();
         if ($employee) {
             return $employee;
         }
 
         // 2. Secondary check: case-insensitive email match (office_email or personal_email)
-        if (!empty($user->email)) {
-            $employee = $scoped()->where(function ($q) use ($user) {
-                $q->whereRaw('LOWER(office_email) = ?', [strtolower($user->email)])
-                  ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($user->email)]);
+        if (!empty($userObj?->email)) {
+            $employee = $scoped()->where(function ($q) use ($userObj) {
+                $q->whereRaw('LOWER(office_email) = ?', [strtolower($userObj->email)])
+                  ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($userObj->email)]);
             })->first();
 
             if ($employee) {
                 // Auto-link user_id for instant future lookups
                 if (!$employee->user_id) {
-                    $employee->updateQuietly(['user_id' => $user->id]);
+                    $employee->updateQuietly(['user_id' => $userId]);
                 }
                 return $employee;
             }
         }
 
         // 3. Tertiary check: match full_name with user name if available
-        if (!empty($user->name)) {
-            $employee = $scoped()->whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
+        if (!empty($userObj?->name)) {
+            $employee = $scoped()->whereRaw('LOWER(full_name) = ?', [strtolower($userObj->name)])->first();
             if ($employee) {
                 if (!$employee->user_id) {
-                    $employee->updateQuietly(['user_id' => $user->id]);
+                    $employee->updateQuietly(['user_id' => $userId]);
                 }
                 return $employee;
             }

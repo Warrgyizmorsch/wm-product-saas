@@ -21,7 +21,8 @@ class CustomerPaymentController extends Controller
 {
     public function __construct(
         private readonly CustomerPaymentRepository $paymentRepo
-    ) {}
+    ) {
+    }
 
     public function index(Request $request): View
     {
@@ -65,17 +66,19 @@ class CustomerPaymentController extends Controller
             $nextPaymentNumber = 'PAY-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
         }
 
-        $prefillCustomerId    = $request->input('customer_id') ?? $request->input('amp;customer_id');
-        $prefillInvoiceId     = $request->input('invoice_id') ?? $request->input('amp;invoice_id');
-        $prefillSalesOrderId  = $request->input('sales_order_id') ?? $request->input('amp;sales_order_id');
-        $prefillAmount        = null;
+        $prefillCustomerId = $request->input('customer_id') ?? $request->input('amp;customer_id');
+        $prefillInvoiceId = $request->input('invoice_id') ?? $request->input('amp;invoice_id');
+        $prefillSalesOrderId = $request->input('sales_order_id') ?? $request->input('amp;sales_order_id');
+        $prefillAmount = null;
+        $prefillInvoice = null;
 
         if ($prefillInvoiceId) {
             $prefillInvoice = Invoice::find($prefillInvoiceId);
             if ($prefillInvoice && in_array($prefillInvoice->status, ['Posted', 'Partially Paid', 'Overdue'])) {
-                $prefillAmount      = $prefillInvoice->balance_due;
-                $prefillCustomerId  = $prefillCustomerId ?: ($prefillInvoice->customer_id ?? $prefillInvoice->salesOrder?->customer_id);
+                $prefillAmount = $prefillInvoice->balance_due;
+                $prefillCustomerId = $prefillCustomerId ?: ($prefillInvoice->customer_id ?? $prefillInvoice->salesOrder?->customer_id);
             } else {
+                $prefillInvoice = null;
                 $prefillInvoiceId = null;
             }
         }
@@ -100,8 +103,16 @@ class CustomerPaymentController extends Controller
             ->where('is_cash_or_bank', true)->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']);
 
         return view('modules.sales.payments.create', compact(
-            'customers', 'invoices', 'salesOrders', 'nextPaymentNumber', 'bankAccounts',
-            'prefillCustomerId', 'prefillInvoiceId', 'prefillSalesOrderId', 'prefillAmount'
+            'customers',
+            'invoices',
+            'salesOrders',
+            'nextPaymentNumber',
+            'bankAccounts',
+            'prefillCustomerId',
+            'prefillInvoiceId',
+            'prefillSalesOrderId',
+            'prefillAmount',
+            'prefillInvoice'
         ));
     }
 
@@ -125,23 +136,23 @@ class CustomerPaymentController extends Controller
         }
 
         $validated = $request->validate([
-            'customer_id'    => ['required', 'exists:customers,id'],
+            'customer_id' => ['required', 'exists:customers,id'],
             'payment_number' => [
                 'required',
                 'string',
                 'max:255',
                 \Illuminate\Validation\Rule::unique('customer_payments', 'payment_number')->where('tenant_id', $tenantId),
             ],
-            'payment_date'   => ['required', 'date'],
+            'payment_date' => ['required', 'date'],
             'payment_method' => ['required', 'string', 'max:100'],
-            'amount'         => ['required', 'numeric', 'min:0.01'],
-            'reference_no'   => ['nullable', 'string', 'max:255'],
-            'notes'          => ['nullable', 'string'],
-            'allocate_to'    => ['nullable', 'string', 'in:invoice,sales_order,unallocated,opening_balance'],
-            'invoice_id'     => ['nullable', 'exists:invoices,id'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'reference_no' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'allocate_to' => ['nullable', 'string', 'in:invoice,sales_order,unallocated,opening_balance'],
+            'invoice_id' => ['nullable', 'exists:invoices,id'],
             'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
             'bank_account_id' => ['nullable', 'integer'],
-            'tds_amount'     => ['nullable', 'numeric', 'min:0'],
+            'tds_amount' => ['nullable', 'numeric', 'min:0'],
             'tds_section_code' => ['nullable', 'string', 'max:20'],
         ]);
 
@@ -157,59 +168,82 @@ class CustomerPaymentController extends Controller
         $baseAmount = convert_to_base((float) $validated['amount']);
         $tdsAmount = round(convert_to_base((float) ($validated['tds_amount'] ?? 0)), 2);
 
+        // Balance due validation for linked invoice
+        $targetInvoiceId = (($validated['allocate_to'] ?? null) === 'invoice' || empty($validated['allocate_to']))
+            ? ($validated['invoice_id'] ?? null)
+            : null;
+        if ($targetInvoiceId) {
+            $targetInvoice = Invoice::withoutGlobalScopes()->where('tenant_id', $tenantId)->find($targetInvoiceId)
+                ?? Invoice::withoutGlobalScopes()->find($targetInvoiceId);
+            if ($targetInvoice) {
+                $maxPayable = (float) $targetInvoice->balance_due;
+                if ($maxPayable <= 0 && (float) $targetInvoice->total_amount > (float) $targetInvoice->amount_paid) {
+                    $maxPayable = max(0, (float) $targetInvoice->total_amount - (float) $targetInvoice->amount_paid);
+                }
+                $attemptedAmount = $baseAmount + $tdsAmount;
+                if ($attemptedAmount > ($maxPayable + 0.01)) {
+                    $errorMsg = "Payment amount (" . format_currency($attemptedAmount) . ") cannot exceed the invoice's net balance due of " . format_currency($maxPayable) . ".";
+                    return back()->withInput()
+                        ->with('error', $errorMsg)
+                        ->withErrors(['amount' => $errorMsg]);
+                }
+            }
+        }
+
         $payment = DB::transaction(function () use ($validated, $baseAmount, $tdsAmount) {
             $payment = CustomerPayment::create([
-                'tenant_id'      => tenant_id() ?? 1,
-                'customer_id'    => $validated['customer_id'],
+                'tenant_id' => tenant_id() ?? 1,
+                'customer_id' => $validated['customer_id'],
                 'payment_number' => $validated['payment_number'],
-                'payment_date'   => $validated['payment_date'],
+                'payment_date' => $validated['payment_date'],
                 'payment_method' => $validated['payment_method'],
-                'amount'         => $baseAmount,
-                'reference_no'   => $validated['reference_no'] ?? null,
-                'notes'          => ($validated['allocate_to'] ?? null) === 'opening_balance'
+                'amount' => $baseAmount,
+                'reference_no' => $validated['reference_no'] ?? null,
+                'notes' => ($validated['allocate_to'] ?? null) === 'opening_balance'
                     ? trim('Against opening balance. ' . ($validated['notes'] ?? ''))
                     : ($validated['notes'] ?? null),
                 'bank_account_id' => $validated['bank_account_id'] ?? null,
-                'tds_amount'     => $tdsAmount,
+                'tds_amount' => $tdsAmount,
                 'tds_section_code' => $tdsAmount > 0 ? ($validated['tds_section_code'] ?? null) : null,
-                'status'         => 'Posted',   // Direct post — Odoo/Tally style
+                'status' => 'Posted',   // Direct post — Odoo/Tally style
             ]);
 
-            $allocateTo    = $validated['allocate_to'] ?? 'unallocated';
+            $allocateTo = $validated['allocate_to'] ?? 'unallocated';
             // TDS withheld by the customer settles the invoice too.
-            $allocatedAmt  = $payment->settledAmount();
+            $allocatedAmt = $payment->settledAmount();
 
             // ── Link to Invoice ─────────────────────────────────────────────
             if ($allocateTo === 'invoice' && !empty($validated['invoice_id'])) {
-                $invoice = Invoice::find($validated['invoice_id']);
+                $invoice = Invoice::withoutGlobalScopes()->where('tenant_id', $payment->tenant_id)->find($validated['invoice_id'])
+                    ?? Invoice::withoutGlobalScopes()->find($validated['invoice_id']);
                 if ($invoice) {
                     $apply = min($allocatedAmt, (float) $invoice->balance_due);
 
                     PaymentAllocation::create([
-                        'tenant_id'           => $payment->tenant_id,
-                        'company_id'          => $payment->company_id,
-                        'branch_id'           => $payment->branch_id,
+                        'tenant_id' => $payment->tenant_id,
+                        'company_id' => $payment->company_id,
+                        'branch_id' => $payment->branch_id,
                         'customer_payment_id' => $payment->id,
-                        'sales_order_id'      => $invoice->sales_order_id,
-                        'invoice_id'          => $invoice->id,
-                        'allocated_amount'    => $apply,
+                        'sales_order_id' => $invoice->sales_order_id,
+                        'invoice_id' => $invoice->id,
+                        'allocated_amount' => $apply,
                     ]);
 
                     if ($allocatedAmt > $apply) {
                         PaymentAllocation::create([
-                            'tenant_id'           => $payment->tenant_id,
-                            'company_id'          => $payment->company_id,
-                            'branch_id'           => $payment->branch_id,
+                            'tenant_id' => $payment->tenant_id,
+                            'company_id' => $payment->company_id,
+                            'branch_id' => $payment->branch_id,
                             'customer_payment_id' => $payment->id,
-                            'sales_order_id'      => $invoice->sales_order_id,
-                            'invoice_id'          => null,
-                            'allocated_amount'    => $allocatedAmt - $apply,
+                            'sales_order_id' => $invoice->sales_order_id,
+                            'invoice_id' => null,
+                            'allocated_amount' => $allocatedAmt - $apply,
                         ]);
                     }
 
                     $invoice->amount_paid = (float) $invoice->amount_paid + $apply;
                     $invoice->balance_due = max(0, (float) $invoice->total_amount - $invoice->amount_paid);
-                    $invoice->status      = $invoice->balance_due <= 0 ? 'Paid' : 'Partially Paid';
+                    $invoice->status = $invoice->balance_due <= 0 ? 'Paid' : 'Partially Paid';
                     $invoice->save();
                 }
             }
@@ -217,13 +251,13 @@ class CustomerPaymentController extends Controller
             // ── Link to Sales Order (advance) ────────────────────────────────
             elseif ($allocateTo === 'sales_order' && !empty($validated['sales_order_id'])) {
                 PaymentAllocation::create([
-                    'tenant_id'           => $payment->tenant_id,
-                    'company_id'          => $payment->company_id,
-                    'branch_id'           => $payment->branch_id,
+                    'tenant_id' => $payment->tenant_id,
+                    'company_id' => $payment->company_id,
+                    'branch_id' => $payment->branch_id,
                     'customer_payment_id' => $payment->id,
-                    'sales_order_id'      => $validated['sales_order_id'],
-                    'invoice_id'          => null,
-                    'allocated_amount'    => $allocatedAmt,
+                    'sales_order_id' => $validated['sales_order_id'],
+                    'invoice_id' => null,
+                    'allocated_amount' => $allocatedAmt,
                 ]);
             }
             // else: unallocated / against opening balance — no PaymentAllocation
@@ -235,13 +269,7 @@ class CustomerPaymentController extends Controller
             return $payment;
         });
 
-        \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.payment.received', [
-            'doc_no' => $payment->payment_number,
-            'customer_name' => $payment->customer?->name ?? 'Customer',
-            'amount' => format_currency((float)$payment->amount),
-            'payment_method' => $payment->payment_method ?? 'Bank/Cash',
-            'date' => $payment->payment_date ? (is_string($payment->payment_date) ? $payment->payment_date : $payment->payment_date->format('Y-m-d')) : now()->format('Y-m-d'),
-        ], route('sales.payments.show', $payment->id), $payment);
+        \App\Domains\Sales\Services\SalesNotificationService::notifyPaymentReceived($payment);
 
         return redirect()->route('sales.payments.show', $payment->id)->with('success', "Payment {$payment->payment_number} recorded successfully.");
     }
@@ -249,7 +277,8 @@ class CustomerPaymentController extends Controller
     public function show(int $id): View
     {
         $payment = $this->paymentRepo->find($id);
-        if (!$payment) abort(404);
+        if (!$payment)
+            abort(404);
         $this->authorize('view', $payment);
 
         return view('modules.sales.payments.show', compact('payment'));
@@ -258,7 +287,8 @@ class CustomerPaymentController extends Controller
     public function downloadPdf(int $id)
     {
         $payment = $this->paymentRepo->find($id);
-        if (!$payment) abort(404, 'Payment receipt not found.');
+        if (!$payment)
+            abort(404, 'Payment receipt not found.');
         $this->authorize('view', $payment);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.payments.pdf', compact('payment'));

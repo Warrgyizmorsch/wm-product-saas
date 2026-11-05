@@ -25,7 +25,6 @@ use App\Domains\HRMS\Controllers\AttendanceCorrectionController;
 use App\Domains\HRMS\Controllers\ProbationController;
 use App\Domains\HRMS\Controllers\EmployeeExitController;
 use App\Domains\HRMS\Controllers\ExitClearancePolicyController;
-use App\Domains\HRMS\Controllers\OrgStructureController;
 use App\Domains\HRMS\Controllers\HrmsDashboardController;
 use App\Domains\HRMS\Controllers\PipController;
 use App\Domains\HRMS\Controllers\BroadcastController;
@@ -462,6 +461,7 @@ Route::prefix('hrms')
             Route::get('/statutory-returns/esi', [\App\Domains\HRMS\Controllers\PayrollStatutoryReturnController::class, 'esi'])->name('payroll.statutory-returns.esi');
             Route::post('/hold/{employee}/{month}', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'toggleHold'])->name('payroll.hold.toggle');
             Route::get('/run/{run}/export-bank-file', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'exportBankFile'])->name('payroll.run.export-bank-file');
+            Route::get('/payslip/download-range', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadRangePayslips'])->name('payroll.payslip.download-range');
             Route::get('/payslip/{run}/{employee}/download', [\App\Domains\HRMS\Controllers\PayrollRunController::class, 'downloadPayslip'])->name('payroll.payslip.download');
         });
 
@@ -487,10 +487,14 @@ Route::prefix('hrms')
             Route::get('/', [EmployeeExitController::class, 'index'])->name('exits.index');
             Route::post('/initiate', [EmployeeExitController::class, 'initiate'])->name('exits.initiate');
             Route::post('/{exit}/approve', [EmployeeExitController::class, 'approve'])->name('exits.approve');
+            Route::post('/{exit}/approve-manager', [EmployeeExitController::class, 'approveManager'])->name('exits.approve-manager');
+            Route::post('/{exit}/reject', [EmployeeExitController::class, 'reject'])->name('exits.reject');
             Route::post('/clearance/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearance.update');
             Route::post('/clearances/{clearance}/update', [EmployeeExitController::class, 'updateClearance'])->name('exits.clearances.update');
             Route::post('/{exit}/clearances/{department}/batch-update', [EmployeeExitController::class, 'updateDepartmentClearances'])->name('exits.clearances.batch-update');
             Route::post('/{exit}/clearances/batch-update-all', [EmployeeExitController::class, 'updateAllExitClearances'])->name('exits.clearances.batch-update-all');
+            Route::post('/{exit}/clearances/sync', [EmployeeExitController::class, 'syncClearanceCheckpoints'])->name('exits.clearances.sync');
+            Route::post('/clearances/sync-all', [EmployeeExitController::class, 'syncAllClearanceCheckpoints'])->name('exits.clearances.sync-all');
             Route::post('/{exit}/clearances/adhoc', [EmployeeExitController::class, 'storeAdhocExitClearance'])->name('exits.clearances.adhoc.store');
             Route::delete('/clearances/{clearance}/adhoc', [EmployeeExitController::class, 'destroyExitClearance'])->name('exits.clearances.adhoc.destroy');
             Route::post('/templates', [EmployeeExitController::class, 'storeClearanceTemplate'])->name('exits.templates.store');

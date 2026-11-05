@@ -86,6 +86,13 @@ class VendorPaymentController extends Controller
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $unpaidBills = $this->billRepo->getPaginatedBills(['status' => 'Unpaid'], 100);
 
+        $bankAccounts = \App\Domains\Accounting\Models\ChartOfAccount::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_cash_or_bank', true)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
         return view('modules.purchase.payments.create', compact(
             'vendors',
             'unpaidBills',
@@ -93,7 +100,8 @@ class VendorPaymentController extends Controller
             'availableAdvance',
             'totalAdvancePaid',
             'suggestedNetPayable',
-            'preselectedVendor'
+            'preselectedVendor',
+            'bankAccounts'
         ));
     }
 
@@ -112,18 +120,48 @@ class VendorPaymentController extends Controller
             'allocations.*.allocated_amount' => 'nullable|numeric|min:0',
             'amount' => 'required|numeric|min:0.01',
             'payment_method' => 'required|string',
+            'bank_account_id' => 'nullable|integer',
             'reference_number' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
+            'auto_apply_advance' => 'nullable|boolean',
         ]);
+
+        if (!empty($validated['bank_account_id'])) {
+            $isBankLedger = \App\Domains\Accounting\Models\ChartOfAccount::query()
+                ->where('tenant_id', $tenantId)
+                ->whereKey($validated['bank_account_id'])
+                ->where('is_cash_or_bank', true)
+                ->exists();
+            if (!$isBankLedger) {
+                return back()->withInput()->withErrors(['bank_account_id' => 'Please select a valid cash or bank account.']);
+            }
+        }
 
         if (empty($validated['vendor_bill_id']) && !empty($validated['allocations'][0]['vendor_bill_id'])) {
             $validated['vendor_bill_id'] = $validated['allocations'][0]['vendor_bill_id'];
         }
 
+        if (!empty($validated['vendor_bill_id'])) {
+            $targetBill = $this->billRepo->find($validated['vendor_bill_id']);
+            if ($targetBill) {
+                $maxPayable = (float) $targetBill->due_amount;
+                $attemptedAmount = (float) ($validated['allocations'][0]['allocated_amount'] ?? $validated['amount']);
+                if ($attemptedAmount > ($maxPayable + 0.01)) {
+                    $errorMsg = "Payment amount (" . format_currency($attemptedAmount) . ") cannot exceed the bill's net balance due of " . format_currency($maxPayable) . ".";
+                    return back()->withInput()
+                        ->with('error', $errorMsg)
+                        ->withErrors(['amount' => $errorMsg]);
+                }
+            }
+        }
+
         try {
             $payment = $this->paymentService->recordPayment($validated, $tenantId);
+            \App\Domains\Purchase\Services\PurchaseNotificationService::notifyPaymentRecorded($payment);
         } catch (\InvalidArgumentException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            return back()->withInput()
+                ->with('error', $e->getMessage())
+                ->withErrors(['amount' => $e->getMessage()]);
         }
 
         return redirect()->route('purchase.payments.index')
@@ -137,8 +175,34 @@ class VendorPaymentController extends Controller
         $payment = $this->paymentRepo->find($id);
         if (!$payment) abort(404);
 
-        $payment->load(['vendor', 'vendorBill']);
+        $payment->load([
+            'vendor',
+            'bankAccount',
+            'creator',
+            'purchaseOrder',
+            'allocations.bill.allocations.payment',
+        ]);
         return view('modules.purchase.payments.show', compact('payment'));
+    }
+
+    public function downloadPdf(int $id)
+    {
+        $this->authorizePurchase('purchase.payments.view');
+
+        $payment = $this->paymentRepo->find($id);
+        if (!$payment) abort(404);
+
+        $payment->load([
+            'vendor',
+            'bankAccount',
+            'creator',
+            'purchaseOrder',
+            'allocations.bill.allocations.payment',
+            'allocations.bill.allocations.vendorPayment',
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.purchase.payments.pdf', compact('payment'));
+        return $pdf->download("Payment_Voucher_{$payment->payment_number}.pdf");
     }
 
     public function edit(int $id)

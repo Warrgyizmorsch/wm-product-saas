@@ -76,12 +76,11 @@
                         <option value="">{{ __('purchase.select_po_optional') }}</option>
                         @foreach($purchaseOrders as $po)
                             @php
-                                $paidAdv = (float) \App\Domains\Purchase\Models\PurchaseAdvancePayment::where('purchase_order_id', $po->id)->where('status', '!=', 'cancelled')->sum('amount');
                                 $pTotal = (float) ($po->grand_total ?: $po->total_amount);
-                                $advDue = max(0.0, $pTotal - $paidAdv);
+                                $advLimit = $po->getRemainingAdvanceLimit();
                             @endphp
                             <option value="{{ $po->id }}" @selected(old('purchase_order_id', $prefillPo?->id) == $po->id)>
-                                {{ $po->purchase_order_number }} - {{ $po->vendor?->name }} (PO Total: {{ format_currency($pTotal) }} | Advance Due: {{ format_currency($advDue) }})
+                                {{ $po->purchase_order_number }} - {{ $po->vendor?->name }} (PO Total: {{ format_currency($pTotal) }} | Unbilled Advance Limit: {{ format_currency($advLimit) }})
                             </option>
                         @endforeach
                     </x-ui.odoo-form-ui>
@@ -116,6 +115,20 @@
 
                 <div class="col-md-4">
                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">
+                        Paid From (Bank / Cash Account)
+                    </label>
+                    <x-ui.odoo-form-ui type="select" name="bank_account_id" id="bank_account_id" :errorText="$errors->first('bank_account_id')">
+                        <option value="">Select Bank / Cash Account...</option>
+                        @foreach($bankAccounts as $bankAccount)
+                            <option value="{{ $bankAccount->id }}" data-code="{{ $bankAccount->code }}" @selected((string) old('bank_account_id') === (string) $bankAccount->id)>
+                                {{ $bankAccount->code }} — {{ $bankAccount->name }}
+                            </option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">
                         {{ __('purchase.reference_utr_no') }}
                     </label>
                     <x-ui.odoo-form-ui type="input" name="reference_number" :value="old('reference_number')" placeholder="{{ __('purchase.reference_utr_placeholder') }}" :errorText="$errors->first('reference_number')" />
@@ -132,3 +145,22 @@
     </div>
 
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const methodSelect = document.querySelector('select[name="payment_method"]');
+            const bankSelect = document.querySelector('select[name="bank_account_id"]');
+            if (methodSelect && bankSelect) {
+                methodSelect.addEventListener('change', function () {
+                    if (this.value === 'Cash') {
+                        const cashOpt = Array.from(bankSelect.options).find(opt => opt.getAttribute('data-code') === '1010' || opt.text.toLowerCase().includes('cash'));
+                        if (cashOpt) {
+                            bankSelect.value = cashOpt.value;
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+@endpush

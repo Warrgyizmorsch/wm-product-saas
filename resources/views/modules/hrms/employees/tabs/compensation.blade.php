@@ -154,48 +154,50 @@
                             <div class="fs-12">{{ __('hrms.employees.lbl_no_adhoc_components') }}</div>
                         </div>
                     @else
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0 fs-12">
+                        <div class="w-100" style="overflow-x: hidden;">
+                            <table class="table table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="py-2 px-3">{{ __('hrms.employees.tbl_component') }}</th>
-                                        <th class="py-2">{{ __('hrms.employees.tbl_month') }}</th>
-                                        <th class="py-2 px-3 text-end">{{ __('hrms.employees.tbl_amount') }}</th>
+                                        <th class="py-2 ps-3 pe-1 text-muted text-uppercase fw-semibold" style="width: 38%; font-size: 11px;">{{ __('hrms.employees.tbl_component') }}</th>
+                                        <th class="py-2 px-1 text-muted text-uppercase fw-semibold" style="width: 20%; font-size: 11px;">{{ __('hrms.employees.tbl_month') }}</th>
+                                        <th class="py-2 px-1 text-end text-muted text-uppercase fw-semibold" style="width: 30%; font-size: 11px;">{{ __('hrms.employees.tbl_amount') }}</th>
+                                        @if($canManageCompensation)
+                                            <th class="py-2 pe-3 ps-1 text-center" style="width: 12%;"></th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @php
-                                        $months = [
-                                            '01' => __('hrms.months.january') ?? 'Jan',
-                                            '02' => __('hrms.months.february') ?? 'Feb',
-                                            '03' => __('hrms.months.march') ?? 'Mar',
-                                            '04' => __('hrms.months.april') ?? 'Apr',
-                                            '05' => __('hrms.months.may') ?? 'May',
-                                            '06' => __('hrms.months.june') ?? 'Jun',
-                                            '07' => __('hrms.months.july') ?? 'Jul',
-                                            '08' => __('hrms.months.august') ?? 'Aug',
-                                            '09' => __('hrms.months.september') ?? 'Sep',
-                                            '10' => __('hrms.months.october') ?? 'Oct',
-                                            '11' => __('hrms.months.november') ?? 'Nov',
-                                            '12' => __('hrms.months.december') ?? 'Dec'
+                                        $shortMonths = [
+                                            '01' => 'Jan', '02' => 'Feb', '03' => 'Mar',
+                                            '04' => 'Apr', '05' => 'May', '06' => 'Jun',
+                                            '07' => 'Jul', '08' => 'Aug', '09' => 'Sep',
+                                            '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
                                         ];
                                     @endphp
                                     @foreach($adhocComponents as $adhoc)
                                         @php
-                                            $mParts = explode('-', $adhoc->payroll_month);
-                                            $mName = count($mParts) === 2 ? ($months[$mParts[1]] ?? $mParts[1]) . ' ' . $mParts[0] : $adhoc->payroll_month;
+                                            $mParts = explode('-', (string) $adhoc->payroll_month);
+                                            $mName = count($mParts) === 2 ? ($shortMonths[$mParts[1]] ?? $mParts[1]) . ' ' . $mParts[0] : $adhoc->payroll_month;
                                         @endphp
                                         <tr>
-                                            <td class="py-2 px-3">
-                                                <div class="fw-bold text-dark">{{ $adhoc->component?->name ?? __('hrms.common.unknown') }}</div>
+                                            <td class="py-2 ps-3 pe-1" style="white-space: normal; word-break: break-word;">
+                                                <div class="fw-bold text-dark" style="line-height: 1.35; white-space: normal; word-break: break-word;">{{ $adhoc->component?->name ?? __('hrms.common.unknown') }}</div>
                                                 @if($adhoc->remarks)
-                                                    <small class="text-muted d-block text-truncate" style="max-width: 140px;" title="{{ $adhoc->remarks }}">{{ $adhoc->remarks }}</small>
+                                                    <small class="text-muted d-block mt-0.5" style="line-height: 1.25; white-space: normal; word-break: break-word;" title="{{ $adhoc->remarks }}">{{ $adhoc->remarks }}</small>
                                                 @endif
                                             </td>
-                                            <td class="py-2 text-muted fw-medium">{{ $mName }}</td>
-                                            <td class="py-2 px-3 text-end fw-bold {{ ($adhoc->component?->type === 'deduction') ? 'text-danger' : 'text-success' }}">
+                                            <td class="py-2 px-1 text-muted fw-medium text-nowrap" style="white-space: nowrap !important; font-size: 11.5px;">
+                                                {{ $mName }}
+                                            </td>
+                                            <td class="py-2 px-1 text-end fw-bold text-nowrap {{ ($adhoc->component?->type === 'deduction') ? 'text-danger' : 'text-success' }}" style="white-space: nowrap !important; font-variant-numeric: tabular-nums;">
                                                 {{ ($adhoc->component?->type === 'deduction') ? '-' : '+' }}₹{{ number_format($adhoc->amount, 2) }}
                                             </td>
+                                            @if($canManageCompensation)
+                                                <td class="py-2 pe-3 ps-1 text-center align-middle">
+                                                    <x-ui.button type="button" variant="outline-danger" size="sm" icon="feather-trash-2" class="p-0 rounded d-inline-flex align-items-center justify-content-center btn-delete-adhoc" style="width: 28px; height: 28px; min-height: 28px;" title="{{ __('hrms.common.delete') ?? 'Delete' }}" data-url="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" data-name="{{ $adhoc->component?->name ?? __('hrms.salary.adhoc_components') }}" data-bs-toggle="modal" data-bs-target="#deleteAdhocModal" />
+                                                </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -206,4 +208,54 @@
             </div>
         </div>
     </div>
+
+    @if($canManageCompensation)
+        <!-- Delete Adhoc Confirmation Modal -->
+        <div class="modal fade" id="deleteAdhocModal" tabindex="-1" aria-labelledby="deleteAdhocModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="deleteAdhocModalLabel">
+                            <i class="feather-alert-triangle text-danger fs-16"></i>
+                            <span>{{ trans('hrms.common.confirm_delete') !== 'hrms.common.confirm_delete' ? trans('hrms.common.confirm_delete') : 'Confirm Delete' }}</span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form id="deleteAdhocForm" method="POST" action="">
+                        @csrf
+                        @method('DELETE')
+                        <div class="modal-body p-4">
+                            <p class="text-secondary mb-0 fs-13" id="deleteAdhocModalPrompt">
+                                {{ trans('hrms.employees.msg_confirm_delete_adhoc') !== 'hrms.employees.msg_confirm_delete_adhoc' ? trans('hrms.employees.msg_confirm_delete_adhoc') : 'Are you sure you want to delete this ad-hoc component? This action cannot be undone.' }}
+                            </p>
+                        </div>
+                        <div class="modal-footer bg-light py-2 px-3 gap-2 justify-content-end">
+                            <x-ui.button type="button" variant="light" size="sm" data-bs-dismiss="modal">
+                                {{ __('hrms.common.cancel') }}
+                            </x-ui.button>
+                            <x-ui.button type="submit" variant="danger" size="sm" icon="feather-trash-2">
+                                {{ __('hrms.common.delete') }}
+                            </x-ui.button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        @push('scripts')
+            <script>
+                $(document).on('click', '.btn-delete-adhoc', function () {
+                    var url = $(this).attr('data-url');
+                    var name = $(this).attr('data-name');
+                    var $form = $('#deleteAdhocForm');
+                    if ($form.length && url) {
+                        $form.attr('action', url);
+                    }
+                    if (name) {
+                        $('#deleteAdhocModalPrompt').text('Are you sure you want to delete "' + name + '"? This action cannot be undone.');
+                    }
+                });
+            </script>
+        @endpush
+    @endif
 </div>

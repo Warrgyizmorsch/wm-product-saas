@@ -39,7 +39,13 @@ class ShiftChangeRequestController extends Controller
         ]);
 
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.shift_changes.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $currentEmp = Employee::resolveForUser($user);
             if ($currentEmp) {
@@ -127,8 +133,16 @@ class ShiftChangeRequestController extends Controller
             abort(403, 'Self-approval is prohibited. You cannot approve your own shift change request.');
         }
 
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
+        $canApprove = $user && (
+            ($shiftChangeRequest->employee && $workflowService->canApprove($user, $shiftChangeRequest->employee, $shiftChangeRequest, 'hrms.shift_changes.approve'))
+            || (
+                $user->hasHrPermission('hrms.shift_changes.approve') ||
+                $user->hasHrPermission('hr.settings.manage') ||
+                $user->hasHrPermission('hrms.roster.manage') ||
+                $user->hasHrPermission('hrms.shift_roster.manage') ||
+                $workflowService->isHrOrAdminActor($user)
+            ));
+        abort_unless($canApprove, 403, 'Unauthorized to process this shift change request.');
 
         if ($shiftChangeRequest->status === 'cancelled') {
             return redirect()->back()->with('error', __('hrms.shift_change.cancelled_status_error'));
@@ -177,7 +191,13 @@ class ShiftChangeRequestController extends Controller
     public function withdraw(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.shift_changes.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $shiftChangeRequest->employee_id !== $employee->id) {
@@ -203,7 +223,13 @@ class ShiftChangeRequestController extends Controller
     public function requestCancellation(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.shift_changes.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $shiftChangeRequest->employee_id !== $employee->id) {
@@ -255,9 +281,18 @@ class ShiftChangeRequestController extends Controller
 
     public function approveCancellation(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
+        $canApprove = $user && (
+            ($shiftChangeRequest->employee && $workflowService->canApprove($user, $shiftChangeRequest->employee, $shiftChangeRequest, 'hrms.shift_changes.approve'))
+            || (
+                $user->hasHrPermission('hrms.shift_changes.approve') ||
+                $user->hasHrPermission('hr.settings.manage') ||
+                $user->hasHrPermission('hrms.roster.manage') ||
+                $user->hasHrPermission('hrms.shift_roster.manage') ||
+                $workflowService->isHrOrAdminActor($user)
+            ));
+        abort_unless($canApprove, 403, 'Unauthorized to process this shift change request.');
 
         DB::transaction(function () use ($shiftChangeRequest) {
             $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
@@ -293,9 +328,18 @@ class ShiftChangeRequestController extends Controller
 
     public function denyCancellation(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
+        $workflowService = app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class);
         $user = auth()->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
-        abort_unless($isHrAdmin, 403);
+        $canApprove = $user && (
+            ($shiftChangeRequest->employee && $workflowService->canApprove($user, $shiftChangeRequest->employee, $shiftChangeRequest, 'hrms.shift_changes.approve'))
+            || (
+                $user->hasHrPermission('hrms.shift_changes.approve') ||
+                $user->hasHrPermission('hr.settings.manage') ||
+                $user->hasHrPermission('hrms.roster.manage') ||
+                $user->hasHrPermission('hrms.shift_roster.manage') ||
+                $workflowService->isHrOrAdminActor($user)
+            ));
+        abort_unless($canApprove, 403, 'Unauthorized to process this shift change request.');
 
         DB::transaction(function () use ($shiftChangeRequest) {
             $locked = ShiftChangeRequest::whereKey($shiftChangeRequest->id)->lockForUpdate()->firstOrFail();
@@ -334,7 +378,13 @@ class ShiftChangeRequestController extends Controller
     public function destroy(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
         $user = $request->user();
-        $isHrAdmin = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hrms.roster.manage') || $user->hasHrPermission('hrms.shift_roster.manage'));
+        $isHrAdmin = $user && (
+            $user->hasHrPermission('hr.settings.manage') ||
+            $user->hasHrPermission('hrms.roster.manage') ||
+            $user->hasHrPermission('hrms.shift_roster.manage') ||
+            $user->hasHrPermission('hrms.shift_changes.approve') ||
+            app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)
+        );
         if (!$isHrAdmin) {
             $employee = Employee::resolveForUser($user);
             if (!$employee || $shiftChangeRequest->employee_id !== $employee->id) {

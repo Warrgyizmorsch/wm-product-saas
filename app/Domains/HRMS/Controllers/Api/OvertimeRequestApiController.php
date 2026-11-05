@@ -197,9 +197,17 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
+        $isHrAdmin = $this->isHrAdmin();
+        $dateRules = 'required|date';
+        if (!$isHrAdmin) {
+            $minDate = Carbon::now()->subDays(30)->toDateString();
+            $maxDate = Carbon::now()->addDays(60)->toDateString();
+            $dateRules .= "|after_or_equal:{$minDate}|before_or_equal:{$maxDate}";
+        }
+
         $validated = $request->validate([
             'employee_id'       => 'nullable|integer|exists:employees,id',
-            'date'              => 'required|date',
+            'date'              => $dateRules,
             'start_time'        => 'required|date_format:H:i',
             'end_time'          => 'required|date_format:H:i',
             'compensation_type' => 'required|string|in:payout,comp_off',
@@ -227,6 +235,16 @@ class OvertimeRequestApiController extends Controller
 
         if (!$employee) {
             return $this->sendError('Employee record not found.', 404);
+        }
+
+        // Prevent overtime submissions for locked/finalized payroll cycles
+        $targetMonth = Carbon::parse($validated['date'])->format('Y-m');
+        $isPayrollLocked = \App\Domains\HRMS\Models\PayrollRun::where('tenant_id', $employee->tenant_id ?? 1)
+            ->where('payroll_month', $targetMonth)
+            ->whereIn('status', ['locked', 'paid'])
+            ->exists();
+        if ($isPayrollLocked && !$isHrAdmin) {
+            return $this->sendError("Cannot submit overtime for {$targetMonth} as the payroll run for this period has already been locked or finalized.", 422);
         }
 
         // Check if employee's shift on this date permits overtime

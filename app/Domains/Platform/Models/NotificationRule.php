@@ -71,6 +71,11 @@ class NotificationRule extends BaseModel
     public static function interpolate(string $template, array $data): string
     {
         foreach ($data as $key => $val) {
+            if ($val instanceof \DateTimeInterface) {
+                $val = $val->format('d M Y');
+            } elseif ($val instanceof \Stringable) {
+                $val = (string) $val;
+            }
             if (is_scalar($val) || is_null($val)) {
                 $template = str_replace(['{{' . $key . '}}', '{{ ' . $key . ' }}'], (string) ($val ?? ''), $template);
             }

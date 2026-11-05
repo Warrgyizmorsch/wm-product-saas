@@ -116,6 +116,7 @@ class LeadService
         $explicitOwner = !empty($validated['lead_owner_id']) ? (int)$validated['lead_owner_id'] : null;
 
         $leadData = [
+            'tenant_id' => $validated['tenant_id'] ?? (function_exists('tenant_id') && tenant_id() ? tenant_id() : (auth()->user()?->tenant_id ?? 1)),
             'call_date' => $callDateTime,
             'lead_owner_id' => $explicitOwner,
             'company_name' => !empty($validated['company_name']) ? $validated['company_name'] : (!empty($validated['contact_person']) ? $validated['contact_person'] : 'Individual Customer'),
@@ -161,6 +162,7 @@ class LeadService
                 if (auth()->id()) {
                     $lead->lead_owner_id = auth()->id();
                     $lead->save();
+                    self::notifyLeadAssigned($lead, $lead->lead_owner_id, auth()->id());
                 }
             }
         } elseif ($lead->lead_owner_id) {
@@ -172,7 +174,11 @@ class LeadService
                 $ownerName,
                 'Lead assigned to lead owner: ' . $ownerName
             );
+            self::notifyLeadAssigned($lead, $lead->lead_owner_id, auth()->id());
         }
+
+        // Notify sales management / executive of new lead
+        CrmNotificationService::notifyLeadCreated($lead);
 
         return $lead;
     }
@@ -228,6 +234,9 @@ class LeadService
                 $newOwnerName,
                 "Lead owner updated from {$oldOwnerName} to {$newOwnerName}"
             );
+            if (!empty($lead->lead_owner_id)) {
+                self::notifyLeadAssigned($lead, $lead->lead_owner_id, auth()->id());
+            }
         }
 
         return $updated;
@@ -329,6 +338,8 @@ class LeadService
                 $lead->status,
                 "Lead stage status updated from '{$oldStatus}' to '{$lead->status}'"
             );
+
+            CrmNotificationService::notifyLeadStatusUpdated($lead, $oldStatus, $lead->status);
         }
 
         return ['success' => true, 'message' => $message];
@@ -385,6 +396,76 @@ class LeadService
         if ($lead) {
             $lead->documents = array_values(array_filter(array_diff($lead->documents ?? [], [$document->id])));
             $lead->save();
+        }
+    }
+
+    /**
+     * Dispatch in-app bell notification and real-time Pusher alert to assigned lead owner.
+     */
+    public static function notifyLeadAssigned(Lead $lead, ?int $assignedToUserId, ?int $assignedByUserId = null): void
+    {
+        if (!$assignedToUserId) {
+            return;
+        }
+
+        $assignedUser = User::find($assignedToUserId);
+        if (!$assignedUser) {
+            return;
+        }
+
+        $assignedBy = $assignedByUserId ? User::find($assignedByUserId) : (auth()->user() ?: null);
+        $assignerName = $assignedBy ? $assignedBy->name : 'System';
+        $leadTitle = $lead->company_name ?: ($lead->contact_person ?: $lead->lead_number ?: 'Lead');
+
+        $title = "New Lead Assigned: {$leadTitle}";
+        $message = "Lead '{$leadTitle}'" . ($lead->source ? " (Source: {$lead->source})" : '') . " has been assigned to you by {$assignerName}.";
+        
+        $actionUrl = null;
+        try {
+            $actionUrl = route('crm.leads.show', $lead->id);
+        } catch (\Throwable $e) {
+            $actionUrl = "/crm/leads/{$lead->id}";
+        }
+
+        // 1. Send In-App Notification (Bell Icon DB record) and Pusher WebSocket broadcast
+        try {
+            \App\Services\Notification\NotificationService::send(
+                user: $assignedUser,
+                title: $title,
+                message: $message,
+                actionUrl: $actionUrl,
+                module: 'crm',
+                type: 'lead_assigned',
+                iconClass: 'feather-user-check',
+                extraData: [
+                    'lead_id' => $lead->id,
+                    'lead_number' => $lead->lead_number,
+                    'company_name' => $lead->company_name,
+                    'contact_person' => $lead->contact_person,
+                    'assigned_by' => $assignerName,
+                    'tenant_id' => $lead->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : 1),
+                ]
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("LeadService notifyLeadAssigned NotificationService error: " . $e->getMessage());
+        }
+
+        // 2. Also trigger configurable NotificationRuleService event if rules are configured in Notification Master
+        try {
+            \App\Domains\Platform\Services\NotificationRuleService::trigger('crm.lead.assigned', [
+                'company_name' => $lead->company_name ?? 'Lead',
+                'contact_person' => $lead->contact_person ?? 'N/A',
+                'source' => $lead->source ?? 'Direct',
+                'expected_amount' => function_exists('format_currency') ? format_currency($lead->expected_amount ?? 0) : (string)($lead->expected_amount ?? 0),
+                'lead_number' => $lead->lead_number ?? '',
+                'assigned_to' => $assignedUser->name,
+                'assigned_user_id' => $assignedUser->id,
+                'exclude_user_ids' => [$assignedUser->id],
+                'assigned_by' => $assignerName,
+                'created_by' => $assignerName,
+            ], $actionUrl, $lead);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("NotificationRuleService trigger crm.lead.assigned failed: " . $e->getMessage());
         }
     }
 }

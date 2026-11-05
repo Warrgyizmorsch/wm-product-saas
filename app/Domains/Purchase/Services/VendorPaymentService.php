@@ -42,8 +42,15 @@ class VendorPaymentService
             }
         }
 
-        if ($bill?->isOnHold()) {
-            throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch and cannot be paid until it is released.");
+        if ($bill) {
+            if ($bill->isOnHold()) {
+                throw new \InvalidArgumentException("Bill {$bill->bill_number} is on hold for a PO/GRN mismatch and cannot be paid until it is released.");
+            }
+            $currentDue = (float) $bill->due_amount;
+            $payAmount = convert_to_base((float)($validated['allocations'][0]['allocated_amount'] ?? $validated['amount']));
+            if ($payAmount > ($currentDue + 0.01)) {
+                throw new \InvalidArgumentException("Payment amount (" . format_currency($payAmount) . ") cannot exceed the bill's net balance due of " . format_currency($currentDue) . ".");
+            }
         }
 
         $payment = DB::transaction(function () use ($validated, $bill, $paymentType, $tenantId) {
@@ -59,6 +66,7 @@ class VendorPaymentService
                 'purchase_order_id' => $bill?->purchase_order_id,
                 'payment_type'     => $paymentType,
                 'payment_method'   => $validated['payment_method'],
+                'bank_account_id'  => $validated['bank_account_id'] ?? null,
                 'payment_date'     => $validated['payment_date'],
                 'amount'           => $actualPaymentAmount,
                 'reference_number' => $validated['reference_number'] ?? null,
@@ -84,6 +92,18 @@ class VendorPaymentService
                     'due_amount'  => $newDue,
                     'status'      => $status,
                 ]);
+
+                // Auto-apply available advance credit if bill still has remaining balance
+                $autoApplyAdvance = !array_key_exists('auto_apply_advance', $validated) || (bool)$validated['auto_apply_advance'];
+                if ($newDue > 0.001 && $autoApplyAdvance) {
+                    $billFresh = $bill->fresh();
+                    $poId = $billFresh->purchase_order_id ?? $billFresh->goodsReceiptNote?->purchase_order_id;
+                    $billService = app(\App\Domains\Purchase\Services\VendorBillService::class);
+                    $availAdv = $billService->getAvailableVendorAdvance((int)$billFresh->vendor_id, $tenantId, $poId);
+                    if ($availAdv > 0.001) {
+                        $billService->applyAdvanceCredit($billFresh, $tenantId);
+                    }
+                }
             }
 
             return $payment;

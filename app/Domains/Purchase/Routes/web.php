@@ -67,9 +67,12 @@ Route::prefix('purchase')
         Route::get('bill-matching', [BillMatchingController::class, 'index'])->name('bill-matching.index');
         Route::put('bill-matching/settings', [BillMatchingController::class, 'updateSettings'])->name('bill-matching.settings');
         Route::post('bills/{bill}/release-hold', [BillMatchingController::class, 'release'])->name('bills.release-hold');
+        Route::get('bills/{bill}/pdf', [VendorBillController::class, 'downloadPdf'])->name('bills.pdf');
         Route::resource('bills', VendorBillController::class);
         Route::get('payments/export', [VendorPaymentController::class, 'export'])->name('payments.export');
+        Route::get('payments/{payment}/download', [VendorPaymentController::class, 'downloadPdf'])->name('payments.download');
         Route::resource('payments', VendorPaymentController::class);
+        Route::get('advances/{advance}/download', [PurchaseAdvancePaymentController::class, 'downloadPdf'])->name('advances.download');
         Route::resource('advances', PurchaseAdvancePaymentController::class);
         Route::resource('advance-payments', PurchaseAdvancePaymentController::class);
 
@@ -77,6 +80,7 @@ Route::prefix('purchase')
         Route::get('returns/export', [PurchaseReturnController::class, 'export'])->name('returns.export');
         Route::get('returns/create', [PurchaseReturnController::class, 'create'])->name('returns.create');
         Route::post('returns', [PurchaseReturnController::class, 'store'])->name('returns.store');
+        Route::get('returns/{return}/download', [PurchaseReturnController::class, 'downloadPdf'])->name('returns.download');
         Route::get('returns/{return}', [PurchaseReturnController::class, 'show'])->name('returns.show');
         Route::post('returns/{return}/approve', [PurchaseReturnController::class, 'approve'])->name('returns.approve');
 

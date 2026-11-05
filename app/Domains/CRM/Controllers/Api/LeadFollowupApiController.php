@@ -115,6 +115,8 @@ class LeadFollowupApiController extends Controller
             'title'                => 'nullable|string|max:255',
             'duration_minutes'     => 'nullable|integer|min:1',
             'guest_emails'         => 'nullable|string|max:500',
+            'assigned_to_id'       => 'nullable|exists:users,id',
+            'tagged_user_id'       => 'nullable|exists:users,id',
             'tagged_user_ids'      => 'nullable|array',
             'tagged_user_ids.*'    => 'integer|exists:users,id',
             'sync_google_calendar' => 'nullable|boolean',
@@ -227,6 +229,8 @@ class LeadFollowupApiController extends Controller
                 'status'               => 'Pending',
                 'followup_date'        => $dueDate,
                 'notes'                => $notes,
+                'assigned_to_id'       => $validated['assigned_to_id'] ?? ($lead->lead_owner_id ?? auth()->id()),
+                'tagged_user_id'       => $validated['tagged_user_id'] ?? null,
                 'tagged_user_ids'      => $validated['tagged_user_ids'] ?? null,
                 'sync_google_calendar' => !empty($validated['sync_google_calendar']),
                 'create_meet_link'     => !empty($validated['create_meet_link']),
@@ -420,6 +424,7 @@ class LeadFollowupApiController extends Controller
                     $q->withoutGlobalScope('branch')->with('owner:id,name,email', 'account:id,name', 'contact:id,name');
                 },
                 'taggedUser:id,name,email',
+                'assignedTo:id,name,email',
             ]);
 
         // Filter by activity type: optional ('Meeting', 'Call', etc.). If omitted or 'all', returns all activities
@@ -439,42 +444,43 @@ class LeadFollowupApiController extends Controller
         }
 
         // Ownership logic:
-        // 1. If meeting is assigned to a specific person -> only that assignee sees it in My Meetings
-        // 2. If meeting is unassigned -> it falls back to the Lead owner or Deal owner
+        // 1. If user is explicitly assigned as primary executive (assigned_to_id)
+        // 2. OR user is tagged as participant/attendee (tagged_user_id or in tagged_user_ids)
+        // 3. Fallback: If meeting is unassigned and has no tagged attendees -> falls back to Lead owner or Deal owner
         $query->where(function ($q) use ($userId) {
-            $q->where(function ($sub) use ($userId) {
-                $sub->where('tagged_user_id', $userId)
-                    ->orWhereJsonContains('tagged_user_ids', $userId)
-                    ->orWhereJsonContains('tagged_user_ids', (string)$userId);
-            })
-            ->orWhere(function ($sub) use ($userId) {
-                $sub->whereNull('tagged_user_id')
-                    ->where(function ($emptyCheck) {
-                        $emptyCheck->whereNull('tagged_user_ids')
-                                   ->orWhere('tagged_user_ids', '[]')
-                                   ->orWhere('tagged_user_ids', '');
-                    })
-                    ->where(function ($ownerSub) use ($userId) {
-                        $ownerSub->where(function ($dealSub) use ($userId) {
-                            $dealSub->whereNotNull('crm_deal_id')
-                                    ->whereHas('deal', function ($dq) use ($userId) {
-                                        $dq->withoutGlobalScope('branch')->where('owner_id', $userId);
-                                    });
-                        })
-                        ->orWhere(function ($leadSub) use ($userId) {
-                            $leadSub->whereNotNull('lead_id')
-                                    ->whereNull('crm_deal_id')
-                                    ->whereHas('lead', function ($lq) use ($userId) {
-                                        $lq->withoutGlobalScope('branch')->where('lead_owner_id', $userId);
-                                    });
-                        });
-                    });
-            });
+            $q->where('assigned_to_id', $userId)
+              ->orWhere('tagged_user_id', $userId)
+              ->orWhereJsonContains('tagged_user_ids', $userId)
+              ->orWhereJsonContains('tagged_user_ids', (string)$userId)
+              ->orWhere(function ($fallbackSub) use ($userId) {
+                  $fallbackSub->whereNull('assigned_to_id')
+                      ->whereNull('tagged_user_id')
+                      ->where(function ($emptyCheck) {
+                          $emptyCheck->whereNull('tagged_user_ids')
+                                     ->orWhere('tagged_user_ids', '[]')
+                                     ->orWhere('tagged_user_ids', '');
+                      })
+                      ->where(function ($ownerSub) use ($userId) {
+                          $ownerSub->where(function ($dealSub) use ($userId) {
+                              $dealSub->whereNotNull('crm_deal_id')
+                                      ->whereHas('deal', function ($dq) use ($userId) {
+                                          $dq->withoutGlobalScope('branch')->where('owner_id', $userId);
+                                      });
+                          })
+                          ->orWhere(function ($leadSub) use ($userId) {
+                              $leadSub->whereNotNull('lead_id')
+                                      ->whereNull('crm_deal_id')
+                                      ->whereHas('lead', function ($lq) use ($userId) {
+                                          $lq->withoutGlobalScope('branch')->where('lead_owner_id', $userId);
+                                      });
+                          });
+                      });
+              });
         });
 
         $meetings = $query->orderBy('followup_date', 'asc')->get();
 
-        $transformMeeting = function (LeadFollowup $item) use ($isGeoVerificationEnabled) {
+        $transformMeeting = function (LeadFollowup $item) use ($isGeoVerificationEnabled, $userId) {
             $isMeeting = strcasecmp((string)$item->type, 'Meeting') === 0;
 
             // Extract outcome if present in notes or status
@@ -566,29 +572,23 @@ class LeadFollowupApiController extends Controller
                     'name'  => $u->name,
                     'email' => $u->email,
                 ])->values()->all(),
+                'tagged_user_ids'              => $item->tagged_user_ids ?? ($item->tagged_user_id ? [$item->tagged_user_id] : []),
                 'tagged_user'                  => $item->taggedUser ? [
                     'id'    => $item->taggedUser->id,
                     'name'  => $item->taggedUser->name,
                     'email' => $item->taggedUser->email,
                 ] : null,
-                'assigned_to'                  => $item->taggedUser ? [
-                    'id'    => $item->taggedUser->id,
-                    'name'  => $item->taggedUser->name,
-                    'email' => $item->taggedUser->email,
+                'assigned_to_id'               => $item->assigned_to_id ?: ($item->lead?->lead_owner_id ?? ($item->deal?->owner_id ?? $item->tagged_user_id)),
+                'assigned_to'                  => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser))) ? [
+                    'id'    => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->id,
+                    'name'  => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->name,
+                    'email' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->email,
                 ] : null,
-                'meeting_owner'                => $item->taggedUser ? [
-                    'id'    => $item->taggedUser->id,
-                    'name'  => $item->taggedUser->name,
-                    'email' => $item->taggedUser->email,
-                ] : ($item->lead?->owner ? [
-                    'id'    => $item->lead->owner->id,
-                    'name'  => $item->lead->owner->name,
-                    'email' => $item->lead->owner->email,
-                ] : ($item->deal?->owner ? [
-                    'id'    => $item->deal->owner->id,
-                    'name'  => $item->deal->owner->name,
-                    'email' => $item->deal->owner->email,
-                ] : null)),
+                'meeting_owner'                => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser))) ? [
+                    'id'    => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->id,
+                    'name'  => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->name,
+                    'email' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->email,
+                ] : null,
                 'assigned_by'                  => $item->lead?->owner ? [
                     'id'    => $item->lead->owner->id,
                     'name'  => $item->lead->owner->name,
@@ -598,7 +598,9 @@ class LeadFollowupApiController extends Controller
                     'name'  => $item->deal->owner->name,
                     'email' => $item->deal->owner->email,
                 ] : null),
-                'is_delegated'                 => !empty($item->tagged_user_id),
+                'is_host'                      => ($item->assigned_to_id ? ($item->assigned_to_id == $userId) : ($item->lead?->lead_owner_id == $userId || $item->deal?->owner_id == $userId)),
+                'is_tagged_attendee'           => in_array($userId, (array)($item->tagged_user_ids ?? [])),
+                'is_delegated'                 => !empty($item->assigned_to_id) && $item->assigned_to_id != ($item->lead?->lead_owner_id ?? $item->deal?->owner_id),
                 'created_at'                   => $item->created_at?->toIso8601String(),
             ];
         };
@@ -683,16 +685,25 @@ class LeadFollowupApiController extends Controller
     {
         $followup = $this->resolveFollowupInstance(...$args);
 
-        if ($followup->lead) {
-            $this->authorize('view', $followup->lead);
-        } elseif ($followup->deal) {
-            $this->authorize('view', $followup->deal);
+        $user = auth()->user();
+        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
+        $isAttendee = in_array($user?->id, (array)($followup->tagged_user_ids ?? [])) || ($followup->tagged_user_id == $user?->id);
+        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+
+        if (!$isHost && !$isAttendee && !$isAdmin) {
+            if ($followup->lead) {
+                $this->authorize('view', $followup->lead);
+            } elseif ($followup->deal) {
+                $this->authorize('view', $followup->deal);
+            }
         }
 
         $tenantId = $followup->tenant_id ?? (auth()->user()?->tenant_id ?? (tenant_id() ?? 1));
         $tenantObj = tenant() ?? \App\Models\Tenant::find($tenantId);
         $settings = is_array($tenantObj?->settings) ? $tenantObj->settings : [];
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
+
+        $canManage = $isHost || $isAdmin || ($followup->lead && $user && $user->can('update', $followup->lead));
 
         return response()->json([
             'success' => true,
@@ -738,24 +749,18 @@ class LeadFollowupApiController extends Controller
                     'name'  => $followup->taggedUser->name,
                     'email' => $followup->taggedUser->email,
                 ] : null,
-                'assigned_to'                  => $followup->taggedUser ? [
-                    'id'    => $followup->taggedUser->id,
-                    'name'  => $followup->taggedUser->name,
-                    'email' => $followup->taggedUser->email,
+                'tagged_user_ids'              => $followup->tagged_user_ids ?? ($followup->tagged_user_id ? [$followup->tagged_user_id] : []),
+                'assigned_to_id'               => $followup->assigned_to_id ?: ($followup->lead?->lead_owner_id ?? ($followup->deal?->owner_id ?? $followup->tagged_user_id)),
+                'assigned_to'                  => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser))) ? [
+                    'id'    => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser)))->id,
+                    'name'  => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser)))->name,
+                    'email' => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser)))->email,
                 ] : null,
-                'meeting_owner'                => $followup->taggedUser ? [
-                    'id'    => $followup->taggedUser->id,
-                    'name'  => $followup->taggedUser->name,
-                    'email' => $followup->taggedUser->email,
-                ] : ($followup->lead?->owner ? [
-                    'id'    => $followup->lead->owner->id,
-                    'name'  => $followup->lead->owner->name,
-                    'email' => $followup->lead->owner->email,
-                ] : ($followup->deal?->owner ? [
-                    'id'    => $followup->deal->owner->id,
-                    'name'  => $followup->deal->owner->name,
-                    'email' => $followup->deal->owner->email,
-                ] : null)),
+                'meeting_owner'                => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser))) ? [
+                    'id'    => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser)))->id,
+                    'name'  => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser)))->name,
+                    'email' => ($followup->assignedTo ?: ($followup->lead?->owner ?: ($followup->deal?->owner ?: $followup->taggedUser)))->email,
+                ] : null,
                 'scheduled_venue_location'     => $followup->location_address,
                 'actual_verification_location' => !empty($followup->checkin_address) ? $followup->checkin_address : ((!empty($followup->checkin_latitude) && !empty($followup->checkin_longitude)) ? ($followup->checkin_latitude . ', ' . $followup->checkin_longitude) : null),
                 'lead'                         => $followup->lead ? [
@@ -773,6 +778,9 @@ class LeadFollowupApiController extends Controller
                     'title'       => $followup->deal->title,
                     'stage'       => $followup->deal->stage,
                 ] : null,
+                'is_host'                      => $isHost,
+                'is_tagged_attendee'           => $isAttendee,
+                'can_manage'                   => $canManage,
             ],
         ]);
     }
@@ -785,10 +793,16 @@ class LeadFollowupApiController extends Controller
     {
         $followup = $this->resolveFollowupInstance(...$args);
 
-        if ($followup->lead) {
-            $this->authorize('update', $followup->lead);
-        } elseif ($followup->deal) {
-            $this->authorize('update', $followup->deal);
+        $user = auth()->user();
+        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
+        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+
+        if (!$isHost && !$isAdmin) {
+            if ($followup->lead) {
+                $this->authorize('update', $followup->lead);
+            } elseif ($followup->deal) {
+                $this->authorize('update', $followup->deal);
+            }
         }
 
         // Defensive fallback: If Postman or client sent body as raw Text without application/json header
@@ -1030,10 +1044,16 @@ class LeadFollowupApiController extends Controller
     {
         $followup = $this->resolveFollowupInstance(...$args);
 
-        if ($followup->lead) {
-            $this->authorize('update', $followup->lead);
-        } elseif ($followup->deal) {
-            $this->authorize('update', $followup->deal);
+        $user = auth()->user();
+        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
+        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+
+        if (!$isHost && !$isAdmin) {
+            if ($followup->lead) {
+                $this->authorize('update', $followup->lead);
+            } elseif ($followup->deal) {
+                $this->authorize('update', $followup->deal);
+            }
         }
 
         $targetStatus = $request->input('status', $followup->status);
@@ -1161,17 +1181,17 @@ class LeadFollowupApiController extends Controller
         $request = request();
 
         // Support multiple parameter keys for mobile app backward compatibility
-        $userId = $request->input('tagged_user_id') 
+        $userId = $request->input('assigned_to_id') 
+            ?? $request->input('tagged_user_id') 
             ?? $request->input('user_id') 
-            ?? $request->input('assigned_to_id') 
             ?? $request->input('meeting_owner_id');
 
         if (!$userId) {
             return response()->json([
                 'success' => false,
-                'message' => 'The tagged_user_id (or user_id / meeting_owner_id) field is required.',
+                'message' => 'The assigned_to_id (or tagged_user_id / user_id) field is required.',
                 'errors'  => [
-                    'tagged_user_id' => ['Please provide tagged_user_id or user_id of the executive to assign this meeting.']
+                    'assigned_to_id' => ['Please provide assigned_to_id or tagged_user_id of the executive to assign this meeting.']
                 ]
             ], 422);
         }
@@ -1182,15 +1202,16 @@ class LeadFollowupApiController extends Controller
                 'success' => false,
                 'message' => 'The selected user was not found.',
                 'errors'  => [
-                    'tagged_user_id' => ['The specified user does not exist.']
+                    'assigned_to_id' => ['The specified user does not exist.']
                 ]
             ], 422);
         }
 
         $user = auth()->user();
-        $oldAssignee = $followup->taggedUser?->name ?: ($followup->lead?->owner?->name ?: ($followup->deal?->owner?->name ?: 'Lead Owner'));
+        $oldAssignee = $followup->assignedTo?->name ?: ($followup->lead?->owner?->name ?: ($followup->deal?->owner?->name ?: ($followup->taggedUser?->name ?: 'Lead Owner')));
+        $followup->assigned_to_id = $assignee->id;
         $followup->tagged_user_id = $assignee->id;
-        $followup->tagged_user_ids = [(int)$assignee->id];
+        // Keep existing tagged_user_ids (attendees) intact so participants remain tagged!
 
         if ($request->filled('notes')) {
             $actorName = $user?->name ?: 'Admin';
@@ -1210,11 +1231,14 @@ class LeadFollowupApiController extends Controller
             );
         }
 
+        \App\Domains\CRM\Services\CrmNotificationService::notifyMeetingAssigned($followup, $assignee, $user?->id);
+
         return response()->json([
             'success' => true,
             'message' => 'Meeting successfully assigned to ' . ($assignee->name ?? 'team member') . '.',
             'data'    => [
                 'id'             => $followup->id,
+                'assigned_to_id' => $followup->assigned_to_id,
                 'tagged_user_id' => $followup->tagged_user_id,
                 'assigned_to'    => [
                     'id'    => $assignee->id,
@@ -1226,6 +1250,12 @@ class LeadFollowupApiController extends Controller
                     'name'  => $assignee->name,
                     'email' => $assignee->email,
                 ],
+                'tagged_users'   => $followup->tagged_users->map(fn($u) => [
+                    'id'    => $u->id,
+                    'name'  => $u->name,
+                    'email' => $u->email,
+                ])->values()->all(),
+                'tagged_user_ids' => $followup->tagged_user_ids,
                 'notes'          => $followup->notes,
             ]
         ]);
@@ -1239,10 +1269,16 @@ class LeadFollowupApiController extends Controller
     {
         $followup = $this->resolveFollowupInstance(...$args);
 
-        if ($followup->lead) {
-            $this->authorize('update', $followup->lead);
-        } elseif ($followup->deal) {
-            $this->authorize('update', $followup->deal);
+        $user = auth()->user();
+        $isHost = ($followup->assigned_to_id == $user?->id) || ($followup->lead?->lead_owner_id == $user?->id) || ($followup->deal?->owner_id == $user?->id);
+        $isAdmin = $user && in_array(strtolower(str_replace([' ', '_', '-'], '', (string)($user->role ?? ''))), ['admin', 'superadmin', 'tenantowner', 'companyadmin', 'crmmanager'], true);
+
+        if (!$isHost && !$isAdmin) {
+            if ($followup->lead) {
+                $this->authorize('update', $followup->lead);
+            } elseif ($followup->deal) {
+                $this->authorize('update', $followup->deal);
+            }
         }
 
         $this->followupService->deleteFollowup($followup);

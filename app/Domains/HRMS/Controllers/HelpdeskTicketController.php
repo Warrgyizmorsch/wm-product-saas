@@ -61,16 +61,31 @@ class HelpdeskTicketController extends Controller
             iconClass: 'feather-help-circle'
         );
 
+        // Send Notification to assigned agent if auto-assigned
+        if ($ticket->assignedAgent) {
+            \App\Services\Notification\NotificationService::sendToEmployee(
+                employee: $ticket->assignedAgent,
+                title: "Ticket Assigned #{$ticket->ticket_number}",
+                message: "You have been assigned to ticket: {$ticket->subject}",
+                actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                type: 'helpdesk_ticket',
+                iconClass: 'feather-user-check'
+            );
+        }
+
         try {
             \App\Domains\Platform\Services\NotificationRuleService::trigger('hrms.ticket.created', [
-                'tenant_id'     => $ticket->tenant_id,
-                'ticket_no'     => $ticket->ticket_number ?? ('#' . $ticket->id),
-                'subject'       => $ticket->subject,
-                'category'      => $ticket->category?->name ?? 'General',
-                'priority'      => ucfirst($ticket->priority),
-                'employee_name' => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
-                'action_url'    => route('hrms.helpdesk.tickets.show', $ticket->id),
-            ]);
+                'tenant_id'        => $ticket->tenant_id,
+                'ticket_no'        => $ticket->ticket_number ?? ('#' . $ticket->id),
+                'subject'          => $ticket->subject,
+                'category'         => $ticket->category?->name ?? 'General',
+                'priority'         => ucfirst($ticket->priority),
+                'employee_name'    => $ticket->employee?->full_name ?? (auth()->user()?->name ?? 'Employee'),
+                'action_url'       => route('hrms.helpdesk.tickets.show', $ticket->id),
+                'employee_id'      => $ticket->employee_id,
+                'user_id'          => $ticket->employee?->user_id,
+                'assigned_user_id' => $ticket->assignedAgent?->user_id,
+            ], $ticket);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
         }
@@ -94,18 +109,33 @@ class HelpdeskTicketController extends Controller
             || (method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
             || $user->is_admin);
 
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $currentEmployee?->branch_id,
+            'department_id' => $user?->department_id ?? $currentEmployee?->department_id,
+            'owner_id'      => $ticket->employee_id,
+        ];
+
         $canManage = $user && ($user->is_admin
-            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
 
         $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
         $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
 
+        // Scoped Head: Department Head / Branch Manager / Reporting Manager access for non-confidential tickets
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $isScopedHead = false;
+        if ($currentEmployee && $ticket->employee_id && !$ticket->is_confidential) {
+            $isScopedHead = $scopeService->canAccessEmployee($user ?? $currentEmployee, $ticket->employee_id);
+        }
+
         if (!$canManage) {
-            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent)) {
+            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent && !$isScopedHead)) {
                 abort(403, 'Unauthorized access to this support ticket.');
             }
-            // Defend internal notes from ticket owners and assigned agents
+            // Defend internal notes from ticket owners and non-managing scoped users
             $ticket->setRelation(
                 'replies',
                 $ticket->replies->filter(fn ($r) => !$r->is_internal_note)->values()
@@ -113,7 +143,7 @@ class HelpdeskTicketController extends Controller
         }
 
         // Anti-conflict-of-interest check: ticket creator cannot manage/update their own ticket unless Super Admin
-        $canUpdate = ($canManage || $isAssignedAgent) && (!$isOwnTicket || $isSuperAdmin);
+        $canUpdate = ($canManage || $isAssignedAgent || $isScopedHead) && (!$isOwnTicket || $isSuperAdmin);
 
         $agents = Employee::where('tenant_id', $tenantId)
             ->where(function ($q) {
@@ -146,15 +176,30 @@ class HelpdeskTicketController extends Controller
 
         $user = auth()->user();
         $currentEmployee = Employee::resolveForUser($user);
+
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $currentEmployee?->branch_id,
+            'department_id' => $user?->department_id ?? $currentEmployee?->department_id,
+            'owner_id'      => $ticket->employee_id,
+        ];
+
         $canManage = $user && ($user->is_admin
-            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
 
         $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
         $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
 
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $isScopedHead = false;
+        if ($currentEmployee && $ticket->employee_id && !$ticket->is_confidential) {
+            $isScopedHead = $scopeService->canAccessEmployee($user ?? $currentEmployee, $ticket->employee_id);
+        }
+
         if (!$canManage) {
-            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent)) {
+            if (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent && !$isScopedHead)) {
                 abort(403, 'Unauthorized to reply to this support ticket.');
             }
         }
@@ -220,12 +265,30 @@ class HelpdeskTicketController extends Controller
         app(\App\Domains\HRMS\Services\ApprovalWorkflowService::class)->authorizeTicketManagement($user, $ticket);
 
         $newStatus = $request->input('status');
+        $previousAssignedTo = $ticket->assigned_to;
+        $newAssignedTo = $request->input('assigned_to');
+
         $this->ticketRepository->updateTicketStatus(
             $ticket,
             $newStatus,
-            $request->input('assigned_to'),
+            $newAssignedTo,
             $request->input('priority')
         );
+
+        // Notify assigned agent if assigned or reassigned
+        if ($newAssignedTo && (int)$newAssignedTo !== (int)$previousAssignedTo) {
+            $assignedEmployee = Employee::where('tenant_id', $tenantId)->find($newAssignedTo);
+            if ($assignedEmployee) {
+                \App\Services\Notification\NotificationService::sendToEmployee(
+                    employee: $assignedEmployee,
+                    title: "Ticket Assigned #{$ticket->ticket_number}",
+                    message: "You have been assigned to ticket: {$ticket->subject}",
+                    actionUrl: route('hrms.helpdesk.tickets.show', $ticket->id),
+                    type: 'helpdesk_ticket',
+                    iconClass: 'feather-user-check'
+                );
+            }
+        }
 
         // Notify employee on status change
         if ($ticket->employee) {
@@ -248,7 +311,9 @@ class HelpdeskTicketController extends Controller
                     'subject'     => $ticket->subject,
                     'resolved_by' => auth()->user()?->name ?? 'Support Agent',
                     'action_url'  => route('hrms.helpdesk.tickets.show', $ticket->id),
-                ]);
+                    'employee_id' => $ticket->employee_id,
+                    'user_id'     => $ticket->employee?->user_id,
+                ], $ticket);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("NotificationRule trigger failed: " . $e->getMessage());
             }
@@ -299,14 +364,28 @@ class HelpdeskTicketController extends Controller
         $user = auth()->user();
         $currentEmployee = Employee::resolveForUser($user);
 
+        $context = [
+            'tenant_id'     => $tenantId,
+            'company_id'    => $user?->company_id,
+            'branch_id'     => $user?->branch_id ?? $currentEmployee?->branch_id,
+            'department_id' => $user?->department_id ?? $currentEmployee?->department_id,
+            'owner_id'      => $ticket->employee_id,
+        ];
+
         $canManage = $user && ($user->is_admin
-            || $this->access->allows($user, 'hrms.helpdesk.manage', ['tenant_id' => $tenantId])
-            || $this->access->allows($user, 'hr.settings.manage', ['tenant_id' => $tenantId]));
+            || $this->access->allows($user, 'hrms.helpdesk.manage', $context)
+            || $this->access->allows($user, 'hr.settings.manage', $context));
 
         $isAssignedAgent = $currentEmployee && $ticket->assigned_to && (int)$currentEmployee->id === (int)$ticket->assigned_to;
         $isOwnTicket = $currentEmployee && (int)$currentEmployee->id === (int)$ticket->employee_id;
 
-        if (!$canManage && (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent))) {
+        $scopeService = app(\App\Domains\HRMS\Services\HrmsScopeService::class);
+        $isScopedHead = false;
+        if ($currentEmployee && $ticket->employee_id && !$ticket->is_confidential) {
+            $isScopedHead = $scopeService->canAccessEmployee($user ?? $currentEmployee, $ticket->employee_id);
+        }
+
+        if (!$canManage && (!$currentEmployee || (!$isOwnTicket && !$isAssignedAgent && !$isScopedHead))) {
             abort(403, 'Unauthorized access to this support ticket.');
         }
 

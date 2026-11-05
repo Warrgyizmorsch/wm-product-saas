@@ -69,12 +69,7 @@ class AttendanceApiController extends Controller
             return null;
         }
 
-        return Employee::where('user_id', $user->id)
-            ->where('tenant_id', tenant_id() ?? $user->tenant_id ?? 1)
-            ->first()
-            ?? Employee::where('personal_email', $user->email)
-                ->orWhere('office_email', $user->email)
-                ->first();
+        return Employee::resolveForUser($user);
     }
 
     /**
@@ -1209,7 +1204,7 @@ class AttendanceApiController extends Controller
             $hours = 24;
         }
 
-        $deletedCount = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->pruneOldLogs($hours);
+        $deletedCount = app(\App\Domains\HRMS\Services\AttendanceRouteService::class)->pruneOldLogs(null, $hours);
 
         return $this->sendSuccess([
             'pruned_count'     => $deletedCount,

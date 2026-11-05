@@ -50,6 +50,23 @@ class Notification extends BaseModel
         'read_at' => 'datetime',
     ];
 
+    public function getActionUrlAttribute($value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (!str_contains($value, '/') && \Illuminate\Support\Facades\Route::has($value)) {
+            try {
+                return route($value);
+            } catch (\Throwable $e) {
+                return $value;
+            }
+        }
+
+        return $value;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

@@ -11,23 +11,25 @@
 @if ($tdsSections->isNotEmpty())
     <div id="billTdsBlock" class="mt-3 pt-2 border-top">
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-muted fs-13 fw-semibold">TDS section:</span>
-            <select name="tds_section_id" id="billTdsSection" class="form-select form-select-sm" style="width: 190px;">
-                <option value="">No TDS</option>
-                @foreach ($tdsSections as $section)
-                    <option value="{{ $section->id }}" @selected((string) old('tds_section_id') === (string) $section->id)>{{ $section->code }} - {{ $section->name }}</option>
-                @endforeach
-            </select>
+            <span class="text-muted fs-13 fw-semibold text-nowrap">TDS section:</span>
+            <div style="width: 150px; min-width: 150px; max-width: 150px; flex: 0 0 150px;">
+                <select name="tds_section_id" id="billTdsSection" class="form-select form-select-sm" style="width: 150px !important; min-width: 0 !important; max-width: 150px !important; height: 30px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #ffffff; text-overflow: ellipsis; padding-top: 3px; padding-bottom: 3px; padding-left: 8px;">
+                    <option value="">No TDS</option>
+                    @foreach ($tdsSections as $section)
+                        <option value="{{ $section->id }}" @selected((string) old('tds_section_id') === (string) $section->id)>{{ $section->code }} - {{ $section->name }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
         <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="text-muted fs-13 fw-semibold">Less: TDS <span id="billTdsRate" class="text-muted small"></span></span>
-            <input type="number" step="0.01" min="0" name="tds_amount" id="billTdsAmount" class="form-control form-control-sm text-end font-monospace" style="width: 150px; height: 30px;" value="{{ old('tds_amount', '0.00') }}">
+            <span class="text-muted fs-13 fw-semibold text-nowrap">Less: TDS <span id="billTdsRate" class="text-muted small"></span></span>
+            <input type="number" step="0.01" min="0" name="tds_amount" id="billTdsAmount" class="form-control form-control-sm text-end font-monospace" style="width: 150px; height: 30px; border: 1px solid #cbd5e1; border-radius: 4px;" value="{{ old('tds_amount', '0.00') }}">
         </div>
         <input type="hidden" name="tds_overridden" id="billTdsOverridden" value="{{ old('tds_overridden', 0) }}">
         <div class="small text-muted text-end mb-2" id="billTdsNote"></div>
         <div class="d-flex justify-content-between align-items-center pt-1">
-            <span class="fw-bold fs-14">Net payable to vendor:</span>
-            <input type="text" id="billTdsNetPayable" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px;" readonly value="0.00">
+            <span class="fw-bold fs-14 text-nowrap">Net payable to vendor:</span>
+            <input type="text" id="billTdsNetPayable" class="form-control form-control-sm text-end fw-bold" style="width: 150px; height: 34px; border: 1px solid #cbd5e1; border-radius: 4px;" readonly value="0.00">
         </div>
     </div>
 

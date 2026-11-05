@@ -267,6 +267,7 @@ class DispatchOrderController extends Controller
 
         try {
             $dispatch = $this->dispatchService->createDispatchOrder($validated, Auth::id() ?? 1);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchCreated($dispatch);
             return redirect()->route('sales.dispatches.index')->with('success', "Dispatch Order {$dispatch->dispatch_number} created successfully.");
         } catch (Exception $e) {
             return redirect()->back()->withInput()->with('error', $e->getMessage());
@@ -314,13 +315,7 @@ class DispatchOrderController extends Controller
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
 
-            \App\Domains\Platform\Services\NotificationRuleService::trigger('sales.dispatch.shipped', [
-                'doc_no' => $dispatch->dispatch_number,
-                'customer_name' => $dispatch->customer?->name ?? 'Customer',
-                'transporter' => $dispatch->transporter?->name ?? $dispatch->carrier ?? 'Carrier',
-                'tracking_no' => $dispatch->tracking_number ?? $dispatch->lr_number ?? 'N/A',
-                'date' => now()->format('Y-m-d'),
-            ], route('inventory.dispatches.show', $dispatch->id), $dispatch);
+            \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchShipped($dispatch);
 
             $redirect = $request->filled('redirect_to')
                 ? redirect()->to($request->input('redirect_to'))
@@ -370,6 +365,8 @@ class DispatchOrderController extends Controller
 
         // Auto sync Material Requirement and Sales Order status to Delivered / Partially Delivered
         $this->dispatchService->syncFulfillmentStatuses((int)$dispatch->sales_order_id, $dispatch->material_requirement_id ? (int)$dispatch->material_requirement_id : null);
+
+        \App\Domains\Sales\Services\SalesNotificationService::notifyDispatchDelivered($dispatch);
 
         return redirect()->route('sales.dispatches.show', $dispatch->id)
             ->with('success', 'Dispatch Order status updated to Delivered successfully.');

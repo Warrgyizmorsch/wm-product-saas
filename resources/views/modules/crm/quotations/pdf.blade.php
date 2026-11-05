@@ -124,9 +124,7 @@
         .info-boxes-table {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 12px 0;
-            margin-left: -12px;
-            margin-right: -12px;
+            border-spacing: 0;
             margin-bottom: 14px;
             page-break-inside: avoid;
         }
@@ -136,7 +134,13 @@
             border-radius: 6px;
             padding: 10px 12px;
             vertical-align: top;
-            width: 50%;
+            width: 48.5%;
+        }
+        .info-box-gap {
+            width: 3%;
+            border: none;
+            background: transparent;
+            padding: 0;
         }
         .box-title {
             font-size: 9px;
@@ -380,17 +384,41 @@
     <table class="header-table">
         <tr>
             <td style="vertical-align: top; width: 58%;">
+                @php
+                    $sellerOrg = billing_organization_details($quotation);
+                @endphp
                 <div class="company-avatar">
-                    {{ strtoupper(substr(tenant() ? tenant()->name : 'S', 0, 1)) }}
+                    {{ $sellerOrg['avatar_char'] }}
                 </div>
                 <div class="company-info">
-                    <div class="company-name">{{ tenant() ? tenant()->name : 'Demo Tenant' }}</div>
-                    <div class="company-sub">Official Corporate Sales Unit</div>
+                    <div class="company-name">{{ $sellerOrg['name'] }}</div>
+                    @if(!empty($sellerOrg['unit_subtext']))
+                        <div class="company-sub">{{ $sellerOrg['unit_subtext'] }}</div>
+                    @endif
                 </div>
                 <div class="company-address">
-                    H-1, Industrial Area, Sukher, Udaipur 313001, Rajasthan, India<br>
-                    <strong>GSTIN:</strong> 08AAFCS1234E1Z0 &nbsp;|&nbsp; <strong>State Code:</strong> 08 (Rajasthan)<br>
-                    <strong>Email:</strong> {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }} &nbsp;|&nbsp; <strong>Phone:</strong> +91 294 2440230
+                    @if(!empty($sellerOrg['address']))
+                        {{ $sellerOrg['address'] }}<br>
+                    @endif
+                    @if(!empty($sellerOrg['gstin']))
+                        <strong>GSTIN:</strong> {{ $sellerOrg['gstin'] }}
+                    @endif
+                    @if(!empty($sellerOrg['state_code']) && !empty($sellerOrg['state_name']))
+                        @if(!empty($sellerOrg['gstin'])) &nbsp;|&nbsp; @endif
+                        <strong>State Code:</strong> {{ $sellerOrg['state_code'] }} ({{ $sellerOrg['state_name'] }})
+                    @endif
+                    @if(!empty($sellerOrg['gstin']) || !empty($sellerOrg['state_code']))
+                        <br>
+                    @endif
+                    @if(!empty($sellerOrg['email']))
+                        <strong>Email:</strong> {{ $sellerOrg['email'] }}
+                    @endif
+                    @if(!empty($sellerOrg['email']) && !empty($sellerOrg['phone']))
+                        &nbsp;|&nbsp;
+                    @endif
+                    @if(!empty($sellerOrg['phone']))
+                        <strong>Phone:</strong> {{ $sellerOrg['phone'] }}
+                    @endif
                 </div>
             </td>
             <td style="vertical-align: top; width: 42%; text-align: right;">
@@ -444,62 +472,57 @@
                 @endif
             </td>
 
-            <!-- Right Box: Quotation References -->
+            <!-- Middle Gap -->
+            <td class="info-box-gap"></td>
+
+            <!-- Right Box: Quotation Details -->
             <td class="info-box">
-                <div class="box-title">QUOTATION REFERENCES:</div>
+                <div class="box-title">QUOTATION DETAILS:</div>
                 
-                @if ($quotation->crmDeal)
+                @php
+                    $salesRep = $quotation->salesPerson ?: ($quotation->crmDeal?->owner ?: null);
+                    $dealPaymentTerms = $quotation->crmDeal?->payment_terms;
+                    $paymentTermsLabel = $dealPaymentTerms ? \App\Domains\Platform\Models\PaymentTerm::getLabel($dealPaymentTerms) : null;
+                @endphp
+
+                @if ($salesRep && $salesRep->name)
                     <div class="ref-row">
-                        <span class="ref-label">CRM Deal Ref:</span>
-                        <span class="ref-val" style="color: #2563eb;">{{ $quotation->crmDeal->deal_number }}</span>
+                        <span class="ref-label">Sales Representative:</span>
+                        <span class="ref-val" style="color: #1e293b; font-weight: 600;">{{ $salesRep->name }}</span>
                     </div>
-                @elseif ($quotation->lead)
+                @endif
+
+                @if ($paymentTermsLabel)
                     <div class="ref-row">
-                        <span class="ref-label">Lead Ref:</span>
-                        <span class="ref-val" style="color: #2563eb;">{{ $quotation->lead->title ?: $quotation->lead->name }}</span>
+                        <span class="ref-label">Payment Terms:</span>
+                        <span class="ref-val">{{ $paymentTermsLabel }}</span>
                     </div>
                 @endif
 
                 <div class="ref-row">
-                    <span class="ref-label">Pricing Mode:</span>
-                    <span class="ref-val">{{ $quotation->effective_tax_mode === 'inclusive' ? 'Tax Inclusive' : 'Tax Exclusive' }}</span>
-                </div>
-
-                <div class="ref-row">
-                    <span class="ref-label">Discount Option:</span>
-                    <span class="ref-val">
-                        @if($quotation->effective_discount_type === 'item_wise')
-                            Line / Item Level
-                        @elseif($quotation->effective_discount_type === 'none')
-                            Without Discount
-                        @else
-                            Order Level
-                        @endif
-                    </span>
-                </div>
-
-                <div class="ref-row">
-                    <span class="ref-label">GST Tax Type:</span>
-                    <span class="ref-val" style="color: #0f766e;">
+                    <span class="ref-label">Supply Type:</span>
+                    <span class="ref-val" style="color: #0f766e; font-weight: 600;">
                         @if($quotation->effective_tax_type === 'intra_state')
                             Intra-State (CGST + SGST)
                         @elseif($quotation->effective_tax_type === 'inter_state')
                             Inter-State (IGST)
                         @else
-                            Exempt (0%)
+                            Tax Exempt (0%)
                         @endif
                     </span>
                 </div>
 
                 <div class="ref-row">
-                    <span class="ref-label">Revision Count:</span>
-                    <span class="ref-val">Revision {{ $quotation->revision_number }}</span>
+                    <span class="ref-label">Price Basis:</span>
+                    <span class="ref-val">{{ $quotation->effective_tax_mode === 'inclusive' ? 'Prices Incl. of GST' : 'Prices Excl. of GST' }}</span>
                 </div>
 
-                <div class="ref-row">
-                    <span class="ref-label">Status:</span>
-                    <span class="ref-val">{{ $quotation->status }}</span>
-                </div>
+                @if($quotation->revision_number > 0)
+                    <div class="ref-row">
+                        <span class="ref-label">Revision:</span>
+                        <span class="ref-val font-monospace">Rev. {{ $quotation->revision_number }}</span>
+                    </div>
+                @endif
             </td>
         </tr>
     </table>
@@ -548,34 +571,29 @@
     <!-- 4. CALCULATIONS SECTION -->
     <table class="calc-wrapper">
         <tr>
-            <!-- Left: Tax Treatment Summary & Notes -->
+            <!-- Left: Commercial Notes & Terms -->
             <td class="calc-notes-col">
                 <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
-                    <div style="font-size: 8.5px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 4px;">Tax Treatment & Commercials Summary</div>
-                    <table style="width: 100%; font-size: 9.5px; border-collapse: collapse;">
+                    <div style="font-size: 8.5px; font-weight: bold; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 6px;">Commercial Notes &amp; Validity</div>
+                    <table style="width: 100%; font-size: 9px; border-collapse: collapse; line-height: 1.5;">
                         <tr>
-                            <td style="color: #64748b; padding: 2px 0; width: 45%;">Tax Scheme:</td>
-                            <td style="font-weight: bold; color: #1e293b; padding: 2px 0;">{{ $quotation->effective_tax_mode === 'inclusive' ? 'Inclusive of GST' : 'Exclusive of GST (Base Rate)' }}</td>
+                            <td style="color: #64748b; padding: 2px 0; width: 38%;">Quotation Validity:</td>
+                            <td style="font-weight: 600; color: #1e293b; padding: 2px 0;">Until {{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : date('d-M-Y', strtotime('+30 days')) }}</td>
                         </tr>
-                        <tr>
-                            <td style="color: #64748b; padding: 2px 0;">Applicable GST:</td>
-                            <td style="font-weight: bold; color: #0f766e; padding: 2px 0;">
-                                @if($quotation->effective_tax_type === 'intra_state')
-                                    CGST + SGST (Intra-State Supply)
-                                @elseif($quotation->effective_tax_type === 'inter_state')
-                                    IGST (Inter-State Supply)
-                                @else
-                                    GST Exempt / Nil-Rated
-                                @endif
-                            </td>
-                        </tr>
+                        @if($paymentTermsLabel)
+                            <tr>
+                                <td style="color: #64748b; padding: 2px 0;">Payment Terms:</td>
+                                <td style="font-weight: 600; color: #1e293b; padding: 2px 0;">{{ $paymentTermsLabel }}</td>
+                            </tr>
+                        @endif
+                        @if(!empty($quotation->notes))
+                            <tr>
+                                <td style="color: #64748b; padding: 2px 0; vertical-align: top;">Remarks:</td>
+                                <td style="font-style: italic; color: #475569; padding: 2px 0;">{{ $quotation->notes }}</td>
+                            </tr>
+                        @endif
                     </table>
                 </div>
-
-                @if(!empty($quotation->notes))
-                    <div class="section-label">Internal Notes / Remarks:</div>
-                    <div class="terms-content" style="font-style: italic; color: #64748b;">{{ $quotation->notes }}</div>
-                @endif
             </td>
 
             <!-- Right: Totals Box -->
@@ -647,7 +665,9 @@
         <tr>
             <td class="sig-note">
                 This sales quotation is valid until {{ $quotation->expiry_date ? date('d-M-Y', strtotime($quotation->expiry_date)) : 'the expiry date' }}.<br>
-                For any queries, please contact our support at {{ tenant() ? tenant()->billing_email : 'sales@saaserp.com' }}.
+                @if(!empty($sellerOrg['email']))
+                    For any queries, please contact our support at {{ $sellerOrg['email'] }}.
+                @endif
             </td>
             <td class="sig-space">
                 <div class="sig-line">Authorized Signature</div>

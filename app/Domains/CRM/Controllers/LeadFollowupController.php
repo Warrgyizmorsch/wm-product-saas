@@ -296,6 +296,7 @@ class LeadFollowupController extends Controller
                 'tenant_id' => $tenantId,
                 'crm_deal_id' => $deal->id,
                 'lead_id' => null,
+                'assigned_to_id' => $request->input('assigned_to_id') ?: ($deal->owner_id ?: auth()->id()),
                 'followup_date' => $followupDateTime,
                 'type' => $scheduleType,
                 'title' => $titleInput,
@@ -439,9 +440,6 @@ class LeadFollowupController extends Controller
     public function meetingsIndex(Request $request)
     {
         if ($request->wantsJson() || $request->ajax()) {
-            if (!$request->has('type')) {
-                $request->merge(['type' => 'Meeting']);
-            }
             return app(\App\Domains\CRM\Controllers\Api\LeadFollowupApiController::class)->myMeetings($request);
         }
 
@@ -454,43 +452,47 @@ class LeadFollowupController extends Controller
         $isGeoVerificationEnabled = !empty($settings['field_visit_verification']);
 
         $baseQuery = LeadFollowup::withoutGlobalScope('branch')
-            ->where('tenant_id', $tenantId)
-            ->where(function ($q) {
-                $q->where('type', 'Meeting')
-                    ->orWhereNull('type');
+            ->where('tenant_id', $tenantId);
+
+        // Optional activity type filter (if specified and not 'all')
+        if ($request->filled('type') && strtolower($request->input('type')) !== 'all') {
+            $baseQuery->where('type', $request->input('type'));
+        }
+
+        $baseQuery->where(function ($q) use ($userId) {
+            // 1. If assigned to a specific person (assigned_to_id) OR tagged as attendee
+            $q->where(function ($sub) use ($userId) {
+                $sub->where('assigned_to_id', $userId)
+                    ->orWhere('tagged_user_id', $userId)
+                    ->orWhereJsonContains('tagged_user_ids', $userId)
+                    ->orWhereJsonContains('tagged_user_ids', (string) $userId);
             })
-            ->where(function ($q) use ($userId) {
-                // 1. If assigned to a specific person -> only that assignee sees it in My Meetings
-                $q->where(function ($sub) use ($userId) {
-                    $sub->where('tagged_user_id', $userId)
-                        ->orWhereJsonContains('tagged_user_ids', $userId)
-                        ->orWhereJsonContains('tagged_user_ids', (string) $userId);
-                })
-                    // 2. If unassigned -> falls back to Lead owner or Deal owner
-                    ->orWhere(function ($sub) use ($userId) {
-                    $sub->whereNull('tagged_user_id')
-                        ->where(function ($emptyCheck) {
-                            $emptyCheck->whereNull('tagged_user_ids')
-                                ->orWhere('tagged_user_ids', '[]')
-                                ->orWhere('tagged_user_ids', '');
+            // 2. If unassigned -> falls back to Lead owner or Deal owner
+            ->orWhere(function ($sub) use ($userId) {
+                $sub->whereNull('assigned_to_id')
+                    ->whereNull('tagged_user_id')
+                    ->where(function ($emptyCheck) {
+                        $emptyCheck->whereNull('tagged_user_ids')
+                            ->orWhere('tagged_user_ids', '[]')
+                            ->orWhere('tagged_user_ids', '');
+                    })
+                    ->where(function ($ownerSub) use ($userId) {
+                        $ownerSub->where(function ($dealSub) use ($userId) {
+                            $dealSub->whereNotNull('crm_deal_id')
+                                ->whereHas('deal', function ($dq) use ($userId) {
+                                    $dq->withoutGlobalScope('branch')->where('owner_id', $userId);
+                                });
                         })
-                        ->where(function ($ownerSub) use ($userId) {
-                            $ownerSub->where(function ($dealSub) use ($userId) {
-                                $dealSub->whereNotNull('crm_deal_id')
-                                    ->whereHas('deal', function ($dq) use ($userId) {
-                                        $dq->withoutGlobalScope('branch')->where('owner_id', $userId);
-                                    });
-                            })
-                                ->orWhere(function ($leadSub) use ($userId) {
-                                    $leadSub->whereNotNull('lead_id')
-                                        ->whereNull('crm_deal_id')
-                                        ->whereHas('lead', function ($lq) use ($userId) {
-                                            $lq->withoutGlobalScope('branch')->where('lead_owner_id', $userId);
-                                        });
+                        ->orWhere(function ($leadSub) use ($userId) {
+                            $leadSub->whereNotNull('lead_id')
+                                ->whereNull('crm_deal_id')
+                                ->whereHas('lead', function ($lq) use ($userId) {
+                                    $lq->withoutGlobalScope('branch')->where('lead_owner_id', $userId);
                                 });
                         });
-                });
+                    });
             });
+        });
 
         $startOfToday = now()->startOfDay();
         $endOfToday = now()->endOfDay();
@@ -570,10 +572,11 @@ class LeadFollowupController extends Controller
             'deal' => function ($q) {
                 $q->withoutGlobalScope('branch')->with('owner:id,name,email', 'account:id,name', 'contact:id,name');
             },
+            'assignedTo:id,name,email',
             'taggedUser:id,name,email',
         ])->paginate(15)->withQueryString();
 
-        $paginated->through(function (LeadFollowup $item) use ($isGeoVerificationEnabled) {
+        $paginated->through(function (LeadFollowup $item) use ($isGeoVerificationEnabled, $userId) {
             $isMeeting = strcasecmp((string) $item->type, 'Meeting') === 0;
 
             $leadData = null;
@@ -669,11 +672,20 @@ class LeadFollowupController extends Controller
                     'name' => $u->name,
                     'email' => $u->email,
                 ])->values()->all(),
-                'assigned_to' => $item->taggedUser ? [
-                    'id' => $item->taggedUser->id,
-                    'name' => $item->taggedUser->name,
-                    'email' => $item->taggedUser->email,
+                'tagged_user_ids' => $item->tagged_user_ids ?: [],
+                'assigned_to_id' => $item->assigned_to_id,
+                'assigned_to' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser))) ? [
+                    'id' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->id,
+                    'name' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->name,
+                    'email' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->email,
                 ] : null,
+                'meeting_owner' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser))) ? [
+                    'id' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->id,
+                    'name' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->name,
+                    'email' => ($item->assignedTo ?: ($item->lead?->owner ?: ($item->deal?->owner ?: $item->taggedUser)))->email,
+                ] : null,
+                'is_host' => ($item->assigned_to_id ? ($item->assigned_to_id == $userId) : (($item->lead?->lead_owner_id == $userId) || ($item->deal?->owner_id == $userId))),
+                'is_tagged_attendee' => in_array($userId, (array) ($item->tagged_user_ids ?? [])),
                 'assigned_by' => $item->lead?->owner ? [
                     'id' => $item->lead->owner->id,
                     'name' => $item->lead->owner->name,
@@ -683,7 +695,7 @@ class LeadFollowupController extends Controller
                         'name' => $item->deal->owner->name,
                         'email' => $item->deal->owner->email,
                     ] : null),
-                'is_delegated' => !empty($item->tagged_user_id),
+                'is_delegated' => !empty($item->assigned_to_id) && $item->assigned_to_id != ($item->lead?->lead_owner_id ?? $item->deal?->owner_id),
             ];
         });
 

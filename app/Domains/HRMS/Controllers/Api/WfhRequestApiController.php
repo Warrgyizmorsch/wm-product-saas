@@ -4,6 +4,7 @@ namespace App\Domains\HRMS\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\WfhRequest;
 use App\Domains\HRMS\Repositories\WfhRequestRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
