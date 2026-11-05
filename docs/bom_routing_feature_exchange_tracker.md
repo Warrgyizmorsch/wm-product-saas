@@ -184,7 +184,7 @@ Currently:
 
 ### TRACK-04: BOM Creation & Edit UI Overhaul (Operation-Centric Sequential Cards / Accordions)
 * **Date Logged:** 2026-10-30 (Updated: November 2026 with Option A Layout Consensus)
-* **Status:** 🟢 **Applied & Complete**
+* **Status:** 🛠️ **Applied (Awaiting User Acceptance)**
 * **Area:** BOM Frontend Views (`bom/create.blade.php`, `bom/edit.blade.php`), Routing Views (`routing/create.blade.php`, `routing/edit.blade.php`, `routing/index.blade.php`, `routing/show.blade.php`), Alpine.js Scripts & Form Validation
 
 #### 1. Description & Context
@@ -351,6 +351,52 @@ The BOM defines the material components, and every component must be assigned to
 * `app/Domains/Production/Requests/StoreProductionBomRequest.php`
 * `app/Domains/Production/Requests/UpdateProductionBomRequest.php`
 * `app/Domains/Production/Services/ProductionBomService.php`
+
+#### 5. Identified Issue & Root Cause: Duplicate Material Error Text Disappears on Re-selection (UI Bug)
+* **Date Identified:** 2026-11-05 (Reported during user Journey A testing)
+* **Status:** 🛠️ **Investigated & Documented (Awaiting User Approval to Apply Fix)**
+* **Symptoms (Observed in Browser):**
+  1. Under an Operation Card (e.g., Op 10), when a user selects a material that already exists in the same operation, the Select2 input receives a red outline (`.is-invalid`), and the error text appears underneath: `"Duplicate material component found for the same routing operation."` (Verified in user screenshot `media_1793856589859_eb4b470e.png`).
+  2. While remaining on that same row, if the user changes the selection to *another* material that is *also* already used in the same operation, the Select2 input retains the red outline (`.is-invalid`), but the error message text below completely disappears (Verified in user screenshot `media_1793856575603_4180a5b3.png`).
+* **Root Cause Breakdown:**
+  1. In `resources/views/components/ui/odoo-form-ui.blade.php`, global listeners listen for user interaction:
+     `$(document).on('input change', '.odoo-form-control, .odoo-table-input, .odoo-table-select, .erp-file-input', ...)`
+     and `$(document).on('change.select2', 'select', ...)`.
+  2. When the user changes a select value, `clearOdooError(this)` executes to hide previous server-side validation errors:
+     ```javascript
+     let serverErrorEl = errorContainer.querySelector('.invalid-feedback');
+     if (serverErrorEl) {
+         serverErrorEl.classList.remove('d-block');
+         serverErrorEl.classList.add('d-none');
+     }
+     ```
+  3. **First duplicate selection:**
+     - Alpine's `<template x-if="errors['items.' + getItemIndex(item) + '.material_id']">` had not yet rendered its `<div class="invalid-feedback d-block fs-11 mt-1">` element when `clearOdooError()` ran.
+     - Following `validateDuplicateMaterials()`, Alpine evaluated `x-if` to true and rendered the `<div class="invalid-feedback d-block ...">` node fresh into the DOM.
+     - `$nextTick()` added `.is-invalid` to the Select2 container. Both red outline and error text were visible.
+  4. **Second duplicate selection (re-selection):**
+     - When the user selects another duplicate material, `clearOdooError(this)` runs first upon the `change` event.
+     - It finds the *already-rendered* `.invalid-feedback` element in the table cell `<td>` and applies `classList.add('d-none')` while removing `d-block`.
+     - In Alpine, the `errors['items.X.material_id']` key is updated, but because the condition was *already truthy* and the message string was identical, Alpine does not recreate the DOM node nor does it reset classes overridden by jQuery/DOM manipulation.
+     - In `validateDuplicateMaterials()`, Step 4 re-applies `.is-invalid` to `$s2Selection`, keeping the red outline visible, but never removes `d-none` or re-adds `d-block` to `.invalid-feedback`.
+     - **Result:** The red border stays on the Select2 box, but the text is suppressed by Bootstrap's `d-none`.
+* **Proposed Resolution:**
+  1. In `resources/views/modules/production/bom/create.blade.php` and `edit.blade.php`:
+     Inside `validateDuplicateMaterials()` Step 4 (`$nextTick`), explicitly ensure any row with a material error has its feedback element refreshed:
+     ```javascript
+     const $feedback = $row.find('.invalid-feedback');
+     if (hasErr) {
+         $select.addClass('is-invalid');
+         $s2Selection.addClass('is-invalid');
+         $feedback.removeClass('d-none').addClass('d-block');
+     } else {
+         $select.removeClass('is-invalid');
+         $s2Selection.removeClass('is-invalid');
+         $feedback.removeClass('d-block').addClass('d-none');
+     }
+     ```
+  2. In `resources/views/components/ui/odoo-form-ui.blade.php`:
+     Update `clearOdooError(input)` so that it does not blindly add `d-none` to feedback elements managed by Alpine (`:not([x-text])`).
 
 ---
 
