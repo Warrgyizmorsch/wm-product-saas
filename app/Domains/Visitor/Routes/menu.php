@@ -22,7 +22,7 @@ return [
                 'label'      => 'visitor.my_approvals',
                 'default'    => 'My Approvals',
                 'route'      => 'visitor.approvals.index',
-                'permission' => 'visitor.passes.view',
+                'permission' => 'visitor.passes.approve',
             ],
         ],
     ],

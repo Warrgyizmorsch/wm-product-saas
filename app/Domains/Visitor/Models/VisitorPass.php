@@ -10,11 +10,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\BelongsToBranch;
+use App\Models\Concerns\HasRbacScope;
 use App\Models\User;
 
 class VisitorPass extends Model
 {
-    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes;
+    use BelongsToTenant, BelongsToCompany, BelongsToBranch, HasFactory, SoftDeletes, HasRbacScope;
+
+    protected ?string $rbacPermission = 'visitor.passes.view';
+    protected ?string $rbacOwnerColumn = 'host_user_id';
 
     protected $table = 'visitor_passes';
 

@@ -25,6 +25,7 @@ class StockReservationApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', StockReservation::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = StockReservation::query()
@@ -77,6 +78,8 @@ class StockReservationApiController extends Controller
                 'message' => 'Stock Reservation not found',
             ], 404);
         }
+
+        $this->authorize('update', $reservation);
 
         if ($reservation->status !== 'Active') {
             return response()->json([

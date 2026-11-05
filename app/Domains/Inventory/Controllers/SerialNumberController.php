@@ -13,6 +13,8 @@ class SerialNumberController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', SerialNumber::class);
+
         $tenantId = require_tenant_id();
 
         $query = SerialNumber::query()

@@ -43,6 +43,7 @@ class PurchaseRfqApiController extends Controller
      */
     public function meta(): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
         [$tenantId] = $this->resolveTenantContext();
         $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)->where('status', 'Approved')->orderBy('id', 'desc')->get(['id', 'requisition_number']);
         $products     = Product::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name', 'sku', 'cost_price', 'unit_cost', 'preferred_vendor_id']);
@@ -68,6 +69,7 @@ class PurchaseRfqApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = PurchaseRfq::query()
@@ -108,6 +110,8 @@ class PurchaseRfqApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', PurchaseRfq::class);
+
         $validator = Validator::make($request->all(), [
             'rfq_date'                => ['required', 'date'],
             'purchase_requisition_id' => ['nullable', 'integer'],
@@ -164,6 +168,8 @@ class PurchaseRfqApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $rfq);
+
         return response()->json([
             'success' => true,
             'data'    => $rfq,
@@ -184,6 +190,8 @@ class PurchaseRfqApiController extends Controller
                 'message' => 'Purchase RFQ not found',
             ], 404);
         }
+
+        $this->authorize('update', $rfq);
 
         if ($rfq->status !== 'Draft') {
             return response()->json([
@@ -236,6 +244,8 @@ class PurchaseRfqApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $rfq);
+
         if ($rfq->status !== 'Draft') {
             return response()->json([
                 'success' => false,
@@ -265,6 +275,8 @@ class PurchaseRfqApiController extends Controller
                 'message' => 'Purchase RFQ not found',
             ], 404);
         }
+
+        $this->authorize('update', $rfq);
 
         $validator = Validator::make($request->all(), [
             'quotes'                     => ['required', 'array'],
@@ -336,6 +348,8 @@ class PurchaseRfqApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('update', $rfq);
+
         $rfq->update(['status' => 'Confirmed']);
 
         return response()->json([
@@ -359,6 +373,9 @@ class PurchaseRfqApiController extends Controller
                 'message' => 'Purchase RFQ not found',
             ], 404);
         }
+
+        $this->authorize('view', $rfq);
+        $this->authorize('create', \App\Domains\Purchase\Models\PurchaseOrder::class);
 
         $validator = Validator::make($request->all(), [
             'vendor_id'                 => ['required', 'integer'],
@@ -402,6 +419,7 @@ class PurchaseRfqApiController extends Controller
      */
     public function savingsDashboard(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
         [$tenantId] = $this->resolveTenantContext();
         $user       = auth()->user();
         $data       = $this->rfqService->getSavingsDashboardData($request, $tenantId, $user);
@@ -417,6 +435,7 @@ class PurchaseRfqApiController extends Controller
      */
     public function poSavingsDetails(int $orderId): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
         [$tenantId] = $this->resolveTenantContext();
         $order      = PurchaseOrder::where('tenant_id', $tenantId)
             ->with(['vendor', 'creator', 'items.product', 'requisition'])
@@ -452,6 +471,7 @@ class PurchaseRfqApiController extends Controller
      */
     public function getRequisitionItems(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
         [$tenantId]    = $this->resolveTenantContext();
         $requisitionId = (int)$request->query('requisition_id');
         $requisition   = PurchaseRequisition::where('tenant_id', $tenantId)
@@ -483,6 +503,7 @@ class PurchaseRfqApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', PurchaseRfq::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return Excel::download(

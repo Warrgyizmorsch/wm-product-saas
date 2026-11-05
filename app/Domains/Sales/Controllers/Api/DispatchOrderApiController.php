@@ -40,6 +40,7 @@ class DispatchOrderApiController extends Controller
      */
     public function meta(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', DispatchOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $warehouses = Warehouse::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
@@ -68,6 +69,7 @@ class DispatchOrderApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', DispatchOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = DispatchOrder::query()
@@ -107,6 +109,8 @@ class DispatchOrderApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', DispatchOrder::class);
+
         $validator = Validator::make($request->all(), [
             'sales_order_id'          => ['nullable', 'exists:sales_orders,id'],
             'material_requirement_id' => ['nullable', 'exists:material_requirements,id'],
@@ -197,6 +201,8 @@ class DispatchOrderApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $dispatch);
+
         return response()->json([
             'success' => true,
             'data'    => $dispatch,
@@ -217,6 +223,8 @@ class DispatchOrderApiController extends Controller
                 'message' => 'Dispatch Order not found',
             ], 404);
         }
+
+        $this->authorize('update', $dispatch);
 
         try {
             $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
@@ -247,6 +255,8 @@ class DispatchOrderApiController extends Controller
                 'message' => 'Dispatch Order not found',
             ], 404);
         }
+
+        $this->authorize('update', $dispatch);
 
         try {
             $dispatch = $this->dispatchService->shipDispatchOrder($dispatch);
@@ -287,6 +297,8 @@ class DispatchOrderApiController extends Controller
                 'message' => 'Dispatch Order not found',
             ], 404);
         }
+
+        $this->authorize('update', $dispatch);
 
         $reason = $request->input('reason', 'Cancelled via API');
 
@@ -476,6 +488,7 @@ class DispatchOrderApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', DispatchOrder::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return Excel::download(
@@ -490,6 +503,7 @@ class DispatchOrderApiController extends Controller
      */
     public function pendingSalesOrders(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', DispatchOrder::class);
         [$tenantId] = $this->resolveTenantContext();
         $perPage = min((int)$request->input('per_page', 15), 100);
 
@@ -520,6 +534,8 @@ class DispatchOrderApiController extends Controller
         if (!$dispatch) {
             return response()->json(['success' => false, 'message' => 'Dispatch Order not found'], 404);
         }
+
+        $this->authorize('view', $dispatch);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.sales.dispatches.pdf', compact('dispatch'));
         return $pdf->download("DispatchOrder_{$dispatch->dispatch_number}.pdf");

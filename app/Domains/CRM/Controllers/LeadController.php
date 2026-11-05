@@ -58,15 +58,19 @@ class LeadController extends Controller
         $users = \App\Models\User::select(['id', 'name', 'email'])->orderBy('name')->get();
         $leadStatuses = \App\Domains\CRM\Models\LeadStatus::getOrderedStatuses($tenantId);
 
+        $authUser = auth()->user();
+        $cacheKey = "tenant_{$tenantId}_user_" . ($authUser ? $authUser->id : 'guest') . "_lead_status_counts";
+
         $statusCounts = \Illuminate\Support\Facades\Cache::remember(
-            "tenant_{$tenantId}_lead_status_counts",
+            $cacheKey,
             30,
-            fn() => Lead::query()
-                ->where('tenant_id', $tenantId)
-                ->select('status', \DB::raw('count(*) as aggregate'))
-                ->groupBy('status')
-                ->pluck('aggregate', 'status')
-                ->toArray()
+            function () use ($tenantId) {
+                return Lead::query()->where('tenant_id', $tenantId)
+                    ->select('status', \DB::raw('count(*) as aggregate'))
+                    ->groupBy('status')
+                    ->pluck('aggregate', 'status')
+                    ->toArray();
+            }
         );
 
         $totalLeadsCount = array_sum($statusCounts);

@@ -223,7 +223,36 @@ class PurchaseRfqService
                 ]);
             }
 
-            $rfq->update(['status' => 'Confirmed']);
+            // Check whether all RFQ items are now ordered across all linked POs
+            $rfq->load('items');
+            $linkedOrders = PurchaseOrder::where('tenant_id', $tenantId)
+                ->where('source_type', 'rfq')
+                ->where(function ($q) use ($rfq) {
+                    $q->where('reference', $rfq->rfq_number)
+                      ->orWhere('reference', 'RFQ: ' . $rfq->rfq_number);
+                })
+                ->where('status', '!=', 'Cancelled')
+                ->with('items')
+                ->get();
+
+            $allFullyOrdered = $rfq->items->isNotEmpty();
+            foreach ($rfq->items as $rfqItem) {
+                $itemOrderedQty = 0;
+                foreach ($linkedOrders as $lo) {
+                    foreach ($lo->items as $loItem) {
+                        if ($loItem->product_id == $rfqItem->product_id) {
+                            $itemOrderedQty += (float) $loItem->quantity;
+                        }
+                    }
+                }
+                if ($itemOrderedQty < (float) $rfqItem->quantity) {
+                    $allFullyOrdered = false;
+                    break;
+                }
+            }
+
+            $newRfqStatus = $allFullyOrdered ? 'Confirmed' : 'Partially Ordered';
+            $rfq->update(['status' => $newRfqStatus]);
 
             return $po;
         });

@@ -11,7 +11,7 @@ class QuotationRepository
 {
     public function find(int $id): ?Quotation
     {
-        return Quotation::query()->with(['lead', 'salesPerson', 'items.product'])->find($id);
+        return Quotation::withoutGlobalScope('rbac_scope')->with(['lead', 'salesPerson', 'items.product'])->find($id);
     }
 
     public function create(array $data): Quotation
@@ -49,8 +49,11 @@ class QuotationRepository
      */
     public function getPaginatedQuotations(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
         $query = Quotation::query()
-            ->with(['lead', 'salesPerson'])
+            ->where('tenant_id', $tenantId)
+            ->with(['lead', 'salesPerson', 'crmDeal', 'crmAccount'])
             ->where('is_current', true);
 
         if (empty($filters['status']) && empty($filters['search'])) {
@@ -98,8 +101,11 @@ class QuotationRepository
      */
     public function getPendingApprovals(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
         $query = Quotation::query()
-            ->with(['lead', 'salesPerson'])
+            ->where('tenant_id', $tenantId)
+            ->with(['lead', 'salesPerson', 'crmDeal', 'crmAccount'])
             ->where('is_current', true);
 
         if (empty($filters['status']) && empty($filters['search'])) {

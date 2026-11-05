@@ -9,7 +9,11 @@ class InvoiceRepository
 {
     public function getPaginated(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Invoice::query()->with(['customer', 'salesOrder.customer']);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $query = Invoice::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['customer.crmAccount', 'salesOrder.customer']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
@@ -42,7 +46,7 @@ class InvoiceRepository
 
     public function find(int $id): ?Invoice
     {
-        return Invoice::with(['customer', 'salesOrder', 'items.product', 'allocations.payment'])->find($id);
+        return Invoice::withoutGlobalScope('rbac_scope')->with(['customer', 'salesOrder', 'items.product', 'allocations.payment'])->find($id);
     }
 
     public function create(array $data): Invoice

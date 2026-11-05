@@ -228,4 +228,35 @@ class CrmAllNotificationsTest extends TestCase
             'type'    => 'quotation_rejected',
         ]);
     }
+
+    public function test_account_manager_receives_notification_when_deal_created_on_their_account(): void
+    {
+        $this->actingAs($this->manager);
+
+        // Account managed by Executive One
+        $account = CrmAccount::create([
+            'tenant_id' => $this->tenant->id,
+            'name'      => 'WarrgyizMorsch Managed Account',
+            'owner_id'  => $this->salesExecutive->id,
+        ]);
+
+        // Deal created by manager with owner as manager (or another executive)
+        $deal = CrmDeal::create([
+            'tenant_id'       => $this->tenant->id,
+            'crm_account_id'  => $account->id,
+            'title'           => 'Enterprise Server Upgrade',
+            'owner_id'        => $this->manager->id,
+            'stage'           => 'Qualification',
+            'estimated_value' => 75000.00,
+        ]);
+
+        CrmNotificationService::notifyDealCreated($deal);
+
+        // Assert Notification created for Executive One (Account Manager)
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->salesExecutive->id,
+            'module'  => 'crm',
+            'type'    => 'deal_created',
+        ]);
+    }
 }

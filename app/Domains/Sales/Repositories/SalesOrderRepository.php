@@ -14,12 +14,12 @@ class SalesOrderRepository
 {
     public function find(int $id): ?SalesOrder
     {
-        return SalesOrder::query()->with(['customer', 'salesPerson', 'quotation', 'items.product', 'items.warehouse'])->find($id);
+        return SalesOrder::withoutGlobalScope('rbac_scope')->with(['customer', 'salesPerson', 'quotation', 'items.product', 'items.warehouse'])->find($id);
     }
 
     public function findWithDetails(int $id): SalesOrder
     {
-        return SalesOrder::with([
+        return SalesOrder::withoutGlobalScope('rbac_scope')->with([
             'customer', 
             'salesPerson', 
             'quotation', 
@@ -70,7 +70,11 @@ class SalesOrderRepository
      */
     public function getPaginatedOrders(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        $query = SalesOrder::query()->with(['customer', 'quotation', 'invoices', 'dispatches']);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $query = SalesOrder::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['customer.crmAccount', 'quotation', 'invoices', 'dispatches', 'salesPerson']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);

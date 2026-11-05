@@ -54,6 +54,11 @@ class CustomerApiController extends Controller
             ->where('tenant_id', $tenantId)
             ->withCount(['salesOrders', 'invoices', 'payments']);
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.view', ['tenant_id' => $tenantId])) {
+            $query->whereHas('crmAccount', fn($q) => $q->where('owner_id', $authUser->id));
+        }
+
         // Search
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -185,6 +190,17 @@ class CustomerApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.view', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $customer->crmAccount?->owner_id,
+        ])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to view this customer.',
+            ], 403);
+        }
+
         $totalInvoiced = (float) Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('total_amount');
         $totalPaid     = (float) CustomerPayment::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('amount');
         $balanceDue    = (float) Invoice::where('tenant_id', $tenantId)->where('customer_id', $id)->sum('balance_due');
@@ -237,6 +253,17 @@ class CustomerApiController extends Controller
             ], 404);
         }
 
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.update', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $customer->crmAccount?->owner_id,
+        ])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to update this customer.',
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'name'             => ['sometimes', 'required', 'string', 'max:255'],
             'company_name'     => ['nullable', 'string', 'max:255'],
@@ -286,6 +313,17 @@ class CustomerApiController extends Controller
                 'success' => false,
                 'message' => 'Customer not found',
             ], 404);
+        }
+
+        $authUser = auth()->user();
+        if ($authUser && !app(\App\Services\Access\AccessService::class)->allows($authUser, 'crm.customers.delete', [
+            'tenant_id' => $tenantId,
+            'owner_id'  => $customer->crmAccount?->owner_id,
+        ])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to delete this customer.',
+            ], 403);
         }
 
         // Check active orders or pending balances
