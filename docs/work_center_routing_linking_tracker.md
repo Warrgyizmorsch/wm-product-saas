@@ -14,7 +14,8 @@
 * 🟡 **Discussion / Proposed** — Item under discussion and architectural review.
 * 🟢 **Agreed** — Requirements and technical specification agreed upon; queued for batch implementation.
 * 🔵 **In Progress** — Currently being coded during execution phase.
-* ✅ **Applied & Verified** — Fully implemented and passed tests.
+* 🛠️ **Applied** — Implemented in code/schema; awaiting user UI testing & explicit acceptance.
+* ✅ **Verified** — Verified and signed off by user after full UI acceptance testing (passing automated tests does NOT qualify as verified; only explicit user acceptance does).
 * ⏸️ **On Hold / Postponed** — Deferred for future iteration.
 
 ---
@@ -53,11 +54,8 @@
 ---
 
 > [!IMPORTANT]
-> **Database Architecture Strategy — ON HOLD FOR RE-EVALUATION (User Directive):**  
-> All backend database structure proposals (e.g., dual storage with direct foreign keys alongside multiple pivot tables: `production_routing_operation_sections`, `production_routing_operation_machines`, `production_routing_operation_manual_batches`) are placed **ON HOLD**.  
-> **Order of Execution:**  
-> 1. Complete, align, and freeze all **business requirements, cost resolution formulas, operational rules, lifecycle safeguards, and UI/UX behaviors** first.  
-> 2. After all business decisions are finalised, conduct a dedicated review of the database schema to select the cleanest, most performant, and least complex database design that supports all finalized business needs.
+> **Database Architecture Strategy — Simplified Direct FK Model (Applied in Batch 27 & 28):**  
+> Direct foreign keys (`section_id`, `section_manual_production_id`, `is_alternative`, `replaces_operation_id`, `priority`, `cost_per_unit`, `resource_snapshot`) added cleanly to `production_routing_operations`. Zero pivot tables.
 
 ---
 
@@ -65,16 +63,16 @@
 
 | Track ID | Area | Decision Points Covered | Status | Impacted Components |
 | :--- | :--- | :--- | :--- | :--- |
-| **WC-TRACK-01** | Database Schema & Hierarchy Boundaries | **Point 1.1** (Mandatory Section & Strictly 1 Section/Op) ✅<br>**Point 1.2** (Alternative Operations via BOM Pattern) ✅<br>**Point 1.3** (Section Deletion Protection) ✅<br>*(Direct FKs, zero pivot tables)* | 🟢 **Agreed / Simplified** | Migrations, `RoutingOperation`, `WorkCenterSection`, Requests, DTOs |
-| **WC-TRACK-02** | Operation Types & Section Compatibility | **Point 2.1** (Machine XOR Manual Batch Mutually Exclusive) ✅<br>**Point 2.2** (External Ops Clearing) ✅<br>**Point 2.3** (Inspection / QC Operations Scope) 🔍<br>*(Direct FKs, zero pivot tables)* | 🟢 **Agreed / Simplified** | `StoreRoutingRequest`, `UpdateRoutingRequest`, `RoutingOperation`, `SectionManualProduction` |
-| **WC-TRACK-03** | Dynamic Cost Rate Resolution & Active Bug Fixes | **Point 3.1** (Machine vs Manual Costing Branches) 🟢<br>**Point 3.2** (Overhead Allocation) ⏸️ On Hold | 🟢 **Agreed / Defined** | `RoutingCostService`, `ProductionCostService`, `RoutingOperation` |
-| **WC-TRACK-04** | UI/UX Cascading & Interactive Guidance | **Point 4.1** (Mixed WC/Section Preload + Lazy Resources) ✅<br>**Point 4.2** (Soft-Switch XOR with Notice) ✅<br>**Point 4.3** (Cascading Reset Rules) ✅ | 🟢 **Agreed / Defined** | `routing/create.blade.php`, `routing/edit.blade.php`, Alpine.js, `RoutingController` |
-| **WC-TRACK-05** | Master Data CSV Import & API Alignment | **Point 5.1** (Routing Operations CSV Import) ✅<br>**Point 5.2** (API Requests & Resources) ✅ | 🟢 **Agreed / Defined** | `ProductionMasterImportService`, `StoreRoutingApiRequest`, `UpdateRoutingApiRequest`, `RoutingDetailResource` |
-| **WC-TRACK-06** | Deletion, Inactivation & Integrity Safeguards | **Point 6.1** (Inactive Resource Handling) ✅<br>**Point 6.2** (Section/Resource Deletion Safeguards) ✅ | 🟢 **Agreed / Defined** | `WorkCenterSectionService::delete()`, `WorkCenterService::delete()`, `hasProductionHistory()` |
-| **WC-TRACK-07** | Downstream Order Execution & Scheduling | Execution propagation (`ProductionOrderOperation`, MES) | ⏸️ On Hold / Deferred | `ProductionOrderOperation`, `SchedulingService`, `CapacityPlanningService` |
-| **WC-TRACK-08** | Seeders & Feature Test Suite Alignment | Comprehensive tests for Section-aware Routings | 🟡 Discussion / Proposed | `tests/Feature/Production/`, `ProductionTestWorkCenterSeeder` |
-| **WC-TRACK-09** | Parallel Operations & Collision Safeguards | Parallel groups & physical resource collision checks | ⏸️ On Hold / Deferred | `create.blade.php`, `edit.blade.php`, Requests |
-| **WC-TRACK-10** | Routing Details Header & Cost Statistics Alignment | **Point 10.1** (Header stats calculation on new snapshot/unit cost fields, primary vs alternative breakdown alignment in show view) | 🟢 **Applied & Verified** | `routing/show.blade.php`, `RoutingCostService`, `Routing.php`, `RoutingOperation.php` |
+| **WC-TRACK-01** | Database Schema & Hierarchy Boundaries | **Point 1.1** (Mandatory Section & Strictly 1 Section/Op)<br>**Point 1.2** (Alternative Operations via BOM Pattern)<br>**Point 1.3** (Section Deletion Protection)<br>*(Direct FKs, zero pivot tables)* | 🛠️ **Applied** | Migrations, `RoutingOperation`, `WorkCenterSection`, Requests, DTOs |
+| **WC-TRACK-02** | Operation Types & Section Compatibility | **Point 2.1** (Machine XOR Manual Batch Mutually Exclusive)<br>**Point 2.2** (External Ops Clearing)<br>**Point 2.3** (Inspection / QC Operations Scope) 🔍<br>*(Direct FKs, zero pivot tables)* | 🛠️ **Applied** | `StoreRoutingRequest`, `UpdateRoutingRequest`, `RoutingOperation`, `SectionManualProduction` |
+| **WC-TRACK-03** | Dynamic Cost Rate Resolution & Active Bug Fixes | **Point 3.1** (Machine vs Manual Costing Branches)<br>**Point 3.2** (Overhead Allocation) ⏸️ On Hold | 🛠️ **Applied** | `RoutingCostService`, `ProductionCostService`, `RoutingOperation` |
+| **WC-TRACK-04** | UI/UX Cascading & Interactive Guidance | **Point 4.1** (Mixed WC/Section Preload + Lazy Resources)<br>**Point 4.2** (Soft-Switch XOR with Notice)<br>**Point 4.3** (Cascading Reset Rules) | 🛠️ **Applied** | `routing/create.blade.php`, `routing/edit.blade.php`, Alpine.js, `RoutingController` |
+| **WC-TRACK-05** | Master Data CSV Import & API Alignment | **Point 5.1** (Routing Operations CSV Import)<br>**Point 5.2** (API Requests & Resources) | 🛠️ **Applied** | `ProductionMasterImportService`, `StoreRoutingApiRequest`, `UpdateRoutingApiRequest`, `RoutingDetailResource` |
+| **WC-TRACK-06** | Deletion, Inactivation & Integrity Safeguards | **Point 6.1** (Inactive Resource Handling)<br>**Point 6.2** (Section/Resource Deletion Safeguards) | 🛠️ **Applied** | `WorkCenterSectionService::delete()`, `WorkCenterService::delete()`, `hasProductionHistory()` |
+| **WC-TRACK-07** | Downstream Order Execution & Scheduling | Execution propagation (`ProductionOrderOperation`, MES) | ⏸️ **On Hold / Deferred** | `ProductionOrderOperation`, `SchedulingService`, `CapacityPlanningService` |
+| **WC-TRACK-08** | Seeders & Feature Test Suite Alignment | Comprehensive tests for Section-aware Routings | 🛠️ **Applied** | `tests/Feature/Production/WorkCenterRoutingIntegrationTest.php`, `ProductionRoutingBomDemoSeeder.php` |
+| **WC-TRACK-09** | Parallel Operations & Collision Safeguards | Parallel groups & physical resource collision checks | ⏸️ **On Hold / Deferred** | `create.blade.php`, `edit.blade.php`, Requests |
+| **WC-TRACK-10** | Routing Details Header & Cost Statistics Alignment | **Point 10.1** (Header stats calculation on new snapshot/unit cost fields, primary vs alternative breakdown alignment in show view, cycle time scoping) | 🛠️ **Applied** | `routing/show.blade.php`, `RoutingCostService`, `Routing.php`, `RoutingOperation.php` |
 
 ---
 
@@ -133,8 +131,8 @@
      - Replaces the disconnected, UI-less `RoutingOperationAlternateMachine` table with full first-class alternative operations that schedule seamlessly in `CapacityLevelingService` and `SchedulingService`.
 
 #### Point 1.3: Section Deletion Protection
-* **Status:** ✅ **Already Implemented & Verified in Code**
-* **Verification Proof:**
+* **Status:** 🛠️ **Applied in Code (Awaiting User Acceptance)**
+* **Implementation Proof:**
   1. `WorkCenterSection` model uses Laravel `SoftDeletes` (table `production_work_center_sections` has `deleted_at`).
   2. `WorkCenterSectionService::delete()` lines 162–167 explicitly calls `$section->hasProductionHistory()` and throws a blocking `InvalidArgumentException`:
      ```php
@@ -323,7 +321,7 @@
   2. Labor Cost / Unit = `0.00`, Machine Cost / Unit = `0.00`.
   3. $\text{Cost Per Unit} = \text{subcontract\_cost\_per\_unit}$.
 
-* **Status:** 🟢 **Agreed (Direction Set by User — Mathematically Grounded & Verified)**
+* **Status:** 🟢 **Agreed (Direction Set by User — Mathematically Grounded)**
 
 #### Point 3.2: Monthly Lump-sum `overhead_cost` Allocation Formula
 * **Status:** ⏸️ **On Hold / Postponed (Per User Directive: Overhead not considered for now, let it be)**
@@ -429,7 +427,7 @@
     - Inactive Sections, Machines, and Manual Batches are filtered out and cannot be selected.
 
 #### Point 6.2: Section & Resource Deletion Safeguards
-* **Status:** 🟢 **Agreed / Verified**
+* **Status:** 🛠️ **Applied in Code (Awaiting User Acceptance)**
 * **Rules:**
   * `WorkCenterSection::hasProductionHistory()` already contains `Schema::hasColumn('production_routing_operations', 'section_id')`.
   * `WorkCenterSectionService::delete()` permanently blocks deleting any section referenced by routing operations.
@@ -444,7 +442,7 @@
 ---
 
 ### Area 8: Seeders & Feature Test Suite Alignment (WC-TRACK-08)
-* **Status:** 🟢 **Completed & Verified**
+* **Status:** 🛠️ **Applied & Automated Tests Passed (Awaiting User Acceptance)**
 * Aligned all test fixtures in `tests/Feature/Production/RoutingTest.php` (8/8 passed) and created new dedicated test suite `tests/Feature/Production/WorkCenterRoutingIntegrationTest.php` (11/11 passed with 79 assertions) verifying:
   - Internal operations require Section and either Machine XOR Manual Batch
   - External/subcontract operations clear WC/Section/Resources
@@ -482,7 +480,7 @@
 ---
 
 ### Area 10: Routing Details Header & Live Calculation Alignment (WC-TRACK-10)
-* **Status:** 🟢 **Applied & Verified**
+* **Status:** 🛠️ **Applied (Awaiting User Acceptance)**
 * **Area:** Frontend Views (`resources/views/modules/production/routing/show.blade.php`), Costing Services (`RoutingCostService.php`), Requests (`StoreRoutingRequest.php`, `UpdateRoutingRequest.php`), and Models (`Routing.php`, `RoutingOperation.php`)
 
 #### Point 10.1: Header Statistics & Cost Calculation Alignment
@@ -511,7 +509,7 @@
 ---
 
 #### Point 10.2: Interactive Alternative Route Simulation Modal & Explanatory Context
-* **Status:** 🟢 **Applied & Verified**
+* **Status:** 🛠️ **Applied (Awaiting User Acceptance)**
 * **Design Decision:**
   1. **Primary Ground Truth:** Header values continue displaying standard Primary Route calculations (excluding alternatives).
   2. **Explanatory Note:** A clear note in the header explains that displayed totals reflect the primary sequence and exclude alternative operations.
@@ -528,7 +526,7 @@
 ---
 
 #### Point 10.3: Universal Clock Time Duration Formatting
-* **Status:** 🟢 **Applied & Verified**
+* **Status:** 🛠️ **Applied (Awaiting User Acceptance)**
 * **Context & Core ERP Principle:**
   Users and shop-floor planners should never be forced to mentally calculate raw decimal minutes (e.g., calculating that `0.2 min = 12s`, `11.5 min = 11m 30s`, or `29.1 min = 29m 05s`). All durations and speeds across routing displays are now rendered in human-readable clock notation.
 * **Applied Enhancements:**
