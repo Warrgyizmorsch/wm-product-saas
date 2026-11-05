@@ -98,6 +98,11 @@ class ProductionBom extends BaseModel
         return $this->hasMany(ProductionBomItem::class, 'bom_id');
     }
 
+    public function operationMaterials(): HasMany
+    {
+        return $this->hasMany(RoutingOperationMaterial::class, 'bom_id');
+    }
+
     public function approvals(): HasMany
     {
         return $this->hasMany(ProductionBomApproval::class, 'bom_id')->orderBy('created_at', 'desc');

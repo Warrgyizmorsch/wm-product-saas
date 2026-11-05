@@ -636,7 +636,7 @@ class BomRoutingInversionTest extends TestCase
 
         $this->assertEquals($routing->id, $clonedBom->routing_id);
         $this->assertCount(1, $clonedBom->items);
-        $this->assertEquals($op->id, $clonedBom->items[0]->routing_operation_id);
+        $this->assertEquals($op->id, $clonedBom->operationMaterials->first()->routing_operation_id);
 
         // Assert RoutingOperationMaterial was populated for the cloned BOM
         $this->assertDatabaseHas('production_routing_operation_materials', [
@@ -645,6 +645,98 @@ class BomRoutingInversionTest extends TestCase
             'material_id' => $this->rawMaterial1->id,
             'quantity' => 5.0,
         ]);
+    }
+
+    public function test_two_tier_storage_aggregates_master_bom_items_and_splits_operation_materials(): void
+    {
+        $this->actingAs($this->engineer);
+
+        $routing = $this->createSampleRouting('2-Tier Routing', '2.0.0');
+        $this->routingService->submitApproval($routing->id, $this->engineer->id);
+        $routing = $this->routingService->approve($routing->id, $this->engineer->id);
+        $routing->load('operations');
+
+        $op10 = $routing->operations[0];
+        $op20 = $routing->operations[1];
+
+        $dto = new ProductionBomDTO(
+            bom_number: 'BOM-2TIER-001',
+            bom_type: 'manufacturing',
+            product_id: $this->finishedProduct->id,
+            routing_id: $routing->id,
+            base_quantity: 1.0,
+            base_uom_id: $this->pieceUom->id,
+            version: '1.0.0',
+            effective_date: now()->toDateString(),
+            items: [
+                new ProductionBomItemDTO(
+                    material_id: $this->rawMaterial1->id,
+                    quantity: 4.0,
+                    uom_id: $this->pieceUom->id,
+                    routing_operation_id: $op10->id,
+                    row_uid: 'row_mat1_op10'
+                ),
+                new ProductionBomItemDTO(
+                    material_id: $this->rawMaterial1->id,
+                    quantity: 4.0,
+                    uom_id: $this->pieceUom->id,
+                    routing_operation_id: $op20->id,
+                    row_uid: 'row_mat1_op20'
+                ),
+                new ProductionBomItemDTO(
+                    material_id: $this->rawMaterial2->id,
+                    quantity: 4.0,
+                    uom_id: $this->pieceUom->id,
+                    routing_operation_id: $op20->id,
+                    is_alternative: true,
+                    replaces_row_uid: 'row_mat1_op20',
+                    priority: 1,
+                    row_uid: 'row_mat2_op20_alt'
+                ),
+            ]
+        );
+
+        $bom = $this->bomService->create($dto, $this->engineer->id);
+
+        // 1. Assert Table 1 (production_bom_items): 1 aggregated row per unique material
+        $bomItems = $bom->items()->get();
+        $this->assertCount(2, $bomItems); // Only 2 unique materials (Material 1 and Material 2)
+
+        $bomItem1 = $bomItems->where('material_id', $this->rawMaterial1->id)->first();
+        $this->assertNotNull($bomItem1);
+        $this->assertEquals(8.0, $bomItem1->quantity); // 4 + 4 = 8
+        $this->assertEquals('primary', $bomItem1->allocation_role);
+
+        $bomItem2 = $bomItems->where('material_id', $this->rawMaterial2->id)->first();
+        $this->assertNotNull($bomItem2);
+        $this->assertEquals(4.0, $bomItem2->quantity);
+        $this->assertEquals('alternative', $bomItem2->allocation_role);
+
+        // 2. Assert Table 2 (production_routing_operation_materials): 3 workstation allocations
+        $opMats = $bom->operationMaterials()->get();
+        $this->assertCount(3, $opMats);
+
+        $op10Mat = $opMats->where('routing_operation_id', $op10->id)->where('material_id', $this->rawMaterial1->id)->first();
+        $this->assertNotNull($op10Mat);
+        $this->assertEquals(4.0, $op10Mat->quantity);
+        $this->assertFalse($op10Mat->is_alternative);
+        $this->assertNull($op10Mat->priority); // Strictly null for primary
+        $this->assertEquals($bomItem1->id, $op10Mat->bom_item_id);
+
+        $op20Primary = $opMats->where('routing_operation_id', $op20->id)->where('material_id', $this->rawMaterial1->id)->first();
+        $this->assertNotNull($op20Primary);
+        $this->assertEquals(4.0, $op20Primary->quantity);
+        $this->assertFalse($op20Primary->is_alternative);
+        $this->assertNull($op20Primary->priority);
+        $this->assertEquals($bomItem1->id, $op20Primary->bom_item_id);
+
+        $op20Alt = $opMats->where('routing_operation_id', $op20->id)->where('material_id', $this->rawMaterial2->id)->first();
+        $this->assertNotNull($op20Alt);
+        $this->assertEquals(4.0, $op20Alt->quantity);
+        $this->assertTrue($op20Alt->is_alternative);
+        $this->assertEquals(1, $op20Alt->priority);
+        $this->assertEquals($bomItem2->id, $op20Alt->bom_item_id);
+        $this->assertEquals($op20Primary->id, $op20Alt->replaces_routing_material_id);
     }
 }
 

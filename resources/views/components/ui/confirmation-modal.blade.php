@@ -70,6 +70,7 @@
     @endpush
 @endonce
 
+@once('confirm-modal-html-' . $id)
 <div class="modal fade erp-confirm-modal" id="{{ $id }}" tabindex="-1" aria-labelledby="{{ $id }}Label" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 420px;">
         <div class="modal-content">
@@ -94,20 +95,26 @@
         </div>
     </div>
 </div>
+@endonce
 
+@once
 <script>
     (function () {
         var modalEl = document.getElementById('{{ $id }}');
-        if (modalEl) {
+        if (modalEl && modalEl.parentNode !== document.body) {
             document.body.appendChild(modalEl);
         }
     })();
 
-    // Upgraded confirmAction script compatible with legacy calls: confirmAction(message, onConfirm, options)
-    // and modern calls: confirmAction(options)
+    // Upgraded confirmAction script compatible with:
+    // 1. Legacy callback: confirmAction(message, onConfirm, options)
+    // 2. Modern options with callback: confirmAction({ title, message, onConfirm, onCancel })
+    // 3. Modern Promise/async-await: confirmAction(options).then(res => { if (res.isConfirmed) ... })
     window.confirmAction = function(messageOrOptions, onConfirm, options) {
         const modalEl = document.getElementById('{{ $id }}');
-        if (!modalEl) return;
+        if (!modalEl) {
+            return Promise.reject(new Error('Confirmation modal element #{{ $id }} not found'));
+        }
 
         let message = '';
         let callback = null;
@@ -124,25 +131,25 @@
         }
 
         // Set title
-        const titleEl = document.getElementById('{{ $id }}Title');
+        const titleEl = modalEl.querySelector('#{{ $id }}Title') || modalEl.querySelector('.modal-title');
         if (titleEl) {
             titleEl.textContent = opts.title || '{{ $title }}';
         }
 
         // Set message
-        const messageEl = document.getElementById('{{ $id }}Message');
+        const messageEl = modalEl.querySelector('#{{ $id }}Message') || modalEl.querySelector('.confirmation-message');
         if (messageEl) {
             messageEl.textContent = message || 'Are you sure you want to perform this action?';
         }
 
         // Set Cancel Button Text
-        const cancelBtn = document.getElementById('{{ $id }}CancelBtn');
+        const cancelBtn = modalEl.querySelector('#{{ $id }}CancelBtn') || modalEl.querySelector('button[data-bs-dismiss="modal"]');
         if (cancelBtn) {
             cancelBtn.textContent = opts.cancelButtonText || '{{ $cancelText }}';
         }
 
         // Set Confirm Button Text
-        const confirmBtn = document.getElementById('{{ $id }}ConfirmBtn');
+        const confirmBtn = modalEl.querySelector('#{{ $id }}ConfirmBtn') || modalEl.querySelector('.confirm-button');
         if (confirmBtn) {
             confirmBtn.textContent = opts.confirmButtonText || opts.confirmText || '{{ $confirmText }}';
         }
@@ -201,19 +208,37 @@
             confirmBtn.className = 'btn btn-confirm text-white ' + btnBgClass;
         }
 
-        // Bind callback on click
-        const freshConfirmBtn = confirmBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(freshConfirmBtn, confirmBtn);
+        return new Promise(function(resolve) {
+            let isConfirmed = false;
 
-        const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            // Bind callback on click
+            const freshConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(freshConfirmBtn, confirmBtn);
 
-        freshConfirmBtn.addEventListener('click', function() {
-            bsModal.hide();
-            if (typeof callback === 'function') {
-                callback();
-            }
-        }, { once: true });
+            const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
-        bsModal.show();
+            freshConfirmBtn.addEventListener('click', function() {
+                isConfirmed = true;
+                bsModal.hide();
+                if (typeof callback === 'function') {
+                    callback();
+                }
+                resolve({ isConfirmed: true });
+            }, { once: true });
+
+            const onHidden = function () {
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                if (!isConfirmed) {
+                    if (typeof opts.onCancel === 'function') {
+                        opts.onCancel();
+                    }
+                    resolve({ isConfirmed: false });
+                }
+            };
+            modalEl.addEventListener('hidden.bs.modal', onHidden);
+
+            bsModal.show();
+        });
     };
 </script>
+@endonce

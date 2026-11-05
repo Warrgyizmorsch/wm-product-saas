@@ -69,7 +69,7 @@ class BomExplosionService
             $bom = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $product->id)
-                ->where('status', 'approved')
+                ->whereIn('status', ['approved', 'active'])
                 ->whereIn('bom_type', ['manufacturing', 'subcontracting', 'phantom'])
                 ->orderByRaw("CASE WHEN bom_type = 'manufacturing' THEN 1 WHEN bom_type = 'subcontracting' THEN 2 WHEN bom_type = 'phantom' THEN 3 ELSE 4 END")
                 ->with(['items.material', 'items.uom'])

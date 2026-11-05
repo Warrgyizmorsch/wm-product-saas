@@ -661,15 +661,25 @@
                                             @endif
                                             
                                             <!-- Consumed operation-level materials -->
-                                            @if($op->materials->count() > 0)
+                                            @php
+                                                $bomOpMaterials = $bom->operationMaterials ? $bom->operationMaterials->where('routing_operation_id', $op->id) : collect();
+                                            @endphp
+                                            @if($bomOpMaterials->count() > 0)
                                                 <div class="mt-2 bg-white p-2 rounded border border-dashed">
                                                     <small class="fw-bold text-muted d-block mb-1 text-uppercase fs-9">{{ __('production.allocated_consumed_materials') ?? 'Allocated Consumed Materials:' }}</small>
                                                     <ul class="mb-0 ps-3 fs-10 text-muted">
-                                                        @foreach($op->materials as $opMat)
+                                                        @foreach($bomOpMaterials as $opMat)
                                                             <li>
                                                                  <span class="text-secondary fw-semibold">{{ __('production.seq') }} {{ $opMat->sequence }}:</span>
                                                                 <strong>{{ $opMat->material?->name ?? 'Material' }}</strong>: {{ number_format($opMat->quantity, 2) }} {{ $opMat->uom?->code ?? 'PCS' }}
-                                                                <span class="badge bg-light text-dark fs-8">{{ $opMat->consumption_type ?? 'manual' }}</span>
+                                                                @if($opMat->is_alternative)
+                                                                    <span class="badge bg-soft-warning text-warning fs-8 ms-1">Alternative (P{{ $opMat->priority }})</span>
+                                                                @else
+                                                                    <span class="badge bg-soft-primary text-primary fs-8 ms-1">Primary</span>
+                                                                @endif
+                                                                @if($opMat->consumption_type)
+                                                                    <span class="badge bg-light text-dark fs-8 ms-1">{{ $opMat->consumption_type }}</span>
+                                                                @endif
                                                             </li>
                                                         @endforeach
                                                     </ul>

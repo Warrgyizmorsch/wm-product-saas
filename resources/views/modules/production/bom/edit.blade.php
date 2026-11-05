@@ -13,7 +13,7 @@
                 title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
         @endif
 
-        <form method="POST" action="{{ route('production.boms.update', $bom->id) }}" @submit="if (!validateBeforeSubmit($event)) return false;">
+        <form method="POST" action="{{ route('production.boms.update', $bom->id) }}" id="bom-form" @submit="if (!validateBeforeSubmit($event)) return false;">
             @csrf
             @method('PUT')
             @if(request()->has('parent_product_id'))
@@ -30,6 +30,24 @@
                         {{ __('production.cancel') }}
                     </x-ui.button>
                 </div>
+
+                <!-- Unsaved Draft Auto-Restored Alert -->
+                <template x-if="isDraftRestored">
+                    <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center justify-content-between p-2.5 mb-4 rounded-2 shadow-sm border border-warning-subtle" role="alert">
+                        <div class="d-flex align-items-center gap-2 fs-12 text-dark">
+                            <i class="feather-clock text-warning fs-16"></i>
+                            <span>
+                                <strong>Draft Restored:</strong> Restored previously entered changes from your recent session (<span x-text="draftRestoredTime || 'recent session'"></span>).
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2.5 fs-11" @click="discardDraft()">
+                                <i class="feather-trash-2 me-1"></i>Discard Changes & Reload Saved
+                            </button>
+                            <button type="button" class="btn-close fs-10 p-2 position-static" @click="isDraftRestored = false" aria-label="Close"></button>
+                        </div>
+                    </div>
+                </template>
 
                 <!-- BOM Header Fields -->
                 <div class="row g-4 mb-4 fs-13 text-dark">
@@ -181,8 +199,9 @@
 
                 <!-- Tab Headers -->
                 <x-ui.horizontal-tabs id="bomFormTabs" :tabs="[
-            ['id' => 'tab-components', 'label' => __('production.components'), 'active' => true, 'icon' => 'feather-list']
-        ]" />
+                    ['id' => 'tab-components', 'label' => __('production.components_by_operation') ?? 'Components (By Operation)', 'active' => true, 'icon' => 'feather-list'],
+                    ['id' => 'tab-summary', 'label' => __('production.material_rollup') ?? 'Total Material Rollup (Live)', 'active' => false, 'icon' => 'feather-pie-chart']
+                ]" />
 
                 <div class="tab-content mt-3">
                     <!-- Tab 1: Components Panel -->
@@ -224,6 +243,8 @@
                             <!-- Sequential Operation Cards -->
                             <template x-for="(op, opIndex) in availableOperations" :key="op.id">
                                 <div class="card border shadow-none mb-3 operation-card"
+                                    :data-op-id="op.id"
+                                    :id="'op-card-' + op.id"
                                     :class="isOpExpanded(op.id) ? 'border-primary-subtle' : ''">
                                     <!-- Card Header / Accordion Bar -->
                                     <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center c-pointer select-none"
@@ -244,6 +265,24 @@
                                                     <i class="feather-box me-1"></i><span x-text="op.work_center.name"></span>
                                                     <template x-if="op.section && op.section.name">
                                                         <span x-text="' / ' + op.section.name"></span>
+                                                    </template>
+                                                </span>
+                                            </template>
+
+                                            <!-- Operation Primary vs Alternative Badge -->
+                                            <template x-if="!op.is_alternative">
+                                                <span class="badge bg-soft-success text-success border border-success-subtle fs-11 fw-normal">
+                                                    <i class="feather-check-circle me-1"></i>{{ __('production.primary_operation') ?? 'Primary Operation' }}
+                                                </span>
+                                            </template>
+                                            <template x-if="op.is_alternative">
+                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11 fw-normal">
+                                                    <i class="feather-shuffle me-1"></i>{{ __('production.alternative_operation') ?? 'Alternative Operation' }}
+                                                    <template x-if="op.replaces_operation_id">
+                                                        <span x-text="' (Substitutes Op ' + getOpSequenceById(op.replaces_operation_id) + ')'"></span>
+                                                    </template>
+                                                    <template x-if="op.priority">
+                                                        <span x-text="' · Priority ' + op.priority"></span>
                                                     </template>
                                                 </span>
                                             </template>
@@ -568,6 +607,195 @@
                             </template>
                         </div>
                     </div>
+
+                    <!-- Tab 2: Live Material Rollup / Summary Panel -->
+                    <div class="tab-pane fade" id="tab-summary" role="tabpanel" aria-labelledby="tab-summary-tab">
+                        <div class="card border shadow-none mb-3">
+                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0 fw-bold fs-13 text-dark">
+                                        <i class="feather-pie-chart text-primary me-1.5"></i>{{ __('production.material_rollup') ?? 'Total Material Rollup (Live)' }}
+                                    </h6>
+                                    <small class="text-muted fs-11">Aggregated consumption across all configured operations</small>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-soft-primary text-primary border border-primary-subtle fs-11">
+                                        <span x-text="summarizedMaterials.length"></span> Unique Components
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <template x-if="summarizedMaterials.length === 0">
+                                    <div class="text-center py-5 text-muted">
+                                        <i class="feather-box fs-32 text-muted mb-2 d-block"></i>
+                                        <p class="mb-1 fw-semibold fs-13">No Materials Configured Yet</p>
+                                        <p class="fs-12 text-muted mb-0">Add raw materials inside the operation cards in the <strong>Components (By Operation)</strong> tab to see their aggregated rollup here.</p>
+                                    </div>
+                                </template>
+
+                                <template x-if="summarizedMaterials.length > 0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle table-hover mb-0 fs-12">
+                                            <thead class="table-light fs-11 text-uppercase text-muted border-bottom">
+                                                <tr>
+                                                    <th style="width: 4%" class="text-center"></th>
+                                                    <th style="width: 34%">{{ __('production.component_product') }}</th>
+                                                    <th style="width: 14%">{{ __('production.type') }}</th>
+                                                    <th style="width: 18%">Allocation Role</th>
+                                                    <th style="width: 18%">Total Planned Qty</th>
+                                                    <th style="width: 12%">{{ __('production.uom') }}</th>
+                                                </tr>
+                                            </thead>
+                                            <template x-for="item in summarizedMaterials" :key="item.material_id">
+                                                <tbody class="border-top-0">
+                                                    <!-- Master Item Row -->
+                                                    <tr class="c-pointer" @click="toggleSummaryRow(item.material_id)" style="cursor: pointer;"
+                                                        :class="isSummaryRowExpanded(item.material_id) ? 'table-active fw-medium' : ''">
+                                                        <td class="text-center text-muted">
+                                                            <i class="feather-chevron-right transition-all"
+                                                                :style="isSummaryRowExpanded(item.material_id) ? 'transform: rotate(90deg); display: inline-block;' : 'display: inline-block;'"></i>
+                                                        </td>
+                                                        <td>
+                                                            <div class="fw-bold text-dark" x-text="item.name"></div>
+                                                            <small class="text-muted" x-text="'SKU: ' + item.sku"></small>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-soft-secondary text-secondary text-capitalize" x-text="item.type.replace('_', ' ')"></span>
+                                                        </td>
+                                                        <td>
+                                                            <template x-if="item.has_primary && item.has_alternative">
+                                                                <span class="badge bg-soft-info text-info border border-info-subtle fs-11">
+                                                                    <i class="feather-shuffle me-1"></i>Mixed Roles
+                                                                </span>
+                                                            </template>
+                                                            <template x-if="item.has_primary && !item.has_alternative">
+                                                                <span class="badge bg-soft-success text-success border border-success-subtle fs-11">
+                                                                    <i class="feather-check-circle me-1"></i>Primary Only
+                                                                </span>
+                                                            </template>
+                                                            <template x-if="!item.has_primary && item.has_alternative">
+                                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-11">
+                                                                    <i class="feather-tag me-1"></i>Alternative Only
+                                                                </span>
+                                                            </template>
+                                                        </td>
+                                                        <td>
+                                                            <div class="fw-bold text-dark">
+                                                                <span x-text="item.total_qty.toFixed(2)"></span>
+                                                                <span class="text-muted fw-normal fs-11 ms-0.5" x-text="item.uom_name"></span>
+                                                            </div>
+                                                            <template x-if="item.has_primary && item.has_alternative">
+                                                                <div class="fs-11 text-muted">
+                                                                    <span x-text="item.primary_qty.toFixed(2) + ' Primary'"></span> +
+                                                                    <span x-text="item.alternative_qty.toFixed(2) + ' Alt'"></span>
+                                                                </div>
+                                                            </template>
+                                                        </td>
+                                                        <td x-text="item.uom_name"></td>
+                                                    </tr>
+                                                    <!-- Inline Drawer / Drilldown Row -->
+                                                    <tr x-show="isSummaryRowExpanded(item.material_id)" class="bg-light-subtle">
+                                                        <td colspan="6" class="p-3 bg-light-subtle border-bottom">
+                                                            <div class="card border shadow-none mb-0 bg-white">
+                                                                <div class="card-header py-1.5 px-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+                                                                    <span class="fs-11 fw-bold text-uppercase text-muted">
+                                                                        <i class="feather-layers me-1 text-primary"></i>Operation Allocations Breakdown
+                                                                    </span>
+                                                                    <span class="fs-11 text-muted" x-text="item.allocations.length + ' Operation(s)'"></span>
+                                                                </div>
+                                                                <div class="card-body p-0">
+                                                                    <table class="table table-sm mb-0 fs-11">
+                                                                        <thead class="table-light text-muted">
+                                                                            <tr>
+                                                                                <th style="width: 25%">Operation</th>
+                                                                                <th style="width: 25%">Role & Substitution</th>
+                                                                                <th style="width: 20%">Quantity & Type</th>
+                                                                                <th style="width: 15%">Scrap Rate</th>
+                                                                                <th style="width: 15%" class="text-end">Action</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            <template x-for="alloc in item.allocations" :key="alloc.uid">
+                                                                                <tr>
+                                                                                    <td>
+                                                                                        <div class="d-flex align-items-center flex-wrap gap-1">
+                                                                                            <span class="badge bg-primary text-white fw-bold" x-text="'Op ' + alloc.op_sequence"></span>
+                                                                                            <span class="fw-semibold text-dark" x-text="alloc.op_name"></span>
+                                                                                            <template x-if="alloc.op_is_alternative">
+                                                                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle fs-10 py-0.5 px-1.5">
+                                                                                                    <i class="feather-shuffle me-0.5"></i>Alternative Op
+                                                                                                    <template x-if="alloc.op_replaces_sequence">
+                                                                                                        <span x-text="' (Sub Op ' + alloc.op_replaces_sequence + ')'"></span>
+                                                                                                    </template>
+                                                                                                    <template x-if="alloc.op_priority">
+                                                                                                        <span x-text="' · P' + alloc.op_priority"></span>
+                                                                                                    </template>
+                                                                                                </span>
+                                                                                            </template>
+                                                                                        </div>
+                                                                                        <template x-if="alloc.notes">
+                                                                                            <div class="text-muted fs-10 fst-italic mt-0.5" x-text="alloc.notes"></div>
+                                                                                        </template>
+                                                                                    </td>
+                                                                                    <td>
+                                                                                        <template x-if="alloc.is_alternative">
+                                                                                            <div>
+                                                                                                <span class="badge bg-soft-warning text-warning border border-warning-subtle">
+                                                                                                    <i class="feather-shuffle me-1"></i>Alternative (Priority <span x-text="alloc.priority"></span>)
+                                                                                                </span>
+                                                                                                <template x-if="alloc.replaces_name">
+                                                                                                    <div class="text-muted fs-10 mt-0.5" x-text="'Substitutes: ' + alloc.replaces_name"></div>
+                                                                                                </template>
+                                                                                            </div>
+                                                                                        </template>
+                                                                                        <template x-if="!alloc.is_alternative">
+                                                                                            <div class="d-inline-flex align-items-center">
+                                                                                                <div class="erp-tooltip-wrap">
+                                                                                                    <span class="badge bg-soft-success text-success border border-success-subtle select-none d-inline-flex align-items-center gap-1">
+                                                                                                        <i class="feather-check-circle fs-11"></i>
+                                                                                                        <span>Primary Component</span>
+                                                                                                        <template x-if="alloc.op_is_alternative">
+                                                                                                            <i class="feather-info text-warning fs-11 ms-0.5"></i>
+                                                                                                        </template>
+                                                                                                    </span>
+                                                                                                    <template x-if="alloc.op_is_alternative">
+                                                                                                        <div class="erp-tooltip-bubble">
+                                                                                                            <i class="feather-shuffle me-1 text-warning"></i>Used only if Op <span x-text="alloc.op_sequence"></span> is executed
+                                                                                                        </div>
+                                                                                                    </template>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </template>
+                                                                                    </td>
+                                                                                    <td>
+                                                                                        <strong class="text-dark" x-text="alloc.quantity.toFixed(2)"></strong>
+                                                                                        <span class="text-muted text-capitalize" x-text="' (' + alloc.quantity_type + ')'"></span>
+                                                                                    </td>
+                                                                                    <td>
+                                                                                        <span x-text="alloc.scrap_percentage + '%'"></span>
+                                                                                    </td>
+                                                                                    <td class="text-end">
+                                                                                        <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-2 fs-10"
+                                                                                            @click.stop="jumpToOpCard(alloc.routing_operation_id, alloc.uid)">
+                                                                                            <i class="feather-corner-down-right me-0.5"></i>{{ __('production.jump_to_op_card') ?? 'Jump to Op Card' }}
+                                                                                        </button>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </template>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </template>
+                                        </table>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
@@ -576,11 +804,32 @@
                 </div>
             </x-ui.odoo-form-ui>
         </form>
-
-        <x-ui.confirmation-modal />
     </div>
     @php
-        $oldItems = old('items', $bom->items->toArray());
+        $existingAllocations = $bom->operationMaterials->isNotEmpty()
+            ? $bom->operationMaterials->map(function ($om) {
+                return [
+                    'id'                        => $om->id,
+                    'uid'                       => 'existing_' . $om->id,
+                    'routing_operation_id'      => $om->routing_operation_id,
+                    'material_id'               => $om->material_id,
+                    'quantity'                  => (float) $om->quantity,
+                    'quantity_type'             => $om->quantity_type ?? 'fixed',
+                    'formula'                   => $om->formula,
+                    'uom_id'                    => $om->uom_id,
+                    'material_scrap_percentage' => (float) $om->material_scrap_percentage,
+                    'is_alternative'            => (bool) $om->is_alternative,
+                    'priority'                  => $om->priority,
+                    'replaces_item_id'          => $om->replaces_routing_material_id,
+                    'replaces_row_uid'          => $om->replaces_routing_material_id ? 'existing_' . $om->replaces_routing_material_id : null,
+                    'child_bom_id'              => $om->child_bom_id,
+                    'notes'                     => $om->notes,
+                    'sequence'                  => $om->sequence,
+                ];
+            })->toArray()
+            : $bom->items->toArray();
+
+        $oldItems = old('items', $existingAllocations);
     @endphp
 
     <style>
@@ -634,6 +883,46 @@
         select.is-invalid + .select2-container .select2-selection {
             border-color: #dc3545 !important;
         }
+        .erp-tooltip-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .erp-tooltip-wrap .erp-tooltip-bubble {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: calc(100% + 7px);
+            left: 50%;
+            transform: translateX(-50%) translateY(3px);
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 1.3;
+            padding: 5px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+            transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1060;
+        }
+        .erp-tooltip-wrap .erp-tooltip-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #0f172a transparent transparent transparent;
+        }
+        .erp-tooltip-wrap:hover .erp-tooltip-bubble {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 
     <script>
@@ -647,10 +936,22 @@
                 materials: @json($materials),
                 routings: routingsData,
                 selectedRoutingId: '{{ old('routing_id', $bom->routing_id ?? '') }}',
+                previousRoutingId: '{{ old('routing_id', $bom->routing_id ?? '') }}',
                 availableOperations: [],
                 expandedOps: {},
+                expandedSummaryRows: {},
                 activeTab: 'components',
                 showAdvanced: true,
+
+                // Client-side draft recovery state (persists across F5 reloads)
+                draftStorageKey: 'bom_edit_draft_v1_{{ $bom->id }}',
+                isDraftRestored: false,
+                draftRestoredTime: '',
+                _isRestoringDraft: false,
+                _draftRestoredProduct: null,
+                _draftRestoredRouting: null,
+                _hasServerOldInput: {{ (old('product_id') || old('routing_id') || (old('items') && count(old('items')) > count($bom->operationMaterials))) ? 'true' : 'false' }},
+                _draftTimeout: null,
 
                 isOpExpanded(opId) {
                     if (this.expandedOps[opId] === undefined) {
@@ -699,22 +1000,371 @@
                     return idx >= 0 ? idx : 0;
                 },
 
+                getOpSequenceById(opId) {
+                    if (!opId) return '';
+                    const found = this.availableOperations.find(o => String(o.id) === String(opId));
+                    return found ? found.sequence : '';
+                },
+
+                toggleSummaryRow(matId) {
+                    this.expandedSummaryRows[matId] = !this.expandedSummaryRows[matId];
+                    this.expandedSummaryRows = Object.assign({}, this.expandedSummaryRows);
+                },
+
+                isSummaryRowExpanded(matId) {
+                    return !!this.expandedSummaryRows[matId];
+                },
+
+                get summarizedMaterials() {
+                    const map = {};
+                    this.items.forEach(item => {
+                        const matId = String(item.material_id || '');
+                        if (!matId) return;
+
+                        if (!map[matId]) {
+                            const matObj = this.materials.find(m => String(m.id) === matId);
+                            const uomObj = this.uoms ? this.uoms.find(u => String(u.id) === String(item.uom_id)) : null;
+                            map[matId] = {
+                                material_id: matId,
+                                name: matObj ? matObj.name : 'Component #' + matId,
+                                sku: matObj ? matObj.sku : '—',
+                                type: matObj ? matObj.type : (item.material_type || 'raw_material'),
+                                uom_name: uomObj ? uomObj.name : 'Units',
+                                primary_qty: 0,
+                                alternative_qty: 0,
+                                total_qty: 0,
+                                has_primary: false,
+                                has_alternative: false,
+                                allocations: []
+                            };
+                        }
+
+                        const qty = parseFloat(item.quantity) || 0;
+                        const op = this.availableOperations.find(o => String(o.id) === String(item.routing_operation_id));
+                        const isOpAlt = !!(op && (op.is_alternative === true || op.is_alternative === 1 || String(op.is_alternative) === '1' || String(op.is_alternative) === 'true'));
+                        const isAlt = !!item.is_alternative;
+                        const isEffectiveAlt = isAlt || isOpAlt;
+
+                        if (isEffectiveAlt) {
+                            map[matId].alternative_qty += qty;
+                            map[matId].has_alternative = true;
+                        } else {
+                            map[matId].primary_qty += qty;
+                            map[matId].has_primary = true;
+                        }
+                        map[matId].total_qty += qty;
+
+                        let replacedName = '';
+                        if (isAlt && item.replaces_row_uid) {
+                            const targetItem = this.items.find(it => it.uid === item.replaces_row_uid);
+                            if (targetItem) {
+                                const targetMat = this.materials.find(m => String(m.id) === String(targetItem.material_id));
+                                replacedName = targetMat ? targetMat.name : 'Primary Component';
+                            }
+                        }
+
+                        map[matId].allocations.push({
+                            uid: item.uid,
+                            routing_operation_id: item.routing_operation_id,
+                            op_sequence: op ? op.sequence : '—',
+                            op_name: op ? op.name : 'Operation #' + item.routing_operation_id,
+                            op_is_alternative: isOpAlt,
+                            op_replaces_sequence: (op && op.replaces_operation_id) ? this.getOpSequenceById(op.replaces_operation_id) : null,
+                            op_priority: op ? op.priority : null,
+                            quantity: qty,
+                            quantity_type: item.quantity_type || 'fixed',
+                            is_alternative: isAlt,
+                            is_effective_alternative: isEffectiveAlt,
+                            priority: item.priority || 1,
+                            replaces_name: replacedName,
+                            scrap_percentage: parseFloat(item.material_scrap_percentage) || 0,
+                            notes: item.notes || ''
+                        });
+                    });
+
+                    return Object.values(map);
+                },
+
+                jumpToOpCard(opId, itemUid) {
+                    if (!opId) return;
+                    this.activeTab = 'components';
+                    this.expandedOps = Object.assign({}, this.expandedOps, { [opId]: true });
+
+                    const compTabBtn = document.querySelector('#bomFormTabs button[data-bs-target="#tab-components"], #bomFormTabs button[aria-controls="tab-components"], #bomFormTabs a[href="#tab-components"], #tab-components-tab');
+                    if (compTabBtn) {
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                            bootstrap.Tab.getOrCreateInstance(compTabBtn).show();
+                        } else {
+                            $(compTabBtn).tab('show');
+                        }
+                    }
+
+                    const executeScroll = () => {
+                        const rowEl = itemUid ? document.querySelector('.bom-component-row[data-row-uid="' + itemUid + '"]') : null;
+                        if (rowEl && rowEl.offsetParent !== null) {
+                            rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            rowEl.classList.add('table-warning');
+                            setTimeout(() => {
+                                rowEl.classList.remove('table-warning');
+                            }, 2500);
+                            return true;
+                        }
+
+                        const opCard = document.querySelector('.operation-card[data-op-id="' + opId + '"]') || document.getElementById('op-card-' + opId);
+                        if (opCard && opCard.offsetParent !== null) {
+                            opCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            opCard.classList.add('border-primary');
+                            setTimeout(() => {
+                                opCard.classList.remove('border-primary');
+                            }, 2500);
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    this.$nextTick(() => {
+                        executeScroll();
+                    });
+
+                    // Wait for Bootstrap tab transition (fade is ~150ms)
+                    setTimeout(() => {
+                        executeScroll();
+                    }, 180);
+
+                    // Final safety retry
+                    setTimeout(() => {
+                        executeScroll();
+                    }, 350);
+                },
+
+                getSavedDraft() {
+                    try {
+                        let raw = sessionStorage.getItem(this.draftStorageKey);
+                        if (!raw) {
+                            raw = localStorage.getItem(this.draftStorageKey);
+                        }
+                        if (!raw) return null;
+                        const data = JSON.parse(raw);
+                        if (data && data.timestamp && Date.now() - data.timestamp > 7 * 24 * 60 * 60 * 1000) {
+                            this.clearDraftStorage();
+                            return null;
+                        }
+                        return data;
+                    } catch (e) {
+                        return null;
+                    }
+                },
+
+                clearDraftStorage() {
+                    try {
+                        sessionStorage.removeItem(this.draftStorageKey);
+                        localStorage.removeItem(this.draftStorageKey);
+                    } catch (e) {}
+                },
+
+                discardDraft() {
+                    this.clearDraftStorage();
+                    this.isDraftRestored = false;
+                    window.location.reload();
+                },
+
+                saveDraft() {
+                    if (this._isRestoringDraft) return;
+                    try {
+                        const prodId = $('#product_id').val() || '';
+                        const routId = $('#routing_id').val() || this.selectedRoutingId || '';
+                        const bomName = $('input[name="bom_name"]').val() || '';
+                        const bomType = $('select[name="bom_type"]').val() || 'manufacturing';
+                        const usageContext = $('select[name="usage_context"]').val() || 'manufacturing';
+                        const baseQty = $('input[name="base_quantity"]').val() || '1.00';
+                        const notes = $('textarea[name="notes"]').val() || '';
+                        const version = $('input[name="version"]').val() || '1.0.0';
+                        const effectiveDate = $('input[name="effective_date"]').val() || '';
+                        const revisionReason = $('input[name="revision_reason"]').val() || '';
+
+                        const itemsToSave = (this.items || []).map(it => ({
+                            uid: it.uid,
+                            id: it.id || null,
+                            material_id: it.material_id || '',
+                            routing_operation_id: it.routing_operation_id ? String(it.routing_operation_id) : '',
+                            child_bom_id: it.child_bom_id || null,
+                            quantity: it.quantity || '',
+                            quantity_type: it.quantity_type || 'fixed',
+                            formula: it.formula || '',
+                            notes: it.notes || '',
+                            uom_id: it.uom_id || '',
+                            material_scrap_percentage: it.material_scrap_percentage || 0,
+                            is_alternative: !!it.is_alternative,
+                            replaces_row_uid: it.replaces_row_uid || '',
+                            replaces_item_id: it.replaces_item_id || null,
+                            priority: it.priority || 1
+                        }));
+
+                        const draftData = {
+                            product_id: prodId,
+                            routing_id: routId,
+                            bom_name: bomName,
+                            bom_type: bomType,
+                            usage_context: usageContext,
+                            base_quantity: baseQty,
+                            notes: notes,
+                            version: version,
+                            effective_date: effectiveDate,
+                            revision_reason: revisionReason,
+                            items: itemsToSave,
+                            activeTab: this.activeTab,
+                            timestamp: Date.now()
+                        };
+
+                        const serialized = JSON.stringify(draftData);
+                        sessionStorage.setItem(this.draftStorageKey, serialized);
+                        localStorage.setItem(this.draftStorageKey, serialized);
+                    } catch (e) {
+                        console.warn('Auto-save draft warning:', e);
+                    }
+                },
+
+                debouncedSaveDraft() {
+                    clearTimeout(this._draftTimeout);
+                    this._draftTimeout = setTimeout(() => {
+                        this.saveDraft();
+                    }, 350);
+                },
+
+                restoreFromDraft(draft) {
+                    if (!draft) return;
+                    this._isRestoringDraft = true;
+
+                    // 1. Restore input fields
+                    if (draft.bom_name) $('input[name="bom_name"]').val(draft.bom_name);
+                    if (draft.bom_type) $('select[name="bom_type"]').val(draft.bom_type);
+                    if (draft.usage_context) $('select[name="usage_context"]').val(draft.usage_context);
+                    if (draft.base_quantity) $('input[name="base_quantity"]').val(draft.base_quantity);
+                    if (draft.notes) $('textarea[name="notes"]').val(draft.notes);
+                    if (draft.version) $('input[name="version"]').val(draft.version);
+                    if (draft.effective_date) $('input[name="effective_date"]').val(draft.effective_date);
+                    if (draft.revision_reason) $('input[name="revision_reason"]').val(draft.revision_reason);
+
+                    // 2. Restore Product
+                    if (draft.product_id) {
+                        this._draftRestoredProduct = String(draft.product_id);
+                        $('#product_id').val(draft.product_id);
+                        if ($('#product_id').data('select2')) {
+                            $('#product_id').trigger('change.select2');
+                        } else {
+                            $('#product_id').trigger('change');
+                        }
+                    }
+
+                    // 3. Restore Routing
+                    if (draft.routing_id) {
+                        this._draftRestoredRouting = String(draft.routing_id);
+                        this.selectedRoutingId = String(draft.routing_id);
+                        this.previousRoutingId = String(draft.routing_id);
+                        $('#routing_id').val(draft.routing_id);
+                        if ($('#routing_id').data('select2')) {
+                            $('#routing_id').trigger('change.select2');
+                        } else {
+                            $('#routing_id').trigger('change');
+                        }
+                        this.updateAvailableOperations(draft.routing_id, false);
+                        this.expandAllOps();
+                    }
+
+                    // 4. Restore Items
+                    if (Array.isArray(draft.items) && draft.items.length > 0) {
+                        this.items = draft.items.map((item, idx) => {
+                            var initialUomId = item.uom_id || '';
+                            if (!initialUomId && item.material_id) {
+                                var foundMat = this.materials.find(m => String(m.id) === String(item.material_id));
+                                if (foundMat && foundMat.uom_id) {
+                                    initialUomId = String(foundMat.uom_id);
+                                }
+                            }
+                            return {
+                                uid: item.uid || ('draft_' + Date.now() + '_' + idx),
+                                id: item.id || null,
+                                material_id: item.material_id || '',
+                                routing_operation_id: item.routing_operation_id ? String(item.routing_operation_id) : '',
+                                child_bom_id: item.child_bom_id || null,
+                                quantity: item.quantity || '',
+                                quantity_type: item.quantity_type || 'fixed',
+                                formula: item.formula || '',
+                                notes: item.notes || '',
+                                uom_id: initialUomId,
+                                material_scrap_percentage: item.material_scrap_percentage || 0,
+                                is_alternative: !!item.is_alternative,
+                                replaces_row_uid: item.replaces_row_uid || '',
+                                replaces_item_id: item.replaces_item_id || null,
+                                priority: item.priority || 1,
+                                child_bom_status: 'none',
+                                child_bom_versions: [],
+                                child_bom_loading: false
+                            };
+                        });
+                    }
+
+                    // 5. Restore active tab
+                    if (draft.activeTab) {
+                        this.activeTab = draft.activeTab;
+                        const tabBtn = document.querySelector('#bomFormTabs button[data-bs-target="#tab-' + draft.activeTab + '"], #bomFormTabs a[href="#tab-' + draft.activeTab + '"], #tab-' + draft.activeTab + '-tab');
+                        if (tabBtn) {
+                            if (typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                                bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+                            } else {
+                                $(tabBtn).tab('show');
+                            }
+                        }
+                    }
+
+                    this.isDraftRestored = true;
+                    this.draftRestoredTime = draft.timestamp ? new Date(draft.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+                    this.$nextTick(() => {
+                        this._isRestoringDraft = false;
+                        this.items.forEach(item => {
+                            if (item.material_id) {
+                                this.fetchChildBomStatus(item);
+                            }
+                        });
+                        this.initAllRowSelects();
+                        this.validateDuplicateMaterials();
+                    });
+                },
+
+                syncDraftSelect2() {
+                    if (this._draftRestoredProduct) {
+                        $('#product_id').val(this._draftRestoredProduct);
+                        if ($('#product_id').data('select2')) {
+                            $('#product_id').trigger('change.select2');
+                        }
+                    }
+                    if (this._draftRestoredRouting) {
+                        $('#routing_id').val(this._draftRestoredRouting);
+                        if ($('#routing_id').data('select2')) {
+                            $('#routing_id').trigger('change.select2');
+                        }
+                    }
+                },
+
                 updateAvailableOperations(routingId, autoAssignDefault = true) {
-                    if (!routingId || !this.routings[routingId] || !this.routings[routingId].operations) {
+                    let routingObj = null;
+                    if (Array.isArray(this.routings)) {
+                        routingObj = this.routings.find(r => String(r.id) === String(routingId));
+                    } else if (this.routings && typeof this.routings === 'object') {
+                        routingObj = this.routings[routingId] || Object.values(this.routings).find(r => String(r.id) === String(routingId));
+                    }
+
+                    if (!routingId || !routingObj || !routingObj.operations) {
                         this.availableOperations = [];
                         return;
                     }
-                    this.availableOperations = (this.routings[routingId].operations || []).slice().sort((a, b) => a.sequence - b.sequence);
+                    this.availableOperations = (routingObj.operations || []).slice().sort((a, b) => a.sequence - b.sequence);
 
-                    const firstOpId = this.availableOperations.length > 0 ? String(this.availableOperations[0].id) : '';
                     const validOpIds = this.availableOperations.map(op => String(op.id));
 
                     if (autoAssignDefault) {
-                        this.items.forEach(item => {
-                            if (!item.routing_operation_id || !validOpIds.includes(String(item.routing_operation_id))) {
-                                item.routing_operation_id = firstOpId;
-                            }
-                        });
+                        this.items = this.items.filter(item => item.routing_operation_id && validOpIds.includes(String(item.routing_operation_id)));
                     }
                 },
 
@@ -776,65 +1426,6 @@
 
                 init() {
                     window.bomAlpineInstance = this;
-                    this.items = this.items.map((item, idx) => {
-                        var initialUomId = item.uom_id || '';
-                        if (!initialUomId && item.material_id) {
-                            var foundMat = this.materials.find(m => String(m.id) === String(item.material_id));
-                            if (foundMat && foundMat.uom_id) {
-                                initialUomId = String(foundMat.uom_id);
-                            }
-                        }
-                        var initialUid = item.uid || item.row_uid || (item.id ? ('item_' + item.id) : ('row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx));
-                        var initialReplacesRowUid = item.replaces_row_uid || '';
-                        if (!initialReplacesRowUid && item.replaces_item_id) {
-                            initialReplacesRowUid = 'item_' + item.replaces_item_id;
-                        }
-                        return {
-                            uid: initialUid,
-                            id: item.id || null,
-                            material_id: item.material_id || '',
-                            routing_operation_id: item.routing_operation_id ? String(item.routing_operation_id) : '',
-                            child_bom_id: item.child_bom_id || null,
-                            quantity: item.quantity || '',
-                            quantity_type: item.quantity_type || 'fixed',
-                            formula: item.formula || '',
-                            notes: item.notes || '',
-                            uom_id: initialUomId,
-                            material_scrap_percentage: item.material_scrap_percentage || 0,
-                            is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
-                            replaces_row_uid: initialReplacesRowUid,
-                            replaces_item_id: item.replaces_item_id || null,
-                            priority: item.priority || 1,
-                            child_bom_status: 'none',
-                            child_bom_versions: [],
-                            child_bom_loading: false
-                        };
-                    });
-
-                    // Initial routing and operations setup
-                    const initialRoutingId = $('#routing_id').val() || this.selectedRoutingId;
-                    this.selectedRoutingId = initialRoutingId;
-                    this.updateAvailableOperations(initialRoutingId, false);
-
-                    const firstOp = this.getFirstOperationId();
-                    if (firstOp) {
-                        this.items.forEach(item => {
-                            if (!item.routing_operation_id) {
-                                item.routing_operation_id = firstOp;
-                            }
-                        });
-                    }
-
-                    this.expandAllOps();
-
-                    this.$nextTick(() => {
-                        this.items.forEach(item => {
-                            if (item.material_id) {
-                                this.fetchChildBomStatus(item);
-                            }
-                        });
-                        this.initAllRowSelects();
-                    });
 
                     const syncHeaderUom = (productId) => {
                         var prodUomId = '';
@@ -858,15 +1449,156 @@
                         }
                     };
 
-                    $('#routing_id').on('change.select2 change', (e) => {
-                        var routingVal = e.target.value;
-                        this.selectedRoutingId = routingVal;
-                        this.updateAvailableOperations(routingVal, true);
-                        this.expandAllOps();
-                        this.$nextTick(() => {
-                            this.initAllRowSelects();
-                            this.validateDuplicateMaterials();
+                    const savedDraft = this.getSavedDraft();
+                    const shouldRestore = savedDraft && !this._hasServerOldInput;
+
+                    if (shouldRestore) {
+                        this.restoreFromDraft(savedDraft);
+                    } else {
+                        this.items = this.items.map((item, idx) => {
+                            var initialUomId = item.uom_id || '';
+                            if (!initialUomId && item.material_id) {
+                                var foundMat = this.materials.find(m => String(m.id) === String(item.material_id));
+                                if (foundMat && foundMat.uom_id) {
+                                    initialUomId = String(foundMat.uom_id);
+                                }
+                            }
+                            var initialUid = item.uid || item.row_uid || (item.id ? ('item_' + item.id) : ('row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx));
+                            var initialReplacesRowUid = item.replaces_row_uid || '';
+                            if (!initialReplacesRowUid && item.replaces_item_id) {
+                                initialReplacesRowUid = 'item_' + item.replaces_item_id;
+                            }
+                            return {
+                                uid: initialUid,
+                                id: item.id || null,
+                                material_id: item.material_id || '',
+                                routing_operation_id: item.routing_operation_id ? String(item.routing_operation_id) : '',
+                                child_bom_id: item.child_bom_id || null,
+                                quantity: item.quantity || '',
+                                quantity_type: item.quantity_type || 'fixed',
+                                formula: item.formula || '',
+                                notes: item.notes || '',
+                                uom_id: initialUomId,
+                                material_scrap_percentage: item.material_scrap_percentage || 0,
+                                is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
+                                replaces_row_uid: initialReplacesRowUid,
+                                replaces_item_id: item.replaces_item_id || null,
+                                priority: item.priority || 1,
+                                child_bom_status: 'none',
+                                child_bom_versions: [],
+                                child_bom_loading: false
+                            };
                         });
+
+                        // Initial routing and operations setup
+                        const initialRoutingId = $('#routing_id').val() || this.selectedRoutingId;
+                        this.selectedRoutingId = initialRoutingId;
+                        this.previousRoutingId = initialRoutingId;
+                        this.updateAvailableOperations(initialRoutingId, false);
+
+                        const firstOp = this.getFirstOperationId();
+                        if (firstOp) {
+                            this.items.forEach(item => {
+                                if (!item.routing_operation_id) {
+                                    item.routing_operation_id = firstOp;
+                                }
+                            });
+                        }
+
+                        this.expandAllOps();
+
+                        this.$nextTick(() => {
+                            this.items.forEach(item => {
+                                if (item.material_id) {
+                                    this.fetchChildBomStatus(item);
+                                }
+                            });
+                            this.initAllRowSelects();
+                        });
+                    }
+
+                    var self = this;
+                    var isReverting = false;
+
+                    $('#routing_id').on('change.select2 change', function (e) {
+                        if (isReverting || self._isRestoringDraft) return;
+                        var newRoutingVal = $(this).val();
+                        if (newRoutingVal === self.previousRoutingId) {
+                            return;
+                        }
+
+                        var hasEnteredMaterials = self.items.some(it => it.material_id && String(it.material_id).trim() !== '');
+
+                        var applyRoutingChange = function () {
+                            self.previousRoutingId = newRoutingVal;
+                            self.selectedRoutingId = newRoutingVal;
+                            self.items = []; // Clean reset - no orphaned materials dumped into Op 1!
+                            self.updateAvailableOperations(newRoutingVal, false);
+                            self.expandAllOps();
+                            self.$nextTick(() => {
+                                self.initAllRowSelects();
+                                self.validateDuplicateMaterials();
+                                self.debouncedSaveDraft();
+                            });
+                        };
+
+                        var revertRouting = function () {
+                            isReverting = true;
+                            $('#routing_id').val(self.previousRoutingId);
+                            if ($('#routing_id').data('select2')) {
+                                $('#routing_id').trigger('change.select2');
+                            }
+                            self.$nextTick(() => {
+                                isReverting = false;
+                            });
+                        };
+
+                        if (hasEnteredMaterials) {
+                            var msg = "{{ __('production.change_routing_confirm_msg') }}";
+                            var title = "{{ __('production.change_routing_confirm_title') }}";
+
+                            var isActionHandled = false;
+                            var doApply = function () {
+                                if (isActionHandled) return;
+                                isActionHandled = true;
+                                applyRoutingChange();
+                            };
+                            var doRevert = function () {
+                                if (isActionHandled) return;
+                                isActionHandled = true;
+                                revertRouting();
+                            };
+
+                            if (typeof window.confirmAction === 'function') {
+                                var p = window.confirmAction({
+                                    title: title,
+                                    message: msg,
+                                    variant: 'warning',
+                                    confirmText: 'Yes, Change Routing',
+                                    cancelButtonText: 'Cancel',
+                                    onConfirm: doApply,
+                                    onCancel: doRevert
+                                }, doApply);
+
+                                if (p && typeof p.then === 'function') {
+                                    p.then(function (result) {
+                                        if (result && result.isConfirmed) {
+                                            doApply();
+                                        } else {
+                                            doRevert();
+                                        }
+                                    }).catch(function () {
+                                        doRevert();
+                                    });
+                                }
+                            } else if (confirm(msg)) {
+                                doApply();
+                            } else {
+                                doRevert();
+                            }
+                        } else {
+                            applyRoutingChange();
+                        }
                     });
 
                     // Initial header UOM on load
@@ -892,6 +1624,26 @@
                             }
                         });
                         this.validateDuplicateMaterials();
+                        if (!this._isRestoringDraft) {
+                            this.debouncedSaveDraft();
+                        }
+                    });
+
+                    // Auto-save: listen to changes in form inputs & deep watch items
+                    this.$watch('items', () => {
+                        if (!this._isRestoringDraft) {
+                            this.debouncedSaveDraft();
+                        }
+                    });
+
+                    $('#bom-form').on('input change', (e) => {
+                        if (!this._isRestoringDraft) {
+                            this.debouncedSaveDraft();
+                        }
+                    });
+
+                    $('#bom-form').on('submit', () => {
+                        this.clearDraftStorage();
                     });
 
                     this.$nextTick(() => {
@@ -1207,20 +1959,23 @@
 
                     this.errors = updatedErrors;
 
-                    // 4. Update Select2 visual border in DOM
+                    // 4. Update Select2 visual border and feedback visibility in DOM
                     this.$nextTick(() => {
                         this.items.forEach((item, index) => {
                             const hasErr = !!this.errors['items.' + index + '.material_id'];
                             const $row = $('tr.bom-component-row[data-row-uid="' + item.uid + '"]');
                             const $select = $row.find('select[name*="[material_id]"]');
                             const $s2Selection = $select.next('.select2-container').find('.select2-selection');
+                            const $feedback = $row.find('.invalid-feedback');
 
                             if (hasErr) {
                                 $select.addClass('is-invalid');
                                 $s2Selection.addClass('is-invalid');
+                                $feedback.removeClass('d-none').addClass('d-block');
                             } else {
                                 $select.removeClass('is-invalid');
                                 $s2Selection.removeClass('is-invalid');
+                                $feedback.removeClass('d-block');
                             }
                         });
                     });
@@ -1283,6 +2038,7 @@
                         return false;
                     }
 
+                    this.clearDraftStorage();
                     return true;
                 },
 
@@ -1414,13 +2170,25 @@
 
             }));
 
-            // Hook bootstrap horizontal tabs change to load operations on Alpine
-            $(document).on('shown.bs.tab', '#bomFormTabs button', function (e) {
-                var targetId = $(e.target).attr('aria-controls');
-                if (targetId === 'tab-operations') {
+            // Hook bootstrap horizontal tabs change to load operations on Alpine and save active tab
+            $(document).on('shown.bs.tab', '#bomFormTabs button, #bomFormTabs a', function (e) {
+                var targetId = $(e.target).attr('aria-controls') || $(e.target).attr('data-bs-target') || $(e.target).attr('href') || '';
+                if (targetId.indexOf('summary') !== -1) {
                     if (window.bomAlpineInstance) {
-                        window.bomAlpineInstance.loadOperations();
+                        window.bomAlpineInstance.activeTab = 'summary';
+                        window.bomAlpineInstance.debouncedSaveDraft();
                     }
+                } else if (targetId.indexOf('components') !== -1) {
+                    if (window.bomAlpineInstance) {
+                        window.bomAlpineInstance.activeTab = 'components';
+                        window.bomAlpineInstance.debouncedSaveDraft();
+                    }
+                }
+            });
+
+            $(document).ready(function () {
+                if (window.bomAlpineInstance) {
+                    window.bomAlpineInstance.syncDraftSelect2();
                 }
             });
 
@@ -1433,9 +2201,6 @@
             });
         });
     </script>
-
-    {{-- Global confirmation modal --}}
-    <x-ui.confirmation-modal />
 
     {{-- Global master quick-create modals --}}
     <x-ui.master-modals :masters="['product', 'uom']" />

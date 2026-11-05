@@ -106,8 +106,24 @@ class BomAlternativeComponentsTest extends TestCase
         $pineLeg = $this->createProduct('Pine Leg', 'RM-PINE-LEG', 'raw_material', 10.0);
         $steelLeg = $this->createProduct('Steel Leg', 'RM-STEEL-LEG', 'raw_material', 12.0);
 
+        $routing = \App\Domains\Production\Models\Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-CHAIR-001',
+            'name' => 'Chair Routing',
+            'product_id' => $fg->id,
+            'status' => \App\Domains\Production\Models\Routing::STATUS_ACTIVE,
+        ]);
+        $op = \App\Domains\Production\Models\RoutingOperation::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_id' => $routing->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-10',
+            'name' => 'Assembly',
+        ]);
+
         $payload = [
             'product_id' => $fg->id,
+            'routing_id' => $routing->id,
             'bom_number' => 'BOM-CHAIR-001',
             'bom_name' => 'Chair Standard BOM',
             'bom_type' => 'manufacturing',
@@ -118,6 +134,7 @@ class BomAlternativeComponentsTest extends TestCase
             'items' => [
                 [
                     'row_uid' => 'row_primary_leg',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $oakLeg->id,
                     'quantity' => 4,
                     'uom_id' => $this->uom->id,
@@ -129,6 +146,7 @@ class BomAlternativeComponentsTest extends TestCase
                 ],
                 [
                     'row_uid' => 'row_alt_pine',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $pineLeg->id,
                     'quantity' => 4,
                     'uom_id' => $this->uom->id,
@@ -140,6 +158,7 @@ class BomAlternativeComponentsTest extends TestCase
                 ],
                 [
                     'row_uid' => 'row_alt_steel',
+                    'routing_operation_id' => $op->id,
                     'material_id' => $steelLeg->id,
                     'quantity' => 4,
                     'uom_id' => $this->uom->id,

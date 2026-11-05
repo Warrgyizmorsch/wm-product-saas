@@ -31,6 +31,7 @@ This document tracks all requirements, architecture shifts, business rules, desi
 | **TRACK-11** | Bulk Import Service — Invert `RoutingOperationMaterial` Population Source | 🛠️ **Applied** | `ProductionMasterImportService` (lines 703–793), CSV import schema |
 | **TRACK-12** | Feature Test Suite Updates — Align All BOM & Routing Tests with New Architecture | 🛠️ **Applied** | `tests/Feature/Production/BomRoutingInversionTest.php`, `tests/Feature/Production/RoutingTest.php` |
 | **TRACK-13** | Parallel Operations Live Grouping & Machine/Batch Collision Safeguards | ⏸️ **On Hold / Deferred** | `create.blade.php`, `edit.blade.php`, `StoreRoutingRequest`, `UpdateRoutingRequest`, `SchedulingService` |
+| **TRACK-14** | 2-Tier BOM Storage Architecture & Live Component Rollup Tab | 🛠️ **Applied** (Awaiting Acceptance) | `bom/create.blade.php`, `bom/edit.blade.php`, `database/migrations/2026_11_05_160000_update_bom_items_and_routing_materials_for_2tier_architecture.php`, `ProductionBomItem`, `RoutingOperationMaterial`, `ProductionBomService` |
 
 ---
 
@@ -283,6 +284,15 @@ Process Routing: [ RTG-001 - Desk Routing (v1.0.0 · Active) ]   Version: [ 1.0.
    - Backend controller, DTO, validation requests, and models remain 100% consistent with no breaking changes.
 5. **Alternative Component Scoping**:
    - Primary component replacement targets (`replaces_row_uid`) are scoped to the **same operation** (an alternative component must replace a primary component consumed at that same station).
+6. **Operation Card Primary vs. Alternative Indicator**:
+   - Each Operation Card header must explicitly identify whether the operation itself is a **Primary Operation** (`is_alternative = false`) or an **Alternative Operation** (`is_alternative = true`).
+   - If alternative, display the target operation it substitutes and its priority (e.g. `[🟡 Alternative Operation (Substitutes Op 10 · Priority 1)]`).
+7. **Process Routing Switch Safeguard & Material Reset Policy**:
+   - When a user changes the selected Process Routing in the BOM header:
+     - **If materials are already entered** (`items.some(it => it.material_id)`): Display a confirmation warning modal informing the user that changing the routing will reset and remove all assigned materials because the operation sequence is changing.
+       - If **Cancelled**: Revert the dropdown selection to the previous routing with zero data loss.
+       - If **Confirmed**: Cleanly wipe all component rows (`items = []`), load the new routing's operations cleanly, and ensure NO stale materials carry over.
+     - **If no materials are entered**: Change the routing immediately without showing any warning.
 
 #### 4. Routing Views Cleanups (Already Applied)
 1. **Header Cleanup**: Removed `bom_id` dropdown and "Linked BOM" badge from `routing/create.blade.php` and `routing/edit.blade.php`.
@@ -296,6 +306,40 @@ Process Routing: [ RTG-001 - Desk Routing (v1.0.0 · Active) ]   Version: [ 1.0.
 * `resources/views/modules/production/bom/edit.blade.php` (Option A Sequential Operation Cards, sub-tables, zero-material notices, embedded priority, unified Odoo/Apex UI input controls with `odoo-table-input` and `odoo-table-select`, dynamic Bootstrap-5 Select2 on `bom-alt-select` with operation-specific candidate indexing)
 * `lang/en/production.php` (Added `select_routing_first`, `select_routing_operation`, `process_operation_zero_materials`, `add_material_to_op`, `expand_all`, `collapse_all`, `no_routing_selected_alert`, `zero_materials_notice`)
 * `app/Domains/Production/Controllers/ProductionBomController.php` (Eager loaded `['operations.workCenter', 'operations.section']` on Routings)
+
+#### 6. Identified Frontend Issues & Enhancements from User Testing (2026-11-05)
+
+##### Issue A: Operation Card Header Lacks Primary vs. Alternative Designation (Photo 1)
+* **Date Identified:** 2026-11-05
+* **Symptom:** In the Operation Card header (`media_1793870056410_784cd0a7.png`), an operation displays its sequence, name, work center, and cycle times, but does not indicate whether the operation itself is part of the standard primary process route or an alternative operation branch.
+* **Specification / Fix:**
+  - Add a distinct role badge in the Operation Card header:
+    - If `op.is_alternative === false`: Display `[🟢 Primary Operation]`.
+    - If `op.is_alternative === true`: Display `[🟡 Alternative Operation]` with details of the target primary operation it replaces and its priority (e.g. `Substitutes Op 10 · Priority 1`).
+
+##### Issue B: Changing Process Routing Shifts All Materials to Op 1 Without Warning (Photo 2)
+* **Date Identified:** 2026-11-05
+* **Symptom:** When a user initially selects Routing 1 and configures components across Op 1, Op 2, and Op 3, and then changes the header dropdown to Routing 3 (`media_1793870288461_3bbc669d.jpg`), all materials from Op 2 and Op 3 of R1 are unintentionally shifted into Op 1 of R3, dumping all components into a single card without warning!
+* **Root Cause:**
+  - In `create.blade.php` / `edit.blade.php`, `updateAvailableOperations()` runs:
+    ```javascript
+    this.items.forEach(item => {
+        if (!item.routing_operation_id || !validOpIds.includes(String(item.routing_operation_id))) {
+            item.routing_operation_id = firstOpId;
+        }
+    });
+    ```
+    Since the operations of R1 do not exist in R3, the fallback automatically reassigned all rows to `firstOpId` (Op 1 of R3) instead of warning the user and wiping the obsolete assignments.
+* **Agreed Specification & Safeguard:**
+  1. **User Confirmation Prompt:**
+     - When changing `#routing_id`, intercept the change event:
+     - Check if `this.items.some(it => it.material_id)`.
+     - **If materials exist:** Display a confirmation dialog (`window.confirmAction`):
+       - Title: *"Change Process Routing?"*
+       - Message: *"Changing the Process Routing will reset and remove all currently assigned component materials because the operation sequence is changing. Do you want to proceed?"*
+       - If **Cancelled**: Revert the dropdown back to the previous routing value; keep all existing materials intact.
+       - If **Confirmed**: Clear all component rows (`this.items = []`), load the new routing's operations cleanly, and ensure no orphaned materials carry over.
+     - **If no materials exist:** (Empty form), switch the routing immediately with zero warning.
 
 ---
 
@@ -692,6 +736,242 @@ Currently, `is_parallel` uses an unstyled text input (`Grp: [ A ]`). The freefor
 4. **UI/UX Cleanup:**
    - Neatly align `[✓] Parallel` checkbox and the group selector on the same row.
    - Auto-clear group assignment and resource warnings when `Parallel` is unchecked.
+
+---
+
+### TRACK-14: Live Component Allocation Rollup & Drilldown Drawer (BOM Multi-Op Rollup Tab)
+* **Date Logged:** 2026-11-05
+* **Status:** 🛠️ **Applied** (Awaiting User Acceptance)
+* **Area:** BOM Creation & Edit Views (`bom/create.blade.php`, `bom/edit.blade.php`), `<x-ui.horizontal-tabs>`, Alpine.js reactive store, 2-Tier Database Schema & Persistence (`production_bom_items` & `production_routing_operation_materials`)
+
+#### 1. Description & Context
+Under Option A's sequential Operation Cards layout, components are distributed across individual operations (Op 10, Op 20, Op 30...). While this reflects shop-floor execution accurately, production engineers and BOM planners require an aggregated, recipe-level overview to verify:
+1. Exactly how much of each raw material / component is consumed in total across the entire finished product.
+2. Which specific operations consume that material, and in what quantities.
+3. Whether a material is used as a primary component, an alternative substitute, or a mix of both.
+
+To support this, a second tab is introduced alongside `[ ≡ Components ]` in the horizontal tab strip: **`[ 📊 Total Material Rollup (Live) ]`**.
+
+#### 2. Agreed Architectural & UI/UX Decisions
+1. **Live Aggregation Engine (Alpine.js In-Memory Computed State):**
+   - 100% computed on the client via an Alpine.js getter (`get summarizedMaterials()`).
+   - Re-evaluates automatically whenever items are added, removed, quantities changed, or alternative flags toggled in any Operation Card.
+   - Zero page reload and zero backend roundtrip latency.
+2. **Multi-Operation Role Support (Primary vs. Alternative):**
+   - **Crucial Rule:** A single raw material component can be configured as a **Primary** component in one operation (e.g. Op 10), while the exact same material is configured as an **Alternative** (substitute) in another operation (e.g. Op 30).
+   - In the summary table row, every material is assigned a clear role badge:
+     - `🟢 Primary Only`: Material is consumed exclusively as a primary required item across operations.
+     - `🟡 Alternative Only`: Material is configured strictly as an optional substitute across operations.
+     - `🔀 Mixed Roles`: Material is primary in at least one operation and alternative in another.
+   - The **Quantity** column displays a split: e.g., `8.00 Pcs (4.00 Primary + 4.00 Alt)`.
+3. **Interactive Inline Drawer / Drilldown Breakdown:**
+   - Clicking on a material row expands an inline accordion drawer directly beneath the row.
+   - The drawer lists each operation consuming the material with:
+     - Operation badge & name (e.g. `Op 10: 5-Axis CNC Perimeter Profiling`).
+     - Role specification: `Primary Component` vs `Alternative (Substitutes: [SKU] Name #Seq)`.
+     - Quantity and Quantity Type (`Fixed` vs `Variable / Formula`).
+     - Material Scrap % and UOM.
+4. **Deep-Linking / Quick Navigation to Operation Card:**
+   - Each operation entry inside the drawer includes a `[↗ Jump to Op Card]` action.
+   - Clicking this action:
+     1. Switches the active tab back to **Tab 1: `Components (By Operation)`**.
+     2. Ensures the target Operation Card is expanded (`this.expandedOps[opId] = true`).
+     3. Smoothly scrolls the viewport to that component's row and applies a temporary highlight border so the user can edit it immediately.
+
+#### 3. Visual Layout Blueprint (Approach A: Live Material Rollup Tab)
+
+```text
+┌─────────────────────────────────┬──────────────────────────────────────────┐
+│  ≡ Components (By Operation)    │  📊 Total Material Rollup (Live)  [ 3 ]  │
+└─────────────────────────────────┴──────────────────────────────────────────┘
+
+TOTAL MATERIAL SUMMARY (Aggregated Across All Operations)
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  • Total Unique Materials: 3       • Base Primary Demand: 17.00 Units       • Alternative Slots: 4.00  │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌───┬──────────────────────────────────────────┬───────────────┬─────────────────┬──────────────────────┬───────────┐
+│   │ Component Material                       │ Material Type │ Allocation Role │ Total Quantity       │ UOM       │
+├───┼──────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────┼───────────┤
+│ ▼ │ Fabricated Steel Table Leg (750mm)       │ Raw Material  │ 🔀 Mixed Roles  │ 8.00 Pcs             │ Pieces    │
+│   │ SKU: RM-TBL-LEG-750                      │               │ (1 Prim, 1 Alt) │ (4 Prim + 4 Alt)     │           │
+├───┴──────────────────────────────────────────┴───────────────┴─────────────────┴──────────────────────┴───────────┤
+│   │  INLINE DRAWER / ALLOCATION BREAKDOWN:                                                                         │
+│   │                                                                                                                │
+│   │  ├─ Op 10: 5-Axis CNC Perimeter Profiling                                                                      │
+│   │  │   Role:  🟢 Primary Component                                                                               │
+│   │  │   Qty:   4.00 Pieces (Fixed)  •  Scrap: 0.00%                                                               │
+│   │  │   Action: [↗ Jump to Op 10 Card]                                                                            │
+│   │  │                                                                                                             │
+│   │  └─ Op 30: Final Table Assembly & Welding                                                                      │
+│   │      Role:  🟡 Alternative (Substitutes: [RM-04] Wooden Leg #1)  •  Priority: 1                                │
+│   │      Qty:   4.00 Pieces (Fixed)  •  Scrap: 2.00%                                                               │
+│   │      Action: [↗ Jump to Op 30 Card]                                                                            │
+├───┼──────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────┼───────────┤
+│ ▶ │ Engineered Wood Table Top Board          │ Raw Material  │ 🟢 Primary Only │ 1.00 Pcs             │ Pieces    │
+│   │ SKU: RM-TBL-TOP-BOARD                    │               │ (1 Operation)   │ (1.00 Primary)       │           │
+├───┼──────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────┼───────────┤
+│ ▶ │ Dining Table Fastener & Hardware Set     │ Raw Material  │ 🟢 Primary Only │ 12.00 Pcs            │ Pieces    │
+│   │ SKU: RM-TBL-FASTENER                     │               │ (1 Operation)   │ (12.00 Primary)      │           │
+└───┴──────────────────────────────────────────┴───────────────┴─────────────────┴──────────────────────┴───────────┘
+```
+
+#### 4. Backend 2-Tier Master-Detail Storage Architecture (Schema Specification)
+
+To eliminate data redundancy between `production_bom_items` and `production_routing_operation_materials`, the storage model is partitioned into a clean parent-child relationship:
+* **Tab 2 (Rollup / Summary)** maps to **`production_bom_items`** (Master Recipe per BOM).
+* **Tab 1 (Operation Cards)** maps to **`production_routing_operation_materials`** (Operation-Level Allocations).
+
+```mermaid
+erDiagram
+    production_boms ||--o{ production_bom_items : "has master recipe items"
+    production_bom_items ||--o{ production_routing_operation_materials : "allocates to operations via bom_item_id"
+    production_routing_operations ||--o{ production_routing_operation_materials : "consumes at station"
+
+    production_bom_items {
+        bigint id PK
+        bigint tenant_id
+        bigint bom_id FK
+        bigint material_id FK "Unique per bom_id"
+        decimal total_quantity
+        bigint uom_id FK
+        string allocation_role "primary, alternative, mixed"
+    }
+
+    production_routing_operation_materials {
+        bigint id PK
+        bigint tenant_id
+        bigint bom_item_id FK "Points to production_bom_items.id"
+        bigint routing_operation_id FK "Points to production_routing_operations.id"
+        bigint material_id FK "Redundant convenience FK or resolved via bom_item"
+        decimal quantity "Consumption at this specific Op"
+        boolean is_alternative "false = Primary, true = Substitute"
+        int priority "null for Primary; 1, 2, 3... for Alternatives"
+        bigint replaces_routing_material_id FK "null or points to primary allocation replaced"
+        bigint child_bom_id FK "null or Sub-BOM version locked for this operation"
+        decimal material_scrap_percentage "Scrap percentage specific to this Op"
+        int sequence "Loading order inside this Op: 1, 2, 3..."
+        text notes "Operation-specific component notes"
+    }
+```
+
+##### Table 1: `production_bom_items` (Master Recipe Summary — Tab 2)
+* **Role:** Stores one aggregated line per unique material in the BOM.
+* **Fields Retained:**
+  - `id` (PK)
+  - `tenant_id`
+  - `bom_id` (FK to `production_boms`)
+  - `material_id` (FK to `products`, strictly unique per `bom_id`)
+  - `total_quantity` (Decimal 15,4 — total planned quantity across all operations)
+  - `uom_id` (FK to `uoms`)
+  - `allocation_role` (`primary`, `alternative`, `mixed`)
+* **Fields Omitted / Removed from Table 1:**
+  - `sequence`: Omitted (sequence is determined per operation in Table 2).
+  - `notes`: Omitted (operational notes are entered per operation in Table 2).
+  - `child_bom_id`: Omitted (sub-BOM assignment is selected per operation in Table 2).
+  - `routing_operation_id`: Dropped (operations are tracked in child Table 2).
+  - `material_scrap_percentage`: Scrap rollup calculation rules for Table 1 will be specified later.
+
+##### Table 2: `production_routing_operation_materials` (Operation Allocations — Tab 1)
+* **Role:** Stores the physical workstation consumption rows configured inside each Operation Card.
+* **Fields:**
+  - `id` (PK)
+  - `tenant_id`
+  - `bom_item_id` (FK to `production_bom_items.id` — links allocation back to master recipe item)
+  - `routing_operation_id` (FK to `production_routing_operations.id`)
+  - `material_id` (FK to `products`)
+  - `quantity` (Decimal 15,4 — quantity consumed at this specific operation)
+  - `is_alternative` (Boolean — `false` for primary, `true` for alternative substitute)
+  - `priority` (Integer nullable — **strictly `null` for primary components**; `1, 2, 3...` for alternative substitutes)
+  - `replaces_routing_material_id` (FK nullable — points to the primary allocation row in this operation that it substitutes)
+  - `child_bom_id` (FK nullable to `production_boms.id` — Sub-BOM version assigned at this operation)
+  - `material_scrap_percentage` (Decimal 5,2 — scrap rate specific to this operation)
+  - `sequence` (Integer — workstation line/loading sequence inside this operation: 1, 2, 3...)
+  - `notes` (Text nullable — operational component notes)
+
+#### 5. Planned Files to Modify (During Implementation Batch)
+* **Database Migrations:**
+  - Update `production_bom_items`: drop `routing_operation_id`, `child_bom_id`, `sequence`, `notes`; add `allocation_role`, unique index on `[bom_id, material_id]`.
+  - Update `production_routing_operation_materials`: add `bom_item_id` (FK to `production_bom_items`), `child_bom_id` (FK to `production_boms`), `material_scrap_percentage`, `replaces_routing_material_id`.
+* **Models & Eloquent Relations:**
+  - `ProductionBomItem.php`: `hasMany(RoutingOperationMaterial::class, 'bom_item_id')`.
+  - `RoutingOperationMaterial.php`: `belongsTo(ProductionBomItem::class, 'bom_item_id')`, `belongsTo(ProductionBom::class, 'child_bom_id')`.
+* **Services & DTOs:**
+  - `ProductionBomService.php`: Update `persistBomItems()` to create/update `production_bom_items` as master aggregates, then insert child allocations in `production_routing_operation_materials`.
+  - `BomWhereUsedService.php`: Update queries to traverse parent BOMs via `production_bom_items` and `child_bom_id`.
+* **Frontend Views:**
+  - `resources/views/modules/production/bom/create.blade.php`: Add summary tab in `<x-ui.horizontal-tabs>`, summary tab pane with inline drawer, and Alpine getter `summarizedMaterials` + `jumpToOpCard()`.
+  - `resources/views/modules/production/bom/edit.blade.php`: Mirror create view changes for edit mode.
+  - `lang/en/production.php`: Add localization strings (`material_rollup`, `total_unique_materials`, `primary_demand`, `alternative_slots`, `mixed_roles`, `primary_only`, `alternative_only`, `jump_to_op_card`).
+
+##### 4. Frontend Enhancements (Tab 2 Rollup Drawer & F5 Draft Recovery)
+* **Rollup Inline Drawer DOM Structure:**
+  - Resolved Alpine.js single root requirement inside `<template x-for>`: Wrapped both the master rollup row (`<tr>`) and the drilldown allocations drawer (`<tr x-show>`) inside a dedicated `<tbody class="border-top-0">` per summarized material component.
+  - Clicking the component row toggles the expanded state with reactive proxy reassignment, smoothly opening the breakdown table showing:
+    - Target Operation (`Op 10`, `Op 20` badge + operation name, plus `Alternative Op` badge with substituted op and priority when the operation is an alternative in the routing).
+    - Allocation Role (displays `Primary Component` badge for primary items, with an info tooltip "Used only if Op X is executed" when consumed inside an alternative operation; displays `Alternative Component` for substituted rows).
+    - Planned quantity, quantity type, scrap rate.
+    - Rollup Demand Aggregation: Materials consumed inside an Alternative Operation are automatically grouped into `alternative_qty` / `Alternative Only` / `Mixed Roles` demand, as they are conditionally consumed only if that alternative operation is executed on the shop floor.
+    - Interactive "Jump to Op Card" button that switches back to Tab 1 and scrolls/highlights the component in its operation card (with transition-aware offset checking, tab switch delay handling, auto-expansion of collapsed operation cards, and fallback smooth scroll to `:data-op-id` operation card).
+* **Client-Side Draft Auto-Save & Recovery (F5 Resilience):**
+  - **Storage:** Persisted across reloads in `sessionStorage` (with tab isolation) and mirrored to `localStorage`.
+  - **Payload:** Captures selected Product (`#product_id`), selected Process Routing (`#routing_id`), base quantities, version, effective date, revision notes, active tab, and all configured operation components (`items`).
+  - **Restoration:** On page reload (F5) or re-opening, if no server-side validation error is reflashed, the draft is restored with Select2 synchronization across header and row dropdowns.
+  - **Banner:** Displays a top notification: *"Draft Restored: Restored previously selected routing and entered materials..."* with an instant `[Discard Draft & Reset]` button.
+  - **Auto-Cleanup:** Cleanly removes the draft on successful form submission.
+
+---
+
+### TRACK-15: BOM Show Page (`show.blade.php`) Components Tab: Synthesis of Rollup Drawer UI/UX with Financial Calculations
+* **Date Logged:** 2026-11-05
+* **Status:** 📋 **Under Discussion (Requires Deeper Discussion)**
+* **Area:** UI/UX & Master Data View (Read-Only Specification)
+
+#### 1. Description & Context
+On the BOM Details / Show view (`resources/views/modules/production/bom/show.blade.php`), the first tab ("Components") currently displays a flat list of component rows with financial cost calculations (`NET QTY`, `SCRAP %`, `GROSS QTY`, `UNIT COST`, `NET COST`, `TOTAL COST`).
+
+With the new 2-tier database architecture:
+- `production_bom_items`: Represents the consolidated master recipe items (1 row per unique material per BOM).
+- `production_routing_operation_materials`: Represents the physical workstation allocations across operations.
+
+The user wants to apply the **UI and UX of Photo 1** (the Master Component Row + expandable Operation Allocations Breakdown drawer seen in Tab 2 of the BOM builder) into **Photo 2** (`show.blade.php`), while **retaining all existing financial costing and quantity calculations**.
+
+#### 2. Concept Draft (Initial Alignment)
+##### A. Master Component Row (Consolidated Summary View)
+* One row per unique material component (`production_bom_items`):
+  * Expand/collapse chevron toggle (`[>]` / `[v]`).
+  * Component Details: Product Name, SKU, Type badge (`Raw Material`, `Semi Finished`), Allocation Role badge (`Primary Only`, `Alternative Only`, `Mixed Roles`).
+  * Financial & Quantity Rollups (retained from current show view):
+    * **Net Quantity:** Total planned net quantity (with `X.XX Primary + Y.YY Alt` subtext when mixed).
+    * **Scrap %:** Consolidated / effective scrap percentage.
+    * **Gross Quantity:** Total planned gross quantity accounting for scrap.
+    * **Unit Cost:** Standard inventory unit cost (`format_currency($unitCost)`).
+    * **Net Cost:** Total Net Qty × Unit Cost.
+    * **Total / Gross Cost:** Total Gross Qty × Unit Cost.
+
+##### B. Expandable Operation Allocations Breakdown (Inline Drawer)
+* Clicking the master component row expands an inline drawer:
+  * Drawer Header: `OPERATION ALLOCATIONS BREAKDOWN` with operation count badge (e.g. `2 Operation(s)`).
+  * Inner Allocation Breakdown Table:
+    * **Operation:** Workstation sequence + name (e.g., `[Op 10] op 1` or `[Op 40] op 4 [Alternative Op (Sub Op 30) · P1]`).
+    * **Role & Substitution:**
+      * `Primary Component` (with floating tooltip `"Used only if Op X is executed"` when inside an alternative operation).
+      * `Alternative (Priority X)` with `"Substitutes: <Primary Component>"`.
+    * **Operation Net Qty & Type:** Operation-level planned quantity and type (Fixed vs Formula).
+    * **Scrap Rate:** Operation-specific scrap rate (e.g. `+4.00%` or `0.00%`).
+    * **Operation Gross Qty:** Operation-specific gross quantity accounting for workstation scrap.
+    * **Operation Gross Cost:** Operation-specific cost contribution (`Operation Gross Qty × Unit Cost`).
+    * **Sub-BOM / Notes:** Clickable Sub-BOM badge (for sub-assemblies) and operational notes.
+
+---
+
+> [!IMPORTANT]
+> **Deeper Discussion Required Before Implementation:**
+> The above captures the initial structural alignment, but several crucial design decisions require deeper discussion:
+> 1. **Scrap % Aggregation Formula on Master Row:** When a material is consumed across multiple operations with different scrap rates (e.g., 0% in Op 10 and 5% in Op 30), should the master row show the weighted-average scrap rate, the total scrap loss quantity, or an operation scrap range?
+> 2. **Multi-Level Sub-BOM Hierarchy:** The current `show.blade.php` has a recursive tree renderer (`renderComponentTreeRows`) that indents child BOM items underneath assemblies. How should multi-level child components be visually organized when each material is consolidated at the master row level vs inside the operation drawer?
+> 3. **Navigation / Cross-Tab Interaction:** On the show page, should the drawer contain a link to jump directly to the target operation card in the "Workflow & Routing" tab?
+> 4. **Database Column Cleanup Confirmation:** Confirming timing for running the cleanup migration to physically drop the legacy nullable columns (`routing_operation_id`, `child_bom_id`, `replaces_item_id`, `is_alternative`, `priority`, `sequence`, `notes`) from `production_bom_items`, and clarifying intent on `consumption_type` in `production_routing_operation_materials`.
 
 ---
 

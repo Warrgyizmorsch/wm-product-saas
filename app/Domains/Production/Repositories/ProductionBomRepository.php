@@ -103,7 +103,16 @@ class ProductionBomRepository implements ProductionBomRepositoryInterface
     public function getBomWithComponents(int $id): ?ProductionBom
     {
         return ProductionBom::query()
-            ->with(['product', 'items.material', 'items.uom', 'creator', 'approver'])
+            ->with([
+                'product',
+                'items.material',
+                'items.uom',
+                'operationMaterials.material',
+                'operationMaterials.uom',
+                'operationMaterials.childBom',
+                'creator',
+                'approver',
+            ])
             ->find($id);
     }
 

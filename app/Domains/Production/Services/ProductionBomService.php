@@ -8,6 +8,7 @@ use App\Domains\Production\Models\ProductionBomItem;
 use App\Domains\Production\Models\ProductionBomApproval;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
+use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Repositories\ProductionBomRepositoryInterface;
 use Illuminate\Support\Carbon;
@@ -126,11 +127,12 @@ class ProductionBomService
             $bom->update($bomData);
 
             // Recreate items to handle dynamic grids correctly
+            RoutingOperationMaterial::where('bom_id', $bom->id)->delete();
             $bom->items()->delete();
 
             $this->persistBomItems($bom, $dto->items, $tenantId);
 
-            $bom->load('items');
+            $bom->load(['items', 'operationMaterials']);
             $bom->refreshWarningStatus();
 
             return $bom;
@@ -368,58 +370,79 @@ class ProductionBomService
                 'created_by' => $creatorUserId,
             ]);
 
-            $oldToNewIdMap = [];
-            $createdPairs = [];
-
-            // Pass 1: Clone all component rows
+            $oldToNewBomItemIdMap = [];
+            // Pass 1: Clone Master BOM Items (production_bom_items)
             foreach ($original->items as $item) {
-                if ($item->child_bom_id) {
+                $newItem = ProductionBomItem::create([
+                    'tenant_id'                 => $tenantId,
+                    'bom_id'                    => $newBom->id,
+                    'material_id'               => $item->material_id,
+                    'quantity'                  => $item->quantity,
+                    'uom_id'                    => $item->uom_id,
+                    'allocation_role'           => $item->allocation_role ?? 'primary',
+                    'material_scrap_percentage' => $item->material_scrap_percentage ?? 0.00,
+                ]);
+
+                $oldToNewBomItemIdMap[$item->id] = $newItem;
+            }
+
+            foreach ($original->items as $item) {
+                if ($item->replaces_item_id && isset($oldToNewBomItemIdMap[$item->replaces_item_id])) {
+                    $oldToNewBomItemIdMap[$item->id]->replaces_item_id = $oldToNewBomItemIdMap[$item->replaces_item_id]->id;
+                }
+            }
+
+            // Pass 2: Clone Operation Allocations (production_routing_operation_materials)
+            $oldToNewOpMatMap = [];
+            $createdOpMatPairs = [];
+
+            foreach ($original->operationMaterials as $opMat) {
+                if ($opMat->child_bom_id) {
                     $this->validateChildBomLink(
-                        $item->child_bom_id,
-                        $item->material_id,
+                        $opMat->child_bom_id,
+                        $opMat->material_id,
                         $newBom->id,
                         Carbon::parse($newBom->effective_date)->toDateString(),
                         $newBom->expiry_date ? Carbon::parse($newBom->expiry_date)->toDateString() : null
                     );
                 }
 
-                $newItem = ProductionBomItem::create([
-                    'tenant_id' => $tenantId,
-                    'bom_id' => $newBom->id,
-                    'material_id' => $item->material_id,
-                    'routing_operation_id' => $item->routing_operation_id, // [TRACK-10] Clone operation assignment
-                    'child_bom_id' => $item->child_bom_id,
-                    'quantity' => $item->quantity,
-                    'quantity_type' => $item->quantity_type ?? 'fixed',
-                    'formula' => $item->formula,
-                    'uom_id' => $item->uom_id,
-                    'material_scrap_percentage' => $item->material_scrap_percentage,
-                    'is_alternative' => (bool) $item->is_alternative,
-                    'replaces_item_id' => null, // resolved in Pass 2
-                    'priority' => $item->priority ?? 1,
-                    'sequence' => $item->sequence,
-                    'notes' => $item->notes,
+                $newOpMat = RoutingOperationMaterial::create([
+                    'tenant_id'                    => $tenantId,
+                    'bom_id'                       => $newBom->id,
+                    'bom_item_id'                  => isset($oldToNewBomItemIdMap[$opMat->bom_item_id]) ? $oldToNewBomItemIdMap[$opMat->bom_item_id]->id : null,
+                    'routing_operation_id'         => $opMat->routing_operation_id,
+                    'material_id'                  => $opMat->material_id,
+                    'child_bom_id'                 => $opMat->child_bom_id,
+                    'quantity'                     => $opMat->quantity,
+                    'quantity_type'                => $opMat->quantity_type ?? 'fixed',
+                    'formula'                      => $opMat->formula,
+                    'uom_id'                       => $opMat->uom_id,
+                    'is_alternative'               => (bool) $opMat->is_alternative,
+                    'priority'                     => $opMat->priority,
+                    'replaces_routing_material_id' => null, // resolved below
+                    'material_scrap_percentage'    => $opMat->material_scrap_percentage ?? 0.00,
+                    'sequence'                     => $opMat->sequence,
+                    'notes'                        => $opMat->notes,
+                    'consumption_type'             => $opMat->consumption_type,
                 ]);
 
-                $oldToNewIdMap[$item->id] = $newItem->id;
-                $createdPairs[] = ['old' => $item, 'new' => $newItem];
+                $oldToNewOpMatMap[$opMat->id] = $newOpMat->id;
+                $createdOpMatPairs[] = ['old' => $opMat, 'new' => $newOpMat];
             }
 
-            // Pass 2: Re-link alternative components to cloned primary items
-            foreach ($createdPairs as $pair) {
-                $oldItem = $pair['old'];
-                $newItem = $pair['new'];
+            // Pass 3: Re-link alternative replacements
+            foreach ($createdOpMatPairs as $pair) {
+                $oldOpMat = $pair['old'];
+                $newOpMat = $pair['new'];
 
-                if ($oldItem->is_alternative && $oldItem->replaces_item_id) {
-                    $targetNewId = $oldToNewIdMap[$oldItem->replaces_item_id] ?? null;
+                if ($oldOpMat->is_alternative && $oldOpMat->replaces_routing_material_id) {
+                    $targetNewId = $oldToNewOpMatMap[$oldOpMat->replaces_routing_material_id] ?? null;
                     if ($targetNewId) {
-                        $newItem->update(['replaces_item_id' => $targetNewId]);
+                        $newOpMat->update(['replaces_routing_material_id' => $targetNewId]);
                     }
                 }
             }
-
-            // [TRACK-02] Sync cloned component allocations into RoutingOperationMaterial
-            $this->syncRoutingOperationMaterials($newBom);
 
             // Log revision creation
             ProductionBomApproval::create([
@@ -437,14 +460,74 @@ class ProductionBomService
     }
 
     /**
-     * Persist BOM items using a two-pass algorithm to resolve primary/alternative links.
+     * Persist BOM items using the 2-tier architecture:
+     * - Table 1 (production_bom_items): Master recipe summary (1 unique row per material per BOM).
+     * - Table 2 (production_routing_operation_materials): Workstation operation allocations.
      */
     protected function persistBomItems(ProductionBom $bom, array $itemDtos, int $tenantId): void
     {
-        $uidToItemMap = [];
+        if (empty($itemDtos)) {
+            return;
+        }
+
+        // Preload alternative routing operations to accurately reflect effective alternative demand
+        $opIds = array_filter(array_map(fn($d) => $d->routing_operation_id, $itemDtos));
+        $altOpIds = !empty($opIds)
+            ? RoutingOperation::whereIn('id', $opIds)->where('is_alternative', true)->pluck('id')->all()
+            : [];
+        $altOpIdsMap = array_fill_keys(array_map('strval', $altOpIds), true);
+
+        // STEP 1: Group allocations by material_id to build the Master Recipe Summary (Tab 2)
+        $materialGroups = [];
+        foreach ($itemDtos as $itemDto) {
+            $materialGroups[$itemDto->material_id][] = $itemDto;
+        }
+
+        $materialToBomItemMap = [];
+        foreach ($materialGroups as $materialId => $dtos) {
+            $totalQuantity = 0.0;
+            $hasPrimary = false;
+            $hasAlternative = false;
+            $uomId = $dtos[0]->uom_id;
+
+            foreach ($dtos as $dto) {
+                $totalQuantity += (float) $dto->quantity;
+                $isEffectiveAlt = !empty($dto->is_alternative) || isset($altOpIdsMap[(string) $dto->routing_operation_id]);
+                if ($isEffectiveAlt) {
+                    $hasAlternative = true;
+                } else {
+                    $hasPrimary = true;
+                }
+            }
+
+            $allocationRole = 'primary';
+            if ($hasPrimary && $hasAlternative) {
+                $allocationRole = 'mixed';
+            } elseif ($hasAlternative) {
+                $allocationRole = 'alternative';
+            }
+
+            // Create 1 consolidated master summary row per unique material
+            $bomItem = ProductionBomItem::create([
+                'tenant_id'                 => $tenantId,
+                'bom_id'                    => $bom->id,
+                'material_id'               => $materialId,
+                'quantity'                  => $totalQuantity,
+                'uom_id'                    => $uomId,
+                'allocation_role'           => $allocationRole,
+                'material_scrap_percentage' => 0.00,
+            ]);
+
+            $materialToBomItemMap[$materialId] = $bomItem;
+        }
+
+        // STEP 2: Clear and recreate operation allocations in production_routing_operation_materials (Tab 1)
+        RoutingOperationMaterial::where('bom_id', $bom->id)->delete();
+
+        $uidToOpMatMap = [];
         $createdList = [];
 
-        // Pass 1: create all items with base attributes
+        // Pass 1: Create all operation material records
         foreach ($itemDtos as $index => $itemDto) {
             $childBomId = $itemDto->child_bom_id;
 
@@ -457,7 +540,7 @@ class ProductionBomService
                     $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
                 );
             } else {
-                // If not explicitly set, auto-bind to the currently active/approved BOM for this material
+                // Auto-bind to the currently active/approved BOM for manufactured sub-assemblies
                 $defaultChildBom = ProductionBom::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $itemDto->material_id)
@@ -474,47 +557,58 @@ class ProductionBomService
                 }
             }
 
-            $itemData = $itemDto->toArray();
-            unset($itemData['row_uid'], $itemData['replaces_row_uid']);
+            $parentBomItem = $materialToBomItemMap[$itemDto->material_id] ?? null;
 
-            $itemData = array_merge($itemData, [
-                'tenant_id' => $tenantId,
-                'bom_id' => $bom->id,
-                'child_bom_id' => $childBomId,
-                'sequence' => $itemDto->sequence ?: ($index + 1),
-                'replaces_item_id' => null, // resolved in pass 2
-                'priority' => $itemDto->priority ?? 1,
+            // Priority: strictly null for primary component; integer for alternative
+            $priority = !empty($itemDto->is_alternative) ? ($itemDto->priority ?? 1) : null;
+
+            $createdOpMat = RoutingOperationMaterial::create([
+                'tenant_id'                    => $tenantId,
+                'bom_id'                       => $bom->id,
+                'bom_item_id'                  => $parentBomItem?->id,
+                'routing_operation_id'         => $itemDto->routing_operation_id,
+                'material_id'                  => $itemDto->material_id,
+                'child_bom_id'                 => $childBomId,
+                'quantity'                     => (float) $itemDto->quantity,
+                'quantity_type'                => $itemDto->quantity_type ?? 'fixed',
+                'formula'                      => $itemDto->formula,
+                'uom_id'                       => $itemDto->uom_id,
+                'is_alternative'               => (bool) $itemDto->is_alternative,
+                'priority'                     => $priority,
+                'replaces_routing_material_id' => null, // resolved in Pass 2
+                'material_scrap_percentage'    => $itemDto->material_scrap_percentage ?? 0.00,
+                'sequence'                     => $itemDto->sequence ?: ($index + 1),
+                'notes'                        => $itemDto->notes,
+                'consumption_type'             => null,
             ]);
 
-            $createdItem = ProductionBomItem::create($itemData);
-
             if (!empty($itemDto->row_uid)) {
-                $uidToItemMap[$itemDto->row_uid] = $createdItem;
+                $uidToOpMatMap[$itemDto->row_uid] = $createdOpMat;
             }
             if (!empty($itemDto->id)) {
-                $uidToItemMap[(string) $itemDto->id] = $createdItem;
+                $uidToOpMatMap[(string) $itemDto->id] = $createdOpMat;
             }
-            $uidToItemMap[(string) $createdItem->id] = $createdItem;
+            $uidToOpMatMap[(string) $createdOpMat->id] = $createdOpMat;
 
             $createdList[] = [
-                'dto' => $itemDto,
-                'model' => $createdItem,
+                'dto'   => $itemDto,
+                'model' => $createdOpMat,
             ];
         }
 
-        // Pass 2: resolve replaces_item_id for alternative components
+        // Pass 2: Resolve replaces_routing_material_id for alternative components
         foreach ($createdList as $entry) {
             $itemDto = $entry['dto'];
             $model = $entry['model'];
 
             if ($itemDto->is_alternative) {
                 $targetModel = null;
-                if (!empty($itemDto->replaces_row_uid) && isset($uidToItemMap[$itemDto->replaces_row_uid])) {
-                    $targetModel = $uidToItemMap[$itemDto->replaces_row_uid];
-                } elseif (!empty($itemDto->replaces_item_id) && isset($uidToItemMap[(string) $itemDto->replaces_item_id])) {
-                    $targetModel = $uidToItemMap[(string) $itemDto->replaces_item_id];
+                if (!empty($itemDto->replaces_row_uid) && isset($uidToOpMatMap[$itemDto->replaces_row_uid])) {
+                    $targetModel = $uidToOpMatMap[$itemDto->replaces_row_uid];
+                } elseif (!empty($itemDto->replaces_item_id) && isset($uidToOpMatMap[(string) $itemDto->replaces_item_id])) {
+                    $targetModel = $uidToOpMatMap[(string) $itemDto->replaces_item_id];
                 } elseif (!empty($itemDto->replaces_item_id)) {
-                    $existing = ProductionBomItem::where('bom_id', $bom->id)->find($itemDto->replaces_item_id);
+                    $existing = RoutingOperationMaterial::where('bom_id', $bom->id)->find($itemDto->replaces_item_id);
                     if ($existing && !$existing->is_alternative && $existing->id !== $model->id) {
                         $targetModel = $existing;
                     }
@@ -522,38 +616,20 @@ class ProductionBomService
 
                 if ($targetModel && $targetModel->id !== $model->id) {
                     if ($targetModel->bom_id === $bom->id && !$targetModel->is_alternative) {
-                        $model->update(['replaces_item_id' => $targetModel->id]);
+                        $model->update(['replaces_routing_material_id' => $targetModel->id]);
                     }
                 }
             }
         }
-
-        // [TRACK-02] Sync component allocations to production_routing_operation_materials
-        $this->syncRoutingOperationMaterials($bom);
     }
 
     /**
      * [TRACK-02] Sync BOM component allocations into production_routing_operation_materials.
+     * Maintained for backwards-compatibility; persistBomItems now handles native 2-tier storage.
      */
     public function syncRoutingOperationMaterials(ProductionBom $bom): void
     {
-        RoutingOperationMaterial::where('bom_id', $bom->id)->delete();
-
-        $items = $bom->items()->get();
-        foreach ($items as $item) {
-            if (!empty($item->routing_operation_id)) {
-                RoutingOperationMaterial::create([
-                    'tenant_id'            => $bom->tenant_id,
-                    'bom_id'               => $bom->id,
-                    'routing_operation_id' => $item->routing_operation_id,
-                    'material_id'          => $item->material_id,
-                    'quantity'             => (float) $item->quantity,
-                    'uom_id'               => $item->uom_id,
-                    'consumption_type'     => null,
-                    'sequence'             => (int) $item->sequence,
-                ]);
-            }
-        }
+        // Handled directly inside persistBomItems
     }
 
     /**
@@ -585,9 +661,9 @@ class ProductionBomService
                 'wastage_percentage' => $item->material_scrap_percentage, // compatibility fallback
                 'material_scrap_percentage' => $item->material_scrap_percentage,
                 'uom_code' => $item->uom?->code ?? $item->material?->uom?->code ?? 'PCS',
-                'is_alternative' => (bool) $item->is_alternative,
-                'replaces_item_id' => $item->replaces_item_id,
-                'priority' => $item->priority,
+                'is_alternative' => $item->isAlternative(),
+                'replaces_item_id' => null,
+                'priority' => null,
             ];
         }
 
