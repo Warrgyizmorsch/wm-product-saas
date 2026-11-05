@@ -18,6 +18,14 @@ use Illuminate\Support\Facades\Cache;
 class HrmsScopeService
 {
     /**
+     * Proxy static calls to container-resolved instance to prevent non-static call fatal errors.
+     */
+    public static function __callStatic(string $method, array $arguments)
+    {
+        return app(static::class)->$method(...$arguments);
+    }
+
+    /**
      * Resolve the employee instance for a given user or employee actor.
      */
     public function resolveEmployee(User|Employee|null $actor, ?int $tenantId = null): ?Employee
@@ -60,6 +68,17 @@ class HrmsScopeService
         // Superadmin or root administrative roles
         if (!empty($user->is_super_admin)) {
             return true;
+        }
+
+        // Tenant owner account
+        if (!empty($user->tenant_id)) {
+            $currentTenant = function_exists('tenant') ? tenant() : null;
+            if ($currentTenant && (int) $currentTenant->owner_user_id === (int) $user->id) {
+                return true;
+            }
+            if (\App\Models\Tenant::where('id', $user->tenant_id)->where('owner_user_id', $user->id)->exists()) {
+                return true;
+            }
         }
 
         // Dynamic RBAC platform admin check

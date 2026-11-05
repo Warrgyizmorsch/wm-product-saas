@@ -2,6 +2,7 @@
 
 namespace App\Domains\HRMS\Repositories;
 
+use App\Domains\HRMS\Models\Attendance;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\LeaveBalance;
 use App\Domains\HRMS\Models\LeaveEncashment;
@@ -385,6 +386,10 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                 $balance->increment('used', (float) $validated['duration']);
             }
 
+            if ($status === 'approved') {
+                $this->syncAttendanceForApprovedLeave($leaveRequest);
+            }
+
             return $leaveRequest;
         });
     }
@@ -455,6 +460,8 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                     }
                     $balance->increment('used', (float) $lockedRequest->duration);
                 }
+
+                $this->syncAttendanceForApprovedLeave($lockedRequest);
             } elseif ($action === 'rejected') {
                 // Restore balance if previously approved
                 if ($isPaidLimited && $wasBalanceCharged) {
@@ -465,6 +472,10 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                         $balance->used = max(0, (float) $balance->used - (float) $lockedRequest->duration);
                         $balance->save();
                     }
+                }
+
+                if ($wasBalanceCharged) {
+                    $this->removeAttendanceForCancelledLeave($lockedRequest);
                 }
 
                 $lockedRequest->update([
@@ -482,6 +493,10 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                         $balance->used = max(0, (float) $balance->used - (float) $lockedRequest->duration);
                         $balance->save();
                     }
+                }
+
+                if ($wasBalanceCharged && $action !== 'approved') {
+                    $this->removeAttendanceForCancelledLeave($lockedRequest);
                 }
 
                 $lockedRequest->update([
@@ -559,6 +574,8 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
                     $newUsed = max(0, floatval($balance->used) - $restore);
                     $balance->update(['used' => $newUsed]);
                 }
+
+                $this->removeAttendanceForCancelledLeave($lockedRequest);
             }
         });
         $leaveRequest->refresh();
@@ -646,5 +663,57 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $filename = 'leave_applications_' . now()->format('Y-m-d') . '.xlsx';
 
         return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, $filename);
+    }
+
+    /**
+     * Automatically sync Attendance records for approved leave date range.
+     */
+    public function syncAttendanceForApprovedLeave(LeaveRequest $leaveRequest): void
+    {
+        $startDate = $leaveRequest->start_date instanceof Carbon ? $leaveRequest->start_date->copy() : Carbon::parse($leaveRequest->start_date);
+        $endDate = $leaveRequest->end_date instanceof Carbon ? $leaveRequest->end_date->copy() : Carbon::parse($leaveRequest->end_date);
+        $tenantId = $leaveRequest->tenant_id ?? $leaveRequest->employee?->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null);
+
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $dateStr = $date->format('Y-m-d');
+            $existing = Attendance::where('employee_id', $leaveRequest->employee_id)
+                ->where('date', $dateStr)
+                ->first();
+
+            if (!$existing) {
+                Attendance::create([
+                    'tenant_id'   => $tenantId,
+                    'employee_id' => $leaveRequest->employee_id,
+                    'date'        => $dateStr,
+                    'status'      => 'on_leave',
+                ]);
+            } elseif (empty($existing->check_in) && in_array($existing->status, ['absent', 'on_leave', 'missing_logs', null], true)) {
+                $existing->update([
+                    'status' => 'on_leave',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Remove or revert on_leave attendance records when an approved leave is cancelled or rejected.
+     */
+    public function removeAttendanceForCancelledLeave(LeaveRequest $leaveRequest): void
+    {
+        $startDate = $leaveRequest->start_date instanceof Carbon ? $leaveRequest->start_date->copy() : Carbon::parse($leaveRequest->start_date);
+        $endDate = $leaveRequest->end_date instanceof Carbon ? $leaveRequest->end_date->copy() : Carbon::parse($leaveRequest->end_date);
+
+        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+            $dateStr = $date->format('Y-m-d');
+            $existing = Attendance::where('employee_id', $leaveRequest->employee_id)
+                ->where('date', $dateStr)
+                ->where('status', 'on_leave')
+                ->whereNull('check_in')
+                ->first();
+
+            if ($existing) {
+                $existing->delete();
+            }
+        }
     }
 }

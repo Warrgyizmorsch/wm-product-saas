@@ -315,6 +315,18 @@ class PayrollCalculationService
             })
             ->get();
 
+        $wfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhereBetween('end_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhere(function($sub) use ($startDate, $endDate) {
+                        $sub->where('start_date', '<=', $startDate->format('Y-m-d'))
+                            ->where('end_date', '>=', $endDate->format('Y-m-d'));
+                    });
+            })
+            ->get();
+
         $absenceDays = 0.0;
         $unpaidLeaveDays = 0.0;
         $today = Carbon::today();
@@ -403,7 +415,23 @@ class PayrollCalculationService
                 continue;
             }
 
-            // 5. It's an employed working day. Check attendance status
+            // 5. Check if it is an approved Work From Home (WFH) day
+            $activeWfh = $wfhRequests->first(function($w) use ($dateStr) {
+                $start = $w->start_date instanceof Carbon ? $w->start_date->format('Y-m-d') : Carbon::parse($w->start_date)->format('Y-m-d');
+                $end = $w->end_date instanceof Carbon ? $w->end_date->format('Y-m-d') : Carbon::parse($w->end_date)->format('Y-m-d');
+                return $dateStr >= $start && $dateStr <= $end;
+            });
+
+            if ($activeWfh) {
+                $att = $attendances->get($dateStr);
+                if ($att && $att->status === 'half_day') {
+                    $absenceDays += 0.5;
+                }
+                // Approved WFH covers this working day; skip marking as absent
+                continue;
+            }
+
+            // 6. It's an employed working day. Check attendance status
             $att = $attendances->get($dateStr);
             if (!$att || $att->status === 'absent') {
                 $absenceDays += 1.0;

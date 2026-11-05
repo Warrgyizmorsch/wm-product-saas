@@ -76,7 +76,7 @@
                 @php
                     $isClockedIn = ($myTodayAttendance ?? null) && $myTodayAttendance->check_in && !$myTodayAttendance->check_out;
                     $isCompleted = ($myTodayAttendance ?? null) && $myTodayAttendance->check_in && $myTodayAttendance->check_out;
-                    $activeBreak = ($myTodayAttendance ?? null) && $myTodayAttendance->breaks ? $myTodayAttendance->breaks->whereNull('break_out')->first() : null;
+                    $activeBreak = ($myTodayAttendance ?? null) ? ($myTodayAttendance->activeBreak() ?: ($myTodayAttendance->breaks ? $myTodayAttendance->breaks->whereNull('break_out')->first() : null)) : null;
                 @endphp
 
                 @if($isClockedIn && !$activeBreak)
@@ -141,12 +141,12 @@
                             </button>
                         @elseif($isClockedIn)
                             @if(!$activeBreak)
-                                <button type="submit" name="action" value="break_out" {{ !($trackingConfig['punch_allowed'] ?? true) ? 'disabled' : '' }} class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px; gap: 6px;">
+                                <button type="submit" name="action" value="start_break" {{ !($trackingConfig['punch_allowed'] ?? true) ? 'disabled' : '' }} class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #ffffff; border: 1px solid #e2e8f0; color: #1e293b; font-size: 11px; font-weight: 800; letter-spacing: 0.03em; border-radius: 8px; gap: 6px;">
                                     <i class="feather-pause-circle fs-13 me-1" style="color: #f97316;"></i> START BREAK
                                 </button>
                             @else
-                                <button type="submit" name="action" value="break_in" {{ !($trackingConfig['punch_allowed'] ?? true) ? 'disabled' : '' }} class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca; font-size: 11px; font-weight: 800; border-radius: 8px; gap: 6px;">
-                                    <i class="feather-play-circle fs-13 me-1" style="color: #6366f1;"></i> RESUME WORK
+                                <button type="submit" name="action" value="end_break" {{ !($trackingConfig['punch_allowed'] ?? true) ? 'disabled' : '' }} class="btn fw-bold px-3 py-1.5 rounded-3 text-uppercase d-inline-flex align-items-center" style="background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca; font-size: 11px; font-weight: 800; border-radius: 8px; gap: 6px;">
+                                    <i class="feather-play-circle fs-13 me-1" style="color: #6366f1;"></i> END BREAK
                                 </button>
                             @endif
 
@@ -208,6 +208,10 @@
                             $badgeBg = '#e0f2fe';
                             $badgeColor = '#0284c7';
                             $statusLabel = 'Leave';
+                        } elseif ($status === 'missing_logs') {
+                            $badgeBg = '#fef3c7';
+                            $badgeColor = '#d97706';
+                            $statusLabel = 'Missed';
                         } else {
                             if ($isToday) {
                                 if ($isClockedIn) {
@@ -215,9 +219,9 @@
                                     $badgeColor = '#16a34a';
                                     $statusLabel = 'Present';
                                 } else {
-                                    $badgeBg = '#fef3c7';
-                                    $badgeColor = '#d97706';
-                                    $statusLabel = 'Late';
+                                    $badgeBg = '#f1f5f9';
+                                    $badgeColor = '#64748b';
+                                    $statusLabel = 'Pending';
                                 }
                             } else {
                                 $badgeBg = '#fee2e2';
@@ -629,7 +633,7 @@
 
                 // Break actions don't require selfie, but check if break geofence is enabled (Enhancement 2)
                 const breakGeofenceRequired = punchForm.dataset.officeBreakGeofence === '1';
-                if (['break_in', 'break_out'].includes(action)) {
+                if (['break_in', 'break_out', 'start_break', 'end_break'].includes(action)) {
                     if (breakGeofenceRequired && (!latInput?.value || !lngInput?.value)) {
                         e.preventDefault();
                         fetchCurrentPosition(function(coords) {

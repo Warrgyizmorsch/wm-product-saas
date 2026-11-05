@@ -481,7 +481,7 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         if ($activeBreak) {
             $activeBreak->update([
                 'break_out' => $now,
-                'duration_minutes' => max(0, intval($activeBreak->break_in->diffInMinutes($now))),
+                'duration_minutes' => max(1, (int) round($activeBreak->break_in->diffInMinutes($now))),
             ]);
         }
 
@@ -667,9 +667,10 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         }
 
         $now = Carbon::now();
+        $diffMins = max(1, (int) round($activeBreak->break_in->diffInMinutes($now)));
         $activeBreak->update([
             'break_out'        => $now,
-            'duration_minutes' => max(0, intval($activeBreak->break_in->diffInMinutes($now))),
+            'duration_minutes' => $diffMins,
         ]);
 
         // Recalculate total break hours and update attendance immediately
@@ -677,9 +678,13 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         $totalBreakMinutes = $attendance->breaks->sum('duration_minutes');
         $totalBreakHours = round($totalBreakMinutes / 60, 2);
 
-        $attendance->update([
-            'total_break_hours' => $totalBreakHours,
-        ]);
+        $updateData = ['total_break_hours' => $totalBreakHours];
+        if (!empty($attendance->check_in) && !empty($attendance->check_out)) {
+            $grossHours = Carbon::parse($attendance->check_in)->diffInMinutes(Carbon::parse($attendance->check_out)) / 60;
+            $updateData['total_work_hours'] = max(0, round($grossHours - $totalBreakHours, 2));
+        }
+
+        $attendance->update($updateData);
 
         return $activeBreak;
     }
