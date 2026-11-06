@@ -89,6 +89,13 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
+        // Login runs outside the `tenant` middleware, so an unknown tenant header
+        // would otherwise be ignored and a platform admin signed in regardless.
+        if (filled($request->header(config('tenancy.header')))
+            && app(\App\Core\Tenant\TenantResolver::class)->resolve($request) === null) {
+            return response()->json(['message' => 'Tenant not found.'], 404);
+        }
+
         if (!Auth::attempt($credentials)) {
             return response()->json([
                 'message' => 'These credentials do not match our records.'

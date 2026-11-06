@@ -57,7 +57,7 @@ Two-way sync between this ERP's Accounting module and external books. Built so f
 
 ## Set up a sync
 
-Requests need the `X-Tenant` header and a bearer token. Get a first token from `POST /api/auth/login`, which needs `X-Tenant` too unless you call it on the tenant's own domain. Without it, login returns `401` even with the right password.
+Requests need the `X-Tenant` header and a bearer token. Get a first token from `POST /api/auth/login`, which needs `X-Tenant` too unless you call it on the tenant's own domain. An unknown or suspended tenant returns `404 Tenant not found`, and a user who isn't in that tenant gets `401`, even with the right password.
 
 ### 1. Create a service user
 
