@@ -27,6 +27,7 @@ class WarehouseApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Warehouse::class);
         [$tenantId] = $this->resolveTenantContext();
 
         $query = Warehouse::query()->where('tenant_id', $tenantId);
@@ -57,6 +58,8 @@ class WarehouseApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Warehouse::class);
+
         $validator = Validator::make($request->all(), [
             'name'           => ['required', 'string', 'max:255'],
             'code'           => ['required', 'string', 'max:50'],
@@ -124,6 +127,8 @@ class WarehouseApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('view', $warehouse);
+
         $stockSummary = ProductWarehouseStock::where('warehouse_id', $id)
             ->with('product:id,name,sku,unit_cost')
             ->paginate(50);
@@ -151,6 +156,8 @@ class WarehouseApiController extends Controller
                 'message' => 'Warehouse not found',
             ], 404);
         }
+
+        $this->authorize('update', $warehouse);
 
         $validator = Validator::make($request->all(), [
             'name'           => ['sometimes', 'required', 'string', 'max:255'],
@@ -199,6 +206,8 @@ class WarehouseApiController extends Controller
             ], 404);
         }
 
+        $this->authorize('delete', $warehouse);
+
         $hasStock = ProductWarehouseStock::where('warehouse_id', $id)->where('quantity', '>', 0)->exists();
         if ($hasStock) {
             return response()->json([
@@ -220,6 +229,7 @@ class WarehouseApiController extends Controller
      */
     public function export(Request $request)
     {
+        $this->authorize('viewAny', Warehouse::class);
         [$tenantId] = $this->resolveTenantContext();
 
         return \Maatwebsite\Excel\Facades\Excel::download(
@@ -233,6 +243,7 @@ class WarehouseApiController extends Controller
      */
     public function quickCreate(Request $request): JsonResponse
     {
+        $this->authorize('create', Warehouse::class);
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [

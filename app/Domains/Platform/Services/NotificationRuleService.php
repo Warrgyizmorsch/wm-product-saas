@@ -256,6 +256,15 @@ class NotificationRuleService
             if ($assignedId) {
                 $finalIds[] = (int) $assignedId;
             }
+
+            // Dynamic Account Manager for CRM / Sales models
+            $accountManagerId = $data['account_manager_id'] ?? null;
+            if (!$accountManagerId && $subjectModel && method_exists($subjectModel, 'account')) {
+                $accountManagerId = $subjectModel->account?->owner_id;
+            }
+            if ($accountManagerId) {
+                $finalIds[] = (int) $accountManagerId;
+            }
         }
 
         // 5. Exclude Users (prevent duplicate notification if already sent directly)

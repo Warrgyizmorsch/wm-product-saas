@@ -155,8 +155,8 @@
 (function() {
     @php
         $pusherConfig = \App\Services\Pusher\PusherBroadcastService::getClientConfig();
-        $currentUserId = auth()->id() ?? 0;
-        $currentTenantId = function_exists('tenant_id') ? tenant_id() : (auth()->user()->tenant_id ?? 0);
+        $currentUserId = (int) (auth()->id() ?? 0);
+        $currentTenantId = (int) ((function_exists('tenant_id') ? tenant_id() : null) ?? auth()->user()?->tenant_id ?? 0);
     @endphp
 
     const pusherKey = "{{ $pusherConfig['key'] }}";

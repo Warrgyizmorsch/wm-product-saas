@@ -679,7 +679,7 @@ class Employee extends BaseModel
     }
 
     /**
-     * Multi-tier resolution of Employee profile for a given User model.
+     * Multi-tier resolution of Employee profile for a given User model or user ID.
      */
     public static function resolveForUser(mixed $user, ?int $tenantId = null): ?self
     {
@@ -687,10 +687,17 @@ class Employee extends BaseModel
             return null;
         }
 
+        $userId = is_object($user) ? ($user->id ?? null) : (is_numeric($user) ? (int) $user : null);
+        if (!$userId) {
+            return null;
+        }
+
+        $userObj = is_object($user) ? $user : \App\Models\User::find($userId);
+
         $tenantId = $tenantId
             ?? (function_exists('tenant_id') ? tenant_id() : null)
             ?? (app()->bound(\App\Core\Tenant\TenantContext::class) ? app(\App\Core\Tenant\TenantContext::class)->id() : null)
-            ?? $user->tenant_id;
+            ?? ($userObj?->tenant_id ?? null);
 
         $scoped = function () use ($tenantId) {
             $q = static::query();
@@ -701,33 +708,33 @@ class Employee extends BaseModel
         };
 
         // 1. Primary check: by user_id link
-        $employee = $scoped()->where('user_id', $user->id)->first();
+        $employee = $scoped()->where('user_id', $userId)->first();
         if ($employee) {
             return $employee;
         }
 
         // 2. Secondary check: case-insensitive email match (office_email or personal_email)
-        if (!empty($user->email)) {
-            $employee = $scoped()->where(function ($q) use ($user) {
-                $q->whereRaw('LOWER(office_email) = ?', [strtolower($user->email)])
-                  ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($user->email)]);
+        if (!empty($userObj?->email)) {
+            $employee = $scoped()->where(function ($q) use ($userObj) {
+                $q->whereRaw('LOWER(office_email) = ?', [strtolower($userObj->email)])
+                  ->orWhereRaw('LOWER(personal_email) = ?', [strtolower($userObj->email)]);
             })->first();
 
             if ($employee) {
                 // Auto-link user_id for instant future lookups
                 if (!$employee->user_id) {
-                    $employee->updateQuietly(['user_id' => $user->id]);
+                    $employee->updateQuietly(['user_id' => $userId]);
                 }
                 return $employee;
             }
         }
 
         // 3. Tertiary check: match full_name with user name if available
-        if (!empty($user->name)) {
-            $employee = $scoped()->whereRaw('LOWER(full_name) = ?', [strtolower($user->name)])->first();
+        if (!empty($userObj?->name)) {
+            $employee = $scoped()->whereRaw('LOWER(full_name) = ?', [strtolower($userObj->name)])->first();
             if ($employee) {
                 if (!$employee->user_id) {
-                    $employee->updateQuietly(['user_id' => $user->id]);
+                    $employee->updateQuietly(['user_id' => $userId]);
                 }
                 return $employee;
             }

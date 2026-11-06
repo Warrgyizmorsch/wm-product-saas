@@ -13,6 +13,8 @@ class BatchController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Batch::class);
+
         $tenantId = require_tenant_id();
 
         $query = Batch::query()

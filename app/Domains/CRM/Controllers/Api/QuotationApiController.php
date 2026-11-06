@@ -33,6 +33,8 @@ class QuotationApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Quotation::class);
+
         $perPage = min((int)$request->input('per_page', 15), 100);
         $quotations = $this->quotationRepo->getPaginatedQuotations($request->all(), $perPage);
 
@@ -59,6 +61,8 @@ class QuotationApiController extends Controller
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
 
+        $this->authorize('view', $quotation);
+
         return response()->json([
             'success' => true,
             'data'    => $quotation,
@@ -70,6 +74,8 @@ class QuotationApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Quotation::class);
+
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 
         $validator = Validator::make($request->all(), [
@@ -128,6 +134,8 @@ class QuotationApiController extends Controller
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
 
+        $this->authorize('approve', $quotation);
+
         $oldStatus = $quotation->status;
         $this->quotationRepo->update($quotation, ['status' => 'Approved']);
         $this->quotationService->handleQuotationStatusChange($quotation, 'Approved', $quotation->lead_id);
@@ -149,6 +157,8 @@ class QuotationApiController extends Controller
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
 
+        $this->authorize('approve', $quotation);
+
         $reason = $request->input('rejection_reason');
         $this->quotationRepo->update($quotation, [
             'status'           => 'Rejected',
@@ -168,6 +178,8 @@ class QuotationApiController extends Controller
      */
     public function convertFromLead(int $leadId): JsonResponse
     {
+        $this->authorize('create', Quotation::class);
+
         $lead = Lead::find($leadId);
         if (!$lead) {
             return response()->json(['success' => false, 'message' => "Lead #{$leadId} not found."], 404);
@@ -191,6 +203,8 @@ class QuotationApiController extends Controller
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
+
+        $this->authorize('update', $quotation);
 
         $validator = Validator::make($request->all(), [
             'quotation_date'   => 'nullable|date',
@@ -238,6 +252,8 @@ class QuotationApiController extends Controller
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
 
+        $this->authorize('delete', $quotation);
+
         $quotation->delete();
 
         return response()->json([
@@ -255,6 +271,8 @@ class QuotationApiController extends Controller
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
+
+        $this->authorize('view', $quotation);
 
         $validator = Validator::make($request->all(), [
             'to_email'   => 'required|email',
@@ -323,6 +341,8 @@ class QuotationApiController extends Controller
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
+
+        $this->authorize('view', $quotation);
 
         $tenantSettings = is_array(tenant()?->settings) ? tenant()->settings : [];
         $approvalPolicy = $tenantSettings['quotation_approval_policy'] ?? 'approval_required';
@@ -414,6 +434,8 @@ class QuotationApiController extends Controller
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
 
+        $this->authorize('view', $quotation);
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('modules.crm.quotations.pdf', compact('quotation'));
         $pdf->setOption('isPhpEnabled', true);
         return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
@@ -428,6 +450,8 @@ class QuotationApiController extends Controller
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
+
+        $this->authorize('update', $quotation);
 
         $validator = Validator::make($request->all(), [
             'status'           => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted,Won'],
@@ -477,6 +501,8 @@ class QuotationApiController extends Controller
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
+
+        $this->authorize('update', $quotation);
 
         $validator = Validator::make($request->all(), [
             'conversion_mode'      => 'nullable|string|in:existing,create_new',
@@ -543,6 +569,9 @@ class QuotationApiController extends Controller
         if (!$quotation) {
             return response()->json(['success' => false, 'message' => "Quotation #{$id} not found."], 404);
         }
+
+        $this->authorize('view', $quotation);
+        $this->authorize('create', Quotation::class);
 
         [$tenantId, $companyId, $branchId] = $this->resolveTenantContext();
 

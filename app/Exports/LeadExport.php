@@ -15,7 +15,18 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
     public function collection()
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
-        return Lead::where('tenant_id', $tenantId)->with(['owner'])->orderBy('id', 'desc')->get();
+        $query = Lead::where('tenant_id', $tenantId)->with(['owner']);
+
+        $currentUser = auth()->user();
+        if ($currentUser && !app(\App\Services\Access\AccessService::class)->allows($currentUser, 'crm.leads.view', ['tenant_id' => $tenantId])) {
+            $query->where(function ($sq) use ($currentUser) {
+                $sq->where('lead_owner_id', $currentUser->id)
+                   ->orWhereHas('crmAccount', fn($aq) => $aq->where('owner_id', $currentUser->id))
+                   ->orWhereHas('crmDeal.account', fn($aq) => $aq->where('owner_id', $currentUser->id));
+            });
+        }
+
+        return $query->orderBy('id', 'desc')->get();
     }
 
     /**

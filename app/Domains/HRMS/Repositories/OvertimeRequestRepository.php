@@ -206,12 +206,16 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
             ]);
 
             // If compensation type is comp_off, credit equivalent leave balance
-            if ($requestModel->compensation_type === 'comp_off') {
-                $this->creditCompOffLeave(
-                    $requestModel->employee,
-                    (float) $finalApprovedHours,
-                    $requestModel
-                );
+            $isCompOff = in_array(strtolower(str_replace(['-', ' '], '_', (string) $requestModel->compensation_type)), ['comp_off', 'compoff'], true);
+            if ($isCompOff) {
+                $employeeToCredit = $requestModel->employee ?: Employee::find($requestModel->employee_id);
+                if ($employeeToCredit) {
+                    $this->creditCompOffLeave(
+                        $employeeToCredit,
+                        (float) $finalApprovedHours,
+                        $requestModel
+                    );
+                }
             }
         } elseif ($action === 'rejected') {
             if ($oldStatus === 'approved') {
@@ -241,7 +245,8 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
     public function revertCompOffLeave(OvertimeRequest $overtime): void
     {
         try {
-            if ($overtime->compensation_type !== 'comp_off' || !$overtime->employee_id) {
+            $isCompOff = in_array(strtolower(str_replace(['-', ' '], '_', (string) $overtime->compensation_type)), ['comp_off', 'compoff'], true);
+            if (!$isCompOff || !$overtime->employee_id) {
                 return;
             }
 
@@ -252,19 +257,35 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 
             $approvedHours = (float) ($overtime->approved_duration_hours ?? $overtime->duration_hours);
             $workdayHours = $this->getEmployeeWorkdayHours($employee, (string) $overtime->date);
+            if ($workdayHours <= 0) {
+                $workdayHours = 8.0;
+            }
             $creditDays = round($approvedHours / $workdayHours, 1);
             if ($creditDays <= 0) {
                 return;
             }
 
             $leavePlanId = $employee->leave_plan_id;
-            $query = LeaveType::query();
+            $leaveType = null;
             if ($leavePlanId) {
-                $query->where('leave_plan_id', $leavePlanId);
+                $leaveType = LeaveType::where('leave_plan_id', $leavePlanId)
+                    ->where(function ($q) {
+                        $q->where('code', 'COMP_OFF')
+                          ->orWhere('code', 'COMPOFF')
+                          ->orWhereRaw('LOWER(name) LIKE ?', ['%comp%off%'])
+                          ->orWhereRaw('LOWER(name) LIKE ?', ['%compensatory%']);
+                    })
+                    ->first();
             }
-            $leaveType = (clone $query)->where('code', 'COMP_OFF')->first()
-                ?? (clone $query)->whereRaw('LOWER(name) LIKE ?', ['%comp%off%'])->first()
-                ?? LeaveType::where('code', 'COMP_OFF')->first();
+
+            if (!$leaveType) {
+                $leaveType = LeaveType::where(function ($q) {
+                    $q->where('code', 'COMP_OFF')
+                      ->orWhere('code', 'COMPOFF')
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%comp%off%'])
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%compensatory%']);
+                })->first();
+            }
 
             if ($leaveType) {
                 $balance = LeaveBalance::where('employee_id', $employee->id)
@@ -279,6 +300,10 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                         'allocated' => $newAllocated,
                         'used'      => $newUsed,
                     ]);
+
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('leave_balances', 'remaining')) {
+                        $balance->update(['remaining' => max(0.0, $newAllocated - $newUsed)]);
+                    }
 
                     Log::info('Comp Off reverted', [
                         'employee_id'   => $employee->id,
@@ -300,17 +325,27 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
      * Credit compensatory off leave days to the employee's leave balance.
      * Auto-creates the Comp Off leave type and/or leave plan if they don't exist.
      */
-    protected function creditCompOffLeave(Employee $employee, float $approvedHours, OvertimeRequest $overtime): void
+    public function creditCompOffLeave(Employee|int|null $employee, float $approvedHours, OvertimeRequest $overtime): void
     {
         try {
-            $tenantId  = $employee->tenant_id;
-            $companyId = $employee->company_id;
+            if (!$employee instanceof Employee) {
+                $employee = Employee::find($employee ?: $overtime->employee_id);
+            }
+            if (!$employee) {
+                Log::warning('Comp Off credit skipped: employee not found', ['overtime_id' => $overtime->id]);
+                return;
+            }
+
+            $tenantId  = $employee->tenant_id ?? $overtime->tenant_id ?? (function_exists('tenant_id') ? tenant_id() : null);
+            $companyId = $employee->company_id ?? $overtime->company_id ?? ($overtime->tenant_id ? 1 : null);
 
             // Step 0: Check if approved hours are less than the minimum request hours setting
             $minHours = 0.5;
-            $tenant = Tenant::find($tenantId);
-            if ($tenant && is_array($tenant->settings)) {
-                $minHours = (float) ($tenant->settings['min_overtime_request_hours'] ?? 0.5);
+            if ($tenantId) {
+                $tenant = Tenant::find($tenantId);
+                if ($tenant && is_array($tenant->settings)) {
+                    $minHours = (float) ($tenant->settings['min_overtime_request_hours'] ?? 0.5);
+                }
             }
 
             if ($approvedHours < $minHours) {
@@ -325,72 +360,121 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 
             // Convert overtime hours to fractional days using the employee's assigned shift workday hours
             $workdayHours = $this->getEmployeeWorkdayHours($employee, (string) $overtime->date);
+            if ($workdayHours <= 0) {
+                $workdayHours = 8.0;
+            }
             $creditDays = round($approvedHours / $workdayHours, 1);
             if ($creditDays <= 0) {
-                return;
+                $creditDays = 0.5;
             }
 
             // Step 1: Find the employee's assigned leave plan, or auto-create one
             $leavePlanId = $employee->leave_plan_id;
             if (!$leavePlanId) {
-                // Auto-create a default leave plan for this company if none exists
-                $leavePlan = LeavePlan::firstOrCreate(
-                    ['company_id' => $companyId, 'name' => 'Default Leave Plan'],
-                    [
+                $leavePlan = LeavePlan::where(function ($q) use ($companyId, $tenantId) {
+                    if ($companyId) {
+                        $q->where('company_id', $companyId);
+                    }
+                    if ($tenantId) {
+                        $q->orWhere('tenant_id', $tenantId);
+                    }
+                })->first();
+
+                if (!$leavePlan) {
+                    $planData = [
+                        'name'           => 'Default Leave Plan',
+                        'company_id'     => $companyId ?? 1,
                         'effective_from' => now()->startOfYear(),
                         'status'         => true,
                         'description'    => 'Auto-created by system for Comp Off tracking.',
-                    ]
-                );
+                    ];
+                    if ($tenantId) {
+                        $planData['tenant_id'] = $tenantId;
+                    }
+                    $leavePlan = LeavePlan::create($planData);
+                }
+
                 $leavePlanId = $leavePlan->id;
-                // Assign this plan to the employee
-                $employee->update(['leave_plan_id' => $leavePlanId]);
+                $employee->updateQuietly(['leave_plan_id' => $leavePlanId]);
             }
 
-            // Step 2: Find or auto-create the "Compensatory Off" leave type in this plan
+            // Step 2: Find or create the "Compensatory Off" leave type in this plan
             $leaveType = LeaveType::where('leave_plan_id', $leavePlanId)
-                ->where('code', 'COMP_OFF')
+                ->where(function ($q) {
+                    $q->where('code', 'COMP_OFF')
+                      ->orWhere('code', 'COMPOFF')
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%comp%off%'])
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%compensatory%']);
+                })
                 ->first();
 
             if (!$leaveType) {
-                // Also check by name in case code was not set
-                $leaveType = LeaveType::where('leave_plan_id', $leavePlanId)
-                    ->whereRaw('LOWER(name) LIKE ?', ['%comp%off%'])
-                    ->first();
+                $existingType = LeaveType::where(function ($q) {
+                    $q->where('code', 'COMP_OFF')
+                      ->orWhere('code', 'COMPOFF')
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%comp%off%'])
+                      ->orWhereRaw('LOWER(name) LIKE ?', ['%compensatory%']);
+                })
+                ->whereHas('plan', function ($pq) use ($companyId, $tenantId) {
+                    if ($companyId) {
+                        $pq->where('company_id', $companyId);
+                    }
+                    if ($tenantId) {
+                        $pq->orWhere('tenant_id', $tenantId);
+                    }
+                })
+                ->first();
+
+                if ($existingType && (int) $existingType->leave_plan_id === (int) $leavePlanId) {
+                    $leaveType = $existingType;
+                }
             }
 
             if (!$leaveType) {
-                // Auto-create the Comp Off leave type in the plan
-                $leaveType = LeaveType::create([
+                $typeData = [
                     'leave_plan_id' => $leavePlanId,
                     'name'          => 'Compensatory Off',
                     'code'          => 'COMP_OFF',
                     'description'   => 'Earned compensatory off for approved overtime hours.',
-                    'type'          => 'fixed',
+                    'type'          => 'paid',
                     'color'         => '#6366f1',
-                    'quota'         => 0,  // No fixed quota; balance is earned dynamically
+                    'quota'         => 0.0,
                     'status'        => true,
-                    'rules'         => [],
-                ]);
+                    'rules'         => [
+                        'approval' => ['workflow_level' => '1_level'],
+                        'accrual'  => ['quota_type' => 'limited', 'calculate_in' => 'days'],
+                    ],
+                ];
+                if ($tenantId) {
+                    $typeData['tenant_id'] = $tenantId;
+                }
+                $leaveType = LeaveType::create($typeData);
             }
 
             // Step 3: Find or create the leave balance record for this employee + leave type
-            $leaveBalance = LeaveBalance::firstOrCreate(
-                [
+            $leaveBalance = LeaveBalance::where('employee_id', $employee->id)
+                ->where('leave_type_id', $leaveType->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$leaveBalance) {
+                $balanceData = [
+                    'tenant_id'     => $tenantId,
+                    'company_id'    => $companyId ?? 1,
                     'employee_id'   => $employee->id,
                     'leave_type_id' => $leaveType->id,
-                ],
-                [
-                    'tenant_id'  => $tenantId,
-                    'company_id' => $companyId,
-                    'allocated'  => 0.0,
-                    'used'       => 0.0,
-                    'encashed'   => 0.0,
-                ]
-            );
+                    'allocated'     => (float) $creditDays,
+                    'used'          => 0.0,
+                    'encashed'      => 0.0,
+                ];
+                $leaveBalance = LeaveBalance::create($balanceData);
+            } else {
+                $leaveBalance->increment('allocated', (float) $creditDays);
+            }
 
-            // Step 4: Credit the days into the allocated balance
-            $leaveBalance->increment('allocated', $creditDays);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('leave_balances', 'remaining')) {
+                $leaveBalance->update(['remaining' => max(0.0, (float) $leaveBalance->allocated - (float) $leaveBalance->used)]);
+            }
 
             Log::info('Comp Off credited', [
                 'employee_id'    => $employee->id,
@@ -400,11 +484,9 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
                 'leave_type_id'  => $leaveType->id,
             ]);
         } catch (\Throwable $e) {
-            // Log but do not block the approval if credit fails
-            Log::error('Failed to credit Comp Off leave', [
-                'employee_id' => $employee->id,
+            Log::error('Failed to credit Comp Off leave: ' . $e->getMessage(), [
+                'employee_id' => $employee?->id ?? null,
                 'overtime_id' => $overtime->id,
-                'error'       => $e->getMessage(),
             ]);
         }
     }

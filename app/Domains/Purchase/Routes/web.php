@@ -102,6 +102,8 @@ Route::prefix('grns')
         Route::get('export', [GoodsReceiptNoteController::class, 'export'])->name('export');
         Route::get('pending', [GoodsReceiptNoteController::class, 'indexPending'])->name('pending');
         Route::get('get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('get-po-items');
+        Route::get('next-serial-sequence', [GoodsReceiptNoteController::class, 'getNextSerialSequence'])->name('next-serial-sequence');
+        Route::post('validate-serials', [GoodsReceiptNoteController::class, 'validateSerials'])->name('validate-serials');
         Route::post('{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('approve');
         Route::get('{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('download');
         Route::resource('/', GoodsReceiptNoteController::class)->parameters(['' => 'grn']);
@@ -114,6 +116,8 @@ Route::prefix('purchase/grns')
         Route::get('export', [GoodsReceiptNoteController::class, 'export'])->name('export');
         Route::get('pending', fn() => redirect()->route('grns.pending'))->name('pending');
         Route::get('get-po-items/{po}', [GoodsReceiptNoteController::class, 'getPurchaseOrderItems'])->name('get-po-items');
+        Route::get('next-serial-sequence', [GoodsReceiptNoteController::class, 'getNextSerialSequence'])->name('next-serial-sequence');
+        Route::post('validate-serials', [GoodsReceiptNoteController::class, 'validateSerials'])->name('validate-serials');
         Route::post('{grn}/approve', [GoodsReceiptNoteController::class, 'approve'])->name('approve');
         Route::get('{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('download');
         Route::resource('/', GoodsReceiptNoteController::class)->parameters(['' => 'grn']);

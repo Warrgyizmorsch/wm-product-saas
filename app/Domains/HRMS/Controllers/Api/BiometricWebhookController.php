@@ -89,7 +89,7 @@ class BiometricWebhookController extends Controller
 
         if (!empty($recordsToInsert)) {
             foreach (array_chunk($recordsToInsert, 500) as $chunk) {
-                BiometricPunchLog::insert($chunk);
+                BiometricPunchLog::insertOrIgnore($chunk);
             }
         }
 
@@ -212,7 +212,7 @@ class BiometricWebhookController extends Controller
 
         if (!empty($recordsToInsert)) {
             foreach (array_chunk($recordsToInsert, 500) as $chunk) {
-                BiometricPunchLog::insert($chunk);
+                BiometricPunchLog::insertOrIgnore($chunk);
             }
         }
 

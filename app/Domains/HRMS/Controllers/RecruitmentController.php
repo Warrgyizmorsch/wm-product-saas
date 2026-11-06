@@ -29,7 +29,7 @@ class RecruitmentController extends Controller
             abort(401);
         }
 
-        if (\App\Domains\HRMS\Services\HrmsScopeService::isCompanyAdmin($user)) {
+        if (app(\App\Domains\HRMS\Services\HrmsScopeService::class)->isCompanyAdmin($user)) {
             return;
         }
 

@@ -15,6 +15,9 @@ class PurchaseRequisition extends BaseModel
 {
     use BelongsToCompany, BelongsToBranch, HasFactory;
 
+    protected ?string $rbacPermission = 'purchase.requisitions.view';
+    protected ?string $rbacOwnerColumn = 'requested_by';
+
     protected $table = 'purchase_requisitions';
 
     protected $fillable = [
