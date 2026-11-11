@@ -923,8 +923,8 @@ erDiagram
 ---
 
 ### TRACK-15: BOM Show Page (`show.blade.php`) Components Tab: Synthesis of Rollup Drawer UI/UX with Financial Calculations
-* **Date Logged:** 2026-11-05
-* **Status:** 📋 **Under Discussion (Requires Deeper Discussion)**
+* **Date Logged:** 2026-11-05 (Updated 2026-11-06)
+* **Status:** 📋 **Under Discussion (Decisions Recorded, Calculations in Detailed Review)**
 * **Area:** UI/UX & Master Data View (Read-Only Specification)
 
 #### 1. Description & Context
@@ -936,42 +936,31 @@ With the new 2-tier database architecture:
 
 The user wants to apply the **UI and UX of Photo 1** (the Master Component Row + expandable Operation Allocations Breakdown drawer seen in Tab 2 of the BOM builder) into **Photo 2** (`show.blade.php`), while **retaining all existing financial costing and quantity calculations**.
 
-#### 2. Concept Draft (Initial Alignment)
-##### A. Master Component Row (Consolidated Summary View)
-* One row per unique material component (`production_bom_items`):
-  * Expand/collapse chevron toggle (`[>]` / `[v]`).
-  * Component Details: Product Name, SKU, Type badge (`Raw Material`, `Semi Finished`), Allocation Role badge (`Primary Only`, `Alternative Only`, `Mixed Roles`).
-  * Financial & Quantity Rollups (retained from current show view):
-    * **Net Quantity:** Total planned net quantity (with `X.XX Primary + Y.YY Alt` subtext when mixed).
-    * **Scrap %:** Consolidated / effective scrap percentage.
-    * **Gross Quantity:** Total planned gross quantity accounting for scrap.
-    * **Unit Cost:** Standard inventory unit cost (`format_currency($unitCost)`).
-    * **Net Cost:** Total Net Qty × Unit Cost.
-    * **Total / Gross Cost:** Total Gross Qty × Unit Cost.
+#### 2. Decisions & Architectural Principles Agreed Upon
+* **Tab 1 Scope (Option A Confirmed):**
+  * Tab 1 ("Components") will **NOT** render recursive multi-level child BOM items. The legacy recursive tree (`renderComponentTreeRows`) in Tab 1 was an incorrect mixing of concerns and will be removed from this tab.
+  * Tab 1 is dedicated **strictly to this BOM's direct components (`production_bom_items`) and their financials**, with expandable workstation operation allocation drawers.
+  * Full multi-level explosion remains isolated to its dedicated **Tab 2: Multi-Level BOM Explosion** (`tab-explosion`).
+* **Dynamic On-The-Fly Calculations (Confirmed):**
+  * All cost figures (`Unit Cost`, `Net Cost`, `Gross Cost`, `Scrap Loss`, `Total Mfg Cost`) are computed dynamically on the fly in memory using base rates from `products.unit_cost` and operation parameters.
+  * No cost totals are persisted or cached in the database, ensuring real-time responsiveness to inventory pricing updates.
+* **Database Cleanup Migration Completed:**
+  * Redundant columns (`routing_operation_id`, `child_bom_id`, `replaces_item_id`, `is_alternative`, `priority`, `sequence`, `notes`) have been permanently dropped from `production_bom_items` via migration `2026_11_05_170000`.
 
-##### B. Expandable Operation Allocations Breakdown (Inline Drawer)
-* Clicking the master component row expands an inline drawer:
-  * Drawer Header: `OPERATION ALLOCATIONS BREAKDOWN` with operation count badge (e.g. `2 Operation(s)`).
-  * Inner Allocation Breakdown Table:
-    * **Operation:** Workstation sequence + name (e.g., `[Op 10] op 1` or `[Op 40] op 4 [Alternative Op (Sub Op 30) · P1]`).
-    * **Role & Substitution:**
-      * `Primary Component` (with floating tooltip `"Used only if Op X is executed"` when inside an alternative operation).
-      * `Alternative (Priority X)` with `"Substitutes: <Primary Component>"`.
-    * **Operation Net Qty & Type:** Operation-level planned quantity and type (Fixed vs Formula).
-    * **Scrap Rate:** Operation-specific scrap rate (e.g. `+4.00%` or `0.00%`).
-    * **Operation Gross Qty:** Operation-specific gross quantity accounting for workstation scrap.
-    * **Operation Gross Cost:** Operation-specific cost contribution (`Operation Gross Qty × Unit Cost`).
-    * **Sub-BOM / Notes:** Clickable Sub-BOM badge (for sub-assemblies) and operational notes.
-
----
-
+#### 3. Current Focus: Detailed Discussion on Calculations
 > [!IMPORTANT]
-> **Deeper Discussion Required Before Implementation:**
-> The above captures the initial structural alignment, but several crucial design decisions require deeper discussion:
-> 1. **Scrap % Aggregation Formula on Master Row:** When a material is consumed across multiple operations with different scrap rates (e.g., 0% in Op 10 and 5% in Op 30), should the master row show the weighted-average scrap rate, the total scrap loss quantity, or an operation scrap range?
-> 2. **Multi-Level Sub-BOM Hierarchy:** The current `show.blade.php` has a recursive tree renderer (`renderComponentTreeRows`) that indents child BOM items underneath assemblies. How should multi-level child components be visually organized when each material is consolidated at the master row level vs inside the operation drawer?
-> 3. **Navigation / Cross-Tab Interaction:** On the show page, should the drawer contain a link to jump directly to the target operation card in the "Workflow & Routing" tab?
-> 4. **Database Column Cleanup Confirmation:** Confirming timing for running the cleanup migration to physically drop the legacy nullable columns (`routing_operation_id`, `child_bom_id`, `replaces_item_id`, `is_alternative`, `priority`, `sequence`, `notes`) from `production_bom_items`, and clarifying intent on `consumption_type` in `production_routing_operation_materials`.
+> **Priority Discussion Item — Financial & Quantity Calculations in Detail:**
+> 1. **Master Row Rollup Formulas across Multiple Operations:**
+>    * Net Qty = $\sum(\text{Operation Net Qty})$.
+>    * Gross Qty = $\sum(\text{Operation Gross Qty accounting for workstation scrap})$.
+>    * Effective Scrap % = $\frac{\text{Master Gross Qty} - \text{Master Net Qty}}{\text{Master Net Qty}} \times 100$ vs. using `production_bom_items.material_scrap_percentage`.
+>    * Net Cost = $\text{Master Net Qty} \times \text{Unit Cost}$.
+>    * Total / Gross Cost = $\text{Master Gross Qty} \times \text{Unit Cost}$.
+> 2. **Alternative Components Financial Costing:**
+>    * Should alternative materials be excluded from the master table footer grand total so standard product manufacturing cost is not double-counted?
+>    * How should alternative rows be visually badged on the master row and inside the drawer (e.g. `(Excluded from base cost)`)?
+> 3. **Drawer Row Financials:**
+>    * Each operation allocation row in the drawer displaying its individual Net Qty, Scrap %, Gross Qty, and Operation Cost Share.
 
 ---
 
